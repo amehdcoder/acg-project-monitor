@@ -294,33 +294,6 @@ const UsersView = () => {
     }
   };
 
-  // ---------------- Bulk actions (selected users) ----------------
-  const toggleSelect = (userId: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.has(userId) ? next.delete(userId) : next.add(userId);
-      return next;
-    });
-  };
-
-  const selectableUsers = () => filteredUsers.filter((u) => !u.is_owner);
-
-  const allFilteredSelected =
-    selectableUsers().length > 0 &&
-    selectableUsers().every((u) => selectedIds.has(u.user_id));
-
-  const toggleSelectAll = () => {
-    setSelectedIds((prev) => {
-      if (selectableUsers().every((u) => prev.has(u.user_id))) return new Set();
-      return new Set(selectableUsers().map((u) => u.user_id));
-    });
-  };
-
-  const clearSelection = () => setSelectedIds(new Set());
-
-  const selectedUserObjects = () =>
-    users.filter((u) => selectedIds.has(u.user_id) && !u.is_owner);
-
   const handleBulkAssignProject = async () => {
     const targets = selectedUserObjects();
     if (!bulkProject || targets.length === 0) return;
@@ -622,6 +595,33 @@ const UsersView = () => {
     const matchesDesignation = filterDesignation === "all" || user.designation === "adhoc_user";
     return matchesSearch && matchesDesignation;
   });
+
+  // ---------------- Bulk actions (selected users) ----------------
+  const selectableUsers = filteredUsers.filter((u) => !u.is_owner);
+
+  const allFilteredSelected =
+    selectableUsers.length > 0 &&
+    selectableUsers.every((u) => selectedIds.has(u.user_id));
+
+  const toggleSelect = (userId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(userId) ? next.delete(userId) : next.add(userId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (selectableUsers.every((u) => prev.has(u.user_id))) return new Set();
+      return new Set(selectableUsers.map((u) => u.user_id));
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const selectedUserObjects = () =>
+    users.filter((u) => selectedIds.has(u.user_id) && !u.is_owner);
 
   const isSuperAdmin = currentUserRole === "super_admin";
 
