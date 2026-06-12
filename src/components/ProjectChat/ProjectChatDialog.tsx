@@ -101,10 +101,30 @@ export function ProjectChatDialog({
   }, []);
 
   const handleGroupSelect = (group: typeof selectedGroup) => {
+    setSelectedDirect(null);
     setSelectedGroup(group);
     setShowMembers(false);
     setShowSearch(false);
     setReplyTo(null);
+  };
+
+  const handleDirectSelect = (chat: DirectChat) => {
+    setSelectedGroup(null);
+    setShowMembers(false);
+    setShowSearch(false);
+    setReplyTo(null);
+    setSelectedDirect(chat);
+  };
+
+  const handleArchiveDirect = async (chat: DirectChat) => {
+    await setDirectFlag(chat.conversation_id, chat.archived ? "unarchive" : "archive");
+  };
+
+  const handleDeleteDirect = async (chat: DirectChat) => {
+    await setDirectFlag(chat.conversation_id, "delete");
+    if (selectedDirect?.conversation_id === chat.conversation_id) {
+      setSelectedDirect(null);
+    }
   };
 
   const handleGroupDeleted = () => {
