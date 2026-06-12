@@ -190,6 +190,39 @@ export function GroupSettingsDialog({
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {/* Group Icon */}
+            <div className="flex flex-col items-center gap-2">
+              <div className="relative">
+                <Avatar className="h-20 w-20">
+                  {iconUrl && <AvatarImage src={iconUrl} alt={group.name} />}
+                  <AvatarFallback className="bg-primary/10 text-primary text-xl font-semibold">
+                    {group.name?.[0]?.toUpperCase() || "G"}
+                  </AvatarFallback>
+                </Avatar>
+                <button
+                  type="button"
+                  onClick={() => iconInputRef.current?.click()}
+                  disabled={uploadingIcon}
+                  className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 disabled:opacity-60"
+                  aria-label="Change group icon"
+                >
+                  {uploadingIcon ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Camera className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+              <input
+                ref={iconInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleIconUpload}
+              />
+              <p className="text-xs text-muted-foreground">Tap the camera to change the group icon</p>
+            </div>
+
             {/* Group Info */}
             <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
