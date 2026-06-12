@@ -10,11 +10,13 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useProjectChat } from "@/hooks/useProjectChat";
+import { useDirectChats, type DirectChat } from "@/hooks/useDirectChats";
 import { useAuth } from "@/hooks/useAuth";
 import { ChatGroupList } from "./ChatGroupList";
 import { ChatHeader } from "./ChatHeader";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
+import { DirectChatView } from "./DirectChatView";
 import { MembersPanel } from "./MembersPanel";
 import { MessageSearch } from "./MessageSearch";
 import { CallDialog, ActiveCallBanner } from "./CallDialog";
@@ -54,6 +56,10 @@ export function ProjectChatDialog({
     fetchChatGroups,
     isAdmin,
   } = useProjectChat(open ? projectId : null);
+
+  const { chats: directChats, fetchChats: fetchDirectChats, setFlag: setDirectFlag } =
+    useDirectChats(open);
+  const [selectedDirect, setSelectedDirect] = useState<DirectChat | null>(null);
 
   const [showMembers, setShowMembers] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -95,10 +101,30 @@ export function ProjectChatDialog({
   }, []);
 
   const handleGroupSelect = (group: typeof selectedGroup) => {
+    setSelectedDirect(null);
     setSelectedGroup(group);
     setShowMembers(false);
     setShowSearch(false);
     setReplyTo(null);
+  };
+
+  const handleDirectSelect = (chat: DirectChat) => {
+    setSelectedGroup(null);
+    setShowMembers(false);
+    setShowSearch(false);
+    setReplyTo(null);
+    setSelectedDirect(chat);
+  };
+
+  const handleArchiveDirect = async (chat: DirectChat) => {
+    await setDirectFlag(chat.conversation_id, chat.archived ? "unarchive" : "archive");
+  };
+
+  const handleDeleteDirect = async (chat: DirectChat) => {
+    await setDirectFlag(chat.conversation_id, "delete");
+    if (selectedDirect?.conversation_id === chat.conversation_id) {
+      setSelectedDirect(null);
+    }
   };
 
   const handleGroupDeleted = () => {
@@ -144,7 +170,7 @@ export function ProjectChatDialog({
         >
           <div className="flex h-full">
             {/* Sidebar */}
-            <div className={cn("w-80 flex-shrink-0 flex flex-col border-r border-border", selectedGroup ? "hidden lg:flex" : "flex")}>
+            <div className={cn("w-80 flex-shrink-0 flex flex-col border-r border-border", (selectedGroup || selectedDirect) ? "hidden lg:flex" : "flex")}>
               <div className="p-3 border-b border-border flex items-center justify-between bg-card">
                 <DialogTitle className="font-display text-sm">{projectName}</DialogTitle>
                 <div className="flex items-center gap-1">
@@ -160,12 +186,24 @@ export function ProjectChatDialog({
                 onCreateGroup={createChatGroup}
                 isAdmin={isAdmin}
                 forms={forms}
+                directChats={directChats}
+                selectedDirectId={selectedDirect?.conversation_id || null}
+                onSelectDirect={handleDirectSelect}
+                onArchiveDirect={handleArchiveDirect}
+                onDeleteDirect={handleDeleteDirect}
               />
             </div>
 
             {/* Main Chat Area */}
-            <div className={cn("flex-1 flex flex-col min-w-0", !selectedGroup && "hidden lg:flex")}>
-              {selectedGroup ? (
+            <div className={cn("flex-1 flex flex-col min-w-0", !selectedGroup && !selectedDirect && "hidden lg:flex")}>
+              {selectedDirect ? (
+                <DirectChatView
+                  chat={selectedDirect}
+                  onBack={() => setSelectedDirect(null)}
+                  onArchive={() => handleArchiveDirect(selectedDirect)}
+                  onDelete={() => handleDeleteDirect(selectedDirect)}
+                />
+              ) : selectedGroup ? (
                 <>
                   <div className="relative">
                     <ChatHeader
