@@ -157,6 +157,8 @@ export function ChatInput({
 
   const getAttachmentIcon = (type: string) => {
     if (type.startsWith("image/")) return <Image className="h-4 w-4" />;
+    if (type.startsWith("audio/")) return <Music className="h-4 w-4" />;
+    if (type.startsWith("video/")) return <Video className="h-4 w-4" />;
     return <FileText className="h-4 w-4" />;
   };
 
