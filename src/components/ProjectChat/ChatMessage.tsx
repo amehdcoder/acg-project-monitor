@@ -137,6 +137,7 @@ export function ChatMessage({
   const canPin = isAdmin;
 
   const isSystemMessage = message.message_type === "system";
+  const special = parseSpecial(message.message_type, message.content);
 
   const renderContent = (content: string) => {
     const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
