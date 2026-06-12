@@ -8,14 +8,30 @@ interface LocationMessageProps {
 
 /** Live Nigerian Location inspired card (green theme, live badge, info grid). */
 export function LocationMessage({ location }: LocationMessageProps) {
-  const { lat, lng, label, address } = location;
+  const { lat, lng, label, address, accuracy } = location;
   const [copied, setCopied] = useState(false);
 
   const delta = 0.004;
   const bbox = [lng - delta, lat - delta, lng + delta, lat + delta].join("%2C");
   const embedSrc = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat}%2C${lng}`;
-  const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${lat}%2C${lng}`;
-  const coords = `${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E`;
+  // Turn-by-turn directions deep link — opens Google Maps app on mobile,
+  // maps.google.com on desktop.
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat}%2C${lng}`;
+  const latHem = lat >= 0 ? "N" : "S";
+  const lngHem = lng >= 0 ? "E" : "W";
+  const coords = `${Math.abs(lat).toFixed(5)}° ${latHem}, ${Math.abs(lng).toFixed(5)}° ${lngHem}`;
+
+  const accQuality =
+    accuracy == null
+      ? { text: "Good", cls: "bg-[#7dffb8]/30 text-[#0a6b4f]" }
+      : accuracy <= 15
+        ? { text: "Excellent", cls: "bg-[#7dffb8]/30 text-[#0a6b4f]" }
+        : accuracy <= 50
+          ? { text: "Good", cls: "bg-[#7dffb8]/30 text-[#0a6b4f]" }
+          : accuracy <= 150
+            ? { text: "Fair", cls: "bg-amber-400/30 text-amber-700" }
+            : { text: "Approx.", cls: "bg-amber-400/30 text-amber-700" };
+
 
   const copyCoords = async () => {
     try {
