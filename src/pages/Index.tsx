@@ -92,6 +92,7 @@ const Index = () => {
   const isMobile = useIsMobile();
   useHeartbeat();
   useAppUpdateNotifications();
+  usePushNotifications();
   const { trackPageVisit } = useSurveillanceTracking(user?.id);
 
   useEffect(() => {
