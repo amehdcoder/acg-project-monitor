@@ -22,6 +22,7 @@ export interface DirectMessage {
   sender_id: string;
   recipient_id: string;
   body: string;
+  message_type: string;
   created_at: string;
   delivered_at: string | null;
   read_at: string | null;
