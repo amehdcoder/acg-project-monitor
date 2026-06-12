@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { Settings, Trash2, Users, Link2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { Settings, Trash2, Users, Link2, Camera, Loader2 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
