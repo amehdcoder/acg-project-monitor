@@ -33,6 +33,29 @@ export function ChatMessage({ message, isOwn, showAvatar = true, members = [], c
     ? `${message.sender.first_name?.[0] || ""}${message.sender.last_name?.[0] || ""}`
     : "??";
 
+  const [transcription, setTranscription] = useState<string | null>(message.transcription || null);
+  const [transcribing, setTranscribing] = useState(false);
+
+  const handleTranscribe = async () => {
+    if (transcribing) return;
+    setTranscribing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("transcribe-chat-media", {
+        body: { messageId: message.id },
+      });
+      if (error) throw error;
+      if (data?.transcription) {
+        setTranscription(data.transcription as string);
+      } else {
+        toast({ title: data?.error || "No speech detected in this file." });
+      }
+    } catch (err: any) {
+      toast({ title: "Transcription failed", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setTranscribing(false);
+    }
+  };
+
   const isSystemMessage = message.message_type === "system";
 
   // Parse mentions and highlight them
