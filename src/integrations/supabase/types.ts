@@ -2051,6 +2051,7 @@ export type Database = {
           created_by: string
           description: string | null
           form_id: string | null
+          icon_url: string | null
           id: string
           is_default: boolean
           name: string
@@ -2062,6 +2063,7 @@ export type Database = {
           created_by: string
           description?: string | null
           form_id?: string | null
+          icon_url?: string | null
           id?: string
           is_default?: boolean
           name: string
@@ -2073,6 +2075,7 @@ export type Database = {
           created_by?: string
           description?: string | null
           form_id?: string | null
+          icon_url?: string | null
           id?: string
           is_default?: boolean
           name?: string
@@ -2111,6 +2114,7 @@ export type Database = {
           message_type: string
           reply_to_id: string | null
           sender_id: string
+          transcription: string | null
           updated_at: string
         }
         Insert: {
@@ -2127,6 +2131,7 @@ export type Database = {
           message_type?: string
           reply_to_id?: string | null
           sender_id: string
+          transcription?: string | null
           updated_at?: string
         }
         Update: {
@@ -2143,6 +2148,7 @@ export type Database = {
           message_type?: string
           reply_to_id?: string | null
           sender_id?: string
+          transcription?: string | null
           updated_at?: string
         }
         Relationships: [
