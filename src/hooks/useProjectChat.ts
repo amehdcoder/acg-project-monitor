@@ -466,6 +466,52 @@ export function useProjectChat(projectId: string | null) {
     }
   };
 
+  // Delete a message (own message, or admin). Soft-delete keeps history clean.
+  const deleteMessage = async (messageId: string) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from("chat_messages")
+        .update({ is_deleted: true })
+        .eq("id", messageId);
+      if (error) throw error;
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      toast({ title: "Message deleted" });
+    } catch (error: any) {
+      console.error("Error deleting message:", error);
+      toast({
+        title: "Failed to delete message",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Pin / unpin a message (WhatsApp-style). Admins / group admins only per RLS.
+  const togglePin = async (messageId: string, pin: boolean) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from("chat_messages")
+        .update({ is_pinned: pin })
+        .eq("id", messageId);
+      if (error) throw error;
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, is_pinned: pin } : m)),
+      );
+      toast({ title: pin ? "Message pinned" : "Message unpinned" });
+    } catch (error: any) {
+      console.error("Error pinning message:", error);
+      toast({
+        title: "Failed to pin message",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+
+
   // Subscribe to realtime messages
   useEffect(() => {
     if (!selectedGroup) return;
