@@ -31,6 +31,9 @@ interface ProjectChatDialogProps {
   forms?: Array<{ id: string; name: string }>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When opened from a push notification, auto-select this group so its
+      messages are shown and immediately marked as read. */
+  initialGroupId?: string | null;
 }
 
 export function ProjectChatDialog({
@@ -39,6 +42,7 @@ export function ProjectChatDialog({
   forms = [],
   open,
   onOpenChange,
+  initialGroupId,
 }: ProjectChatDialogProps) {
   const { user } = useAuth();
   const {
@@ -87,6 +91,24 @@ export function ProjectChatDialog({
       active = false;
     };
   }, [open, projectId]);
+
+  // Deep-link: when opened from a push notification with a target group,
+  // select that group so its thread is shown and marked read on open.
+  const appliedInitialGroup = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open) {
+      appliedInitialGroup.current = null;
+      return;
+    }
+    if (!initialGroupId || appliedInitialGroup.current === initialGroupId) return;
+    const target = chatGroups.find((g) => g.id === initialGroupId);
+    if (target) {
+      appliedInitialGroup.current = initialGroupId;
+      setSelectedDirect(null);
+      setSelectedGroup(target);
+    }
+  }, [open, initialGroupId, chatGroups, setSelectedGroup]);
+
 
 
   const [showMembers, setShowMembers] = useState(false);

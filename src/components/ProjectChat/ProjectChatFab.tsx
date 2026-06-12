@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { MessageCircle, X, Check, MessagesSquare } from "lucide-react";
+import { Check, MessagesSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -15,10 +15,40 @@ interface ProjectChatFabProps {
   currentProjectId?: string | null;
 }
 
+const UNREAD_CACHE_KEY = "amehnities:chat:unread";
+
+/** Read the last-known unread total from localStorage so the badge stays
+ *  accurate across page refreshes and full app restarts (before the live
+ *  count finishes loading). */
+function readCachedUnread(userId: string | undefined): number {
+  if (!userId || typeof window === "undefined") return 0;
+  try {
+    const raw = window.localStorage.getItem(`${UNREAD_CACHE_KEY}:${userId}`);
+    const n = raw == null ? 0 : Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeCachedUnread(userId: string | undefined, value: number) {
+  if (!userId || typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(`${UNREAD_CACHE_KEY}:${userId}`, String(value));
+  } catch {
+    /* ignore quota / privacy-mode errors */
+  }
+}
+
 /**
- * Floating chat launcher positioned at the bottom-left of the Forms page.
- * Deliberately placed away from the Proximity discovery hub (bottom-right).
- * Uses the Amehnities brand palette for a cohesive, premium feel.
+ * Floating chat launcher anchored to the bottom-LEFT of the Forms page.
+ *
+ * Layout guarantees:
+ *  - Sits on the left, while the Proximity discovery hub is pinned bottom-right,
+ *    so the two controls are always far more than 40px apart on every screen.
+ *  - On mobile it is lifted above the bottom navigation bar (and the safe-area
+ *    inset) so it is never hidden or overlapped.
+ *  - Renders above the desktop sidebar via a high z-index + left offset.
  */
 export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabProps) {
   const { user } = useAuth();
@@ -27,18 +57,52 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
   const [activeProjectId, setActiveProjectId] = useState<string | null>(
     currentProjectId ?? projects[0]?.id ?? null,
   );
-  const [unread, setUnread] = useState(0);
+  const [initialGroupId, setInitialGroupId] = useState<string | null>(null);
+  const [unread, setUnread] = useState(() => readCachedUnread(user?.id));
 
   useEffect(() => {
     if (currentProjectId) setActiveProjectId(currentProjectId);
   }, [currentProjectId]);
+
+  // Re-hydrate the cached badge when the signed-in user changes.
+  useEffect(() => {
+    setUnread(readCachedUnread(user?.id));
+  }, [user?.id]);
 
   const activeProject = useMemo(
     () => projects.find((p) => p.id === activeProjectId) ?? projects[0] ?? null,
     [projects, activeProjectId],
   );
 
-  // Lightweight unread badge across all of the user's projects.
+  // ── Push-notification deep link ──
+  // A tapped notification lands here with ?pcid=<project>&pgid=<group>.
+  // Open the correct project chat (and group) so it is shown and marked read.
+  useEffect(() => {
+    if (projects.length === 0 || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const pcid = params.get("pcid");
+    const pgid = params.get("pgid");
+    if (!pcid) return;
+    if (!projects.some((p) => p.id === pcid)) return;
+
+    setActiveProjectId(pcid);
+    setInitialGroupId(pgid);
+    setPickerOpen(false);
+    setOpen(true);
+
+    // Clean the URL so a later refresh doesn't keep reopening the chat.
+    params.delete("pcid");
+    params.delete("pgid");
+    const qs = params.toString();
+    window.history.replaceState(
+      {},
+      "",
+      `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`,
+    );
+  }, [projects]);
+
+  // Lightweight unread badge across all of the user's projects, persisted
+  // to localStorage so it survives refreshes and app restarts.
   useEffect(() => {
     if (!user || projects.length === 0) return;
     let cancelled = false;
@@ -52,9 +116,12 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
           });
           total += Number(data ?? 0);
         }
-        if (!cancelled) setUnread(total);
+        if (!cancelled) {
+          setUnread(total);
+          writeCachedUnread(user.id, total);
+        }
       } catch {
-        /* ignore */
+        /* keep last cached value on transient errors */
       }
     };
     load();
@@ -77,9 +144,11 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
 
   return (
     <>
-      {/* ── Floating Action Button ── bottom-left, clear of the desktop sidebar
-          and far from the ProximityHub (which lives at the bottom-right). ── */}
-      <div className="fixed bottom-24 left-4 z-[55] sm:bottom-8 lg:left-[260px]">
+      {/* ── Floating Action Button ──
+          Bottom-LEFT, lifted above the mobile bottom-nav + safe area, and clear
+          of the desktop sidebar. The Proximity hub lives bottom-RIGHT, so the
+          two are always well beyond the required 40px apart. */}
+      <div className="fixed left-4 z-[60] bottom-[calc(6.5rem+env(safe-area-inset-bottom))] sm:bottom-8 lg:left-[260px]">
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
             <button
@@ -99,7 +168,6 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
                 }}
               />
 
-              {/* Icon morphs between bubble and square on hover */}
               <MessagesSquare className="h-7 w-7 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3" strokeWidth={2.2} />
 
               {/* Unread badge — red with white ring */}
@@ -120,7 +188,6 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
             side="top"
             className="w-72 p-0 overflow-hidden rounded-2xl border border-border/60 bg-popover shadow-2xl"
           >
-            {/* Popover header with gradient */}
             <div className="px-4 py-3 border-b border-border/40"
               style={{
                 background: "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--chart-accent)) 100%)"
@@ -141,6 +208,7 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
                   type="button"
                   onClick={() => {
                     setActiveProjectId(p.id);
+                    setInitialGroupId(null);
                     setPickerOpen(false);
                     setOpen(true);
                   }}
@@ -150,7 +218,6 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
                   )}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    {/* Project avatar circle */}
                     <div className="h-8 w-8 shrink-0 rounded-full flex items-center justify-center text-xs font-bold text-white"
                       style={{
                         background: "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--chart-accent)) 100%)"
@@ -179,6 +246,7 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
           projectName={activeProject.name}
           open={open}
           onOpenChange={setOpen}
+          initialGroupId={initialGroupId}
         />
       )}
     </>

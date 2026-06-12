@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
 
       const { data: group } = await admin
         .from("chat_groups")
-        .select("name")
+        .select("name, project_id")
         .eq("id", msg.chat_group_id)
         .single();
 
@@ -105,11 +105,17 @@ Deno.serve(async (req) => {
         ? "📎 Attachment"
         : "New message";
 
+      // Deep-link straight to the correct project chat group. The Forms page
+      // hosts the floating chat launcher which reads pcid/pgid and opens it.
+      const groupUrl = group?.project_id
+        ? `/?tab=forms&pcid=${group.project_id}&pgid=${msg.chat_group_id}`
+        : `/?tab=project-chat`;
+
       await sendToUsers(recipients, {
         title: group?.name ?? "New message",
         body: `${displayName(sender)}: ${preview}`,
         tag: `group-${msg.chat_group_id}`,
-        url: `/?tab=project-chat`,
+        url: groupUrl,
       });
       return ok();
     }
