@@ -1,9 +1,25 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { Plus, Search, Users, MessageSquare, Link2 } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Users,
+  MessageSquare,
+  Link2,
+  MoreVertical,
+  Archive,
+  Trash2,
+  ArchiveRestore,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import {
   Dialog,
