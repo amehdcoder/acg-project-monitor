@@ -549,7 +549,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         key.startsWith("kpi_cache_") || 
         key.startsWith("detail_cache_") || 
         key.startsWith("ces_auth_cache_") ||
-        key.startsWith("survey_progress_")
+        key.startsWith("survey_progress_") ||
+        // Wipe the WhatsApp-style chat unread badge cache so a different user
+        // signing in on this device never sees the previous user's stale count.
+        key.startsWith("amehnities:chat:unread")
       ) {
         localStorage.removeItem(key);
       }
