@@ -268,21 +268,31 @@ export function GroupSettingsDialog({
             <Separator />
 
             {/* Danger Zone */}
-            <div className="space-y-2">
-              <Label className="text-destructive">Danger Zone</Label>
-              <p className="text-sm text-muted-foreground">
-                Deleting this group will permanently remove all messages and member data.
-              </p>
-              <Button
-                variant="destructive"
-                className="w-full"
-                onClick={() => setShowDeleteConfirm(true)}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Group
-              </Button>
-            </div>
+            {canDelete ? (
+              <div className="space-y-2">
+                <Label className="text-destructive">Danger Zone</Label>
+                <p className="text-sm text-muted-foreground">
+                  Deleting this group will permanently remove all messages and member data.
+                </p>
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Group
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+                <ShieldCheck className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary" />
+                <span>
+                  This is an official group and can only be deleted by the app Owner.
+                </span>
+              </div>
+            )}
           </div>
+
 
           <DialogFooter>
             <Button variant="outline" onClick={onClose}>
