@@ -758,7 +758,8 @@ const UsersView = () => {
           ) : (
             <div className="space-y-3">
               {filteredUsers.map((user) => {
-                const roleInfo = roleLabels[user.role?.role || "user"];
+                const roleInfo =
+                  roleLabels[(user.role?.role as keyof typeof roleLabels)] || roleLabels.user;
                 const RoleIcon = roleInfo.icon;
 
                 return (
