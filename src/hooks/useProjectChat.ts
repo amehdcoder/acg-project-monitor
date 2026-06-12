@@ -368,17 +368,27 @@ export function useProjectChat(projectId: string | null) {
   // Add member to group (admin only)
   const addMember = async (userId: string) => {
     if (!selectedGroup || !user || !isAdmin) return;
-    
-    try {
-      const { error } = await supabase
-        .from("chat_group_members")
-        .upsert({
-          chat_group_id: selectedGroup.id,
-          user_id: userId,
-          added_by: user.id,
-        }, { onConflict: "chat_group_id,user_id" });
 
-      if (error) throw error;
+    try {
+      // Server-side validation: verifies the user's designation before
+      // allowing them into protected groups, and blocks any mismatch.
+      const { data, error } = await supabase.functions.invoke(
+        "validate-protected-membership",
+        { body: { chat_group_id: selectedGroup.id, user_id: userId } },
+      );
+
+      if (error) {
+        // Surface the server's reason (e.g. designation mismatch) when present.
+        let reason = error.message;
+        try {
+          const ctx = await (error as any).context?.json?.();
+          if (ctx?.reason) reason = ctx.reason;
+        } catch { /* ignore */ }
+        throw new Error(reason);
+      }
+      if (data && data.allowed === false) {
+        throw new Error(data.reason || "This user cannot join this group.");
+      }
 
       toast({ title: "Member added successfully" });
       await fetchMembers();

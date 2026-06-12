@@ -74,6 +74,7 @@ import { Loader2 } from "lucide-react";
 
 
 import { toast } from "@/hooks/use-toast";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 const Index = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -92,6 +93,7 @@ const Index = () => {
   const isMobile = useIsMobile();
   useHeartbeat();
   useAppUpdateNotifications();
+  usePushNotifications();
   const { trackPageVisit } = useSurveillanceTracking(user?.id);
 
   useEffect(() => {

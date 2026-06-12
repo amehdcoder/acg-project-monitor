@@ -97,6 +97,8 @@ export default defineConfig(({ mode }) => {
         ],
       },
       workbox: {
+        // Pull in the Web Push handler so background notifications work.
+        importScripts: ["/push-sw.js"],
         // IMPORTANT: do NOT precache html — that locks users to a stale shell.
         // HTML is fetched fresh via the NetworkFirst runtime handler below.
         globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
