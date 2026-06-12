@@ -543,6 +543,27 @@ export function useProjectChat(projectId: string | null) {
           setMessages(prev => [...prev, newMessage]);
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "chat_messages",
+          filter: `chat_group_id=eq.${selectedGroup.id}`,
+        },
+        (payload) => {
+          const updated = payload.new as any;
+          setMessages((prev) =>
+            updated.is_deleted
+              ? prev.filter((m) => m.id !== updated.id)
+              : prev.map((m) =>
+                  m.id === updated.id
+                    ? { ...m, ...updated, mentions: updated.mentions || [] }
+                    : m,
+                ),
+          );
+        }
+      )
       .subscribe();
 
     return () => {
