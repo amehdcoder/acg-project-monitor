@@ -253,6 +253,35 @@ export function useProjectChat(projectId: string | null) {
     }
   };
 
+  // Send a structured message (poll / location / event). Payload is stored as
+  // JSON in content with the matching message_type.
+  const sendSpecial = async (
+    messageType: "poll" | "location" | "event",
+    payload: Record<string, any>,
+  ) => {
+    if (!selectedGroup || !user) return;
+    try {
+      setSending(true);
+      const { error } = await supabase.from("chat_messages").insert({
+        chat_group_id: selectedGroup.id,
+        sender_id: user.id,
+        content: JSON.stringify(payload),
+        message_type: messageType,
+        mentions: [],
+      });
+      if (error) throw error;
+    } catch (error: any) {
+      console.error("Error sending message:", error);
+      toast({
+        title: "Failed to send",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
   // Upload attachment
   const uploadAttachment = async (file: File): Promise<{ url: string; type: string; name: string } | null> => {
     if (!user) return null;
