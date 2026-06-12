@@ -92,7 +92,11 @@ Deno.serve(async (req) => {
     // profile, so a re-registration never reappears as "pending approval".
     // Their historical trails and submissions stay untouched (left orphaned
     // under the old user id).
-    const targetEmail = (targetProfile?.email ?? "").trim();
+    let targetEmail = (targetProfile?.email ?? "").trim();
+    if (!targetEmail) {
+      const { data: authUser } = await admin.auth.admin.getUserById(targetUserId);
+      targetEmail = (authUser?.user?.email ?? "").trim();
+    }
     if (targetEmail) {
       await admin
         .from("deleted_account_emails")
