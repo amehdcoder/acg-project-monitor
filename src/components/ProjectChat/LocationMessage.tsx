@@ -130,11 +130,12 @@ export function LocationMessage({ location }: LocationMessageProps) {
             </p>
             <div className="flex items-center gap-1">
               <Crosshair className="h-3 w-3 text-[#0a6b4f]" />
-              <span className="rounded bg-[#7dffb8]/30 px-1.5 py-0.5 text-[10px] font-bold text-[#0a6b4f]">
-                Excellent
+              <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${accQuality.cls}`}>
+                {accuracy != null ? `±${Math.round(accuracy)}m` : accQuality.text}
               </span>
             </div>
           </div>
+
         </div>
 
         {/* Actions */}
