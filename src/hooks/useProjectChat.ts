@@ -12,6 +12,7 @@ export interface ChatGroup {
   created_by: string;
   created_at: string;
   is_default: boolean;
+  icon_url?: string | null;
   unread_count?: number;
 }
 
@@ -28,6 +29,7 @@ export interface ChatMessage {
   attachment_url: string | null;
   attachment_type: string | null;
   attachment_name: string | null;
+  transcription?: string | null;
   mentions: string[];
   sender?: {
     first_name: string;
