@@ -12,6 +12,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { useDirectThread, type DirectChat } from "@/hooks/useDirectChats";
+import { ComposerActionsMenu } from "./ComposerActionsMenu";
+import { MessageReactions } from "./MessageReactions";
+import { PollMessage } from "./PollMessage";
+import { LocationMessage } from "./LocationMessage";
+import { EventMessage } from "./EventMessage";
+import { parseSpecial } from "./specialMessages";
 
 interface DirectChatViewProps {
   chat: DirectChat;
