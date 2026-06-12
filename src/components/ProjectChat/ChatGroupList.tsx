@@ -72,12 +72,20 @@ export function ChatGroupList({
   onSelectDirect,
   onArchiveDirect,
   onDeleteDirect,
+  projectMembers = [],
+  onStartDirect,
 }: ChatGroupListProps) {
   const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [newGroup, setNewGroup] = useState({ name: "", description: "", formId: "" });
   const [creating, setCreating] = useState(false);
+  const [showNewChat, setShowNewChat] = useState(false);
+  const [memberQuery, setMemberQuery] = useState("");
+
+  const filteredMembers = projectMembers.filter((m) =>
+    (m.full_name || "").toLowerCase().includes(memberQuery.toLowerCase())
+  );
 
   const filteredGroups = groups.filter((g) =>
     g.name.toLowerCase().includes(searchQuery.toLowerCase())
