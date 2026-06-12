@@ -57,6 +57,12 @@ const DESIGNATIONS = [
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const safeText = (value: unknown, fallback = "—") => {
+  if (typeof value === "string") return value.trim() || fallback;
+  if (value === null || value === undefined) return fallback;
+  return String(value).trim() || fallback;
+};
+
 interface Row {
   id: string;
   first_name: string;
@@ -66,8 +72,8 @@ interface Row {
 }
 
 interface RowResult {
-  email: string;
-  name: string;
+  email: string | null;
+  name: string | null;
   status: "created" | "failed";
   account_created: boolean;
   email_sent: boolean;
@@ -76,13 +82,13 @@ interface RowResult {
 
 interface HistoryRow {
   id: string;
-  recipient_email: string;
+  recipient_email: string | null;
   recipient_name: string | null;
   designation_label: string | null;
   account_created: boolean;
   email_sent: boolean;
   error: string | null;
-  created_at: string;
+  created_at: string | null;
 }
 
 interface EmailDetail {
@@ -271,12 +277,15 @@ export default function AdminCreateUsersDialog() {
   };
 
   const resultFor = (email: string) =>
-    results.find((r) => r.email.toLowerCase() === email.trim().toLowerCase());
+    results.find((r) => safeText(r.email, "").toLowerCase() === email.trim().toLowerCase());
 
-  const fmt = (iso: string) =>
-    new Date(iso).toLocaleString(undefined, {
+  const fmt = (iso: string | null) => {
+    const date = new Date(iso || "");
+    if (Number.isNaN(date.getTime())) return "Unknown time";
+    return date.toLocaleString(undefined, {
       year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
     });
+  };
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setSelected(null); setEmailDetail(null); } }}>
