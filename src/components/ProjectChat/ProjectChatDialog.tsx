@@ -31,6 +31,9 @@ interface ProjectChatDialogProps {
   forms?: Array<{ id: string; name: string }>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When opened from a push notification, auto-select this group so its
+      messages are shown and immediately marked as read. */
+  initialGroupId?: string | null;
 }
 
 export function ProjectChatDialog({
@@ -39,6 +42,7 @@ export function ProjectChatDialog({
   forms = [],
   open,
   onOpenChange,
+  initialGroupId,
 }: ProjectChatDialogProps) {
   const { user } = useAuth();
   const {
