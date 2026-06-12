@@ -414,10 +414,29 @@ function LocationDialog({
                   className="h-40 w-full"
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Accurate to your device GPS · {coords.lat.toFixed(5)},{" "}
-                {coords.lng.toFixed(5)}
-              </p>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground tabular-nums">
+                  {coords.lat.toFixed(6)}, {coords.lng.toFixed(6)}
+                </span>
+                <span
+                  className={`flex items-center gap-1 font-medium ${
+                    refining
+                      ? "text-amber-600"
+                      : coords.accuracy <= 30
+                        ? "text-emerald-600"
+                        : "text-muted-foreground"
+                  }`}
+                >
+                  {refining ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" /> Refining… ±
+                      {Math.round(coords.accuracy)}m
+                    </>
+                  ) : (
+                    <>±{Math.round(coords.accuracy)}m accuracy</>
+                  )}
+                </span>
+              </div>
               <div className="space-y-1.5">
                 <Label>Label (optional)</Label>
                 <Input
