@@ -86,20 +86,42 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
   // ── Push-notification deep link ──
   // A tapped notification lands here with ?pcid=<project>&pgid=<group>.
   // Open the correct project chat (and group) so it is shown and marked read.
+  // Malformed / missing / unknown params degrade gracefully: we still strip
+  // them from the URL and fall back to the normal default chat state instead
+  // of opening the wrong chat or throwing.
   useEffect(() => {
     if (projects.length === 0 || typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const pcid = params.get("pcid");
-    const pgid = params.get("pgid");
-    if (!pcid) return;
-    if (!projects.some((p) => p.id === pcid)) return;
 
-    setActiveProjectId(pcid);
-    setInitialGroupId(pgid);
-    setPickerOpen(false);
-    setOpen(true);
+    let params: URLSearchParams;
+    try {
+      params = new URLSearchParams(window.location.search);
+    } catch {
+      return;
+    }
 
-    // Clean the URL so a later refresh doesn't keep reopening the chat.
+    const hadParams = params.has("pcid") || params.has("pgid");
+    if (!hadParams) return;
+
+    const rawPcid = params.get("pcid");
+    const rawPgid = params.get("pgid");
+
+    // Only honour a syntactically valid project id that the user actually
+    // belongs to; otherwise leave the default active project untouched.
+    const validProjectId =
+      isUuid(rawPcid) && projects.some((p) => p.id === rawPcid) ? rawPcid! : null;
+    // A group id is only meaningful alongside a valid project, and must be a
+    // well-formed UUID — anything else falls back to the project's default group.
+    const validGroupId = validProjectId && isUuid(rawPgid) ? rawPgid! : null;
+
+    if (validProjectId) {
+      setActiveProjectId(validProjectId);
+      setInitialGroupId(validGroupId);
+      setPickerOpen(false);
+      setOpen(true);
+    }
+
+    // Always clean the deep-link params so a later refresh doesn't reopen or
+    // re-attempt the (possibly malformed) chat.
     params.delete("pcid");
     params.delete("pgid");
     const qs = params.toString();
@@ -109,6 +131,22 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
       `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`,
     );
   }, [projects]);
+
+  // ── Cross-tab unread synchronization ──
+  // When another tab/window updates the cached unread total, mirror it here so
+  // the WhatsApp-style badge stays consistent everywhere without waiting for
+  // the next 30s poll.
+  useEffect(() => {
+    if (!user?.id || typeof window === "undefined") return;
+    const key = `${UNREAD_CACHE_KEY}:${user.id}`;
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== key) return;
+      const n = e.newValue == null ? 0 : Number(e.newValue);
+      if (Number.isFinite(n) && n >= 0) setUnread(n);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [user?.id]);
 
   // Lightweight unread badge across all of the user's projects, persisted
   // to localStorage so it survives refreshes and app restarts.
