@@ -257,34 +257,31 @@ function LocationDialog({
   onOpenChange: (o: boolean) => void;
   onSubmit: (p: LocationPayload) => void;
 }) {
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [coords, setCoords] = useState<
+    { lat: number; lng: number; accuracy: number } | null
+  >(null);
   const [loading, setLoading] = useState(false);
+  const [refining, setRefining] = useState(false);
   const [label, setLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const watchRef = useState<{ id: number | null }>(() => ({ id: null }))[0];
+
+  const stopWatch = () => {
+    if (watchRef.id !== null) {
+      navigator.geolocation.clearWatch(watchRef.id);
+      watchRef.id = null;
+    }
+  };
 
   const capture = () => {
     setLoading(true);
+    setRefining(false);
     setError(null);
     if (!navigator.geolocation) {
       setError("Geolocation is not supported on this device.");
       setLoading(false);
       return;
     }
-
-    let settled = false;
-    const succeed = (pos: GeolocationPosition) => {
-      if (settled) return;
-      settled = true;
-      setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      setError(null);
-      setLoading(false);
-    };
-    const fail = (msg: string) => {
-      if (settled) return;
-      settled = true;
-      setError(msg);
-      setLoading(false);
-    };
 
     const friendly = (err: GeolocationPositionError) => {
       if (err.code === err.PERMISSION_DENIED)
@@ -294,36 +291,86 @@ function LocationDialog({
       return "Couldn't get a precise fix — try again, ideally outdoors or on a mobile device.";
     };
 
-    // 1) Try a fast high-accuracy fix.
-    navigator.geolocation.getCurrentPosition(
-      (pos) => succeed(pos),
-      () => {
-        if (settled) return;
-        // 2) Fallback: coarse, allow a recent cached fix — works on desktops
-        //    without GPS hardware and resolves quickly instead of erroring.
-        navigator.geolocation.getCurrentPosition(
-          (pos) => succeed(pos),
-          (err) => fail(friendly(err)),
-          { enableHighAccuracy: false, timeout: 12000, maximumAge: 5 * 60 * 1000 },
-        );
+    let best: { lat: number; lng: number; accuracy: number } | null = null;
+    let gotAny = false;
+    stopWatch();
+
+    // watchPosition streams progressively better fixes as the GPS warms up.
+    // We keep the most accurate reading and stop once it is good enough or
+    // after a hard timeout, instead of trusting a single (often coarse) read.
+    watchRef.id = navigator.geolocation.watchPosition(
+      (pos) => {
+        gotAny = true;
+        const acc = pos.coords.accuracy ?? 9999;
+        if (!best || acc < best.accuracy) {
+          best = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: acc,
+          };
+          setCoords(best);
+        }
+        setLoading(false);
+        setRefining(true);
+        // Good enough — a typical phone GPS fix. Lock it in.
+        if (acc <= 20) {
+          stopWatch();
+          setRefining(false);
+        }
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+      (err) => {
+        if (!gotAny) {
+          stopWatch();
+          setError(friendly(err));
+          setLoading(false);
+          setRefining(false);
+        }
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
     );
+
+    // Hard stop after 18s — keep whatever best fix we accumulated.
+    window.setTimeout(() => {
+      stopWatch();
+      setRefining(false);
+      if (!gotAny) {
+        // Last-chance coarse fix for desktops without GPS hardware.
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            setCoords({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              accuracy: pos.coords.accuracy ?? 9999,
+            });
+            setLoading(false);
+          },
+          (err) => {
+            setError(friendly(err));
+            setLoading(false);
+          },
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+        );
+      }
+    }, 18000);
   };
 
   const reset = () => {
+    stopWatch();
     setCoords(null);
     setLabel("");
     setError(null);
     setLoading(false);
+    setRefining(false);
   };
 
   const submit = () => {
     if (!coords) return;
+    stopWatch();
     onSubmit({
       kind: "location",
       lat: coords.lat,
       lng: coords.lng,
+      accuracy: Math.round(coords.accuracy),
       label: label.trim() || undefined,
     });
     reset();
