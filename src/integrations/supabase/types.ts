@@ -4189,7 +4189,11 @@ export type Database = {
       }
       proximity_conversations: {
         Row: {
+          archived_by_a: boolean
+          archived_by_b: boolean
           created_at: string
+          deleted_by_a: boolean
+          deleted_by_b: boolean
           ended_by: string | null
           id: string
           status: string
@@ -4198,7 +4202,11 @@ export type Database = {
           user_b: string
         }
         Insert: {
+          archived_by_a?: boolean
+          archived_by_b?: boolean
           created_at?: string
+          deleted_by_a?: boolean
+          deleted_by_b?: boolean
           ended_by?: string | null
           id?: string
           status?: string
@@ -4207,7 +4215,11 @@ export type Database = {
           user_b: string
         }
         Update: {
+          archived_by_a?: boolean
+          archived_by_b?: boolean
           created_at?: string
+          deleted_by_a?: boolean
+          deleted_by_b?: boolean
           ended_by?: string | null
           id?: string
           status?: string
@@ -5478,6 +5490,21 @@ export type Database = {
         Args: { p_project_id: string; p_user_id: string }
         Returns: number
       }
+      get_proximity_conversations: {
+        Args: never
+        Returns: {
+          archived: boolean
+          conversation_id: string
+          last_message: string
+          last_message_at: string
+          last_sender_id: string
+          other_id: string
+          other_name: string
+          status: string
+          unread_count: number
+          updated_at: string
+        }[]
+      }
       get_quiz_questions_for_attempt: {
         Args: { p_quiz_id: string }
         Returns: {
@@ -5543,6 +5570,10 @@ export type Database = {
         Returns: Json
       }
       owner_factory_reset: { Args: { _confirm: string }; Returns: Json }
+      set_proximity_conversation_flag: {
+        Args: { _action: string; _conversation_id: string }
+        Returns: undefined
+      }
       start_proximity_conversation: {
         Args: { _other: string }
         Returns: string
