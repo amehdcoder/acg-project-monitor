@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import type { SpecialPayload } from "@/components/ProjectChat/specialMessages";
 
 export interface DirectChat {
   conversation_id: string;
