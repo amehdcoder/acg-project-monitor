@@ -362,7 +362,25 @@ export function ChatMessage({
                 {senderName}
               </p>
             )}
-            {message.content && (
+            {special?.kind === "poll" && (
+              <PollMessage
+                messageId={message.id}
+                poll={special}
+                currentUserId={currentUserId}
+                isOwn={isOwn}
+                nameFor={nameFor}
+              />
+            )}
+            {special?.kind === "location" && <LocationMessage location={special} />}
+            {special?.kind === "event" && (
+              <EventMessage
+                messageId={message.id}
+                event={special}
+                currentUserId={currentUserId}
+                nameFor={nameFor}
+              />
+            )}
+            {!special && message.content && (
               <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
                 {renderContent(message.content)}
               </p>
