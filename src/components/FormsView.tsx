@@ -1937,6 +1937,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     { kind: "bloomberg_dash" as const, icon: BarChart3, bg: "bg-[#DCF3F0]", fg: "text-[#14b8a6]", label: "Validation Dashboard", desc: "Baseline vs validated analytics, discrepancies & map (Owner only)." },
                   ],
                 }] : []),
+                ...(isOwner ? [{
+                  id: "seeclear_folder",
+                  title: "See Clear — Plateau Eye Health Project",
+                  subtitle: "Facility monitoring & supervision — checklist & dashboard",
+                  bg: "bg-[#DCF3F0]", fg: "text-[#0f766e]", chipBg: "bg-[#DCF3F0]", chipFg: "text-[#0f766e]",
+                  items: [
+                    { kind: "seeclear_form" as const, icon: ClipboardCheck, bg: "bg-[#DCF3F0]", fg: "text-[#14b8a6]", label: "Facility Monitoring Checklist", desc: "Profile, readiness, equipment, evidence & sign-off (Owner only)." },
+                    { kind: "seeclear_dash" as const, icon: BarChart3, bg: "bg-[#DCF3F0]", fg: "text-[#0f766e]", label: "Monitoring Dashboard", desc: "Readiness, equipment, referrals, data quality & map (Owner only)." },
+                  ],
+                }] : []),
                 {
                   id: "action_tracker_folder",
                   title: "Meeting Action Tracking",
