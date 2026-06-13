@@ -311,7 +311,7 @@ export default function BloombergDashboard({ onClose }: Props) {
             icon={TrendingUp}
             label="Overall Variance"
             value={`${stats.overallPct >= 0 ? "+" : ""}${stats.overallPct.toFixed(1)}%`}
-            tint={stats.overallPct < 0 ? "#ef4444" : TEAL}
+            tint={toneColor(varianceTone(stats.overallPct))}
             sub="validated vs baseline"
           />
           <Kpi icon={Users} label="Boys" value={fmt(stats.validatedMale)} tint={BLUE} />
