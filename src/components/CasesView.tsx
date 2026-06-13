@@ -837,9 +837,8 @@ const CasesView = () => {
       }
     }
     setFollowUpCase(resolvedCase);
-    caseItem = resolvedCase;
 
-    const inlineModules = followUpCatalog[caseItem.caseTypeId] || [];
+    const inlineModules = followUpCatalog[resolvedCase.caseTypeId] || [];
     if (inlineModules.length > 0) {
       setFollowUpForms(inlineModules);
       if (inlineModules.length === 1) {
