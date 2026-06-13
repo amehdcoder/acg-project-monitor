@@ -83,7 +83,7 @@ export const useBloombergDashboard = () => {
       const [v, b] = await Promise.all([
         fetchAll<ValidationRow>(
           "bloomberg_validations",
-          "id,school_key,school_name,school_type,state,lga,gps_lat,gps_lng,total_male,total_female,grand_total,status,submitted_at,created_at",
+          "id,school_key,school_name,school_type,school_code,state,lga,ward,gps_lat,gps_lng,total_male,total_female,grand_total,verification,status,submitted_at,created_at",
         ),
         fetchAll<BaselineRow>("bloomberg_school_baselines", "school_key,total_male,total_female,grand_total"),
       ]);
