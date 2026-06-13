@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { BLOOMBERG_FORM_ID, type BloombergSchool, type CascadeFieldKey } from "@/lib/bloomberg/definition";
+import { BLOOMBERG_FORM_ID, type BloombergSchool, type CascadeFieldKey, normalizeMissingLabel } from "@/lib/bloomberg/definition";
 
 export interface CascadeAssignment {
   field_key: CascadeFieldKey;
