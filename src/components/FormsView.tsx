@@ -14,6 +14,9 @@ import { WorkplanView } from "@/components/Workplan";
 import BloombergFormFiller from "@/components/Bloomberg/BloombergFormFiller";
 import BloombergDashboard from "@/components/Bloomberg/BloombergDashboard";
 import { BLOOMBERG_FORM_NAME, BLOOMBERG_FORM_DESC, BLOOMBERG_DASH_NAME, BLOOMBERG_DASH_DESC } from "@/lib/bloomberg/definition";
+import SeeClearFormFiller from "@/components/SeeClear/SeeClearFormFiller";
+import SeeClearDashboard from "@/components/SeeClear/SeeClearDashboard";
+import { SEECLEAR_FORM_NAME, SEECLEAR_FORM_DESC, SEECLEAR_DASH_NAME, SEECLEAR_DASH_DESC } from "@/lib/seeclear/definition";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
 import { buildMdaSupervisoryChecklist, MDA_CHECKLIST_NAME } from "@/lib/mdaSupervisoryChecklist";
 import {
@@ -225,6 +228,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showWorkplan, setShowWorkplan] = useState(false);
   const [showBloombergForm, setShowBloombergForm] = useState(false);
   const [showBloombergDash, setShowBloombergDash] = useState(false);
+  const [showSeeClearForm, setShowSeeClearForm] = useState(false);
+  const [showSeeClearDash, setShowSeeClearDash] = useState(false);
   const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [showFormsExplorer, setShowFormsExplorer] = useState(false);
   const [openTopFolder, setOpenTopFolder] = useState<"custom" | "standard" | null>("custom");
@@ -285,6 +290,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       showWorkplan ||
       showBloombergForm ||
       showBloombergDash ||
+      showSeeClearForm ||
+      showSeeClearDash ||
       microplanFillingActive ||
       dashboardForm ||
       geofenceManagerForm ||
@@ -316,6 +323,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     showWorkplan,
     showBloombergForm,
     showBloombergDash,
+    showSeeClearForm,
+    showSeeClearDash,
     microplanFillingActive,
     dashboardForm,
     geofenceManagerForm,
@@ -599,12 +608,19 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     try {
       const form = forms.find(f => f.id === formId);
       const bbgKind = (form?.settings as any)?.bloomberg_kind as ("form" | "dashboard" | undefined);
-      // The Bloomberg form and its Validation Dashboard are permanently linked —
+      const scKind = (form?.settings as any)?.seeclear_kind as ("form" | "dashboard" | undefined);
+      // The form and its Dashboard are permanently linked —
       // removing the form also removes the dashboard from the same project.
       const idsToDelete = [formId];
       if (bbgKind === "form" && form?.project_id) {
         const linkedDash = forms.find(
           f => f.project_id === form.project_id && (f.settings as any)?.bloomberg_kind === "dashboard",
+        );
+        if (linkedDash) idsToDelete.push(linkedDash.id);
+      }
+      if (scKind === "form" && form?.project_id) {
+        const linkedDash = forms.find(
+          f => f.project_id === form.project_id && (f.settings as any)?.seeclear_kind === "dashboard",
         );
         if (linkedDash) idsToDelete.push(linkedDash.id);
       }
@@ -878,6 +894,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   if (showBloombergDash) {
     return <BloombergDashboard onClose={() => setShowBloombergDash(false)} />;
   }
+
+  if (showSeeClearForm) {
+    return <SeeClearFormFiller onClose={() => setShowSeeClearForm(false)} />;
+  }
+
+  if (showSeeClearDash) {
+    return <SeeClearDashboard onClose={() => setShowSeeClearDash(false)} />;
+  }
+
+
 
 
 
@@ -1340,6 +1366,75 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     );
                   }
 
+                  // See Clear markers launch their dedicated custom UI.
+                  const scKind = (form.settings as any)?.seeclear_kind as ("form" | "dashboard" | undefined);
+                  if (scKind === "form" || scKind === "dashboard") {
+                    const isDash = scKind === "dashboard";
+                    const ScIcon = isDash ? BarChart3 : ClipboardCheck;
+                    return (
+                      <div
+                        key={form.id}
+                        className="group flex items-center gap-3 border-l-4 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
+                        style={{ borderLeftColor: "#14b8a6" }}
+                      >
+                        <button
+                          onClick={() => (isDash ? setShowSeeClearDash(true) : setShowSeeClearForm(true))}
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#DCF3F0]"
+                          aria-label={`Open ${form.name}`}
+                        >
+                          <ScIcon className="h-5 w-5 text-[#14b8a6]" strokeWidth={2} />
+                        </button>
+                        <button
+                          onClick={() => (isDash ? setShowSeeClearDash(true) : setShowSeeClearForm(true))}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <h4 className="truncate text-[15px] font-bold text-[#0f766e]">{form.name}</h4>
+                          <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">{form.description || "See Clear eye health monitoring tool"}</p>
+                        </button>
+                        {!isDash && (
+                          <span
+                            className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                              form.status === "active"
+                                ? "bg-[#E2F5EC] text-[#22A55A]"
+                                : "bg-[#E3ECFB] text-[#2F6FE6]"
+                            }`}
+                          >
+                            {form.status === "active" ? "Finalized" : "Draft"}
+                          </span>
+                        )}
+                        {isAdmin && !isDash && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-[#0f766e]">
+                                <ChevronRight className="h-5 w-5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {form.status !== "active" && (
+                                <DropdownMenuItem onClick={() => handleUpdateFormStatus(form.id, "active")}>
+                                  <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
+                                  Set Active (Finalize)
+                                </DropdownMenuItem>
+                              )}
+                              {form.status !== "draft" && (
+                                <DropdownMenuItem onClick={() => handleUpdateFormStatus(form.id, "draft")}>
+                                  <FileEdit className="mr-2 h-4 w-4 text-yellow-600" />
+                                  Set Draft
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => setFormToDelete(form)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Remove from project
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                    );
+                  }
+
+
                   // Shared accent color for this form's parent project — same
                   // palette used by the Project dropdown above, so the trigger
                   // border/text + form name + row left-border are all in sync.
@@ -1657,6 +1752,67 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 </div>
               </div>
 
+              {/* See Clear — Eye Health Facility Monitoring — addable to any project */}
+              <div className="px-3 sm:px-4 py-3 border-t border-border/60">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-[#a7e0d8] bg-gradient-to-r from-[#e6f7f4] to-transparent p-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-lg bg-[#cdeee8] shrink-0">
+                      <ClipboardCheck className="h-5 w-5 text-[#14b8a6]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">See Clear — Eye Health Facility Monitoring</p>
+                      <p className="text-xs text-muted-foreground">Monitoring & supervision checklist + facility readiness dashboard (equipment, referrals, data quality & map) with data simulation.</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="shrink-0"
+                    onClick={async () => {
+                      if (!currentProjectId) {
+                        toast({ title: "Select a project", description: "Choose a project before adding the See Clear tools.", variant: "destructive" });
+                        return;
+                      }
+                      if (forms.find((f) => (f.settings as any)?.seeclear_kind)) {
+                        toast({ title: "Already added", description: "The See Clear tools already exist in this project. Open them from the list above." });
+                        return;
+                      }
+                      try {
+                        const { error } = await supabase.from("forms").insert([
+                          {
+                            name: SEECLEAR_FORM_NAME,
+                            description: SEECLEAR_FORM_DESC,
+                            questions: [] as any,
+                            settings: { seeclear_kind: "form" } as any,
+                            project_id: currentProjectId,
+                            created_by: user?.id,
+                            status: "active",
+                          },
+                          {
+                            name: SEECLEAR_DASH_NAME,
+                            description: SEECLEAR_DASH_DESC,
+                            questions: [] as any,
+                            settings: { seeclear_kind: "dashboard" } as any,
+                            project_id: currentProjectId,
+                            created_by: user?.id,
+                            status: "active",
+                          },
+                        ] as any);
+                        if (error) throw error;
+                        toast({ title: "Added to project", description: "Open the monitoring checklist and dashboard from your forms list above." });
+                        fetchForms(currentProjectId);
+                      } catch (e: any) {
+                        console.error("See Clear add error", e);
+                        toast({ title: "Could not add", description: e?.message || "Please try again.", variant: "destructive" });
+                      }
+                    }}
+                  >
+                    <Sparkles className="h-4 w-4 mr-1.5" /> Add to project
+                  </Button>
+                </div>
+              </div>
+
+
+
 
               <div className="px-3 sm:px-4 py-3 border-t border-border/60 space-y-3">
                 <div className="flex items-center gap-2">
@@ -1781,6 +1937,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     { kind: "bloomberg_dash" as const, icon: BarChart3, bg: "bg-[#DCF3F0]", fg: "text-[#14b8a6]", label: "Validation Dashboard", desc: "Baseline vs validated analytics, discrepancies & map (Owner only)." },
                   ],
                 }] : []),
+                ...(isOwner ? [{
+                  id: "seeclear_folder",
+                  title: "See Clear — Plateau Eye Health Project",
+                  subtitle: "Facility monitoring & supervision — checklist & dashboard",
+                  bg: "bg-[#DCF3F0]", fg: "text-[#0f766e]", chipBg: "bg-[#DCF3F0]", chipFg: "text-[#0f766e]",
+                  items: [
+                    { kind: "seeclear_form" as const, icon: ClipboardCheck, bg: "bg-[#DCF3F0]", fg: "text-[#14b8a6]", label: "Facility Monitoring Checklist", desc: "Profile, readiness, equipment, evidence & sign-off (Owner only)." },
+                    { kind: "seeclear_dash" as const, icon: BarChart3, bg: "bg-[#DCF3F0]", fg: "text-[#0f766e]", label: "Monitoring Dashboard", desc: "Readiness, equipment, referrals, data quality & map (Owner only)." },
+                  ],
+                }] : []),
                 {
                   id: "action_tracker_folder",
                   title: "Meeting Action Tracking",
@@ -1900,6 +2066,26 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                               <button
                                 key={idx}
                                 onClick={() => (isDash ? setShowBloombergDash(true) : setShowBloombergForm(true))}
+                                className="flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 text-left hover:bg-white/60 transition-colors border-t border-border/30 first:border-t-0"
+                              >
+                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${it.bg}`}>
+                                  <Icon className={`h-4 w-4 ${it.fg}`} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h5 className="truncate text-sm font-semibold">{it.label}</h5>
+                                  <p className="text-xs text-muted-foreground">{it.desc}</p>
+                                </div>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </button>
+                            );
+                          }
+                          if (it.kind === "seeclear_form" || it.kind === "seeclear_dash") {
+                            const Icon = it.icon;
+                            const isDash = it.kind === "seeclear_dash";
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => (isDash ? setShowSeeClearDash(true) : setShowSeeClearForm(true))}
                                 className="flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 text-left hover:bg-white/60 transition-colors border-t border-border/30 first:border-t-0"
                               >
                                 <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${it.bg}`}>
