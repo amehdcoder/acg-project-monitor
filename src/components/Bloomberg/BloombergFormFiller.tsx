@@ -122,7 +122,7 @@ export default function BloombergFormFiller({ onClose }: Props) {
   };
 
   const canNext = () => {
-    if (step === 0) return !!schoolKey;
+    if (step === 0) return !!(state && lga && ward && location && schoolKey && gps);
     if (step === 1) return schoolExists !== "";
     return true;
   };
@@ -216,11 +216,11 @@ export default function BloombergFormFiller({ onClose }: Props) {
                 <div className="mb-3 flex items-center gap-2 text-[#1f6feb]"><SchoolIcon className="h-5 w-5" /><h3 className="text-sm font-bold uppercase tracking-wide">School Information</h3></div>
                 <p className="mb-4 rounded-lg bg-[#eef4ff] p-3 text-xs text-[#1f6feb]">Select the assigned school. LEA baseline enrolment figures are hidden from validators.</p>
                 <div className="space-y-3">
-                  <Field label="State"><Sel value={state} onChange={(v) => { setState(v); setLga(""); setWard(""); setLocation(""); setSchoolKey(""); }} options={stateOpts} placeholder="Select state" /></Field>
-                  <Field label="LGA"><Sel value={lga} onChange={(v) => { setLga(v); setWard(""); setLocation(""); setSchoolKey(""); }} options={lgaOpts} placeholder="Select LGA" disabled={!state} /></Field>
-                  <Field label="Ward"><Sel value={ward} onChange={(v) => { setWard(v); setLocation(""); setSchoolKey(""); }} options={wardOpts} placeholder="Select ward" disabled={!lga} /></Field>
-                  <Field label="Community / Location"><Sel value={location} onChange={(v) => { setLocation(v); setSchoolKey(""); }} options={locOpts} placeholder="Select community or location" disabled={!ward} /></Field>
-                  <Field label="School Name">
+                  <Field label="State" required><Sel value={state} onChange={(v) => { setState(v); setLga(""); setWard(""); setLocation(""); setSchoolKey(""); }} options={stateOpts} placeholder="Select state" /></Field>
+                  <Field label="LGA" required><Sel value={lga} onChange={(v) => { setLga(v); setWard(""); setLocation(""); setSchoolKey(""); }} options={lgaOpts} placeholder="Select LGA" disabled={!state} /></Field>
+                  <Field label="Ward" required><Sel value={ward} onChange={(v) => { setWard(v); setLocation(""); setSchoolKey(""); }} options={wardOpts} placeholder="Select ward" disabled={!lga} /></Field>
+                  <Field label="Community / Location" required><Sel value={location} onChange={(v) => { setLocation(v); setSchoolKey(""); }} options={locOpts} placeholder="Select community or location" disabled={!ward} /></Field>
+                  <Field label="School Name" required>
                     <Select value={schoolKey} onValueChange={setSchoolKey}>
                       <SelectTrigger className="h-11"><SelectValue placeholder={`Select school (${schoolOpts.length})`} /></SelectTrigger>
                       <SelectContent className="max-h-72">
@@ -353,9 +353,11 @@ export default function BloombergFormFiller({ onClose }: Props) {
   );
 }
 
-const Field = ({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) => (
+const Field = ({ label, children, className = "", required = false }: { label: string; children: React.ReactNode; className?: string; required?: boolean }) => (
   <div className={className}>
-    <label className="mb-1 block text-xs font-medium text-muted-foreground">{label}</label>
+    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+      {label}{required && <span className="ml-0.5 text-[#dc2626]">*</span>}
+    </label>
     {children}
   </div>
 );

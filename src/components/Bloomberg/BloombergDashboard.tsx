@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin, Download, Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid,
@@ -7,6 +7,9 @@ import {
 import MapVisualization from "@/components/MapVisualization/MapVisualization";
 import { MapMarker } from "@/components/MapVisualization/types";
 import { useBloombergDashboard } from "@/hooks/useBloombergDashboard";
+import { useAuth } from "@/hooks/useAuth";
+import { exportSchoolTemplate, importSchoolTemplate } from "@/lib/bloomberg/schoolTemplate";
+import { toast } from "sonner";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
 
 const NAVY = "#0c2340";
@@ -35,6 +38,46 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 
 export default function BloombergDashboard({ onClose }: Props) {
   const { stats, byState, points, loading, reload } = useBloombergDashboard();
+  const { isOwner, isSuperAdmin } = useAuth();
+  const canManage = isOwner || isSuperAdmin;
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const n = await exportSchoolTemplate();
+      toast.success(`Template exported with ${n.toLocaleString()} schools`);
+    } catch (e: any) {
+      toast.error(e?.message || "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImport = async (file: File | null) => {
+    if (!file) return;
+    setImporting(true);
+    try {
+      const res = await importSchoolTemplate(file);
+      if (res.errors.length) {
+        toast.warning(`Imported ${res.schools} schools, ${res.baselines} baselines — ${res.errors.length} issue(s)`, {
+          description: res.errors.slice(0, 3).join(" • "),
+        });
+      } else {
+        toast.success(`Updated ${res.schools.toLocaleString()} schools & ${res.baselines.toLocaleString()} baseline records`);
+      }
+      reload();
+    } catch (e: any) {
+      toast.error(e?.message || "Import failed");
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+
 
   const markers: MapMarker[] = useMemo(
     () =>
@@ -77,6 +120,25 @@ export default function BloombergDashboard({ onClose }: Props) {
         </div>
         <h1 className="mt-3 text-2xl font-bold">Validation Dashboard</h1>
         <p className="text-sm text-white/70">Independent school enrolment validation — admin analytics</p>
+        {canManage && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              hidden
+              onChange={(e) => handleImport(e.target.files?.[0] || null)}
+            />
+            <Button size="sm" onClick={handleExport} disabled={exporting} className="h-9 bg-white/15 text-white hover:bg-white/25 border-0">
+              {exporting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}
+              Export Template
+            </Button>
+            <Button size="sm" onClick={() => fileRef.current?.click()} disabled={importing} className="h-9 bg-[#2dd4a8] text-[#0c2340] hover:bg-[#22c0a0] border-0 font-semibold">
+              {importing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Upload className="mr-1.5 h-4 w-4" />}
+              Import Schools & Baselines
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">

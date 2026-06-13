@@ -1286,7 +1286,46 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                           <h4 className="truncate text-[15px] font-bold text-[#2563eb]">{form.name}</h4>
                           <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">{form.description || "Bloomberg School Eye Health tool"}</p>
                         </button>
-                        {isAdmin && (
+                        {!isDash && (
+                          <span
+                            className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                              form.status === "active"
+                                ? "bg-[#E2F5EC] text-[#22A55A]"
+                                : "bg-[#E3ECFB] text-[#2F6FE6]"
+                            }`}
+                          >
+                            {form.status === "active" ? "Finalized" : "Draft"}
+                          </span>
+                        )}
+                        {isAdmin && !isDash && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-[#2F6FE6]">
+                                <ChevronRight className="h-5 w-5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {form.status !== "active" && (
+                                <DropdownMenuItem onClick={() => handleUpdateFormStatus(form.id, "active")}>
+                                  <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
+                                  Set Active (Finalize)
+                                </DropdownMenuItem>
+                              )}
+                              {form.status !== "draft" && (
+                                <DropdownMenuItem onClick={() => handleUpdateFormStatus(form.id, "draft")}>
+                                  <FileEdit className="mr-2 h-4 w-4 text-yellow-600" />
+                                  Set Draft
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => setFormToDelete(form)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Remove from project
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                        {isAdmin && isDash && (
                           <Button
                             variant="ghost"
                             size="icon"
