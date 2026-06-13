@@ -120,6 +120,25 @@ export default function BloombergDashboard({ onClose }: Props) {
         </div>
         <h1 className="mt-3 text-2xl font-bold">Validation Dashboard</h1>
         <p className="text-sm text-white/70">Independent school enrolment validation — admin analytics</p>
+        {canManage && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              hidden
+              onChange={(e) => handleImport(e.target.files?.[0] || null)}
+            />
+            <Button size="sm" onClick={handleExport} disabled={exporting} className="h-9 bg-white/15 text-white hover:bg-white/25 border-0">
+              {exporting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}
+              Export Template
+            </Button>
+            <Button size="sm" onClick={() => fileRef.current?.click()} disabled={importing} className="h-9 bg-[#2dd4a8] text-[#0c2340] hover:bg-[#22c0a0] border-0 font-semibold">
+              {importing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Upload className="mr-1.5 h-4 w-4" />}
+              Import Schools & Baselines
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
