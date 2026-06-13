@@ -158,8 +158,8 @@ export default function BloombergDashboard({ onClose }: Props) {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const n = await exportSchoolTemplate();
-      toast.success(`Template exported with ${n.toLocaleString()} schools`);
+      await exportSchoolTemplate();
+      toast.success("Empty template exported — ready to fill & re-import");
     } catch (e: any) {
       toast.error(e?.message || "Export failed");
     } finally {
