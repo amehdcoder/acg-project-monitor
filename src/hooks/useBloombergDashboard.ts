@@ -1,20 +1,33 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ALL_CLASSES } from "@/lib/bloomberg/definition";
+import { ALL_CLASSES, NOT_FOUND_REASONS, OPERATIONAL_STATUS } from "@/lib/bloomberg/definition";
 import { generateBloombergSimulation } from "@/lib/bloomberg/bloombergSimulation";
+
+export interface ValidationVerification {
+  school_exists?: "yes" | "no" | "";
+  not_found_reason?: string;
+  operational_status?: string;
+  head_teacher?: string;
+  head_phone?: string;
+  date_of_visit?: string;
+  register_available?: boolean;
+}
 
 export interface ValidationRow {
   id: string;
   school_key: string | null;
   school_name: string | null;
   school_type: string | null;
+  school_code: string | null;
   state: string | null;
   lga: string | null;
+  ward: string | null;
   gps_lat: number | null;
   gps_lng: number | null;
   total_male: number | null;
   total_female: number | null;
   grand_total: number | null;
+  verification: ValidationVerification | null;
   status: string | null;
   submitted_at: string | null;
   created_at: string;
@@ -26,6 +39,10 @@ export interface BaselineRow {
   total_female: number | null;
   grand_total: number | null;
 }
+
+const REASON_LABEL = new Map(NOT_FOUND_REASONS.map((r) => [r.value, r.label]));
+const OP_STATUS_LABEL = new Map(OPERATIONAL_STATUS.map((r) => [r.value, r.label]));
+
 
 async function fetchAll<T>(table: string, columns: string): Promise<T[]> {
   const all: T[] = [];
@@ -66,7 +83,7 @@ export const useBloombergDashboard = () => {
       const [v, b] = await Promise.all([
         fetchAll<ValidationRow>(
           "bloomberg_validations",
-          "id,school_key,school_name,school_type,state,lga,gps_lat,gps_lng,total_male,total_female,grand_total,status,submitted_at,created_at",
+          "id,school_key,school_name,school_type,school_code,state,lga,ward,gps_lat,gps_lng,total_male,total_female,grand_total,verification,status,submitted_at,created_at",
         ),
         fetchAll<BaselineRow>("bloomberg_school_baselines", "school_key,total_male,total_female,grand_total"),
       ]);
@@ -173,5 +190,78 @@ export const useBloombergDashboard = () => {
     [validations],
   );
 
-  return { validations, baselines, stats, byState, points, loading, reload, ALL_CLASSES, simulate, setSimulate };
+  // Schools reported as not existing / not found during field validation.
+  const nonExistent = useMemo(() => {
+    const rows = validations
+      .filter((v) => v.verification?.school_exists === "no")
+      .map((v) => {
+        const reasonVal = v.verification?.not_found_reason || "other";
+        return {
+          school: v.school_name || "Unknown",
+          code: v.school_code || v.school_key || "—",
+          state: v.state || "—",
+          lga: v.lga || "—",
+          ward: v.ward || "—",
+          reasonValue: reasonVal,
+          reason: REASON_LABEL.get(reasonVal) || reasonVal || "Other",
+          status: v.status || "draft",
+          date: v.verification?.date_of_visit || v.submitted_at || v.created_at,
+        };
+      })
+      .sort((a, b) => a.state.localeCompare(b.state) || a.school.localeCompare(b.school));
+
+    // Reason breakdown for the analytics chart.
+    const counts = new Map<string, number>();
+    rows.forEach((r) => counts.set(r.reasonValue, (counts.get(r.reasonValue) || 0) + 1));
+    const reasonAnalysis = NOT_FOUND_REASONS
+      .map((r) => ({
+        key: r.value,
+        name: r.label,
+        count: counts.get(r.value) || 0,
+        pct: rows.length > 0 ? ((counts.get(r.value) || 0) / rows.length) * 100 : 0,
+      }))
+      .filter((r) => r.count > 0)
+      .sort((a, b) => b.count - a.count);
+
+    return { rows, reasonAnalysis, total: rows.length };
+  }, [validations]);
+
+  // Full register of validated schools with status & variance vs baseline.
+  const validatedTable = useMemo(() => {
+    return validations
+      .filter((v) => v.verification?.school_exists !== "no")
+      .map((v) => {
+        const b = v.school_key ? baselineByKey.get(v.school_key) : undefined;
+        const baseline = b?.grand_total ?? 0;
+        const validated = v.grand_total ?? 0;
+        const diff = validated - baseline;
+        const pct = baseline > 0 ? (diff / baseline) * 100 : 0;
+        const hasBaseline = baseline > 0;
+        // A material variance is anything beyond ±2% (rounding tolerance).
+        const hasVariance = hasBaseline ? Math.abs(pct) >= 2 : diff !== 0;
+        const opStatus = v.verification?.operational_status;
+        return {
+          school: v.school_name || "Unknown",
+          code: v.school_code || v.school_key || "—",
+          state: v.state || "—",
+          lga: v.lga || "—",
+          type: v.school_type || "—",
+          baseline,
+          validated,
+          diff,
+          pct,
+          hasBaseline,
+          hasVariance,
+          status: v.status || "draft",
+          operational: opStatus ? OP_STATUS_LABEL.get(opStatus) || opStatus : null,
+          operationalValue: opStatus || null,
+        };
+      })
+      .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct) || a.school.localeCompare(b.school));
+  }, [validations, baselineByKey]);
+
+  return {
+    validations, baselines, stats, byState, points, nonExistent, validatedTable,
+    loading, reload, ALL_CLASSES, simulate, setSimulate,
+  };
 };

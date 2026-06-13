@@ -88,35 +88,70 @@ export function generateBloombergSimulation(seed = 4242): BloombergSimDataset {
       const validated = rng() < 0.88;
       if (!validated) continue;
 
+      const lat = place.lat + (((idx * 13) % 10) - 5) * 0.04;
+      const lng = place.lng + (((idx * 7) % 10) - 5) * 0.04;
+
+      // ~85% finalized/sent, rest drafts.
+      const r = rng();
+      const status = r < 0.7 ? "sent" : r < 0.85 ? "finalized" : "draft";
+
+      // ~9% of validated visits find the school does not exist / not found.
+      const exists = rng() > 0.09;
+
+      if (!exists) {
+        const reasons = ["wrong_location", "renamed", "closed_down", "inaccessible", "other"];
+        const reason = reasons[Math.floor(rng() * reasons.length)];
+        validations.push({
+          id: `sim-bbg-${idx}`,
+          school_key: key,
+          school_name: name,
+          school_type: type,
+          school_code: key,
+          state: place.state,
+          lga: `${place.state} Municipal`,
+          ward: `${place.state} Ward ${(i % 8) + 1}`,
+          gps_lat: lat,
+          gps_lng: lng,
+          total_male: 0,
+          total_female: 0,
+          grand_total: 0,
+          verification: { school_exists: "no", not_found_reason: reason },
+          status,
+          submitted_at: status === "draft" ? null : daysAgo(idx % 45),
+          created_at: daysAgo((idx % 45) + 1),
+        });
+        continue;
+      }
+
       // Validated figures deviate from baseline by -28% .. +12% (typically lower).
       const variance = -0.28 + rng() * 0.4;
       const valTotal = Math.max(40, Math.round(baseTotal * (1 + variance)));
       const valMale = Math.round(valTotal * (0.46 + rng() * 0.08));
       const valFemale = valTotal - valMale;
 
-      // ~85% finalized/sent, rest drafts.
-      const r = rng();
-      const status = r < 0.7 ? "sent" : r < 0.85 ? "finalized" : "draft";
-
-      const lat = place.lat + (((idx * 13) % 10) - 5) * 0.04;
-      const lng = place.lng + (((idx * 7) % 10) - 5) * 0.04;
+      const opStates = ["operational", "operational", "operational", "partially", "merged"];
+      const opStatus = opStates[Math.floor(rng() * opStates.length)];
 
       validations.push({
         id: `sim-bbg-${idx}`,
         school_key: key,
         school_name: name,
         school_type: type,
+        school_code: key,
         state: place.state,
         lga: `${place.state} Municipal`,
+        ward: `${place.state} Ward ${(i % 8) + 1}`,
         gps_lat: lat,
         gps_lng: lng,
         total_male: valMale,
         total_female: valFemale,
         grand_total: valTotal,
+        verification: { school_exists: "yes", operational_status: opStatus, register_available: rng() > 0.1 },
         status,
         submitted_at: status === "draft" ? null : daysAgo(idx % 45),
         created_at: daysAgo((idx % 45) + 1),
       });
+
     }
   }
 
