@@ -74,6 +74,7 @@ import FollowUpScheduleEditor, {
   getIntervalDays,
 } from "@/components/CaseManagement/FollowUpScheduleEditor";
 import { CommCarePageHeader } from "@/components/ui/commcare-page-header";
+import { generateSimulatedCaseData } from "@/lib/caseSimulation";
 
 interface Case {
   id: string;
