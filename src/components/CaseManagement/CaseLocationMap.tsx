@@ -247,7 +247,7 @@ const CaseLocationMap = ({
           {/* The Nigeria boundary map always renders, even with no GPS data. */}
           <MapVisualization
             markers={markers}
-            height="500px"
+            height="min(72vh, 760px)"
             initialView="nigeria"
             showControls={true}
             showLegend={markers.length > 0}
