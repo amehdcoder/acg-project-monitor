@@ -198,6 +198,17 @@ export default function BloombergDashboard({ onClose }: Props) {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            {isOwner && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setSimulate(!simulate)}
+                className={`h-9 border-0 ${simulate ? "bg-[#2dd4a8] text-[#0c2340] hover:bg-[#22c0a0] font-semibold" : "bg-white/15 text-white hover:bg-white/25"}`}
+              >
+                <Sparkles className="h-4 w-4" />
+                <span className="ml-1.5 hidden sm:inline">{simulate ? "Simulating" : "Simulate"}</span>
+              </Button>
+            )}
             <Button size="sm" variant="secondary" onClick={reload} disabled={loading} className="h-9 bg-white/15 text-white hover:bg-white/25 border-0">
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </Button>
