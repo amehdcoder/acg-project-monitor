@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import {
   PRIMARY_CLASSES, JSS_CLASSES, ALL_CLASSES, emptyEnrolment, sectionTotals,
   grandTotals, OPERATIONAL_STATUS, NOT_FOUND_REASONS, type EnrolmentCounts,
-  type BloombergSchool,
+  type BloombergSchool, normalizeMissingLabel,
 } from "@/lib/bloomberg/definition";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +34,7 @@ const uniq = (rows: BloombergSchool[], val: keyof BloombergSchool, lbl: keyof Bl
   const m = new Map<string, string>();
   rows.forEach((r) => {
     const v = (r[val] as string) || "";
-    if (v) m.set(v, ((r[lbl] as string) || v));
+    if (v) m.set(v, normalizeMissingLabel((r[lbl] as string) || v) || v);
   });
   return [...m.entries()].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
 };

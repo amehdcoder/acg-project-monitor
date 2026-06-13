@@ -8,7 +8,7 @@
 
 import ExcelJS from "exceljs";
 import { supabase } from "@/integrations/supabase/client";
-import { ALL_CLASSES } from "@/lib/bloomberg/definition";
+import { ALL_CLASSES, normalizeMissingLabel } from "@/lib/bloomberg/definition";
 
 import fmohLogo from "@/assets/logo-fmoh.png";
 import handsLogo from "@/assets/logo-hands.png";
@@ -252,15 +252,15 @@ export async function importSchoolTemplate(file: File): Promise<SchoolImportResu
 
     schoolRows.push({
       school_key: key,
-      label: norm(get(row, "label")) || null,
+      label: normalizeMissingLabel(norm(get(row, "label"))) || null,
       state: norm(get(row, "state")) || null,
       lga: norm(get(row, "lga")) || null,
       ward: norm(get(row, "ward")) || null,
       location: norm(get(row, "location")) || null,
-      state_label: norm(get(row, "state_label")) || null,
-      lga_label: norm(get(row, "lga_label")) || null,
-      ward_label: norm(get(row, "ward_label")) || null,
-      location_label: norm(get(row, "location_label")) || null,
+      state_label: normalizeMissingLabel(norm(get(row, "state_label"))) || null,
+      lga_label: normalizeMissingLabel(norm(get(row, "lga_label"))) || null,
+      ward_label: normalizeMissingLabel(norm(get(row, "ward_label"))) || null,
+      location_label: normalizeMissingLabel(norm(get(row, "location_label"))) || null,
       school_code: norm(get(row, "school_code")) || null,
       school_name: schoolName,
       school_type: norm(get(row, "school_type")) || null,
