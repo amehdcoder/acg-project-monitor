@@ -43,8 +43,14 @@ const CaseLocationMap = ({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (simulatedMarkers) {
+      setMarkers(simulatedMarkers);
+      setLoading(false);
+      return;
+    }
     if (user?.id) fetchCaseLocations();
-  }, [user?.id, projectFilter, caseTypeFilter, statusFilter]);
+  }, [user?.id, projectFilter, caseTypeFilter, statusFilter, simulatedMarkers]);
+
 
   const fetchCaseLocations = async () => {
     if (!user?.id) return;
