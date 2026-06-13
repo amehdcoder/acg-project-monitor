@@ -1261,6 +1261,46 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   const { Icon: RowIcon, bg: rowBg, fg: rowFg } = rowIconSet[idx % rowIconSet.length];
                   const isFinalized = form.status === "active";
 
+                  // Bloomberg markers launch their dedicated custom UI instead of the generic FormFiller.
+                  const bbgKind = (form.settings as any)?.bloomberg_kind as ("form" | "dashboard" | undefined);
+                  if (bbgKind === "form" || bbgKind === "dashboard") {
+                    const isDash = bbgKind === "dashboard";
+                    const BbgIcon = isDash ? BarChart3 : ClipboardCheck;
+                    return (
+                      <div
+                        key={form.id}
+                        className="group flex items-center gap-3 border-l-4 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
+                        style={{ borderLeftColor: "#2563eb" }}
+                      >
+                        <button
+                          onClick={() => (isDash ? setShowBloombergDash(true) : setShowBloombergForm(true))}
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#E3ECFB]"
+                          aria-label={`Open ${form.name}`}
+                        >
+                          <BbgIcon className="h-5 w-5 text-[#2563eb]" strokeWidth={2} />
+                        </button>
+                        <button
+                          onClick={() => (isDash ? setShowBloombergDash(true) : setShowBloombergForm(true))}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <h4 className="truncate text-[15px] font-bold text-[#2563eb]">{form.name}</h4>
+                          <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">{form.description || "Bloomberg School Eye Health tool"}</p>
+                        </button>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 text-destructive"
+                            onClick={() => setFormToDelete(form)}
+                            aria-label="Remove from project"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  }
+
                   // Shared accent color for this form's parent project — same
                   // palette used by the Project dropdown above, so the trigger
                   // border/text + form name + row left-border are all in sync.
