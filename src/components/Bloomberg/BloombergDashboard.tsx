@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin, Download, Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid,
@@ -7,6 +7,9 @@ import {
 import MapVisualization from "@/components/MapVisualization/MapVisualization";
 import { MapMarker } from "@/components/MapVisualization/types";
 import { useBloombergDashboard } from "@/hooks/useBloombergDashboard";
+import { useAuth } from "@/hooks/useAuth";
+import { exportSchoolTemplate, importSchoolTemplate } from "@/lib/bloomberg/schoolTemplate";
+import { toast } from "sonner";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
 
 const NAVY = "#0c2340";
