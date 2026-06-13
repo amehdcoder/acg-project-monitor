@@ -608,12 +608,19 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     try {
       const form = forms.find(f => f.id === formId);
       const bbgKind = (form?.settings as any)?.bloomberg_kind as ("form" | "dashboard" | undefined);
-      // The Bloomberg form and its Validation Dashboard are permanently linked —
+      const scKind = (form?.settings as any)?.seeclear_kind as ("form" | "dashboard" | undefined);
+      // The form and its Dashboard are permanently linked —
       // removing the form also removes the dashboard from the same project.
       const idsToDelete = [formId];
       if (bbgKind === "form" && form?.project_id) {
         const linkedDash = forms.find(
           f => f.project_id === form.project_id && (f.settings as any)?.bloomberg_kind === "dashboard",
+        );
+        if (linkedDash) idsToDelete.push(linkedDash.id);
+      }
+      if (scKind === "form" && form?.project_id) {
+        const linkedDash = forms.find(
+          f => f.project_id === form.project_id && (f.settings as any)?.seeclear_kind === "dashboard",
         );
         if (linkedDash) idsToDelete.push(linkedDash.id);
       }
