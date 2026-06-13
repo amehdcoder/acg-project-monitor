@@ -17,6 +17,7 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import handsLogo from "@/assets/logo-hands.png";
 import coatOfArms from "@/assets/nigeria-coat-of-arms.png.asset.json";
+import { pctTone, toneColor } from "@/lib/conditionalFormatting";
 
 const NAVY = "#0c2340";
 const BLUE = "#2563eb";
