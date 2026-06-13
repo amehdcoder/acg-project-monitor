@@ -184,6 +184,31 @@ export function generateSimulatedCaseData(): SimulatedDataset {
   ).length;
   const highPriority = cases.filter((c) => c.properties.priority === "high").length;
 
+  // Cases-by-state (Top 5) aggregated from the synthetic set, sorted desc.
+  const stateCounts = new Map<string, number>();
+  cases.forEach((c) => {
+    const s = c.properties.state === "FCT" ? "FCT (Abuja)" : c.properties.state;
+    stateCounts.set(s, (stateCounts.get(s) || 0) + 1);
+  });
+  const casesByState = [...stateCounts.entries()]
+    .map(([state, count]) => ({ state, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  const followUpTrends = [
+    { label: "May 18", completed: 120, pending: 180, overdue: 60 },
+    { label: "May 25", completed: 150, pending: 175, overdue: 72 },
+    { label: "Jun 1", completed: 168, pending: 165, overdue: 80 },
+    { label: "Jun 8", completed: 190, pending: 172, overdue: 76 },
+    { label: "Jun 15", completed: 215, pending: 168, overdue: 84 },
+  ];
+
+  const recentActivity: SimulatedDataset["insights"]["recentActivity"] = [
+    { type: "overdue", title: "CASE-2025-01245 marked as Overdue", meta: "by Muhammad B. · 2h ago" },
+    { type: "registered", title: "New case registered in Kano State", meta: "by Amina A. · 5h ago" },
+    { type: "completed", title: "Follow-up completed for CASE-2025-01244", meta: "by Chioma U. · 1d ago" },
+  ];
+
   return {
     cases,
     markers,
@@ -195,6 +220,11 @@ export function generateSimulatedCaseData(): SimulatedDataset {
       overdue,
       activeFieldTeams: ASSIGNEES.length,
       highPriority,
+    },
+    insights: {
+      casesByState,
+      followUpTrends,
+      recentActivity,
     },
   };
 }
