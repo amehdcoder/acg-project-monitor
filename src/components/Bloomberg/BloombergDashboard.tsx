@@ -302,7 +302,7 @@ export default function BloombergDashboard({ onClose }: Props) {
         {/* KPI tiles */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Kpi icon={School} label="Total Schools" value={fmt(stats.totalSchools)} tint={NAVY} />
-          <Kpi icon={CheckCircle2} label="Schools Validated" value={fmt(stats.validatedSchools)} tint={TEAL} sub={`${stats.coveragePct.toFixed(1)}% coverage`} />
+          <Kpi icon={CheckCircle2} label="Schools Validated" value={fmt(stats.validatedSchools)} tint={toneColor(pctTone(stats.coveragePct, { good: 75, ok: 50, warn: 25 }))} sub={`${stats.coveragePct.toFixed(1)}% coverage`} />
           <Kpi icon={FileText} label="Submissions" value={fmt(stats.submittedCount)} tint={BLUE} sub={`${stats.draftCount} drafts`} />
           <Kpi icon={Users} label="Pupils Validated" value={fmt(stats.validatedTotal)} tint={PINK} />
           <Kpi icon={Users} label="Baseline (LEA)" value={fmt(stats.baselineTotal)} tint="#64748b" sub="for validated schools" />
