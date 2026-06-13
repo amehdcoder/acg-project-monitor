@@ -28,6 +28,7 @@ import AppSettingsDialog from "@/components/AppSettingsDialog";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import AppUpdateButton from "@/components/AppUpdateButton";
 import InstallAppButton from "@/components/InstallAppButton";
+import CollaboratorPresence from "@/components/CollaboratorPresence";
 
 interface Profile {
   first_name: string;
