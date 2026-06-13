@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ALL_CLASSES } from "@/lib/bloomberg/definition";
+import { generateBloombergSimulation } from "@/lib/bloomberg/bloombergSimulation";
 
 export interface ValidationRow {
   id: string;
@@ -145,5 +146,5 @@ export const useBloombergDashboard = () => {
     [validations],
   );
 
-  return { validations, baselines, stats, byState, points, loading, reload, ALL_CLASSES };
+  return { validations, baselines, stats, byState, points, loading, reload, ALL_CLASSES, simulate, setSimulate };
 };
