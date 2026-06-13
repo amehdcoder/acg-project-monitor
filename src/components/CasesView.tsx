@@ -842,7 +842,7 @@ const CasesView = () => {
     if (inlineModules.length > 0) {
       setFollowUpForms(inlineModules);
       if (inlineModules.length === 1) {
-        launchFormFiller(inlineModules[0], caseItem);
+        launchFormFiller(inlineModules[0], resolvedCase);
       } else {
         setShowFormPicker(true);
       }
