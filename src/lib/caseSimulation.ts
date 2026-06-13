@@ -115,6 +115,7 @@ export function generateSimulatedCaseData(): SimulatedDataset {
       const code = `CASE-2025-${String(11000 + idx).padStart(5, "0")}`;
       const programme = PROGRAMMES[idx % PROGRAMMES.length];
       const assignee = ASSIGNEES[idx % ASSIGNEES.length];
+      const role = ROLES[idx % ROLES.length];
 
       // jitter coordinates a little so points don't fully overlap
       const lat = place.lat + (((idx * 13) % 10) - 5) * 0.03;
