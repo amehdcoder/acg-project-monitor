@@ -1728,7 +1728,7 @@ const CasesView = () => {
                               onClick={() => setSelectedCaseId(caseItem.id)}
                             >
                               <td className="px-3 py-3">
-                                <p className="font-semibold text-primary text-xs">{code}</p>
+                                <p className="font-semibold text-primary text-xs whitespace-nowrap">{code}</p>
                                 <p className="text-[11px] text-muted-foreground leading-tight mt-0.5 max-w-[140px]">{title}</p>
                               </td>
                               <td className="px-3 py-3">
