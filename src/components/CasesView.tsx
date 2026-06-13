@@ -1253,7 +1253,9 @@ const CasesView = () => {
       c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCaseType = caseTypeFilter === "all" || c.caseTypeId === caseTypeFilter;
     const matchesStatus = statusFilter === "all" || c.status === statusFilter;
-    return matchesSearch && matchesCaseType && (simulate ? matchesStatus : true);
+    const matchesPriority =
+      priorityFilter === "all" || (c.properties?.priority as string) === priorityFilter;
+    return matchesSearch && matchesCaseType && matchesPriority && (simulate ? matchesStatus : true);
   });
 
   const getTimeSince = (dateStr: string) => {
