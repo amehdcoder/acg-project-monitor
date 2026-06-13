@@ -1366,6 +1366,75 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     );
                   }
 
+                  // See Clear markers launch their dedicated custom UI.
+                  const scKind = (form.settings as any)?.seeclear_kind as ("form" | "dashboard" | undefined);
+                  if (scKind === "form" || scKind === "dashboard") {
+                    const isDash = scKind === "dashboard";
+                    const ScIcon = isDash ? BarChart3 : ClipboardCheck;
+                    return (
+                      <div
+                        key={form.id}
+                        className="group flex items-center gap-3 border-l-4 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
+                        style={{ borderLeftColor: "#14b8a6" }}
+                      >
+                        <button
+                          onClick={() => (isDash ? setShowSeeClearDash(true) : setShowSeeClearForm(true))}
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#DCF3F0]"
+                          aria-label={`Open ${form.name}`}
+                        >
+                          <ScIcon className="h-5 w-5 text-[#14b8a6]" strokeWidth={2} />
+                        </button>
+                        <button
+                          onClick={() => (isDash ? setShowSeeClearDash(true) : setShowSeeClearForm(true))}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <h4 className="truncate text-[15px] font-bold text-[#0f766e]">{form.name}</h4>
+                          <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">{form.description || "See Clear eye health monitoring tool"}</p>
+                        </button>
+                        {!isDash && (
+                          <span
+                            className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                              form.status === "active"
+                                ? "bg-[#E2F5EC] text-[#22A55A]"
+                                : "bg-[#E3ECFB] text-[#2F6FE6]"
+                            }`}
+                          >
+                            {form.status === "active" ? "Finalized" : "Draft"}
+                          </span>
+                        )}
+                        {isAdmin && !isDash && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-[#0f766e]">
+                                <ChevronRight className="h-5 w-5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {form.status !== "active" && (
+                                <DropdownMenuItem onClick={() => handleUpdateFormStatus(form.id, "active")}>
+                                  <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
+                                  Set Active (Finalize)
+                                </DropdownMenuItem>
+                              )}
+                              {form.status !== "draft" && (
+                                <DropdownMenuItem onClick={() => handleUpdateFormStatus(form.id, "draft")}>
+                                  <FileEdit className="mr-2 h-4 w-4 text-yellow-600" />
+                                  Set Draft
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => setFormToDelete(form)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Remove from project
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                    );
+                  }
+
+
                   // Shared accent color for this form's parent project — same
                   // palette used by the Project dropdown above, so the trigger
                   // border/text + form name + row left-border are all in sync.
