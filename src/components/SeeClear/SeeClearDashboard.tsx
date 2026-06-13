@@ -15,7 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import handsLogo from "@/assets/logo-hands.png";
+import handsLogo from "@/assets/logo-amehnities.png";
 import coatOfArms from "@/assets/nigeria-coat-of-arms.png.asset.json";
 import { pctTone, toneColor } from "@/lib/conditionalFormatting";
 
