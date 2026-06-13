@@ -22,6 +22,7 @@ interface Profile {
   ward: string | null;
   is_active: boolean;
   is_owner: boolean;
+  is_co_owner?: boolean;
   approval_status: string;
   avatar_url?: string | null;
 }
