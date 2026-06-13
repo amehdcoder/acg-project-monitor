@@ -1699,7 +1699,7 @@ const CasesView = () => {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-border/60 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                          <th className="font-medium px-3 py-2.5">Case</th>
+                          <th className="font-medium px-3 py-2.5 min-w-[150px]">Case</th>
                           <th className="font-medium px-3 py-2.5">Assignee</th>
                           <th className="font-medium px-3 py-2.5">Status</th>
                           <th className="font-medium px-3 py-2.5">Location</th>
