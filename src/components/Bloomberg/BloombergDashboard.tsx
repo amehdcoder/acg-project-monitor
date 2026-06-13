@@ -178,10 +178,31 @@ export default function BloombergDashboard({ onClose }: Props) {
             <img src={bloombergLogo} alt="Bloomberg School Eye Health" className="h-7 w-7 rounded" loading="lazy" width={28} height={28} />
             <span className="text-sm font-semibold leading-tight">Bloomberg School<br />Eye Health Project</span>
           </div>
-          <Button size="sm" variant="secondary" onClick={reload} disabled={loading} className="h-9 bg-white/15 text-white hover:bg-white/25 border-0">
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          </Button>
-        </div>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="secondary" disabled={capturing} className="h-9 bg-white/15 text-white hover:bg-white/25 border-0">
+                  {capturing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  <span className="ml-1.5 hidden sm:inline">Export</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => exportPDF()}>
+                  <FileText className="mr-2 h-4 w-4" /> Export as PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportImage("png")}>
+                  <FileImage className="mr-2 h-4 w-4" /> Export as PNG
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportImage("jpeg")}>
+                  <FileImage className="mr-2 h-4 w-4" /> Export as JPEG
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button size="sm" variant="secondary" onClick={reload} disabled={loading} className="h-9 bg-white/15 text-white hover:bg-white/25 border-0">
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+
         <h1 className="mt-3 text-2xl font-bold">Validation Dashboard</h1>
         <p className="text-sm text-white/70">Independent school enrolment validation — admin analytics</p>
         {canManage && (
