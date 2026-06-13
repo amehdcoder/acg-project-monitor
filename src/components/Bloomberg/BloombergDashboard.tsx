@@ -410,6 +410,129 @@ export default function BloombergDashboard({ onClose }: Props) {
             </div>
           )}
         </div>
+
+        {/* Schools that do not exist + reason analysis */}
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="mb-1 flex items-center gap-2">
+            <XCircle className="h-4 w-4 text-red-600" />
+            <h3 className="text-sm font-semibold text-foreground">Schools That Do Not Exist / Not Found</h3>
+            <span className="ml-auto rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-bold text-red-700">{fmt(nonExistent.total)}</span>
+          </div>
+          <p className="mb-3 text-xs text-muted-foreground">Schools that field validators could not locate, with the documented reason for each.</p>
+          {nonExistent.total === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">No schools have been reported as non-existent.</p>
+          ) : (
+            <>
+              {/* Reason analysis bars */}
+              <div className="mb-4 space-y-2">
+                {nonExistent.reasonAnalysis.map((r) => (
+                  <div key={r.key} className="flex items-center gap-3">
+                    <span className="w-44 shrink-0 truncate text-xs font-medium text-foreground" title={r.name}>{r.name}</span>
+                    <div className="relative h-5 flex-1 overflow-hidden rounded bg-muted">
+                      <div className="h-full rounded" style={{ width: `${Math.max(4, r.pct)}%`, background: REASON_COLORS[r.key] || "#64748b" }} />
+                    </div>
+                    <span className="w-24 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{r.count} ({r.pct.toFixed(0)}%)</span>
+                  </div>
+                ))}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                      <th className="py-2 pr-3">School</th>
+                      <th className="py-2 px-3">Code</th>
+                      <th className="py-2 px-3">State</th>
+                      <th className="py-2 px-3">LGA</th>
+                      <th className="py-2 px-3">Reason</th>
+                      <th className="py-2 pl-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {nonExistent.rows.map((r, i) => (
+                      <tr key={i} className="border-b border-border/50 last:border-0">
+                        <td className="py-2 pr-3 font-medium text-foreground">{r.school}</td>
+                        <td className="py-2 px-3 text-xs text-muted-foreground">{r.code}</td>
+                        <td className="py-2 px-3">{r.state}</td>
+                        <td className="py-2 px-3">{r.lga}</td>
+                        <td className="py-2 px-3">
+                          <span className="inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold text-white" style={{ background: REASON_COLORS[r.reasonValue] || "#64748b" }}>
+                            {r.reason}
+                          </span>
+                        </td>
+                        <td className="py-2 pl-3"><StatusBadge status={r.status} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Validated schools register with status & variance */}
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="mb-1 flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 text-[#2563eb]" />
+            <h3 className="text-sm font-semibold text-foreground">Validated Schools — Status & Variance Register</h3>
+            <span className="ml-auto rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700">{fmt(validatedTable.length)}</span>
+          </div>
+          <p className="mb-3 text-xs text-muted-foreground">Every validated school with baseline vs validated enrolment, whether a variance exists and its magnitude. Rows tinted by variance severity.</p>
+          {validatedTable.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">No validated schools yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <th className="py-2 pr-3">School</th>
+                    <th className="py-2 px-3">State / LGA</th>
+                    <th className="py-2 px-3">Operational</th>
+                    <th className="py-2 px-3 text-right">Baseline</th>
+                    <th className="py-2 px-3 text-right">Validated</th>
+                    <th className="py-2 px-3 text-center">Variance?</th>
+                    <th className="py-2 px-3 text-right">Diff</th>
+                    <th className="py-2 px-3 text-right">%</th>
+                    <th className="py-2 pl-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {validatedTable.map((r, i) => {
+                    const sev = !r.hasVariance ? 0 : Math.abs(r.pct) >= 20 ? 3 : Math.abs(r.pct) >= 10 ? 2 : 1;
+                    const rowBg = sev === 3 ? "bg-red-50/70" : sev === 2 ? "bg-amber-50/60" : sev === 1 ? "bg-yellow-50/40" : "bg-emerald-50/40";
+                    return (
+                      <tr key={i} className={`border-b border-border/50 last:border-0 ${rowBg}`}>
+                        <td className="py-2 pr-3">
+                          <div className="font-medium text-foreground">{r.school}</div>
+                          <div className="text-[11px] text-muted-foreground">{r.code} · {r.type}</div>
+                        </td>
+                        <td className="py-2 px-3 text-xs">{r.state}<br /><span className="text-muted-foreground">{r.lga}</span></td>
+                        <td className="py-2 px-3"><OpBadge value={r.operationalValue} label={r.operational} /></td>
+                        <td className="py-2 px-3 text-right tabular-nums">{r.hasBaseline ? fmt(r.baseline) : "—"}</td>
+                        <td className="py-2 px-3 text-right tabular-nums">{fmt(r.validated)}</td>
+                        <td className="py-2 px-3 text-center">
+                          {!r.hasBaseline ? (
+                            <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">No baseline</span>
+                          ) : r.hasVariance ? (
+                            <span className="inline-block rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">Variance</span>
+                          ) : (
+                            <span className="inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Match</span>
+                          )}
+                        </td>
+                        <td className={`py-2 px-3 text-right tabular-nums ${!r.hasBaseline ? "text-muted-foreground" : r.diff < 0 ? "text-red-600" : r.diff > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>
+                          {r.hasBaseline ? `${r.diff >= 0 ? "+" : ""}${fmt(r.diff)}` : "—"}
+                        </td>
+                        <td className={`py-2 px-3 text-right font-semibold tabular-nums ${!r.hasBaseline ? "text-muted-foreground" : Math.abs(r.pct) >= 20 ? "text-red-600" : Math.abs(r.pct) >= 10 ? "text-amber-600" : r.hasVariance ? "text-yellow-600" : "text-emerald-600"}`}>
+                          {r.hasBaseline ? `${r.pct >= 0 ? "+" : ""}${r.pct.toFixed(1)}%` : "—"}
+                        </td>
+                        <td className="py-2 pl-3"><StatusBadge status={r.status} /></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
