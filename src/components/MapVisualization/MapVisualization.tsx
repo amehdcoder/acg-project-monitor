@@ -135,6 +135,7 @@ const MapVisualization = ({
   const markersLayerRef = useRef<MarkerClusterGroup | null>(null);
   const individualMarkersRef = useRef<L.LayerGroup | null>(null);
   const heatmapLayerRef = useRef<L.LayerGroup | null>(null);
+  const boundaryLayerRef = useRef<L.GeoJSON | null>(null);
 
   const [currentView, setCurrentView] = useState<MapViewLevel>(initialView);
   const [currentLayer, setCurrentLayer] = useState<MapLayerType>("standard");
