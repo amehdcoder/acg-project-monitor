@@ -226,12 +226,11 @@ export default function BloombergFormFiller({ onClose }: Props) {
                   <Field label="Ward" required><Sel value={ward} onChange={(v) => { setWard(v); setLocation(""); setSchoolKey(""); }} options={wardOpts} placeholder="Select ward" disabled={!lga} /></Field>
                   <Field label="Community / Location" required><Sel value={location} onChange={(v) => { setLocation(v); setSchoolKey(""); }} options={locOpts} placeholder="Select community or location" disabled={!ward} /></Field>
                   <Field label="School Name" required>
-                    <Select value={schoolKey} onValueChange={setSchoolKey}>
-                      <SelectTrigger className="h-11"><SelectValue placeholder={`Select school (${schoolOpts.length})`} /></SelectTrigger>
-                      <SelectContent className="max-h-72">
-                        {schoolOpts.map((s) => <SelectItem key={s.school_key} value={s.school_key}>{s.school_name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <SchoolSearchCombobox
+                      schools={schoolOpts}
+                      value={schoolKey}
+                      onChange={(v) => setSchoolKey(v)}
+                    />
                   </Field>
                   {selectedSchool && (
                     <div className="grid grid-cols-2 gap-2 rounded-lg bg-[#f4f6fb] p-3 text-xs">
@@ -402,3 +401,103 @@ const EnrolTable = ({ title, classes, enrol, onChange, totals }: { title: string
     </table>
   </div>
 );
+
+const SchoolSearchCombobox = ({
+  schools,
+  value,
+  onChange,
+  disabled,
+}: {
+  schools: BloombergSchool[];
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}) => {
+  const [open, setOpen] = useState(false);
+  const selected = useMemo(() => schools.find((s) => s.school_key === value), [schools, value]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className={cn(
+            "flex h-11 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background transition-colors hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            !value && "text-muted-foreground"
+          )}
+        >
+          <span className="truncate">
+            {selected
+              ? selected.school_name
+              : `Search & select school (${schools.length.toLocaleString()})`}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-[--radix-popover-trigger-width] p-0"
+        align="start"
+        sideOffset={4}
+      >
+        <Command>
+          <CommandInput
+            placeholder={`Type to search among ${schools.length.toLocaleString()} schools…`}
+            className="h-11 border-none focus:ring-0"
+          />
+          <CommandList className="max-h-[320px]">
+            <CommandEmpty className="flex flex-col items-center py-6 text-center text-sm text-muted-foreground">
+              <Search className="mb-2 h-5 w-5 opacity-40" />
+              <p>No schools match your search.</p>
+              <p className="mt-1 text-xs">Try a different spelling or reduce filters.</p>
+            </CommandEmpty>
+            <CommandGroup>
+              {schools.map((s) => (
+                <CommandItem
+                  key={s.school_key}
+                  value={`${s.school_name} ${s.school_code ?? ""} ${s.school_type ?? ""} ${s.ownership ?? ""}`}
+                  onSelect={() => {
+                    onChange(s.school_key === value ? "" : s.school_key);
+                    setOpen(false);
+                  }}
+                  className="flex cursor-pointer flex-col items-start py-2.5"
+                >
+                  <div className="flex w-full items-center justify-between gap-2">
+                    <span
+                      className={cn(
+                        "truncate text-sm",
+                        value === s.school_key && "font-semibold text-[#1f6feb]"
+                      )}
+                    >
+                      {s.school_name}
+                    </span>
+                    {value === s.school_key && (
+                      <Check className="ml-1 h-4 w-4 shrink-0 text-[#1f6feb]" />
+                    )}
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {s.school_code && (
+                      <span className="rounded-md bg-[#f4f6fb] px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        {s.school_code}
+                      </span>
+                    )}
+                    {s.school_type && (
+                      <span className="rounded-md bg-[#f4f6fb] px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                        {s.school_type}
+                      </span>
+                    )}
+                    {s.ownership && (
+                      <span className="rounded-md bg-[#f4f6fb] px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                        {s.ownership}
+                      </span>
+                    )}
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+};
