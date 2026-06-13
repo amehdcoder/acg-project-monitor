@@ -1743,7 +1743,7 @@ const CasesView = () => {
                                 </div>
                               </td>
                               <td className="px-3 py-3">
-                                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${ds.cls}`}>{ds.label}</span>
+                                <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-medium ${ds.cls}`}>{ds.label}</span>
                               </td>
                               <td className="px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">{location}</td>
                               <td className="px-3 py-3">
