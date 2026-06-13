@@ -20,7 +20,7 @@ import {
   buildCommunityTreatmentRegister, COMMUNITY_TREATMENT_REGISTER_NAME,
 } from "@/lib/treatmentDataForms";
 import { generateTreatmentRollupWorkbook } from "@/lib/treatmentRollup";
-import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck, BarChart3, Eye } from "lucide-react";
+import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck, BarChart3 } from "lucide-react";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
 import {
   FileText,
