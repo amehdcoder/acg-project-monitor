@@ -10,6 +10,19 @@ export const BLOOMBERG_DASH_NAME = "Bloomberg Validation Dashboard";
 export const BLOOMBERG_DASH_DESC =
   "Baseline vs validated enrolment analytics, discrepancies & map (admin only).";
 
+// Legacy placeholder found in source CSVs / LEA files for missing Ward/Community.
+const LEGACY_MISSING_TEXT = "not provided in lea file";
+// Unified display label for missing ward / community / location data.
+export const MISSING_LOCATION_LABEL = "Not Specified in the LGA School Enrollment Dataset";
+
+/** Normalize any label that contains the legacy LEA missing placeholder. */
+export const normalizeMissingLabel = (text: string | null | undefined): string | null => {
+  if (!text) return text ?? null;
+  const t = text.trim();
+  if (t.toLowerCase() === LEGACY_MISSING_TEXT) return MISSING_LOCATION_LABEL;
+  return t;
+};
+
 export interface ClassDef {
   key: string;
   label: string;
