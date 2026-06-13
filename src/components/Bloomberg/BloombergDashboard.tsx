@@ -1,6 +1,9 @@
 import { useMemo, useRef, useState } from "react";
-import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin, Download, Upload, Loader2 } from "lucide-react";
+import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin, Download, Upload, Loader2, FileImage } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid,
 } from "recharts";
@@ -10,7 +13,10 @@ import { useBloombergDashboard } from "@/hooks/useBloombergDashboard";
 import { useAuth } from "@/hooks/useAuth";
 import { exportSchoolTemplate, importSchoolTemplate } from "@/lib/bloomberg/schoolTemplate";
 import { toast } from "sonner";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
+
 
 const NAVY = "#0c2340";
 const BLUE = "#2563eb";
