@@ -11,6 +11,8 @@ import UPRPSubmissionsView from "@/components/UPRP/UPRPSubmissionsView";
 import { OfficeFormsView } from "@/components/OfficeForms";
 import { ActionTrackerView } from "@/components/ActionTracker";
 import { WorkplanView } from "@/components/Workplan";
+import BloombergFormFiller from "@/components/Bloomberg/BloombergFormFiller";
+import BloombergDashboard from "@/components/Bloomberg/BloombergDashboard";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
 import { buildMdaSupervisoryChecklist, MDA_CHECKLIST_NAME } from "@/lib/mdaSupervisoryChecklist";
 import {
@@ -18,7 +20,7 @@ import {
   buildCommunityTreatmentRegister, COMMUNITY_TREATMENT_REGISTER_NAME,
 } from "@/lib/treatmentDataForms";
 import { generateTreatmentRollupWorkbook } from "@/lib/treatmentRollup";
-import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck } from "lucide-react";
+import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck, BarChart3 } from "lucide-react";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
 import {
   FileText,
@@ -220,6 +222,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [officeFormsOpen, setOfficeFormsOpen] = useState<null | { codes?: ("srf" | "incident" | "leave" | "stationery")[]; title?: string }>(null);
   const [showActionTracker, setShowActionTracker] = useState(false);
   const [showWorkplan, setShowWorkplan] = useState(false);
+  const [showBloombergForm, setShowBloombergForm] = useState(false);
+  const [showBloombergDash, setShowBloombergDash] = useState(false);
   const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [showFormsExplorer, setShowFormsExplorer] = useState(false);
   const [openTopFolder, setOpenTopFolder] = useState<"custom" | "standard" | null>("custom");
@@ -278,6 +282,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       officeFormsOpen ||
       showActionTracker ||
       showWorkplan ||
+      showBloombergForm ||
+      showBloombergDash ||
       microplanFillingActive ||
       dashboardForm ||
       geofenceManagerForm ||
@@ -307,6 +313,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     officeFormsOpen,
     showActionTracker,
     showWorkplan,
+    showBloombergForm,
+    showBloombergDash,
     microplanFillingActive,
     dashboardForm,
     geofenceManagerForm,
@@ -849,6 +857,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         onClose={() => setShowWorkplan(false)}
       />
     );
+  }
+
+  if (showBloombergForm) {
+    return <BloombergFormFiller onClose={() => setShowBloombergForm(false)} />;
+  }
+
+  if (showBloombergDash) {
+    return <BloombergDashboard onClose={() => setShowBloombergDash(false)} />;
   }
 
 
@@ -1616,6 +1632,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
               {/* Folder-grouped standard forms */}
               {([
+                ...(isOwner ? [{
+                  id: "bloomberg_folder",
+                  title: "Bloomberg School Eye Health Project",
+                  subtitle: "School enrolment validation — form & admin dashboard",
+                  bg: "bg-[#E3ECFB]", fg: "text-[#0c2340]", chipBg: "bg-[#E3ECFB]", chipFg: "text-[#0c2340]",
+                  items: [
+                    { kind: "bloomberg_form" as const, icon: ClipboardCheck, bg: "bg-[#E3ECFB]", fg: "text-[#2563eb]", label: "School Enrolment Validation", desc: "Independent 4-step validation of LEA school enrolment (Owner only)." },
+                    { kind: "bloomberg_dash" as const, icon: BarChart3, bg: "bg-[#DCF3F0]", fg: "text-[#14b8a6]", label: "Validation Dashboard", desc: "Baseline vs validated analytics, discrepancies & map (Owner only)." },
+                  ],
+                }] : []),
                 {
                   id: "action_tracker_folder",
                   title: "Meeting Action Tracking",
@@ -1728,6 +1754,26 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     {open && (
                       <div className="bg-muted/20 border-t border-border/40">
                         {folder.items.map((it, idx) => {
+                          if (it.kind === "bloomberg_form" || it.kind === "bloomberg_dash") {
+                            const Icon = it.icon;
+                            const isDash = it.kind === "bloomberg_dash";
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => (isDash ? setShowBloombergDash(true) : setShowBloombergForm(true))}
+                                className="flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 text-left hover:bg-white/60 transition-colors border-t border-border/30 first:border-t-0"
+                              >
+                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${it.bg}`}>
+                                  <Icon className={`h-4 w-4 ${it.fg}`} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h5 className="truncate text-sm font-semibold">{it.label}</h5>
+                                  <p className="text-xs text-muted-foreground">{it.desc}</p>
+                                </div>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </button>
+                            );
+                          }
                           if (it.kind === "action_tracker") {
                             const Icon = it.icon;
                             return (
