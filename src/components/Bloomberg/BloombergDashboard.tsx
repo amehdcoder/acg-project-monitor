@@ -29,6 +29,48 @@ interface Props {
 
 const fmt = (n: number) => n.toLocaleString();
 
+// Reason colors for the "schools that do not exist" analysis.
+const REASON_COLORS: Record<string, string> = {
+  wrong_location: "#dc2626",
+  renamed: "#f59e0b",
+  closed_down: "#7c3aed",
+  inaccessible: "#0ea5e9",
+  other: "#64748b",
+};
+
+// Status pill — colors validation workflow state.
+const StatusBadge = ({ status }: { status: string }) => {
+  const map: Record<string, { label: string; bg: string; fg: string }> = {
+    sent: { label: "Submitted", bg: "#dcfce7", fg: "#15803d" },
+    finalized: { label: "Finalized", bg: "#dbeafe", fg: "#1d4ed8" },
+    draft: { label: "Draft", bg: "#fef3c7", fg: "#b45309" },
+  };
+  const s = map[status] || { label: status, bg: "#f1f5f9", fg: "#475569" };
+  return (
+    <span className="inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: s.bg, color: s.fg }}>
+      {s.label}
+    </span>
+  );
+};
+
+// Operational status pill.
+const OpBadge = ({ value, label }: { value: string | null; label: string | null }) => {
+  if (!label) return <span className="text-muted-foreground">—</span>;
+  const map: Record<string, { bg: string; fg: string }> = {
+    operational: { bg: "#dcfce7", fg: "#15803d" },
+    partially: { bg: "#fef3c7", fg: "#b45309" },
+    closed: { bg: "#fee2e2", fg: "#b91c1c" },
+    merged: { bg: "#ede9fe", fg: "#6d28d9" },
+  };
+  const s = (value && map[value]) || { bg: "#f1f5f9", fg: "#475569" };
+  return (
+    <span className="inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: s.bg, color: s.fg }}>
+      {label}
+    </span>
+  );
+};
+
+
 const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string; value: string; tint: string; sub?: string }) => (
   <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
     <div className="flex items-center justify-between">
