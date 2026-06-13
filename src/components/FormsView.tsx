@@ -323,6 +323,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     showWorkplan,
     showBloombergForm,
     showBloombergDash,
+    showSeeClearForm,
+    showSeeClearDash,
     microplanFillingActive,
     dashboardForm,
     geofenceManagerForm,
