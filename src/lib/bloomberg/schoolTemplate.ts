@@ -8,7 +8,7 @@
 
 import ExcelJS from "exceljs";
 import { supabase } from "@/integrations/supabase/client";
-import { ALL_CLASSES } from "@/lib/bloomberg/definition";
+import { ALL_CLASSES, normalizeMissingLabel } from "@/lib/bloomberg/definition";
 
 import fmohLogo from "@/assets/logo-fmoh.png";
 import handsLogo from "@/assets/logo-hands.png";
