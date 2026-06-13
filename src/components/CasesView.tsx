@@ -1800,6 +1800,7 @@ const CasesView = () => {
 
                 {/* Map */}
                 <Card className="lg:col-span-3 border border-border/60 shadow-card overflow-hidden">
+
                   <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/60">
                     <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
                       Case Distribution Across Nigeria
