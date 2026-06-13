@@ -487,7 +487,9 @@ const CasesView = () => {
           projectName: c.projects?.name || "",
           projectId: c.project_id,
           activitiesCount: Array.isArray(c.case_activities) ? c.case_activities.length : 0,
-          followUpCount: Array.isArray(c.follow_up_activities) ? c.follow_up_activities.length : 0,
+          followUpCount: Array.isArray(c.case_activities)
+            ? c.case_activities.filter((a: any) => a.activity_type === "follow_up").length
+            : 0,
           nextFollowUpDate: c.next_follow_up_date,
           followUpSchedule: ctSchedule,
         };
