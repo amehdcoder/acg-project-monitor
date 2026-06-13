@@ -32,7 +32,13 @@ export const useBloombergSchools = () => {
           .order("school_name")
           .range(from, from + PAGE - 1);
         if (error || !data || data.length === 0) break;
-        all.push(...(data as BloombergSchool[]));
+        const normalized = (data as BloombergSchool[]).map((s) => ({
+          ...s,
+          ward_label: normalizeMissingLabel(s.ward_label),
+          location_label: normalizeMissingLabel(s.location_label),
+          label: normalizeMissingLabel(s.label),
+        }));
+        all.push(...normalized);
         if (data.length < PAGE) break;
       }
       if (!cancelled) setSchools(all);
