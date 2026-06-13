@@ -1,20 +1,33 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ALL_CLASSES } from "@/lib/bloomberg/definition";
+import { ALL_CLASSES, NOT_FOUND_REASONS, OPERATIONAL_STATUS } from "@/lib/bloomberg/definition";
 import { generateBloombergSimulation } from "@/lib/bloomberg/bloombergSimulation";
+
+export interface ValidationVerification {
+  school_exists?: "yes" | "no" | "";
+  not_found_reason?: string;
+  operational_status?: string;
+  head_teacher?: string;
+  head_phone?: string;
+  date_of_visit?: string;
+  register_available?: boolean;
+}
 
 export interface ValidationRow {
   id: string;
   school_key: string | null;
   school_name: string | null;
   school_type: string | null;
+  school_code: string | null;
   state: string | null;
   lga: string | null;
+  ward: string | null;
   gps_lat: number | null;
   gps_lng: number | null;
   total_male: number | null;
   total_female: number | null;
   grand_total: number | null;
+  verification: ValidationVerification | null;
   status: string | null;
   submitted_at: string | null;
   created_at: string;
@@ -26,6 +39,10 @@ export interface BaselineRow {
   total_female: number | null;
   grand_total: number | null;
 }
+
+const REASON_LABEL = new Map(NOT_FOUND_REASONS.map((r) => [r.value, r.label]));
+const OP_STATUS_LABEL = new Map(OPERATIONAL_STATUS.map((r) => [r.value, r.label]));
+
 
 async function fetchAll<T>(table: string, columns: string): Promise<T[]> {
   const all: T[] = [];
