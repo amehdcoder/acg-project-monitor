@@ -202,6 +202,9 @@ export default function BloombergDashboard({ onClose }: Props) {
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </Button>
           </div>
+        </div>
+
+
 
         <h1 className="mt-3 text-2xl font-bold">Validation Dashboard</h1>
         <p className="text-sm text-white/70">Independent school enrolment validation — admin analytics</p>
