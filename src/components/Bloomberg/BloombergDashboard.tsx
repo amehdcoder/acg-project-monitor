@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
+import { pctTone, toneColor, varianceTone } from "@/lib/conditionalFormatting";
 
 
 const NAVY = "#0c2340";
