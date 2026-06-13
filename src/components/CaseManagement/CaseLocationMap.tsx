@@ -12,20 +12,45 @@ interface CaseLocationMapProps {
   projectFilter?: string;
   caseTypeFilter?: string;
   statusFilter?: string;
+  /** When provided (e.g. owner simulation), these markers are shown instead of live data. */
+  simulatedMarkers?: MapMarker[];
 }
+
+// Status-based pin colour so cases show as different coloured points on the map.
+const statusColor = (status?: string): string => {
+  switch ((status || "").toLowerCase()) {
+    case "closed":
+      return "#94a3b8"; // slate
+    case "overdue":
+      return "#ef4444"; // red
+    case "in_progress":
+    case "in progress":
+      return "#f59e0b"; // amber
+    case "open":
+    default:
+      return "#10b981"; // green
+  }
+};
 
 const CaseLocationMap = ({
   projectFilter = "all",
   caseTypeFilter = "all",
   statusFilter = "all",
+  simulatedMarkers,
 }: CaseLocationMapProps) => {
   const { user, isAdmin } = useAuth();
   const [markers, setMarkers] = useState<MapMarker[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (simulatedMarkers) {
+      setMarkers(simulatedMarkers);
+      setLoading(false);
+      return;
+    }
     if (user?.id) fetchCaseLocations();
-  }, [user?.id, projectFilter, caseTypeFilter, statusFilter]);
+  }, [user?.id, projectFilter, caseTypeFilter, statusFilter, simulatedMarkers]);
+
 
   const fetchCaseLocations = async () => {
     if (!user?.id) return;
@@ -142,6 +167,7 @@ const CaseLocationMap = ({
             ward: (caseData as any)?.properties?.ward,
             community: (caseData as any)?.properties?.community,
             formName: undefined,
+            markerColor: statusColor((caseData as any)?.status),
             submittedAt: sub.submitted_at || undefined,
             data: {
               _geoSource: loc.source,
@@ -185,6 +211,7 @@ const CaseLocationMap = ({
             lng: loc.lng,
             title: (matchingCase as any)?.name || "Submission Location",
             formName: undefined,
+            markerColor: statusColor((matchingCase as any)?.status),
             submittedAt: sub.submitted_at || undefined,
             data: {
               _geoSource: loc.source,
@@ -215,24 +242,28 @@ const CaseLocationMap = ({
             <span className="text-sm text-muted-foreground">Loading case locations...</span>
           </CardContent>
         </Card>
-      ) : markers.length === 0 ? (
-        <Card className="border-0 shadow-card">
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <MapPin className="h-12 w-12 text-muted-foreground/30 mb-3" />
-            <h3 className="font-semibold text-foreground">No Locations Found</h3>
-            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-              No GPS data available for the current cases. Ensure forms capture location data during submissions.
-            </p>
-          </CardContent>
-        </Card>
       ) : (
-        <MapVisualization
-          markers={markers}
-          height="500px"
-          initialView="nigeria"
-          showControls={true}
-          showLegend={true}
-        />
+        <div className="relative">
+          {/* The Nigeria boundary map always renders, even with no GPS data. */}
+          <MapVisualization
+            markers={markers}
+            height="500px"
+            initialView="nigeria"
+            showControls={true}
+            showLegend={markers.length > 0}
+            showNigeriaBoundaries={true}
+          />
+          {markers.length === 0 && (
+            <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center z-[500]">
+              <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-background/95 px-4 py-2 shadow-card ring-1 ring-border">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">
+                  No GPS data yet — points appear here once forms capture location.
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

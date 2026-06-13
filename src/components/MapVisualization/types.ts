@@ -14,6 +14,8 @@ export interface MapMarker {
   submittedAt?: string;
   submitterName?: string;
   formName?: string;
+  /** Explicit marker colour (overrides GPS-source colour). */
+  markerColor?: string;
   data?: Record<string, any>;
 }
 

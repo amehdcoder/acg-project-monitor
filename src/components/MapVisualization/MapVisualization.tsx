@@ -19,6 +19,7 @@ import {
 } from "./types";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { loadNigeriaGeo } from "@/components/Dashboard/ops/lgaGeo";
 
 // Helper function to create popup HTML content
 const createPopupContent = (marker: MapMarker): string => {
@@ -80,8 +81,8 @@ L.Icon.Default.mergeOptions({
 });
 
 // Custom marker icon
-const createCustomIcon = (isFromForm: boolean = false) => {
-  const color = isFromForm ? "#10B981" : "#d4a843";
+const createCustomIcon = (isFromForm: boolean = false, colorOverride?: string) => {
+  const color = colorOverride || (isFromForm ? "#10B981" : "#d4a843");
   return L.divIcon({
     className: "custom-marker",
     html: `<div style="
@@ -113,6 +114,8 @@ interface MapVisualizationProps {
   showControls?: boolean;
   showLegend?: boolean;
   geofences?: GeofenceBoundary[];
+  /** Always render Nigeria national + state/LGA boundaries beneath the markers. */
+  showNigeriaBoundaries?: boolean;
   onMarkerClick?: (marker: MapMarker) => void;
 }
 
@@ -123,6 +126,7 @@ const MapVisualization = ({
   showControls = true,
   showLegend = true,
   geofences = [],
+  showNigeriaBoundaries = true,
   onMarkerClick,
 }: MapVisualizationProps) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -131,6 +135,7 @@ const MapVisualization = ({
   const markersLayerRef = useRef<MarkerClusterGroup | null>(null);
   const individualMarkersRef = useRef<L.LayerGroup | null>(null);
   const heatmapLayerRef = useRef<L.LayerGroup | null>(null);
+  const boundaryLayerRef = useRef<L.GeoJSON | null>(null);
 
   const [currentView, setCurrentView] = useState<MapViewLevel>(initialView);
   const [currentLayer, setCurrentLayer] = useState<MapLayerType>("standard");
@@ -262,7 +267,7 @@ const MapVisualization = ({
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
       try {
         const isFromForm = markerData.data?._geoSource === 'form_response';
-        const icon = createCustomIcon(isFromForm);
+        const icon = createCustomIcon(isFromForm, markerData.markerColor);
         const marker = L.marker([lat, lng], { icon });
 
         const popupContent = createPopupContent(markerData);
@@ -272,7 +277,7 @@ const MapVisualization = ({
 
         clusterGroup.addLayer(marker);
 
-        const individualMarker = L.marker([lat, lng], { icon: createCustomIcon(isFromForm) });
+        const individualMarker = L.marker([lat, lng], { icon: createCustomIcon(isFromForm, markerData.markerColor) });
         individualMarker.bindPopup(popupContent, { maxWidth: 300, className: "custom-popup" });
         individualGroup.addLayer(individualMarker);
       } catch (e) {
@@ -360,6 +365,46 @@ const MapVisualization = ({
       geofenceLayers.forEach((layer) => map.removeLayer(layer));
     };
   }, [geofences, isMapReady]);
+
+  // Always render the Nigeria national + state/LGA boundaries beneath markers so
+  // the country outline is visible even when there is no GPS data to plot.
+  useEffect(() => {
+    if (!isMapReady || !mapRef.current || !showNigeriaBoundaries) return;
+    const map = mapRef.current;
+    let cancelled = false;
+
+    loadNigeriaGeo()
+      .then((geo) => {
+        if (cancelled || !mapRef.current) return;
+        if (boundaryLayerRef.current) {
+          try { map.removeLayer(boundaryLayerRef.current); } catch { /* noop */ }
+          boundaryLayerRef.current = null;
+        }
+        const layer = L.geoJSON(geo, {
+          interactive: false,
+          style: () => ({
+            color: "#64748b",       // visible state/LGA boundary lines
+            weight: 0.6,
+            opacity: 0.65,
+            fillColor: "#bbf7d0",   // soft green land fill, matching the design
+            fillOpacity: 0.12,
+          }),
+        });
+        layer.addTo(map);
+        try { layer.bringToBack(); } catch { /* noop */ }
+        boundaryLayerRef.current = layer;
+      })
+      .catch((e) => console.warn("Nigeria boundaries failed to load", e));
+
+    return () => {
+      cancelled = true;
+      if (boundaryLayerRef.current && mapRef.current) {
+        try { mapRef.current.removeLayer(boundaryLayerRef.current); } catch { /* noop */ }
+        boundaryLayerRef.current = null;
+      }
+    };
+  }, [isMapReady, showNigeriaBoundaries]);
+
 
   // Handle view changes
   const handleViewChange = useCallback((view: MapViewLevel) => {

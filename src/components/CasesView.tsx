@@ -74,6 +74,7 @@ import FollowUpScheduleEditor, {
   getIntervalDays,
 } from "@/components/CaseManagement/FollowUpScheduleEditor";
 import { CommCarePageHeader } from "@/components/ui/commcare-page-header";
+import { generateSimulatedCaseData } from "@/lib/caseSimulation";
 
 interface Case {
   id: string;
@@ -135,7 +136,8 @@ interface FollowUpForm {
 }
 
 const CasesView = () => {
-  const { user, profile, isAdmin } = useAuth();
+  const { user, profile, isAdmin, isOwner } = useAuth();
+  const [simulate, setSimulate] = useState(false);
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -1229,12 +1231,18 @@ const CasesView = () => {
     return raw || "New Case";
   };
 
-  const filteredCases = cases.filter((c) => {
+  // Owner simulation: when enabled, populate the page with realistic synthetic
+  // data so the full Case Management experience can be demoed end-to-end.
+  const simulatedData = simulate ? generateSimulatedCaseData() : null;
+  const baseCases = simulatedData ? (simulatedData.cases as unknown as Case[]) : cases;
+
+  const filteredCases = baseCases.filter((c) => {
     const matchesSearch = getCaseDisplayName(c).toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCaseType = caseTypeFilter === "all" || c.caseTypeId === caseTypeFilter;
-    return matchesSearch && matchesCaseType;
+    const matchesStatus = statusFilter === "all" || c.status === statusFilter;
+    return matchesSearch && matchesCaseType && (simulate ? matchesStatus : true);
   });
 
   const getTimeSince = (dateStr: string) => {
@@ -1363,6 +1371,18 @@ const CasesView = () => {
         subtitle="Track and manage longitudinal follow-up cases across projects"
         actions={
           <div className="flex items-center gap-2 flex-wrap">
+          {isOwner && (
+            <Button
+              variant={simulate ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSimulate((s) => !s)}
+              className="gap-1"
+              title="Owner-only: populate the page with realistic demo data"
+            >
+              <Activity className="h-4 w-4" />
+              <span className="hidden sm:inline">{simulate ? "Simulating…" : "Simulate Data"}</span>
+            </Button>
+          )}
           {isAdmin && caseTypes.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1931,6 +1951,7 @@ const CasesView = () => {
             projectFilter={projectFilter}
             caseTypeFilter={caseTypeFilter}
             statusFilter={statusFilter}
+            simulatedMarkers={simulatedData ? simulatedData.markers : undefined}
           />
         </TabsContent>
 
