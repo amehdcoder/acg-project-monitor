@@ -1570,28 +1570,261 @@ const CasesView = () => {
       />
 
 
-      {/* Tabs: Cases List & Map */}
+      {/* KPI cards — 7 metric tiles matching the dashboard reference */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+        {kpiCards.map((kpi) => {
+          const t = toneStyles[kpi.tone];
+          const Icon = kpi.icon;
+          return (
+            <Card key={kpi.label} className="border border-border/60 shadow-card hover:shadow-lg transition-shadow">
+              <CardContent className="p-3.5 space-y-2">
+                <div className="flex items-center gap-2.5">
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg ring-1 ${t.bg} ${t.ring}`}>
+                    <Icon className={`h-[18px] w-[18px] ${t.icon}`} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-display text-xl font-bold text-foreground leading-none tabular-nums">
+                      {kpi.value.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs font-medium text-muted-foreground">{kpi.label}</p>
+                <p className="flex items-center gap-1 text-[10px] font-medium text-green-600 dark:text-green-400">
+                  <Activity className="h-3 w-3" /> {kpi.trend}
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Tabs: Case List / Map View / Analytics */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-        <TabsList className="bg-muted/50 p-1 rounded-xl">
-          <TabsTrigger value="cases" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4">
-            <Briefcase className="h-4 w-4" />
-            Cases
+        <TabsList className="bg-transparent p-0 gap-6 border-b border-border/60 rounded-none w-full justify-start h-auto">
+          <TabsTrigger value="cases" className="gap-1.5 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary px-1 pb-2.5">
+            <ClipboardList className="h-4 w-4" />
+            Case List
           </TabsTrigger>
-          <TabsTrigger value="map" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4">
+          <TabsTrigger value="map" className="gap-1.5 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary px-1 pb-2.5">
             <MapIcon className="h-4 w-4" />
-            Map
+            Map View
           </TabsTrigger>
-          <TabsTrigger value="analytics" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4">
+          <TabsTrigger value="analytics" className="gap-1.5 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary px-1 pb-2.5">
             <BarChart3 className="h-4 w-4" />
             Analytics
           </TabsTrigger>
           {isAdmin && (
-            <TabsTrigger value="configure" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4">
+            <TabsTrigger value="configure" className="gap-1.5 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary px-1 pb-2.5">
               <Settings className="h-4 w-4" />
               Case Types
             </TabsTrigger>
           )}
         </TabsList>
+
+        <TabsContent value="cases" className="mt-4">
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
+            {/* Left region: filters + table + map */}
+            <div className="xl:col-span-3 space-y-4">
+              {/* Filter bar */}
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search cases by name, ID, community..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 bg-card"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as any); setCasePage(1); }}>
+                    <SelectTrigger className="w-[110px] bg-card"><SelectValue placeholder="Status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={projectFilter} onValueChange={(v) => { setProjectFilter(v); setCasePage(1); }}>
+                    <SelectTrigger className="w-[130px] bg-card"><SelectValue placeholder="Project" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Projects</SelectItem>
+                      {projects.map((p) => (<SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={priorityFilter} onValueChange={(v) => { setPriorityFilter(v); setCasePage(1); }}>
+                    <SelectTrigger className="w-[110px] bg-card"><SelectValue placeholder="Priority" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+                    <Filter className="h-4 w-4" /> Filters
+                  </Button>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="text-primary px-1"
+                    onClick={() => { setSearchQuery(""); setStatusFilter("all"); setProjectFilter("all"); setPriorityFilter("all"); setCasePage(1); }}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+
+              {/* Bulk Action Bar */}
+              {isAdmin && selectedCaseIds.size > 0 && (
+                <Card className="border-0 shadow-card bg-primary/5">
+                  <CardContent className="p-3 flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="default" className="text-xs">{selectedCaseIds.size} selected</Badge>
+                      <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setSelectedCaseIds(new Set())}>Clear</Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="text-xs h-7 gap-1" onClick={() => handleBulkAction("close")} disabled={bulkProcessing}><XCircle className="h-3.5 w-3.5" />Close</Button>
+                      <Button variant="outline" size="sm" className="text-xs h-7 gap-1" onClick={() => handleBulkAction("reopen")} disabled={bulkProcessing}><RefreshCw className="h-3.5 w-3.5" />Reopen</Button>
+                      <Button variant="default" size="sm" className="text-xs h-7 gap-1" onClick={() => handleBulkAction("reassign")} disabled={bulkProcessing}><UserCheck className="h-3.5 w-3.5" />Reassign</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                {/* Case table */}
+                <Card className="lg:col-span-2 border border-border/60 shadow-card overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border/60 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                          <th className="font-medium px-3 py-2.5">Case</th>
+                          <th className="font-medium px-3 py-2.5">Assignee</th>
+                          <th className="font-medium px-3 py-2.5">Status</th>
+                          <th className="font-medium px-3 py-2.5">Location</th>
+                          <th className="font-medium px-3 py-2.5">Next Follow-up</th>
+                          <th className="px-2 py-2.5" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {loading ? (
+                          <tr><td colSpan={6} className="py-12 text-center"><RefreshCw className="h-5 w-5 animate-spin text-muted-foreground mx-auto" /></td></tr>
+                        ) : pagedCases.length === 0 ? (
+                          <tr><td colSpan={6} className="py-12 text-center text-sm text-muted-foreground">No cases found.</td></tr>
+                        ) : pagedCases.map((caseItem) => {
+                          const { code, title } = splitCaseName(caseItem);
+                          const assignee = (caseItem.properties?.assignee as string) || ownerProfiles.get(caseItem.ownerId) || caseItem.ownerName || "Unassigned";
+                          const role = (caseItem.properties?.role as string) || "Field Officer";
+                          const ds = getDisplayStatus(caseItem);
+                          const location = (caseItem.properties?.state as string)
+                            ? ((caseItem.properties.state as string) === "FCT" ? "Abuja (FCT)" : `${caseItem.properties.state} State`)
+                            : (caseItem.projectName || "—");
+                          const pchip = priorityChip(caseItem.properties?.priority as string);
+                          return (
+                            <tr
+                              key={caseItem.id}
+                              className="border-b border-border/40 last:border-0 hover:bg-muted/40 cursor-pointer align-top"
+                              onClick={() => setSelectedCaseId(caseItem.id)}
+                            >
+                              <td className="px-3 py-3">
+                                <p className="font-semibold text-primary text-xs">{code}</p>
+                                <p className="text-[11px] text-muted-foreground leading-tight mt-0.5 max-w-[140px]">{title}</p>
+                              </td>
+                              <td className="px-3 py-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                                    {getInitials(assignee)}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-medium text-foreground truncate">{assignee}</p>
+                                    <p className="text-[10px] text-muted-foreground">{role}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-3 py-3">
+                                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${ds.cls}`}>{ds.label}</span>
+                              </td>
+                              <td className="px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">{location}</td>
+                              <td className="px-3 py-3">
+                                <p className="text-xs text-foreground whitespace-nowrap">
+                                  {caseItem.nextFollowUpDate ? format(new Date(caseItem.nextFollowUpDate), "dd MMM yyyy") : "—"}
+                                </p>
+                                {pchip && <p className={`text-[10px] font-medium ${pchip.cls}`}>{pchip.label}</p>}
+                              </td>
+                              <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7"><MoreVertical className="h-4 w-4" /></Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => setSelectedCaseId(caseItem.id)}><Eye className="h-4 w-4 mr-2" />View Details</DropdownMenuItem>
+                                    {caseItem.status === "open" && (followUpCatalog[caseItem.caseTypeId] || []).length > 0 && (
+                                      <DropdownMenuItem onClick={() => handleFollowUp(caseItem)}><ClipboardList className="h-4 w-4 mr-2" />Follow-up</DropdownMenuItem>
+                                    )}
+                                    {caseItem.status === "open" ? (
+                                      <DropdownMenuItem onClick={() => handleCloseCase(caseItem.id)}><XCircle className="h-4 w-4 mr-2" />Close Case</DropdownMenuItem>
+                                    ) : (
+                                      <DropdownMenuItem onClick={() => handleReopenCase(caseItem.id)}><RefreshCw className="h-4 w-4 mr-2" />Reopen Case</DropdownMenuItem>
+                                    )}
+                                    {isAdmin && (
+                                      <DropdownMenuItem onClick={() => handleOpenReassign(caseItem)}><UserCheck className="h-4 w-4 mr-2" />Reassign</DropdownMenuItem>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* Pagination footer */}
+                  <div className="flex items-center justify-between gap-2 border-t border-border/60 px-3 py-2.5 flex-wrap">
+                    <p className="text-[11px] text-muted-foreground">
+                      {filteredCases.length === 0
+                        ? "No cases"
+                        : `Showing ${(safePage - 1) * PAGE_SIZE + 1} to ${Math.min(safePage * PAGE_SIZE, filteredCases.length)} of ${filteredCases.length.toLocaleString()} cases`}
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <Button variant="outline" size="icon" className="h-7 w-7" disabled={safePage <= 1} onClick={() => setCasePage((p) => Math.max(1, p - 1))}>
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                      </Button>
+                      <span className="px-2 text-xs font-medium text-foreground">{safePage} / {totalPages}</span>
+                      <Button variant="outline" size="icon" className="h-7 w-7" disabled={safePage >= totalPages} onClick={() => setCasePage((p) => Math.min(totalPages, p + 1))}>
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Map */}
+                <Card className="lg:col-span-3 border border-border/60 shadow-card overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/60">
+                    <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                      Case Distribution Across Nigeria
+                      <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                    </p>
+                  </div>
+                  <div className="p-0">
+                    <CaseLocationMap
+                      projectFilter={projectFilter}
+                      caseTypeFilter={caseTypeFilter}
+                      statusFilter={statusFilter}
+                      simulatedMarkers={simulatedData ? simulatedData.markers : undefined}
+                    />
+                  </div>
+                </Card>
+              </div>
+            </div>
+
+            {/* Right region: Insights */}
+            <div className="xl:col-span-1">
+              <CaseInsightsPanel data={insightsData} />
+            </div>
+          </div>
+        </TabsContent>
+
 
         <TabsContent value="cases" className="mt-4 space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
