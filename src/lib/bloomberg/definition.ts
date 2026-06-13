@@ -6,6 +6,9 @@ export const BLOOMBERG_FORM_ID = "bloomberg_enrolment";
 export const BLOOMBERG_FORM_NAME = "Bloomberg School Enrolment Validation";
 export const BLOOMBERG_FORM_DESC =
   "School-based Eye Health Intervention — independent validation of LEA school enrolment.";
+export const BLOOMBERG_DASH_NAME = "Bloomberg Validation Dashboard";
+export const BLOOMBERG_DASH_DESC =
+  "Baseline vs validated enrolment analytics, discrepancies & map (admin only).";
 
 export interface ClassDef {
   key: string;
