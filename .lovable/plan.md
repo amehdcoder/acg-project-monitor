@@ -1,51 +1,39 @@
-## Goal
+## Bloomberg School Enrolment Validation — Standard Form, Dashboard & Cascade Assignment
 
-Grow the existing case management feature into a full CommCare-style Case Management System. Standard (non-case) forms stay exactly as they are today — every change here is gated behind "case management enabled".
+### Goal
+Build a self-contained Bloomberg validation system that lives permanently in the **Standard Forms** folder (independent of whether the Bloomberg project still exists in Projects), is **visible only to the Owner** (and the data it produces), exactly matches the two reference images, and adds a **global owner capability** to scope a user to specific cascade field values (State/LGA/Ward/Community/School).
 
-## What already exists (reuse, don't rebuild)
+### 1. Database & data import
+- **`bloomberg_schools`** table — identifying fields only (school_key, school_name, school_code, school_type, school_level, ownership, state/lga/ward/location + labels). Readable by `authenticated` (validators must pick their school). No baseline columns here.
+- **`bloomberg_school_baselines`** table — keyed by `school_key`, holds all `*_baseline` figures + quality flag. **Owner-only** RLS (via `has_role`/owner email check) so validators can never read baselines.
+- **`bloomberg_validations`** table — one row per submission: school_key, location answers, verification block, actual enrolment by class/sex, GPS, photos (storage paths), validator id, status, timestamps. Validators insert/read own rows; Owner/Admins read all.
+- **`user_cascade_assignments`** table (global feature) — `(form_id, user_id, field_key, value)`. Owner-managed. Used app-wide to filter cascade options.
+- Import all ~2,853 rows from `Schools.csv` into the two tables via an insert migration (split: identity → `bloomberg_schools`, baselines → `bloomberg_school_baselines`).
+- All tables get GRANTs + RLS in the same migration. A storage bucket `bloomberg-evidence` for photos.
 
-- **DB:** `cases` (id, case_type_id, project_id, owner_id, name, properties jsonb, status, opened/closed/last_modified fields, next_follow_up_date), `case_types` (name, label, description, properties, follow_up_schedule), `case_activities` (event log: case_id, activity_type, performed_by, changes, notes, form_submission_id).
-- **UI:** `CasesView` (cases/map/analytics tabs, KPI cards, search, transfer/reassign, bulk close/reopen, follow-up creator), `CaseDetails` (timeline/properties/history tabs), `CaseList`, `CaseLocationMap`, `CaseAgingAnalytics`, `FollowUpScheduleEditor`, `FollowUpFormCreator`.
-- **Form Builder:** `CaseManagementEditor` with actions `none | register | update | close`, case-type picker, property mapping, close condition.
-- **Filler:** `FormFiller` + `useCaseManagement` hook create/update/close cases on submit; `CaseSelector` to pick an existing case.
+### 2. The Standard Form (mobile-first, matches Form image)
+- Add a Bloomberg definition + filler so it appears as a card in the **Standard Forms** folder in `FormsView`, gated so **only the Owner** sees the card and its submissions.
+- 4-step wizard exactly like the reference: **1 School** (cascading State→LGA→Ward→Community→School + code/type/level + GPS capture), **2 Verify** (exists?, operational status, head teacher, date, register toggles), **3 Enrolment** (P1–P6 + JSS1–JSS3 male/female tables with live totals, grand total), **4 Evidence** (required signboard/classroom/register photos + optional + remarks + confirm checkbox + Save Draft / Submit).
+- Deep-navy header, stepper, blue primary buttons, rounded cards, soft shadows; offline-capable via existing saved-forms store.
+- **Privacy:** baseline figures are looked up server-side for the dashboard only and are never fetched or shown anywhere in the filler.
 
-## Gap analysis (what to build)
+### 3. The Dashboard (matches Dashboard image, Owner/Admin only)
+- New `BloombergDashboardView`: Bloomberg branded navy sidebar, top filter bar (LGA/Ward/date), 7 KPI tiles (Total Schools, Visited, Validated, Partially Matched, Not Matched, Total Validated Enrolment), Nigeria map of validation status (reusing existing MapVisualization with Bauchi/Jigawa boundaries, colored status pins), Enrollment Comparison donut, aggregated Baseline-vs-Validated bar chart, Gender Distribution donut, Top Discrepancies table, Data Quality + Sync + Quick Actions panels.
+- Baseline vs validated comparison + discrepancy % computed here (owner-only data).
 
-Missing tables: `case_types` icon/color/status-workflow columns, `case_referrals`, `case_notes`, `case_relationships` (parent–child), `case_tasks` (follow-up scheduling), `case_attachments`, `case_permissions`/sharing, `case_status_history`. Missing UI: Case Types admin, referral engine, notes panel, parent–child linking, task queue (upcoming/overdue), sharing/visibility, safeguarding stages, no-code workflow rules, expanded reporting, sequential human-readable Case IDs.
+### 4. Global cascade-field assignment (owner right, app-wide)
+- Extend `OwnerRolesAccessManager` with a "Cascade Scope" section: pick a user + form, then assign allowed values for chosen cascade fields (State/LGA/Ward/Community/School).
+- In `FormFiller` (and the Bloomberg filler), when a `user_cascade_assignments` record exists for the current user+form, **pre-filter and lock** the assigned cascade levels so the user only sees schools/areas within their assignment. Generic across any form with cascade fields.
 
-## Phased delivery
+### Technical notes
+- School cascade options are sourced from `bloomberg_schools` (DB-backed `select_one_from_file`-style), filtered by parent selection and by the user's cascade assignment.
+- Folder persistence: the form is registered as a built-in standard form (code-defined like existing WG-SS/PHQ-9), so it survives project deletion and never depends on the `projects` table.
+- Owner gating reuses `useAuth` `isOwnerLevel` / owner email (`amehjoey1@gmail.com`).
 
-### Phase 1 — Data model + Case Types admin (foundation)
-- Migration: add `case_id_seq`/`reference_code` (e.g. `CASE-2026-00001`) to `cases`; add `icon`, `color`, `status_workflow jsonb`, `sharing_default` to `case_types`; new tables `case_referrals`, `case_notes`, `case_relationships`, `case_tasks`, `case_attachments`, `case_status_history`, `case_permissions`. All with GRANTs + RLS (owner + admin + shared-via-permissions visibility, security-definer helper `can_access_case`).
-- New **Case Types admin** screen (within CasesView as a "Configure" tab, admin-only): create/edit unlimited case types with name, description, icon, color, status workflow.
+### Files (high level)
+- Migrations: schools + baselines + validations + cascade_assignments + storage bucket + CSV import.
+- New: `src/lib/bloomberg/definition.ts`, `src/components/Bloomberg/BloombergFormFiller.tsx`, `BloombergDashboardView.tsx`, `useBloombergData.ts`.
+- Edits: `FormsView.tsx` (Standard Forms card, owner gate), `OwnerRolesAccessManager.tsx` (cascade scope UI), `FormFiller.tsx` (assignment filtering), nav/route wiring.
 
-### Phase 2 — Form behaviors expansion
-- Extend `CaseManagementAction` to `none | register | update | close | referral | case_note | follow_up`. Update `CaseManagementEditor` UI and `useCaseManagement` so each behavior writes the right record (referral → `case_referrals`, note → `case_notes`, follow_up → `case_activities` + `case_tasks`). Keep `register/update/close` working as-is.
-
-### Phase 3 — Case Detail enrichment
-- Add tabs to `CaseDetails`: Referrals, Notes, Relationships (parent/child), Tasks, Attachments, Forms Submitted. Timeline merges all event sources. Closure dialog with reasons (Completed/Recovered/Transferred/Withdrawn/Deceased/Duplicate/Resolved) writing `case_status_history`; closed cases render read-only.
-
-### Phase 4 — Referral engine + Task scheduling
-- Referral create dialog (type, destination, reason, priority, expected date) + status flow (Pending→Accepted→Completed/Rejected/Cancelled). Task queue view in CasesView: Upcoming / Overdue / Completed, generated from follow-up schedules and manual tasks.
-
-### Phase 5 — List filters, ownership/sharing, reporting
-- Case List filters: case type, status, owner, ward/LGA/state, date opened, risk level. Sharing levels (Private/Team/Facility/District/National) enforced via `case_permissions` + RLS. Reporting tab: active/closed/referrals/by status/location/owner, plus KPIs (avg resolution time, referral completion rate, follow-up compliance, open vs closed).
-
-### Phase 6 — Safeguarding + Workflow rules (no-code)
-- Safeguarding case type with stages (Reported→Screened→Investigated→Actioned→Resolved→Closed) and role-based visibility. Simple no-code rule builder: "If property = value → create task / assign / notify", stored as JSON on case type and evaluated on submit. (Full drag-and-drop designer deferred; start with a condition→action list editor.)
-
-### Offline
-Reuse the existing offline forms/sync queue (`useOfflineForms`); case create/update/note/referral actions queue and sync like current submissions. Conflict handling reuses `optimisticUpdate`/version pattern where applicable.
-
-## Technical notes
-
-- Event sourcing: continue appending to `case_activities` (+ new `case_status_history`) — never overwrite history.
-- All new public tables get GRANTs + RLS in the same migration; access gated by a `can_access_case(_user_id, _case_id)` security-definer function covering owner, admin/owner, and `case_permissions` sharing rows.
-- Sequential IDs via a Postgres sequence + trigger (mirrors existing `set_office_form_reference` pattern).
-- No changes to standard (non-case) form behavior anywhere.
-
-## Suggested approach
-
-I recommend we start with **Phase 1 (data model + Case Types admin)** since everything else depends on it, then proceed phase-by-phase so you can review each. Phases 1–3 deliver the core CommCare experience; 4–6 add the advanced engines.
-
-Confirm and I'll begin with Phase 1, or tell me which phases to prioritize.
+### Open question
+Will be confirmed before build: should the dashboard be a brand-new full-screen Bloomberg-skinned view (its own navy sidebar as in the image), or embedded inside the existing app shell/analytics area?
