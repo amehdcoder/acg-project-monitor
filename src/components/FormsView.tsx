@@ -1559,7 +1559,66 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 </div>
               </div>
 
-              {/* Treatment Data Reporting Tools — addable to a project like the MDA checklist */}
+              {/* Bloomberg School Enrolment Validation — addable to any project like the MDA checklist */}
+              <div className="px-3 sm:px-4 py-3 border-t border-border/60">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-[#bcd0f5] bg-gradient-to-r from-[#eaf1fd] to-transparent p-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-lg bg-[#dbe8fc] shrink-0">
+                      <ClipboardCheck className="h-5 w-5 text-[#2563eb]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">Bloomberg School Enrolment Validation</p>
+                      <p className="text-xs text-muted-foreground">Independent 4-step school enrolment validation form + admin analytics dashboard (baseline vs validated, discrepancies & map).</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="shrink-0"
+                    onClick={async () => {
+                      if (!currentProjectId) {
+                        toast({ title: "Select a project", description: "Choose a project before adding the Bloomberg tools.", variant: "destructive" });
+                        return;
+                      }
+                      if (forms.find((f) => (f.settings as any)?.bloomberg_kind)) {
+                        toast({ title: "Already added", description: "The Bloomberg tools already exist in this project. Open them from the list above." });
+                        return;
+                      }
+                      try {
+                        const { error } = await supabase.from("forms").insert([
+                          {
+                            name: BLOOMBERG_FORM_NAME,
+                            description: BLOOMBERG_FORM_DESC,
+                            questions: [] as any,
+                            settings: { bloomberg_kind: "form" } as any,
+                            project_id: currentProjectId,
+                            created_by: user?.id,
+                            status: "active",
+                          },
+                          {
+                            name: BLOOMBERG_DASH_NAME,
+                            description: BLOOMBERG_DASH_DESC,
+                            questions: [] as any,
+                            settings: { bloomberg_kind: "dashboard" } as any,
+                            project_id: currentProjectId,
+                            created_by: user?.id,
+                            status: "active",
+                          },
+                        ] as any);
+                        if (error) throw error;
+                        toast({ title: "Added to project", description: "Open the validation form and dashboard from your forms list above." });
+                        fetchForms(currentProjectId);
+                      } catch (e: any) {
+                        console.error("Bloomberg add error", e);
+                        toast({ title: "Could not add", description: e?.message || "Please try again.", variant: "destructive" });
+                      }
+                    }}
+                  >
+                    <Sparkles className="h-4 w-4 mr-1.5" /> Add to project
+                  </Button>
+                </div>
+              </div>
+
+
               <div className="px-3 sm:px-4 py-3 border-t border-border/60 space-y-3">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-sky-100">
