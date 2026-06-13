@@ -1692,7 +1692,7 @@ const CasesView = () => {
                 </Card>
               )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
                 {/* Case table */}
                 <Card className="lg:col-span-2 border border-border/60 shadow-card overflow-hidden">
                   <div className="overflow-x-auto">
