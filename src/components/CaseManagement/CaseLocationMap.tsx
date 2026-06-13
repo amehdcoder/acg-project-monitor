@@ -12,12 +12,31 @@ interface CaseLocationMapProps {
   projectFilter?: string;
   caseTypeFilter?: string;
   statusFilter?: string;
+  /** When provided (e.g. owner simulation), these markers are shown instead of live data. */
+  simulatedMarkers?: MapMarker[];
 }
+
+// Status-based pin colour so cases show as different coloured points on the map.
+const statusColor = (status?: string): string => {
+  switch ((status || "").toLowerCase()) {
+    case "closed":
+      return "#94a3b8"; // slate
+    case "overdue":
+      return "#ef4444"; // red
+    case "in_progress":
+    case "in progress":
+      return "#f59e0b"; // amber
+    case "open":
+    default:
+      return "#10b981"; // green
+  }
+};
 
 const CaseLocationMap = ({
   projectFilter = "all",
   caseTypeFilter = "all",
   statusFilter = "all",
+  simulatedMarkers,
 }: CaseLocationMapProps) => {
   const { user, isAdmin } = useAuth();
   const [markers, setMarkers] = useState<MapMarker[]>([]);
