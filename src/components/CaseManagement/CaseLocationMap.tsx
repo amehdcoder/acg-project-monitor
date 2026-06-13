@@ -142,6 +142,7 @@ const CaseLocationMap = ({
             ward: (caseData as any)?.properties?.ward,
             community: (caseData as any)?.properties?.community,
             formName: undefined,
+            markerColor: statusColor((caseData as any)?.status),
             submittedAt: sub.submitted_at || undefined,
             data: {
               _geoSource: loc.source,
