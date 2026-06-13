@@ -80,8 +80,8 @@ L.Icon.Default.mergeOptions({
 });
 
 // Custom marker icon
-const createCustomIcon = (isFromForm: boolean = false) => {
-  const color = isFromForm ? "#10B981" : "#d4a843";
+const createCustomIcon = (isFromForm: boolean = false, colorOverride?: string) => {
+  const color = colorOverride || (isFromForm ? "#10B981" : "#d4a843");
   return L.divIcon({
     className: "custom-marker",
     html: `<div style="
