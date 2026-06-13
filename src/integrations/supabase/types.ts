@@ -4967,6 +4967,150 @@ export type Database = {
           },
         ]
       }
+      seeclear_monitoring: {
+        Row: {
+          challenges: Json
+          community: string | null
+          complete_records: boolean | null
+          created_at: string
+          critical_gap: string | null
+          date_of_visit: string | null
+          equip_max: number | null
+          equip_score: number | null
+          equipment: Json
+          essential_supplies: boolean | null
+          evidence: Json
+          facility_level: string | null
+          facility_name: string | null
+          focal_designation: string | null
+          focal_name: string | null
+          focal_phone: string | null
+          functional_status: string | null
+          general: Json
+          gps_accuracy: number | null
+          gps_lat: number | null
+          gps_lng: number | null
+          hr_max: number | null
+          hr_score: number | null
+          id: string
+          incharge_signature: string | null
+          infra_max: number | null
+          infra_score: number | null
+          is_functional: boolean | null
+          lga: string | null
+          monitor_id: string
+          officer_signature: string | null
+          overall_score: number | null
+          ownership: string | null
+          readiness_score: number | null
+          recommendations: Json
+          referral_compliance: boolean | null
+          referrals_completed: number | null
+          referrals_made: number | null
+          remarks: string | null
+          staff_on_duty: number | null
+          state: string | null
+          status: string
+          team_members: Json
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          challenges?: Json
+          community?: string | null
+          complete_records?: boolean | null
+          created_at?: string
+          critical_gap?: string | null
+          date_of_visit?: string | null
+          equip_max?: number | null
+          equip_score?: number | null
+          equipment?: Json
+          essential_supplies?: boolean | null
+          evidence?: Json
+          facility_level?: string | null
+          facility_name?: string | null
+          focal_designation?: string | null
+          focal_name?: string | null
+          focal_phone?: string | null
+          functional_status?: string | null
+          general?: Json
+          gps_accuracy?: number | null
+          gps_lat?: number | null
+          gps_lng?: number | null
+          hr_max?: number | null
+          hr_score?: number | null
+          id?: string
+          incharge_signature?: string | null
+          infra_max?: number | null
+          infra_score?: number | null
+          is_functional?: boolean | null
+          lga?: string | null
+          monitor_id?: string
+          officer_signature?: string | null
+          overall_score?: number | null
+          ownership?: string | null
+          readiness_score?: number | null
+          recommendations?: Json
+          referral_compliance?: boolean | null
+          referrals_completed?: number | null
+          referrals_made?: number | null
+          remarks?: string | null
+          staff_on_duty?: number | null
+          state?: string | null
+          status?: string
+          team_members?: Json
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          challenges?: Json
+          community?: string | null
+          complete_records?: boolean | null
+          created_at?: string
+          critical_gap?: string | null
+          date_of_visit?: string | null
+          equip_max?: number | null
+          equip_score?: number | null
+          equipment?: Json
+          essential_supplies?: boolean | null
+          evidence?: Json
+          facility_level?: string | null
+          facility_name?: string | null
+          focal_designation?: string | null
+          focal_name?: string | null
+          focal_phone?: string | null
+          functional_status?: string | null
+          general?: Json
+          gps_accuracy?: number | null
+          gps_lat?: number | null
+          gps_lng?: number | null
+          hr_max?: number | null
+          hr_score?: number | null
+          id?: string
+          incharge_signature?: string | null
+          infra_max?: number | null
+          infra_score?: number | null
+          is_functional?: boolean | null
+          lga?: string | null
+          monitor_id?: string
+          officer_signature?: string | null
+          overall_score?: number | null
+          ownership?: string | null
+          readiness_score?: number | null
+          recommendations?: Json
+          referral_compliance?: boolean | null
+          referrals_completed?: number | null
+          referrals_made?: number | null
+          remarks?: string | null
+          staff_on_duty?: number | null
+          state?: string | null
+          status?: string
+          team_members?: Json
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: []
+      }
       standard_assessment_submissions: {
         Row: {
           activity_description: string | null
