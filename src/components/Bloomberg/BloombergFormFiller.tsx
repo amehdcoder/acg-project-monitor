@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import {
   PRIMARY_CLASSES, JSS_CLASSES, ALL_CLASSES, emptyEnrolment, sectionTotals,
   grandTotals, OPERATIONAL_STATUS, NOT_FOUND_REASONS, type EnrolmentCounts,
-  type BloombergSchool,
+  type BloombergSchool, normalizeMissingLabel,
 } from "@/lib/bloomberg/definition";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
