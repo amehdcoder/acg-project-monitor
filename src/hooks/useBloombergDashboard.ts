@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ALL_CLASSES } from "@/lib/bloomberg/definition";
 import { generateBloombergSimulation } from "@/lib/bloomberg/bloombergSimulation";
