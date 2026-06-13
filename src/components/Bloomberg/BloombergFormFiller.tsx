@@ -85,11 +85,19 @@ export default function BloombergFormFiller({ onClose }: Props) {
   );
   const selectedSchool = useMemo(() => schools.find((s) => s.school_key === schoolKey) || null, [schools, schoolKey]);
 
-  const captureGps = async () => {
-    const p = await geo.getCurrentPosition();
-    if (p) setGps({ lat: p.lat, lng: p.lng, accuracy: p.accuracy });
-    else toast.error(geo.error || "Could not capture GPS");
+  const captureGps = () => {
+    geo.getCurrentPosition();
   };
+
+  useEffect(() => {
+    if (geo.position) {
+      setGps({ lat: geo.position.lat, lng: geo.position.lng, accuracy: geo.position.accuracy });
+    }
+  }, [geo.position]);
+
+  useEffect(() => {
+    if (geo.error) toast.error(geo.error);
+  }, [geo.error]);
 
   const setCount = (key: string, sex: "male" | "female", v: string) => {
     const n = v === "" ? null : Math.max(0, parseInt(v, 10) || 0);
