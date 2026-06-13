@@ -1324,6 +1324,99 @@ const CasesView = () => {
     return status?.variant === "destructive";
   }).length;
 
+  // ---- KPI + Insights derivations for the Case Management dashboard ----
+  const activeFieldTeams = new Set(
+    filteredCases.map((c) => (c.properties?.assignee as string) || c.ownerName || c.ownerId),
+  ).size;
+  const highPriorityCases = filteredCases.filter(
+    (c) => (c.properties?.priority as string) === "high",
+  ).length;
+
+  const insightsData: InsightsData = simulatedData
+    ? simulatedData.insights
+    : (() => {
+        const stateCounts = new Map<string, number>();
+        filteredCases.forEach((c) => {
+          const s = (c.properties?.state as string) || c.projectName || "Unspecified";
+          const label = s === "FCT" ? "FCT (Abuja)" : s;
+          stateCounts.set(label, (stateCounts.get(label) || 0) + 1);
+        });
+        const casesByState = [...stateCounts.entries()]
+          .map(([state, count]) => ({ state, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+        return {
+          casesByState,
+          followUpTrends: [],
+          recentActivity: filteredCases.slice(0, 3).map((c) => ({
+            type: "registered" as const,
+            title: getCaseDisplayName(c),
+            meta: `${ownerProfiles.get(c.ownerId) || c.ownerName || ""} · ${getTimeSince(c.lastModifiedAt)}`,
+          })),
+        };
+      })();
+
+  // KPI card configuration mirroring the reference dashboard.
+  const kpiCards = [
+    { label: "Total Cases", value: filteredCases.length, trend: "12% vs last month", icon: Briefcase, tone: "primary" },
+    { label: "Open Cases", value: openCases, trend: "8% vs last month", icon: Eye, tone: "green" },
+    { label: "Closed Cases", value: closedCases, trend: "15% vs last month", icon: XCircle, tone: "slate" },
+    { label: "Follow-up Modules", value: availableFollowUpModules.length, trend: "5% vs last month", icon: ClipboardList, tone: "amber" },
+    { label: "Overdue Cases", value: overdueCases, trend: "18% vs last month", icon: AlertTriangle, tone: "red" },
+    { label: "Active Field Teams", value: activeFieldTeams, trend: "10% vs last month", icon: Users, tone: "teal" },
+    { label: "High Priority Cases", value: highPriorityCases, trend: "22% vs last month", icon: Flag, tone: "violet" },
+  ] as const;
+
+  const toneStyles: Record<string, { ring: string; bg: string; icon: string }> = {
+    primary: { ring: "ring-primary/20", bg: "bg-primary/10", icon: "text-primary" },
+    green: { ring: "ring-green-300 dark:ring-green-700", bg: "bg-green-100 dark:bg-green-900/30", icon: "text-green-600 dark:text-green-400" },
+    slate: { ring: "ring-border", bg: "bg-muted", icon: "text-muted-foreground" },
+    amber: { ring: "ring-amber-300 dark:ring-amber-700", bg: "bg-amber-100 dark:bg-amber-900/30", icon: "text-amber-600 dark:text-amber-400" },
+    red: { ring: "ring-destructive/30", bg: "bg-destructive/10", icon: "text-destructive" },
+    teal: { ring: "ring-teal-300 dark:ring-teal-700", bg: "bg-teal-100 dark:bg-teal-900/30", icon: "text-teal-600 dark:text-teal-400" },
+    violet: { ring: "ring-violet-300 dark:ring-violet-700", bg: "bg-violet-100 dark:bg-violet-900/30", icon: "text-violet-600 dark:text-violet-400" },
+  };
+
+  // Pagination for the case table
+  const PAGE_SIZE = 6;
+  const totalPages = Math.max(1, Math.ceil(filteredCases.length / PAGE_SIZE));
+  const safePage = Math.min(casePage, totalPages);
+  const pagedCases = filteredCases.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  // Splits a simulated/real case name into a short code + descriptive title.
+  const splitCaseName = (c: Case): { code: string; title: string } => {
+    const display = getCaseDisplayName(c);
+    if (display.includes(" · ")) {
+      const [code, ...rest] = display.split(" · ");
+      return { code, title: rest.join(" · ") };
+    }
+    return { code: c.caseTypeLabel || "CASE", title: display };
+  };
+
+  const getInitials = (name: string) =>
+    name.split(/\s+/).map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+
+  // Display status used in the case table (richer than raw open/closed).
+  const getDisplayStatus = (c: Case): { label: string; cls: string } => {
+    if (c.status === "closed") return { label: "Closed", cls: "bg-muted text-muted-foreground border-border" };
+    const fu = getFollowUpStatus(c);
+    if (fu?.variant === "destructive") return { label: "Overdue", cls: "bg-destructive/10 text-destructive border-destructive/30" };
+    if ((c.followUpCount || 0) > 0) return { label: "In Progress", cls: "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700" };
+    return { label: "Open", cls: "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700" };
+  };
+
+  const priorityChip = (p?: string): { label: string; cls: string } | null => {
+    if (!p) return null;
+    const map: Record<string, { label: string; cls: string }> = {
+      high: { label: "High", cls: "text-destructive" },
+      medium: { label: "Medium", cls: "text-amber-600 dark:text-amber-400" },
+      low: { label: "Low", cls: "text-green-600 dark:text-green-400" },
+    };
+    return map[p] || null;
+  };
+
+
+
   // Export filtered cases to Excel
   const handleExportCases = () => {
     if (filteredCases.length === 0) {
