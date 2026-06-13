@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
+import { pctTone, toneColor, varianceTone } from "@/lib/conditionalFormatting";
 
 
 const NAVY = "#0c2340";
@@ -72,14 +73,18 @@ const OpBadge = ({ value, label }: { value: string | null; label: string | null 
 
 
 const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string; value: string; tint: string; sub?: string }) => (
-  <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+  <div
+    className="relative overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+    style={{ background: `linear-gradient(135deg, ${tint}0d, transparent 70%)` }}
+  >
+    <span className="absolute inset-y-0 left-0 w-1" style={{ background: tint }} />
     <div className="flex items-center justify-between">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${tint}1a`, color: tint }}>
         <Icon className="h-4 w-4" />
       </div>
     </div>
-    <p className="mt-2 text-2xl font-bold text-foreground">{value}</p>
+    <p className="mt-2 text-2xl font-bold" style={{ color: tint }}>{value}</p>
     {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
   </div>
 );
@@ -298,7 +303,7 @@ export default function BloombergDashboard({ onClose }: Props) {
         {/* KPI tiles */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Kpi icon={School} label="Total Schools" value={fmt(stats.totalSchools)} tint={NAVY} />
-          <Kpi icon={CheckCircle2} label="Schools Validated" value={fmt(stats.validatedSchools)} tint={TEAL} sub={`${stats.coveragePct.toFixed(1)}% coverage`} />
+          <Kpi icon={CheckCircle2} label="Schools Validated" value={fmt(stats.validatedSchools)} tint={toneColor(pctTone(stats.coveragePct, { good: 75, ok: 50, warn: 25 }))} sub={`${stats.coveragePct.toFixed(1)}% coverage`} />
           <Kpi icon={FileText} label="Submissions" value={fmt(stats.submittedCount)} tint={BLUE} sub={`${stats.draftCount} drafts`} />
           <Kpi icon={Users} label="Pupils Validated" value={fmt(stats.validatedTotal)} tint={PINK} />
           <Kpi icon={Users} label="Baseline (LEA)" value={fmt(stats.baselineTotal)} tint="#64748b" sub="for validated schools" />
@@ -306,7 +311,7 @@ export default function BloombergDashboard({ onClose }: Props) {
             icon={TrendingUp}
             label="Overall Variance"
             value={`${stats.overallPct >= 0 ? "+" : ""}${stats.overallPct.toFixed(1)}%`}
-            tint={stats.overallPct < 0 ? "#ef4444" : TEAL}
+            tint={toneColor(varianceTone(stats.overallPct))}
             sub="validated vs baseline"
           />
           <Kpi icon={Users} label="Boys" value={fmt(stats.validatedMale)} tint={BLUE} />

@@ -17,6 +17,7 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import handsLogo from "@/assets/logo-hands.png";
 import coatOfArms from "@/assets/nigeria-coat-of-arms.png.asset.json";
+import { pctTone, toneColor } from "@/lib/conditionalFormatting";
 
 const NAVY = "#0c2340";
 const BLUE = "#2563eb";
@@ -27,13 +28,17 @@ interface Props { onClose: () => void; }
 const fmt = (n: number) => n.toLocaleString();
 
 const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string; value: string; tint: string; sub?: string }) => (
-  <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+  <div
+    className="relative overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+    style={{ background: `linear-gradient(135deg, ${tint}0d, transparent 70%)` }}
+  >
+    <span className="absolute inset-y-0 left-0 w-1" style={{ background: tint }} />
     <div className="flex items-center justify-between">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${tint}1a`, color: tint }}><Icon className="h-4 w-4" /></div>
     </div>
-    <p className="mt-2 text-2xl font-bold text-foreground">{value}</p>
-    {sub && <p className="mt-0.5 text-xs" style={{ color: tint }}>{sub}</p>}
+    <p className="mt-2 text-2xl font-bold" style={{ color: tint }}>{value}</p>
+    {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
   </div>
 );
 
@@ -107,13 +112,13 @@ export default function SeeClearDashboard({ onClose }: Props) {
         {/* KPI tiles */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Kpi icon={Building2} label="Total Facilities Assessed" value={fmt(stats.total)} tint={NAVY} sub="Across 3 levels" />
-          <Kpi icon={CheckCircle2} label="Functional Facilities" value={fmt(stats.functional)} tint="#16a34a" sub={`${stats.functionalPct.toFixed(1)}%`} />
+          <Kpi icon={CheckCircle2} label="Functional Facilities" value={fmt(stats.functional)} tint={toneColor(pctTone(stats.functionalPct))} sub={`${stats.functionalPct.toFixed(1)}%`} />
           <Kpi icon={Landmark} label="Government Facilities" value={fmt(stats.government)} tint={BLUE} sub={`${stats.governmentPct.toFixed(1)}%`} />
           <Kpi icon={Users} label="Private Facilities" value={fmt(stats.private)} tint={PURPLE} sub={`${stats.privatePct.toFixed(1)}%`} />
-          <Kpi icon={Building2} label="Facilities with Essential Supplies" value={fmt(stats.withSupplies)} tint={TEAL} sub={`${stats.withSuppliesPct.toFixed(1)}%`} />
-          <Kpi icon={ClipboardList} label="Facilities with Complete Records" value={fmt(stats.withRecords)} tint="#f97316" sub={`${stats.withRecordsPct.toFixed(1)}%`} />
-          <Kpi icon={ArrowLeftRight} label="Referral Compliance Rate" value={`${stats.referralCompliancePct.toFixed(1)}%`} tint={TEAL} sub="Good" />
-          <Kpi icon={Gauge} label="Average Readiness Score" value={`${stats.avgReadiness.toFixed(1)}%`} tint={BLUE} sub={stats.avgReadinessBand.label} />
+          <Kpi icon={Building2} label="Facilities with Essential Supplies" value={fmt(stats.withSupplies)} tint={toneColor(pctTone(stats.withSuppliesPct))} sub={`${stats.withSuppliesPct.toFixed(1)}%`} />
+          <Kpi icon={ClipboardList} label="Facilities with Complete Records" value={fmt(stats.withRecords)} tint={toneColor(pctTone(stats.withRecordsPct))} sub={`${stats.withRecordsPct.toFixed(1)}%`} />
+          <Kpi icon={ArrowLeftRight} label="Referral Compliance Rate" value={`${stats.referralCompliancePct.toFixed(1)}%`} tint={toneColor(pctTone(stats.referralCompliancePct))} sub={pctTone(stats.referralCompliancePct) === "good" ? "Excellent" : pctTone(stats.referralCompliancePct) === "ok" ? "Good" : pctTone(stats.referralCompliancePct) === "warn" ? "Needs attention" : "Critical"} />
+          <Kpi icon={Gauge} label="Average Readiness Score" value={`${stats.avgReadiness.toFixed(1)}%`} tint={toneColor(pctTone(stats.avgReadiness))} sub={stats.avgReadinessBand.label} />
         </div>
 
         {/* Donuts + readiness + map */}
