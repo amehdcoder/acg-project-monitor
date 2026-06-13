@@ -38,6 +38,46 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 
 export default function BloombergDashboard({ onClose }: Props) {
   const { stats, byState, points, loading, reload } = useBloombergDashboard();
+  const { isOwner, isSuperAdmin } = useAuth();
+  const canManage = isOwner || isSuperAdmin;
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const n = await exportSchoolTemplate();
+      toast.success(`Template exported with ${n.toLocaleString()} schools`);
+    } catch (e: any) {
+      toast.error(e?.message || "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImport = async (file: File | null) => {
+    if (!file) return;
+    setImporting(true);
+    try {
+      const res = await importSchoolTemplate(file);
+      if (res.errors.length) {
+        toast.warning(`Imported ${res.schools} schools, ${res.baselines} baselines — ${res.errors.length} issue(s)`, {
+          description: res.errors.slice(0, 3).join(" • "),
+        });
+      } else {
+        toast.success(`Updated ${res.schools.toLocaleString()} schools & ${res.baselines.toLocaleString()} baseline records`);
+      }
+      reload();
+    } catch (e: any) {
+      toast.error(e?.message || "Import failed");
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+
 
   const markers: MapMarker[] = useMemo(
     () =>
