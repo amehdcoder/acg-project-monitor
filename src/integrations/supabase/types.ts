@@ -560,6 +560,280 @@ export type Database = {
         }
         Relationships: []
       }
+      bloomberg_school_baselines: {
+        Row: {
+          baseline_notes: string | null
+          created_at: string
+          data_quality_flag: string | null
+          grand_total: number | null
+          jss1_female: number | null
+          jss1_male: number | null
+          jss1_total: number | null
+          jss2_female: number | null
+          jss2_male: number | null
+          jss2_total: number | null
+          jss3_female: number | null
+          jss3_male: number | null
+          jss3_total: number | null
+          p1_female: number | null
+          p1_male: number | null
+          p1_total: number | null
+          p2_female: number | null
+          p2_male: number | null
+          p2_total: number | null
+          p3_female: number | null
+          p3_male: number | null
+          p3_total: number | null
+          p4_female: number | null
+          p4_male: number | null
+          p4_total: number | null
+          p5_female: number | null
+          p5_male: number | null
+          p5_total: number | null
+          p6_female: number | null
+          p6_male: number | null
+          p6_total: number | null
+          school_key: string
+          total_female: number | null
+          total_male: number | null
+        }
+        Insert: {
+          baseline_notes?: string | null
+          created_at?: string
+          data_quality_flag?: string | null
+          grand_total?: number | null
+          jss1_female?: number | null
+          jss1_male?: number | null
+          jss1_total?: number | null
+          jss2_female?: number | null
+          jss2_male?: number | null
+          jss2_total?: number | null
+          jss3_female?: number | null
+          jss3_male?: number | null
+          jss3_total?: number | null
+          p1_female?: number | null
+          p1_male?: number | null
+          p1_total?: number | null
+          p2_female?: number | null
+          p2_male?: number | null
+          p2_total?: number | null
+          p3_female?: number | null
+          p3_male?: number | null
+          p3_total?: number | null
+          p4_female?: number | null
+          p4_male?: number | null
+          p4_total?: number | null
+          p5_female?: number | null
+          p5_male?: number | null
+          p5_total?: number | null
+          p6_female?: number | null
+          p6_male?: number | null
+          p6_total?: number | null
+          school_key: string
+          total_female?: number | null
+          total_male?: number | null
+        }
+        Update: {
+          baseline_notes?: string | null
+          created_at?: string
+          data_quality_flag?: string | null
+          grand_total?: number | null
+          jss1_female?: number | null
+          jss1_male?: number | null
+          jss1_total?: number | null
+          jss2_female?: number | null
+          jss2_male?: number | null
+          jss2_total?: number | null
+          jss3_female?: number | null
+          jss3_male?: number | null
+          jss3_total?: number | null
+          p1_female?: number | null
+          p1_male?: number | null
+          p1_total?: number | null
+          p2_female?: number | null
+          p2_male?: number | null
+          p2_total?: number | null
+          p3_female?: number | null
+          p3_male?: number | null
+          p3_total?: number | null
+          p4_female?: number | null
+          p4_male?: number | null
+          p4_total?: number | null
+          p5_female?: number | null
+          p5_male?: number | null
+          p5_total?: number | null
+          p6_female?: number | null
+          p6_male?: number | null
+          p6_total?: number | null
+          school_key?: string
+          total_female?: number | null
+          total_male?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bloomberg_school_baselines_school_key_fkey"
+            columns: ["school_key"]
+            isOneToOne: true
+            referencedRelation: "bloomberg_schools"
+            referencedColumns: ["school_key"]
+          },
+        ]
+      }
+      bloomberg_schools: {
+        Row: {
+          baseline_scope: string | null
+          created_at: string
+          label: string | null
+          lga: string | null
+          lga_label: string | null
+          location: string | null
+          location_label: string | null
+          ownership: string | null
+          school_code: string | null
+          school_key: string
+          school_level: string | null
+          school_name: string
+          school_type: string | null
+          state: string | null
+          state_label: string | null
+          ward: string | null
+          ward_label: string | null
+        }
+        Insert: {
+          baseline_scope?: string | null
+          created_at?: string
+          label?: string | null
+          lga?: string | null
+          lga_label?: string | null
+          location?: string | null
+          location_label?: string | null
+          ownership?: string | null
+          school_code?: string | null
+          school_key: string
+          school_level?: string | null
+          school_name: string
+          school_type?: string | null
+          state?: string | null
+          state_label?: string | null
+          ward?: string | null
+          ward_label?: string | null
+        }
+        Update: {
+          baseline_scope?: string | null
+          created_at?: string
+          label?: string | null
+          lga?: string | null
+          lga_label?: string | null
+          location?: string | null
+          location_label?: string | null
+          ownership?: string | null
+          school_code?: string | null
+          school_key?: string
+          school_level?: string | null
+          school_name?: string
+          school_type?: string | null
+          state?: string | null
+          state_label?: string | null
+          ward?: string | null
+          ward_label?: string | null
+        }
+        Relationships: []
+      }
+      bloomberg_validations: {
+        Row: {
+          created_at: string
+          enrolment: Json
+          evidence: Json
+          gps_accuracy: number | null
+          gps_lat: number | null
+          gps_lng: number | null
+          grand_total: number | null
+          id: string
+          lga: string | null
+          location: string | null
+          ownership: string | null
+          remarks: string | null
+          school_code: string | null
+          school_key: string | null
+          school_level: string | null
+          school_name: string | null
+          school_type: string | null
+          state: string | null
+          status: string
+          submitted_at: string
+          total_female: number | null
+          total_male: number | null
+          updated_at: string
+          validator_id: string
+          verification: Json
+          ward: string | null
+        }
+        Insert: {
+          created_at?: string
+          enrolment?: Json
+          evidence?: Json
+          gps_accuracy?: number | null
+          gps_lat?: number | null
+          gps_lng?: number | null
+          grand_total?: number | null
+          id?: string
+          lga?: string | null
+          location?: string | null
+          ownership?: string | null
+          remarks?: string | null
+          school_code?: string | null
+          school_key?: string | null
+          school_level?: string | null
+          school_name?: string | null
+          school_type?: string | null
+          state?: string | null
+          status?: string
+          submitted_at?: string
+          total_female?: number | null
+          total_male?: number | null
+          updated_at?: string
+          validator_id: string
+          verification?: Json
+          ward?: string | null
+        }
+        Update: {
+          created_at?: string
+          enrolment?: Json
+          evidence?: Json
+          gps_accuracy?: number | null
+          gps_lat?: number | null
+          gps_lng?: number | null
+          grand_total?: number | null
+          id?: string
+          lga?: string | null
+          location?: string | null
+          ownership?: string | null
+          remarks?: string | null
+          school_code?: string | null
+          school_key?: string | null
+          school_level?: string | null
+          school_name?: string | null
+          school_type?: string | null
+          state?: string | null
+          status?: string
+          submitted_at?: string
+          total_female?: number | null
+          total_male?: number | null
+          updated_at?: string
+          validator_id?: string
+          verification?: Json
+          ward?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bloomberg_validations_school_key_fkey"
+            columns: ["school_key"]
+            isOneToOne: false
+            referencedRelation: "bloomberg_schools"
+            referencedColumns: ["school_key"]
+          },
+        ]
+      }
       case_activities: {
         Row: {
           activity_type: string
@@ -5175,6 +5449,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_cascade_assignments: {
+        Row: {
+          assigned_by: string | null
+          created_at: string
+          field_key: string
+          form_id: string
+          id: string
+          user_id: string
+          value: string
+          value_label: string | null
+        }
+        Insert: {
+          assigned_by?: string | null
+          created_at?: string
+          field_key: string
+          form_id: string
+          id?: string
+          user_id: string
+          value: string
+          value_label?: string | null
+        }
+        Update: {
+          assigned_by?: string | null
+          created_at?: string
+          field_key?: string
+          form_id?: string
+          id?: string
+          user_id?: string
+          value?: string
+          value_label?: string | null
+        }
+        Relationships: []
       }
       user_form_assignments: {
         Row: {
