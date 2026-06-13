@@ -22,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import handsLogo from "@/assets/logo-hands.png";
+import handsLogo from "@/assets/logo-amehnities.png";
 import coatOfArms from "@/assets/nigeria-coat-of-arms.png.asset.json";
 
 const NAVY = "#0c2340";
