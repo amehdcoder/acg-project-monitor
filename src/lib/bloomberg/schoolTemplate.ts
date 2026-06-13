@@ -14,7 +14,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { ALL_CLASSES, normalizeMissingLabel } from "@/lib/bloomberg/definition";
 
 import fmohLogo from "@/assets/logo-fmoh.png";
-import handsLogo from "@/assets/logo-hands.png";
 import amehLogo from "@/assets/logo-amehnities.png";
 
 // Exact machine column order, matching the reference Schools.csv.
@@ -117,9 +116,9 @@ export async function exportSchoolTemplate(): Promise<number> {
   wb.created = new Date();
   const ws = wb.addWorksheet("Schools", { views: [{ state: "frozen", ySplit: HEADER_ROW, xSplit: 1 }] });
 
-  // ---- Logo banner ----
-  const [fmoh, hands, ameh] = await Promise.all([
-    fetchImage(fmohLogo), fetchImage(handsLogo), fetchImage(amehLogo),
+  // ---- Logo banner (FMoH + Amehnities) ----
+  const [fmoh, ameh] = await Promise.all([
+    fetchImage(fmohLogo), fetchImage(amehLogo),
   ]);
   const addLogo = (buf: ArrayBuffer | null, col: number) => {
     if (!buf) return;
@@ -127,7 +126,6 @@ export async function exportSchoolTemplate(): Promise<number> {
     ws.addImage(id, { tl: { col, row: 0.1 }, ext: { width: 70, height: 70 } });
   };
   addLogo(fmoh, 0);
-  addLogo(hands, 2);
   addLogo(ameh, 4);
   ws.mergeCells(2, 7, 3, 16);
   const title = ws.getCell(2, 7);
