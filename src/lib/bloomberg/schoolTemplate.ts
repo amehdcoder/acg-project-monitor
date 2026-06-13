@@ -1,10 +1,13 @@
 // Bloomberg School Eye Health Project — School & Baseline import/export template.
 //
-// Produces a branded .xlsx (FMoH / HANDS / Amehnities logos) pre-populated with
-// the current school register and LEA baseline figures. The Owner / Super Admin
-// can edit it offline and re-import; the importer upserts BOTH the location
-// cascade (bloomberg_schools) and the hidden baseline figures
+// Produces a branded, EMPTY .xlsx template (FMoH / HANDS / Amehnities logos) with
+// human-friendly column headers, drop-down validations and an instructions sheet.
+// The Owner / Super Admin fills it offline and re-imports; the importer upserts
+// BOTH the location cascade (bloomberg_schools) and the hidden baseline figures
 // (bloomberg_school_baselines).
+//
+// The importer accepts EITHER the friendly headers produced here OR the legacy
+// machine headers, so older exported files keep working.
 
 import ExcelJS from "exceljs";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,7 +17,7 @@ import fmohLogo from "@/assets/logo-fmoh.png";
 import handsLogo from "@/assets/logo-hands.png";
 import amehLogo from "@/assets/logo-amehnities.png";
 
-// Exact column order, matching the reference Schools.csv.
+// Exact machine column order, matching the reference Schools.csv.
 const BASELINE_COLS = ALL_CLASSES.flatMap((c) => [
   `${c.key}_male_baseline`,
   `${c.key}_female_baseline`,
@@ -30,6 +33,53 @@ const COLUMNS = [
   "total_male_baseline", "total_female_baseline", "grand_total_baseline",
   "data_quality_flag", "baseline_notes",
 ] as const;
+
+// Human-friendly, understandable header label for every machine column.
+const classLabel = new Map(ALL_CLASSES.map((c) => [c.key, c.label]));
+const COLUMN_LABELS: Record<string, string> = {
+  name: "School ID (Unique Key)",
+  label: "Display Name",
+  state: "State Code",
+  lga: "LGA Code",
+  ward: "Ward Code",
+  location: "Community Code",
+  state_label: "State",
+  lga_label: "LGA",
+  ward_label: "Ward",
+  location_label: "Community / Location",
+  school_code: "School Code",
+  school_name: "School Name",
+  school_type: "School Type",
+  school_level: "School Level",
+  ownership: "Ownership",
+  baseline_scope: "Baseline Scope",
+  source_file: "Source File",
+  source_sheet: "Source Sheet",
+  total_male_baseline: "Total Boys (Baseline)",
+  total_female_baseline: "Total Girls (Baseline)",
+  grand_total_baseline: "Grand Total (Baseline)",
+  data_quality_flag: "Data Quality Flag",
+  baseline_notes: "Notes",
+};
+// Friendly labels for the per-class baseline columns, e.g. "P1 — Boys".
+BASELINE_COLS.forEach((c) => {
+  const key = c.replace(/_(male|female|total)_baseline$/, "");
+  const sex = c.endsWith("_male_baseline") ? "Boys" : c.endsWith("_female_baseline") ? "Girls" : "Total";
+  COLUMN_LABELS[c] = `${classLabel.get(key) || key.toUpperCase()} — ${sex}`;
+});
+
+const friendly = (machine: string) => COLUMN_LABELS[machine] || machine;
+
+// Normalisation used to match a header cell back to a machine column name,
+// tolerant of friendly labels, casing, spacing and punctuation.
+const normalizeKey = (s: any) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+// Reverse lookup: normalized(friendly OR machine) -> machine column name.
+const HEADER_LOOKUP: Record<string, string> = {};
+COLUMNS.forEach((m) => {
+  HEADER_LOOKUP[normalizeKey(m)] = m;
+  HEADER_LOOKUP[normalizeKey(friendly(m))] = m;
+});
 
 const NIGERIA_STATES = [
   "Abia","Adamawa","Akwa Ibom","Anambra","Bauchi","Bayelsa","Benue","Borno",
@@ -60,31 +110,8 @@ async function fetchImage(url: string): Promise<ArrayBuffer | null> {
   }
 }
 
-/** Build & download the branded school/baseline template. */
+/** Build & download the branded, EMPTY school/baseline template for filling. */
 export async function exportSchoolTemplate(): Promise<number> {
-  // Pull schools + baselines (paginated).
-  const schools: any[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await supabase
-      .from("bloomberg_schools")
-      .select("*")
-      .order("school_name")
-      .range(from, from + 999);
-    if (error || !data || data.length === 0) break;
-    schools.push(...data);
-    if (data.length < 1000) break;
-  }
-  const baselineMap = new Map<string, any>();
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await supabase
-      .from("bloomberg_school_baselines")
-      .select("*")
-      .range(from, from + 999);
-    if (error || !data || data.length === 0) break;
-    data.forEach((b: any) => baselineMap.set(b.school_key, b));
-    if (data.length < 1000) break;
-  }
-
   const wb = new ExcelJS.Workbook();
   wb.creator = "Amehnities — Bloomberg School Eye Health Project";
   wb.created = new Date();
@@ -108,49 +135,43 @@ export async function exportSchoolTemplate(): Promise<number> {
   title.font = { bold: true, size: 13, color: { argb: "FF0C2340" } };
   title.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
 
-  // ---- Header row ----
+  // ---- Header row (friendly labels) ----
   const header = ws.getRow(HEADER_ROW);
   COLUMNS.forEach((c, i) => {
     const cell = header.getCell(i + 1);
-    cell.value = c;
+    cell.value = friendly(c);
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0C2340" } };
     cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
     cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    cell.border = {
+      top: { style: "thin", color: { argb: "FF1E3A5F" } },
+      bottom: { style: "thin", color: { argb: "FF1E3A5F" } },
+      left: { style: "thin", color: { argb: "FF1E3A5F" } },
+      right: { style: "thin", color: { argb: "FF1E3A5F" } },
+    };
   });
-  header.height = 30;
-  COLUMNS.forEach((c, i) => { ws.getColumn(i + 1).width = c.length < 12 ? 14 : Math.min(c.length + 3, 26); });
+  header.height = 34;
+  COLUMNS.forEach((c, i) => {
+    const len = friendly(c).length;
+    ws.getColumn(i + 1).width = Math.min(Math.max(len + 2, 12), 26);
+  });
 
   const colIndex = (name: string) => COLUMNS.indexOf(name as any) + 1;
 
-  // ---- Data rows ----
-  let r = HEADER_ROW + 1;
-  schools.forEach((s) => {
-    const b = baselineMap.get(s.school_key) || {};
-    const row = ws.getRow(r);
-    const setVal = (name: string, v: any) => { row.getCell(colIndex(name)).value = v ?? ""; };
-    setVal("name", s.school_key);
-    setVal("label", s.label);
-    setVal("state", s.state); setVal("lga", s.lga); setVal("ward", s.ward); setVal("location", s.location);
-    setVal("state_label", s.state_label); setVal("lga_label", s.lga_label);
-    setVal("ward_label", s.ward_label); setVal("location_label", s.location_label);
-    setVal("school_code", s.school_code); setVal("school_name", s.school_name);
-    setVal("school_type", s.school_type); setVal("school_level", s.school_level);
-    setVal("ownership", s.ownership); setVal("baseline_scope", s.baseline_scope);
-    ALL_CLASSES.forEach((c) => {
-      setVal(`${c.key}_male_baseline`, b[`${c.key}_male`] ?? 0);
-      setVal(`${c.key}_female_baseline`, b[`${c.key}_female`] ?? 0);
-      setVal(`${c.key}_total_baseline`, b[`${c.key}_total`] ?? 0);
-    });
-    setVal("total_male_baseline", b.total_male ?? 0);
-    setVal("total_female_baseline", b.total_female ?? 0);
-    setVal("grand_total_baseline", b.grand_total ?? 0);
-    setVal("data_quality_flag", b.data_quality_flag);
-    setVal("baseline_notes", b.baseline_notes);
-    r++;
-  });
+  // ---- Empty fill rows with subtle banding so it reads cleanly ----
+  const BLANK_ROWS = 400;
+  const lastRow = HEADER_ROW + BLANK_ROWS;
+  for (let i = HEADER_ROW + 1; i <= lastRow; i++) {
+    const row = ws.getRow(i);
+    row.height = 18;
+    if ((i - HEADER_ROW) % 2 === 0) {
+      COLUMNS.forEach((_, ci) => {
+        row.getCell(ci + 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF4F6FB" } };
+      });
+    }
+  }
 
-  // ---- Validations (apply to a generous range) ----
-  const lastRow = Math.max(r + 500, HEADER_ROW + 600);
+  // ---- Validations (drop-downs + whole numbers) ----
   const listVal = (col: number, list: string[]) => {
     const letter = ws.getColumn(col).letter;
     for (let i = HEADER_ROW + 1; i <= lastRow; i++) {
@@ -163,7 +184,6 @@ export async function exportSchoolTemplate(): Promise<number> {
   listVal(colIndex("school_type"), SCHOOL_TYPES);
   listVal(colIndex("school_level"), SCHOOL_LEVELS);
   listVal(colIndex("ownership"), OWNERSHIP);
-  // Whole-number >= 0 for every numeric baseline column.
   [...BASELINE_COLS, "total_male_baseline", "total_female_baseline", "grand_total_baseline"].forEach((c) => {
     const letter = ws.getColumn(colIndex(c)).letter;
     for (let i = HEADER_ROW + 1; i <= lastRow; i++) {
@@ -176,17 +196,22 @@ export async function exportSchoolTemplate(): Promise<number> {
 
   // ---- Instructions sheet ----
   const help = wb.addWorksheet("Instructions");
-  help.columns = [{ width: 24 }, { width: 90 }];
+  help.columns = [{ width: 28 }, { width: 92 }];
   const note = (a: string, b: string) => help.addRow([a, b]);
-  note("Field", "Guidance");
+  note("Column", "Guidance");
   help.getRow(1).font = { bold: true };
-  note("name", "Unique school key. Leave the existing value to UPDATE a school; use a new UPPERCASE_KEY to ADD one.");
-  note("label", "Friendly display name shown in pickers (e.g. \"Abbas Primary Sch. — Alkaleri\").");
-  note("state / lga / ward / location", "Lowercase machine codes used by the cascade. *_label columns are what users see.");
-  note("school_type", "One of: " + SCHOOL_TYPES.join(", "));
-  note("ownership", "Public or Private.");
-  note("*_baseline", "LEA baseline enrolment by class & sex. Hidden from field validators — admin only.");
-  note("Totals", "total_/grand_total columns are recalculated automatically on import; you may leave them.");
+  help.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0C2340" } };
+  help.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+  note("School ID (Unique Key)", "Unique school key. Use a NEW UPPERCASE_KEY to ADD a school; reuse an existing key to UPDATE it.");
+  note("Display Name", "Friendly display name shown in pickers (e.g. \"Abbas Primary Sch. — Alkaleri\").");
+  note("State / LGA / Ward / Community", "Type the human names in the labelled columns. The lower-case *Code* columns are optional machine codes.");
+  note("School Name", "Required. The official name of the school.");
+  note("School Type", "One of: " + SCHOOL_TYPES.join(", "));
+  note("School Level", "One of: " + SCHOOL_LEVELS.join(", "));
+  note("Ownership", "Public or Private.");
+  note("Class columns (P1 — Boys, etc.)", "LEA baseline enrolment by class & sex. Hidden from field validators — admin only.");
+  note("Totals", "Total / Grand Total columns are recalculated automatically on import — you may leave them blank.");
+  note("Notes", "Any free-text remarks about this school's baseline figures.");
 
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -196,7 +221,7 @@ export async function exportSchoolTemplate(): Promise<number> {
   a.download = `Bloomberg_School_Baseline_Template_${new Date().toISOString().slice(0, 10)}.xlsx`;
   a.click();
   URL.revokeObjectURL(url);
-  return schools.length;
+  return BLANK_ROWS;
 }
 
 export interface SchoolImportResult {
@@ -212,13 +237,16 @@ export async function importSchoolTemplate(file: File): Promise<SchoolImportResu
   const ws = wb.getWorksheet("Schools") ?? wb.worksheets[0];
   if (!ws) return { schools: 0, baselines: 0, errors: ["No worksheet found."] };
 
-  // Locate header row by finding "name" + "school_name".
+  // Locate header row by matching cells (friendly OR machine) to "name" + "school_name".
   let headerRowNum = 0;
   const colMap: Record<string, number> = {};
   for (let i = 1; i <= Math.min(ws.rowCount, 20); i++) {
     const row = ws.getRow(i);
     const map: Record<string, number> = {};
-    row.eachCell((cell, col) => { map[norm(cell.value).toLowerCase()] = col; });
+    row.eachCell((cell, col) => {
+      const machine = HEADER_LOOKUP[normalizeKey(cell.value)];
+      if (machine) map[machine] = col;
+    });
     if (map["name"] && map["school_name"]) {
       headerRowNum = i;
       Object.assign(colMap, map);
@@ -247,8 +275,8 @@ export async function importSchoolTemplate(file: File): Promise<SchoolImportResu
     const key = norm(get(row, "name"));
     const schoolName = norm(get(row, "school_name"));
     if (!key && !schoolName) continue;
-    if (!key) { errors.push(`Row ${i}: missing "name" (school key) — skipped.`); continue; }
-    if (!schoolName) { errors.push(`Row ${i}: missing "school_name" — skipped.`); continue; }
+    if (!key) { errors.push(`Row ${i}: missing "School ID (Unique Key)" — skipped.`); continue; }
+    if (!schoolName) { errors.push(`Row ${i}: missing "School Name" — skipped.`); continue; }
 
     schoolRows.push({
       school_key: key,
