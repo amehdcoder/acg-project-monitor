@@ -11,6 +11,8 @@ import UPRPSubmissionsView from "@/components/UPRP/UPRPSubmissionsView";
 import { OfficeFormsView } from "@/components/OfficeForms";
 import { ActionTrackerView } from "@/components/ActionTracker";
 import { WorkplanView } from "@/components/Workplan";
+import BloombergFormFiller from "@/components/Bloomberg/BloombergFormFiller";
+import BloombergDashboard from "@/components/Bloomberg/BloombergDashboard";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
 import { buildMdaSupervisoryChecklist, MDA_CHECKLIST_NAME } from "@/lib/mdaSupervisoryChecklist";
 import {
