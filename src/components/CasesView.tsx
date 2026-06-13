@@ -1951,6 +1951,7 @@ const CasesView = () => {
             projectFilter={projectFilter}
             caseTypeFilter={caseTypeFilter}
             statusFilter={statusFilter}
+            simulatedMarkers={simulatedData ? simulatedData.markers : undefined}
           />
         </TabsContent>
 
