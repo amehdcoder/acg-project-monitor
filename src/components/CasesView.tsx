@@ -1231,12 +1231,18 @@ const CasesView = () => {
     return raw || "New Case";
   };
 
-  const filteredCases = cases.filter((c) => {
+  // Owner simulation: when enabled, populate the page with realistic synthetic
+  // data so the full Case Management experience can be demoed end-to-end.
+  const simulatedData = simulate ? generateSimulatedCaseData() : null;
+  const baseCases = simulatedData ? (simulatedData.cases as unknown as Case[]) : cases;
+
+  const filteredCases = baseCases.filter((c) => {
     const matchesSearch = getCaseDisplayName(c).toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCaseType = caseTypeFilter === "all" || c.caseTypeId === caseTypeFilter;
-    return matchesSearch && matchesCaseType;
+    const matchesStatus = statusFilter === "all" || c.status === statusFilter;
+    return matchesSearch && matchesCaseType && (simulate ? matchesStatus : true);
   });
 
   const getTimeSince = (dateStr: string) => {
