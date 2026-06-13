@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ALL_CLASSES } from "@/lib/bloomberg/definition";
 import { generateBloombergSimulation } from "@/lib/bloomberg/bloombergSimulation";
@@ -49,25 +49,43 @@ export const useBloombergDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [simulate, setSimulate] = useState(false);
 
+  // Monotonic request id: any async load tags itself with the current value,
+  // and discards its result if a newer load/toggle has happened meanwhile.
+  // This prevents an in-flight reload() from overwriting simulated data
+  // (and vice versa) when the Simulate toggle is flipped — the root cause of
+  // the dashboard "flickering" / showing the wrong dataset.
+  const reqIdRef = useRef(0);
+  // Mirror of `simulate` readable inside async callbacks without re-creating them.
+  const simulateRef = useRef(simulate);
+  simulateRef.current = simulate;
+
   const reload = async () => {
+    const myReq = ++reqIdRef.current;
     setLoading(true);
-    const [v, b] = await Promise.all([
-      fetchAll<ValidationRow>(
-        "bloomberg_validations",
-        "id,school_key,school_name,school_type,state,lga,gps_lat,gps_lng,total_male,total_female,grand_total,status,submitted_at,created_at",
-      ),
-      fetchAll<BaselineRow>("bloomberg_school_baselines", "school_key,total_male,total_female,grand_total"),
-    ]);
-    const { count } = await supabase
-      .from("bloomberg_schools")
-      .select("school_key", { count: "exact", head: true });
-    setValidations(v);
-    setBaselines(b);
-    setSchoolCount(count || 0);
-    setLoading(false);
+    try {
+      const [v, b] = await Promise.all([
+        fetchAll<ValidationRow>(
+          "bloomberg_validations",
+          "id,school_key,school_name,school_type,state,lga,gps_lat,gps_lng,total_male,total_female,grand_total,status,submitted_at,created_at",
+        ),
+        fetchAll<BaselineRow>("bloomberg_school_baselines", "school_key,total_male,total_female,grand_total"),
+      ]);
+      const { count } = await supabase
+        .from("bloomberg_schools")
+        .select("school_key", { count: "exact", head: true });
+      // Discard if a newer request started, or if we've since switched to simulate.
+      if (myReq !== reqIdRef.current || simulateRef.current) return;
+      setValidations(v);
+      setBaselines(b);
+      setSchoolCount(count || 0);
+    } finally {
+      if (myReq === reqIdRef.current) setLoading(false);
+    }
   };
 
   useEffect(() => {
+    // Invalidate any in-flight reload so it can't clobber the dataset we set here.
+    const myReq = ++reqIdRef.current;
     if (simulate) {
       // Swap in a fully synthetic dataset so the dashboard renders exactly as it
       // would with real validations — no backend reads, no writes.
@@ -77,9 +95,18 @@ export const useBloombergDashboard = () => {
       setSchoolCount(sim.schoolCount);
       setLoading(false);
     } else {
-      reload();
+      // Clear stale simulated data immediately, then fetch real data.
+      setValidations([]);
+      setBaselines([]);
+      setSchoolCount(0);
+      void reload();
     }
+    return () => {
+      // On unmount/re-toggle, bump so late async results are ignored.
+      if (myReq === reqIdRef.current) reqIdRef.current++;
+    };
   }, [simulate]);
+
 
   const baselineByKey = useMemo(() => {
     const m = new Map<string, BaselineRow>();
