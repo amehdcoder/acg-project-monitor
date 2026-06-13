@@ -111,13 +111,13 @@ export default function SeeClearDashboard({ onClose }: Props) {
         {/* KPI tiles */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Kpi icon={Building2} label="Total Facilities Assessed" value={fmt(stats.total)} tint={NAVY} sub="Across 3 levels" />
-          <Kpi icon={CheckCircle2} label="Functional Facilities" value={fmt(stats.functional)} tint="#16a34a" sub={`${stats.functionalPct.toFixed(1)}%`} />
+          <Kpi icon={CheckCircle2} label="Functional Facilities" value={fmt(stats.functional)} tint={toneColor(pctTone(stats.functionalPct))} sub={`${stats.functionalPct.toFixed(1)}%`} />
           <Kpi icon={Landmark} label="Government Facilities" value={fmt(stats.government)} tint={BLUE} sub={`${stats.governmentPct.toFixed(1)}%`} />
           <Kpi icon={Users} label="Private Facilities" value={fmt(stats.private)} tint={PURPLE} sub={`${stats.privatePct.toFixed(1)}%`} />
-          <Kpi icon={Building2} label="Facilities with Essential Supplies" value={fmt(stats.withSupplies)} tint={TEAL} sub={`${stats.withSuppliesPct.toFixed(1)}%`} />
-          <Kpi icon={ClipboardList} label="Facilities with Complete Records" value={fmt(stats.withRecords)} tint="#f97316" sub={`${stats.withRecordsPct.toFixed(1)}%`} />
-          <Kpi icon={ArrowLeftRight} label="Referral Compliance Rate" value={`${stats.referralCompliancePct.toFixed(1)}%`} tint={TEAL} sub="Good" />
-          <Kpi icon={Gauge} label="Average Readiness Score" value={`${stats.avgReadiness.toFixed(1)}%`} tint={BLUE} sub={stats.avgReadinessBand.label} />
+          <Kpi icon={Building2} label="Facilities with Essential Supplies" value={fmt(stats.withSupplies)} tint={toneColor(pctTone(stats.withSuppliesPct))} sub={`${stats.withSuppliesPct.toFixed(1)}%`} />
+          <Kpi icon={ClipboardList} label="Facilities with Complete Records" value={fmt(stats.withRecords)} tint={toneColor(pctTone(stats.withRecordsPct))} sub={`${stats.withRecordsPct.toFixed(1)}%`} />
+          <Kpi icon={ArrowLeftRight} label="Referral Compliance Rate" value={`${stats.referralCompliancePct.toFixed(1)}%`} tint={toneColor(pctTone(stats.referralCompliancePct))} sub={pctTone(stats.referralCompliancePct) === "good" ? "Excellent" : pctTone(stats.referralCompliancePct) === "ok" ? "Good" : pctTone(stats.referralCompliancePct) === "warn" ? "Needs attention" : "Critical"} />
+          <Kpi icon={Gauge} label="Average Readiness Score" value={`${stats.avgReadiness.toFixed(1)}%`} tint={toneColor(pctTone(stats.avgReadiness))} sub={stats.avgReadinessBand.label} />
         </div>
 
         {/* Donuts + readiness + map */}
