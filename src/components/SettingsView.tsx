@@ -23,6 +23,7 @@ import { useAppUpdateNotifications } from "@/hooks/useAppUpdateNotifications";
 import BiometricAuth from "@/components/BiometricAuth";
 import VoiceCloningManager from "@/components/VoiceCloningManager";
 import OwnerDataReset from "@/components/OwnerTools/OwnerDataReset";
+import OwnerRolesAccessManager from "@/components/OwnerTools/OwnerRolesAccessManager";
 import { Textarea } from "@/components/ui/textarea";
 import { RESTRICTED_PAGES } from "@/hooks/usePageAccess";
 import { Megaphone } from "lucide-react";
@@ -708,6 +709,9 @@ const SettingsView = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Owner / Co-owner: roles & access control center */}
+            <OwnerRolesAccessManager />
 
             {/* Owner-only: clear microplanning + factory reset */}
             <OwnerDataReset />

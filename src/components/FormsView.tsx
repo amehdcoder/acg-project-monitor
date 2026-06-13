@@ -228,6 +228,21 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showBulkAccess, setShowBulkAccess] = useState(false);
   const { user, isAdmin, isSuperAdmin, isOwner, role, isAdhoc } = useAuth();
   const [assignedStandardCodes, setAssignedStandardCodes] = useState<Set<string>>(new Set());
+  // Owner/Co-owner can hide the Standard forms folder from specific non-admins.
+  const [standardRestricted, setStandardRestricted] = useState(false);
+  useEffect(() => {
+    if (!user?.id || isAdmin) { setStandardRestricted(false); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("standard_form_user_restrictions")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!cancelled) setStandardRestricted(!!data);
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, isAdmin]);
 
   // Adhoc users may only see the standard form(s) explicitly assigned to them.
   useEffect(() => {
@@ -1417,7 +1432,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             </div>
 
             {/* Folder 2 — Standard Forms (hidden for adhoc users with no assigned standard form) */}
-            {(!isAdhoc || assignedStandardCodes.size > 0) && (
+            {(!isAdhoc || assignedStandardCodes.size > 0) && !standardRestricted && (
             <div className="overflow-hidden rounded-2xl border border-border/60 bg-white shadow-sm">
               <button
                 onClick={() => setOpenTopFolder((f) => (f === "standard" ? null : "standard"))}

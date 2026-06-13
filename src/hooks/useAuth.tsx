@@ -22,6 +22,7 @@ interface Profile {
   ward: string | null;
   is_active: boolean;
   is_owner: boolean;
+  is_co_owner?: boolean;
   approval_status: string;
   avatar_url?: string | null;
 }
@@ -34,6 +35,9 @@ interface AuthContextType {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isOwner: boolean;
+  isCoOwner: boolean;
+  /** Owner or Co-owner — near-full app rights. */
+  isOwnerLevel: boolean;
   isAdhoc: boolean;
   isApproved: boolean;
   isPendingApproval: boolean;
@@ -587,7 +591,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const isOwner = profile?.is_owner || user?.email === "amehjoey1@gmail.com";
-  const isAdmin = role === "super_admin" || role === "systems_admin" || isOwner;
+  const isCoOwner = !!profile?.is_co_owner && !isOwner;
+  const isOwnerLevel = isOwner || isCoOwner;
+  const isAdmin = role === "super_admin" || role === "systems_admin" || isOwnerLevel;
   const isSuperAdmin = role === "super_admin" || isOwner;
   // Adhoc users are limited to a single assigned form, their own submissions,
   // and the project chat for the project they are assigned to. Admins/owner are
@@ -610,6 +616,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isAdmin,
         isSuperAdmin,
         isOwner,
+        isCoOwner,
+        isOwnerLevel,
         isAdhoc,
         isApproved,
         isPendingApproval,
