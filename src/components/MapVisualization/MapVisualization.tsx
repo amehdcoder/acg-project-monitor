@@ -114,6 +114,8 @@ interface MapVisualizationProps {
   showControls?: boolean;
   showLegend?: boolean;
   geofences?: GeofenceBoundary[];
+  /** Always render Nigeria national + state/LGA boundaries beneath the markers. */
+  showNigeriaBoundaries?: boolean;
   onMarkerClick?: (marker: MapMarker) => void;
 }
 
@@ -124,6 +126,7 @@ const MapVisualization = ({
   showControls = true,
   showLegend = true,
   geofences = [],
+  showNigeriaBoundaries = true,
   onMarkerClick,
 }: MapVisualizationProps) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
