@@ -458,11 +458,9 @@ const CasesView = () => {
           *,
           case_types!inner(id, name, label, follow_up_schedule),
           projects!inner(name),
-          case_activities(id),
-          follow_up_activities:case_activities!case_activities_case_id_fkey(id)
+          case_activities(id, activity_type)
         `)
         .in("project_id", projectFilter !== "all" ? [projectFilter] : projectIds)
-        .eq("follow_up_activities.activity_type", "follow_up")
         .order("last_modified_at", { ascending: false });
 
       if (statusFilter !== "all") {
