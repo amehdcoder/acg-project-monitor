@@ -1371,6 +1371,18 @@ const CasesView = () => {
         subtitle="Track and manage longitudinal follow-up cases across projects"
         actions={
           <div className="flex items-center gap-2 flex-wrap">
+          {isOwner && (
+            <Button
+              variant={simulate ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSimulate((s) => !s)}
+              className="gap-1"
+              title="Owner-only: populate the page with realistic demo data"
+            >
+              <Activity className="h-4 w-4" />
+              <span className="hidden sm:inline">{simulate ? "Simulating…" : "Simulate Data"}</span>
+            </Button>
+          )}
           {isAdmin && caseTypes.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
