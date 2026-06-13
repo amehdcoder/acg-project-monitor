@@ -1432,7 +1432,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             </div>
 
             {/* Folder 2 — Standard Forms (hidden for adhoc users with no assigned standard form) */}
-            {(!isAdhoc || assignedStandardCodes.size > 0) && (
+            {(!isAdhoc || assignedStandardCodes.size > 0) && !standardRestricted && (
             <div className="overflow-hidden rounded-2xl border border-border/60 bg-white shadow-sm">
               <button
                 onClick={() => setOpenTopFolder((f) => (f === "standard" ? null : "standard"))}
