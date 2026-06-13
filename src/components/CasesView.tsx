@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -458,11 +458,9 @@ const CasesView = () => {
           *,
           case_types!inner(id, name, label, follow_up_schedule),
           projects!inner(name),
-          case_activities(id),
-          follow_up_activities:case_activities!case_activities_case_id_fkey(id)
+          case_activities(id, activity_type)
         `)
         .in("project_id", projectFilter !== "all" ? [projectFilter] : projectIds)
-        .eq("follow_up_activities.activity_type", "follow_up")
         .order("last_modified_at", { ascending: false });
 
       if (statusFilter !== "all") {
@@ -489,7 +487,9 @@ const CasesView = () => {
           projectName: c.projects?.name || "",
           projectId: c.project_id,
           activitiesCount: Array.isArray(c.case_activities) ? c.case_activities.length : 0,
-          followUpCount: Array.isArray(c.follow_up_activities) ? c.follow_up_activities.length : 0,
+          followUpCount: Array.isArray(c.case_activities)
+            ? c.case_activities.filter((a: any) => a.activity_type === "follow_up").length
+            : 0,
           nextFollowUpDate: c.next_follow_up_date,
           followUpSchedule: ctSchedule,
         };
@@ -837,13 +837,12 @@ const CasesView = () => {
       }
     }
     setFollowUpCase(resolvedCase);
-    caseItem = resolvedCase;
 
-    const inlineModules = followUpCatalog[caseItem.caseTypeId] || [];
+    const inlineModules = followUpCatalog[resolvedCase.caseTypeId] || [];
     if (inlineModules.length > 0) {
       setFollowUpForms(inlineModules);
       if (inlineModules.length === 1) {
-        launchFormFiller(inlineModules[0], caseItem);
+        launchFormFiller(inlineModules[0], resolvedCase);
       } else {
         setShowFormPicker(true);
       }
@@ -857,7 +856,7 @@ const CasesView = () => {
       const { data: forms, error } = await supabase
         .from("forms")
         .select("id, name, description, questions, geofence, settings, project_id")
-        .eq("project_id", caseItem.projectId)
+        .eq("project_id", resolvedCase.projectId)
         .eq("status", "active");
 
       if (error) throw error;
@@ -882,7 +881,7 @@ const CasesView = () => {
           const cm = f.settings.caseManagement;
           if (!cm?.enabled) return false;
           if (cm.action !== "update" && cm.action !== "close") return false;
-          if (cm.caseTypeId && cm.caseTypeId !== caseItem.caseTypeId) return false;
+          if (cm.caseTypeId && cm.caseTypeId !== resolvedCase.caseTypeId) return false;
           return true;
         });
 
@@ -890,7 +889,7 @@ const CasesView = () => {
 
       if (matchingForms.length === 1) {
         setShowFormPicker(false);
-        launchFormFiller(matchingForms[0], caseItem);
+        launchFormFiller(matchingForms[0], resolvedCase);
       } else if (matchingForms.length === 0) {
         toast({
           title: "No Follow-up Forms",
@@ -1253,7 +1252,9 @@ const CasesView = () => {
       c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCaseType = caseTypeFilter === "all" || c.caseTypeId === caseTypeFilter;
     const matchesStatus = statusFilter === "all" || c.status === statusFilter;
-    return matchesSearch && matchesCaseType && (simulate ? matchesStatus : true);
+    const matchesPriority =
+      priorityFilter === "all" || (c.properties?.priority as string) === priorityFilter;
+    return matchesSearch && matchesCaseType && matchesPriority && (simulate ? matchesStatus : true);
   });
 
   const getTimeSince = (dateStr: string) => {

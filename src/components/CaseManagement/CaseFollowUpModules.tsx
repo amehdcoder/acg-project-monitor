@@ -107,12 +107,9 @@ const CaseFollowUpModules = ({
                   </span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h4
-                    className="truncate font-display text-[15px] font-semibold text-foreground"
-                    dangerouslySetInnerHTML={{
-                      __html: group.label || group.name || `Module ${idx + 1}`,
-                    }}
-                  />
+                  <h4 className="truncate font-display text-[15px] font-semibold text-foreground">
+                    {group.label || group.name || `Module ${idx + 1}`}
+                  </h4>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     <Badge variant="outline" className="text-[10px] font-normal">
                       {count} question{count !== 1 ? "s" : ""}
