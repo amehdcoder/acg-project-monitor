@@ -211,6 +211,7 @@ const CaseLocationMap = ({
             lng: loc.lng,
             title: (matchingCase as any)?.name || "Submission Location",
             formName: undefined,
+            markerColor: statusColor((matchingCase as any)?.status),
             submittedAt: sub.submitted_at || undefined,
             data: {
               _geoSource: loc.source,
