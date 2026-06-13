@@ -262,7 +262,7 @@ const MapVisualization = ({
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
       try {
         const isFromForm = markerData.data?._geoSource === 'form_response';
-        const icon = createCustomIcon(isFromForm);
+        const icon = createCustomIcon(isFromForm, markerData.markerColor);
         const marker = L.marker([lat, lng], { icon });
 
         const popupContent = createPopupContent(markerData);
@@ -272,7 +272,7 @@ const MapVisualization = ({
 
         clusterGroup.addLayer(marker);
 
-        const individualMarker = L.marker([lat, lng], { icon: createCustomIcon(isFromForm) });
+        const individualMarker = L.marker([lat, lng], { icon: createCustomIcon(isFromForm, markerData.markerColor) });
         individualMarker.bindPopup(popupContent, { maxWidth: 300, className: "custom-popup" });
         individualGroup.addLayer(individualMarker);
       } catch (e) {
