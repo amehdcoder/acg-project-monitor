@@ -146,6 +146,7 @@ export function generateSimulatedCaseData(): SimulatedDataset {
           lga: `${place.city} Municipal`,
           community: place.city,
           assignee,
+          role,
           priority,
           gps: `${lat.toFixed(5)} ${lng.toFixed(5)} 0 12`,
         },
