@@ -48,7 +48,65 @@ export default function BloombergDashboard({ onClose }: Props) {
   const canManage = isOwner || isSuperAdmin;
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [capturing, setCapturing] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const captureRef = useRef<HTMLDivElement | null>(null);
+
+  const captureCanvas = async () => {
+    const el = captureRef.current;
+    if (!el) throw new Error("Dashboard not ready");
+    return html2canvas(el, {
+      backgroundColor: "#f4f6fb",
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      windowWidth: el.scrollWidth,
+      windowHeight: el.scrollHeight,
+    });
+  };
+
+  const stamp = () => {
+    const d = new Date();
+    return d.toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  };
+
+  const exportImage = async (format: "png" | "jpeg") => {
+    setCapturing(true);
+    try {
+      const canvas = await captureCanvas();
+      const link = document.createElement("a");
+      link.download = `bloomberg-validation-dashboard-${stamp()}.${format}`;
+      link.href = canvas.toDataURL(`image/${format}`, 0.95);
+      link.click();
+      toast.success(`Dashboard exported as ${format.toUpperCase()}`);
+    } catch (e: any) {
+      toast.error(e?.message || "Export failed");
+    } finally {
+      setCapturing(false);
+    }
+  };
+
+  const exportPDF = async () => {
+    setCapturing(true);
+    try {
+      const canvas = await captureCanvas();
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? "landscape" : "portrait",
+        unit: "px",
+        format: [canvas.width, canvas.height],
+      });
+      pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
+      pdf.save(`bloomberg-validation-dashboard-${stamp()}.pdf`);
+      toast.success("Dashboard exported as PDF");
+    } catch (e: any) {
+      toast.error(e?.message || "Export failed");
+    } finally {
+      setCapturing(false);
+    }
+  };
+
+
 
   const handleExport = async () => {
     setExporting(true);
