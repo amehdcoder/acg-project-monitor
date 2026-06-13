@@ -856,7 +856,7 @@ const CasesView = () => {
       const { data: forms, error } = await supabase
         .from("forms")
         .select("id, name, description, questions, geofence, settings, project_id")
-        .eq("project_id", caseItem.projectId)
+        .eq("project_id", resolvedCase.projectId)
         .eq("status", "active");
 
       if (error) throw error;
@@ -881,7 +881,7 @@ const CasesView = () => {
           const cm = f.settings.caseManagement;
           if (!cm?.enabled) return false;
           if (cm.action !== "update" && cm.action !== "close") return false;
-          if (cm.caseTypeId && cm.caseTypeId !== caseItem.caseTypeId) return false;
+          if (cm.caseTypeId && cm.caseTypeId !== resolvedCase.caseTypeId) return false;
           return true;
         });
 
@@ -889,7 +889,7 @@ const CasesView = () => {
 
       if (matchingForms.length === 1) {
         setShowFormPicker(false);
-        launchFormFiller(matchingForms[0], caseItem);
+        launchFormFiller(matchingForms[0], resolvedCase);
       } else if (matchingForms.length === 0) {
         toast({
           title: "No Follow-up Forms",
