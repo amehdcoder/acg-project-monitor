@@ -147,6 +147,8 @@ const CasesView = () => {
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [generatingCases, setGeneratingCases] = useState(false);
   const [caseTypeFilter, setCaseTypeFilter] = useState<string>("all");
+  const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [casePage, setCasePage] = useState(1);
 
   // Follow-up form state
   const [followUpCase, setFollowUpCase] = useState<Case | null>(null);
