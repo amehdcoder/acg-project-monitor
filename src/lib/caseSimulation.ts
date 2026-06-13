@@ -92,6 +92,11 @@ export interface SimulatedDataset {
     activeFieldTeams: number;
     highPriority: number;
   };
+  insights: {
+    casesByState: { state: string; count: number }[];
+    followUpTrends: { label: string; completed: number; pending: number; overdue: number }[];
+    recentActivity: { type: "overdue" | "registered" | "completed"; title: string; meta: string }[];
+  };
 }
 
 export function generateSimulatedCaseData(): SimulatedDataset {
