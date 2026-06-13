@@ -131,6 +131,10 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
               </div>
               <OfflineSyncIndicator />
 
+              <CollaboratorPresence />
+
+
+
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
