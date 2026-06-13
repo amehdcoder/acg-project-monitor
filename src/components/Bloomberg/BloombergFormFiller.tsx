@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, ArrowRight, Check, MapPin, Loader2, Camera, Save, Send,
