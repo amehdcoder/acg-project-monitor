@@ -19,6 +19,7 @@ import {
 } from "./types";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { loadNigeriaGeo } from "@/components/Dashboard/ops/lgaGeo";
 
 // Helper function to create popup HTML content
 const createPopupContent = (marker: MapMarker): string => {
