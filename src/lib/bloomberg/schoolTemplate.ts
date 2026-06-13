@@ -14,7 +14,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { ALL_CLASSES, normalizeMissingLabel } from "@/lib/bloomberg/definition";
 
 import fmohLogo from "@/assets/logo-fmoh.png";
-import handsLogo from "@/assets/logo-hands.png";
 import amehLogo from "@/assets/logo-amehnities.png";
 
 // Exact machine column order, matching the reference Schools.csv.
