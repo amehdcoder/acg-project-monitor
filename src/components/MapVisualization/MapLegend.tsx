@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapMarker } from "./types";
-import { useMemo } from "react";
-import { Shield, Eye, EyeOff } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Shield, Eye, EyeOff, ChevronDown, ChevronUp, List } from "lucide-react";
 
 interface GeofenceBoundary {
   name: string;
@@ -20,6 +20,8 @@ interface MapLegendProps {
 }
 
 const MapLegend = ({ markers, showLegend, geofences = [], showGeofences = true, onToggleGeofences, onGeofenceClick }: MapLegendProps) => {
+  const [open, setOpen] = useState(true);
+
   const stateCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     markers.forEach((m) => {
@@ -33,12 +35,41 @@ const MapLegend = ({ markers, showLegend, geofences = [], showGeofences = true, 
 
   if (!showLegend || (markers.length === 0 && geofences.length === 0)) return null;
 
+  // Collapsed: a compact pill button that re-opens the legend.
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="absolute bottom-4 left-4 z-[1000] flex items-center gap-1.5 rounded-full bg-background/95 px-3 py-2 shadow-lg ring-1 ring-border backdrop-blur-sm transition-colors hover:bg-muted"
+        title="Show legend"
+      >
+        <List className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-xs font-medium">Legend</span>
+        <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+      </button>
+    );
+  }
+
   return (
     <Card className="absolute bottom-4 left-4 z-[1000] w-60 shadow-lg bg-background/95 backdrop-blur-sm">
+      {/* Collapse header */}
+      <div className="flex items-center justify-between px-3 pt-2 pb-1">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Map Legend
+        </span>
+        <button
+          onClick={() => setOpen(false)}
+          className="p-1 rounded hover:bg-muted/60 transition-colors"
+          title="Hide legend"
+        >
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
+      </div>
+
       {/* Geofence Boundaries Section */}
       {geofences.length > 0 && (
         <>
-          <CardHeader className="py-2 px-3 pb-1">
+          <CardHeader className="py-2 px-3 pb-1 border-t border-border pt-2">
             <CardTitle className="text-sm font-medium flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <Shield className="h-3.5 w-3.5 text-destructive" />
@@ -90,10 +121,10 @@ const MapLegend = ({ markers, showLegend, geofences = [], showGeofences = true, 
       {/* Submissions by State Section */}
       {stateCounts.length > 0 && (
         <>
-          <CardHeader className={`py-2 px-3 pb-1 ${geofences.length > 0 ? "border-t border-border pt-2" : ""}`}>
+          <CardHeader className={`py-2 px-3 pb-1 ${geofences.length > 0 ? "border-t border-border pt-2" : "border-t border-border pt-2"}`}>
             <CardTitle className="text-sm font-medium">Submissions by State</CardTitle>
           </CardHeader>
-          <CardContent className="py-2 px-3 pt-0">
+          <CardContent className="py-2 px-3 pt-0 max-h-[220px] overflow-y-auto">
             <div className="space-y-1.5">
               {stateCounts.map(([state, count]) => (
                 <div key={state} className="flex items-center justify-between text-sm">
