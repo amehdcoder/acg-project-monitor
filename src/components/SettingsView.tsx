@@ -709,6 +709,9 @@ const SettingsView = () => {
               </CardContent>
             </Card>
 
+            {/* Owner / Co-owner: roles & access control center */}
+            <OwnerRolesAccessManager />
+
             {/* Owner-only: clear microplanning + factory reset */}
             <OwnerDataReset />
           </TabsContent>
