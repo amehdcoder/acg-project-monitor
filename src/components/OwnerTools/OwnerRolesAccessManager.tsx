@@ -66,7 +66,7 @@ export default function OwnerRolesAccessManager() {
         .eq("approval_status", "approved")
         .order("first_name"),
       supabase.from("user_roles").select("user_id, role"),
-      supabase.from("standard_form_user_restrictions").select("user_id"),
+      supabase.from("standard_form_user_restrictions" as any).select("user_id"),
     ]);
     const roleMap = new Map((roles ?? []).map((r: any) => [r.user_id, r.role]));
     setUsers(
@@ -112,7 +112,7 @@ export default function OwnerRolesAccessManager() {
     setBusy(u.user_id);
     if (next) {
       const { error } = await supabase
-        .from("standard_form_user_restrictions")
+        .from("standard_form_user_restrictions" as any)
         .insert({ user_id: u.user_id, restricted_by: user?.id } as any);
       setBusy(null);
       if (error) {
@@ -122,7 +122,7 @@ export default function OwnerRolesAccessManager() {
       setRestricted((s) => new Set(s).add(u.user_id));
     } else {
       const { error } = await supabase
-        .from("standard_form_user_restrictions")
+        .from("standard_form_user_restrictions" as any)
         .delete()
         .eq("user_id", u.user_id);
       setBusy(null);
