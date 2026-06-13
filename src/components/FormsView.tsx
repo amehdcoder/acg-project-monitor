@@ -597,9 +597,19 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   const handleDeleteForm = async (formId: string) => {
     try {
-      const { error } = await supabase.from("forms").delete().eq("id", formId);
-      if (error) throw error;
       const form = forms.find(f => f.id === formId);
+      const bbgKind = (form?.settings as any)?.bloomberg_kind as ("form" | "dashboard" | undefined);
+      // The Bloomberg form and its Validation Dashboard are permanently linked —
+      // removing the form also removes the dashboard from the same project.
+      const idsToDelete = [formId];
+      if (bbgKind === "form" && form?.project_id) {
+        const linkedDash = forms.find(
+          f => f.project_id === form.project_id && (f.settings as any)?.bloomberg_kind === "dashboard",
+        );
+        if (linkedDash) idsToDelete.push(linkedDash.id);
+      }
+      const { error } = await supabase.from("forms").delete().in("id", idsToDelete);
+      if (error) throw error;
       await logAction("delete_form", `Deleted form "${form?.name || formId}"`, "form", formId);
       toast({ title: "Form deleted successfully" });
       if (currentProjectId) {
@@ -607,6 +617,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       } else {
         fetchAllForms();
       }
+
     } catch (error: any) {
       toast({
         title: "Error deleting form",
