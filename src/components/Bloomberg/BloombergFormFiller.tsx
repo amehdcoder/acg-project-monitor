@@ -122,7 +122,7 @@ export default function BloombergFormFiller({ onClose }: Props) {
   };
 
   const canNext = () => {
-    if (step === 0) return !!schoolKey;
+    if (step === 0) return !!(state && lga && ward && location && schoolKey && gps);
     if (step === 1) return schoolExists !== "";
     return true;
   };
