@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ALL_CLASSES } from "@/lib/bloomberg/definition";
+import { generateBloombergSimulation } from "@/lib/bloomberg/bloombergSimulation";
 
 export interface ValidationRow {
   id: string;
@@ -46,6 +47,7 @@ export const useBloombergDashboard = () => {
   const [baselines, setBaselines] = useState<BaselineRow[]>([]);
   const [schoolCount, setSchoolCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [simulate, setSimulate] = useState(false);
 
   const reload = async () => {
     setLoading(true);
@@ -66,8 +68,18 @@ export const useBloombergDashboard = () => {
   };
 
   useEffect(() => {
-    reload();
-  }, []);
+    if (simulate) {
+      // Swap in a fully synthetic dataset so the dashboard renders exactly as it
+      // would with real validations — no backend reads, no writes.
+      const sim = generateBloombergSimulation();
+      setValidations(sim.validations);
+      setBaselines(sim.baselines);
+      setSchoolCount(sim.schoolCount);
+      setLoading(false);
+    } else {
+      reload();
+    }
+  }, [simulate]);
 
   const baselineByKey = useMemo(() => {
     const m = new Map<string, BaselineRow>();
@@ -134,5 +146,5 @@ export const useBloombergDashboard = () => {
     [validations],
   );
 
-  return { validations, baselines, stats, byState, points, loading, reload, ALL_CLASSES };
+  return { validations, baselines, stats, byState, points, loading, reload, ALL_CLASSES, simulate, setSimulate };
 };

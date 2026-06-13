@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin, Download, Upload, Loader2, FileImage } from "lucide-react";
+import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin, Download, Upload, Loader2, FileImage, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -43,7 +43,7 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function BloombergDashboard({ onClose }: Props) {
-  const { stats, byState, points, loading, reload } = useBloombergDashboard();
+  const { stats, byState, points, loading, reload, simulate, setSimulate } = useBloombergDashboard();
   const { isOwner, isSuperAdmin } = useAuth();
   const canManage = isOwner || isSuperAdmin;
   const [exporting, setExporting] = useState(false);
@@ -198,6 +198,17 @@ export default function BloombergDashboard({ onClose }: Props) {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            {isOwner && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setSimulate(!simulate)}
+                className={`h-9 border-0 ${simulate ? "bg-[#2dd4a8] text-[#0c2340] hover:bg-[#22c0a0] font-semibold" : "bg-white/15 text-white hover:bg-white/25"}`}
+              >
+                <Sparkles className="h-4 w-4" />
+                <span className="ml-1.5 hidden sm:inline">{simulate ? "Simulating" : "Simulate"}</span>
+              </Button>
+            )}
             <Button size="sm" variant="secondary" onClick={reload} disabled={loading} className="h-9 bg-white/15 text-white hover:bg-white/25 border-0">
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </Button>
