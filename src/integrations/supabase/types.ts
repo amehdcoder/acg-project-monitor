@@ -4146,6 +4146,7 @@ export type Database = {
           has_seen_tour: boolean
           id: string
           is_active: boolean
+          is_co_owner: boolean
           is_owner: boolean
           last_device_type: string | null
           last_ip_address: string | null
@@ -4174,6 +4175,7 @@ export type Database = {
           has_seen_tour?: boolean
           id?: string
           is_active?: boolean
+          is_co_owner?: boolean
           is_owner?: boolean
           last_device_type?: string | null
           last_ip_address?: string | null
@@ -4202,6 +4204,7 @@ export type Database = {
           has_seen_tour?: boolean
           id?: string
           is_active?: boolean
+          is_co_owner?: boolean
           is_owner?: boolean
           last_device_type?: string | null
           last_ip_address?: string | null
@@ -4767,6 +4770,27 @@ export type Database = {
           disabled_by?: string | null
           form_code?: string
           reason?: string | null
+        }
+        Relationships: []
+      }
+      standard_form_user_restrictions: {
+        Row: {
+          created_at: string
+          id: string
+          restricted_by: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          restricted_by?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          restricted_by?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -5692,6 +5716,10 @@ export type Database = {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
       }
+      can_manage_form: {
+        Args: { _form_id: string; _user_id: string }
+        Returns: boolean
+      }
       can_peer_validate_survey: {
         Args: { _survey_id: string; _user_id: string }
         Returns: boolean
@@ -5778,14 +5806,20 @@ export type Database = {
         Args: { _chat_group_id: string; _user_id: string }
         Returns: boolean
       }
+      is_co_owner: { Args: { _user_id: string }; Returns: boolean }
       is_email_deleted: { Args: { _email: string }; Returns: boolean }
       is_office_approver: {
         Args: { _role: string; _user_id: string }
         Returns: boolean
       }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_owner_or_co_owner: { Args: { _user_id: string }; Returns: boolean }
       is_proximity_message_participant: {
         Args: { _message_id: string }
+        Returns: boolean
+      }
+      is_standard_forms_restricted: {
+        Args: { _user_id: string }
         Returns: boolean
       }
       office_form_approver_role: {
