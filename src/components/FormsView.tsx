@@ -1632,6 +1632,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
               {/* Folder-grouped standard forms */}
               {([
+                ...(isOwner ? [{
+                  id: "bloomberg_folder",
+                  title: "Bloomberg School Eye Health Project",
+                  subtitle: "School enrolment validation — form & admin dashboard",
+                  bg: "bg-[#E3ECFB]", fg: "text-[#0c2340]", chipBg: "bg-[#E3ECFB]", chipFg: "text-[#0c2340]",
+                  items: [
+                    { kind: "bloomberg_form" as const, icon: ClipboardCheck, bg: "bg-[#E3ECFB]", fg: "text-[#2563eb]", label: "School Enrolment Validation", desc: "Independent 4-step validation of LEA school enrolment (Owner only)." },
+                    { kind: "bloomberg_dash" as const, icon: BarChart3, bg: "bg-[#DCF3F0]", fg: "text-[#14b8a6]", label: "Validation Dashboard", desc: "Baseline vs validated analytics, discrepancies & map (Owner only)." },
+                  ],
+                }] : []),
                 {
                   id: "action_tracker_folder",
                   title: "Meeting Action Tracking",
