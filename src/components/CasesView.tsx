@@ -135,7 +135,8 @@ interface FollowUpForm {
 }
 
 const CasesView = () => {
-  const { user, profile, isAdmin } = useAuth();
+  const { user, profile, isAdmin, isOwner } = useAuth();
+  const [simulate, setSimulate] = useState(false);
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
