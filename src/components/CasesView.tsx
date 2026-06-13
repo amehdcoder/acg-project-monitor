@@ -51,6 +51,14 @@ import {
     BarChart3,
     Settings,
     Activity,
+    Filter,
+    MapPin,
+    Users,
+    Flag,
+    ChevronLeft,
+    Info,
+    Maximize2,
+
 
 } from "lucide-react";
 import FollowUpFormCreator from "@/components/CaseManagement/FollowUpFormCreator";
