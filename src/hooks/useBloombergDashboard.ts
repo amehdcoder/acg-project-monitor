@@ -190,5 +190,78 @@ export const useBloombergDashboard = () => {
     [validations],
   );
 
-  return { validations, baselines, stats, byState, points, loading, reload, ALL_CLASSES, simulate, setSimulate };
+  // Schools reported as not existing / not found during field validation.
+  const nonExistent = useMemo(() => {
+    const rows = validations
+      .filter((v) => v.verification?.school_exists === "no")
+      .map((v) => {
+        const reasonVal = v.verification?.not_found_reason || "other";
+        return {
+          school: v.school_name || "Unknown",
+          code: v.school_code || v.school_key || "—",
+          state: v.state || "—",
+          lga: v.lga || "—",
+          ward: v.ward || "—",
+          reasonValue: reasonVal,
+          reason: REASON_LABEL.get(reasonVal) || reasonVal || "Other",
+          status: v.status || "draft",
+          date: v.verification?.date_of_visit || v.submitted_at || v.created_at,
+        };
+      })
+      .sort((a, b) => a.state.localeCompare(b.state) || a.school.localeCompare(b.school));
+
+    // Reason breakdown for the analytics chart.
+    const counts = new Map<string, number>();
+    rows.forEach((r) => counts.set(r.reasonValue, (counts.get(r.reasonValue) || 0) + 1));
+    const reasonAnalysis = NOT_FOUND_REASONS
+      .map((r) => ({
+        key: r.value,
+        name: r.label,
+        count: counts.get(r.value) || 0,
+        pct: rows.length > 0 ? ((counts.get(r.value) || 0) / rows.length) * 100 : 0,
+      }))
+      .filter((r) => r.count > 0)
+      .sort((a, b) => b.count - a.count);
+
+    return { rows, reasonAnalysis, total: rows.length };
+  }, [validations]);
+
+  // Full register of validated schools with status & variance vs baseline.
+  const validatedTable = useMemo(() => {
+    return validations
+      .filter((v) => v.verification?.school_exists !== "no")
+      .map((v) => {
+        const b = v.school_key ? baselineByKey.get(v.school_key) : undefined;
+        const baseline = b?.grand_total ?? 0;
+        const validated = v.grand_total ?? 0;
+        const diff = validated - baseline;
+        const pct = baseline > 0 ? (diff / baseline) * 100 : 0;
+        const hasBaseline = baseline > 0;
+        // A material variance is anything beyond ±2% (rounding tolerance).
+        const hasVariance = hasBaseline ? Math.abs(pct) >= 2 : diff !== 0;
+        const opStatus = v.verification?.operational_status;
+        return {
+          school: v.school_name || "Unknown",
+          code: v.school_code || v.school_key || "—",
+          state: v.state || "—",
+          lga: v.lga || "—",
+          type: v.school_type || "—",
+          baseline,
+          validated,
+          diff,
+          pct,
+          hasBaseline,
+          hasVariance,
+          status: v.status || "draft",
+          operational: opStatus ? OP_STATUS_LABEL.get(opStatus) || opStatus : null,
+          operationalValue: opStatus || null,
+        };
+      })
+      .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct) || a.school.localeCompare(b.school));
+  }, [validations, baselineByKey]);
+
+  return {
+    validations, baselines, stats, byState, points, nonExistent, validatedTable,
+    loading, reload, ALL_CLASSES, simulate, setSimulate,
+  };
 };
