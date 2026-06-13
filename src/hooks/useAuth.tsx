@@ -35,6 +35,9 @@ interface AuthContextType {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isOwner: boolean;
+  isCoOwner: boolean;
+  /** Owner or Co-owner — near-full app rights. */
+  isOwnerLevel: boolean;
   isAdhoc: boolean;
   isApproved: boolean;
   isPendingApproval: boolean;
