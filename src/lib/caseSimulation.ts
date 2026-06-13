@@ -62,6 +62,11 @@ const ASSIGNEES = [
   "Ibrahim D.", "Grace N.", "Yusuf K.", "Blessing E.", "Samuel T.",
 ];
 
+const ROLES = [
+  "Field Officer", "Supervisor", "Field Officer", "Field Officer", "Supervisor",
+  "Field Officer", "Supervisor", "Field Officer", "Field Officer", "Supervisor",
+];
+
 const STATUSES: ("open" | "closed")[] = ["open", "open", "open", "closed"];
 
 const daysAgo = (n: number) => {
