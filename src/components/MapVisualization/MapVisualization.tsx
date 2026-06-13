@@ -366,6 +366,46 @@ const MapVisualization = ({
     };
   }, [geofences, isMapReady]);
 
+  // Always render the Nigeria national + state/LGA boundaries beneath markers so
+  // the country outline is visible even when there is no GPS data to plot.
+  useEffect(() => {
+    if (!isMapReady || !mapRef.current || !showNigeriaBoundaries) return;
+    const map = mapRef.current;
+    let cancelled = false;
+
+    loadNigeriaGeo()
+      .then((geo) => {
+        if (cancelled || !mapRef.current) return;
+        if (boundaryLayerRef.current) {
+          try { map.removeLayer(boundaryLayerRef.current); } catch { /* noop */ }
+          boundaryLayerRef.current = null;
+        }
+        const layer = L.geoJSON(geo, {
+          interactive: false,
+          style: () => ({
+            color: "#64748b",       // visible state/LGA boundary lines
+            weight: 0.6,
+            opacity: 0.65,
+            fillColor: "#bbf7d0",   // soft green land fill, matching the design
+            fillOpacity: 0.12,
+          }),
+        });
+        layer.addTo(map);
+        try { layer.bringToBack(); } catch { /* noop */ }
+        boundaryLayerRef.current = layer;
+      })
+      .catch((e) => console.warn("Nigeria boundaries failed to load", e));
+
+    return () => {
+      cancelled = true;
+      if (boundaryLayerRef.current && mapRef.current) {
+        try { mapRef.current.removeLayer(boundaryLayerRef.current); } catch { /* noop */ }
+        boundaryLayerRef.current = null;
+      }
+    };
+  }, [isMapReady, showNigeriaBoundaries]);
+
+
   // Handle view changes
   const handleViewChange = useCallback((view: MapViewLevel) => {
     setCurrentView(view);
