@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, ArrowRight, Check, MapPin, Loader2, Camera, Save, Send,
-  School as SchoolIcon, ClipboardCheck, ImageIcon, ChevronDown,
+  School as SchoolIcon, ClipboardCheck, ImageIcon, ChevronDown, Search, ChevronsUpDown,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
