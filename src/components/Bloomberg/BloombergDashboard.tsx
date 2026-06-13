@@ -72,14 +72,18 @@ const OpBadge = ({ value, label }: { value: string | null; label: string | null 
 
 
 const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string; value: string; tint: string; sub?: string }) => (
-  <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+  <div
+    className="relative overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+    style={{ background: `linear-gradient(135deg, ${tint}0d, transparent 70%)` }}
+  >
+    <span className="absolute inset-y-0 left-0 w-1" style={{ background: tint }} />
     <div className="flex items-center justify-between">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${tint}1a`, color: tint }}>
         <Icon className="h-4 w-4" />
       </div>
     </div>
-    <p className="mt-2 text-2xl font-bold text-foreground">{value}</p>
+    <p className="mt-2 text-2xl font-bold" style={{ color: tint }}>{value}</p>
     {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
   </div>
 );
