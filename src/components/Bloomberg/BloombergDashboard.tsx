@@ -229,7 +229,19 @@ export default function BloombergDashboard({ onClose }: Props) {
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={captureRef} className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Report header & timestamp — visible and captured in exports */}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-2">
+            <img src={bloombergLogo} alt="" className="h-8 w-8 rounded" width={32} height={32} />
+            <div>
+              <h2 className="text-sm font-bold text-foreground">Bloomberg Validation Dashboard</h2>
+              <p className="text-xs text-muted-foreground">School Enrolment Validation Report</p>
+            </div>
+          </div>
+          <p className="text-xs font-medium text-muted-foreground">Generated: {new Date().toLocaleString()}</p>
+        </div>
+
         {/* KPI tiles */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Kpi icon={School} label="Total Schools" value={fmt(stats.totalSchools)} tint={NAVY} />
