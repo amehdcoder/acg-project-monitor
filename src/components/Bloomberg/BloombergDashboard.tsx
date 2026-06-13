@@ -1,6 +1,9 @@
 import { useMemo, useRef, useState } from "react";
-import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin, Download, Upload, Loader2 } from "lucide-react";
+import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin, Download, Upload, Loader2, FileImage } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid,
 } from "recharts";
@@ -10,7 +13,10 @@ import { useBloombergDashboard } from "@/hooks/useBloombergDashboard";
 import { useAuth } from "@/hooks/useAuth";
 import { exportSchoolTemplate, importSchoolTemplate } from "@/lib/bloomberg/schoolTemplate";
 import { toast } from "sonner";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
+
 
 const NAVY = "#0c2340";
 const BLUE = "#2563eb";
@@ -42,7 +48,65 @@ export default function BloombergDashboard({ onClose }: Props) {
   const canManage = isOwner || isSuperAdmin;
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [capturing, setCapturing] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const captureRef = useRef<HTMLDivElement | null>(null);
+
+  const captureCanvas = async () => {
+    const el = captureRef.current;
+    if (!el) throw new Error("Dashboard not ready");
+    return html2canvas(el, {
+      backgroundColor: "#f4f6fb",
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      windowWidth: el.scrollWidth,
+      windowHeight: el.scrollHeight,
+    });
+  };
+
+  const stamp = () => {
+    const d = new Date();
+    return d.toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  };
+
+  const exportImage = async (format: "png" | "jpeg") => {
+    setCapturing(true);
+    try {
+      const canvas = await captureCanvas();
+      const link = document.createElement("a");
+      link.download = `bloomberg-validation-dashboard-${stamp()}.${format}`;
+      link.href = canvas.toDataURL(`image/${format}`, 0.95);
+      link.click();
+      toast.success(`Dashboard exported as ${format.toUpperCase()}`);
+    } catch (e: any) {
+      toast.error(e?.message || "Export failed");
+    } finally {
+      setCapturing(false);
+    }
+  };
+
+  const exportPDF = async () => {
+    setCapturing(true);
+    try {
+      const canvas = await captureCanvas();
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? "landscape" : "portrait",
+        unit: "px",
+        format: [canvas.width, canvas.height],
+      });
+      pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
+      pdf.save(`bloomberg-validation-dashboard-${stamp()}.pdf`);
+      toast.success("Dashboard exported as PDF");
+    } catch (e: any) {
+      toast.error(e?.message || "Export failed");
+    } finally {
+      setCapturing(false);
+    }
+  };
+
+
 
   const handleExport = async () => {
     setExporting(true);
@@ -114,10 +178,34 @@ export default function BloombergDashboard({ onClose }: Props) {
             <img src={bloombergLogo} alt="Bloomberg School Eye Health" className="h-7 w-7 rounded" loading="lazy" width={28} height={28} />
             <span className="text-sm font-semibold leading-tight">Bloomberg School<br />Eye Health Project</span>
           </div>
-          <Button size="sm" variant="secondary" onClick={reload} disabled={loading} className="h-9 bg-white/15 text-white hover:bg-white/25 border-0">
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          </Button>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="secondary" disabled={capturing} className="h-9 bg-white/15 text-white hover:bg-white/25 border-0">
+                  {capturing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  <span className="ml-1.5 hidden sm:inline">Export</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => exportPDF()}>
+                  <FileText className="mr-2 h-4 w-4" /> Export as PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportImage("png")}>
+                  <FileImage className="mr-2 h-4 w-4" /> Export as PNG
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportImage("jpeg")}>
+                  <FileImage className="mr-2 h-4 w-4" /> Export as JPEG
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button size="sm" variant="secondary" onClick={reload} disabled={loading} className="h-9 bg-white/15 text-white hover:bg-white/25 border-0">
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
         </div>
+
+
+
         <h1 className="mt-3 text-2xl font-bold">Validation Dashboard</h1>
         <p className="text-sm text-white/70">Independent school enrolment validation — admin analytics</p>
         {canManage && (
@@ -141,7 +229,19 @@ export default function BloombergDashboard({ onClose }: Props) {
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={captureRef} className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Report header & timestamp — visible and captured in exports */}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-2">
+            <img src={bloombergLogo} alt="" className="h-8 w-8 rounded" width={32} height={32} />
+            <div>
+              <h2 className="text-sm font-bold text-foreground">Bloomberg Validation Dashboard</h2>
+              <p className="text-xs text-muted-foreground">School Enrolment Validation Report</p>
+            </div>
+          </div>
+          <p className="text-xs font-medium text-muted-foreground">Generated: {new Date().toLocaleString()}</p>
+        </div>
+
         {/* KPI tiles */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Kpi icon={School} label="Total Schools" value={fmt(stats.totalSchools)} tint={NAVY} />
