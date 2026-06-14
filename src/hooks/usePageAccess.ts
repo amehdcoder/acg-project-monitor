@@ -130,9 +130,10 @@ export const usePageAccess = () => {
 
 
 
-  // Realtime subscription for super admins (not owner)
+  // Realtime grant updates for any admin (Super Admin or Systems Admin), not the
+  // Owner (who always has every page).
   useEffect(() => {
-    if (!user || authLoading || isOwner || !isSuperAdmin) return;
+    if (!user || authLoading || isOwner || !isAdmin) return;
 
     // Remove any stale channel with the same topic to avoid
     // "cannot add postgres_changes callbacks after subscribe()" errors
