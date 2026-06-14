@@ -1025,7 +1025,14 @@ const CasesView = () => {
           .eq("status", "open");
 
         for (const c of openCasesData || []) {
-          const nextDate = new Date(c.last_modified_at);
+          // Anchor the schedule on the most recent activity, but never earlier
+          // than now, so enabling a schedule today can't produce a date already
+          // in the past.
+          const anchor = Math.max(
+            new Date(c.last_modified_at).getTime(),
+            Date.now()
+          );
+          const nextDate = new Date(anchor);
           nextDate.setDate(nextDate.getDate() + intervalDays);
           await supabase
             .from("cases")
