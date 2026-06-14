@@ -40,7 +40,7 @@ const FIELD_DESIGNATIONS = new Set([
 const FIELD_DESIGNATION_PAGES = new Set(["microplanning"]);
 
 export const usePageAccess = () => {
-  const { user, isOwner, isSuperAdmin, isAdmin, profile, loading: authLoading } = useAuth();
+  const { user, isOwner, isOwnerLevel, isSuperAdmin, isAdmin, profile, loading: authLoading } = useAuth();
   const [grantedPages, setGrantedPages] = useState<string[]>([]);
   const [loadingAccess, setLoadingAccess] = useState(true);
   // Tier 2: a "Manage Microplanning Form Access" grant unlocks the full
