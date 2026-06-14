@@ -383,7 +383,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     if (authLoading) return;
     fetchProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, user?.id, role, isSuperAdmin, isAdmin]);
+  }, [authLoading, user?.id, role, isSuperAdmin, isOwnerLevel, isAdmin]);
 
   useEffect(() => {
     if (selectedProjectId) {
