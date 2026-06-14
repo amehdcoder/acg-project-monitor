@@ -111,6 +111,88 @@ export function IncomingCallManager() {
 
   useEffect(() => () => stopRingtone(), [stopRingtone]);
 
+  // Shared ingest: turns a raw active_calls row into a ringing prompt (idempotent).
+  const ingestCall = useCallback(
+    async (call: Record<string, unknown> | null) => {
+      if (!call || !user?.id) return;
+      const callId = call.id as string;
+      if (!callId) return;
+      if (call.started_by === user.id || seenRef.current.has(callId)) return;
+      if (call.is_active === false) return;
+      // Ignore stale rows from previous, never-ended sessions.
+      const startedAt = call.started_at ? new Date(call.started_at as string).getTime() : Date.now();
+      if (Date.now() - startedAt > 120000) return;
+      seenRef.current.add(callId);
+
+      const chatGroupId = call.chat_group_id as string;
+
+      // Only ring if the user is a member of the group.
+      const { data: membership } = await supabase
+        .from("chat_group_members")
+        .select("id")
+        .eq("chat_group_id", chatGroupId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!membership) return;
+
+      const [callerRes, groupRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("first_name, last_name")
+          .eq("user_id", call.started_by as string)
+          .maybeSingle(),
+        supabase
+          .from("chat_groups")
+          .select("name")
+          .eq("id", chatGroupId)
+          .maybeSingle(),
+      ]);
+
+      const callerName = callerRes.data
+        ? `${callerRes.data.first_name ?? ""} ${callerRes.data.last_name ?? ""}`.trim() ||
+          "Someone"
+        : "Someone";
+
+      setIncoming((prev) =>
+        prev.some((c) => c.id === callId)
+          ? prev
+          : [
+              ...prev,
+              {
+                id: callId,
+                chatGroupId,
+                callType: (call.call_type as "voice" | "video") || "voice",
+                callerName,
+                groupName: groupRes.data?.name || "Group call",
+              },
+            ]
+      );
+    },
+    [user?.id]
+  );
+
+  // Polling fallback: catches calls that started while the realtime socket was
+  // mid-reconnect or before this manager finished mounting, so members still ring.
+  const scanForActiveCalls = useCallback(async () => {
+    if (!user?.id) return;
+    const { data: memberships } = await supabase
+      .from("chat_group_members")
+      .select("chat_group_id")
+      .eq("user_id", user.id);
+    const groupIds = (memberships || []).map((m) => m.chat_group_id);
+    if (!groupIds.length) return;
+
+    const { data: calls } = await supabase
+      .from("active_calls" as never)
+      .select("*")
+      .eq("is_active", true)
+      .in("chat_group_id", groupIds)
+      .order("started_at", { ascending: false })
+      .limit(20);
+
+    (calls || []).forEach((c) => void ingestCall(c as Record<string, unknown>));
+  }, [user?.id, ingestCall]);
+
   // --- Realtime subscription to calls across the user's groups ---
   useEffect(() => {
     if (!user?.id) return;
@@ -120,57 +202,8 @@ export function IncomingCallManager() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "active_calls" },
-        async (payload: { new: Record<string, unknown> }) => {
-          const call = payload.new;
-          if (!call) return;
-          const callId = call.id as string;
-          if (call.started_by === user.id || seenRef.current.has(callId)) return;
-          if (call.is_active === false) return;
-          seenRef.current.add(callId);
-
-          const chatGroupId = call.chat_group_id as string;
-
-          // Only ring if the user is a member of the group.
-          const { data: membership } = await supabase
-            .from("chat_group_members")
-            .select("id")
-            .eq("chat_group_id", chatGroupId)
-            .eq("user_id", user.id)
-            .maybeSingle();
-          if (!membership) return;
-
-          const [callerRes, groupRes] = await Promise.all([
-            supabase
-              .from("profiles")
-              .select("first_name, last_name")
-              .eq("user_id", call.started_by as string)
-              .maybeSingle(),
-            supabase
-              .from("chat_groups")
-              .select("name")
-              .eq("id", chatGroupId)
-              .maybeSingle(),
-          ]);
-
-          const callerName = callerRes.data
-            ? `${callerRes.data.first_name ?? ""} ${callerRes.data.last_name ?? ""}`.trim() ||
-              "Someone"
-            : "Someone";
-
-          setIncoming((prev) =>
-            prev.some((c) => c.id === callId)
-              ? prev
-              : [
-                  ...prev,
-                  {
-                    id: callId,
-                    chatGroupId,
-                    callType: (call.call_type as "voice" | "video") || "voice",
-                    callerName,
-                    groupName: groupRes.data?.name || "Group call",
-                  },
-                ]
-          );
+        (payload: { new: Record<string, unknown> }) => {
+          void ingestCall(payload.new);
         }
       )
       .on(
@@ -185,10 +218,20 @@ export function IncomingCallManager() {
       )
       .subscribe();
 
+    // Immediate scan + lightweight polling fallback for missed realtime events.
+    void scanForActiveCalls();
+    const poll = setInterval(() => void scanForActiveCalls(), 6000);
+    const onFocus = () => void scanForActiveCalls();
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("online", onFocus);
+
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(poll);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("online", onFocus);
     };
-  }, [user?.id]);
+  }, [user?.id, ingestCall, scanForActiveCalls]);
 
   const current = incoming[0] ?? null;
 
