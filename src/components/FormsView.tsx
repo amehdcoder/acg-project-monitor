@@ -405,8 +405,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     try {
       let projectsData;
       
-      // Super admins see all projects; Systems admins only see assigned projects
-      if (isSuperAdmin) {
+      // Super admins and owner-level users (Owner + Co-owner) see all projects;
+      // Systems admins only see assigned projects
+      if (isSuperAdmin || isOwnerLevel) {
         const { data, error } = await supabase
           .from("projects")
           .select("id, name")
