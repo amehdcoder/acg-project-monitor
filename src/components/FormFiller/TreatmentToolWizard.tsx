@@ -621,6 +621,12 @@ const CommunitySummaryWizard = (p: InnerProps) => {
                 <Input type="date" value={p.get("end_date_treatment") || ""} onChange={(e) => p.set("end_date_treatment", e.target.value)} />
               </div>
             </div>
+            {dateOrderError && (
+              <p className="flex items-center gap-1.5 text-xs font-medium text-destructive">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Check the dates: end of treatment cannot be before the start, and the reporting date cannot be before the end of treatment.
+              </p>
+            )}
             {!step0Complete && (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
