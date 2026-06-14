@@ -108,12 +108,18 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const [settingsProject, setSettingsProject] = useState<Project | null>(null);
   const [settingsForm, setSettingsForm] = useState<{ status: string }>({ status: "active" });
   const [savingSettings, setSavingSettings] = useState(false);
-  const { user, role, isSuperAdmin } = useAuth();
+  const { user, role, isSuperAdmin, isOwnerLevel, loading: authLoading } = useAuth();
   const { logAction } = useAdminSurveillance();
 
+  // Wait for auth (role / owner status) to resolve before the first fetch and
+  // re-fetch when it changes. Fetching on mount alone ran the query while
+  // `role` was still null, so a Super Admin / Co-owner could be silently
+  // scoped to the assigned-only branch and see an empty project list.
   useEffect(() => {
+    if (authLoading) return;
     fetchProjects();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user?.id, role, isSuperAdmin, isOwnerLevel]);
 
   // Fetch forms when chat project is selected
   useEffect(() => {
@@ -147,7 +153,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       let projectsData;
       
       // Super admins see all projects; Systems admins only see assigned projects
-      if (isSuperAdmin) {
+      if (isSuperAdmin || isOwnerLevel) {
         const { data, error } = await supabase
           .from("projects")
           .select("*")

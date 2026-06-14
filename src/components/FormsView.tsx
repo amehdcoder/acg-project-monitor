@@ -236,7 +236,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
   const [bulkForm, setBulkForm] = useState<Form | null>(null);
   const [showBulkAccess, setShowBulkAccess] = useState(false);
-  const { user, isAdmin, isSuperAdmin, isOwner, role, isAdhoc, loading: authLoading } = useAuth();
+  const { user, isAdmin, isSuperAdmin, isOwner, isOwnerLevel, role, isAdhoc, loading: authLoading } = useAuth();
   const [assignedStandardCodes, setAssignedStandardCodes] = useState<Set<string>>(new Set());
   // Owner/Co-owner can hide the Standard forms folder from specific non-admins.
   const [standardRestricted, setStandardRestricted] = useState(false);
@@ -383,7 +383,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     if (authLoading) return;
     fetchProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, user?.id, role, isSuperAdmin, isAdmin]);
+  }, [authLoading, user?.id, role, isSuperAdmin, isOwnerLevel, isAdmin]);
 
   useEffect(() => {
     if (selectedProjectId) {
@@ -399,14 +399,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       fetchAllForms();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentProjectId, authLoading, user?.id, role, isSuperAdmin]);
+  }, [currentProjectId, authLoading, user?.id, role, isSuperAdmin, isOwnerLevel]);
 
   const fetchProjects = async () => {
     try {
       let projectsData;
       
-      // Super admins see all projects; Systems admins only see assigned projects
-      if (isSuperAdmin) {
+      // Super admins and owner-level users (Owner + Co-owner) see all projects;
+      // Systems admins only see assigned projects
+      if (isSuperAdmin || isOwnerLevel) {
         const { data, error } = await supabase
           .from("projects")
           .select("id, name")
@@ -506,9 +507,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       setLoading(true);
 
       
-      // Super admins see all forms; Systems admins only see assigned forms
+      // Super admins and owner-level users (Owner + Co-owner) see all forms;
+      // Systems admins only see assigned forms
       let formsData;
-      if (isSuperAdmin) {
+      if (isSuperAdmin || isOwnerLevel) {
         const { data, error } = await supabase
           .from("forms")
           .select("*")

@@ -40,7 +40,7 @@ const FIELD_DESIGNATIONS = new Set([
 const FIELD_DESIGNATION_PAGES = new Set(["microplanning"]);
 
 export const usePageAccess = () => {
-  const { user, isOwner, isSuperAdmin, isAdmin, profile, loading: authLoading } = useAuth();
+  const { user, isOwner, isOwnerLevel, isSuperAdmin, isAdmin, profile, loading: authLoading } = useAuth();
   const [grantedPages, setGrantedPages] = useState<string[]>([]);
   const [loadingAccess, setLoadingAccess] = useState(true);
   // Tier 2: a "Manage Microplanning Form Access" grant unlocks the full
@@ -76,7 +76,9 @@ export const usePageAccess = () => {
       return;
     }
 
-    if (!isSuperAdmin) {
+    // Any admin (Super Admin OR Systems Admin) can be granted restricted pages
+    // by the Owner. Non-admins have no per-admin grants to fetch.
+    if (!isAdmin) {
       setGrantedPages([]);
       setLoadingAccess(false);
       initialLoadDone.current = true;
@@ -104,7 +106,7 @@ export const usePageAccess = () => {
       initialLoadDone.current = true;
       lastUserId.current = user.id;
     }
-  }, [user, isOwner, isSuperAdmin, authLoading]);
+  }, [user, isOwner, isSuperAdmin, isAdmin, authLoading]);
 
   useEffect(() => {
     fetchAccess();
@@ -128,9 +130,10 @@ export const usePageAccess = () => {
 
 
 
-  // Realtime subscription for super admins (not owner)
+  // Realtime grant updates for any admin (Super Admin or Systems Admin), not the
+  // Owner (who always has every page).
   useEffect(() => {
-    if (!user || authLoading || isOwner || !isSuperAdmin) return;
+    if (!user || authLoading || isOwner || !isAdmin) return;
 
     // Remove any stale channel with the same topic to avoid
     // "cannot add postgres_changes callbacks after subscribe()" errors
@@ -188,19 +191,28 @@ export const usePageAccess = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, authLoading, isOwner, isSuperAdmin]);
+  }, [user, authLoading, isOwner, isAdmin]);
 
   // Owner-granted user-level page access (with optional time window).
   // Available to ANY user — not just super admins.
-  const { canAccessUserPage } = useUserAccess();
+  const { canAccessUserPage, loadingUserAccess } = useUserAccess();
 
   const designation = (profile?.designation || "").toLowerCase();
   const isFieldDesignation = FIELD_DESIGNATIONS.has(designation);
 
   const canAccessPage = useCallback(
     (pageId: string): boolean => {
-      if (loadingAccess) return true;
+      // Owner/admin status comes from auth and resolves independently of the
+      // grant fetch, so honour those immediately. While the per-user grants are
+      // still loading we DEFAULT-DENY restricted pages instead of default-allow,
+      // which previously caused restricted sidebar items to flash for users who
+      // were never entitled to them. Content rendering in Index gates on
+      // `loadingAccess` separately (spinner), so this never blocks a legitimate
+      // page — it only prevents the unauthorized flash.
       if (isOwner) return true;
+      // Co-owners are owner-level ("near-full app rights") — grant every page,
+      // including the restricted ones, just like the Owner.
+      if (isOwnerLevel) return true;
       // Owner-granted, time-bounded per-user access works for any page id.
       if (canAccessUserPage(pageId)) return true;
       // Field designations (FLHF Supervisor, Enumerator, CDD) get default
@@ -209,9 +221,10 @@ export const usePageAccess = () => {
       // Tier 2: a "Manage Microplanning Form Access" grant unlocks the full
       // Geo Microplanning dashboard page for any user.
       if (pageId === "microplanning" && hasMicroplanFormAccess) return true;
-      // Restricted pages: super admins can be granted access by the owner.
+      // Restricted pages: any admin (Super Admin or Systems Admin) can be
+      // granted access by the owner via admin_page_access.
       if (isRestrictedPageId(pageId)) {
-        if (isSuperAdmin && grantedPages.includes(pageId)) return true;
+        if (isAdmin && grantedPages.includes(pageId)) return true;
         return false;
       }
       // Non-restricted pages: admins always pass; regular users only get
@@ -220,7 +233,7 @@ export const usePageAccess = () => {
       if (pageId === "forms" || pageId === "cases" || pageId === "community-forum" || pageId === "project-chat") return true;
       return false;
     },
-    [isOwner, isAdmin, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage, isFieldDesignation, hasMicroplanFormAccess]
+    [isOwner, isOwnerLevel, isAdmin, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage, isFieldDesignation, hasMicroplanFormAccess]
   );
 
   const refetch = useCallback(async () => {
@@ -230,6 +243,9 @@ export const usePageAccess = () => {
     await fetchAccess();
   }, [fetchAccess]);
 
-  return { canAccessPage, grantedPages, loadingAccess, refetch };
+  // Surface per-user grant loading too, so callers (e.g. Index's guardedPage
+  // spinner) wait for time-bounded grants to resolve before deciding access —
+  // preventing a brief "Access Restricted" flash for users who DO have a grant.
+  return { canAccessPage, grantedPages, loadingAccess: loadingAccess || loadingUserAccess, refetch };
 };
 

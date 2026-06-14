@@ -386,7 +386,7 @@ interface MicroplanningViewProps {
 }
 
 const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
-  const { user, isOwner, isSuperAdmin } = useAuth();
+  const { user, isOwner, isSuperAdmin, isAdmin } = useAuth();
   const [entries, setEntries] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
@@ -418,7 +418,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [grantedUsers, setGrantedUsers] = useState<any[]>([]);
   const [accessSearchQuery, setAccessSearchQuery] = useState("");
   const canManageAccess = isOwner || isSuperAdmin;
-  const isAdmin = isOwner || isSuperAdmin;
+  // Use the shared `isAdmin` from useAuth so Systems Admins (not just Owner /
+  // Super Admin) get full in-page admin behaviour and scope bypass.
 
   // Designation-based scope (admins bypass)
   const scope = useMicroplanScope(isAdmin);

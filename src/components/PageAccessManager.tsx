@@ -33,7 +33,7 @@ const PageAccessManager = () => {
       const { data: roles } = await supabase
         .from("user_roles")
         .select("user_id")
-        .eq("role", "super_admin");
+        .in("role", ["super_admin", "systems_admin"]);
 
       if (!roles?.length) {
         setAdmins([]);
