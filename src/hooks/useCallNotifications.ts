@@ -64,27 +64,11 @@ export function useCallNotifications(onJoinCall?: (groupId: string, callType: "v
           const groupName = groupRes.data?.name || "a group";
           const callType = call.call_type as "voice" | "video";
 
-          const joinAction = onJoinCallRef.current
-            ? React.createElement(
-                ToastAction,
-                {
-                  altText: "Join Call",
-                  onClick: () => onJoinCallRef.current?.(call.chat_group_id, callType, groupName),
-                  className: "bg-primary text-primary-foreground hover:bg-primary/90 border-0 font-semibold",
-                },
-                "📞 Join"
-              )
-            : undefined;
+          void onJoinCallRef.current;
 
-          // Show push-style toast with Join button — include caller name
-          toast({
-            title: `📞 Incoming ${callType === "video" ? "Video" : "Voice"} Call`,
-            description: `${callerName} started a ${callType} call in "${groupName}"`,
-            duration: 20000,
-            action: joinAction as any,
-          });
-
-          // Also insert a persistent notification with caller name
+          // The full-screen WhatsApp-style incoming-call prompt (IncomingCallManager)
+          // now handles the live ring + Join experience, so we skip the duplicate
+          // toast here and only record a persistent notification for history.
           await supabase.from("notifications").insert({
             user_id: user.id,
             type: "info",
