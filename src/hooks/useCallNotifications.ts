@@ -2,8 +2,6 @@ import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
-import { ToastAction } from "@/components/ui/toast";
-import React from "react";
 
 /**
  * Global listener for incoming calls across all chat groups the user belongs to.
