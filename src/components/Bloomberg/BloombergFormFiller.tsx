@@ -356,7 +356,7 @@ export default function BloombergFormFiller({ onClose }: Props) {
                     </div>
                   ))}
                 </div>
-                <Field label="Validator Remarks (Optional)" className="mt-4">
+                <Field label="Validator Remarks" required className="mt-4">
                   <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Any additional information about the school, enrolment, or challenges encountered" rows={3} />
                 </Field>
                 <label className="mt-3 flex items-start gap-2 text-sm">
