@@ -467,7 +467,11 @@ export default function SeeClearFormFiller({ onClose }: Props) {
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-2">
           {step > 0 ? <Button variant="outline" onClick={() => setStep(step - 1)}><ArrowLeft className="mr-1 h-4 w-4" /> Back</Button> : <span />}
           {step < 2 ? (
-            <Button onClick={() => { if (step === 0 && !profileValid) { toast.error("Complete all required fields."); return; } setStep(step + 1); }} className="bg-[#0c2340] hover:bg-[#163a63]">Next <ArrowRight className="ml-1 h-4 w-4" /></Button>
+            <Button onClick={() => {
+              if (step === 0 && !profileValid) { toast.error("Complete all required fields, including GPS capture."); return; }
+              if (step === 1 && !checklistValid) { toast.error("Answer every checklist item, staff on duty and all equipment statuses."); return; }
+              setStep(step + 1);
+            }} className="bg-[#0c2340] hover:bg-[#163a63]">Next <ArrowRight className="ml-1 h-4 w-4" /></Button>
           ) : (
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => submit(true)} disabled={saving}>{saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />} Save Draft</Button>
