@@ -1243,19 +1243,26 @@ const CasesView = () => {
 
   // Owner simulation: when enabled, populate the page with realistic synthetic
   // data so the full Case Management experience can be demoed end-to-end.
-  const simulatedData = simulate ? generateSimulatedCaseData() : null;
+  const simulatedData = useMemo(
+    () => (simulate ? generateSimulatedCaseData() : null),
+    [simulate]
+  );
   const baseCases = simulatedData ? (simulatedData.cases as unknown as Case[]) : cases;
 
-  const filteredCases = baseCases.filter((c) => {
-    const matchesSearch = getCaseDisplayName(c).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCaseType = caseTypeFilter === "all" || c.caseTypeId === caseTypeFilter;
-    const matchesStatus = statusFilter === "all" || c.status === statusFilter;
-    const matchesPriority =
-      priorityFilter === "all" || (c.properties?.priority as string) === priorityFilter;
-    return matchesSearch && matchesCaseType && matchesPriority && (simulate ? matchesStatus : true);
-  });
+  const filteredCases = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return baseCases.filter((c) => {
+      const matchesSearch = getCaseDisplayName(c).toLowerCase().includes(q) ||
+        c.name.toLowerCase().includes(q) ||
+        c.caseTypeLabel.toLowerCase().includes(q);
+      const matchesCaseType = caseTypeFilter === "all" || c.caseTypeId === caseTypeFilter;
+      const matchesStatus = statusFilter === "all" || c.status === statusFilter;
+      const matchesPriority =
+        priorityFilter === "all" || (c.properties?.priority as string) === priorityFilter;
+      return matchesSearch && matchesCaseType && matchesPriority && (simulate ? matchesStatus : true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseCases, searchQuery, caseTypeFilter, statusFilter, priorityFilter, simulate]);
 
   const getTimeSince = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
