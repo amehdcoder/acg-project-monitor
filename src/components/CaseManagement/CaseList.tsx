@@ -29,7 +29,7 @@ import {
   Search,
   MoreVertical,
   Eye,
-  Edit,
+  
   XCircle,
   RefreshCw,
   User,
