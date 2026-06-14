@@ -202,6 +202,13 @@ const CasesView = () => {
   const [showFollowUpCreator, setShowFollowUpCreator] = useState(false);
   const [showLongitudinal, setShowLongitudinal] = useState(false);
 
+  // Reset to the first page whenever the active filters or search change so the
+  // user never lands on an out-of-range (and therefore empty) page.
+  useEffect(() => {
+    setCasePage(1);
+  }, [searchQuery, caseTypeFilter, statusFilter, priorityFilter, simulate]);
+
+
   const [selectedCreatorCaseType, setSelectedCreatorCaseType] = useState<any>(null);
 
   useEffect(() => {
