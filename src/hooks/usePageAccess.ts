@@ -106,7 +106,7 @@ export const usePageAccess = () => {
       initialLoadDone.current = true;
       lastUserId.current = user.id;
     }
-  }, [user, isOwner, isSuperAdmin, authLoading]);
+  }, [user, isOwner, isSuperAdmin, isAdmin, authLoading]);
 
   useEffect(() => {
     fetchAccess();
