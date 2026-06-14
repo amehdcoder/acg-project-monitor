@@ -136,7 +136,7 @@ export function buildMdaSupervisoryChecklist(): {
     group("2. Planning & Preparation", [
       q({ type: "select_one", name: "microplan_available", label: "Is the microplan available on site?", required: true, options: yesNo(["Partial"]) }),
       q({ type: "select_one", name: "training_conducted", label: "Was CDD training conducted before MDA?", options: yesNo() }),
-      q({ type: "number", name: "num_cdds_trained", label: "Number of CDDs trained", number: { kind: "integer", showStepper: true } }),
+      q({ type: "number", name: "num_cdds_trained", label: "Number of CDDs trained", relevant: "${training_conducted} = 'yes'", number: { kind: "integer", showStepper: true } }),
       q({ type: "select_one", name: "commodities_available", label: "Were commodities available before start?", options: yesNo(["Partial"]) }),
       q({ type: "select_one", name: "social_mobilization_done", label: "Was social mobilization carried out?", options: yesNo() }),
       q({ type: "text", name: "planning_notes", label: "Planning observations", text: { multiline: true, rows: 3 } }),
