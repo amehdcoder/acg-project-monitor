@@ -212,7 +212,9 @@ export function buildCommunitySummaryForm(): {
     ]),
   ];
 
+  enforceNonNegative(groups);
   return {
+
     name: COMMUNITY_SUMMARY_FORM_NAME,
     description: COMMUNITY_SUMMARY_FORM_DESCRIPTION,
     questions: groups,
