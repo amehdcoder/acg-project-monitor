@@ -561,20 +561,30 @@ export function useProjectChat(projectId: string | null) {
           filter: `chat_group_id=eq.${selectedGroup.id}`,
         },
         async (payload) => {
+          const incoming = payload.new as any;
+          // Ignore rows that arrive already soft-deleted.
+          if (incoming.is_deleted) return;
+
           // Fetch sender profile for new message
           const { data: profile } = await supabase
             .from("profiles")
             .select("user_id, first_name, last_name, avatar_url")
-            .eq("user_id", payload.new.sender_id)
+            .eq("user_id", incoming.sender_id)
             .single();
 
           const newMessage: ChatMessage = {
-            ...(payload.new as any),
-            mentions: payload.new.mentions || [],
+            ...incoming,
+            mentions: incoming.mentions || [],
             sender: profile || undefined,
           };
 
-          setMessages(prev => [...prev, newMessage]);
+          // Guard against duplicates from reconnects, races with fetchMessages,
+          // or overlapping channels.
+          setMessages((prev) =>
+            prev.some((m) => m.id === newMessage.id)
+              ? prev
+              : [...prev, newMessage],
+          );
         }
       )
       .on(
