@@ -399,7 +399,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       fetchAllForms();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentProjectId, authLoading, user?.id, role, isSuperAdmin]);
+  }, [currentProjectId, authLoading, user?.id, role, isSuperAdmin, isOwnerLevel]);
 
   const fetchProjects = async () => {
     try {
