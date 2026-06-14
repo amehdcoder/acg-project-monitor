@@ -108,7 +108,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const [settingsProject, setSettingsProject] = useState<Project | null>(null);
   const [settingsForm, setSettingsForm] = useState<{ status: string }>({ status: "active" });
   const [savingSettings, setSavingSettings] = useState(false);
-  const { user, role, isSuperAdmin } = useAuth();
+  const { user, role, isSuperAdmin, isOwnerLevel } = useAuth();
   const { logAction } = useAdminSurveillance();
 
   useEffect(() => {
