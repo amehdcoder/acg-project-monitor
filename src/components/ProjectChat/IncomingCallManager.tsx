@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Phone, PhoneOff, Video, Mic } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { CallDialog } from "./CallDialog";
 import type { ChatGroup, ChatGroupMember } from "@/hooks/useProjectChat";
@@ -12,6 +12,7 @@ interface IncomingCall {
   chatGroupId: string;
   callType: "voice" | "video";
   callerName: string;
+  callerAvatar: string | null;
   groupName: string;
 }
 
@@ -31,7 +32,8 @@ export function IncomingCallManager() {
   const { user } = useAuth();
   const [incoming, setIncoming] = useState<IncomingCall[]>([]);
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
-  const seenRef = useRef<Set<string>>(new Set());
+  const promptedRef = useRef<Set<string>>(new Set());
+  const dismissedRef = useRef<Set<string>>(new Set());
 
   // --- Ringtone (Web Audio, no asset required) ---
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -117,28 +119,31 @@ export function IncomingCallManager() {
       if (!call || !user?.id) return;
       const callId = call.id as string;
       if (!callId) return;
-      if (call.started_by === user.id || seenRef.current.has(callId)) return;
+      if (call.started_by === user.id || promptedRef.current.has(callId) || dismissedRef.current.has(callId)) return;
       if (call.is_active === false) return;
       // Ignore stale rows from previous, never-ended sessions.
       const startedAt = call.started_at ? new Date(call.started_at as string).getTime() : Date.now();
-      if (Date.now() - startedAt > 120000) return;
-      seenRef.current.add(callId);
+      if (Date.now() - startedAt > 10 * 60 * 1000) return;
 
       const chatGroupId = call.chat_group_id as string;
 
       // Only ring if the user is a member of the group.
-      const { data: membership } = await supabase
+      const { data: membership, error: membershipError } = await supabase
         .from("chat_group_members")
         .select("id")
         .eq("chat_group_id", chatGroupId)
         .eq("user_id", user.id)
         .maybeSingle();
+      if (membershipError) {
+        console.warn("Incoming call membership check failed; will retry on next scan", membershipError);
+        return;
+      }
       if (!membership) return;
 
       const [callerRes, groupRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("first_name, last_name")
+          .select("first_name, last_name, avatar_url")
           .eq("user_id", call.started_by as string)
           .maybeSingle(),
         supabase
@@ -152,6 +157,7 @@ export function IncomingCallManager() {
         ? `${callerRes.data.first_name ?? ""} ${callerRes.data.last_name ?? ""}`.trim() ||
           "Someone"
         : "Someone";
+      promptedRef.current.add(callId);
 
       setIncoming((prev) =>
         prev.some((c) => c.id === callId)
@@ -163,6 +169,7 @@ export function IncomingCallManager() {
                 chatGroupId,
                 callType: (call.call_type as "voice" | "video") || "voice",
                 callerName,
+                callerAvatar: callerRes.data?.avatar_url ?? null,
                 groupName: groupRes.data?.name || "Group call",
               },
             ]
@@ -237,6 +244,7 @@ export function IncomingCallManager() {
 
   const handleDecline = useCallback(() => {
     if (!current) return;
+    dismissedRef.current.add(current.id);
     setIncoming((prev) => prev.filter((c) => c.id !== current.id));
   }, [current]);
 
@@ -290,6 +298,7 @@ export function IncomingCallManager() {
             <div className="relative">
               <span className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
               <Avatar className="h-28 w-28 ring-4 ring-primary/30 shadow-card">
+                <AvatarImage src={current.callerAvatar || undefined} alt={current.callerName} />
                 <AvatarFallback className="bg-primary/10 text-primary text-3xl font-semibold">
                   {current.callerName.charAt(0).toUpperCase()}
                 </AvatarFallback>
