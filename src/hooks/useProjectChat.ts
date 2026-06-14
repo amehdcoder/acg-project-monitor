@@ -97,18 +97,23 @@ export function useProjectChat(projectId: string | null) {
       );
       
       setChatGroups(groupsWithUnread);
-      
-      // Auto-select default group if none selected
-      if (!selectedGroup && groupsWithUnread.length > 0) {
-        const defaultGroup = groupsWithUnread.find(g => g.is_default) || groupsWithUnread[0];
-        setSelectedGroup(defaultGroup);
+
+      // Auto-select default group if none selected. Use a functional update so
+      // this callback does not need `selectedGroup` as a dependency (which would
+      // make it unstable and risk refetch loops).
+      if (groupsWithUnread.length > 0) {
+        setSelectedGroup((prev) =>
+          prev
+            ? groupsWithUnread.find((g) => g.id === prev.id) || prev
+            : groupsWithUnread.find((g) => g.is_default) || groupsWithUnread[0],
+        );
       }
     } catch (error: any) {
       console.error("Error fetching chat groups:", error);
     } finally {
       setLoading(false);
     }
-  }, [projectId, selectedGroup, user]);
+  }, [projectId, user]);
 
   // Fetch messages for selected group
   const fetchMessages = useCallback(async () => {
