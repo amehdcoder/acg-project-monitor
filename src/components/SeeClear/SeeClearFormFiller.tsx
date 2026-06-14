@@ -373,7 +373,7 @@ export default function SeeClearFormFiller({ onClose }: Props) {
                     </div>
                   ))}
                   <div className="flex items-center justify-between gap-3 pt-1">
-                    <span className="text-sm text-foreground">Number of staff on duty</span>
+                    <span className="text-sm text-foreground">Number of staff on duty <span className="text-red-500">*</span></span>
                     <Input type="number" min={0} value={staffOnDuty} onChange={(e) => setStaffOnDuty(e.target.value)} className="h-9 w-24" />
                   </div>
                 </div>
@@ -431,17 +431,17 @@ export default function SeeClearFormFiller({ onClose }: Props) {
               </div>
 
               <div className="rounded-2xl bg-white p-4 shadow-sm">
-                <h3 className="mb-2 text-sm font-bold text-[#0c2340]">Challenges Identified</h3>
+                <h3 className="mb-2 text-sm font-bold text-[#0c2340]">Challenges Identified <span className="text-red-500">*</span></h3>
                 <Chips options={CHALLENGE_OPTIONS} selected={challenges} onToggle={(v) => setChallenges(challenges.includes(v) ? challenges.filter((c) => c !== v) : [...challenges, v])} />
               </div>
 
               <div className="rounded-2xl bg-white p-4 shadow-sm">
-                <h3 className="mb-2 text-sm font-bold text-[#0c2340]">Recommendations</h3>
+                <h3 className="mb-2 text-sm font-bold text-[#0c2340]">Recommendations <span className="text-red-500">*</span></h3>
                 <Chips options={RECOMMENDATION_OPTIONS} selected={recommendations} onToggle={(v) => setRecommendations(recommendations.includes(v) ? recommendations.filter((c) => c !== v) : [...recommendations, v])} />
               </div>
 
               <div className="rounded-2xl bg-white p-4 shadow-sm">
-                <h3 className="mb-2 text-sm font-bold text-[#0c2340]">Remarks</h3>
+                <h3 className="mb-2 text-sm font-bold text-[#0c2340]">Remarks <span className="text-red-500">*</span></h3>
                 <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} maxLength={500} placeholder="Enter additional comments" rows={3} />
                 <p className="mt-1 text-right text-[10px] text-muted-foreground">{remarks.length} / 500</p>
               </div>
