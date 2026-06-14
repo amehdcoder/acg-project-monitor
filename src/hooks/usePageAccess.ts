@@ -76,7 +76,9 @@ export const usePageAccess = () => {
       return;
     }
 
-    if (!isSuperAdmin) {
+    // Any admin (Super Admin OR Systems Admin) can be granted restricted pages
+    // by the Owner. Non-admins have no per-admin grants to fetch.
+    if (!isAdmin) {
       setGrantedPages([]);
       setLoadingAccess(false);
       initialLoadDone.current = true;
