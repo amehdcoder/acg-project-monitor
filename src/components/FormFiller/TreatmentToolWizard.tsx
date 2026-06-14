@@ -476,13 +476,22 @@ const CommunitySummaryWizard = (p: InnerProps) => {
   // so gate the stepper here to prevent empty/partial submissions.
   const locationComplete =
     !!(p.get("state") && p.get("lga") && p.get("ward") && p.get("flhf_name") && p.get("community"));
+  // End date must not be before start date; reporting date must not be before
+  // the end of treatment. These guard against transposed/typo'd dates.
+  const dStart = p.get("start_date_treatment");
+  const dEnd = p.get("end_date_treatment");
+  const dReport = p.get("reporting_date");
+  const dateOrderError =
+    (!!dStart && !!dEnd && dEnd < dStart) ||
+    (!!dEnd && !!dReport && dReport < dEnd);
   const step0Complete =
     locationComplete &&
     selectedDiseases.length > 0 &&
     !!String(p.get("annual_treatment_round") || "").trim() &&
-    !!p.get("reporting_date") &&
-    !!p.get("start_date_treatment") &&
-    !!p.get("end_date_treatment");
+    !!dReport &&
+    !!dStart &&
+    !!dEnd &&
+    !dateOrderError;
   const nextDisabled =
     (step === 0 && !step0Complete) ||
     (step === 1 && trachomaPopMismatch) ||
