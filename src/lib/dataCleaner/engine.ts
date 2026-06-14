@@ -240,7 +240,8 @@ function evalRule(rule: Rule, idx: number, values: Record<string, any>): CellIss
         }
         const check = actual !== null ? actual : expected;
         if (check < rule.min || check > rule.max) {
-          push({ col: rule.col, category: "Drug ratio out of range", severity: "high", message: `${rule.drug} ratio ${check} is outside SOP range ${rule.min}–${rule.max}`, suggestedFix: "Flag drug accountability review", original: values[rule.col] });
+          const rangeText = rule.min === rule.max ? `exactly ${rule.min}` : `SOP range ${rule.min}–${rule.max}`;
+          push({ col: rule.col, category: "Drug ratio out of range", severity: "high", message: `${rule.drug} ratio ${check} must be ${rangeText} (potential drug wastage or data fabrication)`, suggestedFix: "Flag drug accountability review", original: values[rule.col] });
         }
       }
       break;
