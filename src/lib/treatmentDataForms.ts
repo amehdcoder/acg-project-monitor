@@ -294,7 +294,9 @@ export function buildCommunityTreatmentRegister(): {
     ]),
   ];
 
+  enforceNonNegative(groups);
   return {
+
     name: COMMUNITY_TREATMENT_REGISTER_NAME,
     description: COMMUNITY_TREATMENT_REGISTER_DESCRIPTION,
     questions: groups,
