@@ -126,17 +126,47 @@ export default function BloombergFormFiller({ onClose }: Props) {
     }
   };
 
+  const enrolComplete = useMemo(
+    () => ALL_CLASSES.every((c) => enrol[c.key]?.male != null && enrol[c.key]?.female != null),
+    [enrol],
+  );
+  const REQUIRED_EVIDENCE = ["signboard", "classroom", "register"];
+  const evidenceComplete = REQUIRED_EVIDENCE.every((s) => !!evidence[s]);
+
   const canNext = () => {
     if (step === 0) return !!(state && lga && ward && location && schoolKey && gps);
-    if (step === 1) return schoolExists !== "";
+    if (step === 1) {
+      if (schoolExists === "") return false;
+      if (schoolExists === "no") return !!notFoundReason;
+      return !!(operationalStatus && headTeacher.trim() && headPhone.trim() && dateOfVisit);
+    }
+    if (step === 2) return enrolComplete;
     return true;
   };
 
   const submit = async (asDraft: boolean) => {
     if (!user?.id) return;
-    if (!asDraft && !confirmed) {
-      toast.error("Please confirm the figures were taken from the register.");
-      return;
+    if (!asDraft) {
+      if (!(state && lga && ward && location && schoolKey && gps)) {
+        toast.error("Complete all school information."); setStep(0); return;
+      }
+      if (schoolExists === "" || (schoolExists === "no" && !notFoundReason) ||
+          (schoolExists === "yes" && !(operationalStatus && headTeacher.trim() && headPhone.trim() && dateOfVisit))) {
+        toast.error("Complete all verification fields."); setStep(1); return;
+      }
+      if (!enrolComplete) {
+        toast.error("Enter male and female counts for every class."); setStep(2); return;
+      }
+      if (!evidenceComplete) {
+        toast.error("Attach all required photo evidence."); return;
+      }
+      if (!remarks.trim()) {
+        toast.error("Validator remarks are required."); return;
+      }
+      if (!confirmed) {
+        toast.error("Please confirm the figures were taken from the register.");
+        return;
+      }
     }
     setSaving(true);
     try {
@@ -265,17 +295,17 @@ export default function BloombergFormFiller({ onClose }: Props) {
                   <button onClick={() => setSchoolExists("no")} className={`rounded-lg border-2 py-2.5 text-sm font-semibold ${schoolExists === "no" ? "border-[#dc2626] bg-[#fee2e2] text-[#b91c1c]" : "border-border text-foreground"}`}>No</button>
                 </div>
                 {schoolExists === "no" && (
-                  <Field label="Reason school was not found"><Sel value={notFoundReason} onChange={setNotFoundReason} options={NOT_FOUND_REASONS} placeholder="Select reason" /></Field>
+                  <Field label="Reason school was not found" required><Sel value={notFoundReason} onChange={setNotFoundReason} options={NOT_FOUND_REASONS} placeholder="Select reason" /></Field>
                 )}
                 {schoolExists === "yes" && (
                   <div className="space-y-3">
-                    <Field label="Operational Status"><Sel value={operationalStatus} onChange={setOperationalStatus} options={OPERATIONAL_STATUS} /></Field>
+                    <Field label="Operational Status" required><Sel value={operationalStatus} onChange={setOperationalStatus} options={OPERATIONAL_STATUS} /></Field>
                     <div className="grid grid-cols-2 gap-3">
-                      <Field label="Head Teacher / Contact Person"><Input value={headTeacher} onChange={(e) => setHeadTeacher(e.target.value)} placeholder="Enter full name" className="h-11" /></Field>
-                      <Field label="Phone Number"><Input value={headPhone} onChange={(e) => setHeadPhone(e.target.value)} placeholder="Enter phone number" className="h-11" /></Field>
+                      <Field label="Head Teacher / Contact Person" required><Input value={headTeacher} onChange={(e) => setHeadTeacher(e.target.value)} placeholder="Enter full name" className="h-11" /></Field>
+                      <Field label="Phone Number" required><Input value={headPhone} onChange={(e) => setHeadPhone(e.target.value)} placeholder="Enter phone number" className="h-11" /></Field>
                     </div>
                     <div className="grid grid-cols-2 items-end gap-3">
-                      <Field label="Date of Visit"><Input type="date" value={dateOfVisit} onChange={(e) => setDateOfVisit(e.target.value)} className="h-11" /></Field>
+                      <Field label="Date of Visit" required><Input type="date" value={dateOfVisit} onChange={(e) => setDateOfVisit(e.target.value)} className="h-11" /></Field>
                       <div className="flex items-center justify-between rounded-lg border border-border p-3">
                         <span className="text-sm font-medium">Register Available</span>
                         <Switch checked={registerAvailable} onCheckedChange={setRegisterAvailable} />
@@ -326,7 +356,7 @@ export default function BloombergFormFiller({ onClose }: Props) {
                     </div>
                   ))}
                 </div>
-                <Field label="Validator Remarks (Optional)" className="mt-4">
+                <Field label="Validator Remarks" required className="mt-4">
                   <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Any additional information about the school, enrolment, or challenges encountered" rows={3} />
                 </Field>
                 <label className="mt-3 flex items-start gap-2 text-sm">
