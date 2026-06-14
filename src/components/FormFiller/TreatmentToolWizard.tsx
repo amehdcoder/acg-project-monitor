@@ -441,8 +441,9 @@ const CommunitySummaryWizard = (p: InnerProps) => {
     if (key === "teo") return p.getNum("teo_treated");
     return p.getNum(`${key}_males_treated`) + p.getNum(`${key}_females_treated`);
   };
-  // Population ceiling = the total / registered / census population entered.
-  const populationCeiling = Math.max(enteredTotalPop, p.getNum("persons_registered"));
+  // Population ceiling = the total registered / census population entered
+  // (sum of registered males + females). No phantom field is referenced.
+  const populationCeiling = enteredTotalPop;
   const ALL_TREAT_MEDS = [...PZ_MEDS, ...TRACHOMA_MEDS];
   const treatmentChecks = ALL_TREAT_MEDS.map((m) => {
     const target = targetByIntervention[MED_TARGET[m.key].key] || 0;
@@ -475,13 +476,22 @@ const CommunitySummaryWizard = (p: InnerProps) => {
   // so gate the stepper here to prevent empty/partial submissions.
   const locationComplete =
     !!(p.get("state") && p.get("lga") && p.get("ward") && p.get("flhf_name") && p.get("community"));
+  // End date must not be before start date; reporting date must not be before
+  // the end of treatment. These guard against transposed/typo'd dates.
+  const dStart = p.get("start_date_treatment");
+  const dEnd = p.get("end_date_treatment");
+  const dReport = p.get("reporting_date");
+  const dateOrderError =
+    (!!dStart && !!dEnd && dEnd < dStart) ||
+    (!!dEnd && !!dReport && dReport < dEnd);
   const step0Complete =
     locationComplete &&
     selectedDiseases.length > 0 &&
     !!String(p.get("annual_treatment_round") || "").trim() &&
-    !!p.get("reporting_date") &&
-    !!p.get("start_date_treatment") &&
-    !!p.get("end_date_treatment");
+    !!dReport &&
+    !!dStart &&
+    !!dEnd &&
+    !dateOrderError;
   const nextDisabled =
     (step === 0 && !step0Complete) ||
     (step === 1 && trachomaPopMismatch) ||
@@ -611,6 +621,12 @@ const CommunitySummaryWizard = (p: InnerProps) => {
                 <Input type="date" value={p.get("end_date_treatment") || ""} onChange={(e) => p.set("end_date_treatment", e.target.value)} />
               </div>
             </div>
+            {dateOrderError && (
+              <p className="flex items-center gap-1.5 text-xs font-medium text-destructive">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Check the dates: end of treatment cannot be before the start, and the reporting date cannot be before the end of treatment.
+              </p>
+            )}
             {!step0Complete && (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />

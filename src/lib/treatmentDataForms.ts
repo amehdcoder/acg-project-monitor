@@ -66,6 +66,22 @@ function geoQuestions(opts: { requireSettlement?: boolean } = {}): Question[] {
 const num = (name: string, label: string, extra: Partial<Question> = {}): Question =>
   q({ type: "number", name, label, number: { kind: "integer", showStepper: true } as any, ...extra });
 
+/**
+ * Exhaustively guarantee every counting field can never be negative by adding a
+ * non-negative validation (min: 0) to all `number` questions that lack a minimum.
+ */
+function enforceNonNegative(groups: FormGroup[]): void {
+  for (const g of groups) {
+    for (const qq of g.questions) {
+      if (qq.type !== "number") continue;
+      const v = (qq.validation ?? {}) as { min?: number; max?: number; message?: string };
+      if (typeof v.min !== "number") v.min = 0;
+      if (!v.message) v.message = "Value cannot be negative";
+      qq.validation = v;
+    }
+  }
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // 1. Community/Village/School Summary Form (Level 1)
 // ──────────────────────────────────────────────────────────────────────────
@@ -196,7 +212,9 @@ export function buildCommunitySummaryForm(): {
     ]),
   ];
 
+  enforceNonNegative(groups);
   return {
+
     name: COMMUNITY_SUMMARY_FORM_NAME,
     description: COMMUNITY_SUMMARY_FORM_DESCRIPTION,
     questions: groups,
@@ -276,7 +294,9 @@ export function buildCommunityTreatmentRegister(): {
     ]),
   ];
 
+  enforceNonNegative(groups);
   return {
+
     name: COMMUNITY_TREATMENT_REGISTER_NAME,
     description: COMMUNITY_TREATMENT_REGISTER_DESCRIPTION,
     questions: groups,

@@ -136,7 +136,7 @@ export function buildMdaSupervisoryChecklist(): {
     group("2. Planning & Preparation", [
       q({ type: "select_one", name: "microplan_available", label: "Is the microplan available on site?", required: true, options: yesNo(["Partial"]) }),
       q({ type: "select_one", name: "training_conducted", label: "Was CDD training conducted before MDA?", options: yesNo() }),
-      q({ type: "number", name: "num_cdds_trained", label: "Number of CDDs trained", number: { kind: "integer", showStepper: true } }),
+      q({ type: "number", name: "num_cdds_trained", label: "Number of CDDs trained", relevant: "${training_conducted} = 'yes'", number: { kind: "integer", showStepper: true } }),
       q({ type: "select_one", name: "commodities_available", label: "Were commodities available before start?", options: yesNo(["Partial"]) }),
       q({ type: "select_one", name: "social_mobilization_done", label: "Was social mobilization carried out?", options: yesNo() }),
       q({ type: "text", name: "planning_notes", label: "Planning observations", text: { multiline: true, rows: 3 } }),
@@ -241,5 +241,24 @@ export function buildMdaSupervisoryChecklist(): {
     campaignType: "MDA (Mass Drug Administration)",
   };
 
+  enforceNonNegative(groups);
   return { name: MDA_CHECKLIST_NAME, description: MDA_CHECKLIST_DESCRIPTION, questions: groups, settings };
+}
+
+/**
+ * Exhaustively guarantee every counting field can never be negative.
+ * Adds a non-negative validation (min: 0) to all `number` questions that do
+ * not already declare a minimum, with a clear field-level message. Percentage
+ * / score fields that already cap at 0–100 are left untouched.
+ */
+function enforceNonNegative(groups: FormGroup[]): void {
+  for (const g of groups) {
+    for (const qq of g.questions) {
+      if (qq.type !== "number") continue;
+      const v = (qq.validation ?? {}) as { min?: number; max?: number; message?: string };
+      if (typeof v.min !== "number") v.min = 0;
+      if (!v.message) v.message = "Value cannot be negative";
+      qq.validation = v;
+    }
+  }
 }
