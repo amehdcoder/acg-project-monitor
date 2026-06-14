@@ -126,17 +126,47 @@ export default function BloombergFormFiller({ onClose }: Props) {
     }
   };
 
+  const enrolComplete = useMemo(
+    () => ALL_CLASSES.every((c) => enrol[c.key]?.male != null && enrol[c.key]?.female != null),
+    [enrol],
+  );
+  const REQUIRED_EVIDENCE = ["signboard", "classroom", "register"];
+  const evidenceComplete = REQUIRED_EVIDENCE.every((s) => !!evidence[s]);
+
   const canNext = () => {
     if (step === 0) return !!(state && lga && ward && location && schoolKey && gps);
-    if (step === 1) return schoolExists !== "";
+    if (step === 1) {
+      if (schoolExists === "") return false;
+      if (schoolExists === "no") return !!notFoundReason;
+      return !!(operationalStatus && headTeacher.trim() && headPhone.trim() && dateOfVisit);
+    }
+    if (step === 2) return enrolComplete;
     return true;
   };
 
   const submit = async (asDraft: boolean) => {
     if (!user?.id) return;
-    if (!asDraft && !confirmed) {
-      toast.error("Please confirm the figures were taken from the register.");
-      return;
+    if (!asDraft) {
+      if (!(state && lga && ward && location && schoolKey && gps)) {
+        toast.error("Complete all school information."); setStep(0); return;
+      }
+      if (schoolExists === "" || (schoolExists === "no" && !notFoundReason) ||
+          (schoolExists === "yes" && !(operationalStatus && headTeacher.trim() && headPhone.trim() && dateOfVisit))) {
+        toast.error("Complete all verification fields."); setStep(1); return;
+      }
+      if (!enrolComplete) {
+        toast.error("Enter male and female counts for every class."); setStep(2); return;
+      }
+      if (!evidenceComplete) {
+        toast.error("Attach all required photo evidence."); return;
+      }
+      if (!remarks.trim()) {
+        toast.error("Validator remarks are required."); return;
+      }
+      if (!confirmed) {
+        toast.error("Please confirm the figures were taken from the register.");
+        return;
+      }
     }
     setSaving(true);
     try {
