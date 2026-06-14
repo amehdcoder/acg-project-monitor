@@ -236,7 +236,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
   const [bulkForm, setBulkForm] = useState<Form | null>(null);
   const [showBulkAccess, setShowBulkAccess] = useState(false);
-  const { user, isAdmin, isSuperAdmin, isOwner, role, isAdhoc } = useAuth();
+  const { user, isAdmin, isSuperAdmin, isOwner, role, isAdhoc, loading: authLoading } = useAuth();
   const [assignedStandardCodes, setAssignedStandardCodes] = useState<Set<string>>(new Set());
   // Owner/Co-owner can hide the Standard forms folder from specific non-admins.
   const [standardRestricted, setStandardRestricted] = useState(false);
