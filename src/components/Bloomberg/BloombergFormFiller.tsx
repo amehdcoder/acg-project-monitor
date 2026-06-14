@@ -295,17 +295,17 @@ export default function BloombergFormFiller({ onClose }: Props) {
                   <button onClick={() => setSchoolExists("no")} className={`rounded-lg border-2 py-2.5 text-sm font-semibold ${schoolExists === "no" ? "border-[#dc2626] bg-[#fee2e2] text-[#b91c1c]" : "border-border text-foreground"}`}>No</button>
                 </div>
                 {schoolExists === "no" && (
-                  <Field label="Reason school was not found"><Sel value={notFoundReason} onChange={setNotFoundReason} options={NOT_FOUND_REASONS} placeholder="Select reason" /></Field>
+                  <Field label="Reason school was not found" required><Sel value={notFoundReason} onChange={setNotFoundReason} options={NOT_FOUND_REASONS} placeholder="Select reason" /></Field>
                 )}
                 {schoolExists === "yes" && (
                   <div className="space-y-3">
-                    <Field label="Operational Status"><Sel value={operationalStatus} onChange={setOperationalStatus} options={OPERATIONAL_STATUS} /></Field>
+                    <Field label="Operational Status" required><Sel value={operationalStatus} onChange={setOperationalStatus} options={OPERATIONAL_STATUS} /></Field>
                     <div className="grid grid-cols-2 gap-3">
-                      <Field label="Head Teacher / Contact Person"><Input value={headTeacher} onChange={(e) => setHeadTeacher(e.target.value)} placeholder="Enter full name" className="h-11" /></Field>
-                      <Field label="Phone Number"><Input value={headPhone} onChange={(e) => setHeadPhone(e.target.value)} placeholder="Enter phone number" className="h-11" /></Field>
+                      <Field label="Head Teacher / Contact Person" required><Input value={headTeacher} onChange={(e) => setHeadTeacher(e.target.value)} placeholder="Enter full name" className="h-11" /></Field>
+                      <Field label="Phone Number" required><Input value={headPhone} onChange={(e) => setHeadPhone(e.target.value)} placeholder="Enter phone number" className="h-11" /></Field>
                     </div>
                     <div className="grid grid-cols-2 items-end gap-3">
-                      <Field label="Date of Visit"><Input type="date" value={dateOfVisit} onChange={(e) => setDateOfVisit(e.target.value)} className="h-11" /></Field>
+                      <Field label="Date of Visit" required><Input type="date" value={dateOfVisit} onChange={(e) => setDateOfVisit(e.target.value)} className="h-11" /></Field>
                       <div className="flex items-center justify-between rounded-lg border border-border p-3">
                         <span className="text-sm font-medium">Register Available</span>
                         <Switch checked={registerAvailable} onCheckedChange={setRegisterAvailable} />
