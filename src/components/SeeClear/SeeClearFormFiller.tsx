@@ -363,8 +363,8 @@ export default function SeeClearFormFiller({ onClose }: Props) {
                 </div>
               </div>
 
-              <Section id="hr" title="Human Resources" qs={HR_QUESTIONS} answers={hr} setAnswers={setHr} icon={UserIcon} />
-              <Section id="infra" title="Infrastructure & Utilities" qs={INFRA_QUESTIONS} answers={infra} setAnswers={setInfra} icon={Building2} />
+              <Section id="hr" title="Human Resources" qs={HR_QUESTIONS} answers={hr} setAnswers={setHr} icon={UserIcon} openSection={openSection} setOpenSection={setOpenSection} />
+              <Section id="infra" title="Infrastructure & Utilities" qs={INFRA_QUESTIONS} answers={infra} setAnswers={setInfra} icon={Building2} openSection={openSection} setOpenSection={setOpenSection} />
 
               {/* Equipment */}
               <div className="rounded-xl border border-border bg-white">
