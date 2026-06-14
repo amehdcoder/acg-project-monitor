@@ -623,7 +623,10 @@ const UsersView = () => {
   const selectedUserObjects = () =>
     users.filter((u) => selectedIds.has(u.user_id) && !u.is_owner);
 
-  const isSuperAdmin = currentUserRole === "super_admin";
+  // Mirror the hook's definition (role === super_admin OR the Owner) so the
+  // Owner — who holds is_owner=true but may not carry a super_admin role row —
+  // is never wrongly excluded from super-admin-only actions.
+  const isSuperAdmin = currentUserRole === "super_admin" || isOwner;
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
