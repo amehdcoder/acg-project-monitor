@@ -343,7 +343,7 @@ export default function AdminCreateUsersDialog() {
             </div>
 
             {/* Table */}
-            <ScrollArea className="flex-1 min-h-0">
+            <div className="flex-1 min-h-0 overflow-auto">
               <div className="min-w-[760px]">
                 {/* Header */}
                 <div className="grid grid-cols-[1.1fr_1.1fr_1.6fr_1.4fr_auto] gap-2 px-2 py-2 sticky top-0 z-10 bg-gradient-to-r from-primary/10 to-acg-gold/10 rounded-md text-xs font-semibold text-foreground">
