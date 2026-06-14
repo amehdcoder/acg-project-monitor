@@ -441,8 +441,9 @@ const CommunitySummaryWizard = (p: InnerProps) => {
     if (key === "teo") return p.getNum("teo_treated");
     return p.getNum(`${key}_males_treated`) + p.getNum(`${key}_females_treated`);
   };
-  // Population ceiling = the total / registered / census population entered.
-  const populationCeiling = Math.max(enteredTotalPop, p.getNum("persons_registered"));
+  // Population ceiling = the total registered / census population entered
+  // (sum of registered males + females). No phantom field is referenced.
+  const populationCeiling = enteredTotalPop;
   const ALL_TREAT_MEDS = [...PZ_MEDS, ...TRACHOMA_MEDS];
   const treatmentChecks = ALL_TREAT_MEDS.map((m) => {
     const target = targetByIntervention[MED_TARGET[m.key].key] || 0;
