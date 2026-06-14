@@ -386,7 +386,7 @@ interface MicroplanningViewProps {
 }
 
 const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
-  const { user, isOwner, isSuperAdmin } = useAuth();
+  const { user, isOwner, isSuperAdmin, isAdmin } = useAuth();
   const [entries, setEntries] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
