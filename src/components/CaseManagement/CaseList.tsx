@@ -29,7 +29,7 @@ import {
   Search,
   MoreVertical,
   Eye,
-  Edit,
+  
   XCircle,
   RefreshCw,
   User,
@@ -324,26 +324,25 @@ const CaseList = ({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectCase?.(caseItem);
+                              }}
+                            >
                               <Eye className="h-4 w-4 mr-2" />
                               View Details
                             </DropdownMenuItem>
                             {caseItem.status === "open" && (
-                              <>
-                                <DropdownMenuItem>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Follow-up
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleCloseCase(caseItem.id);
-                                  }}
-                                >
-                                  <XCircle className="h-4 w-4 mr-2" />
-                                  Close Case
-                                </DropdownMenuItem>
-                              </>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCloseCase(caseItem.id);
+                                }}
+                              >
+                                <XCircle className="h-4 w-4 mr-2" />
+                                Close Case
+                              </DropdownMenuItem>
                             )}
                             {caseItem.status === "closed" && (
                               <DropdownMenuItem

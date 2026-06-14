@@ -202,6 +202,13 @@ const CasesView = () => {
   const [showFollowUpCreator, setShowFollowUpCreator] = useState(false);
   const [showLongitudinal, setShowLongitudinal] = useState(false);
 
+  // Reset to the first page whenever the active filters or search change so the
+  // user never lands on an out-of-range (and therefore empty) page.
+  useEffect(() => {
+    setCasePage(1);
+  }, [searchQuery, caseTypeFilter, statusFilter, priorityFilter, simulate]);
+
+
   const [selectedCreatorCaseType, setSelectedCreatorCaseType] = useState<any>(null);
 
   useEffect(() => {
@@ -1018,7 +1025,14 @@ const CasesView = () => {
           .eq("status", "open");
 
         for (const c of openCasesData || []) {
-          const nextDate = new Date(c.last_modified_at);
+          // Anchor the schedule on the most recent activity, but never earlier
+          // than now, so enabling a schedule today can't produce a date already
+          // in the past.
+          const anchor = Math.max(
+            new Date(c.last_modified_at).getTime(),
+            Date.now()
+          );
+          const nextDate = new Date(anchor);
           nextDate.setDate(nextDate.getDate() + intervalDays);
           await supabase
             .from("cases")
@@ -1243,19 +1257,26 @@ const CasesView = () => {
 
   // Owner simulation: when enabled, populate the page with realistic synthetic
   // data so the full Case Management experience can be demoed end-to-end.
-  const simulatedData = simulate ? generateSimulatedCaseData() : null;
+  const simulatedData = useMemo(
+    () => (simulate ? generateSimulatedCaseData() : null),
+    [simulate]
+  );
   const baseCases = simulatedData ? (simulatedData.cases as unknown as Case[]) : cases;
 
-  const filteredCases = baseCases.filter((c) => {
-    const matchesSearch = getCaseDisplayName(c).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCaseType = caseTypeFilter === "all" || c.caseTypeId === caseTypeFilter;
-    const matchesStatus = statusFilter === "all" || c.status === statusFilter;
-    const matchesPriority =
-      priorityFilter === "all" || (c.properties?.priority as string) === priorityFilter;
-    return matchesSearch && matchesCaseType && matchesPriority && (simulate ? matchesStatus : true);
-  });
+  const filteredCases = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return baseCases.filter((c) => {
+      const matchesSearch = getCaseDisplayName(c).toLowerCase().includes(q) ||
+        c.name.toLowerCase().includes(q) ||
+        c.caseTypeLabel.toLowerCase().includes(q);
+      const matchesCaseType = caseTypeFilter === "all" || c.caseTypeId === caseTypeFilter;
+      const matchesStatus = statusFilter === "all" || c.status === statusFilter;
+      const matchesPriority =
+        priorityFilter === "all" || (c.properties?.priority as string) === priorityFilter;
+      return matchesSearch && matchesCaseType && matchesPriority && (simulate ? matchesStatus : true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseCases, searchQuery, caseTypeFilter, statusFilter, priorityFilter, simulate]);
 
   const getTimeSince = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
