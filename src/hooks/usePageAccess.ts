@@ -210,6 +210,9 @@ export const usePageAccess = () => {
       // `loadingAccess` separately (spinner), so this never blocks a legitimate
       // page — it only prevents the unauthorized flash.
       if (isOwner) return true;
+      // Co-owners are owner-level ("near-full app rights") — grant every page,
+      // including the restricted ones, just like the Owner.
+      if (isOwnerLevel) return true;
       // Owner-granted, time-bounded per-user access works for any page id.
       if (canAccessUserPage(pageId)) return true;
       // Field designations (FLHF Supervisor, Enumerator, CDD) get default
@@ -218,9 +221,10 @@ export const usePageAccess = () => {
       // Tier 2: a "Manage Microplanning Form Access" grant unlocks the full
       // Geo Microplanning dashboard page for any user.
       if (pageId === "microplanning" && hasMicroplanFormAccess) return true;
-      // Restricted pages: super admins can be granted access by the owner.
+      // Restricted pages: any admin (Super Admin or Systems Admin) can be
+      // granted access by the owner via admin_page_access.
       if (isRestrictedPageId(pageId)) {
-        if (isSuperAdmin && grantedPages.includes(pageId)) return true;
+        if (isAdmin && grantedPages.includes(pageId)) return true;
         return false;
       }
       // Non-restricted pages: admins always pass; regular users only get
@@ -229,7 +233,7 @@ export const usePageAccess = () => {
       if (pageId === "forms" || pageId === "cases" || pageId === "community-forum" || pageId === "project-chat") return true;
       return false;
     },
-    [isOwner, isAdmin, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage, isFieldDesignation, hasMicroplanFormAccess]
+    [isOwner, isOwnerLevel, isAdmin, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage, isFieldDesignation, hasMicroplanFormAccess]
   );
 
   const refetch = useCallback(async () => {
