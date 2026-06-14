@@ -389,6 +389,8 @@ const Index = () => {
 
       <ProximityHub />
 
+      <IncomingCallManager />
+
       <GuidedTour onNavigate={handleTabChange} />
     </ProximityProvider>
   );
