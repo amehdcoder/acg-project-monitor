@@ -218,31 +218,7 @@ export default function SeeClearFormFiller({ onClose }: Props) {
     }
   };
 
-  const Section = ({ id, title, qs, answers, setAnswers, icon: Icon }: { id: string; title: string; qs: YesNoQ[]; answers: YesNoAnswers; setAnswers: (a: YesNoAnswers) => void; icon: any }) => {
-    const sc = scoreYesNo(qs, answers);
-    const open = openSection === id;
-    return (
-      <div className="rounded-xl border border-border bg-white">
-        <button type="button" onClick={() => setOpenSection(open ? "" : id)} className="flex w-full items-center justify-between gap-2 p-3">
-          <span className="flex items-center gap-2 text-sm font-semibold text-[#2563eb]"><Icon className="h-4 w-4" /> {title}</span>
-          <span className="flex items-center gap-2">
-            <span className="rounded-full bg-[#dcfce7] px-2 py-0.5 text-xs font-semibold text-[#15803d]">{sc.score} / {sc.max}</span>
-            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
-          </span>
-        </button>
-        {open && (
-          <div className="space-y-2 border-t border-border p-3">
-            {qs.map((q) => (
-              <div key={q.key} className="flex items-center justify-between gap-3">
-                <span className="text-sm text-foreground">{q.label}</span>
-                <YesNo value={answers[q.key] || ""} onChange={(v) => setAnswers({ ...answers, [q.key]: v })} />
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
+
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#f4f6fb]">
