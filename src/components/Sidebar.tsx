@@ -73,6 +73,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
   const { t } = useLanguage();
   const { playNavigate, playClick } = useAudioCues();
   const navRef = useRef<HTMLElement | null>(null);
+  const navigate = useNavigate();
 
   // Keep the highlighted (selected) menu item in view when navigating. This
   // prevents the sidebar from appearing to "jump" to a different item by
