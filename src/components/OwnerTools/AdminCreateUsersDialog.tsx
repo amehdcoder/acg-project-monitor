@@ -447,7 +447,8 @@ export default function AdminCreateUsersDialog() {
                   <Plus className="h-4 w-4" /> Add row
                 </Button>
               </div>
-            </ScrollArea>
+            </div>
+
 
             {/* Footer */}
             <div className="flex items-center justify-end gap-2 border-t pt-3 mt-3">
