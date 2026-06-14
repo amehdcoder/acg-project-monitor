@@ -147,7 +147,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       let projectsData;
       
       // Super admins see all projects; Systems admins only see assigned projects
-      if (isSuperAdmin) {
+      if (isSuperAdmin || isOwnerLevel) {
         const { data, error } = await supabase
           .from("projects")
           .select("*")
