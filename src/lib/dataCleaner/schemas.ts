@@ -213,7 +213,7 @@ function onchoConfig(): MdaConfig {
     { t: "geocov", col: "Geographic Coverage (%)", treated: "Total Treated" },
     { t: "coverage", col: "Therapeutic Coverage (%)", treated: "Total Treated", census: "Total Census", threshold: 80 },
     ...cddRules(),
-    { t: "ratio", col: "IVM Drug Ratio", used: "Number of IVM Used", total: "Total Treated", min: 1.0, max: 3.5, drug: "IVM" },
+    { t: "ratio", col: "IVM Drug Ratio", used: "Number of IVM Used", total: "Total Treated", min: 2.5, max: 3.0, drug: "IVM" },
   ];
   return { id: "ONCHO", label: "ONCHO Only", sheet: "ONCHO Only", diseaseAccepted: ["ONCHO Only", "Onchocerciasis", "ONCHO"], coverageThreshold: 80, columns, rules };
 }
@@ -233,8 +233,8 @@ function lfConfig(ratioIvmLabel = "IVM Ratio", ratioAlbLabel = "ALB Ratio", id: 
     { t: "geocov", col: "Geographic Coverage (%)", treated: "Total Treated" },
     { t: "coverage", col: "Therapeutic Coverage (%)", treated: "Total Treated", census: "Total Census", threshold },
     ...cddRules(),
-    { t: "ratio", col: ratioIvmLabel, used: "Number of IVM Used", total: "Total Treated", min: 1.0, max: 3.5, drug: "IVM" },
-    { t: "ratio", col: ratioAlbLabel, used: "Number of ALB Used", total: "Total Treated", min: 0.95, max: 1.05, drug: "ALB" },
+    { t: "ratio", col: ratioIvmLabel, used: "Number of IVM Used", total: "Total Treated", min: 2.5, max: 3.0, drug: "IVM" },
+    { t: "ratio", col: ratioAlbLabel, used: "Number of ALB Used", total: "Total Treated", min: 1.0, max: 1.0, drug: "ALB" },
   ];
   return { id, label, sheet, diseaseAccepted: accepted, coverageThreshold: threshold, columns, rules };
 }
@@ -266,8 +266,8 @@ function schConfig(id: MdaTypeId = "SCH", label = "SCH Only", sheet = "SCH Only"
     { t: "geocov", col: "Geographic Coverage (%)", treated: "Total Treated" },
     { t: "coverage", col: "Therapeutic Coverage (%)", treated: "Total 5 -14 Years Treated", census: "Total Children 5 - 14 Year (Census)", threshold: 75 },
     ...cddRules(),
-    { t: "ratio", col: "PZQ Drug Ratio", used: "Number of PZQ Used", total: "Total Treated", min: 2.0, max: 3.0, drug: "PZQ" },
-    ...(withMeb ? [{ t: "ratio", col: "MEB Drug Ratio", used: "Number of MEB Used", total: "Total Treated", min: 0.95, max: 1.05, drug: "MEB" } as Rule] : []),
+    { t: "ratio", col: "PZQ Drug Ratio", used: "Number of PZQ Used", total: "Total Treated", min: 1.5, max: 2.5, drug: "PZQ" },
+    ...(withMeb ? [{ t: "ratio", col: "MEB Drug Ratio", used: "Number of MEB Used", total: "Total Treated", min: 1.0, max: 1.0, drug: "MEB" } as Rule] : []),
   ];
   return { id, label, sheet, diseaseAccepted: accepted, coverageThreshold: 75, columns, rules };
 }
@@ -421,7 +421,7 @@ function trachomaConfig(): MdaConfig {
     { t: "coverage", col: "Therapeutic Coverage (%)", treated: "Total Treated", census: "Total Census", threshold: 80 },
     { t: "ratio", col: "AZT Tabs Drug Ratio", used: "AZT - Used", total: "Total treated with AZT tabs", min: 3.0, max: 4.0, drug: "AZT Tabs" },
     { t: "ratio", col: "AZT POS Drug Ratio", used: "POS - Used", total: "Total treated with AZT POS", min: 4.0, max: 10.0, drug: "AZT POS" },
-    { t: "ratio", col: "TEO Drug Ratio", used: "TEO - Used", total: "Total treated with TEO", min: 1.8, max: 2.2, drug: "TEO" },
+    { t: "ratio", col: "TEO Drug Ratio", used: "TEO - Used", total: "Total treated with TEO", min: 2.0, max: 2.0, drug: "TEO" },
   ];
   return { id: "TRACHOMA", label: "Trachoma", sheet: "Trachoma", diseaseAccepted: accepted, coverageThreshold: 80, columns, rules };
 }
