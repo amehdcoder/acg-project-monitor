@@ -241,5 +241,24 @@ export function buildMdaSupervisoryChecklist(): {
     campaignType: "MDA (Mass Drug Administration)",
   };
 
+  enforceNonNegative(groups);
   return { name: MDA_CHECKLIST_NAME, description: MDA_CHECKLIST_DESCRIPTION, questions: groups, settings };
+}
+
+/**
+ * Exhaustively guarantee every counting field can never be negative.
+ * Adds a non-negative validation (min: 0) to all `number` questions that do
+ * not already declare a minimum, with a clear field-level message. Percentage
+ * / score fields that already cap at 0–100 are left untouched.
+ */
+function enforceNonNegative(groups: FormGroup[]): void {
+  for (const g of groups) {
+    for (const qq of g.questions) {
+      if (qq.type !== "number") continue;
+      const v = (qq.validation ?? {}) as { min?: number; max?: number; message?: string };
+      if (typeof v.min !== "number") v.min = 0;
+      if (!v.message) v.message = "Value cannot be negative";
+      qq.validation = v;
+    }
+  }
 }
