@@ -199,7 +199,13 @@ export const usePageAccess = () => {
 
   const canAccessPage = useCallback(
     (pageId: string): boolean => {
-      if (loadingAccess) return true;
+      // Owner/admin status comes from auth and resolves independently of the
+      // grant fetch, so honour those immediately. While the per-user grants are
+      // still loading we DEFAULT-DENY restricted pages instead of default-allow,
+      // which previously caused restricted sidebar items to flash for users who
+      // were never entitled to them. Content rendering in Index gates on
+      // `loadingAccess` separately (spinner), so this never blocks a legitimate
+      // page — it only prevents the unauthorized flash.
       if (isOwner) return true;
       // Owner-granted, time-bounded per-user access works for any page id.
       if (canAccessUserPage(pageId)) return true;
