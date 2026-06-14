@@ -155,7 +155,22 @@ export default function SeeClearFormFiller({ onClose }: Props) {
   const equipScore = scoreEquipment(equip);
   const band = readinessBand(scores.overallPct);
 
-  const profileValid = !!(state && lga && ward && community && facilityName && focalName && focalDesignation && focalPhone);
+  const profileValid = !!(state && lga && ward && community && facilityName && level && ownership && funcStatus && focalName && focalDesignation && focalPhone && gps);
+
+  const checklistValid = useMemo(() => {
+    const allYesNo = (qs: YesNoQ[], a: YesNoAnswers) => qs.every((q) => a[q.key] === "yes" || a[q.key] === "no");
+    const equipDone = EQUIPMENT_ITEMS.every((it) => !!equip[it.key]);
+    return (
+      allYesNo(GENERAL_QUESTIONS, general) &&
+      staffOnDuty.trim() !== "" &&
+      allYesNo(HR_QUESTIONS, hr) &&
+      allYesNo(INFRA_QUESTIONS, infra) &&
+      equipDone
+    );
+  }, [general, staffOnDuty, hr, infra, equip]);
+
+  const requiredEvidenceComplete = EVIDENCE_SLOTS.filter((s) => s.required).every((s) => !!evidence[s.slot]);
+  const reviewValid = requiredEvidenceComplete && challenges.length > 0 && recommendations.length > 0 && remarks.trim() !== "" && !!officerSig && !!inchargeSig;
 
   const handlePhoto = async (slot: string, file: File | null) => {
     if (!file || !user?.id) return;
