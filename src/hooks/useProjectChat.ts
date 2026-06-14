@@ -622,16 +622,16 @@ export function useProjectChat(projectId: string | null) {
     }
   }, [selectedGroup, messages.length, markAsRead]);
 
-  // Fetch groups on project change
+  // Fetch groups on project change (and once the user auth has resolved).
   useEffect(() => {
-    if (projectId) {
+    if (projectId && user) {
       fetchChatGroups();
-    } else {
+    } else if (!projectId) {
       setChatGroups([]);
       setSelectedGroup(null);
       setMessages([]);
     }
-  }, [projectId]);
+  }, [projectId, user, fetchChatGroups]);
 
   // Fetch messages when group changes
   useEffect(() => {
