@@ -192,7 +192,8 @@ export default function SeeClearFormFiller({ onClose }: Props) {
   const submit = async (asDraft: boolean) => {
     if (!user?.id) return;
     if (!asDraft && !profileValid) { toast.error("Complete all required facility information."); setStep(0); return; }
-    if (!asDraft && (!officerSig || !inchargeSig)) { toast.error("Both sign-off names are required to submit."); return; }
+    if (!asDraft && !checklistValid) { toast.error("Answer every checklist item, staff on duty and all equipment statuses."); setStep(1); return; }
+    if (!asDraft && !reviewValid) { toast.error("Attach required photos, select challenges & recommendations, add remarks and both sign-offs."); setStep(2); return; }
     setSaving(true);
     try {
       const { error } = await supabase.from("seeclear_monitoring" as any).insert({
