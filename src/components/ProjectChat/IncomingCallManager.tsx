@@ -182,15 +182,15 @@ export function IncomingCallManager() {
     const groupIds = (memberships || []).map((m) => m.chat_group_id);
     if (!groupIds.length) return;
 
-    const { data: calls } = await supabase
-      .from("active_calls" as never)
+    const { data: calls } = await (supabase as any)
+      .from("active_calls")
       .select("*")
       .eq("is_active", true)
       .in("chat_group_id", groupIds)
       .order("started_at", { ascending: false })
       .limit(20);
 
-    (calls || []).forEach((c) => void ingestCall(c as Record<string, unknown>));
+    ((calls as Record<string, unknown>[]) || []).forEach((c) => void ingestCall(c));
   }, [user?.id, ingestCall]);
 
   // --- Realtime subscription to calls across the user's groups ---
