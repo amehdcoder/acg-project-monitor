@@ -540,7 +540,7 @@ export default function AdminCreateUsersDialog() {
               </div>
             ) : (
               /* ----- List view ----- */
-              <ScrollArea className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0 overflow-auto">
                 {historyLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -584,7 +584,7 @@ export default function AdminCreateUsersDialog() {
                     ))}
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             )}
           </TabsContent>
         </Tabs>
