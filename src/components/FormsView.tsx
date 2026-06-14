@@ -376,9 +376,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     checkMicroplanAccess();
   }, [user?.id]);
 
+  // Wait for auth (role/user) to resolve before fetching, otherwise super admins
+  // and assigned users get empty/incorrect lists that never refresh because the
+  // queries ran while `role` was still null.
   useEffect(() => {
+    if (authLoading) return;
     fetchProjects();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user?.id, role, isSuperAdmin, isAdmin]);
 
   useEffect(() => {
     if (selectedProjectId) {
@@ -387,12 +392,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }, [selectedProjectId]);
 
   useEffect(() => {
+    if (authLoading) return;
     if (currentProjectId) {
       fetchForms(currentProjectId);
     } else {
       fetchAllForms();
     }
-  }, [currentProjectId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProjectId, authLoading, user?.id, role, isSuperAdmin]);
 
   const fetchProjects = async () => {
     try {
