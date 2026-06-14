@@ -191,7 +191,7 @@ export const usePageAccess = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, authLoading, isOwner, isSuperAdmin]);
+  }, [user, authLoading, isOwner, isAdmin]);
 
   // Owner-granted user-level page access (with optional time window).
   // Available to ANY user — not just super admins.
