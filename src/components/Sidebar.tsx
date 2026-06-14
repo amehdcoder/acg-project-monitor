@@ -169,7 +169,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     const btn = (
       <button
         data-active={isActive ? "true" : undefined}
-        onClick={() => { playNavigate(); onTabChange(id); onClose(); }}
+        onClick={() => { playNavigate(); if (id === "data-cleaner") { navigate("/data-cleaner"); } else { onTabChange(id); } onClose(); }}
         className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13px] font-medium transition-all duration-100 ${
           isActive
             ? "bg-sidebar-primary text-sidebar-primary-foreground"
