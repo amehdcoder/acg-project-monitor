@@ -5,9 +5,10 @@ import {
   Repeat, Globe, Navigation, ShieldCheck, MapPin, BookOpen,
   ArrowRightLeft, Stethoscope, Accessibility, HandMetal, Sparkles, Satellite,
   PanelLeftClose, PanelLeftOpen, History, ScanLine, Nfc,
-  Share2, FlaskConical, Watch, Bluetooth, Boxes, SatelliteDish,
+  Share2, FlaskConical, Watch, Bluetooth, Boxes, SatelliteDish, Brush,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -72,6 +73,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
   const { t } = useLanguage();
   const { playNavigate, playClick } = useAudioCues();
   const navRef = useRef<HTMLElement | null>(null);
+  const navigate = useNavigate();
 
   // Keep the highlighted (selected) menu item in view when navigating. This
   // prevents the sidebar from appearing to "jump" to a different item by
@@ -93,6 +95,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "templates", label: t("nav.templates"), icon: LayoutTemplate, adminOnly: true },
     { id: "projects", label: t("nav.projects"), icon: FolderOpen, adminOnly: true },
     { id: "data", label: t("nav.analytics"), icon: BarChart3, adminOnly: true },
+    { id: "data-cleaner", label: "Data Cleaner", icon: Brush, adminOnly: true, route: "/data-cleaner" },
     { id: "ml", label: "Machine Learning", icon: Brain, adminOnly: true },
     { id: "math-modeling", label: "Math Modeling", icon: Calculator, adminOnly: true },
     { id: "integrations", label: t("nav.integrations"), icon: Upload, adminOnly: true },
@@ -166,7 +169,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     const btn = (
       <button
         data-active={isActive ? "true" : undefined}
-        onClick={() => { playNavigate(); onTabChange(id); onClose(); }}
+        onClick={() => { playNavigate(); if (id === "data-cleaner") { navigate("/data-cleaner"); } else { onTabChange(id); } onClose(); }}
         className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13px] font-medium transition-all duration-100 ${
           isActive
             ? "bg-sidebar-primary text-sidebar-primary-foreground"
