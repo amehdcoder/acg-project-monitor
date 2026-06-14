@@ -195,7 +195,7 @@ export const usePageAccess = () => {
 
   // Owner-granted user-level page access (with optional time window).
   // Available to ANY user — not just super admins.
-  const { canAccessUserPage } = useUserAccess();
+  const { canAccessUserPage, loadingUserAccess } = useUserAccess();
 
   const designation = (profile?.designation || "").toLowerCase();
   const isFieldDesignation = FIELD_DESIGNATIONS.has(designation);
