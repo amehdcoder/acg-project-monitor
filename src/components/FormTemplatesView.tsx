@@ -382,6 +382,18 @@ const FormTemplatesView = () => {
         </div>
         {isAdmin && (
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={seedStarterTemplates}
+                disabled={seeding}
+                className="gap-1.5"
+              >
+                {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                Add Starter Templates
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
