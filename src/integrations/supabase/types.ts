@@ -6411,6 +6411,10 @@ export type Database = {
         Args: { _chat_group_id: string; _user_id: string }
         Returns: boolean
       }
+      user_cascade_allows: {
+        Args: { _fields: Json; _form_id: string; _user_id: string }
+        Returns: boolean
+      }
       user_has_microplan_scope: {
         Args: {
           _community: string
