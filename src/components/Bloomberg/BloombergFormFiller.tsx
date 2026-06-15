@@ -194,6 +194,17 @@ export default function BloombergFormFiller({ onClose }: Props) {
         status: asDraft ? "draft" : "sent",
       });
       if (error) throw error;
+      await mirrorSpecialForm({
+        userId: user.id,
+        formId: BLOOMBERG_FORM_ID,
+        formName: "Bloomberg School Enrolment Validation",
+        formDescription: selectedSchool?.school_name
+          ? `${selectedSchool.school_name} — ${state}, ${lga}`
+          : `${state}, ${lga}`,
+        status: asDraft ? "draft" : "sent",
+        responses: { enrolment: enrolPayload, total_male: gt.male, total_female: gt.female, grand_total: gt.total },
+        gps: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy } : null,
+      });
       toast.success(asDraft ? "Draft saved" : "Validation submitted");
       onClose();
     } catch (e: any) {
