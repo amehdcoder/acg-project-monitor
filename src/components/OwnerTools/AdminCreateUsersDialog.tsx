@@ -608,7 +608,19 @@ export default function AdminCreateUsersDialog() {
                   <p className="text-xs text-muted-foreground">
                     {safeText(selected.designation_label)} · {fmt(selected.created_at)}
                   </p>
-                  {selected.error && <p className="text-xs text-destructive">{selected.error}</p>}
+                  {selected.error && (() => {
+                    const reason = friendlyReason(selected.error);
+                    const tc = TONE_CLASSES[reason.tone];
+                    return (
+                      <div className={`mt-1 flex items-start gap-2 rounded-md border px-2.5 py-1.5 ${tc.wrap}`}>
+                        <AlertCircle className={`h-4 w-4 mt-0.5 shrink-0 ${tc.title}`} />
+                        <div className="min-w-0">
+                          <p className={`text-xs font-semibold ${tc.title}`}>{reason.title}</p>
+                          <p className={`text-[11px] leading-snug ${tc.hint}`}>{reason.hint}</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="mt-3 flex-1 min-h-0 flex flex-col">
