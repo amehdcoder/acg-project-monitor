@@ -124,6 +124,15 @@ Deno.serve(async (req) => {
 
       const password = generatePassword();
 
+      // If this email was previously deleted, the signup trigger would skip
+      // profile creation — clear the tombstone so the new account is complete.
+      try {
+        await admin
+          .from("deleted_account_emails")
+          .delete()
+          .ilike("email", email);
+      } catch (_) { /* non-fatal */ }
+
       // Create the auth user (email pre-confirmed so they can log in immediately).
       const { data: created, error: createErr } = await admin.auth.admin.createUser({
         email,
@@ -157,11 +166,24 @@ Deno.serve(async (req) => {
       }
 
 
-      // Approve the profile (the signup trigger created it as pending).
+      // Ensure the profile exists and is approved. The signup trigger normally
+      // creates it, but if it was skipped (e.g. tombstone/race) the update would
+      // silently affect zero rows — so we upsert to guarantee a usable profile.
       await admin
         .from("profiles")
-        .update({ approval_status: "approved", designation })
-        .eq("user_id", created.user.id);
+        .upsert(
+          {
+            user_id: created.user.id,
+            email,
+            first_name: first,
+            last_name: last,
+            approval_status: "approved",
+            designation,
+          },
+          { onConflict: "user_id" },
+        );
+
+
 
       // Build and send the credentials email.
       let emailSent = false;
