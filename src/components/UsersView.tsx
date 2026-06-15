@@ -1129,8 +1129,11 @@ const UsersView = () => {
                     </div>
                   </div>
                 );
-              })}
+                  })}
+                </div>
+              ))}
             </div>
+
           )}
         </CardContent>
       </Card>
