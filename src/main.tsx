@@ -2,7 +2,11 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import RootErrorBoundary from "./components/RootErrorBoundary";
 import { installGlobalErrorReporter, recordError } from "./lib/errorReporter";
+import { initOfflineMedia } from "./lib/offlineMedia";
 import "./index.css";
+
+// Drain any queued offline media as soon as the app boots / regains connectivity.
+initOfflineMedia();
 
 // Install global error capture FIRST so any failure during bootstrap is logged.
 installGlobalErrorReporter();
