@@ -432,7 +432,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
         name: templateName,
         description: templateDescription,
         questions: [...(groups.length > 0 ? groups : []), ...questions] as any,
-        settings: settings as any,
+        settings: { ...settings, theme } as any,
         created_by: profile?.user_id,
         is_published: false,
         category: templateCategory,
