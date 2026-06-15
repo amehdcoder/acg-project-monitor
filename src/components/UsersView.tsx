@@ -850,21 +850,32 @@ const UsersView = () => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
             </div>
           ) : (
-            <div className="space-y-3">
-              {filteredUsers.map((user) => {
+            <div className="space-y-6">
+              {groupedUsers.map((group) => (
+                <div key={group.key} className="space-y-3">
+                  <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${group.color.soft}`}>
+                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${group.color.bar}`} />
+                    <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                    <h3 className="font-display text-sm font-semibold text-foreground">{group.name}</h3>
+                    <Badge variant="secondary" className="ml-auto">{group.users.length}</Badge>
+                  </div>
+                  {group.users.map((user) => {
                 const roleInfo = getRoleInfo(user.role?.role);
                 const RoleIcon = roleInfo.icon;
                 const displayName = getUserDisplayName(user);
                 const displayEmail = safeText(user.email);
+                const userProjectIds = getUserProjectIds(user.user_id);
+                const userFormIds = getUserFormIds(user.user_id);
 
                 return (
                   <div
-                    key={user.id}
+                    key={`${group.key}-${user.id}`}
                     className={`group flex flex-col gap-4 rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft sm:flex-row sm:items-center sm:justify-between ${
                       !user.is_active ? "opacity-60" : ""
                     }`}
                   >
                     <div className="flex items-start gap-4">
+
                       {!user.is_owner && (
                         <Checkbox
                           className="mt-5"
