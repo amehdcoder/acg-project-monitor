@@ -3266,7 +3266,8 @@ const FormFiller = ({
 
             let questionCounter = 0;
             return (
-              <div className="space-y-4">
+              <div className="space-y-4" style={formTheme.enabled ? { gap: "var(--form-field-gap)", display: "flex", flexDirection: "column" } : undefined}>
+
                 {/* Groups */}
                 {groups.map((group) => {
                   const isCollapsed = collapsedGroups[group.id];
