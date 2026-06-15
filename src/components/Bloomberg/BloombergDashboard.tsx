@@ -90,9 +90,24 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function BloombergDashboard({ onClose }: Props) {
-  const { stats, byState, points, nonExistent, validatedTable, loading, reload, simulate, setSimulate } = useBloombergDashboard();
-  const { isOwner, isSuperAdmin } = useAuth();
+  const { stats, byState, points, nonExistent, validatedTable, loading, reload, deleteValidations, simulate, setSimulate } = useBloombergDashboard();
+  const { isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
   const canManage = isOwner || isSuperAdmin;
+  // Hard-delete of validation entries is restricted to the Owner / Co-owner.
+  const canDelete = isOwnerLevel && !simulate;
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const handleDeleteRow = async (id: string, label: string) => {
+    if (!window.confirm(`Permanently delete the validation entry for "${label}"?\n\nThis removes it from the database and every dashboard view. This cannot be undone.`)) return;
+    setDeleting(id);
+    try {
+      await deleteValidations([id]);
+      toast.success("Validation entry deleted");
+    } catch (e) {
+      toast.error(`Could not delete: ${(e as Error).message}`);
+    } finally {
+      setDeleting(null);
+    }
+  };
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [capturing, setCapturing] = useState(false);
