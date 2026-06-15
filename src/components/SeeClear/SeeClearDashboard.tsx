@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import {
   ArrowLeft, RefreshCw, Building2, CheckCircle2, FileText, Landmark, Users, ClipboardList,
-  TrendingUp, AlertTriangle, MapPin, Download, Loader2, FileImage, Sparkles, ArrowLeftRight, Gauge,
+  TrendingUp, AlertTriangle, MapPin, Download, Loader2, FileImage, Sparkles, ArrowLeftRight, Gauge, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
