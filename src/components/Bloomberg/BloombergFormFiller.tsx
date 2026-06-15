@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { mirrorSpecialForm, BLOOMBERG_FORM_ID } from "@/lib/specialFormBridge";
+import { queueOrUploadMedia } from "@/lib/offlineMedia";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
 
 const NAVY = "#0c2340";
