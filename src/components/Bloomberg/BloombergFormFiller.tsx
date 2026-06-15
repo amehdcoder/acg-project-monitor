@@ -26,6 +26,7 @@ import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { mirrorSpecialForm, BLOOMBERG_FORM_ID } from "@/lib/specialFormBridge";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
 
 const NAVY = "#0c2340";
