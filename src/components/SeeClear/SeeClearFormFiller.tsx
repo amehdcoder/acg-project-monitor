@@ -197,7 +197,7 @@ export default function SeeClearFormFiller({ onClose }: Props) {
     if (!asDraft && !reviewValid) { toast.error("Attach required photos, select challenges & recommendations, add remarks and both sign-offs."); setStep(2); return; }
     setSaving(true);
     try {
-      const { error } = await supabase.from("seeclear_monitoring" as any).insert({
+      const { queued } = await queueOrInsert("seeclear_monitoring", {
         monitor_id: user.id,
         date_of_visit: dateOfVisit,
         state, lga, ward, community,
@@ -224,8 +224,7 @@ export default function SeeClearFormFiller({ onClose }: Props) {
         officer_signature: officerSig, incharge_signature: inchargeSig,
         critical_gap: challenges[0] || null,
         status: asDraft ? "draft" : "sent",
-      } as any);
-      if (error) throw error;
+      });
       await mirrorSpecialForm({
         userId: user.id,
         formId: SEECLEAR_FORM_ID,
@@ -235,7 +234,11 @@ export default function SeeClearFormFiller({ onClose }: Props) {
         responses: { general, equipment: equip, readiness_score: scores.overallPct },
         gps: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy } : null,
       });
-      toast.success(asDraft ? "Draft saved" : "Checklist submitted");
+      toast.success(
+        queued
+          ? (asDraft ? "Draft saved offline — will sync automatically" : "Submitted offline — will sync automatically")
+          : (asDraft ? "Draft saved" : "Checklist submitted"),
+      );
       onClose();
     } catch (e: any) {
       toast.error(e.message || "Could not save");
