@@ -84,6 +84,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     enforceGeofence: false,
     autoSaveInterval: 30,
   });
+  const [theme, setTheme] = useState<FormTheme>(() => normalizeFormTheme(editForm?.settings?.theme));
   const [showPreview, setShowPreview] = useState(false);
   const [showSkipLogic, setShowSkipLogic] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
