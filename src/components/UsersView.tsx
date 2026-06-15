@@ -132,7 +132,7 @@ const getRoleInfo = (role?: string | null) =>
   roleLabels[(role || "user") as keyof typeof roleLabels] || roleLabels.user;
 
 const UsersView = () => {
-  const { role: currentUserRole, profile: currentUserProfile, isOwner, isAdmin } = useAuth();
+  const { role: currentUserRole, profile: currentUserProfile, isOwner, isCoOwner, isAdmin } = useAuth();
   const { startImpersonation, isImpersonating } = useImpersonation();
   const { logAction } = useAdminSurveillance();
   const [users, setUsers] = useState<(UserProfile & { role?: UserRole })[]>([]);
