@@ -171,7 +171,27 @@ const UsersView = () => {
     fetchUsers();
     fetchProjects();
     fetchForms();
+    fetchAssignments();
   }, []);
+
+  const fetchAssignments = async () => {
+    const [{ data: pa }, { data: fa }] = await Promise.all([
+      supabase.from("user_project_assignments").select("user_id, project_id"),
+      supabase.from("user_form_assignments").select("user_id, form_id"),
+    ]);
+    const pMap: Record<string, string[]> = {};
+    (pa || []).forEach((r: any) => {
+      if (!r.user_id || !r.project_id) return;
+      (pMap[r.user_id] ||= []).push(r.project_id);
+    });
+    const fMap: Record<string, string[]> = {};
+    (fa || []).forEach((r: any) => {
+      if (!r.user_id || !r.form_id) return;
+      (fMap[r.user_id] ||= []).push(r.form_id);
+    });
+    setProjectAssign(pMap);
+    setFormAssign(fMap);
+  };
 
   const fetchUsers = async () => {
     try {
