@@ -225,6 +225,15 @@ export default function SeeClearFormFiller({ onClose }: Props) {
         status: asDraft ? "draft" : "sent",
       } as any);
       if (error) throw error;
+      await mirrorSpecialForm({
+        userId: user.id,
+        formId: SEECLEAR_FORM_ID,
+        formName: "See Clear Eye Health Facility Monitoring Checklist",
+        formDescription: facilityName ? `${facilityName} — ${state}, ${lga}` : `${state}, ${lga}`,
+        status: asDraft ? "draft" : "sent",
+        responses: { general, equipment: equip, readiness_score: scores.overallPct },
+        gps: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy } : null,
+      });
       toast.success(asDraft ? "Draft saved" : "Checklist submitted");
       onClose();
     } catch (e: any) {
