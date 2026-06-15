@@ -2730,9 +2730,10 @@ const FormFiller = ({
   }
 
   return (
-    <div data-mda-scroll data-mda-mode={isMdaChecklist ? "true" : undefined} className={isMdaChecklist
+    <div data-mda-scroll data-mda-mode={isMdaChecklist ? "true" : undefined} style={formThemeStyle} className={isMdaChecklist
       ? "fixed inset-0 z-[70] isolate flex flex-col overflow-y-auto bg-background lg:pl-64"
       : "flex min-h-full flex-col bg-background relative"}>
+      {/* Apply optional custom form theme as scoped CSS variable overrides. */}
       {/* Location enforcement runs SILENTLY in the background.
           No gate modal, no header bar, no toasts — capture happens invisibly
           and metadata is still attached to every submission. */}
