@@ -77,6 +77,8 @@ import { useFormTracking } from "@/hooks/useFormTracking";
 import { useAudioVerification } from "@/hooks/useAudioVerification";
 import { usePhotoMetadata } from "@/hooks/usePhotoMetadata";
 import { useVoiceDataEntry } from "@/hooks/useVoiceDataEntry";
+import { useTheme } from "next-themes";
+import { normalizeFormTheme, buildFormThemeStyle } from "@/lib/formTheme";
 import { useFormTTS } from "@/hooks/useFormTTS";
 import { useVoiceCommands } from "@/hooks/useVoiceCommands";
 import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
