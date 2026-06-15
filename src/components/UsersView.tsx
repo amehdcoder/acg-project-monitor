@@ -932,6 +932,44 @@ const UsersView = () => {
                           {(user.designation || "").replace("_", " ") || "—"}
                           {user.other_designation && ` - ${user.other_designation}`}
                         </p>
+                        {/* Access: projects & forms (blank when none) */}
+                        <div className="mt-2.5 flex flex-col gap-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Projects</span>
+                            {userProjectIds.length > 0 ? (
+                              userProjectIds.map((pid) => {
+                                const c = colorForProject(pid);
+                                return (
+                                  <span key={pid} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${c.chip}`}>
+                                    <FolderOpen className="h-3 w-3" />
+                                    {projectNameById(pid)}
+                                  </span>
+                                );
+                              })
+                            ) : (
+                              <span className="text-[11px] italic text-muted-foreground/50">—</span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Forms</span>
+                            {userFormIds.length > 0 ? (
+                              userFormIds.map((fid) => {
+                                const parentColor = (() => {
+                                  const f = forms.find((x) => x.id === fid);
+                                  return f?.project_id ? colorForProject(f.project_id) : NO_ACCESS;
+                                })();
+                                return (
+                                  <span key={fid} className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium ${parentColor.chip}`}>
+                                    <FileText className="h-3 w-3" />
+                                    {formNameById(fid)}
+                                  </span>
+                                );
+                              })
+                            ) : (
+                              <span className="text-[11px] italic text-muted-foreground/50">—</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
