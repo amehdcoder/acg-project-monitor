@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { mirrorSpecialForm, SEECLEAR_FORM_ID } from "@/lib/specialFormBridge";
 import handsLogo from "@/assets/logo-amehnities.png";
 import coatOfArms from "@/assets/nigeria-coat-of-arms.png.asset.json";
 
@@ -225,6 +226,15 @@ export default function SeeClearFormFiller({ onClose }: Props) {
         status: asDraft ? "draft" : "sent",
       } as any);
       if (error) throw error;
+      await mirrorSpecialForm({
+        userId: user.id,
+        formId: SEECLEAR_FORM_ID,
+        formName: "See Clear Eye Health Facility Monitoring Checklist",
+        formDescription: facilityName ? `${facilityName} — ${state}, ${lga}` : `${state}, ${lga}`,
+        status: asDraft ? "draft" : "sent",
+        responses: { general, equipment: equip, readiness_score: scores.overallPct },
+        gps: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy } : null,
+      });
       toast.success(asDraft ? "Draft saved" : "Checklist submitted");
       onClose();
     } catch (e: any) {
