@@ -43,10 +43,25 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function SeeClearDashboard({ onClose }: Props) {
-  const { stats, byLevel, byOwnership, readinessByLevel, equipment, referrals, dataQuality, flagged, challenges, points, draftCount, loading, reload, simulate, setSimulate } = useSeeClearDashboard();
-  const { isOwner, isSuperAdmin } = useAuth();
+  const { rows, stats, byLevel, byOwnership, readinessByLevel, equipment, referrals, dataQuality, flagged, challenges, points, draftCount, loading, reload, simulate, setSimulate, deleteFacilities } = useSeeClearDashboard();
+  const { isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
   const [capturing, setCapturing] = useState(false);
   const captureRef = useRef<HTMLDivElement | null>(null);
+  // Owner / Co-owner only hard delete (never while simulating).
+  const canDelete = isOwnerLevel && !simulate;
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const handleDeleteRow = async (id: string, label: string) => {
+    if (!window.confirm(`Permanently delete the monitoring entry for "${label}"?\n\nThis removes it from the database and every dashboard view. This cannot be undone.`)) return;
+    setDeleting(id);
+    try {
+      await deleteFacilities([id]);
+      toast.success("Monitoring entry deleted");
+    } catch (e) {
+      toast.error(`Could not delete: ${(e as Error).message}`);
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const stamp = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
   const captureCanvas = async () => {
