@@ -62,6 +62,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Json } from "@/integrations/supabase/types";
+import { buildBuiltInTemplates } from "@/lib/builtInFormTemplates";
 
 interface FormTemplate {
   id: string;
