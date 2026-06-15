@@ -100,11 +100,9 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (users.length > 500) {
-      return new Response(JSON.stringify({ error: "Too many rows (max 500)" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // No upper limit on the number of accounts created. The client submits in
+    // batches to avoid request timeouts, so each invocation handles a chunk.
+
 
     const results: RowResult[] = [];
 
