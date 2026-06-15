@@ -241,19 +241,28 @@ export default function AdminCreateUsersDialog() {
     setSaving(true);
     setResults([]);
     try {
-      const payload = {
-        users: validRows.map((r) => ({
-          first_name: r.first_name.trim(),
-          last_name: r.last_name.trim(),
-          email: r.email.trim().toLowerCase(),
-          designation: r.designation,
-          designation_label: labelFor(r.designation),
-        })),
-      };
-      const { data, error } = await supabase.functions.invoke("admin-create-user", { body: payload });
-      if (error) throw error;
-      const res: RowResult[] = (data?.results ?? []) as RowResult[];
-      setResults(res);
+      const allUsers = validRows.map((r) => ({
+        first_name: r.first_name.trim(),
+        last_name: r.last_name.trim(),
+        email: r.email.trim().toLowerCase(),
+        designation: r.designation,
+        designation_label: labelFor(r.designation),
+      }));
+
+      // Submit in batches so any number of accounts can be created without
+      // hitting request timeouts. Results are accumulated across batches.
+      const BATCH_SIZE = 25;
+      const res: RowResult[] = [];
+      for (let i = 0; i < allUsers.length; i += BATCH_SIZE) {
+        const chunk = allUsers.slice(i, i + BATCH_SIZE);
+        const { data, error } = await supabase.functions.invoke("admin-create-user", {
+          body: { users: chunk },
+        });
+        if (error) throw error;
+        res.push(...(((data?.results ?? []) as RowResult[]) || []));
+        setResults([...res]);
+      }
+
       const ok = res.filter((r) => r.account_created).length;
       const mailed = res.filter((r) => r.email_sent).length;
       const failed = res.length - ok;
