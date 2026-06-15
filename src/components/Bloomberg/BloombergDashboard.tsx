@@ -90,7 +90,7 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function BloombergDashboard({ onClose }: Props) {
-  const { stats, byState, points, nonExistent, validatedTable, loading, reload, deleteValidations, simulate, setSimulate } = useBloombergDashboard();
+  const { validations, stats, byState, points, nonExistent, validatedTable, loading, reload, deleteValidations, simulate, setSimulate } = useBloombergDashboard();
   const { isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
   const canManage = isOwner || isSuperAdmin;
   // Hard-delete of validation entries is restricted to the Owner / Co-owner.
