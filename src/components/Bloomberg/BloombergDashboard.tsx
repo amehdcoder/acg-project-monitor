@@ -546,6 +546,19 @@ export default function BloombergDashboard({ onClose }: Props) {
                           {r.hasBaseline ? `${r.pct >= 0 ? "+" : ""}${r.pct.toFixed(1)}%` : "—"}
                         </td>
                         <td className="py-2 pl-3"><StatusBadge status={r.status} /></td>
+                        {canDelete && (
+                          <td className="py-2 pl-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRow(r.id, r.school)}
+                              disabled={deleting === r.id}
+                              title="Delete this validation entry (Owner only)"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+                            >
+                              {deleting === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
