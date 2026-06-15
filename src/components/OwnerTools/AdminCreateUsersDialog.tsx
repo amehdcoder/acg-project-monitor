@@ -63,6 +63,93 @@ const safeText = (value: unknown, fallback = "—") => {
   return String(value).trim() || fallback;
 };
 
+/**
+ * Translate a raw error string from the backend into an intuitive, friendly
+ * explanation with a matching tone (colour) and suggested next step. This makes
+ * account-creation failures self-explanatory for non-technical admins.
+ */
+type FailTone = "rose" | "amber" | "violet";
+interface FriendlyReason {
+  title: string;
+  hint: string;
+  tone: FailTone;
+}
+
+const TONE_CLASSES: Record<FailTone, { wrap: string; title: string; hint: string }> = {
+  rose: {
+    wrap: "border-rose-500/40 bg-rose-500/10",
+    title: "text-rose-700 dark:text-rose-300",
+    hint: "text-rose-600/90 dark:text-rose-300/80",
+  },
+  amber: {
+    wrap: "border-amber-500/40 bg-amber-500/10",
+    title: "text-amber-700 dark:text-amber-300",
+    hint: "text-amber-600/90 dark:text-amber-300/80",
+  },
+  violet: {
+    wrap: "border-violet-500/40 bg-violet-500/10",
+    title: "text-violet-700 dark:text-violet-300",
+    hint: "text-violet-600/90 dark:text-violet-300/80",
+  },
+};
+
+function friendlyReason(raw?: string | null): FriendlyReason {
+  const msg = (raw ?? "").toLowerCase();
+  if (!msg.trim()) {
+    return { title: "Account could not be created", hint: "An unexpected error occurred. Please try again.", tone: "rose" };
+  }
+  if (/already.*regist|already.*exist|duplicate|email.*taken/.test(msg)) {
+    return {
+      title: "This email is already registered",
+      hint: "An account with this email already exists. Use a different email, or manage the existing account.",
+      tone: "amber",
+    };
+  }
+  if (/invalid email|not a valid email|email.*format/.test(msg)) {
+    return {
+      title: "The email address looks invalid",
+      hint: "Check for typos and make sure it follows the name@example.com format.",
+      tone: "amber",
+    };
+  }
+  if (/first name.*required|name is required/.test(msg)) {
+    return { title: "A first name is required", hint: "Enter the person's first name and try again.", tone: "amber" };
+  }
+  if (/password/.test(msg)) {
+    return { title: "Password requirement not met", hint: "The generated password was rejected. Please retry.", tone: "violet" };
+  }
+  if (/not authoris|not authoriz|permission|forbidden|403/.test(msg)) {
+    return {
+      title: "You're not allowed to create this account",
+      hint: "Your role doesn't permit creating accounts. Contact the Owner if you need access.",
+      tone: "violet",
+    };
+  }
+  if (/network|timeout|timed out|fetch|connection|502|503|504/.test(msg)) {
+    return {
+      title: "Network problem reaching the server",
+      hint: "The request didn't get through. It has been queued for automatic retry — or try again now.",
+      tone: "violet",
+    };
+  }
+  if (/queued for.*retry/.test(msg)) {
+    return {
+      title: "Temporary error — queued for automatic retry",
+      hint: "A transient issue occurred. The system will retry this account automatically.",
+      tone: "violet",
+    };
+  }
+  if (/email failed/.test(msg)) {
+    return {
+      title: "Account created, but the email didn't send",
+      hint: "The login email could not be delivered. Share the credentials manually or resend later.",
+      tone: "amber",
+    };
+  }
+  // Fall back to showing the raw message so nothing is hidden from the admin.
+  return { title: "Account could not be created", hint: raw ?? "Unknown error.", tone: "rose" };
+}
+
 interface Row {
   id: string;
   first_name: string;
@@ -447,6 +534,21 @@ export default function AdminCreateUsersDialog() {
                             </Button>
                           )}
                         </div>
+                        {result && (!result.account_created || (result.account_created && !result.email_sent)) && (() => {
+                          const reason = !result.account_created
+                            ? friendlyReason(result.error)
+                            : friendlyReason("email failed");
+                          const tc = TONE_CLASSES[reason.tone];
+                          return (
+                            <div className={`col-span-full mt-0.5 flex items-start gap-2 rounded-md border px-2.5 py-1.5 ${tc.wrap}`}>
+                              <AlertCircle className={`h-4 w-4 mt-0.5 shrink-0 ${tc.title}`} />
+                              <div className="min-w-0">
+                                <p className={`text-xs font-semibold ${tc.title}`}>{reason.title}</p>
+                                <p className={`text-[11px] leading-snug ${tc.hint}`}>{reason.hint}</p>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     );
                   })}
@@ -506,7 +608,19 @@ export default function AdminCreateUsersDialog() {
                   <p className="text-xs text-muted-foreground">
                     {safeText(selected.designation_label)} · {fmt(selected.created_at)}
                   </p>
-                  {selected.error && <p className="text-xs text-destructive">{selected.error}</p>}
+                  {selected.error && (() => {
+                    const reason = friendlyReason(selected.error);
+                    const tc = TONE_CLASSES[reason.tone];
+                    return (
+                      <div className={`mt-1 flex items-start gap-2 rounded-md border px-2.5 py-1.5 ${tc.wrap}`}>
+                        <AlertCircle className={`h-4 w-4 mt-0.5 shrink-0 ${tc.title}`} />
+                        <div className="min-w-0">
+                          <p className={`text-xs font-semibold ${tc.title}`}>{reason.title}</p>
+                          <p className={`text-[11px] leading-snug ${tc.hint}`}>{reason.hint}</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="mt-3 flex-1 min-h-0 flex flex-col">
