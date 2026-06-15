@@ -167,28 +167,22 @@ Deno.serve(async (req) => {
 
 
       // Ensure the profile exists and is approved. The signup trigger normally
-      // creates it, but if it was skipped (e.g. race or tombstone) we upsert so
-      // the account is never left without a usable, approved profile.
-      const { error: updateErr } = await admin
+      // creates it, but if it was skipped (e.g. tombstone/race) the update would
+      // silently affect zero rows — so we upsert to guarantee a usable profile.
+      await admin
         .from("profiles")
-        .update({ approval_status: "approved", designation })
-        .eq("user_id", created.user.id);
+        .upsert(
+          {
+            user_id: created.user.id,
+            email,
+            first_name: first,
+            last_name: last,
+            approval_status: "approved",
+            designation,
+          },
+          { onConflict: "user_id" },
+        );
 
-      if (updateErr) {
-        await admin
-          .from("profiles")
-          .upsert(
-            {
-              user_id: created.user.id,
-              email,
-              first_name: first,
-              last_name: last,
-              approval_status: "approved",
-              designation,
-            },
-            { onConflict: "user_id" },
-          );
-      }
 
 
       // Build and send the credentials email.
