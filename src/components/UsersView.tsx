@@ -163,12 +163,35 @@ const UsersView = () => {
   // Per-user progress + outcome feedback for bulk operations
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [bulkResults, setBulkResults] = useState<{ name: string; ok: boolean; message: string }[]>([]);
+  // Access maps: user_id -> assigned project / form ids
+  const [projectAssign, setProjectAssign] = useState<Record<string, string[]>>({});
+  const [formAssign, setFormAssign] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     fetchUsers();
     fetchProjects();
     fetchForms();
+    fetchAssignments();
   }, []);
+
+  const fetchAssignments = async () => {
+    const [{ data: pa }, { data: fa }] = await Promise.all([
+      supabase.from("user_project_assignments").select("user_id, project_id"),
+      supabase.from("user_form_assignments").select("user_id, form_id"),
+    ]);
+    const pMap: Record<string, string[]> = {};
+    (pa || []).forEach((r: any) => {
+      if (!r.user_id || !r.project_id) return;
+      (pMap[r.user_id] ||= []).push(r.project_id);
+    });
+    const fMap: Record<string, string[]> = {};
+    (fa || []).forEach((r: any) => {
+      if (!r.user_id || !r.form_id) return;
+      (fMap[r.user_id] ||= []).push(r.form_id);
+    });
+    setProjectAssign(pMap);
+    setFormAssign(fMap);
+  };
 
   const fetchUsers = async () => {
     try {
@@ -277,7 +300,7 @@ const UsersView = () => {
         description: `User has been assigned to the project.`,
       });
 
-      setSelectedProject("");
+      setSelectedProject(""); fetchAssignments();
     } catch (error: any) {
       if (error.code === "23505") {
         toast({
@@ -328,6 +351,7 @@ const UsersView = () => {
       { user_ids: targets.map((u) => u.user_id), project_id: bulkProject }
     );
     toast({ title: "Assignment complete", description: `${okCount} of ${targets.length} user(s) assigned to ${projName}.` });
+    fetchAssignments();
     if (okCount === targets.length) clearSelection();
     setBulkBusy(false);
     setBulkProgress(null);
@@ -424,7 +448,7 @@ const UsersView = () => {
         description: `User has been assigned to the form.`,
       });
 
-      setSelectedForm("");
+      setSelectedForm(""); fetchAssignments();
     } catch (error: any) {
       if (error.code === "23505") {
         toast({
@@ -628,6 +652,56 @@ const UsersView = () => {
   // is never wrongly excluded from super-admin-only actions.
   const isSuperAdmin = currentUserRole === "super_admin" || isOwner;
 
+  // ---------- Access display: projects & forms per user ----------
+  const projectNameById = (id: string) => projects.find((p) => p.id === id)?.name || "Unknown project";
+  const formNameById = (id: string) => forms.find((f) => f.id === id)?.name || "Unknown form";
+
+  const getUserProjectIds = (uid: string) =>
+    Array.from(new Set(projectAssign[uid] || [])).filter((id) => projects.some((p) => p.id === id));
+  const getUserFormIds = (uid: string) =>
+    Array.from(new Set(formAssign[uid] || [])).filter((id) => forms.some((f) => f.id === id));
+
+  // Deterministic color-grade palette keyed by project id.
+  const PROJECT_PALETTE = [
+    { chip: "bg-blue-100 text-blue-700 border-blue-200", bar: "bg-blue-500", soft: "bg-blue-50/60" },
+    { chip: "bg-emerald-100 text-emerald-700 border-emerald-200", bar: "bg-emerald-500", soft: "bg-emerald-50/60" },
+    { chip: "bg-violet-100 text-violet-700 border-violet-200", bar: "bg-violet-500", soft: "bg-violet-50/60" },
+    { chip: "bg-amber-100 text-amber-700 border-amber-200", bar: "bg-amber-500", soft: "bg-amber-50/60" },
+    { chip: "bg-rose-100 text-rose-700 border-rose-200", bar: "bg-rose-500", soft: "bg-rose-50/60" },
+    { chip: "bg-cyan-100 text-cyan-700 border-cyan-200", bar: "bg-cyan-500", soft: "bg-cyan-50/60" },
+    { chip: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200", bar: "bg-fuchsia-500", soft: "bg-fuchsia-50/60" },
+    { chip: "bg-teal-100 text-teal-700 border-teal-200", bar: "bg-teal-500", soft: "bg-teal-50/60" },
+  ];
+  const colorForProject = (id: string) => {
+    const idx = projects.findIndex((p) => p.id === id);
+    return PROJECT_PALETTE[(idx < 0 ? 0 : idx) % PROJECT_PALETTE.length];
+  };
+  const NO_ACCESS = { chip: "bg-muted text-muted-foreground border-border", bar: "bg-muted-foreground/40", soft: "bg-muted/30" };
+
+  // Group filtered users by the projects they have access to. A user assigned to
+  // multiple projects appears under each; users with none fall into "No Project Access".
+  const groupedUsers = (() => {
+    const groups: { key: string; name: string; color: typeof NO_ACCESS; users: typeof filteredUsers }[] = [];
+    const byKey = new Map<string, { key: string; name: string; color: typeof NO_ACCESS; users: typeof filteredUsers }>();
+    const sortedProjects = [...projects].sort((a, b) => a.name.localeCompare(b.name));
+    sortedProjects.forEach((p) =>
+      byKey.set(p.id, { key: p.id, name: p.name, color: colorForProject(p.id), users: [] }),
+    );
+    const noAccess = { key: "__none__", name: "No Project Access", color: NO_ACCESS, users: [] as typeof filteredUsers };
+    filteredUsers.forEach((u) => {
+      const pids = getUserProjectIds(u.user_id);
+      if (pids.length === 0) {
+        noAccess.users.push(u);
+      } else {
+        pids.forEach((pid) => byKey.get(pid)?.users.push(u));
+      }
+    });
+    byKey.forEach((g) => { if (g.users.length) groups.push(g); });
+    if (noAccess.users.length) groups.push(noAccess);
+    return groups;
+  })();
+
+
   return (
     <div className="space-y-6 p-4 lg:p-6">
       {/* Header */}
@@ -777,21 +851,32 @@ const UsersView = () => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
             </div>
           ) : (
-            <div className="space-y-3">
-              {filteredUsers.map((user) => {
+            <div className="space-y-6">
+              {groupedUsers.map((group) => (
+                <div key={group.key} className="space-y-3">
+                  <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${group.color.soft}`}>
+                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${group.color.bar}`} />
+                    <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                    <h3 className="font-display text-sm font-semibold text-foreground">{group.name}</h3>
+                    <Badge variant="secondary" className="ml-auto">{group.users.length}</Badge>
+                  </div>
+                  {group.users.map((user) => {
                 const roleInfo = getRoleInfo(user.role?.role);
                 const RoleIcon = roleInfo.icon;
                 const displayName = getUserDisplayName(user);
                 const displayEmail = safeText(user.email);
+                const userProjectIds = getUserProjectIds(user.user_id);
+                const userFormIds = getUserFormIds(user.user_id);
 
                 return (
                   <div
-                    key={user.id}
+                    key={`${group.key}-${user.id}`}
                     className={`group flex flex-col gap-4 rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft sm:flex-row sm:items-center sm:justify-between ${
                       !user.is_active ? "opacity-60" : ""
                     }`}
                   >
                     <div className="flex items-start gap-4">
+
                       {!user.is_owner && (
                         <Checkbox
                           className="mt-5"
@@ -848,6 +933,44 @@ const UsersView = () => {
                           {(user.designation || "").replace("_", " ") || "—"}
                           {user.other_designation && ` - ${user.other_designation}`}
                         </p>
+                        {/* Access: projects & forms (blank when none) */}
+                        <div className="mt-2.5 flex flex-col gap-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Projects</span>
+                            {userProjectIds.length > 0 ? (
+                              userProjectIds.map((pid) => {
+                                const c = colorForProject(pid);
+                                return (
+                                  <span key={pid} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${c.chip}`}>
+                                    <FolderOpen className="h-3 w-3" />
+                                    {projectNameById(pid)}
+                                  </span>
+                                );
+                              })
+                            ) : (
+                              <span className="text-[11px] italic text-muted-foreground/50">—</span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Forms</span>
+                            {userFormIds.length > 0 ? (
+                              userFormIds.map((fid) => {
+                                const parentColor = (() => {
+                                  const f = forms.find((x) => x.id === fid);
+                                  return f?.project_id ? colorForProject(f.project_id) : NO_ACCESS;
+                                })();
+                                return (
+                                  <span key={fid} className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium ${parentColor.chip}`}>
+                                    <FileText className="h-3 w-3" />
+                                    {formNameById(fid)}
+                                  </span>
+                                );
+                              })
+                            ) : (
+                              <span className="text-[11px] italic text-muted-foreground/50">—</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1007,8 +1130,11 @@ const UsersView = () => {
                     </div>
                   </div>
                 );
-              })}
+                  })}
+                </div>
+              ))}
             </div>
+
           )}
         </CardContent>
       </Card>
