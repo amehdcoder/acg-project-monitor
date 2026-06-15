@@ -208,6 +208,13 @@ const FormFiller = ({
   onSavedLocally,
   previewMode = false,
 }: FormFillerProps) => {
+  // Custom form theme (layout + light/dark colours) configured in the builder.
+  const { resolvedTheme } = useTheme();
+  const formTheme = useMemo(() => normalizeFormTheme((settings as any)?.theme), [settings]);
+  const formThemeStyle = useMemo(
+    () => buildFormThemeStyle(formTheme, resolvedTheme === "dark"),
+    [formTheme, resolvedTheme],
+  );
   // Case-management registration forms (CommCare-style) show ONLY the
   // registration questions (top-level/ungrouped). The follow-up question
   // groups are surfaced separately as their own beautiful modules and are not
