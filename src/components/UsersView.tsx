@@ -351,6 +351,7 @@ const UsersView = () => {
       { user_ids: targets.map((u) => u.user_id), project_id: bulkProject }
     );
     toast({ title: "Assignment complete", description: `${okCount} of ${targets.length} user(s) assigned to ${projName}.` });
+    fetchAssignments();
     if (okCount === targets.length) clearSelection();
     setBulkBusy(false);
     setBulkProgress(null);
