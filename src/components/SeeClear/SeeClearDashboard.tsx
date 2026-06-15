@@ -208,6 +208,57 @@ export default function SeeClearDashboard({ onClose }: Props) {
             </div>
           )}
         </div>
+
+        {/* Owner-only management register */}
+        {canDelete && (
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <div className="mb-1 flex items-center gap-2">
+              <Trash2 className="h-4 w-4 text-red-600" />
+              <h3 className="text-sm font-semibold text-foreground">Manage Monitoring Entries (Owner only)</h3>
+              <span className="ml-auto rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-bold text-red-700">{fmt(rows.length)}</span>
+            </div>
+            <p className="mb-3 text-xs text-muted-foreground">Permanently delete monitoring entries. This cannot be undone.</p>
+            {rows.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">No monitoring entries yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                      <th className="py-2 pr-3">Facility</th>
+                      <th className="py-2 px-3">State / LGA</th>
+                      <th className="py-2 px-3">Level</th>
+                      <th className="py-2 px-3">Status</th>
+                      <th className="py-2 pl-3 text-right">Manage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={r.id} className="border-b border-border/50 last:border-0">
+                        <td className="py-2 pr-3 font-medium text-foreground">{r.facility_name || "Unnamed facility"}</td>
+                        <td className="py-2 px-3 text-xs capitalize">{r.state || "—"}<br /><span className="text-muted-foreground">{r.lga || ""}</span></td>
+                        <td className="py-2 px-3 capitalize">{r.facility_level || "—"}</td>
+                        <td className="py-2 px-3 capitalize">{r.status || "—"}</td>
+                        <td className="py-2 pl-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRow(r.id, r.facility_name || "this entry")}
+                            disabled={deleting === r.id}
+                            title="Delete this monitoring entry (Owner only)"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+                          >
+                            {deleting === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {draftCount > 0 && <p className="text-center text-xs text-muted-foreground">{draftCount} draft checklist(s) not yet included in analytics.</p>}
       </div>
     </div>
