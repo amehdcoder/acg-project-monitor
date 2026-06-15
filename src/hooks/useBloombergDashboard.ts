@@ -241,6 +241,7 @@ export const useBloombergDashboard = () => {
         const hasVariance = hasBaseline ? Math.abs(pct) >= 2 : diff !== 0;
         const opStatus = v.verification?.operational_status;
         return {
+          id: v.id,
           school: v.school_name || "Unknown",
           code: v.school_code || v.school_key || "—",
           state: v.state || "—",
