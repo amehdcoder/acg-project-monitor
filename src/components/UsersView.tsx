@@ -651,6 +651,56 @@ const UsersView = () => {
   // is never wrongly excluded from super-admin-only actions.
   const isSuperAdmin = currentUserRole === "super_admin" || isOwner;
 
+  // ---------- Access display: projects & forms per user ----------
+  const projectNameById = (id: string) => projects.find((p) => p.id === id)?.name || "Unknown project";
+  const formNameById = (id: string) => forms.find((f) => f.id === id)?.name || "Unknown form";
+
+  const getUserProjectIds = (uid: string) =>
+    Array.from(new Set(projectAssign[uid] || [])).filter((id) => projects.some((p) => p.id === id));
+  const getUserFormIds = (uid: string) =>
+    Array.from(new Set(formAssign[uid] || [])).filter((id) => forms.some((f) => f.id === id));
+
+  // Deterministic color-grade palette keyed by project id.
+  const PROJECT_PALETTE = [
+    { chip: "bg-blue-100 text-blue-700 border-blue-200", bar: "bg-blue-500", soft: "bg-blue-50/60" },
+    { chip: "bg-emerald-100 text-emerald-700 border-emerald-200", bar: "bg-emerald-500", soft: "bg-emerald-50/60" },
+    { chip: "bg-violet-100 text-violet-700 border-violet-200", bar: "bg-violet-500", soft: "bg-violet-50/60" },
+    { chip: "bg-amber-100 text-amber-700 border-amber-200", bar: "bg-amber-500", soft: "bg-amber-50/60" },
+    { chip: "bg-rose-100 text-rose-700 border-rose-200", bar: "bg-rose-500", soft: "bg-rose-50/60" },
+    { chip: "bg-cyan-100 text-cyan-700 border-cyan-200", bar: "bg-cyan-500", soft: "bg-cyan-50/60" },
+    { chip: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200", bar: "bg-fuchsia-500", soft: "bg-fuchsia-50/60" },
+    { chip: "bg-teal-100 text-teal-700 border-teal-200", bar: "bg-teal-500", soft: "bg-teal-50/60" },
+  ];
+  const colorForProject = (id: string) => {
+    const idx = projects.findIndex((p) => p.id === id);
+    return PROJECT_PALETTE[(idx < 0 ? 0 : idx) % PROJECT_PALETTE.length];
+  };
+  const NO_ACCESS = { chip: "bg-muted text-muted-foreground border-border", bar: "bg-muted-foreground/40", soft: "bg-muted/30" };
+
+  // Group filtered users by the projects they have access to. A user assigned to
+  // multiple projects appears under each; users with none fall into "No Project Access".
+  const groupedUsers = (() => {
+    const groups: { key: string; name: string; color: typeof NO_ACCESS; users: typeof filteredUsers }[] = [];
+    const byKey = new Map<string, { key: string; name: string; color: typeof NO_ACCESS; users: typeof filteredUsers }>();
+    const sortedProjects = [...projects].sort((a, b) => a.name.localeCompare(b.name));
+    sortedProjects.forEach((p) =>
+      byKey.set(p.id, { key: p.id, name: p.name, color: colorForProject(p.id), users: [] }),
+    );
+    const noAccess = { key: "__none__", name: "No Project Access", color: NO_ACCESS, users: [] as typeof filteredUsers };
+    filteredUsers.forEach((u) => {
+      const pids = getUserProjectIds(u.user_id);
+      if (pids.length === 0) {
+        noAccess.users.push(u);
+      } else {
+        pids.forEach((pid) => byKey.get(pid)?.users.push(u));
+      }
+    });
+    byKey.forEach((g) => { if (g.users.length) groups.push(g); });
+    if (noAccess.users.length) groups.push(noAccess);
+    return groups;
+  })();
+
+
   return (
     <div className="space-y-6 p-4 lg:p-6">
       {/* Header */}
