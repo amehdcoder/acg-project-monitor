@@ -237,9 +237,21 @@ export const useSeeClearDashboard = () => {
 
   const draftCount = useMemo(() => rows.filter((r) => r.status === "draft").length, [rows]);
 
+  // Owner-only hard delete of monitoring entries.
+  const deleteFacilities = async (ids: string[]): Promise<void> => {
+    if (!ids.length) return;
+    const { error } = await supabase
+      .from("seeclear_monitoring" as any)
+      .delete()
+      .in("id", ids);
+    if (error) throw error;
+    setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
+    await reload();
+  };
+
   return {
     rows, loading, reload, simulate, setSimulate,
     stats, byLevel, byOwnership, readinessByLevel, equipment, referrals,
-    dataQuality, flagged, challenges, points, draftCount,
+    dataQuality, flagged, challenges, points, draftCount, deleteFacilities,
   };
 };
