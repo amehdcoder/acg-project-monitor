@@ -197,6 +197,7 @@ export const useBloombergDashboard = () => {
       .map((v) => {
         const reasonVal = v.verification?.not_found_reason || "other";
         return {
+          id: v.id,
           school: v.school_name || "Unknown",
           code: v.school_code || v.school_key || "—",
           state: v.state || "—",
@@ -241,6 +242,7 @@ export const useBloombergDashboard = () => {
         const hasVariance = hasBaseline ? Math.abs(pct) >= 2 : diff !== 0;
         const opStatus = v.verification?.operational_status;
         return {
+          id: v.id,
           school: v.school_name || "Unknown",
           code: v.school_code || v.school_key || "—",
           state: v.state || "—",
@@ -260,8 +262,22 @@ export const useBloombergDashboard = () => {
       .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct) || a.school.localeCompare(b.school));
   }, [validations, baselineByKey]);
 
+  // Owner-only hard delete of validation entries. Removes the rows from the
+  // database so they immediately disappear from every dashboard view.
+  const deleteValidations = async (ids: string[]): Promise<void> => {
+    if (!ids.length) return;
+    const { error } = await supabase
+      .from("bloomberg_validations")
+      .delete()
+      .in("id", ids);
+    if (error) throw error;
+    // Optimistically drop locally, then re-sync from server.
+    setValidations((prev) => prev.filter((v) => !ids.includes(v.id)));
+    await reload();
+  };
+
   return {
     validations, baselines, stats, byState, points, nonExistent, validatedTable,
-    loading, reload, ALL_CLASSES, simulate, setSimulate,
+    loading, reload, deleteValidations, ALL_CLASSES, simulate, setSimulate,
   };
 };

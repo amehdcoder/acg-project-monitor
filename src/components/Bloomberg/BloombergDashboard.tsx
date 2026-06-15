@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin, Download, Upload, Loader2, FileImage, Sparkles, XCircle, ClipboardList } from "lucide-react";
+import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin, Download, Upload, Loader2, FileImage, Sparkles, XCircle, ClipboardList, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -90,9 +90,24 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function BloombergDashboard({ onClose }: Props) {
-  const { stats, byState, points, nonExistent, validatedTable, loading, reload, simulate, setSimulate } = useBloombergDashboard();
-  const { isOwner, isSuperAdmin } = useAuth();
+  const { stats, byState, points, nonExistent, validatedTable, loading, reload, deleteValidations, simulate, setSimulate } = useBloombergDashboard();
+  const { isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
   const canManage = isOwner || isSuperAdmin;
+  // Hard-delete of validation entries is restricted to the Owner / Co-owner.
+  const canDelete = isOwnerLevel && !simulate;
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const handleDeleteRow = async (id: string, label: string) => {
+    if (!window.confirm(`Permanently delete the validation entry for "${label}"?\n\nThis removes it from the database and every dashboard view. This cannot be undone.`)) return;
+    setDeleting(id);
+    try {
+      await deleteValidations([id]);
+      toast.success("Validation entry deleted");
+    } catch (e) {
+      toast.error(`Could not delete: ${(e as Error).message}`);
+    } finally {
+      setDeleting(null);
+    }
+  };
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [capturing, setCapturing] = useState(false);
@@ -498,6 +513,7 @@ export default function BloombergDashboard({ onClose }: Props) {
                     <th className="py-2 px-3 text-right">Diff</th>
                     <th className="py-2 px-3 text-right">%</th>
                     <th className="py-2 pl-3">Status</th>
+                    {canDelete && <th className="py-2 pl-3 text-right">Manage</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -530,6 +546,19 @@ export default function BloombergDashboard({ onClose }: Props) {
                           {r.hasBaseline ? `${r.pct >= 0 ? "+" : ""}${r.pct.toFixed(1)}%` : "—"}
                         </td>
                         <td className="py-2 pl-3"><StatusBadge status={r.status} /></td>
+                        {canDelete && (
+                          <td className="py-2 pl-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRow(r.id, r.school)}
+                              disabled={deleting === r.id}
+                              title="Delete this validation entry (Owner only)"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+                            >
+                              {deleting === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}

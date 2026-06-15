@@ -67,6 +67,7 @@ import { useImpersonation } from "@/hooks/useImpersonation";
 import { DeviceManagementDialog } from "@/components/DeviceManagementDialog";
 import OwnerAccessManager from "@/components/OwnerTools/OwnerAccessManager";
 import AdminCreateUsersDialog from "@/components/OwnerTools/AdminCreateUsersDialog";
+import CascadeAssignmentDialog from "@/components/OwnerTools/CascadeAssignmentDialog";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import InactiveUsersPanel from "@/components/InactiveUsersPanel";
 import { STANDARD_ASSESSMENTS } from "@/lib/standardAssessments/definitions";
@@ -131,7 +132,7 @@ const getRoleInfo = (role?: string | null) =>
   roleLabels[(role || "user") as keyof typeof roleLabels] || roleLabels.user;
 
 const UsersView = () => {
-  const { role: currentUserRole, profile: currentUserProfile, isOwner, isAdmin } = useAuth();
+  const { role: currentUserRole, profile: currentUserProfile, isOwner, isCoOwner, isAdmin } = useAuth();
   const { startImpersonation, isImpersonating } = useImpersonation();
   const { logAction } = useAdminSurveillance();
   const [users, setUsers] = useState<(UserProfile & { role?: UserRole })[]>([]);
@@ -166,6 +167,9 @@ const UsersView = () => {
   // Access maps: user_id -> assigned project / form ids
   const [projectAssign, setProjectAssign] = useState<Record<string, string[]>>({});
   const [formAssign, setFormAssign] = useState<Record<string, string[]>>({});
+  // Cascade scope assignments: user_id -> rows { form_id, field_key, value, value_label }
+  const [cascadeAssign, setCascadeAssign] = useState<Record<string, { form_id: string; field_key: string; value: string; value_label: string | null }[]>>({});
+  const [cascadeUser, setCascadeUser] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -175,9 +179,10 @@ const UsersView = () => {
   }, []);
 
   const fetchAssignments = async () => {
-    const [{ data: pa }, { data: fa }] = await Promise.all([
+    const [{ data: pa }, { data: fa }, { data: ca }] = await Promise.all([
       supabase.from("user_project_assignments").select("user_id, project_id"),
       supabase.from("user_form_assignments").select("user_id, form_id"),
+      supabase.from("user_cascade_assignments").select("user_id, form_id, field_key, value, value_label"),
     ]);
     const pMap: Record<string, string[]> = {};
     (pa || []).forEach((r: any) => {
@@ -189,8 +194,14 @@ const UsersView = () => {
       if (!r.user_id || !r.form_id) return;
       (fMap[r.user_id] ||= []).push(r.form_id);
     });
+    const cMap: Record<string, { form_id: string; field_key: string; value: string; value_label: string | null }[]> = {};
+    (ca || []).forEach((r: any) => {
+      if (!r.user_id) return;
+      (cMap[r.user_id] ||= []).push({ form_id: r.form_id, field_key: r.field_key, value: r.value, value_label: r.value_label });
+    });
     setProjectAssign(pMap);
     setFormAssign(fMap);
+    setCascadeAssign(cMap);
   };
 
   const fetchUsers = async () => {
@@ -970,6 +981,18 @@ const UsersView = () => {
                               <span className="text-[11px] italic text-muted-foreground/50">—</span>
                             )}
                           </div>
+                          {(cascadeAssign[user.user_id]?.length ?? 0) > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Cascade scope</span>
+                              {(cascadeAssign[user.user_id] || []).map((c, ci) => (
+                                <span key={ci} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                                  <MapPin className="h-3 w-3" />
+                                  <span className="capitalize opacity-60">{c.field_key.replace("_", " ")}:</span>
+                                  {c.value_label || c.value}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -985,6 +1008,17 @@ const UsersView = () => {
                         <FolderOpen className="h-4 w-4" />
                         Assign
                       </Button>
+                      {(isOwner || isCoOwner) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCascadeUser(user)}
+                          title="Link this user to cascade options (e.g. a State)"
+                        >
+                          <MapPin className="h-4 w-4" />
+                          Cascade
+                        </Button>
+                      )}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon">
@@ -1399,6 +1433,16 @@ const UsersView = () => {
           onClose={() => setShowDeviceDialog(false)}
           userId={selectedUser.user_id}
           userName={getUserDisplayName(selectedUser)}
+        />
+      )}
+
+      {cascadeUser && (
+        <CascadeAssignmentDialog
+          userId={cascadeUser.user_id}
+          userName={getUserDisplayName(cascadeUser)}
+          open={!!cascadeUser}
+          onOpenChange={(v) => { if (!v) setCascadeUser(null); }}
+          onSaved={fetchAssignments}
         />
       )}
 

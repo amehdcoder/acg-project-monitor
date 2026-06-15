@@ -158,9 +158,33 @@ Deno.serve(async (req) => {
             error: createErr?.message ?? "Could not create account",
           });
         } catch (_) { /* non-fatal */ }
+
+        const errMsg = createErr?.message ?? "Could not create account";
+        // Permanent errors (e.g. email already registered, invalid email) are
+        // NOT retried; everything else is queued for automatic retry.
+        const permanent = /already.*regist|already.*exist|invalid email/i.test(errMsg);
+        if (!permanent) {
+          try {
+            await admin.from("account_creation_retry_queue").insert({
+              email, first_name: first, last_name: last,
+              designation, designation_label: designationLabel,
+              requested_by: caller.id, status: "pending", last_error: errMsg,
+            });
+            await admin.from("account_audit_log").insert({
+              event_type: "retry_enqueued", actor_id: caller.id, actor_email: caller.email,
+              target_email: email, success: false, details: { error: errMsg },
+            });
+          } catch (_) { /* non-fatal */ }
+        }
+        await admin.from("account_audit_log").insert({
+          event_type: "account_created", actor_id: caller.id, actor_email: caller.email,
+          target_email: email, success: false,
+          details: { error: errMsg, queued_for_retry: !permanent },
+        }).then(() => {}, () => {});
+
         results.push({
           email, name, status: "failed", account_created: false, email_sent: false,
-          error: createErr?.message ?? "Could not create account",
+          error: permanent ? errMsg : `${errMsg} — queued for automatic retry`,
         });
         continue;
       }
@@ -182,6 +206,20 @@ Deno.serve(async (req) => {
           },
           { onConflict: "user_id" },
         );
+
+      // Audit: account created + profile upserted/approved.
+      await admin.from("account_audit_log").insert([
+        {
+          event_type: "account_created", actor_id: caller.id, actor_email: caller.email,
+          target_user_id: created.user.id, target_email: email, success: true,
+          details: { designation, designation_label: designationLabel },
+        },
+        {
+          event_type: "profile_upserted", actor_id: caller.id, actor_email: caller.email,
+          target_user_id: created.user.id, target_email: email, success: true,
+          details: { approval_status: "approved" },
+        },
+      ]).then(() => {}, () => {});
 
 
 
