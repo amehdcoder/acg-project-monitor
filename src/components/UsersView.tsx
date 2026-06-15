@@ -1436,6 +1436,16 @@ const UsersView = () => {
         />
       )}
 
+      {cascadeUser && (
+        <CascadeAssignmentDialog
+          userId={cascadeUser.user_id}
+          userName={getUserDisplayName(cascadeUser)}
+          open={!!cascadeUser}
+          onOpenChange={(v) => { if (!v) setCascadeUser(null); }}
+          onSaved={fetchAssignments}
+        />
+      )}
+
       {/* Permanent Deletion Confirmation (Owner only) */}
       <AlertDialog open={showDeleteDialog} onOpenChange={(open) => { if (!deletingUser) { setShowDeleteDialog(open); if (!open) setDeleteConfirmText(""); } }}>
         <AlertDialogContent className="max-w-lg">
