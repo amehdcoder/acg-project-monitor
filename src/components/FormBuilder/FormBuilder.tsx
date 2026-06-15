@@ -336,6 +336,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
       // Merge case management settings into form settings
       const fullSettings = {
         ...settings,
+        theme,
         caseManagement: caseManagementSettings.enabled ? caseManagementSettings : undefined,
       };
 
