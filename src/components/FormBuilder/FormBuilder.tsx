@@ -660,6 +660,13 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
               <Briefcase className="mr-2 h-4 w-4" />
               Case Management
             </TabsTrigger>
+            <TabsTrigger
+              value="theme"
+              className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+            >
+              <Palette className="mr-2 h-4 w-4" />
+              Theme
+            </TabsTrigger>
           </TabsList>
         </div>
 
