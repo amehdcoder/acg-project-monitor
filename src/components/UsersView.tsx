@@ -163,6 +163,9 @@ const UsersView = () => {
   // Per-user progress + outcome feedback for bulk operations
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [bulkResults, setBulkResults] = useState<{ name: string; ok: boolean; message: string }[]>([]);
+  // Access maps: user_id -> assigned project / form ids
+  const [projectAssign, setProjectAssign] = useState<Record<string, string[]>>({});
+  const [formAssign, setFormAssign] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     fetchUsers();
