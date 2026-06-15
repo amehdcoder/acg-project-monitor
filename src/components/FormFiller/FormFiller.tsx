@@ -77,6 +77,8 @@ import { useFormTracking } from "@/hooks/useFormTracking";
 import { useAudioVerification } from "@/hooks/useAudioVerification";
 import { usePhotoMetadata } from "@/hooks/usePhotoMetadata";
 import { useVoiceDataEntry } from "@/hooks/useVoiceDataEntry";
+import { useTheme } from "next-themes";
+import { normalizeFormTheme, buildFormThemeStyle } from "@/lib/formTheme";
 import { useFormTTS } from "@/hooks/useFormTTS";
 import { useVoiceCommands } from "@/hooks/useVoiceCommands";
 import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
@@ -208,6 +210,13 @@ const FormFiller = ({
   onSavedLocally,
   previewMode = false,
 }: FormFillerProps) => {
+  // Custom form theme (layout + light/dark colours) configured in the builder.
+  const { resolvedTheme } = useTheme();
+  const formTheme = useMemo(() => normalizeFormTheme((settings as any)?.theme), [settings]);
+  const formThemeStyle = useMemo(
+    () => buildFormThemeStyle(formTheme, resolvedTheme === "dark"),
+    [formTheme, resolvedTheme],
+  );
   // Case-management registration forms (CommCare-style) show ONLY the
   // registration questions (top-level/ungrouped). The follow-up question
   // groups are surfaced separately as their own beautiful modules and are not
@@ -2721,9 +2730,10 @@ const FormFiller = ({
   }
 
   return (
-    <div data-mda-scroll data-mda-mode={isMdaChecklist ? "true" : undefined} className={isMdaChecklist
+    <div data-mda-scroll data-mda-mode={isMdaChecklist ? "true" : undefined} style={formThemeStyle} className={isMdaChecklist
       ? "fixed inset-0 z-[70] isolate flex flex-col overflow-y-auto bg-background lg:pl-64"
       : "flex min-h-full flex-col bg-background relative"}>
+      {/* Apply optional custom form theme as scoped CSS variable overrides. */}
       {/* Location enforcement runs SILENTLY in the background.
           No gate modal, no header bar, no toasts — capture happens invisibly
           and metadata is still attached to every submission. */}
@@ -2741,14 +2751,20 @@ const FormFiller = ({
       )}
 
       {!isMdaChecklist && (
-        <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
+        <div
+          className="flex items-center justify-between border-b border-border bg-card px-4 py-3"
+          style={formTheme.enabled ? { backgroundColor: "hsl(var(--form-header-bg))", color: "hsl(var(--form-header-text))" } : undefined}
+        >
           <div className="flex w-full items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <Button variant="ghost" size="icon" onClick={handleCloseAttempt}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div className="min-w-0">
-                <h1 className="font-display text-lg font-bold text-foreground">
+                <h1
+                  className="font-display text-lg font-bold text-foreground"
+                  style={formTheme.enabled ? { color: "hsl(var(--form-header-text))" } : undefined}
+                >
                   {formName || "Form"}
                 </h1>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -3250,7 +3266,8 @@ const FormFiller = ({
 
             let questionCounter = 0;
             return (
-              <div className="space-y-4">
+              <div className="space-y-4" style={formTheme.enabled ? { gap: "var(--form-field-gap)", display: "flex", flexDirection: "column" } : undefined}>
+
                 {/* Groups */}
                 {groups.map((group) => {
                   const isCollapsed = collapsedGroups[group.id];

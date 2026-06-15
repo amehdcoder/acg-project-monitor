@@ -41,7 +41,9 @@ import GroupValidationEditor from "./GroupValidationEditor";
 import { CreateGroupDialog } from "./QuestionGroup";
 import XLSFormImportDialog from "./XLSFormImportDialog";
 import CaseManagementEditor, { CaseManagementSettings } from "./CaseManagementEditor";
-import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate, MoreHorizontal, Plus } from "lucide-react";
+import ThemeEditor from "./ThemeEditor";
+import { normalizeFormTheme, FormTheme } from "@/lib/formTheme";
+import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate, MoreHorizontal, Plus, Palette } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -82,6 +84,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     enforceGeofence: false,
     autoSaveInterval: 30,
   });
+  const [theme, setTheme] = useState<FormTheme>(() => normalizeFormTheme(editForm?.settings?.theme));
   const [showPreview, setShowPreview] = useState(false);
   const [showSkipLogic, setShowSkipLogic] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
@@ -333,6 +336,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
       // Merge case management settings into form settings
       const fullSettings = {
         ...settings,
+        theme,
         caseManagement: caseManagementSettings.enabled ? caseManagementSettings : undefined,
       };
 
@@ -428,7 +432,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
         name: templateName,
         description: templateDescription,
         questions: [...(groups.length > 0 ? groups : []), ...questions] as any,
-        settings: settings as any,
+        settings: { ...settings, theme } as any,
         created_by: profile?.user_id,
         is_published: false,
         category: templateCategory,
@@ -540,7 +544,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
         questions={questions}
         groups={groups}
         geofence={geofence}
-        settings={settings}
+        settings={{ ...settings, theme }}
         userId={profile?.user_id || "preview"}
         projectId={projectId || "preview"}
         onClose={() => setShowPreview(false)}
@@ -656,6 +660,13 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
               <Briefcase className="mr-2 h-4 w-4" />
               Case Management
             </TabsTrigger>
+            <TabsTrigger
+              value="theme"
+              className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+            >
+              <Palette className="mr-2 h-4 w-4" />
+              Theme
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -766,6 +777,10 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
               </div>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="theme" className="mt-0 flex-1 overflow-auto">
+          <ThemeEditor theme={theme} onChange={setTheme} />
         </TabsContent>
       </Tabs>
 
