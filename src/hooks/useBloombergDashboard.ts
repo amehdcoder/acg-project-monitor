@@ -197,6 +197,7 @@ export const useBloombergDashboard = () => {
       .map((v) => {
         const reasonVal = v.verification?.not_found_reason || "other";
         return {
+          id: v.id,
           school: v.school_name || "Unknown",
           code: v.school_code || v.school_key || "—",
           state: v.state || "—",
