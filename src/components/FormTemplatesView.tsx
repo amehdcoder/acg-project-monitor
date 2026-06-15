@@ -119,6 +119,7 @@ const FormTemplatesView = () => {
   const [editorCategory, setEditorCategory] = useState("general");
   const [editorPublished, setEditorPublished] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [seeding, setSeeding] = useState(false);
 
   // Preview dialog
   const [previewTemplate, setPreviewTemplate] = useState<FormTemplate | null>(null);
