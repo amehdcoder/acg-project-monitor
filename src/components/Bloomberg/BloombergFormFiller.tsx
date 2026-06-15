@@ -116,10 +116,9 @@ export default function BloombergFormFiller({ onClose }: Props) {
     try {
       const ext = file.name.split(".").pop() || "jpg";
       const path = `${user.id}/${Date.now()}_${slot}.${ext}`;
-      const { error } = await supabase.storage.from("bloomberg-evidence").upload(path, file, { upsert: true });
-      if (error) throw error;
+      const { queued } = await queueOrUploadMedia("bloomberg-evidence", path, file, { upsert: true });
       setEvidence((e) => ({ ...e, [slot]: path }));
-      toast.success("Photo attached");
+      toast.success(queued ? "Photo saved offline — will upload automatically" : "Photo attached");
     } catch (e: any) {
       toast.error(e.message || "Upload failed");
     } finally {
