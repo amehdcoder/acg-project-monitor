@@ -534,6 +534,21 @@ export default function AdminCreateUsersDialog() {
                             </Button>
                           )}
                         </div>
+                        {result && (!result.account_created || (result.account_created && !result.email_sent)) && (() => {
+                          const reason = !result.account_created
+                            ? friendlyReason(result.error)
+                            : friendlyReason("email failed");
+                          const tc = TONE_CLASSES[reason.tone];
+                          return (
+                            <div className={`col-span-full mt-0.5 flex items-start gap-2 rounded-md border px-2.5 py-1.5 ${tc.wrap}`}>
+                              <AlertCircle className={`h-4 w-4 mt-0.5 shrink-0 ${tc.title}`} />
+                              <div className="min-w-0">
+                                <p className={`text-xs font-semibold ${tc.title}`}>{reason.title}</p>
+                                <p className={`text-[11px] leading-snug ${tc.hint}`}>{reason.hint}</p>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     );
                   })}
