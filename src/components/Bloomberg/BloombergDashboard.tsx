@@ -513,6 +513,7 @@ export default function BloombergDashboard({ onClose }: Props) {
                     <th className="py-2 px-3 text-right">Diff</th>
                     <th className="py-2 px-3 text-right">%</th>
                     <th className="py-2 pl-3">Status</th>
+                    {canDelete && <th className="py-2 pl-3 text-right">Manage</th>}
                   </tr>
                 </thead>
                 <tbody>
