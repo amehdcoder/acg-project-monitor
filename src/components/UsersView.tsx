@@ -166,6 +166,9 @@ const UsersView = () => {
   // Access maps: user_id -> assigned project / form ids
   const [projectAssign, setProjectAssign] = useState<Record<string, string[]>>({});
   const [formAssign, setFormAssign] = useState<Record<string, string[]>>({});
+  // Cascade scope assignments: user_id -> rows { form_id, field_key, value, value_label }
+  const [cascadeAssign, setCascadeAssign] = useState<Record<string, { form_id: string; field_key: string; value: string; value_label: string | null }[]>>({});
+  const [cascadeUser, setCascadeUser] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -175,9 +178,10 @@ const UsersView = () => {
   }, []);
 
   const fetchAssignments = async () => {
-    const [{ data: pa }, { data: fa }] = await Promise.all([
+    const [{ data: pa }, { data: fa }, { data: ca }] = await Promise.all([
       supabase.from("user_project_assignments").select("user_id, project_id"),
       supabase.from("user_form_assignments").select("user_id, form_id"),
+      supabase.from("user_cascade_assignments").select("user_id, form_id, field_key, value, value_label"),
     ]);
     const pMap: Record<string, string[]> = {};
     (pa || []).forEach((r: any) => {
@@ -189,8 +193,14 @@ const UsersView = () => {
       if (!r.user_id || !r.form_id) return;
       (fMap[r.user_id] ||= []).push(r.form_id);
     });
+    const cMap: Record<string, { form_id: string; field_key: string; value: string; value_label: string | null }[]> = {};
+    (ca || []).forEach((r: any) => {
+      if (!r.user_id) return;
+      (cMap[r.user_id] ||= []).push({ form_id: r.form_id, field_key: r.field_key, value: r.value, value_label: r.value_label });
+    });
     setProjectAssign(pMap);
     setFormAssign(fMap);
+    setCascadeAssign(cMap);
   };
 
   const fetchUsers = async () => {
