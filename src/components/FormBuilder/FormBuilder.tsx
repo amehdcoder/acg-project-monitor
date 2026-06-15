@@ -544,7 +544,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
         questions={questions}
         groups={groups}
         geofence={geofence}
-        settings={settings}
+        settings={{ ...settings, theme }}
         userId={profile?.user_id || "preview"}
         projectId={projectId || "preview"}
         onClose={() => setShowPreview(false)}
