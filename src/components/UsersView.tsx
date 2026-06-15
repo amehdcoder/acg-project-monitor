@@ -1008,6 +1008,17 @@ const UsersView = () => {
                         <FolderOpen className="h-4 w-4" />
                         Assign
                       </Button>
+                      {(isOwner || isCoOwner) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCascadeUser(user)}
+                          title="Link this user to cascade options (e.g. a State)"
+                        >
+                          <MapPin className="h-4 w-4" />
+                          Cascade
+                        </Button>
+                      )}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon">
