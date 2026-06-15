@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { mirrorSpecialForm, BLOOMBERG_FORM_ID } from "@/lib/specialFormBridge";
+import { queueOrUploadMedia } from "@/lib/offlineMedia";
+import { queueOrInsert } from "@/lib/offlineSubmissions";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
 
 const NAVY = "#0c2340";
@@ -116,10 +118,9 @@ export default function BloombergFormFiller({ onClose }: Props) {
     try {
       const ext = file.name.split(".").pop() || "jpg";
       const path = `${user.id}/${Date.now()}_${slot}.${ext}`;
-      const { error } = await supabase.storage.from("bloomberg-evidence").upload(path, file, { upsert: true });
-      if (error) throw error;
+      const { queued } = await queueOrUploadMedia("bloomberg-evidence", path, file, { upsert: true });
       setEvidence((e) => ({ ...e, [slot]: path }));
-      toast.success("Photo attached");
+      toast.success(queued ? "Photo saved offline — will upload automatically" : "Photo attached");
     } catch (e: any) {
       toast.error(e.message || "Upload failed");
     } finally {
@@ -174,7 +175,7 @@ export default function BloombergFormFiller({ onClose }: Props) {
       const gt = grandTotals(enrol);
       const enrolPayload: Record<string, any> = {};
       ALL_CLASSES.forEach((c) => (enrolPayload[c.key] = enrol[c.key]));
-      const { error } = await supabase.from("bloomberg_validations").insert({
+      const { queued } = await queueOrInsert("bloomberg_validations", {
         validator_id: user.id,
         school_key: schoolKey || null,
         state, lga, ward, location,
@@ -194,7 +195,6 @@ export default function BloombergFormFiller({ onClose }: Props) {
         evidence, remarks,
         status: asDraft ? "draft" : "sent",
       });
-      if (error) throw error;
       await mirrorSpecialForm({
         userId: user.id,
         formId: BLOOMBERG_FORM_ID,
@@ -206,7 +206,11 @@ export default function BloombergFormFiller({ onClose }: Props) {
         responses: { enrolment: enrolPayload, total_male: gt.male, total_female: gt.female, grand_total: gt.total },
         gps: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy } : null,
       });
-      toast.success(asDraft ? "Draft saved" : "Validation submitted");
+      toast.success(
+        queued
+          ? (asDraft ? "Draft saved offline — will sync automatically" : "Submitted offline — will sync automatically")
+          : (asDraft ? "Draft saved" : "Validation submitted"),
+      );
       onClose();
     } catch (e: any) {
       toast.error(e.message || "Could not save");

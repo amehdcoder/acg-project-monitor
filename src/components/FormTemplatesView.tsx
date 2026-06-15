@@ -62,6 +62,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Json } from "@/integrations/supabase/types";
+import { buildBuiltInTemplates } from "@/lib/builtInFormTemplates";
 
 interface FormTemplate {
   id: string;
@@ -119,6 +120,7 @@ const FormTemplatesView = () => {
   const [editorCategory, setEditorCategory] = useState("general");
   const [editorPublished, setEditorPublished] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [seeding, setSeeding] = useState(false);
 
   // Preview dialog
   const [previewTemplate, setPreviewTemplate] = useState<FormTemplate | null>(null);
@@ -343,6 +345,41 @@ const FormTemplatesView = () => {
     }
   };
 
+  // Seed the flagship forms as editable starter templates (skips ones already present by name).
+  const seedStarterTemplates = async () => {
+    if (!profile?.user_id) return;
+    setSeeding(true);
+    try {
+      const builtIns = buildBuiltInTemplates();
+      const existingNames = new Set(templates.map((t) => t.name));
+      const toInsert = builtIns
+        .filter((b) => !existingNames.has(b.name))
+        .map((b) => ({
+          name: b.name,
+          description: b.description,
+          category: b.category,
+          questions: b.questions as unknown as Json,
+          settings: b.settings as unknown as Json,
+          created_by: profile.user_id,
+          is_published: true,
+        }));
+      if (toInsert.length === 0) {
+        toast({ title: "Already added", description: "All starter templates are already in your library." });
+        return;
+      }
+      const { error } = await supabase.from("form_templates").insert(toInsert);
+      if (error) throw error;
+      toast({ title: "Starter Templates Added", description: `${toInsert.length} editable template(s) added.` });
+      fetchTemplates();
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Error", description: "Failed to add starter templates.", variant: "destructive" });
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+
   const filteredTemplates = templates.filter((t) => {
     const matchesSearch =
       !searchQuery ||
@@ -382,6 +419,18 @@ const FormTemplatesView = () => {
         </div>
         {isAdmin && (
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={seedStarterTemplates}
+                disabled={seeding}
+                className="gap-1.5"
+              >
+                {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                Add Starter Templates
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
