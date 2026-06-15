@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_audit_log: {
+        Row: {
+          actor_email: string | null
+          actor_id: string | null
+          created_at: string
+          details: Json
+          event_type: string
+          id: string
+          success: boolean
+          target_email: string | null
+          target_user_id: string | null
+        }
+        Insert: {
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          event_type: string
+          id?: string
+          success?: boolean
+          target_email?: string | null
+          target_user_id?: string | null
+        }
+        Update: {
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          event_type?: string
+          id?: string
+          success?: boolean
+          target_email?: string | null
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
       account_creation_emails: {
         Row: {
           created_at: string
@@ -82,6 +118,57 @@ export type Database = {
           id?: string
           recipient_email?: string
           recipient_name?: string | null
+        }
+        Relationships: []
+      }
+      account_creation_retry_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          designation: string
+          designation_label: string | null
+          email: string
+          first_name: string
+          id: string
+          last_error: string | null
+          last_name: string
+          max_attempts: number
+          next_retry_at: string
+          requested_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          designation?: string
+          designation_label?: string | null
+          email: string
+          first_name?: string
+          id?: string
+          last_error?: string | null
+          last_name?: string
+          max_attempts?: number
+          next_retry_at?: string
+          requested_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          designation?: string
+          designation_label?: string | null
+          email?: string
+          first_name?: string
+          id?: string
+          last_error?: string | null
+          last_name?: string
+          max_attempts?: number
+          next_retry_at?: string
+          requested_by?: string | null
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }
