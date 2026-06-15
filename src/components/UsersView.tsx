@@ -300,7 +300,7 @@ const UsersView = () => {
         description: `User has been assigned to the project.`,
       });
 
-      setSelectedProject("");
+      setSelectedProject(""); fetchAssignments();
     } catch (error: any) {
       if (error.code === "23505") {
         toast({
@@ -447,7 +447,7 @@ const UsersView = () => {
         description: `User has been assigned to the form.`,
       });
 
-      setSelectedForm("");
+      setSelectedForm(""); fetchAssignments();
     } catch (error: any) {
       if (error.code === "23505") {
         toast({
