@@ -174,7 +174,7 @@ export default function BloombergFormFiller({ onClose }: Props) {
       const gt = grandTotals(enrol);
       const enrolPayload: Record<string, any> = {};
       ALL_CLASSES.forEach((c) => (enrolPayload[c.key] = enrol[c.key]));
-      const { error } = await supabase.from("bloomberg_validations").insert({
+      const { queued } = await queueOrInsert("bloomberg_validations", {
         validator_id: user.id,
         school_key: schoolKey || null,
         state, lga, ward, location,
@@ -194,7 +194,6 @@ export default function BloombergFormFiller({ onClose }: Props) {
         evidence, remarks,
         status: asDraft ? "draft" : "sent",
       });
-      if (error) throw error;
       await mirrorSpecialForm({
         userId: user.id,
         formId: BLOOMBERG_FORM_ID,
@@ -206,7 +205,11 @@ export default function BloombergFormFiller({ onClose }: Props) {
         responses: { enrolment: enrolPayload, total_male: gt.male, total_female: gt.female, grand_total: gt.total },
         gps: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy } : null,
       });
-      toast.success(asDraft ? "Draft saved" : "Validation submitted");
+      toast.success(
+        queued
+          ? (asDraft ? "Draft saved offline — will sync automatically" : "Submitted offline — will sync automatically")
+          : (asDraft ? "Draft saved" : "Validation submitted"),
+      );
       onClose();
     } catch (e: any) {
       toast.error(e.message || "Could not save");
