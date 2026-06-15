@@ -778,6 +778,10 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
             )}
           </div>
         </TabsContent>
+
+        <TabsContent value="theme" className="mt-0 flex-1 overflow-auto">
+          <ThemeEditor theme={theme} onChange={setTheme} />
+        </TabsContent>
       </Tabs>
 
       {/* Skip Logic Editor */}
