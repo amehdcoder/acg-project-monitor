@@ -981,6 +981,18 @@ const UsersView = () => {
                               <span className="text-[11px] italic text-muted-foreground/50">—</span>
                             )}
                           </div>
+                          {(cascadeAssign[user.user_id]?.length ?? 0) > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Cascade scope</span>
+                              {(cascadeAssign[user.user_id] || []).map((c, ci) => (
+                                <span key={ci} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                                  <MapPin className="h-3 w-3" />
+                                  <span className="capitalize opacity-60">{c.field_key.replace("_", " ")}:</span>
+                                  {c.value_label || c.value}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
