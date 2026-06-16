@@ -236,6 +236,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             stage: "session_restore",
             approval_status: p.approval_status,
           });
+          try { await removeOfflineCredential(p.email); } catch {}
           await supabase.auth.signOut();
           setUser(null);
           setSession(null);
