@@ -101,6 +101,8 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "integrations", label: t("nav.integrations"), icon: Upload, adminOnly: true },
     { id: "geocoding", label: "Geocoding & IP", icon: Globe, adminOnly: true },
     { id: "email-services", label: "Email Services", icon: Mail, adminOnly: true },
+    { id: "live-tracking", label: "Live Tracking", icon: Navigation, adminOnly: true },
+    { id: "location-sharing", label: "My Location Sharing", icon: MapPin, adminOnly: false, showForUsers: true },
     { id: "users", label: t("nav.users"), icon: Users, adminOnly: true },
     { id: "feedback", label: "Feedback", icon: MessageSquareText, adminOnly: true },
     { id: "iteration-analysis", label: "Iteration Analysis", icon: Repeat, adminOnly: true },
