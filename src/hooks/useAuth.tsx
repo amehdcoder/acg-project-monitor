@@ -380,6 +380,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  // Keep each user's offline form library fresh: whenever we have an
+  // authenticated user and we're online (session restore, token refresh, or
+  // regaining connectivity), warm-cache their accessible forms so offline data
+  // collection always has the latest definitions available.
+  useEffect(() => {
+    if (!user?.id || !isOnline) return;
+    const isAdminRole =
+      role === "super_admin" ||
+      role === "systems_admin" ||
+      profile?.is_owner === true ||
+      user.email === "amehjoey1@gmail.com";
+    const t = setTimeout(() => {
+      void warmCacheUserForms({ userId: user.id, isAdmin: isAdminRole, role });
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [user?.id, isOnline, role, profile?.is_owner, user?.email]);
+
 
   const signIn = async (email: string, password: string) => {
     if (!navigator.onLine) {
