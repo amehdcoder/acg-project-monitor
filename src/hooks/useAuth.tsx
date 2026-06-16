@@ -545,6 +545,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         profileRes.data?.is_owner === true ||
         email.toLowerCase() === "amehjoey1@gmail.com";
       void warmCacheUserForms({ userId: data.user.id, isAdmin: isAdminRole, role: roleRes.data?.role });
+      void prewarmBloombergOffline(data.user.id);
     }
 
     return { error: error as Error | null };
