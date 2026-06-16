@@ -469,7 +469,7 @@ const SchoolSearchCombobox = ({
           type="button"
           disabled={disabled}
           className={cn(
-            "flex h-11 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background transition-colors hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            "flex h-12 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background transition-colors hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
             !value && "text-muted-foreground"
           )}
         >
@@ -489,7 +489,7 @@ const SchoolSearchCombobox = ({
         <Command>
           <CommandInput
             placeholder={`Type to search among ${schools.length.toLocaleString()} schools…`}
-            className="h-11 border-none focus:ring-0"
+            className="h-12 border-none text-base focus:ring-0"
           />
           <CommandList className="max-h-[320px]">
             <CommandEmpty className="flex flex-col items-center py-6 text-center text-sm text-muted-foreground">
@@ -511,7 +511,7 @@ const SchoolSearchCombobox = ({
                   <div className="flex w-full items-center justify-between gap-2">
                     <span
                       className={cn(
-                        "truncate text-sm",
+                        "truncate text-base",
                         value === s.school_key && "font-semibold text-[#1f6feb]"
                       )}
                     >
