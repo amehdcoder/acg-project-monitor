@@ -73,6 +73,7 @@ export default function AdminReliabilityPanel() {
   const [loading, setLoading] = useState(false);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [rotating, setRotating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
