@@ -248,6 +248,8 @@ const Index = () => {
       case "projects": return <ProjectsView onSelectProject={(projectId) => { setSelectedProjectId(projectId); handleTabChange("forms"); }} />;
       case "data": return guardedPage("data", <DataView />);
       case "integrations": return guardedPage("integrations", <IntegrationsView />);
+      case "geocoding": return guardedPage("geocoding", <GeocodingView />);
+      case "email-services": return guardedPage("email-services", <EmailServicesView />);
       case "users": return guardedPage("users", <UsersView />);
       case "ml": return guardedPage("ml", <MachineLearningView />);
       case "math-modeling": return guardedPage("math-modeling", <MathModelingView />);
