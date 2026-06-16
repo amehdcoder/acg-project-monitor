@@ -249,4 +249,5 @@ export const removeOfflineCredential = async (email: string): Promise<void> => {
     });
   } catch {}
   try { localStorage.removeItem(legacyKey(normalized)); } catch {}
+  void logOfflineAuditEvent("cache_invalidate", { email: normalized, success: true });
 };
