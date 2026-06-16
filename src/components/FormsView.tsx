@@ -2022,6 +2022,67 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 </div>
               </div>
 
+              {/* SBC — Social & Behaviour Change — addable to any project */}
+              <div className="px-3 sm:px-4 py-3 border-t border-border/60">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-[#a5d8ee] bg-gradient-to-r from-[#e6f4fb] to-transparent p-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-lg bg-[#cdebf7] shrink-0">
+                      <BarChart3 className="h-5 w-5 text-[#0891b2]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">Social &amp; Behaviour Change (SBC) Tracking</p>
+                      <p className="text-xs text-muted-foreground">Indicator reporting form + color-graded analytics dashboard for exposure, knowledge, attitudes, norms, self-efficacy &amp; behaviour adoption indicators.</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="shrink-0"
+                    onClick={async () => {
+                      if (!currentProjectId) {
+                        toast({ title: "Select a project", description: "Choose a project before adding the SBC tools.", variant: "destructive" });
+                        return;
+                      }
+                      if (forms.find((f) => (f.settings as any)?.sbc_kind)) {
+                        toast({ title: "Already added", description: "The SBC tools already exist in this project. Open them from the list above." });
+                        return;
+                      }
+                      try {
+                        const { error } = await supabase.from("forms").insert([
+                          {
+                            name: SBC_FORM_NAME,
+                            description: SBC_FORM_DESC,
+                            questions: [] as any,
+                            settings: { sbc_kind: "form" } as any,
+                            project_id: currentProjectId,
+                            created_by: user?.id,
+                            status: "active",
+                          },
+                          {
+                            name: SBC_DASH_NAME,
+                            description: SBC_DASH_DESC,
+                            questions: [] as any,
+                            settings: { sbc_kind: "dashboard" } as any,
+                            project_id: currentProjectId,
+                            created_by: user?.id,
+                            status: "active",
+                          },
+                        ] as any);
+                        if (error) throw error;
+                        toast({ title: "Added to project", description: "Open the reporting form and dashboard from your forms list above." });
+                        fetchForms(currentProjectId);
+                      } catch (e: any) {
+                        console.error("SBC add error", e);
+                        toast({ title: "Could not add", description: e?.message || "Please try again.", variant: "destructive" });
+                      }
+                    }}
+                  >
+                    <Sparkles className="h-4 w-4 mr-1.5" /> Add to project
+                  </Button>
+                </div>
+              </div>
+
+
+
 
 
 
