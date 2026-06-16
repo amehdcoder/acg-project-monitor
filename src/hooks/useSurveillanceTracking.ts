@@ -184,31 +184,36 @@ export const useSurveillanceTracking = (userId: string | undefined) => {
 
   // Track failed login attempt
   const trackFailedLogin = useCallback(async (email: string, errorMessage: string) => {
+    if (!navigator.onLine) return;
     const ua = navigator.userAgent;
     const deviceInfo = getDeviceInfo(ua);
 
-    // Try to find user profile for more details
-    const { data: profile } = await supabase.from("profiles").select("first_name, last_name, state, lga").eq("email", email).maybeSingle();
-    const userName = profile ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() : "Unknown user";
+    try {
+      // Try to find user profile for more details
+      const { data: profile } = await supabase.from("profiles").select("first_name, last_name, state, lga").eq("email", email).maybeSingle();
+      const userName = profile ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() : "Unknown user";
 
-    await supabase.from("admin_surveillance_log" as any).insert({
-      actor_id: "00000000-0000-0000-0000-000000000000",
-      actor_email: email,
-      actor_role: "unknown",
-      action_type: "failed_login",
-      action_description: `Failed login for ${userName} (${email}): ${errorMessage} | Device: ${deviceInfo.type} · ${deviceInfo.os} · ${deviceInfo.browser}${profile?.state ? ` | Location: ${profile.state}${profile.lga ? `, ${profile.lga}` : ""}` : ""}`,
-      target_entity: "auth",
-      target_id: email,
-      user_agent: ua,
-      metadata: {
-        error: errorMessage,
-        device: deviceInfo,
-        user_name: userName,
-        user_state: profile?.state || "",
-        user_lga: profile?.lga || "",
-        timestamp: new Date().toISOString(),
-      },
-    });
+      await supabase.from("admin_surveillance_log" as any).insert({
+        actor_id: "00000000-0000-0000-0000-000000000000",
+        actor_email: email,
+        actor_role: "unknown",
+        action_type: "failed_login",
+        action_description: `Failed login for ${userName} (${email}): ${errorMessage} | Device: ${deviceInfo.type} · ${deviceInfo.os} · ${deviceInfo.browser}${profile?.state ? ` | Location: ${profile.state}${profile.lga ? `, ${profile.lga}` : ""}` : ""}`,
+        target_entity: "auth",
+        target_id: email,
+        user_agent: ua,
+        metadata: {
+          error: errorMessage,
+          device: deviceInfo,
+          user_name: userName,
+          user_state: profile?.state || "",
+          user_lga: profile?.lga || "",
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (e) {
+      console.warn("Failed login tracking skipped:", e);
+    }
   }, []);
 
   const logSurveillanceEvent = async (actionType: string, description: string, metadata: Record<string, unknown>) => {
