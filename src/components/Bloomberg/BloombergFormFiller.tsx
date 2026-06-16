@@ -419,9 +419,9 @@ const Field = ({ label, children, className = "", required = false }: { label: s
 
 const Sel = ({ value, onChange, options, placeholder, disabled }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; placeholder?: string; disabled?: boolean }) => (
   <Select value={value} onValueChange={onChange} disabled={disabled}>
-    <SelectTrigger className="h-12 text-base"><SelectValue placeholder={placeholder} /></SelectTrigger>
+    <SelectTrigger className="h-13 min-h-[3.25rem] text-lg"><SelectValue placeholder={placeholder} /></SelectTrigger>
     <SelectContent className="max-h-72">
-      {options.map((o) => <SelectItem key={o.value} value={o.value} className="text-base">{o.label}</SelectItem>)}
+      {options.map((o) => <SelectItem key={o.value} value={o.value} className="text-lg">{o.label}</SelectItem>)}
     </SelectContent>
   </Select>
 );
