@@ -145,7 +145,7 @@ export const importOfflineProfiles = async (
     const plaintext = await crypto.subtle.decrypt(
       { name: "AES-GCM", iv: iv as BufferSource },
       key,
-      fromB64(envelope.ciphertext),
+      fromB64(envelope.ciphertext) as BufferSource,
     );
     parsed = JSON.parse(new TextDecoder().decode(plaintext));
   } catch {
