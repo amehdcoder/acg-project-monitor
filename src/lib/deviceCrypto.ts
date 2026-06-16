@@ -112,7 +112,7 @@ export async function decryptJSON<T = any>(payload: string): Promise<T> {
   const [ivB64, ctB64] = payload.split(".");
   const iv = fromB64(ivB64);
   const ct = fromB64(ctB64);
-  const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
+  const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv as BufferSource }, key, ct);
   return JSON.parse(new TextDecoder().decode(plaintext)) as T;
 }
 
@@ -177,6 +177,6 @@ export async function decryptBlob(env: any, fallbackType = "application/octet-st
   }
   const key = await getDeviceKey();
   const iv = fromB64(env.iv);
-  const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, env.ct);
+  const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv as BufferSource }, key, env.ct);
   return new Blob([plaintext], { type: env.type || fallbackType });
 }
