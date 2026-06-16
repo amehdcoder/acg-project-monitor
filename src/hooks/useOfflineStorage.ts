@@ -475,20 +475,18 @@ export const useOfflineStorage = () => {
     });
   }, []);
 
-  // --- Draft Management ---
+  // --- Draft Management (encrypted at rest) ---
   const saveDraft = useCallback(async (formId: string, userId: string, data: Record<string, any>) => {
     const db = await initDB();
     const id = `draft_${formId}_${userId}`;
+    const sealed = await sealRecord(
+      { id, form_id: formId, user_id: userId, data, updated_at: new Date().toISOString() },
+      ["id", "form_id", "updated_at"],
+    );
     return new Promise<void>((resolve, reject) => {
       const tx = db.transaction("autosave_drafts", "readwrite");
       const store = tx.objectStore("autosave_drafts");
-      const request = store.put({
-        id,
-        form_id: formId,
-        user_id: userId,
-        data,
-        updated_at: new Date().toISOString()
-      });
+      const request = store.put(sealed);
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve();
     });
@@ -497,13 +495,15 @@ export const useOfflineStorage = () => {
   const getDraft = useCallback(async (formId: string, userId: string): Promise<Record<string, any> | null> => {
     const db = await initDB();
     const id = `draft_${formId}_${userId}`;
-    return new Promise((resolve, reject) => {
+    const row: any = await new Promise((resolve, reject) => {
       const tx = db.transaction("autosave_drafts", "readonly");
-      const store = tx.objectStore("autosave_drafts");
-      const request = store.get(id);
+      const request = tx.objectStore("autosave_drafts").get(id);
       request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result?.data || null);
+      request.onsuccess = () => resolve(request.result);
     });
+    if (!row) return null;
+    const unsealed = await unsealRecord<{ data?: Record<string, any> }>(row);
+    return unsealed?.data || null;
   }, []);
 
   const clearDraft = useCallback(async (formId: string, userId: string) => {
