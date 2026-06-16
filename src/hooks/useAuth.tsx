@@ -433,6 +433,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user.email === "amehjoey1@gmail.com";
     const t = setTimeout(() => {
       void warmCacheUserForms({ userId: user.id, isAdmin: isAdminRole, role });
+      void prewarmBloombergOffline(user.id);
     }, 1500);
     return () => clearTimeout(t);
   }, [user?.id, isOfflineMode, role, profile?.is_owner, user?.email]);
