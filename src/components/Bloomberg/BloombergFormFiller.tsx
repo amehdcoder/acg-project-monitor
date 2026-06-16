@@ -405,7 +405,7 @@ export default function BloombergFormFiller({ onClose }: Props) {
 
 const Field = ({ label, children, className = "", required = false }: { label: string; children: React.ReactNode; className?: string; required?: boolean }) => (
   <div className={className}>
-    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+    <label className="mb-1.5 block text-sm font-semibold text-[#0c2340]">
       {label}{required && <span className="ml-0.5 text-[#dc2626]">*</span>}
     </label>
     {children}
@@ -414,9 +414,9 @@ const Field = ({ label, children, className = "", required = false }: { label: s
 
 const Sel = ({ value, onChange, options, placeholder, disabled }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; placeholder?: string; disabled?: boolean }) => (
   <Select value={value} onValueChange={onChange} disabled={disabled}>
-    <SelectTrigger className="h-11"><SelectValue placeholder={placeholder} /></SelectTrigger>
+    <SelectTrigger className="h-12 text-base"><SelectValue placeholder={placeholder} /></SelectTrigger>
     <SelectContent className="max-h-72">
-      {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+      {options.map((o) => <SelectItem key={o.value} value={o.value} className="text-base">{o.label}</SelectItem>)}
     </SelectContent>
   </Select>
 );
