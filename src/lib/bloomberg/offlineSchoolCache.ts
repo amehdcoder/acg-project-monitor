@@ -114,3 +114,56 @@ export async function readCachedBloombergAssignments(
     return [];
   }
 }
+
+const SCHOOL_COLUMNS =
+  "school_key,label,school_name,school_code,school_type,school_level,ownership,state,lga,ward,location,state_label,lga_label,ward_label,location_label";
+
+/**
+ * Eagerly download the FULL Bloomberg school register + the user's cascade
+ * assignments and persist them into IndexedDB, so the School Enrolment
+ * Validation form works fully offline even if the user never opened it while
+ * online. Safe to call repeatedly; it's a best-effort online-only refresh.
+ */
+export async function prewarmBloombergOffline(userId: string): Promise<number> {
+  if (!navigator.onLine) return 0;
+  try {
+    const all: BloombergSchool[] = [];
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from("bloomberg_schools")
+        .select(SCHOOL_COLUMNS)
+        .order("school_name")
+        .range(from, from + PAGE - 1);
+      if (error) return 0; // network/db failure → keep any existing cache
+      if (!data || data.length === 0) break;
+      const normalized = (data as BloombergSchool[]).map((s) => ({
+        ...s,
+        ward_label: normalizeMissingLabel(s.ward_label),
+        location_label: normalizeMissingLabel(s.location_label),
+        label: normalizeMissingLabel(s.label),
+      }));
+      all.push(...normalized);
+      if (data.length < PAGE) break;
+    }
+
+    if (all.length > 0) await cacheBloombergSchools(all);
+
+    if (userId) {
+      const { data: a, error } = await supabase
+        .from("user_cascade_assignments")
+        .select("field_key,value")
+        .eq("user_id", userId)
+        .eq("form_id", BLOOMBERG_FORM_ID);
+      if (!error) {
+        await cacheBloombergAssignments(
+          userId,
+          (a as { field_key: string; value: string }[]) || [],
+        );
+      }
+    }
+    return all.length;
+  } catch {
+    return 0;
+  }
+}
