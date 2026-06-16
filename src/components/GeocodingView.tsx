@@ -323,6 +323,19 @@ export default function GeocodingView() {
               </div>
             </CardContent>
           </Card>
+
+          <GeocodingMap
+            points={rows
+              .filter((r) => r.lat != null && r.lng != null)
+              .map((r) => ({
+                id: r.id,
+                address: r.address,
+                lat: r.lat as number,
+                lng: r.lng as number,
+                resolved: r.resolved,
+                source: r.source,
+              }))}
+          />
         </TabsContent>
 
         {/* REVERSE */}
