@@ -722,8 +722,48 @@ serve(async (req) => {
       );
     }
 
+    if (action === "sync_offline_audit") {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const svc = createClient(supabaseUrl, supabaseServiceKey);
+
+      const { data: rows, error: auditErr } = await svc
+        .from("offline_auth_audit")
+        .select("*")
+        .order("occurred_at", { ascending: true });
+      if (auditErr) throw new Error(`Failed to fetch offline audit: ${auditErr.message}`);
+
+      const header = [
+        "Occurred At", "Event", "Email", "User ID", "Success", "Device ID", "Details",
+      ];
+      const dataRows: any[][] = [header];
+      for (const r of (rows as any[]) || []) {
+        dataRows.push([
+          formatDateForExcel(r.occurred_at || r.created_at),
+          r.event_type || "",
+          r.email || "",
+          r.user_id || "",
+          r.success === null || r.success === undefined ? "" : (r.success ? "Yes" : "No"),
+          r.device_id || "",
+          r.details ? JSON.stringify(r.details) : "",
+        ]);
+      }
+
+      await clearAndWriteSheet(accessToken, spreadsheetId, "Offline_Auth_Audit", undefined, dataRows);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: `Synced ${dataRows.length - 1} offline auth audit events`,
+          sheets: ["Offline_Auth_Audit"],
+          count: dataRows.length - 1,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ error: "Invalid action. Use 'sync', 'read', 'sync_sensitivity', or 'sync_ces'" }),
+      JSON.stringify({ error: "Invalid action. Use 'sync', 'read', 'sync_sensitivity', 'sync_ces', or 'sync_offline_audit'" }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {
