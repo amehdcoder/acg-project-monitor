@@ -13,6 +13,7 @@
 // other feature that adopts this helper) work 100% offline.
 
 import { supabase } from "@/integrations/supabase/client";
+import { encryptBlob, decryptBlob } from "@/lib/deviceCrypto";
 
 const DB_NAME = "acg_offline_media";
 const DB_VERSION = 1;
