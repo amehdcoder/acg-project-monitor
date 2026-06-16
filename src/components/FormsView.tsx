@@ -21,6 +21,9 @@ import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessment
 import ACSMFormFiller from "@/components/ACSM/ACSMFormFiller";
 import ACSMDashboard from "@/components/ACSM/ACSMDashboard";
 import { ACSM_FORM_NAME, ACSM_FORM_DESC, ACSM_DASH_NAME, ACSM_DASH_DESC } from "@/lib/acsm/definition";
+import SBCFormFiller from "@/components/SBC/SBCFormFiller";
+import SBCDashboard from "@/components/SBC/SBCDashboard";
+import { SBC_FORM_NAME, SBC_FORM_DESC, SBC_DASH_NAME, SBC_DASH_DESC } from "@/lib/sbc/definition";
 import { buildMdaSupervisoryChecklist, MDA_CHECKLIST_NAME } from "@/lib/mdaSupervisoryChecklist";
 import {
   buildCommunitySummaryForm, COMMUNITY_SUMMARY_FORM_NAME,
@@ -235,6 +238,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showSeeClearDash, setShowSeeClearDash] = useState(false);
   const [showAcsmForm, setShowAcsmForm] = useState(false);
   const [showAcsmDash, setShowAcsmDash] = useState(false);
+  const [showSbcForm, setShowSbcForm] = useState(false);
+  const [showSbcDash, setShowSbcDash] = useState(false);
   const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [showFormsExplorer, setShowFormsExplorer] = useState(false);
   const [openTopFolder, setOpenTopFolder] = useState<"custom" | "standard" | null>("custom");
@@ -645,6 +650,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         );
         if (linkedDash) idsToDelete.push(linkedDash.id);
       }
+      const sbcKind = (form?.settings as any)?.sbc_kind as ("form" | "dashboard" | undefined);
+      if (sbcKind === "form" && form?.project_id) {
+        const linkedDash = forms.find(
+          f => f.project_id === form.project_id && (f.settings as any)?.sbc_kind === "dashboard",
+        );
+        if (linkedDash) idsToDelete.push(linkedDash.id);
+      }
       const { error } = await supabase.from("forms").delete().in("id", idsToDelete);
       if (error) throw error;
       await logAction("delete_form", `Deleted form "${form?.name || formId}"`, "form", formId);
@@ -930,6 +942,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   if (showAcsmDash) {
     return <ACSMDashboard projectId={currentProjectId} onClose={() => setShowAcsmDash(false)} />;
+  }
+
+  if (showSbcForm) {
+    return <SBCFormFiller projectId={currentProjectId} onClose={() => setShowSbcForm(false)} />;
+  }
+
+  if (showSbcDash) {
+    return <SBCDashboard projectId={currentProjectId} onClose={() => setShowSbcDash(false)} />;
   }
 
 
@@ -1512,6 +1532,58 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     );
                   }
 
+                  // SBC markers launch their dedicated custom UI.
+                  const sbcKind = (form.settings as any)?.sbc_kind as ("form" | "dashboard" | undefined);
+                  if (sbcKind === "form" || sbcKind === "dashboard") {
+                    const isDash = sbcKind === "dashboard";
+                    const SbcIcon = isDash ? BarChart3 : ClipboardCheck;
+                    return (
+                      <div
+                        key={form.id}
+                        className="group flex items-center gap-3 border-l-4 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
+                        style={{ borderLeftColor: "#0891b2" }}
+                      >
+                        <button
+                          onClick={() => (isDash ? setShowSbcDash(true) : setShowSbcForm(true))}
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#DCF0F8]"
+                          aria-label={`Open ${form.name}`}
+                        >
+                          <SbcIcon className="h-5 w-5 text-[#0891b2]" strokeWidth={2} />
+                        </button>
+                        <button
+                          onClick={() => (isDash ? setShowSbcDash(true) : setShowSbcForm(true))}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <h4 className="truncate text-[15px] font-bold text-[#0891b2]">{form.name}</h4>
+                          <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">{form.description || "SBC indicator tracking tool"}</p>
+                        </button>
+                        {!isDash && (
+                          <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold bg-[#E2F5EC] text-[#22A55A]">
+                            Finalized
+                          </span>
+                        )}
+                        {isAdmin && !isDash && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-[#0891b2]">
+                                <ChevronRight className="h-5 w-5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setFormToDelete(form)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Remove from project
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                    );
+                  }
+
+
+
+
 
 
 
@@ -1949,6 +2021,67 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   </Button>
                 </div>
               </div>
+
+              {/* SBC — Social & Behaviour Change — addable to any project */}
+              <div className="px-3 sm:px-4 py-3 border-t border-border/60">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-[#a5d8ee] bg-gradient-to-r from-[#e6f4fb] to-transparent p-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-lg bg-[#cdebf7] shrink-0">
+                      <BarChart3 className="h-5 w-5 text-[#0891b2]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">Social &amp; Behaviour Change (SBC) Tracking</p>
+                      <p className="text-xs text-muted-foreground">Indicator reporting form + color-graded analytics dashboard for exposure, knowledge, attitudes, norms, self-efficacy &amp; behaviour adoption indicators.</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="shrink-0"
+                    onClick={async () => {
+                      if (!currentProjectId) {
+                        toast({ title: "Select a project", description: "Choose a project before adding the SBC tools.", variant: "destructive" });
+                        return;
+                      }
+                      if (forms.find((f) => (f.settings as any)?.sbc_kind)) {
+                        toast({ title: "Already added", description: "The SBC tools already exist in this project. Open them from the list above." });
+                        return;
+                      }
+                      try {
+                        const { error } = await supabase.from("forms").insert([
+                          {
+                            name: SBC_FORM_NAME,
+                            description: SBC_FORM_DESC,
+                            questions: [] as any,
+                            settings: { sbc_kind: "form" } as any,
+                            project_id: currentProjectId,
+                            created_by: user?.id,
+                            status: "active",
+                          },
+                          {
+                            name: SBC_DASH_NAME,
+                            description: SBC_DASH_DESC,
+                            questions: [] as any,
+                            settings: { sbc_kind: "dashboard" } as any,
+                            project_id: currentProjectId,
+                            created_by: user?.id,
+                            status: "active",
+                          },
+                        ] as any);
+                        if (error) throw error;
+                        toast({ title: "Added to project", description: "Open the reporting form and dashboard from your forms list above." });
+                        fetchForms(currentProjectId);
+                      } catch (e: any) {
+                        console.error("SBC add error", e);
+                        toast({ title: "Could not add", description: e?.message || "Please try again.", variant: "destructive" });
+                      }
+                    }}
+                  >
+                    <Sparkles className="h-4 w-4 mr-1.5" /> Add to project
+                  </Button>
+                </div>
+              </div>
+
+
 
 
 
