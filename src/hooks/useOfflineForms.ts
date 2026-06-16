@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
 import type { Question, GeofenceArea } from "@/components/FormBuilder/types";
+import { sealRecord, unsealRecord, unsealAll } from "@/lib/deviceCrypto";
 
 const DB_NAME = "acg_monitor_offline";
 const DB_VERSION = 2;
