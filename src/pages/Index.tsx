@@ -253,6 +253,14 @@ const Index = () => {
       case "integrations": return guardedPage("integrations", <IntegrationsView />);
       case "geocoding": return guardedPage("geocoding", <GeocodingView />);
       case "email-services": return guardedPage("email-services", <EmailServicesView />);
+      case "location-sharing": return <LocationSharingView />;
+      case "live-tracking": return (isOwner || isSuperAdmin || isCoOwner) ? (
+        <ErrorBoundary name="LiveTracking">
+          <Suspense fallback={<div className="flex h-96 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            <LiveTrackingDashboard />
+          </Suspense>
+        </ErrorBoundary>
+      ) : guardedPage("__admin_only__", <></>);
       case "users": return guardedPage("users", <UsersView />);
       case "ml": return guardedPage("ml", <MachineLearningView />);
       case "math-modeling": return guardedPage("math-modeling", <MathModelingView />);
