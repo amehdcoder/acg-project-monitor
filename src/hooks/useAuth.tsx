@@ -6,6 +6,7 @@ import { warmCacheUserForms } from "@/lib/offlineFormCache";
 import {
   getLatestOfflineCredential,
   getOfflineCredential,
+  refreshOfflineCredentialSnapshot,
   removeOfflineCredential,
   saveOfflineCredential,
   verifyOfflineCredentialPassword,
@@ -307,6 +308,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         setProfile(p);
+        if (p.email) {
+          refreshOfflineCredentialSnapshot({
+            email: p.email,
+            user: authUser,
+            profile: p,
+            role: (roleRes.data?.role as string | null) ?? null,
+          }).catch(() => {});
+        }
       } else if (isOAuth) {
         // Google OAuth user with no profile = attempted sign-up via Google.
         // Sign-up MUST happen through the Sign Up form. Reject and log out.
@@ -503,13 +512,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Cache for future offline use (only for active accounts). The encrypted
       // device cache is intentionally retained across sign-out, CommCare-style.
-      await saveOfflineCredential({
-        email,
-        password,
-        user: data.user,
-        profile: profileRes.data,
-        role: (roleRes.data?.role as string | null) ?? null,
-      });
+      try {
+        await saveOfflineCredential({
+          email,
+          password,
+          user: data.user,
+          profile: profileRes.data,
+          role: (roleRes.data?.role as string | null) ?? null,
+        });
+      } catch (e) {
+        console.warn("Offline credential cache was not written:", e);
+        toast({
+          title: "Offline login not cached",
+          description: "Online login succeeded, but this device could not save the encrypted offline login profile.",
+          variant: "destructive",
+        });
+      }
       logOfflineEvent("login", { mode: "online", email });
 
       // Warm-cache this user's accessible forms so they can collect data offline
