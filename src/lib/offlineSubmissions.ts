@@ -7,6 +7,7 @@
 // queue used for their photo evidence.
 
 import { supabase } from "@/integrations/supabase/client";
+import { sealRecord, unsealRecord } from "@/lib/deviceCrypto";
 
 const DB_NAME = "acg_offline_submissions";
 const DB_VERSION = 1;
