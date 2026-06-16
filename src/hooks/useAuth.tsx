@@ -2,8 +2,15 @@ import { useState, useEffect, useRef, createContext, useContext, ReactNode } fro
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { hashOfflinePassword, verifyOfflinePassword } from "@/lib/offlineAuthCrypto";
 import { warmCacheUserForms } from "@/lib/offlineFormCache";
+import {
+  getLatestOfflineCredential,
+  getOfflineCredential,
+  removeOfflineCredential,
+  saveOfflineCredential,
+  verifyOfflineCredentialPassword,
+  type OfflineAuthCredential,
+} from "@/lib/offlineAuthCache";
 
 
 type AppRole = "super_admin" | "systems_admin" | "user";
@@ -82,8 +89,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
 
   // --- Offline Crypto Helpers ---
-  // Salted PBKDF2 hashing lives in @/lib/offlineAuthCrypto; see hashOfflinePassword /
-  // verifyOfflinePassword. legacySha256 is retained only to verify older caches.
+  // Durable encrypted credential storage lives in @/lib/offlineAuthCache. It uses
+  // a device-bound AES-GCM key for the cache envelope and salted PBKDF2 for the
+  // password verifier, so sign-out never destroys the device's offline profile.
+
+  const isLikelyNetworkAuthError = (error: any) => {
+    const message = String(error?.message || error || "").toLowerCase();
+    const status = error?.status ?? error?.statusCode;
+    if (!navigator.onLine) return true;
+    if (status && [400, 401, 403, 422].includes(status)) return false;
+    return /failed to fetch|network|timeout|load failed|fetch failed|connection|offline/i.test(message);
+  };
+
+  const hydrateOfflineCredential = async (
+    cache: OfflineAuthCredential,
+    reason: string,
+  ): Promise<{ error: Error | null }> => {
+    const isOwnerEmail = cache.user?.email === "amehjoey1@gmail.com";
+    if (cache.profile && cache.profile.is_active === false && !isOwnerEmail) {
+      logOfflineEvent("login_blocked", { mode: "offline", email: cache.email, reason: "account_deactivated" });
+      await recordInactiveAttempt(cache.email, "account_deactivated", "offline", cache.user?.id, {
+        stage: "sign_in",
+        approval_status: cache.profile?.approval_status,
+      });
+      return { error: new Error("Your account has been deactivated. Please contact your administrator to restore access.") };
+    }
+
+    setSession(null);
+    setUser(cache.user);
+    setProfile(cache.profile);
+    setRole((cache.role as AppRole | null) ?? null);
+    setIsOfflineMode(true);
+    setLoading(false);
+    setProfileLoading(false);
+    logOfflineEvent("login", { mode: "offline", email: cache.email, reason });
+    return { error: null };
+  };
 
   const logOfflineEvent = (action: string, metadata: any = {}) => {
     try {
