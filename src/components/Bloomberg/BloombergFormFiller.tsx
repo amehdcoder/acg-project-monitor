@@ -239,6 +239,11 @@ export default function BloombergFormFiller({ onClose }: Props) {
         </div>
         <h1 className="mt-4 text-2xl font-bold">New Validation</h1>
         <p className="text-sm text-white/70">School Enrolment Validation</p>
+        {fromCache && (
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 px-3 py-1 text-xs font-medium text-amber-100">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-300" /> Offline mode — schools &amp; cascade loaded from saved data
+          </p>
+        )}
         {/* Stepper */}
         <div className="mt-5 flex items-center">
           {STEPS.map((s, i) => (
