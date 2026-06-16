@@ -279,11 +279,11 @@ export default function BloombergFormFiller({ onClose }: Props) {
                     />
                   </Field>
                   {selectedSchool && (
-                    <div className="grid grid-cols-2 gap-2 rounded-lg bg-[#f4f6fb] p-3 text-xs">
-                      <span className="text-muted-foreground">Code</span><span className="font-medium">{selectedSchool.school_code || "—"}</span>
-                      <span className="text-muted-foreground">Type</span><span className="font-medium">{selectedSchool.school_type || "—"}</span>
-                      <span className="text-muted-foreground">Level</span><span className="font-medium">{selectedSchool.school_level || "—"}</span>
-                      <span className="text-muted-foreground">Ownership</span><span className="font-medium">{selectedSchool.ownership || "—"}</span>
+                    <div className="grid grid-cols-2 gap-2 rounded-lg bg-[#f4f6fb] p-3 text-sm">
+                      <span className="text-muted-foreground">Code</span><span className="font-semibold">{selectedSchool.school_code || "—"}</span>
+                      <span className="text-muted-foreground">Type</span><span className="font-semibold">{selectedSchool.school_type || "—"}</span>
+                      <span className="text-muted-foreground">Level</span><span className="font-semibold">{selectedSchool.school_level || "—"}</span>
+                      <span className="text-muted-foreground">Ownership</span><span className="font-semibold">{selectedSchool.ownership || "—"}</span>
                     </div>
                   )}
                 </div>
