@@ -53,22 +53,25 @@ const initDB = (): Promise<IDBDatabase> => {
 };
 
 // Add a submission to offline storage
+const SUBMISSION_PLAIN_FIELDS = ["id", "form_id", "created_at"];
+
 const addToOfflineStorage = async (submission: PendingSubmission): Promise<void> => {
   const db = await initDB();
+  const sealed = await sealRecord(submission, SUBMISSION_PLAIN_FIELDS);
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
-    const request = store.put(submission);
+    const request = store.put(sealed);
 
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve();
   });
 };
 
-// Get all pending submissions
+// Get all pending submissions (transparently decrypted)
 const getPendingSubmissions = async (): Promise<PendingSubmission[]> => {
   const db = await initDB();
-  return new Promise((resolve, reject) => {
+  const rows: any[] = await new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readonly");
     const store = tx.objectStore(STORE_NAME);
     const request = store.getAll();
@@ -76,6 +79,7 @@ const getPendingSubmissions = async (): Promise<PendingSubmission[]> => {
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
   });
+  return unsealAll<PendingSubmission>(rows);
 };
 
 // Remove a submission from offline storage
@@ -91,24 +95,24 @@ const removeFromOfflineStorage = async (id: string): Promise<void> => {
   });
 };
 
-// Update retry count
+// Update retry count (re-seals the record)
 const updateRetryCount = async (id: string, retryCount: number): Promise<void> => {
   const db = await initDB();
+  const existing: any = await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const getRequest = tx.objectStore(STORE_NAME).get(id);
+    getRequest.onsuccess = () => resolve(getRequest.result);
+    getRequest.onerror = () => reject(getRequest.error);
+  });
+  if (!existing) return;
+  const submission = await unsealRecord<PendingSubmission>(existing);
+  submission.retryCount = retryCount;
+  const sealed = await sealRecord(submission, SUBMISSION_PLAIN_FIELDS);
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
-    const getRequest = store.get(id);
-
-    getRequest.onsuccess = () => {
-      const submission = getRequest.result;
-      if (submission) {
-        submission.retryCount = retryCount;
-        store.put(submission);
-      }
-      resolve();
-    };
-
-    getRequest.onerror = () => reject(getRequest.error);
+    const putReq = tx.objectStore(STORE_NAME).put(sealed);
+    putReq.onsuccess = () => resolve();
+    putReq.onerror = () => reject(putReq.error);
   });
 };
 
