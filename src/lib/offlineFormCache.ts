@@ -7,6 +7,7 @@
 // wherever the offline reader is used.
 
 import { supabase } from "@/integrations/supabase/client";
+import { sealRecord } from "@/lib/deviceCrypto";
 
 const DB_NAME = "acg_monitor_offline";
 const DB_VERSION = 2;
@@ -96,7 +97,7 @@ export const warmCacheUserForms = async (ctx: WarmCacheCtx): Promise<number> => 
         updated_at: (form as any).updated_at || new Date().toISOString(),
       };
       try {
-        await putForm(db, offlineForm);
+        await putForm(db, await sealRecord(offlineForm, ["id", "project_id", "downloaded_at"]));
         cached++;
       } catch {
         /* skip a single bad row */

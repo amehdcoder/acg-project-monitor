@@ -2,8 +2,16 @@ import { useState, useEffect, useRef, createContext, useContext, ReactNode } fro
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { hashOfflinePassword, verifyOfflinePassword } from "@/lib/offlineAuthCrypto";
 import { warmCacheUserForms } from "@/lib/offlineFormCache";
+import {
+  getLatestOfflineCredential,
+  getOfflineCredential,
+  refreshOfflineCredentialSnapshot,
+  removeOfflineCredential,
+  saveOfflineCredential,
+  verifyOfflineCredentialPassword,
+  type OfflineAuthCredential,
+} from "@/lib/offlineAuthCache";
 
 
 type AppRole = "super_admin" | "systems_admin" | "user";
@@ -82,8 +90,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
 
   // --- Offline Crypto Helpers ---
-  // Salted PBKDF2 hashing lives in @/lib/offlineAuthCrypto; see hashOfflinePassword /
-  // verifyOfflinePassword. legacySha256 is retained only to verify older caches.
+  // Durable encrypted credential storage lives in @/lib/offlineAuthCache. It uses
+  // a device-bound AES-GCM key for the cache envelope and salted PBKDF2 for the
+  // password verifier, so sign-out never destroys the device's offline profile.
+
+  const isLikelyNetworkAuthError = (error: any) => {
+    const message = String(error?.message || error || "").toLowerCase();
+    const status = error?.status ?? error?.statusCode;
+    if (!navigator.onLine) return true;
+    if (status && [400, 401, 403, 422].includes(status)) return false;
+    return /failed to fetch|network|timeout|load failed|fetch failed|connection|offline/i.test(message);
+  };
+
+  const hydrateOfflineCredential = async (
+    cache: OfflineAuthCredential,
+    reason: string,
+  ): Promise<{ error: Error | null }> => {
+    const isOwnerEmail = cache.user?.email === "amehjoey1@gmail.com";
+    if (cache.profile && cache.profile.is_active === false && !isOwnerEmail) {
+      logOfflineEvent("login_blocked", { mode: "offline", email: cache.email, reason: "account_deactivated" });
+      await recordInactiveAttempt(cache.email, "account_deactivated", "offline", cache.user?.id, {
+        stage: "sign_in",
+        approval_status: cache.profile?.approval_status,
+      });
+      return { error: new Error("Your account has been deactivated. Please contact your administrator to restore access.") };
+    }
+
+    setSession(null);
+    setUser(cache.user);
+    setProfile(cache.profile);
+    setRole((cache.role as AppRole | null) ?? null);
+    setIsOfflineMode(true);
+    setLoading(false);
+    setProfileLoading(false);
+    logOfflineEvent("login", { mode: "offline", email: cache.email, reason });
+    return { error: null };
+  };
 
   const logOfflineEvent = (action: string, metadata: any = {}) => {
     try {
@@ -195,6 +237,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             stage: "session_restore",
             approval_status: p.approval_status,
           });
+          try { await removeOfflineCredential(p.email); } catch {}
           await supabase.auth.signOut();
           setUser(null);
           setSession(null);
@@ -265,6 +308,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         setProfile(p);
+        if (p.email) {
+          refreshOfflineCredentialSnapshot({
+            email: p.email,
+            user: authUser,
+            profile: p,
+            role: (roleRes.data?.role as string | null) ?? null,
+          }).catch(() => {});
+        }
       } else if (isOAuth) {
         // Google OAuth user with no profile = attempted sign-up via Google.
         // Sign-up MUST happen through the Sign Up form. Reject and log out.
@@ -333,22 +384,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // most recently cached account so the app boots logged-in.
         // Sync to the server will still require re-auth when online.
         try {
-          const keys = Object.keys(localStorage).filter((k) => k.startsWith("ces_auth_cache_"));
-          let latest: any = null;
-          for (const k of keys) {
-            const c = JSON.parse(localStorage.getItem(k) || "null");
-            if (!c) continue;
-            if (!latest || (c.lastUpdated && c.lastUpdated > latest.lastUpdated)) latest = c;
-          }
+          const latest = await getLatestOfflineCredential();
           if (latest?.user) {
-            const isOwnerEmail = latest.user.email === "amehjoey1@gmail.com";
-            if (!latest.profile || latest.profile.is_active !== false || isOwnerEmail) {
-              setUser(latest.user);
-              setProfile(latest.profile);
-              setRole(latest.role);
-              setIsOfflineMode(true);
-              logOfflineEvent("auto_login_offline_boot", { email: latest.user.email });
-            }
+            await hydrateOfflineCredential(latest, "auto_login_offline_boot");
           }
         } catch (e) {
           console.warn("Offline auto-login failed:", e);
@@ -399,41 +437,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   const signIn = async (email: string, password: string) => {
+    const tryOfflineSignIn = async (reason: string) => {
+      const cache = await getOfflineCredential(email);
+      if (!cache) {
+        return { error: new Error("No offline credentials found on this device. Login online once on this same device, then offline login will remain available after sign-out.") };
+      }
+      const passwordOk = await verifyOfflineCredentialPassword(password, cache);
+      if (!passwordOk) {
+        logOfflineEvent("login_failed", { mode: "offline", email, reason: "invalid_password" });
+        return { error: new Error("Invalid password (Offline).") };
+      }
+      const result = await hydrateOfflineCredential(cache, reason);
+      if (!result.error) {
+        toast({ title: "Offline Login Successful", description: "You are logged in using this device's encrypted offline profile." });
+      }
+      return result;
+    };
+
     if (!navigator.onLine) {
-      // ─── OFFLINE LOGIN ──────────────────────────────────────────
       try {
-        const cacheRaw = localStorage.getItem(`ces_auth_cache_${email.toLowerCase()}`);
-        if (!cacheRaw) throw new Error("No offline credentials found. Please login online first.");
-
-        const cache = JSON.parse(cacheRaw);
-        const passwordOk = await verifyOfflinePassword(password, cache);
-
-        if (passwordOk) {
-          const isOwnerEmail = cache.user?.email === "amehjoey1@gmail.com";
-          if (cache.profile && cache.profile.is_active === false && !isOwnerEmail) {
-            logOfflineEvent("login_blocked", { mode: "offline", email, reason: "account_deactivated" });
-            await recordInactiveAttempt(email, "account_deactivated", "offline", cache.user?.id, {
-              stage: "sign_in",
-              approval_status: cache.profile?.approval_status,
-            });
-            throw new Error(
-              "Your account has been deactivated. Please contact your administrator to restore access."
-            );
-          }
-
-          setUser(cache.user);
-          setProfile(cache.profile);
-          setRole(cache.role);
-          setLoading(false);
-          setProfileLoading(false);
-
-          logOfflineEvent("login", { mode: "offline", email });
-          toast({ title: "Offline Login Successful", description: "You are logged in using cached credentials." });
-          return { error: null };
-        } else {
-          logOfflineEvent("login_failed", { mode: "offline", email, reason: "invalid_password" });
-          throw new Error("Invalid password (Offline).");
-        }
+        return await tryOfflineSignIn("device_offline");
       } catch (err: any) {
         return { error: err };
       }
@@ -441,6 +464,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error && isLikelyNetworkAuthError(error)) {
+      try {
+        return await tryOfflineSignIn("backend_unreachable");
+      } catch (err: any) {
+        return { error: err };
+      }
+    }
 
     if (!error && data.user) {
       // Fetch profile to ensure we cache the latest data AND enforce deactivation
@@ -461,7 +492,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Wipe any cached offline credentials for this email so they can't
         // bypass the block via offline login.
         try {
-          localStorage.removeItem(`ces_auth_cache_${email.toLowerCase()}`);
+          await removeOfflineCredential(email);
         } catch {}
         logOfflineEvent("login_blocked", {
           mode: "online",
@@ -479,22 +510,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
       }
 
-      // Cache for future offline use (only for active accounts) with a salted
-      // PBKDF2 hash so credentials can be verified on-device securely.
-      const cred = await hashOfflinePassword(password);
-      const authCache = {
-        email: email.toLowerCase(),
-        passwordHash: cred.passwordHash,
-        salt: cred.salt,
-        iterations: cred.iterations,
-        algo: cred.algo,
-        user: data.user,
-        profile: profileRes.data,
-        role: roleRes.data?.role,
-        lastUpdated: new Date().toISOString(),
-      };
-
-      localStorage.setItem(`ces_auth_cache_${email.toLowerCase()}`, JSON.stringify(authCache));
+      // Cache for future offline use (only for active accounts). The encrypted
+      // device cache is intentionally retained across sign-out, CommCare-style.
+      try {
+        await saveOfflineCredential({
+          email,
+          password,
+          user: data.user,
+          profile: profileRes.data,
+          role: (roleRes.data?.role as string | null) ?? null,
+        });
+      } catch (e) {
+        console.warn("Offline credential cache was not written:", e);
+        toast({
+          title: "Offline login not cached",
+          description: "Online login succeeded, but this device could not save the encrypted offline login profile.",
+          variant: "destructive",
+        });
+      }
       logOfflineEvent("login", { mode: "online", email });
 
       // Warm-cache this user's accessible forms so they can collect data offline
@@ -567,20 +600,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
-    const userEmail = user?.email;
-    
     // 1. Clear Supabase session
     await supabase.auth.signOut();
     
-    // 2. Clear LocalStorage caches
-    if (userEmail) {
-      localStorage.removeItem(`ces_auth_cache_${userEmail.toLowerCase()}`);
-    }
+    // 2. Clear volatile UI/session caches only. Offline credentials, cached
+    // forms, drafts, and queued submissions are encrypted device data and must
+    // survive sign-out so field teams can log back in and keep collecting data
+    // without internet, matching mature offline-first tools like CommCare.
     Object.keys(localStorage).forEach(key => {
       if (
         key.startsWith("kpi_cache_") || 
         key.startsWith("detail_cache_") || 
-        key.startsWith("ces_auth_cache_") ||
         key.startsWith("survey_progress_") ||
         // Wipe the WhatsApp-style chat unread badge cache so a different user
         // signing in on this device never sees the previous user's stale count.
@@ -589,19 +619,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem(key);
       }
     });
-
-    // 3. Clear IndexedDB (Scorched earth for data residency compliance)
-    // This removes pending submissions, drafts, and offline household queues.
-    try {
-      const dbs = ["acg_monitor_offline", "ces_offline"];
-      dbs.forEach(dbName => {
-        const req = indexedDB.deleteDatabase(dbName);
-        req.onerror = () => console.warn(`Could not purge DB ${dbName}`);
-        req.onsuccess = () => console.log(`Purged DB ${dbName} for security compliance.`);
-      });
-    } catch (e) {
-      console.error("IndexedDB purge failed:", e);
-    }
 
     setUser(null);
     setSession(null);
