@@ -917,6 +917,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     return <SeeClearDashboard onClose={() => setShowSeeClearDash(false)} />;
   }
 
+  if (showAcsmForm) {
+    return <ACSMFormFiller projectId={currentProjectId} onClose={() => setShowAcsmForm(false)} />;
+  }
+
+  if (showAcsmDash) {
+    return <ACSMDashboard projectId={currentProjectId} onClose={() => setShowAcsmDash(false)} />;
+  }
+
 
 
 
