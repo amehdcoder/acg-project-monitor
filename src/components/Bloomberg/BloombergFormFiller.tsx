@@ -295,8 +295,8 @@ export default function BloombergFormFiller({ onClose }: Props) {
                 <div className="mt-4 rounded-xl border border-dashed border-[#cdd7e6] p-3">
                   <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#0c2340]"><MapPin className="h-4 w-4 text-[#1f6feb]" /> GPS Location</div>
                   <div className="flex items-center gap-2">
-                    <Input readOnly value={gps ? gps.lat.toFixed(5) : ""} placeholder="Latitude" className="h-12 text-base" />
-                    <Input readOnly value={gps ? gps.lng.toFixed(5) : ""} placeholder="Longitude" className="h-12 text-base" />
+                    <Input readOnly value={gps ? gps.lat.toFixed(5) : ""} placeholder="Latitude" className="h-[3.25rem] text-lg" />
+                    <Input readOnly value={gps ? gps.lng.toFixed(5) : ""} placeholder="Longitude" className="h-[3.25rem] text-lg" />
                     <Button type="button" onClick={captureGps} disabled={geo.isLoading} className="h-10 shrink-0 bg-[#2563eb] hover:bg-[#1d4ed8]">
                       {geo.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}<span className="ml-1 hidden sm:inline">Capture GPS</span>
                     </Button>
@@ -322,11 +322,11 @@ export default function BloombergFormFiller({ onClose }: Props) {
                   <div className="space-y-3">
                     <Field label="Operational Status" required><Sel value={operationalStatus} onChange={setOperationalStatus} options={OPERATIONAL_STATUS} /></Field>
                     <div className="grid grid-cols-2 gap-3">
-                      <Field label="Head Teacher / Contact Person" required><Input value={headTeacher} onChange={(e) => setHeadTeacher(e.target.value)} placeholder="Enter full name" className="h-12 text-base" /></Field>
-                      <Field label="Phone Number" required><Input value={headPhone} onChange={(e) => setHeadPhone(e.target.value)} placeholder="Enter phone number" className="h-12 text-base" /></Field>
+                      <Field label="Head Teacher / Contact Person" required><Input value={headTeacher} onChange={(e) => setHeadTeacher(e.target.value)} placeholder="Enter full name" className="h-[3.25rem] text-lg" /></Field>
+                      <Field label="Phone Number" required><Input value={headPhone} onChange={(e) => setHeadPhone(e.target.value)} placeholder="Enter phone number" className="h-[3.25rem] text-lg" /></Field>
                     </div>
                     <div className="grid grid-cols-2 items-end gap-3">
-                      <Field label="Date of Visit" required><Input type="date" value={dateOfVisit} onChange={(e) => setDateOfVisit(e.target.value)} className="h-12 text-base" /></Field>
+                      <Field label="Date of Visit" required><Input type="date" value={dateOfVisit} onChange={(e) => setDateOfVisit(e.target.value)} className="h-[3.25rem] text-lg" /></Field>
                       <div className="flex items-center justify-between rounded-lg border border-border p-3">
                         <span className="text-base font-semibold">Register Available</span>
                         <Switch checked={registerAvailable} onCheckedChange={setRegisterAvailable} />
@@ -410,7 +410,7 @@ export default function BloombergFormFiller({ onClose }: Props) {
 
 const Field = ({ label, children, className = "", required = false }: { label: string; children: React.ReactNode; className?: string; required?: boolean }) => (
   <div className={className}>
-    <label className="mb-1.5 block text-sm font-semibold text-[#0c2340]">
+    <label className="mb-1.5 block text-base font-semibold text-[#0c2340]">
       {label}{required && <span className="ml-0.5 text-[#dc2626]">*</span>}
     </label>
     {children}
@@ -419,9 +419,9 @@ const Field = ({ label, children, className = "", required = false }: { label: s
 
 const Sel = ({ value, onChange, options, placeholder, disabled }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; placeholder?: string; disabled?: boolean }) => (
   <Select value={value} onValueChange={onChange} disabled={disabled}>
-    <SelectTrigger className="h-12 text-base"><SelectValue placeholder={placeholder} /></SelectTrigger>
+    <SelectTrigger className="h-[3.25rem] text-lg"><SelectValue placeholder={placeholder} /></SelectTrigger>
     <SelectContent className="max-h-72">
-      {options.map((o) => <SelectItem key={o.value} value={o.value} className="text-base">{o.label}</SelectItem>)}
+      {options.map((o) => <SelectItem key={o.value} value={o.value} className="text-lg">{o.label}</SelectItem>)}
     </SelectContent>
   </Select>
 );
@@ -442,8 +442,8 @@ const EnrolTable = ({ title, classes, enrol, onChange, totals }: { title: string
         {classes.map((c) => (
           <tr key={c.key} className="border-b last:border-0">
             <td className="px-3 py-1.5 text-base font-semibold">{c.label}</td>
-            <td className="px-2 py-1.5"><Input type="number" min={0} inputMode="numeric" value={enrol[c.key].male ?? ""} onChange={(e) => onChange(c.key, "male", e.target.value)} className="h-10 text-center text-base" /></td>
-            <td className="px-2 py-1.5"><Input type="number" min={0} inputMode="numeric" value={enrol[c.key].female ?? ""} onChange={(e) => onChange(c.key, "female", e.target.value)} className="h-10 text-center text-base" /></td>
+            <td className="px-2 py-1.5"><Input type="number" min={0} inputMode="numeric" value={enrol[c.key].male ?? ""} onChange={(e) => onChange(c.key, "male", e.target.value)} className="h-12 text-center text-lg" /></td>
+            <td className="px-2 py-1.5"><Input type="number" min={0} inputMode="numeric" value={enrol[c.key].female ?? ""} onChange={(e) => onChange(c.key, "female", e.target.value)} className="h-12 text-center text-lg" /></td>
             <td className="px-3 py-1.5 text-center text-base font-bold">{(enrol[c.key].male ?? 0) + (enrol[c.key].female ?? 0)}</td>
           </tr>
         ))}
@@ -474,7 +474,7 @@ const SchoolSearchCombobox = ({
           type="button"
           disabled={disabled}
           className={cn(
-            "flex h-12 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background transition-colors hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            "flex h-[3.25rem] w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-lg ring-offset-background transition-colors hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
             !value && "text-muted-foreground"
           )}
         >
@@ -494,7 +494,7 @@ const SchoolSearchCombobox = ({
         <Command>
           <CommandInput
             placeholder={`Type to search among ${schools.length.toLocaleString()} schools…`}
-            className="h-12 border-none text-base focus:ring-0"
+            className="h-[3.25rem] border-none text-lg focus:ring-0"
           />
           <CommandList className="max-h-[320px]">
             <CommandEmpty className="flex flex-col items-center py-6 text-center text-sm text-muted-foreground">
@@ -516,7 +516,7 @@ const SchoolSearchCombobox = ({
                   <div className="flex w-full items-center justify-between gap-2">
                     <span
                       className={cn(
-                        "truncate text-base",
+                        "truncate text-lg",
                         value === s.school_key && "font-semibold text-[#1f6feb]"
                       )}
                     >

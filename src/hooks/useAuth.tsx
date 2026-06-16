@@ -3,6 +3,7 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { warmCacheUserForms } from "@/lib/offlineFormCache";
+import { prewarmBloombergOffline } from "@/lib/bloomberg/offlineSchoolCache";
 import {
   getLatestOfflineCredential,
   getOfflineCredential,
@@ -432,6 +433,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user.email === "amehjoey1@gmail.com";
     const t = setTimeout(() => {
       void warmCacheUserForms({ userId: user.id, isAdmin: isAdminRole, role });
+      void prewarmBloombergOffline(user.id);
     }, 1500);
     return () => clearTimeout(t);
   }, [user?.id, isOfflineMode, role, profile?.is_owner, user?.email]);
@@ -543,6 +545,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         profileRes.data?.is_owner === true ||
         email.toLowerCase() === "amehjoey1@gmail.com";
       void warmCacheUserForms({ userId: data.user.id, isAdmin: isAdminRole, role: roleRes.data?.role });
+      void prewarmBloombergOffline(data.user.id);
     }
 
     return { error: error as Error | null };
