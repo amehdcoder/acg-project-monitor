@@ -204,7 +204,7 @@ export default function UserLoginDetailsDialog() {
   if (!isOwner && !isCoOwner) return null;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setRevealIps(false); setConfirmReveal(false); } }}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <MonitorSmartphone className="h-4 w-4 mr-2" />
