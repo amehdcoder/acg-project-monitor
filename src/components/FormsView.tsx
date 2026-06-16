@@ -1456,6 +1456,57 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     );
                   }
 
+                  // ACSM markers launch their dedicated custom UI.
+                  const acsmKind = (form.settings as any)?.acsm_kind as ("form" | "dashboard" | undefined);
+                  if (acsmKind === "form" || acsmKind === "dashboard") {
+                    const isDash = acsmKind === "dashboard";
+                    const AcsmIcon = isDash ? BarChart3 : ClipboardCheck;
+                    return (
+                      <div
+                        key={form.id}
+                        className="group flex items-center gap-3 border-l-4 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
+                        style={{ borderLeftColor: "#0891b2" }}
+                      >
+                        <button
+                          onClick={() => (isDash ? setShowAcsmDash(true) : setShowAcsmForm(true))}
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#DCF0F8]"
+                          aria-label={`Open ${form.name}`}
+                        >
+                          <AcsmIcon className="h-5 w-5 text-[#0891b2]" strokeWidth={2} />
+                        </button>
+                        <button
+                          onClick={() => (isDash ? setShowAcsmDash(true) : setShowAcsmForm(true))}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <h4 className="truncate text-[15px] font-bold text-[#0891b2]">{form.name}</h4>
+                          <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">{form.description || "ACSM indicator tracking tool"}</p>
+                        </button>
+                        {!isDash && (
+                          <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold bg-[#E2F5EC] text-[#22A55A]">
+                            Finalized
+                          </span>
+                        )}
+                        {isAdmin && !isDash && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-[#0891b2]">
+                                <ChevronRight className="h-5 w-5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setFormToDelete(form)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Remove from project
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                    );
+                  }
+
+
+
 
                   // Shared accent color for this form's parent project — same
                   // palette used by the Project dropdown above, so the trigger
