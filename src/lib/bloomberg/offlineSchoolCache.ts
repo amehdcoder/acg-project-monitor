@@ -6,7 +6,12 @@
 // version-upgrade conflicts with the other offline modules. It holds the full
 // ~2,800-row register, which can exceed the localStorage quota.
 
-import type { BloombergSchool } from "@/lib/bloomberg/definition";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  BLOOMBERG_FORM_ID,
+  normalizeMissingLabel,
+  type BloombergSchool,
+} from "@/lib/bloomberg/definition";
 
 const DB_NAME = "amehnities_bloomberg_cache";
 const DB_VERSION = 1;
