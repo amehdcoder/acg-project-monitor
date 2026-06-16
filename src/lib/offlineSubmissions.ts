@@ -7,6 +7,7 @@
 // queue used for their photo evidence.
 
 import { supabase } from "@/integrations/supabase/client";
+import { sealRecord, unsealRecord } from "@/lib/deviceCrypto";
 
 const DB_NAME = "acg_offline_submissions";
 const DB_VERSION = 1;
@@ -39,9 +40,10 @@ const openDB = (): Promise<IDBDatabase> =>
 
 const putRecord = async (rec: PendingInsert): Promise<void> => {
   const db = await openDB();
+  const sealed = await sealRecord(rec, ["id", "created_at"]);
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).put(rec);
+    tx.objectStore(STORE).put(sealed);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -59,12 +61,13 @@ const deleteRecord = async (id: string): Promise<void> => {
 
 const getAllRecords = async (): Promise<PendingInsert[]> => {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  const rows: any[] = await new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, "readonly");
     const req = tx.objectStore(STORE).getAll();
-    req.onsuccess = () => resolve((req.result as PendingInsert[]) || []);
+    req.onsuccess = () => resolve((req.result as any[]) || []);
     req.onerror = () => reject(req.error);
   });
+  return Promise.all(rows.map((r) => unsealRecord<PendingInsert>(r)));
 };
 
 const isOnline = () => (typeof navigator === "undefined" ? true : navigator.onLine);

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { sealRecord, unsealRecord, unsealAll } from "@/lib/deviceCrypto";
 
 const DB_NAME = "acg_monitor_offline";
 const DB_VERSION = 2;
@@ -52,22 +53,25 @@ const initDB = (): Promise<IDBDatabase> => {
 };
 
 // Add a submission to offline storage
+const SUBMISSION_PLAIN_FIELDS = ["id", "form_id", "created_at"];
+
 const addToOfflineStorage = async (submission: PendingSubmission): Promise<void> => {
   const db = await initDB();
+  const sealed = await sealRecord(submission, SUBMISSION_PLAIN_FIELDS);
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
-    const request = store.put(submission);
+    const request = store.put(sealed);
 
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve();
   });
 };
 
-// Get all pending submissions
+// Get all pending submissions (transparently decrypted)
 const getPendingSubmissions = async (): Promise<PendingSubmission[]> => {
   const db = await initDB();
-  return new Promise((resolve, reject) => {
+  const rows: any[] = await new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readonly");
     const store = tx.objectStore(STORE_NAME);
     const request = store.getAll();
@@ -75,6 +79,7 @@ const getPendingSubmissions = async (): Promise<PendingSubmission[]> => {
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
   });
+  return unsealAll<PendingSubmission>(rows);
 };
 
 // Remove a submission from offline storage
@@ -90,24 +95,24 @@ const removeFromOfflineStorage = async (id: string): Promise<void> => {
   });
 };
 
-// Update retry count
+// Update retry count (re-seals the record)
 const updateRetryCount = async (id: string, retryCount: number): Promise<void> => {
   const db = await initDB();
+  const existing: any = await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const getRequest = tx.objectStore(STORE_NAME).get(id);
+    getRequest.onsuccess = () => resolve(getRequest.result);
+    getRequest.onerror = () => reject(getRequest.error);
+  });
+  if (!existing) return;
+  const submission = await unsealRecord<PendingSubmission>(existing);
+  submission.retryCount = retryCount;
+  const sealed = await sealRecord(submission, SUBMISSION_PLAIN_FIELDS);
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
-    const getRequest = store.get(id);
-
-    getRequest.onsuccess = () => {
-      const submission = getRequest.result;
-      if (submission) {
-        submission.retryCount = retryCount;
-        store.put(submission);
-      }
-      resolve();
-    };
-
-    getRequest.onerror = () => reject(getRequest.error);
+    const putReq = tx.objectStore(STORE_NAME).put(sealed);
+    putReq.onsuccess = () => resolve();
+    putReq.onerror = () => reject(putReq.error);
   });
 };
 
@@ -470,20 +475,18 @@ export const useOfflineStorage = () => {
     });
   }, []);
 
-  // --- Draft Management ---
+  // --- Draft Management (encrypted at rest) ---
   const saveDraft = useCallback(async (formId: string, userId: string, data: Record<string, any>) => {
     const db = await initDB();
     const id = `draft_${formId}_${userId}`;
+    const sealed = await sealRecord(
+      { id, form_id: formId, user_id: userId, data, updated_at: new Date().toISOString() },
+      ["id", "form_id", "updated_at"],
+    );
     return new Promise<void>((resolve, reject) => {
       const tx = db.transaction("autosave_drafts", "readwrite");
       const store = tx.objectStore("autosave_drafts");
-      const request = store.put({
-        id,
-        form_id: formId,
-        user_id: userId,
-        data,
-        updated_at: new Date().toISOString()
-      });
+      const request = store.put(sealed);
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve();
     });
@@ -492,13 +495,15 @@ export const useOfflineStorage = () => {
   const getDraft = useCallback(async (formId: string, userId: string): Promise<Record<string, any> | null> => {
     const db = await initDB();
     const id = `draft_${formId}_${userId}`;
-    return new Promise((resolve, reject) => {
+    const row: any = await new Promise((resolve, reject) => {
       const tx = db.transaction("autosave_drafts", "readonly");
-      const store = tx.objectStore("autosave_drafts");
-      const request = store.get(id);
+      const request = tx.objectStore("autosave_drafts").get(id);
       request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result?.data || null);
+      request.onsuccess = () => resolve(request.result);
     });
+    if (!row) return null;
+    const unsealed = await unsealRecord<{ data?: Record<string, any> }>(row);
+    return unsealed?.data || null;
   }, []);
 
   const clearDraft = useCallback(async (formId: string, userId: string) => {

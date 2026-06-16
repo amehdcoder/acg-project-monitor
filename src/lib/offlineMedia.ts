@@ -13,6 +13,7 @@
 // other feature that adopts this helper) work 100% offline.
 
 import { supabase } from "@/integrations/supabase/client";
+import { encryptBlob, decryptBlob } from "@/lib/deviceCrypto";
 
 const DB_NAME = "acg_offline_media";
 const DB_VERSION = 1;
@@ -50,9 +51,12 @@ const openDB = (): Promise<IDBDatabase> =>
 
 const putRecord = async (rec: PendingMedia): Promise<void> => {
   const db = await openDB();
+  // Encrypt the blob bytes at rest; keep metadata plaintext for indexing.
+  const { blob, ...meta } = rec;
+  const stored: any = { ...meta, encBlob: await encryptBlob(blob) };
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).put(rec);
+    tx.objectStore(STORE).put(stored);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -70,12 +74,18 @@ const deleteRecord = async (id: string): Promise<void> => {
 
 const getAllRecords = async (): Promise<PendingMedia[]> => {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  const rows: any[] = await new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, "readonly");
     const req = tx.objectStore(STORE).getAll();
-    req.onsuccess = () => resolve((req.result as PendingMedia[]) || []);
+    req.onsuccess = () => resolve((req.result as any[]) || []);
     req.onerror = () => reject(req.error);
   });
+  return Promise.all(
+    rows.map(async ({ encBlob, ...meta }) => {
+      const blob = encBlob ? await decryptBlob(encBlob, meta.contentType) : meta.blob;
+      return { ...meta, blob } as PendingMedia;
+    }),
+  );
 };
 
 const isOnline = () => (typeof navigator === "undefined" ? true : navigator.onLine);
