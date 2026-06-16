@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import {
   MapPin, Navigation, Globe, Plus, Trash2, Loader2, Locate, Copy, Download, Network, Upload,
 } from "lucide-react";
+import GeocodingMap from "./GeocodingMap";
 
 interface GeoRow {
   id: string;
