@@ -410,7 +410,7 @@ export default function BloombergFormFiller({ onClose }: Props) {
 
 const Field = ({ label, children, className = "", required = false }: { label: string; children: React.ReactNode; className?: string; required?: boolean }) => (
   <div className={className}>
-    <label className="mb-1.5 block text-sm font-semibold text-[#0c2340]">
+    <label className="mb-1.5 block text-base font-semibold text-[#0c2340]">
       {label}{required && <span className="ml-0.5 text-[#dc2626]">*</span>}
     </label>
     {children}
