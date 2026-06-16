@@ -1,35 +1,36 @@
 /**
  * LiveTrackingDashboard — Owner / Co-owner / Super Admin only.
  *
- * Online: Mapbox GL JS satellite map. A SINGLE GeoJSON source holds all user
- * points (no per-user markers) so 100+ simultaneous targets stay smooth. New
- * coordinates arrive over the Supabase Realtime broadcast channel `live-tracking`
- * every ~5s and each icon glides to its new position via requestAnimationFrame
- * LERP rather than teleporting. Polylines connect each user's chronological
- * coordinates. Clicking a user opens a live mini-profile (name, speed, battery).
- * Geofence alerts fire when a user enters/leaves a major city.
+ * Online: a free Esri World Imagery satellite map via Leaflet (NO external API
+ * key required). Each tracked user is a glowing circle marker that glides to its
+ * new position via requestAnimationFrame LERP rather than teleporting, with a
+ * polyline tracing its chronological path. New coordinates arrive over the
+ * Supabase Realtime broadcast channel `live-tracking` (~5s cadence). Clicking a
+ * user opens a live mini-profile (name, speed, battery). Geofence alerts fire
+ * when a user enters/leaves a major city.
  *
  * Offline: satellite tiles are swapped for a clean dark SVG grid that keeps
  * animating from locally cached streaming state, so admins never lose the view.
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { cityContaining } from "@/lib/liveTracking/geofence";
 import { getAllPaths, cacheServerPaths, type StoredPath } from "@/lib/locationOfflineQueue";
-import { Satellite, Users, Battery, Gauge, X, MapPin, WifiOff, KeyRound } from "lucide-react";
+import { Satellite, Users, Battery, Gauge, X, MapPin, WifiOff } from "lucide-react";
 
-const TOKEN_KEY = "mapbox_public_token";
 const ANIM_DURATION = 5000;
 const MAX_PATH = 500;
+
+const SAT_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+const LABELS_URL = "https://stamen-tiles.a.ssl.fastly.net/toner-labels/{z}/{x}/{y}.png";
 
 interface UserState {
   user_id: string;
@@ -46,21 +47,28 @@ interface UserState {
   heading: number | null;
   lastUpdate: number;
   lastCity: string | null;
-  path: [number, number][];
+  path: [number, number][]; // [lng, lat]
+}
+
+interface MarkerBundle {
+  glow: L.CircleMarker;
+  dot: L.CircleMarker;
+  label: L.Marker;
+  line: L.Polyline;
 }
 
 const LiveTrackingDashboard = () => {
   const { isOwner, isCoOwner, isSuperAdmin } = useAuth();
   const allowed = isOwner || isCoOwner || isSuperAdmin;
 
-  const [token, setToken] = useState<string>(() => localStorage.getItem(TOKEN_KEY) || "");
-  const [tokenInput, setTokenInput] = useState("");
   const [online, setOnline] = useState<boolean>(navigator.onLine);
   const [selected, setSelected] = useState<string | null>(null);
   const [, force] = useState(0); // re-render trigger for the profile panel
 
   const mapContainer = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const layerGroupRef = useRef<L.LayerGroup | null>(null);
+  const markersRef = useRef<Map<string, MarkerBundle>>(new Map());
   const usersRef = useRef<Map<string, UserState>>(new Map());
   const namesRef = useRef<Map<string, string>>(new Map());
   const rafRef = useRef<number | null>(null);
@@ -81,7 +89,6 @@ const LiveTrackingDashboard = () => {
 
   // --- load names + history (and cache for offline) ---
   const loadInitial = useCallback(async () => {
-    // names
     const { data: profs } = await supabase
       .from("profiles")
       .select("user_id, first_name, last_name, email")
@@ -92,7 +99,6 @@ const LiveTrackingDashboard = () => {
     });
 
     if (navigator.onLine) {
-      // recent history → seed paths + last positions
       const { data: rows } = await supabase
         .from("locations")
         .select("user_id, latitude, longitude, speed, heading, battery_level, recorded_at")
@@ -117,7 +123,6 @@ const LiveTrackingDashboard = () => {
       });
       cacheServerPaths(toCache).catch(() => {});
     } else {
-      // offline → restore from cache
       const cached = await getAllPaths();
       cached.forEach((c) => {
         const last = c.points[c.points.length - 1];
@@ -175,7 +180,6 @@ const LiveTrackingDashboard = () => {
       existing.name = name;
       existing.path.push([lng, lat]);
       if (existing.path.length > MAX_PATH) existing.path = existing.path.slice(-MAX_PATH);
-      // geofence enter/leave
       const city = cityContaining(lat, lng);
       if (city !== existing.lastCity) {
         if (city) toast({ title: "📍 Geofence entered", description: `${name} entered ${city}.` });
@@ -201,32 +205,61 @@ const LiveTrackingDashboard = () => {
     };
   }, [allowed, loadInitial, onPosition]);
 
-  // --- animation loop (shared by Mapbox + offline SVG) ---
+  // --- Leaflet marker sync ---
   const refreshSources = useCallback(() => {
     const map = mapRef.current;
+    const group = layerGroupRef.current;
     const users = Array.from(usersRef.current.values());
 
-    if (online && map && mapReadyRef.current) {
-      const pointFC = {
-        type: "FeatureCollection",
-        features: users.map((u) => ({
-          type: "Feature",
-          properties: { user_id: u.user_id, name: u.name },
-          geometry: { type: "Point", coordinates: [u.dispLng, u.dispLat] },
-        })),
-      };
-      const lineFC = {
-        type: "FeatureCollection",
-        features: users
-          .filter((u) => u.path.length > 1)
-          .map((u) => ({
-            type: "Feature",
-            properties: { user_id: u.user_id },
-            geometry: { type: "LineString", coordinates: u.path },
-          })),
-      };
-      (map.getSource("live-users") as mapboxgl.GeoJSONSource | undefined)?.setData(pointFC as any);
-      (map.getSource("live-paths") as mapboxgl.GeoJSONSource | undefined)?.setData(lineFC as any);
+    if (online && map && group && mapReadyRef.current) {
+      const seen = new Set<string>();
+      users.forEach((u) => {
+        seen.add(u.user_id);
+        let m = markersRef.current.get(u.user_id);
+        const latlng: L.LatLngExpression = [u.dispLat, u.dispLng];
+        if (!m) {
+          const glow = L.circleMarker(latlng, { radius: 14, color: "transparent", fillColor: "#22d3ee", fillOpacity: 0.2 });
+          const dot = L.circleMarker(latlng, { radius: 7, color: "#ffffff", weight: 2, fillColor: "#06b6d4", fillOpacity: 1 });
+          const label = L.marker(latlng, {
+            icon: L.divIcon({
+              className: "",
+              html: `<span style="color:#fff;font-size:11px;text-shadow:0 0 3px #0f172a,0 0 3px #0f172a;white-space:nowrap">${escapeXml(u.name)}</span>`,
+              iconAnchor: [0, -10],
+            }),
+            interactive: false,
+          });
+          const line = L.polyline(u.path.map(([lng, lat]) => [lat, lng] as L.LatLngExpression), {
+            color: "#38bdf8",
+            weight: 3,
+            opacity: 0.85,
+          });
+          dot.on("click", () => {
+            setSelected(u.user_id);
+            force((n) => n + 1);
+          });
+          glow.addTo(group);
+          line.addTo(group);
+          dot.addTo(group);
+          label.addTo(group);
+          m = { glow, dot, label, line };
+          markersRef.current.set(u.user_id, m);
+        } else {
+          m.glow.setLatLng(latlng);
+          m.dot.setLatLng(latlng);
+          m.label.setLatLng(latlng);
+          m.line.setLatLngs(u.path.map(([lng, lat]) => [lat, lng] as L.LatLngExpression));
+        }
+      });
+      // remove markers for users no longer present
+      markersRef.current.forEach((m, uid) => {
+        if (!seen.has(uid)) {
+          group.removeLayer(m.glow);
+          group.removeLayer(m.dot);
+          group.removeLayer(m.label);
+          group.removeLayer(m.line);
+          markersRef.current.delete(uid);
+        }
+      });
     }
 
     if (!online) drawOffline(users);
@@ -255,93 +288,27 @@ const LiveTrackingDashboard = () => {
     };
   }, [allowed, tick]);
 
-  // --- Mapbox init ---
+  // --- Leaflet init ---
   useEffect(() => {
-    if (!allowed || !online || !token || !mapContainer.current || mapRef.current) return;
-    mapboxgl.accessToken = token;
-    const map = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: "mapbox://styles/mapbox/satellite-streets-v12",
-      center: [8.6753, 9.082], // Nigeria
-      zoom: 5.2,
-    });
+    if (!allowed || !online || !mapContainer.current || mapRef.current) return;
+    const map = L.map(mapContainer.current, { center: [9.082, 8.6753], zoom: 6, zoomControl: false });
+    L.tileLayer(SAT_URL, { attribution: "&copy; Esri World Imagery", maxZoom: 20 }).addTo(map);
+    L.tileLayer(LABELS_URL, { maxZoom: 20, opacity: 0.6 }).addTo(map);
+    L.control.zoom({ position: "topright" }).addTo(map);
+    const group = L.layerGroup().addTo(map);
+    layerGroupRef.current = group;
     mapRef.current = map;
-    map.addControl(new mapboxgl.NavigationControl(), "top-right");
-
-    map.on("load", () => {
-      map.addSource("live-paths", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-      map.addLayer({
-        id: "live-paths-line",
-        type: "line",
-        source: "live-paths",
-        paint: {
-          "line-color": "#38bdf8",
-          "line-width": 3,
-          "line-opacity": 0.85,
-          "line-blur": 0.3,
-        },
-        layout: { "line-cap": "round", "line-join": "round" },
-      });
-
-      map.addSource("live-users", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-      map.addLayer({
-        id: "live-users-glow",
-        type: "circle",
-        source: "live-users",
-        paint: {
-          "circle-radius": 14,
-          "circle-color": "#22d3ee",
-          "circle-opacity": 0.2,
-        },
-      });
-      map.addLayer({
-        id: "live-users-circle",
-        type: "circle",
-        source: "live-users",
-        paint: {
-          "circle-radius": 7,
-          "circle-color": "#06b6d4",
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 2,
-        },
-      });
-      map.addLayer({
-        id: "live-users-label",
-        type: "symbol",
-        source: "live-users",
-        layout: {
-          "text-field": ["get", "name"],
-          "text-size": 11,
-          "text-offset": [0, 1.4],
-          "text-anchor": "top",
-        },
-        paint: {
-          "text-color": "#ffffff",
-          "text-halo-color": "#0f172a",
-          "text-halo-width": 1.5,
-        },
-      });
-
-      map.on("click", "live-users-circle", (e) => {
-        const f = e.features?.[0];
-        if (f) {
-          setSelected((f.properties as any).user_id);
-          force((n) => n + 1);
-        }
-      });
-      map.on("mouseenter", "live-users-circle", () => (map.getCanvas().style.cursor = "pointer"));
-      map.on("mouseleave", "live-users-circle", () => (map.getCanvas().style.cursor = ""));
-
-      mapReadyRef.current = true;
-      refreshSources();
-    });
+    mapReadyRef.current = true;
+    refreshSources();
 
     return () => {
       mapReadyRef.current = false;
+      markersRef.current.clear();
       map.remove();
       mapRef.current = null;
+      layerGroupRef.current = null;
     };
-  }, [allowed, online, token, refreshSources]);
+  }, [allowed, online, refreshSources]);
 
   // --- offline SVG renderer ---
   const drawOffline = (users: UserState[]) => {
@@ -405,42 +372,13 @@ const LiveTrackingDashboard = () => {
     );
   }
 
-  if (online && !token) {
-    return (
-      <div className="mx-auto max-w-lg space-y-4 p-6">
-        <div className="flex items-center gap-3">
-          <KeyRound className="h-6 w-6 text-primary" />
-          <h2 className="font-display text-xl font-bold">Add your Mapbox token</h2>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          The satellite live map uses Mapbox. Paste your <strong>public</strong> token (starts with
-          <code className="mx-1 rounded bg-muted px-1">pk.</code>) from your Mapbox account. It is stored only on this device.
-        </p>
-        <Input placeholder="pk.eyJ..." value={tokenInput} onChange={(e) => setTokenInput(e.target.value)} />
-        <Button
-          onClick={() => {
-            const t = tokenInput.trim();
-            if (!t.startsWith("pk.")) {
-              toast({ title: "Invalid token", description: "Mapbox public tokens start with 'pk.'", variant: "destructive" });
-              return;
-            }
-            localStorage.setItem(TOKEN_KEY, t);
-            setToken(t);
-          }}
-        >
-          Save token & load map
-        </Button>
-      </div>
-    );
-  }
-
   const sel = selected ? usersRef.current.get(selected) : null;
   const activeCount = usersRef.current.size;
 
   return (
     <div className="relative h-[calc(100dvh-7rem)] w-full overflow-hidden rounded-xl border bg-background">
       {/* Header */}
-      <div className="pointer-events-none absolute left-3 top-3 z-10 flex flex-wrap items-center gap-2">
+      <div className="pointer-events-none absolute left-3 top-3 z-[1000] flex flex-wrap items-center gap-2">
         <Badge className="pointer-events-auto gap-1 bg-background/80 text-foreground backdrop-blur">
           <Satellite className="h-3.5 w-3.5 text-primary" /> Live Tracking
         </Badge>
@@ -463,7 +401,7 @@ const LiveTrackingDashboard = () => {
 
       {/* Mini-profile */}
       {sel && (
-        <Card className="absolute bottom-4 right-4 z-10 w-64 space-y-2 bg-background/95 p-4 shadow-xl backdrop-blur">
+        <Card className="absolute bottom-4 right-4 z-[1000] w-64 space-y-2 bg-background/95 p-4 shadow-xl backdrop-blur">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
               <div className="rounded-full bg-primary/10 p-2 text-primary">
