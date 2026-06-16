@@ -385,7 +385,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // regaining connectivity), warm-cache their accessible forms so offline data
   // collection always has the latest definitions available.
   useEffect(() => {
-    if (!user?.id || !isOnline) return;
+    if (!user?.id || isOfflineMode) return;
     const isAdminRole =
       role === "super_admin" ||
       role === "systems_admin" ||
@@ -395,7 +395,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       void warmCacheUserForms({ userId: user.id, isAdmin: isAdminRole, role });
     }, 1500);
     return () => clearTimeout(t);
-  }, [user?.id, isOnline, role, profile?.is_owner, user?.email]);
+  }, [user?.id, isOfflineMode, role, profile?.is_owner, user?.email]);
 
 
   const signIn = async (email: string, password: string) => {
