@@ -136,6 +136,22 @@ export default function AdminReliabilityPanel() {
     }
   };
 
+  const rotateKey = async () => {
+    setRotating(true);
+    try {
+      const report = await rotateDeviceKey();
+      if (!report.rotated) throw new Error(report.error || "rotation failed");
+      toast({
+        title: "Device key rotated",
+        description: `Re-encrypted ${report.totalReencrypted} offline record(s) with a new key.`,
+      });
+    } catch (e: any) {
+      toast({ title: "Rotation failed", description: e.message, variant: "destructive" });
+    } finally {
+      setRotating(false);
+    }
+  };
+
   const pendingCount = queue.filter((q) => q.status === "pending").length;
 
   return (
