@@ -392,6 +392,9 @@ export default function BloombergDashboard({ onClose }: Props) {
           </ResponsiveContainer>
         </div>
 
+        {/* State → LGA disaggregation drill-down */}
+        <BloombergStateLGADrilldown data={stateBreakdown} />
+
         {/* Top discrepancies */}
         <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="mb-3 flex items-center gap-2">
