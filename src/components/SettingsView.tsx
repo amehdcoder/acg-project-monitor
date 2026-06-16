@@ -554,6 +554,8 @@ const SettingsView = () => {
 
           <BiometricAuth />
 
+          <OfflineProfileManager />
+
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Login Information</CardTitle>
