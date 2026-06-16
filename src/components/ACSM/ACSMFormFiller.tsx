@@ -84,7 +84,7 @@ export default function ACSMFormFiller({ projectId, onClose }: Props) {
   const { user } = useAuth();
   const { position, getCurrentPosition } = useGeolocation();
 
-  useEffect(() => { getCurrentPosition().catch(() => {}); }, []);
+  useEffect(() => { try { getCurrentPosition(); } catch { /* ignore */ } }, []);
 
   // ----- form state -----
   const now = new Date();
