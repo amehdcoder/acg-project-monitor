@@ -290,8 +290,8 @@ export default function BloombergFormFiller({ onClose }: Props) {
                 <div className="mt-4 rounded-xl border border-dashed border-[#cdd7e6] p-3">
                   <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#0c2340]"><MapPin className="h-4 w-4 text-[#1f6feb]" /> GPS Location</div>
                   <div className="flex items-center gap-2">
-                    <Input readOnly value={gps ? gps.lat.toFixed(5) : ""} placeholder="Latitude" className="h-10" />
-                    <Input readOnly value={gps ? gps.lng.toFixed(5) : ""} placeholder="Longitude" className="h-10" />
+                    <Input readOnly value={gps ? gps.lat.toFixed(5) : ""} placeholder="Latitude" className="h-12 text-base" />
+                    <Input readOnly value={gps ? gps.lng.toFixed(5) : ""} placeholder="Longitude" className="h-12 text-base" />
                     <Button type="button" onClick={captureGps} disabled={geo.isLoading} className="h-10 shrink-0 bg-[#2563eb] hover:bg-[#1d4ed8]">
                       {geo.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}<span className="ml-1 hidden sm:inline">Capture GPS</span>
                     </Button>
