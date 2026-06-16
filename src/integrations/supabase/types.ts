@@ -172,6 +172,132 @@ export type Database = {
         }
         Relationships: []
       }
+      acsm_reports: {
+        Row: {
+          achievement_pct: number | null
+          actions_next_steps: string | null
+          actual_achieved: number | null
+          age_18_35: number | null
+          age_35_plus: number | null
+          age_under18: number | null
+          category: string | null
+          communication_channel: string | null
+          community: string | null
+          contribution_story: string | null
+          created_at: string
+          created_by: string | null
+          data_source: string | null
+          date_reported: string | null
+          engagement_type: string | null
+          evidence: Json | null
+          female_count: number | null
+          gps_lat: number | null
+          gps_lng: number | null
+          id: string
+          indicator: string | null
+          indicator_level: string | null
+          key_challenges: string | null
+          lga: string | null
+          male_count: number | null
+          narrative_progress: string | null
+          project_id: string | null
+          reach_type: string | null
+          reporting_level: string | null
+          reporting_period: string | null
+          responsible_officer: string | null
+          stakeholder_type: string | null
+          state: string | null
+          status: string | null
+          submission_status: string
+          target_value: number | null
+          unit_of_measure: string | null
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          achievement_pct?: number | null
+          actions_next_steps?: string | null
+          actual_achieved?: number | null
+          age_18_35?: number | null
+          age_35_plus?: number | null
+          age_under18?: number | null
+          category?: string | null
+          communication_channel?: string | null
+          community?: string | null
+          contribution_story?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_source?: string | null
+          date_reported?: string | null
+          engagement_type?: string | null
+          evidence?: Json | null
+          female_count?: number | null
+          gps_lat?: number | null
+          gps_lng?: number | null
+          id?: string
+          indicator?: string | null
+          indicator_level?: string | null
+          key_challenges?: string | null
+          lga?: string | null
+          male_count?: number | null
+          narrative_progress?: string | null
+          project_id?: string | null
+          reach_type?: string | null
+          reporting_level?: string | null
+          reporting_period?: string | null
+          responsible_officer?: string | null
+          stakeholder_type?: string | null
+          state?: string | null
+          status?: string | null
+          submission_status?: string
+          target_value?: number | null
+          unit_of_measure?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          achievement_pct?: number | null
+          actions_next_steps?: string | null
+          actual_achieved?: number | null
+          age_18_35?: number | null
+          age_35_plus?: number | null
+          age_under18?: number | null
+          category?: string | null
+          communication_channel?: string | null
+          community?: string | null
+          contribution_story?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_source?: string | null
+          date_reported?: string | null
+          engagement_type?: string | null
+          evidence?: Json | null
+          female_count?: number | null
+          gps_lat?: number | null
+          gps_lng?: number | null
+          id?: string
+          indicator?: string | null
+          indicator_level?: string | null
+          key_challenges?: string | null
+          lga?: string | null
+          male_count?: number | null
+          narrative_progress?: string | null
+          project_id?: string | null
+          reach_type?: string | null
+          reporting_level?: string | null
+          reporting_period?: string | null
+          responsible_officer?: string | null
+          stakeholder_type?: string | null
+          state?: string | null
+          status?: string | null
+          submission_status?: string
+          target_value?: number | null
+          unit_of_measure?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: []
+      }
       active_calls: {
         Row: {
           call_type: string
