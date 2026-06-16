@@ -12,6 +12,7 @@ import {
   verifyOfflineCredentialPassword,
   type OfflineAuthCredential,
 } from "@/lib/offlineAuthCache";
+import { logOfflineAuditEvent, flushOfflineAuditQueue } from "@/lib/offlineAuditLog";
 
 
 type AppRole = "super_admin" | "systems_admin" | "user";
