@@ -49,7 +49,7 @@ const uniq = (rows: BloombergSchool[], val: keyof BloombergSchool, lbl: keyof Bl
 
 export default function BloombergFormFiller({ onClose }: Props) {
   const { user } = useAuth();
-  const { schools, loading } = useBloombergSchools();
+  const { schools, loading, fromCache } = useBloombergSchools();
   const geo = useGeolocation();
 
   const [step, setStep] = useState(0);
@@ -239,6 +239,11 @@ export default function BloombergFormFiller({ onClose }: Props) {
         </div>
         <h1 className="mt-4 text-2xl font-bold">New Validation</h1>
         <p className="text-sm text-white/70">School Enrolment Validation</p>
+        {fromCache && (
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 px-3 py-1 text-xs font-medium text-amber-100">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-300" /> Offline mode — schools &amp; cascade loaded from saved data
+          </p>
+        )}
         {/* Stepper */}
         <div className="mt-5 flex items-center">
           {STEPS.map((s, i) => (
@@ -279,19 +284,19 @@ export default function BloombergFormFiller({ onClose }: Props) {
                     />
                   </Field>
                   {selectedSchool && (
-                    <div className="grid grid-cols-2 gap-2 rounded-lg bg-[#f4f6fb] p-3 text-xs">
-                      <span className="text-muted-foreground">Code</span><span className="font-medium">{selectedSchool.school_code || "—"}</span>
-                      <span className="text-muted-foreground">Type</span><span className="font-medium">{selectedSchool.school_type || "—"}</span>
-                      <span className="text-muted-foreground">Level</span><span className="font-medium">{selectedSchool.school_level || "—"}</span>
-                      <span className="text-muted-foreground">Ownership</span><span className="font-medium">{selectedSchool.ownership || "—"}</span>
+                    <div className="grid grid-cols-2 gap-2 rounded-lg bg-[#f4f6fb] p-3 text-sm">
+                      <span className="text-muted-foreground">Code</span><span className="font-semibold">{selectedSchool.school_code || "—"}</span>
+                      <span className="text-muted-foreground">Type</span><span className="font-semibold">{selectedSchool.school_type || "—"}</span>
+                      <span className="text-muted-foreground">Level</span><span className="font-semibold">{selectedSchool.school_level || "—"}</span>
+                      <span className="text-muted-foreground">Ownership</span><span className="font-semibold">{selectedSchool.ownership || "—"}</span>
                     </div>
                   )}
                 </div>
                 <div className="mt-4 rounded-xl border border-dashed border-[#cdd7e6] p-3">
                   <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#0c2340]"><MapPin className="h-4 w-4 text-[#1f6feb]" /> GPS Location</div>
                   <div className="flex items-center gap-2">
-                    <Input readOnly value={gps ? gps.lat.toFixed(5) : ""} placeholder="Latitude" className="h-10" />
-                    <Input readOnly value={gps ? gps.lng.toFixed(5) : ""} placeholder="Longitude" className="h-10" />
+                    <Input readOnly value={gps ? gps.lat.toFixed(5) : ""} placeholder="Latitude" className="h-12 text-base" />
+                    <Input readOnly value={gps ? gps.lng.toFixed(5) : ""} placeholder="Longitude" className="h-12 text-base" />
                     <Button type="button" onClick={captureGps} disabled={geo.isLoading} className="h-10 shrink-0 bg-[#2563eb] hover:bg-[#1d4ed8]">
                       {geo.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}<span className="ml-1 hidden sm:inline">Capture GPS</span>
                     </Button>
@@ -317,13 +322,13 @@ export default function BloombergFormFiller({ onClose }: Props) {
                   <div className="space-y-3">
                     <Field label="Operational Status" required><Sel value={operationalStatus} onChange={setOperationalStatus} options={OPERATIONAL_STATUS} /></Field>
                     <div className="grid grid-cols-2 gap-3">
-                      <Field label="Head Teacher / Contact Person" required><Input value={headTeacher} onChange={(e) => setHeadTeacher(e.target.value)} placeholder="Enter full name" className="h-11" /></Field>
-                      <Field label="Phone Number" required><Input value={headPhone} onChange={(e) => setHeadPhone(e.target.value)} placeholder="Enter phone number" className="h-11" /></Field>
+                      <Field label="Head Teacher / Contact Person" required><Input value={headTeacher} onChange={(e) => setHeadTeacher(e.target.value)} placeholder="Enter full name" className="h-12 text-base" /></Field>
+                      <Field label="Phone Number" required><Input value={headPhone} onChange={(e) => setHeadPhone(e.target.value)} placeholder="Enter phone number" className="h-12 text-base" /></Field>
                     </div>
                     <div className="grid grid-cols-2 items-end gap-3">
-                      <Field label="Date of Visit" required><Input type="date" value={dateOfVisit} onChange={(e) => setDateOfVisit(e.target.value)} className="h-11" /></Field>
+                      <Field label="Date of Visit" required><Input type="date" value={dateOfVisit} onChange={(e) => setDateOfVisit(e.target.value)} className="h-12 text-base" /></Field>
                       <div className="flex items-center justify-between rounded-lg border border-border p-3">
-                        <span className="text-sm font-medium">Register Available</span>
+                        <span className="text-base font-semibold">Register Available</span>
                         <Switch checked={registerAvailable} onCheckedChange={setRegisterAvailable} />
                       </div>
                     </div>
@@ -405,7 +410,7 @@ export default function BloombergFormFiller({ onClose }: Props) {
 
 const Field = ({ label, children, className = "", required = false }: { label: string; children: React.ReactNode; className?: string; required?: boolean }) => (
   <div className={className}>
-    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+    <label className="mb-1.5 block text-sm font-semibold text-[#0c2340]">
       {label}{required && <span className="ml-0.5 text-[#dc2626]">*</span>}
     </label>
     {children}
@@ -414,9 +419,9 @@ const Field = ({ label, children, className = "", required = false }: { label: s
 
 const Sel = ({ value, onChange, options, placeholder, disabled }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; placeholder?: string; disabled?: boolean }) => (
   <Select value={value} onValueChange={onChange} disabled={disabled}>
-    <SelectTrigger className="h-11"><SelectValue placeholder={placeholder} /></SelectTrigger>
+    <SelectTrigger className="h-12 text-base"><SelectValue placeholder={placeholder} /></SelectTrigger>
     <SelectContent className="max-h-72">
-      {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+      {options.map((o) => <SelectItem key={o.value} value={o.value} className="text-base">{o.label}</SelectItem>)}
     </SelectContent>
   </Select>
 );
@@ -430,19 +435,19 @@ const Stat = ({ label, value, color }: { label: string; value: number; color: st
 
 const EnrolTable = ({ title, classes, enrol, onChange, totals }: { title: string; classes: typeof PRIMARY_CLASSES; enrol: EnrolmentCounts; onChange: (k: string, s: "male" | "female", v: string) => void; totals: { male: number; female: number; total: number } }) => (
   <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-    <div className="bg-[#eef4ff] px-4 py-2 text-xs font-bold uppercase tracking-wide text-[#1f6feb]">{title}</div>
-    <table className="w-full text-sm">
-      <thead><tr className="border-b text-xs text-muted-foreground"><th className="px-3 py-2 text-left">Class</th><th className="px-3 py-2 text-center">Male</th><th className="px-3 py-2 text-center">Female</th><th className="px-3 py-2 text-center">Total</th></tr></thead>
+    <div className="bg-[#eef4ff] px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-[#1f6feb]">{title}</div>
+    <table className="w-full text-base">
+      <thead><tr className="border-b text-sm font-semibold text-[#0c2340]"><th className="px-3 py-2.5 text-left">Class</th><th className="px-3 py-2.5 text-center">Male</th><th className="px-3 py-2.5 text-center">Female</th><th className="px-3 py-2.5 text-center">Total</th></tr></thead>
       <tbody>
         {classes.map((c) => (
           <tr key={c.key} className="border-b last:border-0">
-            <td className="px-3 py-1.5 font-medium">{c.label}</td>
-            <td className="px-2 py-1.5"><Input type="number" min={0} inputMode="numeric" value={enrol[c.key].male ?? ""} onChange={(e) => onChange(c.key, "male", e.target.value)} className="h-9 text-center" /></td>
-            <td className="px-2 py-1.5"><Input type="number" min={0} inputMode="numeric" value={enrol[c.key].female ?? ""} onChange={(e) => onChange(c.key, "female", e.target.value)} className="h-9 text-center" /></td>
-            <td className="px-3 py-1.5 text-center font-semibold">{(enrol[c.key].male ?? 0) + (enrol[c.key].female ?? 0)}</td>
+            <td className="px-3 py-1.5 text-base font-semibold">{c.label}</td>
+            <td className="px-2 py-1.5"><Input type="number" min={0} inputMode="numeric" value={enrol[c.key].male ?? ""} onChange={(e) => onChange(c.key, "male", e.target.value)} className="h-10 text-center text-base" /></td>
+            <td className="px-2 py-1.5"><Input type="number" min={0} inputMode="numeric" value={enrol[c.key].female ?? ""} onChange={(e) => onChange(c.key, "female", e.target.value)} className="h-10 text-center text-base" /></td>
+            <td className="px-3 py-1.5 text-center text-base font-bold">{(enrol[c.key].male ?? 0) + (enrol[c.key].female ?? 0)}</td>
           </tr>
         ))}
-        <tr className="bg-[#f4f6fb] font-semibold"><td className="px-3 py-2">Total</td><td className="px-3 py-2 text-center text-[#2563eb]">{totals.male}</td><td className="px-3 py-2 text-center text-[#db2777]">{totals.female}</td><td className="px-3 py-2 text-center text-[#16a34a]">{totals.total}</td></tr>
+        <tr className="bg-[#f4f6fb] text-base font-bold"><td className="px-3 py-2.5">Total</td><td className="px-3 py-2.5 text-center text-[#2563eb]">{totals.male}</td><td className="px-3 py-2.5 text-center text-[#db2777]">{totals.female}</td><td className="px-3 py-2.5 text-center text-[#16a34a]">{totals.total}</td></tr>
       </tbody>
     </table>
   </div>
@@ -469,7 +474,7 @@ const SchoolSearchCombobox = ({
           type="button"
           disabled={disabled}
           className={cn(
-            "flex h-11 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background transition-colors hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            "flex h-12 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background transition-colors hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
             !value && "text-muted-foreground"
           )}
         >
@@ -489,7 +494,7 @@ const SchoolSearchCombobox = ({
         <Command>
           <CommandInput
             placeholder={`Type to search among ${schools.length.toLocaleString()} schools…`}
-            className="h-11 border-none focus:ring-0"
+            className="h-12 border-none text-base focus:ring-0"
           />
           <CommandList className="max-h-[320px]">
             <CommandEmpty className="flex flex-col items-center py-6 text-center text-sm text-muted-foreground">
@@ -511,7 +516,7 @@ const SchoolSearchCombobox = ({
                   <div className="flex w-full items-center justify-between gap-2">
                     <span
                       className={cn(
-                        "truncate text-sm",
+                        "truncate text-base",
                         value === s.school_key && "font-semibold text-[#1f6feb]"
                       )}
                     >

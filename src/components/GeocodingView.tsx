@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
-  MapPin, Navigation, Globe, Plus, Trash2, Loader2, Locate, Copy, Download, Network,
+  MapPin, Navigation, Globe, Plus, Trash2, Loader2, Locate, Copy, Download, Network, Upload,
 } from "lucide-react";
 
 interface GeoRow {
@@ -41,6 +41,7 @@ export default function GeocodingView() {
     { id: uid(), address: "", lat: null, lng: null, resolved: null, source: null, status: "idle" },
   ]);
   const [batchRunning, setBatchRunning] = useState(false);
+  const csvRef = useRef<HTMLInputElement | null>(null);
 
   const updateRow = (id: string, patch: Partial<GeoRow>) =>
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -50,6 +51,72 @@ export default function GeocodingView() {
 
   const removeRow = (id: string) =>
     setRows((prev) => (prev.length > 1 ? prev.filter((r) => r.id !== id) : prev));
+
+  // Minimal RFC-4180-ish CSV line splitter (handles quoted fields & commas).
+  const splitCsvLine = (line: string): string[] => {
+    const out: string[] = [];
+    let cur = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (line[i + 1] === '"') { cur += '"'; i++; } else inQuotes = false;
+        } else cur += ch;
+      } else if (ch === '"') inQuotes = true;
+      else if (ch === ",") { out.push(cur); cur = ""; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out.map((c) => c.trim());
+  };
+
+  const importCsv = async (file: File) => {
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length === 0) { toast.error("The CSV file is empty"); return; }
+
+      // Detect an optional header row and locate address / lat / lng columns.
+      const first = splitCsvLine(lines[0]).map((h) => h.toLowerCase());
+      const headerHas = (...names: string[]) => first.findIndex((h) => names.includes(h));
+      let addrIdx = headerHas("address", "addresses", "location", "street", "place");
+      let latIdx = headerHas("lat", "latitude");
+      let lngIdx = headerHas("lng", "lon", "long", "longitude");
+      const hasHeader = addrIdx !== -1 || latIdx !== -1 || lngIdx !== -1;
+      if (addrIdx === -1) addrIdx = 0; // default to first column
+      const dataLines = hasHeader ? lines.slice(1) : lines;
+
+      const newRows: GeoRow[] = [];
+      for (const line of dataLines) {
+        const cols = splitCsvLine(line);
+        const address = (cols[addrIdx] ?? "").trim();
+        if (!address) continue;
+        const lat = latIdx !== -1 ? Number(cols[latIdx]) : NaN;
+        const lng = lngIdx !== -1 ? Number(cols[lngIdx]) : NaN;
+        const hasCoords = isFinite(lat) && isFinite(lng);
+        newRows.push({
+          id: uid(),
+          address,
+          lat: hasCoords ? lat : null,
+          lng: hasCoords ? lng : null,
+          resolved: hasCoords ? "Imported coordinates" : null,
+          source: hasCoords ? "CSV" : null,
+          status: hasCoords ? "done" : "idle",
+        });
+      }
+
+      if (newRows.length === 0) { toast.error("No addresses found in the CSV"); return; }
+      setRows((prev) => {
+        const existing = prev.filter((r) => r.address.trim().length > 0);
+        return [...existing, ...newRows];
+      });
+      toast.success(`Imported ${newRows.length} address${newRows.length === 1 ? "" : "es"} from CSV`);
+    } catch (e) {
+      toast.error(`Could not read CSV: ${(e as Error).message}`);
+    }
+  };
+
 
   const geocodeRow = async (row: GeoRow) => {
     if (!row.address.trim()) return;
@@ -173,8 +240,9 @@ export default function GeocodingView() {
             <CardHeader>
               <CardTitle className="text-base">Batch address geocoding</CardTitle>
               <CardDescription>
-                Enter addresses in the table below and extract real GPS coordinates. Data source: OpenStreetMap (Nominatim),
-                cross-usable with Google Maps, Bolt and GRID3 coordinate systems (WGS-84).
+                Enter addresses manually or <span className="font-medium text-foreground">import a CSV</span> to load many at once, then extract real
+                GPS coordinates. Data source: OpenStreetMap (Nominatim), cross-usable with Google Maps, Bolt and GRID3
+                coordinate systems (WGS-84). CSV may include an <code>address</code> column (and optional <code>lat</code>/<code>lng</code>).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -230,6 +298,20 @@ export default function GeocodingView() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={addRow}><Plus className="h-4 w-4 mr-1.5" />Add row</Button>
+                <input
+                  ref={csvRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  hidden
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) importCsv(f);
+                    e.target.value = "";
+                  }}
+                />
+                <Button variant="outline" size="sm" onClick={() => csvRef.current?.click()}>
+                  <Upload className="h-4 w-4 mr-1.5" />Import CSV
+                </Button>
                 <Button size="sm" onClick={runBatch} disabled={batchRunning}>
                   {batchRunning ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Locate className="h-4 w-4 mr-1.5" />}
                   Geocode all
