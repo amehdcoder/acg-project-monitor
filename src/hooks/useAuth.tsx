@@ -581,20 +581,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
-    const userEmail = user?.email;
-    
     // 1. Clear Supabase session
     await supabase.auth.signOut();
     
-    // 2. Clear LocalStorage caches
-    if (userEmail) {
-      localStorage.removeItem(`ces_auth_cache_${userEmail.toLowerCase()}`);
-    }
+    // 2. Clear volatile UI/session caches only. Offline credentials, cached
+    // forms, drafts, and queued submissions are encrypted device data and must
+    // survive sign-out so field teams can log back in and keep collecting data
+    // without internet, matching mature offline-first tools like CommCare.
     Object.keys(localStorage).forEach(key => {
       if (
         key.startsWith("kpi_cache_") || 
         key.startsWith("detail_cache_") || 
-        key.startsWith("ces_auth_cache_") ||
         key.startsWith("survey_progress_") ||
         // Wipe the WhatsApp-style chat unread badge cache so a different user
         // signing in on this device never sees the previous user's stale count.
@@ -603,19 +600,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem(key);
       }
     });
-
-    // 3. Clear IndexedDB (Scorched earth for data residency compliance)
-    // This removes pending submissions, drafts, and offline household queues.
-    try {
-      const dbs = ["acg_monitor_offline", "ces_offline"];
-      dbs.forEach(dbName => {
-        const req = indexedDB.deleteDatabase(dbName);
-        req.onerror = () => console.warn(`Could not purge DB ${dbName}`);
-        req.onsuccess = () => console.log(`Purged DB ${dbName} for security compliance.`);
-      });
-    } catch (e) {
-      console.error("IndexedDB purge failed:", e);
-    }
 
     setUser(null);
     setSession(null);

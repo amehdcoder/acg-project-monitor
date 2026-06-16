@@ -68,6 +68,13 @@ const SEALED_STORES: SealedStoreConfig[] = [
     plainFields: ["id", "created_at"],
   },
   {
+    db: "acg_offline_auth",
+    version: 1,
+    store: "credentials",
+    kind: "json",
+    plainFields: ["email", "user_id", "lastUpdated"],
+  },
+  {
     db: "acg_offline_media",
     version: 1,
     store: "pending_media",
