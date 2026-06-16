@@ -2,14 +2,15 @@
 // assignments, so the School Enrolment Validation form can fetch schools and the
 // State→LGA→Ward→Community cascade even with no connectivity.
 //
-// Uses IndexedDB (the same database family used elsewhere for offline data) to
-// hold the full ~2,800-row register, which can exceed the localStorage quota.
+// Uses a DEDICATED IndexedDB database (not the shared offline DB) to avoid
+// version-upgrade conflicts with the other offline modules. It holds the full
+// ~2,800-row register, which can exceed the localStorage quota.
 
 import type { BloombergSchool } from "@/lib/bloomberg/definition";
 
-const DB_NAME = "acg_monitor_offline";
-const DB_VERSION = 3;
-const STORE = "bloomberg_cache";
+const DB_NAME = "amehnities_bloomberg_cache";
+const DB_VERSION = 1;
+const STORE = "cache";
 
 const openDB = (): Promise<IDBDatabase> =>
   new Promise((resolve, reject) => {
@@ -18,17 +19,6 @@ const openDB = (): Promise<IDBDatabase> =>
     req.onsuccess = () => resolve(req.result);
     req.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
-      // Preserve any stores created by other modules on the same DB.
-      if (!db.objectStoreNames.contains("pending_submissions")) {
-        const s = db.createObjectStore("pending_submissions", { keyPath: "id" });
-        s.createIndex("form_id", "form_id", { unique: false });
-        s.createIndex("created_at", "created_at", { unique: false });
-      }
-      if (!db.objectStoreNames.contains("offline_forms")) {
-        const f = db.createObjectStore("offline_forms", { keyPath: "id" });
-        f.createIndex("project_id", "project_id", { unique: false });
-        f.createIndex("downloaded_at", "downloaded_at", { unique: false });
-      }
       if (!db.objectStoreNames.contains(STORE)) {
         db.createObjectStore(STORE, { keyPath: "key" });
       }
