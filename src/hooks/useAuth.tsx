@@ -374,22 +374,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // most recently cached account so the app boots logged-in.
         // Sync to the server will still require re-auth when online.
         try {
-          const keys = Object.keys(localStorage).filter((k) => k.startsWith("ces_auth_cache_"));
-          let latest: any = null;
-          for (const k of keys) {
-            const c = JSON.parse(localStorage.getItem(k) || "null");
-            if (!c) continue;
-            if (!latest || (c.lastUpdated && c.lastUpdated > latest.lastUpdated)) latest = c;
-          }
+          const latest = await getLatestOfflineCredential();
           if (latest?.user) {
-            const isOwnerEmail = latest.user.email === "amehjoey1@gmail.com";
-            if (!latest.profile || latest.profile.is_active !== false || isOwnerEmail) {
-              setUser(latest.user);
-              setProfile(latest.profile);
-              setRole(latest.role);
-              setIsOfflineMode(true);
-              logOfflineEvent("auto_login_offline_boot", { email: latest.user.email });
-            }
+            await hydrateOfflineCredential(latest, "auto_login_offline_boot");
           }
         } catch (e) {
           console.warn("Offline auto-login failed:", e);
