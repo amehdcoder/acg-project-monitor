@@ -102,6 +102,7 @@ export default function UserLoginDetailsDialog() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [revealIps, setRevealIps] = useState(false);
+  const [confirmReveal, setConfirmReveal] = useState(false);
   const [onlineOnly, setOnlineOnly] = useState(false);
 
   const [page, setPage] = useState(0);
