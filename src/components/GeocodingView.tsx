@@ -240,8 +240,9 @@ export default function GeocodingView() {
             <CardHeader>
               <CardTitle className="text-base">Batch address geocoding</CardTitle>
               <CardDescription>
-                Enter addresses in the table below and extract real GPS coordinates. Data source: OpenStreetMap (Nominatim),
-                cross-usable with Google Maps, Bolt and GRID3 coordinate systems (WGS-84).
+                Enter addresses manually or <span className="font-medium text-foreground">import a CSV</span> to load many at once, then extract real
+                GPS coordinates. Data source: OpenStreetMap (Nominatim), cross-usable with Google Maps, Bolt and GRID3
+                coordinate systems (WGS-84). CSV may include an <code>address</code> column (and optional <code>lat</code>/<code>lng</code>).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
