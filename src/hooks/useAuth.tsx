@@ -82,12 +82,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
 
   // --- Offline Crypto Helpers ---
-  const hashPassword = async (password: string): Promise<string> => {
-    const msgUint8 = new TextEncoder().encode(password);
-    const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
-  };
+  // Salted PBKDF2 hashing lives in @/lib/offlineAuthCrypto; see hashOfflinePassword /
+  // verifyOfflinePassword. legacySha256 is retained only to verify older caches.
 
   const logOfflineEvent = (action: string, metadata: any = {}) => {
     try {
