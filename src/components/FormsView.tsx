@@ -21,6 +21,9 @@ import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessment
 import ACSMFormFiller from "@/components/ACSM/ACSMFormFiller";
 import ACSMDashboard from "@/components/ACSM/ACSMDashboard";
 import { ACSM_FORM_NAME, ACSM_FORM_DESC, ACSM_DASH_NAME, ACSM_DASH_DESC } from "@/lib/acsm/definition";
+import SBCFormFiller from "@/components/SBC/SBCFormFiller";
+import SBCDashboard from "@/components/SBC/SBCDashboard";
+import { SBC_FORM_NAME, SBC_FORM_DESC, SBC_DASH_NAME, SBC_DASH_DESC } from "@/lib/sbc/definition";
 import { buildMdaSupervisoryChecklist, MDA_CHECKLIST_NAME } from "@/lib/mdaSupervisoryChecklist";
 import {
   buildCommunitySummaryForm, COMMUNITY_SUMMARY_FORM_NAME,
@@ -235,6 +238,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showSeeClearDash, setShowSeeClearDash] = useState(false);
   const [showAcsmForm, setShowAcsmForm] = useState(false);
   const [showAcsmDash, setShowAcsmDash] = useState(false);
+  const [showSbcForm, setShowSbcForm] = useState(false);
+  const [showSbcDash, setShowSbcDash] = useState(false);
   const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [showFormsExplorer, setShowFormsExplorer] = useState(false);
   const [openTopFolder, setOpenTopFolder] = useState<"custom" | "standard" | null>("custom");
@@ -645,6 +650,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         );
         if (linkedDash) idsToDelete.push(linkedDash.id);
       }
+      const sbcKind = (form?.settings as any)?.sbc_kind as ("form" | "dashboard" | undefined);
+      if (sbcKind === "form" && form?.project_id) {
+        const linkedDash = forms.find(
+          f => f.project_id === form.project_id && (f.settings as any)?.sbc_kind === "dashboard",
+        );
+        if (linkedDash) idsToDelete.push(linkedDash.id);
+      }
       const { error } = await supabase.from("forms").delete().in("id", idsToDelete);
       if (error) throw error;
       await logAction("delete_form", `Deleted form "${form?.name || formId}"`, "form", formId);
@@ -930,6 +942,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   if (showAcsmDash) {
     return <ACSMDashboard projectId={currentProjectId} onClose={() => setShowAcsmDash(false)} />;
+  }
+
+  if (showSbcForm) {
+    return <SBCFormFiller projectId={currentProjectId} onClose={() => setShowSbcForm(false)} />;
+  }
+
+  if (showSbcDash) {
+    return <SBCDashboard projectId={currentProjectId} onClose={() => setShowSbcDash(false)} />;
   }
 
 
