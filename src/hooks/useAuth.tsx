@@ -389,9 +389,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!cacheRaw) throw new Error("No offline credentials found. Please login online first.");
 
         const cache = JSON.parse(cacheRaw);
-        const inputHash = await hashPassword(password);
+        const passwordOk = await verifyOfflinePassword(password, cache);
 
-        if (inputHash === cache.passwordHash) {
+        if (passwordOk) {
           const isOwnerEmail = cache.user?.email === "amehjoey1@gmail.com";
           if (cache.profile && cache.profile.is_active === false && !isOwnerEmail) {
             logOfflineEvent("login_blocked", { mode: "offline", email, reason: "account_deactivated" });
