@@ -130,6 +130,12 @@ export const saveOfflineCredential = async (args: {
   if (results.every((r) => r.status === "rejected")) {
     throw new Error("Offline credential cache could not be written on this device.");
   }
+  void logOfflineAuditEvent("cache_seed", {
+    email: credential.email,
+    userId: credential.user_id,
+    success: true,
+    details: { role: credential.role },
+  });
   return credential;
 };
 
