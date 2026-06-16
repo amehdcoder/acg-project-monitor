@@ -1,6 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 import { hashOfflinePassword, verifyOfflinePassword } from "@/lib/offlineAuthCrypto";
 import { sealRecord, unsealRecord } from "@/lib/deviceCrypto";
+import { logOfflineAuditEvent } from "@/lib/offlineAuditLog";
 
 const DB_NAME = "acg_offline_auth";
 const DB_VERSION = 1;
