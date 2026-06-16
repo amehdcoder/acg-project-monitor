@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, createContext, useContext, ReactNode } fro
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { hashOfflinePassword, verifyOfflinePassword } from "@/lib/offlineAuthCrypto";
+import { warmCacheUserForms } from "@/lib/offlineFormCache";
 
 
 type AppRole = "super_admin" | "systems_admin" | "user";
@@ -80,12 +82,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
 
   // --- Offline Crypto Helpers ---
-  const hashPassword = async (password: string): Promise<string> => {
-    const msgUint8 = new TextEncoder().encode(password);
-    const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
-  };
+  // Salted PBKDF2 hashing lives in @/lib/offlineAuthCrypto; see hashOfflinePassword /
+  // verifyOfflinePassword. legacySha256 is retained only to verify older caches.
 
   const logOfflineEvent = (action: string, metadata: any = {}) => {
     try {
@@ -382,6 +380,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  // Keep each user's offline form library fresh: whenever we have an
+  // authenticated user and we're online (session restore, token refresh, or
+  // regaining connectivity), warm-cache their accessible forms so offline data
+  // collection always has the latest definitions available.
+  useEffect(() => {
+    if (!user?.id || isOfflineMode) return;
+    const isAdminRole =
+      role === "super_admin" ||
+      role === "systems_admin" ||
+      profile?.is_owner === true ||
+      user.email === "amehjoey1@gmail.com";
+    const t = setTimeout(() => {
+      void warmCacheUserForms({ userId: user.id, isAdmin: isAdminRole, role });
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [user?.id, isOfflineMode, role, profile?.is_owner, user?.email]);
+
 
   const signIn = async (email: string, password: string) => {
     if (!navigator.onLine) {
@@ -391,9 +406,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!cacheRaw) throw new Error("No offline credentials found. Please login online first.");
 
         const cache = JSON.parse(cacheRaw);
-        const inputHash = await hashPassword(password);
+        const passwordOk = await verifyOfflinePassword(password, cache);
 
-        if (inputHash === cache.passwordHash) {
+        if (passwordOk) {
           const isOwnerEmail = cache.user?.email === "amehjoey1@gmail.com";
           if (cache.profile && cache.profile.is_active === false && !isOwnerEmail) {
             logOfflineEvent("login_blocked", { mode: "offline", email, reason: "account_deactivated" });
@@ -464,11 +479,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
       }
 
-      // Cache for future offline use (only for active accounts)
-      const hash = await hashPassword(password);
+      // Cache for future offline use (only for active accounts) with a salted
+      // PBKDF2 hash so credentials can be verified on-device securely.
+      const cred = await hashOfflinePassword(password);
       const authCache = {
         email: email.toLowerCase(),
-        passwordHash: hash,
+        passwordHash: cred.passwordHash,
+        salt: cred.salt,
+        iterations: cred.iterations,
+        algo: cred.algo,
         user: data.user,
         profile: profileRes.data,
         role: roleRes.data?.role,
@@ -477,6 +496,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       localStorage.setItem(`ces_auth_cache_${email.toLowerCase()}`, JSON.stringify(authCache));
       logOfflineEvent("login", { mode: "online", email });
+
+      // Warm-cache this user's accessible forms so they can collect data offline
+      // immediately, even without opening the Forms page while online.
+      const isAdminRole =
+        roleRes.data?.role === "super_admin" ||
+        roleRes.data?.role === "systems_admin" ||
+        profileRes.data?.is_owner === true ||
+        email.toLowerCase() === "amehjoey1@gmail.com";
+      void warmCacheUserForms({ userId: data.user.id, isAdmin: isAdminRole, role: roleRes.data?.role });
     }
 
     return { error: error as Error | null };
