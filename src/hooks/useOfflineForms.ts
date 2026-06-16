@@ -57,43 +57,44 @@ const initDB = (): Promise<IDBDatabase> => {
   });
 };
 
-// Save a form for offline use
+const FORM_PLAIN_FIELDS = ["id", "project_id", "downloaded_at"];
+
+// Save a form for offline use (encrypted at rest)
 const saveFormOffline = async (form: OfflineForm): Promise<void> => {
   const db = await initDB();
+  const sealed = await sealRecord(form as any, FORM_PLAIN_FIELDS);
   return new Promise((resolve, reject) => {
     const tx = db.transaction(FORMS_STORE_NAME, "readwrite");
     const store = tx.objectStore(FORMS_STORE_NAME);
-    const request = store.put(form);
+    const request = store.put(sealed);
 
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve();
   });
 };
 
-// Get all offline forms
+// Get all offline forms (transparently decrypted)
 const getOfflineForms = async (): Promise<OfflineForm[]> => {
   const db = await initDB();
-  return new Promise((resolve, reject) => {
+  const rows: any[] = await new Promise((resolve, reject) => {
     const tx = db.transaction(FORMS_STORE_NAME, "readonly");
-    const store = tx.objectStore(FORMS_STORE_NAME);
-    const request = store.getAll();
-
+    const request = tx.objectStore(FORMS_STORE_NAME).getAll();
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
   });
+  return unsealAll<OfflineForm>(rows);
 };
 
 // Get a specific offline form
 const getOfflineForm = async (formId: string): Promise<OfflineForm | null> => {
   const db = await initDB();
-  return new Promise((resolve, reject) => {
+  const row: any = await new Promise((resolve, reject) => {
     const tx = db.transaction(FORMS_STORE_NAME, "readonly");
-    const store = tx.objectStore(FORMS_STORE_NAME);
-    const request = store.get(formId);
-
+    const request = tx.objectStore(FORMS_STORE_NAME).get(formId);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result || null);
   });
+  return row ? unsealRecord<OfflineForm>(row) : null;
 };
 
 // Remove an offline form
