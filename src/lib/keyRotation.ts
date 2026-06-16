@@ -112,37 +112,37 @@ interface ReencryptResult {
   reencrypted: number;
 }
 
+interface TransformedStore extends ReencryptResult {
+  cfg: SealedStoreConfig;
+  rows: any[];
+}
+
 /**
- * Re-encrypt one store: read every record with `oldKey`, write it back with
- * `newKey`. Returns the count of records processed.
+ * Phase 1 (no writes): read every record with `oldKey` and produce the
+ * re-encrypted rows with `newKey`, held in memory.
  */
-const reencryptStore = async (
+const transformStore = async (
   cfg: SealedStoreConfig,
   oldKey: CryptoKey,
   newKey: CryptoKey,
-): Promise<ReencryptResult> => {
+): Promise<TransformedStore> => {
+  const label = `${cfg.db}/${cfg.store}`;
   let db: IDBDatabase;
   try {
     db = await openDB(cfg.db, cfg.version);
   } catch {
-    return { store: `${cfg.db}/${cfg.store}`, reencrypted: 0 };
+    return { store: label, reencrypted: 0, cfg, rows: [] };
   }
   try {
-    if (!hasStore(db, cfg.store)) {
-      return { store: `${cfg.db}/${cfg.store}`, reencrypted: 0 };
-    }
+    if (!hasStore(db, cfg.store)) return { store: label, reencrypted: 0, cfg, rows: [] };
     const rows = await getAll(db, cfg.store);
-    if (rows.length === 0) {
-      return { store: `${cfg.db}/${cfg.store}`, reencrypted: 0 };
-    }
+    if (rows.length === 0) return { store: label, reencrypted: 0, cfg, rows: [] };
 
     const rewritten: any[] = [];
     for (const row of rows) {
       if (cfg.kind === "json") {
-        // Decrypt with old key (passes through legacy plaintext), reseal with new.
         const plainObj = await unsealRecord<Record<string, any>>(row, oldKey);
-        const resealed = await sealRecord(plainObj, cfg.plainFields, newKey);
-        rewritten.push(resealed);
+        rewritten.push(await sealRecord(plainObj, cfg.plainFields, newKey));
       } else {
         const field = cfg.blobField || "encBlob";
         const env = row[field];
@@ -152,13 +152,22 @@ const reencryptStore = async (
         }
         const type = (cfg.typeField && row[cfg.typeField]) || "application/octet-stream";
         const blob = await decryptBlob(env, type, oldKey);
-        const reenc = await encryptBlob(blob, newKey);
-        rewritten.push({ ...row, [field]: reenc });
+        rewritten.push({ ...row, [field]: await encryptBlob(blob, newKey) });
       }
     }
+    return { store: label, reencrypted: rewritten.length, cfg, rows: rewritten };
+  } finally {
+    db.close();
+  }
+};
 
-    await putAll(db, cfg.store, rewritten);
-    return { store: `${cfg.db}/${cfg.store}`, reencrypted: rewritten.length };
+/** Phase 2: persist the already-transformed rows back into their store. */
+const writeStore = async (t: TransformedStore): Promise<void> => {
+  if (t.rows.length === 0) return;
+  const db = await openDB(t.cfg.db, t.cfg.version);
+  try {
+    if (!hasStore(db, t.cfg.store)) return;
+    await putAll(db, t.cfg.store, t.rows);
   } finally {
     db.close();
   }
@@ -176,10 +185,13 @@ let rotating = false;
 /**
  * Rotate the device key and re-encrypt all existing sealed records.
  *
- * Safe and atomic-ish: the new key is only activated after every store has been
- * re-encrypted with it. If any store fails, the old key stays active and the
- * partial re-encryption is harmless because both old and new records are read
- * with the still-active old key (the failed-over records remain old-key sealed).
+ * Two-phase for safety:
+ *   1. Read + re-encrypt every store IN MEMORY with a fresh key (no writes).
+ *   2. Write all stores, then activate the new key.
+ *
+ * If phase 1 fails nothing is written and the old key stays active. The new key
+ * is only persisted/activated once every store has been re-encrypted, so reads
+ * before activation still succeed with the old key.
  */
 export async function rotateDeviceKey(): Promise<RotationReport> {
   if (rotating) {
@@ -190,18 +202,22 @@ export async function rotateDeviceKey(): Promise<RotationReport> {
     const oldKey = await getActiveDeviceKey();
     const newKey = await generateDeviceKey();
 
-    const perStore: ReencryptResult[] = [];
+    // Phase 1 — transform everything in memory.
+    const transformed: TransformedStore[] = [];
     for (const cfg of SEALED_STORES) {
-      // If one store fails hard, abort BEFORE activating the new key so the old
-      // key still decrypts everything (including stores already rewritten,
-      // because we re-read them below only after a clean activation).
-      const res = await reencryptStore(cfg, oldKey, newKey);
-      perStore.push(res);
+      transformed.push(await transformStore(cfg, oldKey, newKey));
     }
 
-    // All stores re-encrypted with newKey — activate it now.
+    // Phase 2 — write everything, then activate the new key.
+    for (const t of transformed) {
+      await writeStore(t);
+    }
     await activateDeviceKey(newKey);
 
+    const perStore: ReencryptResult[] = transformed.map(({ store, reencrypted }) => ({
+      store,
+      reencrypted,
+    }));
     const totalReencrypted = perStore.reduce((n, r) => n + r.reencrypted, 0);
     return { rotated: true, totalReencrypted, perStore };
   } catch (e: any) {
