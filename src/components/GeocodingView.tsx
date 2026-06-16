@@ -298,6 +298,20 @@ export default function GeocodingView() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={addRow}><Plus className="h-4 w-4 mr-1.5" />Add row</Button>
+                <input
+                  ref={csvRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  hidden
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) importCsv(f);
+                    e.target.value = "";
+                  }}
+                />
+                <Button variant="outline" size="sm" onClick={() => csvRef.current?.click()}>
+                  <Upload className="h-4 w-4 mr-1.5" />Import CSV
+                </Button>
                 <Button size="sm" onClick={runBatch} disabled={batchRunning}>
                   {batchRunning ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Locate className="h-4 w-4 mr-1.5" />}
                   Geocode all
