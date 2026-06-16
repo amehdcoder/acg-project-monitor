@@ -93,7 +93,7 @@ const Index = () => {
   
   const [showSubmissionHistory, setShowSubmissionHistory] = useState(false);
 
-  const { user, loading, profile, role, isAdmin, isApproved, isPendingApproval, isSuperAdmin, isOwner, isAdhoc } = useAuth();
+  const { user, loading, profile, role, isAdmin, isApproved, isPendingApproval, isSuperAdmin, isOwner, isCoOwner, isAdhoc } = useAuth();
   const { canAccessPage, loadingAccess } = usePageAccess();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
