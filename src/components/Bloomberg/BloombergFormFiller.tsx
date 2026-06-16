@@ -49,7 +49,7 @@ const uniq = (rows: BloombergSchool[], val: keyof BloombergSchool, lbl: keyof Bl
 
 export default function BloombergFormFiller({ onClose }: Props) {
   const { user } = useAuth();
-  const { schools, loading } = useBloombergSchools();
+  const { schools, loading, fromCache } = useBloombergSchools();
   const geo = useGeolocation();
 
   const [step, setStep] = useState(0);
