@@ -182,6 +182,71 @@ export const useBloombergDashboard = () => {
     return [...m.entries()].map(([state, count]) => ({ state, count })).sort((a, b) => b.count - a.count);
   }, [validations]);
 
+  // State → LGA disaggregation for the Validation Dashboard drill-down.
+  // Each state aggregates its LGAs; each level carries submission counts,
+  // validated pupils and baseline (for validated schools) plus variance.
+  const stateBreakdown = useMemo(() => {
+    const submitted = validations.filter((v) => v.status === "sent" || v.status === "finalized");
+
+    interface Agg {
+      submissions: number;
+      validatedSchools: Set<string>;
+      validated: number;
+      baseline: number;
+      notFound: number;
+    }
+    const newAgg = (): Agg => ({ submissions: 0, validatedSchools: new Set(), validated: 0, baseline: 0, notFound: 0 });
+
+    const states = new Map<string, { agg: Agg; lgas: Map<string, Agg> }>();
+
+    submitted.forEach((v) => {
+      const st = (v.state || "Unknown").toString();
+      const lga = (v.lga || "Unknown").toString();
+      if (!states.has(st)) states.set(st, { agg: newAgg(), lgas: new Map() });
+      const node = states.get(st)!;
+      if (!node.lgas.has(lga)) node.lgas.set(lga, newAgg());
+      const lgaAgg = node.lgas.get(lga)!;
+
+      const b = v.school_key ? baselineByKey.get(v.school_key) : undefined;
+      const bt = b?.grand_total ?? 0;
+      const val = v.grand_total ?? 0;
+      const isNotFound = v.verification?.school_exists === "no";
+
+      [node.agg, lgaAgg].forEach((a) => {
+        a.submissions += 1;
+        if (v.school_key) a.validatedSchools.add(v.school_key);
+        a.validated += val;
+        a.baseline += bt;
+        if (isNotFound) a.notFound += 1;
+      });
+    });
+
+    const variance = (a: Agg) => (a.baseline > 0 ? ((a.validated - a.baseline) / a.baseline) * 100 : 0);
+
+    return [...states.entries()]
+      .map(([state, node]) => ({
+        state,
+        submissions: node.agg.submissions,
+        validatedSchools: node.agg.validatedSchools.size,
+        validated: node.agg.validated,
+        baseline: node.agg.baseline,
+        notFound: node.agg.notFound,
+        variancePct: variance(node.agg),
+        lgas: [...node.lgas.entries()]
+          .map(([lga, a]) => ({
+            lga,
+            submissions: a.submissions,
+            validatedSchools: a.validatedSchools.size,
+            validated: a.validated,
+            baseline: a.baseline,
+            notFound: a.notFound,
+            variancePct: variance(a),
+          }))
+          .sort((x, y) => y.submissions - x.submissions || x.lga.localeCompare(y.lga)),
+      }))
+      .sort((x, y) => y.submissions - x.submissions || x.state.localeCompare(y.state));
+  }, [validations, baselineByKey]);
+
   const points = useMemo(
     () =>
       validations
