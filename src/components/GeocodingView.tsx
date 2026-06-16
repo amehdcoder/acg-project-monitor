@@ -41,6 +41,7 @@ export default function GeocodingView() {
     { id: uid(), address: "", lat: null, lng: null, resolved: null, source: null, status: "idle" },
   ]);
   const [batchRunning, setBatchRunning] = useState(false);
+  const csvRef = useRef<HTMLInputElement | null>(null);
 
   const updateRow = (id: string, patch: Partial<GeoRow>) =>
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -50,6 +51,72 @@ export default function GeocodingView() {
 
   const removeRow = (id: string) =>
     setRows((prev) => (prev.length > 1 ? prev.filter((r) => r.id !== id) : prev));
+
+  // Minimal RFC-4180-ish CSV line splitter (handles quoted fields & commas).
+  const splitCsvLine = (line: string): string[] => {
+    const out: string[] = [];
+    let cur = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (line[i + 1] === '"') { cur += '"'; i++; } else inQuotes = false;
+        } else cur += ch;
+      } else if (ch === '"') inQuotes = true;
+      else if (ch === ",") { out.push(cur); cur = ""; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out.map((c) => c.trim());
+  };
+
+  const importCsv = async (file: File) => {
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length === 0) { toast.error("The CSV file is empty"); return; }
+
+      // Detect an optional header row and locate address / lat / lng columns.
+      const first = splitCsvLine(lines[0]).map((h) => h.toLowerCase());
+      const headerHas = (...names: string[]) => first.findIndex((h) => names.includes(h));
+      let addrIdx = headerHas("address", "addresses", "location", "street", "place");
+      let latIdx = headerHas("lat", "latitude");
+      let lngIdx = headerHas("lng", "lon", "long", "longitude");
+      const hasHeader = addrIdx !== -1 || latIdx !== -1 || lngIdx !== -1;
+      if (addrIdx === -1) addrIdx = 0; // default to first column
+      const dataLines = hasHeader ? lines.slice(1) : lines;
+
+      const newRows: GeoRow[] = [];
+      for (const line of dataLines) {
+        const cols = splitCsvLine(line);
+        const address = (cols[addrIdx] ?? "").trim();
+        if (!address) continue;
+        const lat = latIdx !== -1 ? Number(cols[latIdx]) : NaN;
+        const lng = lngIdx !== -1 ? Number(cols[lngIdx]) : NaN;
+        const hasCoords = isFinite(lat) && isFinite(lng);
+        newRows.push({
+          id: uid(),
+          address,
+          lat: hasCoords ? lat : null,
+          lng: hasCoords ? lng : null,
+          resolved: hasCoords ? "Imported coordinates" : null,
+          source: hasCoords ? "CSV" : null,
+          status: hasCoords ? "done" : "idle",
+        });
+      }
+
+      if (newRows.length === 0) { toast.error("No addresses found in the CSV"); return; }
+      setRows((prev) => {
+        const existing = prev.filter((r) => r.address.trim().length > 0);
+        return [...existing, ...newRows];
+      });
+      toast.success(`Imported ${newRows.length} address${newRows.length === 1 ? "" : "es"} from CSV`);
+    } catch (e) {
+      toast.error(`Could not read CSV: ${(e as Error).message}`);
+    }
+  };
+
 
   const geocodeRow = async (row: GeoRow) => {
     if (!row.address.trim()) return;
