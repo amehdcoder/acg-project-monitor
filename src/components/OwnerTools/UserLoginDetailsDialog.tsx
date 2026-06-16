@@ -34,7 +34,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import {
   Loader2, MonitorSmartphone, RefreshCw, Eye, EyeOff, Circle, Wifi, Clock,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, ShieldAlert,
 } from "lucide-react";
 
 interface ProfileRow {
