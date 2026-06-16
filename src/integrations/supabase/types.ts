@@ -3533,6 +3533,48 @@ export type Database = {
         }
         Relationships: []
       }
+      locations: {
+        Row: {
+          accuracy: number | null
+          altitude: number | null
+          battery_level: number | null
+          created_at: string
+          heading: number | null
+          id: string
+          latitude: number
+          longitude: number
+          recorded_at: string
+          speed: number | null
+          user_id: string
+        }
+        Insert: {
+          accuracy?: number | null
+          altitude?: number | null
+          battery_level?: number | null
+          created_at?: string
+          heading?: number | null
+          id?: string
+          latitude: number
+          longitude: number
+          recorded_at?: string
+          speed?: number | null
+          user_id: string
+        }
+        Update: {
+          accuracy?: number | null
+          altitude?: number | null
+          battery_level?: number | null
+          created_at?: string
+          heading?: number | null
+          id?: string
+          latitude?: number
+          longitude?: number
+          recorded_at?: string
+          speed?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       meeting_action_points: {
         Row: {
           action_point: string
@@ -4550,6 +4592,7 @@ export type Database = {
           last_name: string
           last_seen_at: string | null
           lga: string | null
+          location_tracking_enabled: boolean
           notification_preferences: Json | null
           other_designation: string | null
           phone_number: string | null
@@ -4579,6 +4622,7 @@ export type Database = {
           last_name: string
           last_seen_at?: string | null
           lga?: string | null
+          location_tracking_enabled?: boolean
           notification_preferences?: Json | null
           other_designation?: string | null
           phone_number?: string | null
@@ -4608,6 +4652,7 @@ export type Database = {
           last_name?: string
           last_seen_at?: string | null
           lga?: string | null
+          location_tracking_enabled?: boolean
           notification_preferences?: Json | null
           other_designation?: string | null
           phone_number?: string | null
@@ -6302,6 +6347,7 @@ export type Database = {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
       }
+      can_view_all_locations: { Args: { _user_id: string }; Returns: boolean }
       ensure_hands_staff_group: {
         Args: { _project_id: string }
         Returns: string

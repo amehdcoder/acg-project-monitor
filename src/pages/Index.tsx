@@ -68,6 +68,9 @@ import BottomNavBar from "@/components/BottomNavBar";
 import AdhocProjectChatView from "@/components/AdhocProjectChatView";
 import GeocodingView from "@/components/GeocodingView";
 import EmailServicesView from "@/components/EmailServicesView";
+import LocationSharingView from "@/components/LiveTracking/LocationSharingView";
+import BackgroundLocationTracker from "@/components/LiveTracking/BackgroundLocationTracker";
+const LiveTrackingDashboard = React.lazy(() => import("@/components/LiveTracking/LiveTrackingDashboard"));
 import GuidedTour from "@/components/GuidedTour";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { ProximityProvider } from "@/hooks/useProximity";
@@ -90,7 +93,7 @@ const Index = () => {
   
   const [showSubmissionHistory, setShowSubmissionHistory] = useState(false);
 
-  const { user, loading, profile, role, isAdmin, isApproved, isPendingApproval, isSuperAdmin, isOwner, isAdhoc } = useAuth();
+  const { user, loading, profile, role, isAdmin, isApproved, isPendingApproval, isSuperAdmin, isOwner, isCoOwner, isAdhoc } = useAuth();
   const { canAccessPage, loadingAccess } = usePageAccess();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -250,6 +253,14 @@ const Index = () => {
       case "integrations": return guardedPage("integrations", <IntegrationsView />);
       case "geocoding": return guardedPage("geocoding", <GeocodingView />);
       case "email-services": return guardedPage("email-services", <EmailServicesView />);
+      case "location-sharing": return <LocationSharingView />;
+      case "live-tracking": return (isOwner || isSuperAdmin || isCoOwner) ? (
+        <ErrorBoundary name="LiveTracking">
+          <Suspense fallback={<div className="flex h-96 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            <LiveTrackingDashboard />
+          </Suspense>
+        </ErrorBoundary>
+      ) : guardedPage("__admin_only__", <></>);
       case "users": return guardedPage("users", <UsersView />);
       case "ml": return guardedPage("ml", <MachineLearningView />);
       case "math-modeling": return guardedPage("math-modeling", <MathModelingView />);
@@ -393,6 +404,9 @@ const Index = () => {
       />
 
       <ProximityHub />
+
+      <BackgroundLocationTracker userId={user?.id} initialEnabled={(profile as any)?.location_tracking_enabled} />
+
 
       <IncomingCallManager />
 
