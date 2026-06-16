@@ -442,8 +442,8 @@ const EnrolTable = ({ title, classes, enrol, onChange, totals }: { title: string
         {classes.map((c) => (
           <tr key={c.key} className="border-b last:border-0">
             <td className="px-3 py-1.5 text-base font-semibold">{c.label}</td>
-            <td className="px-2 py-1.5"><Input type="number" min={0} inputMode="numeric" value={enrol[c.key].male ?? ""} onChange={(e) => onChange(c.key, "male", e.target.value)} className="h-10 text-center text-base" /></td>
-            <td className="px-2 py-1.5"><Input type="number" min={0} inputMode="numeric" value={enrol[c.key].female ?? ""} onChange={(e) => onChange(c.key, "female", e.target.value)} className="h-10 text-center text-base" /></td>
+            <td className="px-2 py-1.5"><Input type="number" min={0} inputMode="numeric" value={enrol[c.key].male ?? ""} onChange={(e) => onChange(c.key, "male", e.target.value)} className="h-12 text-center text-lg" /></td>
+            <td className="px-2 py-1.5"><Input type="number" min={0} inputMode="numeric" value={enrol[c.key].female ?? ""} onChange={(e) => onChange(c.key, "female", e.target.value)} className="h-12 text-center text-lg" /></td>
             <td className="px-3 py-1.5 text-center text-base font-bold">{(enrol[c.key].male ?? 0) + (enrol[c.key].female ?? 0)}</td>
           </tr>
         ))}
