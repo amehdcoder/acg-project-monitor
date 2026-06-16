@@ -12,6 +12,7 @@ import {
   verifyOfflineCredentialPassword,
   type OfflineAuthCredential,
 } from "@/lib/offlineAuthCache";
+import { logOfflineAuditEvent, flushOfflineAuditQueue } from "@/lib/offlineAuditLog";
 
 
 type AppRole = "super_admin" | "systems_admin" | "user";
@@ -438,17 +439,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     const tryOfflineSignIn = async (reason: string) => {
+      void logOfflineAuditEvent("offline_login_attempt", { email, details: { reason } });
       const cache = await getOfflineCredential(email);
       if (!cache) {
+        void logOfflineAuditEvent("offline_login_failure", { email, success: false, details: { reason: "no_credentials" } });
         return { error: new Error("No offline credentials found on this device. Login online once on this same device, then offline login will remain available after sign-out.") };
       }
       const passwordOk = await verifyOfflineCredentialPassword(password, cache);
       if (!passwordOk) {
         logOfflineEvent("login_failed", { mode: "offline", email, reason: "invalid_password" });
+        void logOfflineAuditEvent("offline_login_failure", { email: cache.email, userId: cache.user_id, success: false, details: { reason: "invalid_password" } });
         return { error: new Error("Invalid password (Offline).") };
       }
       const result = await hydrateOfflineCredential(cache, reason);
       if (!result.error) {
+        void logOfflineAuditEvent("offline_login_success", { email: cache.email, userId: cache.user_id, success: true, details: { reason } });
         toast({ title: "Offline Login Successful", description: "You are logged in using this device's encrypted offline profile." });
       }
       return result;

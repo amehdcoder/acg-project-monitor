@@ -4423,6 +4423,42 @@ export type Database = {
           },
         ]
       }
+      offline_auth_audit: {
+        Row: {
+          created_at: string
+          details: Json
+          device_id: string | null
+          email: string | null
+          event_type: string
+          id: string
+          occurred_at: string
+          success: boolean | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          device_id?: string | null
+          email?: string | null
+          event_type: string
+          id?: string
+          occurred_at?: string
+          success?: boolean | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          device_id?: string | null
+          email?: string | null
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          success?: boolean | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       patient_referrals: {
         Row: {
           accepted_by: string | null

@@ -1,6 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 import { hashOfflinePassword, verifyOfflinePassword } from "@/lib/offlineAuthCrypto";
 import { sealRecord, unsealRecord } from "@/lib/deviceCrypto";
+import { logOfflineAuditEvent } from "@/lib/offlineAuditLog";
 
 const DB_NAME = "acg_offline_auth";
 const DB_VERSION = 1;
@@ -129,6 +130,12 @@ export const saveOfflineCredential = async (args: {
   if (results.every((r) => r.status === "rejected")) {
     throw new Error("Offline credential cache could not be written on this device.");
   }
+  void logOfflineAuditEvent("cache_seed", {
+    email: credential.email,
+    userId: credential.user_id,
+    success: true,
+    details: { role: credential.role },
+  });
   return credential;
 };
 
@@ -199,6 +206,36 @@ export const getLatestOfflineCredential = async (): Promise<OfflineAuthCredentia
 export const verifyOfflineCredentialPassword = (password: string, credential: OfflineAuthCredential) =>
   verifyOfflinePassword(password, credential);
 
+/**
+ * Restore a previously-exported credential record directly into the device
+ * cache, preserving its existing (PBKDF2) password hash. Used by the encrypted
+ * device-profile import flow so users can log in offline after clearing browser
+ * data — without needing the plaintext password.
+ */
+export const restoreOfflineCredential = async (
+  credential: OfflineAuthCredential,
+): Promise<void> => {
+  const email = normalizeEmail(credential.email || credential.user?.email || "");
+  if (!email || !credential.passwordHash || !credential.user) {
+    throw new Error("Invalid credential profile — missing email, hash, or user.");
+  }
+  const record: OfflineAuthCredential = {
+    ...credential,
+    email,
+    user_id: credential.user_id || credential.user.id,
+    role: credential.role ?? null,
+    profile: credential.profile ?? null,
+    lastUpdated: credential.lastUpdated || new Date().toISOString(),
+  };
+  const results = await Promise.allSettled([
+    putIndexedCredential(record),
+    writeLocalCredential(record),
+  ]);
+  if (results.every((r) => r.status === "rejected")) {
+    throw new Error("Could not write restored credential on this device.");
+  }
+};
+
 export const removeOfflineCredential = async (email: string): Promise<void> => {
   const normalized = normalizeEmail(email);
   if (!normalized) return;
@@ -212,4 +249,5 @@ export const removeOfflineCredential = async (email: string): Promise<void> => {
     });
   } catch {}
   try { localStorage.removeItem(legacyKey(normalized)); } catch {}
+  void logOfflineAuditEvent("cache_invalidate", { email: normalized, success: true });
 };
