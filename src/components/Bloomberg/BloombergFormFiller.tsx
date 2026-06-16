@@ -323,7 +323,7 @@ export default function BloombergFormFiller({ onClose }: Props) {
                     <div className="grid grid-cols-2 items-end gap-3">
                       <Field label="Date of Visit" required><Input type="date" value={dateOfVisit} onChange={(e) => setDateOfVisit(e.target.value)} className="h-12 text-base" /></Field>
                       <div className="flex items-center justify-between rounded-lg border border-border p-3">
-                        <span className="text-sm font-medium">Register Available</span>
+                        <span className="text-base font-semibold">Register Available</span>
                         <Switch checked={registerAvailable} onCheckedChange={setRegisterAvailable} />
                       </div>
                     </div>
