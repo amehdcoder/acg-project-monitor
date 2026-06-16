@@ -19,7 +19,9 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  KeyRound,
 } from "lucide-react";
+import { rotateDeviceKey } from "@/lib/keyRotation";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
