@@ -405,6 +405,9 @@ const Index = () => {
 
       <ProximityHub />
 
+      <BackgroundLocationTracker userId={user?.id} initialEnabled={(profile as any)?.location_tracking_enabled} />
+
+
       <IncomingCallManager />
 
       <GuidedTour onNavigate={handleTabChange} />
