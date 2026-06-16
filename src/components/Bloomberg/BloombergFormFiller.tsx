@@ -430,19 +430,19 @@ const Stat = ({ label, value, color }: { label: string; value: number; color: st
 
 const EnrolTable = ({ title, classes, enrol, onChange, totals }: { title: string; classes: typeof PRIMARY_CLASSES; enrol: EnrolmentCounts; onChange: (k: string, s: "male" | "female", v: string) => void; totals: { male: number; female: number; total: number } }) => (
   <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-    <div className="bg-[#eef4ff] px-4 py-2 text-xs font-bold uppercase tracking-wide text-[#1f6feb]">{title}</div>
-    <table className="w-full text-sm">
-      <thead><tr className="border-b text-xs text-muted-foreground"><th className="px-3 py-2 text-left">Class</th><th className="px-3 py-2 text-center">Male</th><th className="px-3 py-2 text-center">Female</th><th className="px-3 py-2 text-center">Total</th></tr></thead>
+    <div className="bg-[#eef4ff] px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-[#1f6feb]">{title}</div>
+    <table className="w-full text-base">
+      <thead><tr className="border-b text-sm font-semibold text-[#0c2340]"><th className="px-3 py-2.5 text-left">Class</th><th className="px-3 py-2.5 text-center">Male</th><th className="px-3 py-2.5 text-center">Female</th><th className="px-3 py-2.5 text-center">Total</th></tr></thead>
       <tbody>
         {classes.map((c) => (
           <tr key={c.key} className="border-b last:border-0">
-            <td className="px-3 py-1.5 font-medium">{c.label}</td>
-            <td className="px-2 py-1.5"><Input type="number" min={0} inputMode="numeric" value={enrol[c.key].male ?? ""} onChange={(e) => onChange(c.key, "male", e.target.value)} className="h-9 text-center" /></td>
-            <td className="px-2 py-1.5"><Input type="number" min={0} inputMode="numeric" value={enrol[c.key].female ?? ""} onChange={(e) => onChange(c.key, "female", e.target.value)} className="h-9 text-center" /></td>
-            <td className="px-3 py-1.5 text-center font-semibold">{(enrol[c.key].male ?? 0) + (enrol[c.key].female ?? 0)}</td>
+            <td className="px-3 py-1.5 text-base font-semibold">{c.label}</td>
+            <td className="px-2 py-1.5"><Input type="number" min={0} inputMode="numeric" value={enrol[c.key].male ?? ""} onChange={(e) => onChange(c.key, "male", e.target.value)} className="h-10 text-center text-base" /></td>
+            <td className="px-2 py-1.5"><Input type="number" min={0} inputMode="numeric" value={enrol[c.key].female ?? ""} onChange={(e) => onChange(c.key, "female", e.target.value)} className="h-10 text-center text-base" /></td>
+            <td className="px-3 py-1.5 text-center text-base font-bold">{(enrol[c.key].male ?? 0) + (enrol[c.key].female ?? 0)}</td>
           </tr>
         ))}
-        <tr className="bg-[#f4f6fb] font-semibold"><td className="px-3 py-2">Total</td><td className="px-3 py-2 text-center text-[#2563eb]">{totals.male}</td><td className="px-3 py-2 text-center text-[#db2777]">{totals.female}</td><td className="px-3 py-2 text-center text-[#16a34a]">{totals.total}</td></tr>
+        <tr className="bg-[#f4f6fb] text-base font-bold"><td className="px-3 py-2.5">Total</td><td className="px-3 py-2.5 text-center text-[#2563eb]">{totals.male}</td><td className="px-3 py-2.5 text-center text-[#db2777]">{totals.female}</td><td className="px-3 py-2.5 text-center text-[#16a34a]">{totals.total}</td></tr>
       </tbody>
     </table>
   </div>
