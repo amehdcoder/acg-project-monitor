@@ -113,5 +113,5 @@ export const useBloombergSchools = () => {
     );
   }, [schools, assignments]);
 
-  return { schools: scopedSchools, allSchools: schools, assignments, loading };
+  return { schools: scopedSchools, allSchools: schools, assignments, loading, fromCache };
 };
