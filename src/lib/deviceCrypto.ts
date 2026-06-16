@@ -99,8 +99,8 @@ const fromB64 = (b64: string): ArrayBuffer => {
 };
 
 /** Encrypt a JSON-serialisable value. Returns a compact `iv.ct` base64 string. */
-export async function encryptJSON(value: unknown): Promise<string> {
-  const key = await getDeviceKey();
+export async function encryptJSON(value: unknown, withKey?: CryptoKey): Promise<string> {
+  const key = withKey ?? (await getDeviceKey());
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const plaintext = new TextEncoder().encode(JSON.stringify(value));
   const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext);
@@ -108,8 +108,8 @@ export async function encryptJSON(value: unknown): Promise<string> {
 }
 
 /** Decrypt a string produced by encryptJSON. */
-export async function decryptJSON<T = any>(payload: string): Promise<T> {
-  const key = await getDeviceKey();
+export async function decryptJSON<T = any>(payload: string, withKey?: CryptoKey): Promise<T> {
+  const key = withKey ?? (await getDeviceKey());
   const [ivB64, ctB64] = payload.split(".");
   const iv = fromB64(ivB64);
   const ct = fromB64(ctB64);
@@ -132,6 +132,7 @@ const isSealed = (rec: any): rec is SealedRecord =>
 export async function sealRecord(
   record: Record<string, any>,
   plainFields: string[] = ["id"],
+  withKey?: CryptoKey,
 ): Promise<SealedRecord> {
   const plain: Record<string, any> = {};
   const secret: Record<string, any> = {};
@@ -139,15 +140,15 @@ export async function sealRecord(
     if (plainFields.includes(k)) plain[k] = v;
     else secret[k] = v;
   }
-  return { ...plain, __sealed: await encryptJSON(secret) };
+  return { ...plain, __sealed: await encryptJSON(secret, withKey) };
 }
 
 /** Reverse of sealRecord. Passes through already-plaintext (legacy) records. */
-export async function unsealRecord<T = any>(record: any): Promise<T> {
+export async function unsealRecord<T = any>(record: any, withKey?: CryptoKey): Promise<T> {
   if (!isSealed(record)) return record as T;
   const { __sealed, ...plain } = record;
   try {
-    const secret = await decryptJSON<Record<string, any>>(__sealed);
+    const secret = await decryptJSON<Record<string, any>>(__sealed, withKey);
     return { ...plain, ...secret } as T;
   } catch {
     // Key mismatch / corruption — return what we can rather than crash.
@@ -155,15 +156,16 @@ export async function unsealRecord<T = any>(record: any): Promise<T> {
   }
 }
 
-export async function unsealAll<T = any>(records: any[]): Promise<T[]> {
-  return Promise.all((records || []).map((r) => unsealRecord<T>(r)));
+export async function unsealAll<T = any>(records: any[], withKey?: CryptoKey): Promise<T[]> {
+  return Promise.all((records || []).map((r) => unsealRecord<T>(r, withKey)));
 }
 
 /** Encrypt a Blob's bytes. Returns an envelope safe to store in IndexedDB. */
 export async function encryptBlob(
   blob: Blob,
+  withKey?: CryptoKey,
 ): Promise<{ __encBlob: true; iv: string; ct: ArrayBuffer; type: string }> {
-  const key = await getDeviceKey();
+  const key = withKey ?? (await getDeviceKey());
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const buf = await blob.arrayBuffer();
   const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, buf);
@@ -171,13 +173,47 @@ export async function encryptBlob(
 }
 
 /** Decrypt an envelope produced by encryptBlob back into a Blob. */
-export async function decryptBlob(env: any, fallbackType = "application/octet-stream"): Promise<Blob> {
+export async function decryptBlob(
+  env: any,
+  fallbackType = "application/octet-stream",
+  withKey?: CryptoKey,
+): Promise<Blob> {
   if (!env || env.__encBlob !== true) {
     // Legacy plaintext blob.
     return env instanceof Blob ? env : new Blob([env], { type: fallbackType });
   }
-  const key = await getDeviceKey();
+  const key = withKey ?? (await getDeviceKey());
   const iv = fromB64(env.iv);
   const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv as BufferSource }, key, env.ct);
   return new Blob([plaintext], { type: env.type || fallbackType });
+}
+
+// ---------------------------------------------------------------------------
+// Key rotation primitives.
+//
+// Rotation generates a brand-new device key, re-encrypts every sealed record
+// with it, and only then persists/activates the new key. This keeps data
+// recoverable: if re-encryption fails midway the original key remains active so
+// nothing is lost. The heavy lifting of walking each IndexedDB store lives in
+// `keyRotation.ts`, which calls these primitives.
+
+/** Read the currently active device key, generating one only if none exists. */
+export async function getActiveDeviceKey(): Promise<CryptoKey> {
+  return getDeviceKey();
+}
+
+/** Generate a fresh, non-extractable AES-GCM key WITHOUT persisting it. */
+export async function generateDeviceKey(): Promise<CryptoKey> {
+  return crypto.subtle.generateKey(
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+/** Persist `key` to the keystore and make it the active in-memory key. */
+export async function activateDeviceKey(key: CryptoKey): Promise<void> {
+  await writeStoredKey(key);
+  cachedKey = key;
+  keyPromise = Promise.resolve(key);
 }

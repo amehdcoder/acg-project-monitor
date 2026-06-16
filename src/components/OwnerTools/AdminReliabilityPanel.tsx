@@ -19,7 +19,9 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  KeyRound,
 } from "lucide-react";
+import { rotateDeviceKey } from "@/lib/keyRotation";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,6 +73,7 @@ export default function AdminReliabilityPanel() {
   const [loading, setLoading] = useState(false);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [rotating, setRotating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -133,6 +136,22 @@ export default function AdminReliabilityPanel() {
     }
   };
 
+  const rotateKey = async () => {
+    setRotating(true);
+    try {
+      const report = await rotateDeviceKey();
+      if (!report.rotated) throw new Error(report.error || "rotation failed");
+      toast({
+        title: "Device key rotated",
+        description: `Re-encrypted ${report.totalReencrypted} offline record(s) with a new key.`,
+      });
+    } catch (e: any) {
+      toast({ title: "Rotation failed", description: e.message, variant: "destructive" });
+    } finally {
+      setRotating(false);
+    }
+  };
+
   const pendingCount = queue.filter((q) => q.status === "pending").length;
 
   return (
@@ -167,6 +186,10 @@ export default function AdminReliabilityPanel() {
             <Button size="sm" variant="outline" onClick={runScan} disabled={scanning}>
               {scanning ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Wrench className="mr-1 h-4 w-4" />}
               Run orphan scan
+            </Button>
+            <Button size="sm" variant="outline" onClick={rotateKey} disabled={rotating}>
+              {rotating ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <KeyRound className="mr-1 h-4 w-4" />}
+              Rotate device key
             </Button>
           </div>
           {pendingCount > 0 && (
