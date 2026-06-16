@@ -717,6 +717,9 @@ const SettingsView = () => {
             {/* Owner / Co-owner: roles & access control center */}
             <OwnerRolesAccessManager />
 
+            {/* Owner / Co-owner: offline auth audit log + Google Sheets sync */}
+            <OfflineAuditLogPanel />
+
             {/* Owner-only: clear microplanning + factory reset */}
             <OwnerDataReset />
           </TabsContent>
