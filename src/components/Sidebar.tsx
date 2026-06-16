@@ -5,7 +5,7 @@ import {
   Repeat, Globe, Navigation, ShieldCheck, MapPin, BookOpen,
   ArrowRightLeft, Stethoscope, Accessibility, HandMetal, Sparkles, Satellite,
   PanelLeftClose, PanelLeftOpen, History, ScanLine, Nfc,
-  Share2, FlaskConical, Watch, Bluetooth, Boxes, SatelliteDish, Brush,
+  Share2, FlaskConical, Watch, Bluetooth, Boxes, SatelliteDish, Brush, Mail,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -99,6 +99,8 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "ml", label: "Machine Learning", icon: Brain, adminOnly: true },
     { id: "math-modeling", label: "Math Modeling", icon: Calculator, adminOnly: true },
     { id: "integrations", label: t("nav.integrations"), icon: Upload, adminOnly: true },
+    { id: "geocoding", label: "Geocoding & IP", icon: Globe, adminOnly: true },
+    { id: "email-services", label: "Email Services", icon: Mail, adminOnly: true },
     { id: "users", label: t("nav.users"), icon: Users, adminOnly: true },
     { id: "feedback", label: "Feedback", icon: MessageSquareText, adminOnly: true },
     { id: "iteration-analysis", label: "Iteration Analysis", icon: Repeat, adminOnly: true },
