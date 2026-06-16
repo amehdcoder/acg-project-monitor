@@ -187,6 +187,10 @@ export default function AdminReliabilityPanel() {
               {scanning ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Wrench className="mr-1 h-4 w-4" />}
               Run orphan scan
             </Button>
+            <Button size="sm" variant="outline" onClick={rotateKey} disabled={rotating}>
+              {rotating ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <KeyRound className="mr-1 h-4 w-4" />}
+              Rotate device key
+            </Button>
           </div>
           {pendingCount > 0 && (
             <Button size="sm" onClick={() => retry()} disabled={retrying !== null}>
