@@ -44,11 +44,18 @@ async function reverse(lat: number, lng: number) {
 async function ipLookup(ip?: string) {
   const key = Deno.env.get("IPFIND_API_KEY");
   if (!key) throw new Error("IPFIND_API_KEY is not configured");
-  const target = ip ? encodeURIComponent(ip) : "";
-  const url = `https://api.ipfind.com/${target}?auth=${key}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.error || `ipfind ${res.status}`);
+  const params = new URLSearchParams({ auth: key });
+  if (ip) params.set("ip", ip);
+  const res = await fetch(`https://ipfind.co/?${params.toString()}`);
+  const text = await res.text();
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error("IP lookup service returned an unexpected response");
+  }
+  if (data?.error) throw new Error(data.error);
+  if (!res.ok) throw new Error(`ipfind ${res.status}`);
   return data;
 }
 
