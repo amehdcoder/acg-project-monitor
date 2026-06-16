@@ -244,14 +244,51 @@ export default function UserLoginDetailsDialog() {
             <Switch checked={onlineOnly} onCheckedChange={(v) => { setOnlineOnly(v); setPage(0); }} />
             <span className="text-muted-foreground">Online only</span>
           </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <Switch checked={revealIps} onCheckedChange={setRevealIps} />
-            <span className="text-muted-foreground flex items-center gap-1">
-              {revealIps ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-              Reveal IPs
-            </span>
-          </label>
+          {isOwner && (
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Switch
+                checked={revealIps}
+                onCheckedChange={(v) => {
+                  if (v) {
+                    // Require an explicit confirmation step before unmasking IPs.
+                    setConfirmReveal(true);
+                  } else {
+                    setRevealIps(false);
+                  }
+                }}
+              />
+              <span className="text-muted-foreground flex items-center gap-1">
+                {revealIps ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                Reveal IPs
+              </span>
+            </label>
+          )}
         </div>
+
+        <AlertDialog open={confirmReveal} onOpenChange={setConfirmReveal}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-amber-500" /> Reveal full IP addresses?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                IP addresses are sensitive personal data and stay masked by default.
+                Revealing them is an Owner-only action and may be audited. They will be
+                re-masked automatically when you close this panel.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setConfirmReveal(false)}>Keep masked</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-amber-500 hover:bg-amber-600 text-white"
+                onClick={() => { setRevealIps(true); setConfirmReveal(false); }}
+              >
+                Reveal IPs
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
 
         {loading ? (
           <div className="flex items-center justify-center py-16">
