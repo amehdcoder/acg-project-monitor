@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import {
   MapPin, Navigation, Globe, Plus, Trash2, Loader2, Locate, Copy, Download, Network, Upload,
 } from "lucide-react";
+import GeocodingMap from "./GeocodingMap";
 
 interface GeoRow {
   id: string;
@@ -322,6 +323,19 @@ export default function GeocodingView() {
               </div>
             </CardContent>
           </Card>
+
+          <GeocodingMap
+            points={rows
+              .filter((r) => r.lat != null && r.lng != null)
+              .map((r) => ({
+                id: r.id,
+                address: r.address,
+                lat: r.lat as number,
+                lng: r.lng as number,
+                resolved: r.resolved,
+                source: r.source,
+              }))}
+          />
         </TabsContent>
 
         {/* REVERSE */}
