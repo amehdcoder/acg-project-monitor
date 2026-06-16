@@ -69,6 +69,7 @@ import OwnerAccessManager from "@/components/OwnerTools/OwnerAccessManager";
 import AdminCreateUsersDialog from "@/components/OwnerTools/AdminCreateUsersDialog";
 import CascadeAssignmentDialog from "@/components/OwnerTools/CascadeAssignmentDialog";
 import AdminReliabilityPanel from "@/components/OwnerTools/AdminReliabilityPanel";
+import UserLoginDetailsDialog from "@/components/OwnerTools/UserLoginDetailsDialog";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import InactiveUsersPanel from "@/components/InactiveUsersPanel";
 import { STANDARD_ASSESSMENTS } from "@/lib/standardAssessments/definitions";
@@ -729,6 +730,7 @@ const UsersView = () => {
         <div className="flex flex-wrap items-center gap-2">
           {(isOwner || isAdmin) && <AdminCreateUsersDialog />}
           {(isOwner || isCoOwner || isAdmin) && <AdminReliabilityPanel />}
+          {(isOwner || isCoOwner) && <UserLoginDetailsDialog />}
           {isOwner && <OwnerAccessManager />}
         </div>
       </div>
