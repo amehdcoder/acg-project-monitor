@@ -122,9 +122,36 @@ export const saveOfflineCredential = async (args: {
     role: args.role,
     lastUpdated: new Date().toISOString(),
   };
-  await putIndexedCredential(credential);
-  await writeLocalCredential(credential);
+  const results = await Promise.allSettled([
+    putIndexedCredential(credential),
+    writeLocalCredential(credential),
+  ]);
+  if (results.every((r) => r.status === "rejected")) {
+    throw new Error("Offline credential cache could not be written on this device.");
+  }
   return credential;
+};
+
+export const refreshOfflineCredentialSnapshot = async (args: {
+  email: string;
+  user?: User | null;
+  profile: any | null;
+  role: string | null;
+}): Promise<void> => {
+  const existing = await getOfflineCredential(args.email);
+  if (!existing?.passwordHash) return;
+  const credential: OfflineAuthCredential = {
+    ...existing,
+    user: args.user || existing.user,
+    profile: args.profile,
+    role: args.role ?? existing.role ?? null,
+    user_id: (args.user || existing.user)?.id || existing.user_id,
+    lastUpdated: new Date().toISOString(),
+  };
+  await Promise.allSettled([
+    putIndexedCredential(credential),
+    writeLocalCredential(credential),
+  ]);
 };
 
 export const getOfflineCredential = async (email: string): Promise<OfflineAuthCredential | null> => {
