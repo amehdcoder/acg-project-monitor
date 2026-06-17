@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import {
   PRIMARY_CLASSES, JSS_CLASSES, SSS_CLASSES, ALL_CLASSES, emptyEnrolment, sectionTotals,
   grandTotals, OPERATIONAL_STATUS, NOT_FOUND_REASONS, type EnrolmentCounts,
-  type BloombergSchool, type ClassDef, normalizeMissingLabel,
+  type BloombergSchool, type ClassDef, normalizeMissingLabel, MISSING_LOCATION_LABEL,
 } from "@/lib/bloomberg/definition";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
