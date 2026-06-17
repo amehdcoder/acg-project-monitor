@@ -128,8 +128,31 @@ export const useBloombergDashboard = () => {
     return m;
   }, [baselines]);
 
+  // De-duplicate validated schools: a single school must appear only ONCE on the
+  // dashboard, otherwise totals, coverage and discrepancy analysis are inflated
+  // and misleading. When the same school has multiple sent submissions we keep
+  // the most recent one (by submitted_at → updated_at → created_at). Entries
+  // without a school_key cannot be de-duplicated, so each is kept individually.
+  const dedupedSent = useMemo(() => {
+    const ts = (v: ValidationRow) =>
+      new Date(v.submitted_at || v.updated_at || v.created_at).getTime();
+    const byKey = new Map<string, ValidationRow>();
+    const noKey: ValidationRow[] = [];
+    validations
+      .filter((v) => v.status === "sent")
+      .forEach((v) => {
+        if (!v.school_key) {
+          noKey.push(v);
+          return;
+        }
+        const existing = byKey.get(v.school_key);
+        if (!existing || ts(v) >= ts(existing)) byKey.set(v.school_key, v);
+      });
+    return [...byKey.values(), ...noKey];
+  }, [validations]);
+
   const stats = useMemo(() => {
-    const submitted = validations.filter((v) => v.status === "sent");
+    const submitted = dedupedSent;
     const draft = validations.filter((v) => v.status === "draft");
     const validatedTotal = submitted.reduce((s, v) => s + (v.grand_total ?? 0), 0);
     const validatedMale = submitted.reduce((s, v) => s + (v.total_male ?? 0), 0);
