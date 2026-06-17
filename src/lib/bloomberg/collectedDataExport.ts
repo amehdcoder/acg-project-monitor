@@ -262,7 +262,7 @@ export async function exportCollectedData(): Promise<number> {
     }
 
     // Highlight specified location cells (amber) so corrections stand out.
-    const locStart = 5; // State..Location are cols 5-8
+    // State..Location occupy columns 5-8.
     [["state", 5], ["lga", 6], ["ward", 7], ["location", 8]].forEach(([k, col]) => {
       if (spec[k as string] && String(spec[k as string]).trim()) {
         const c = row.getCell(col as number);
