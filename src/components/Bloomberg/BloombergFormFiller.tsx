@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import {
   PRIMARY_CLASSES, JSS_CLASSES, SSS_CLASSES, ALL_CLASSES, emptyEnrolment, sectionTotals,
   grandTotals, OPERATIONAL_STATUS, NOT_FOUND_REASONS, type EnrolmentCounts,
-  type BloombergSchool, normalizeMissingLabel,
+  type BloombergSchool, type ClassDef, normalizeMissingLabel,
 } from "@/lib/bloomberg/definition";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -487,7 +487,7 @@ const Stat = ({ label, value, color }: { label: string; value: number; color: st
   </div>
 );
 
-const EnrolTable = ({ title, classes, enrol, onChange, totals }: { title: string; classes: typeof PRIMARY_CLASSES; enrol: EnrolmentCounts; onChange: (k: string, s: "male" | "female", v: string) => void; totals: { male: number; female: number; total: number } }) => (
+const EnrolTable = ({ title, classes, enrol, onChange, totals }: { title: string; classes: ClassDef[]; enrol: EnrolmentCounts; onChange: (k: string, s: "male" | "female", v: string) => void; totals: { male: number; female: number; total: number } }) => (
   <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
     <div className="bg-[#eef4ff] px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-[#1f6feb]">{title}</div>
     <table className="w-full text-base">
