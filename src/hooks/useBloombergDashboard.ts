@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ALL_CLASSES, NOT_FOUND_REASONS, OPERATIONAL_STATUS } from "@/lib/bloomberg/definition";
-import { generateBloombergSimulation } from "@/lib/bloomberg/bloombergSimulation";
 
 export interface ValidationVerification {
   school_exists?: "yes" | "no" | "";
@@ -64,7 +63,6 @@ export const useBloombergDashboard = () => {
   const [baselines, setBaselines] = useState<BaselineRow[]>([]);
   const [schoolCount, setSchoolCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [simulate, setSimulate] = useState(false);
 
   // Monotonic request id: any async load tags itself with the current value,
   // and discards its result if a newer load/toggle has happened meanwhile.
@@ -72,10 +70,6 @@ export const useBloombergDashboard = () => {
   // (and vice versa) when the Simulate toggle is flipped — the root cause of
   // the dashboard "flickering" / showing the wrong dataset.
   const reqIdRef = useRef(0);
-  // Mirror of `simulate` readable inside async callbacks without re-creating them.
-  const simulateRef = useRef(simulate);
-  simulateRef.current = simulate;
-
   const reload = async () => {
     const myReq = ++reqIdRef.current;
     setLoading(true);
@@ -90,8 +84,7 @@ export const useBloombergDashboard = () => {
       const { count } = await supabase
         .from("bloomberg_schools")
         .select("school_key", { count: "exact", head: true });
-      // Discard if a newer request started, or if we've since switched to simulate.
-      if (myReq !== reqIdRef.current || simulateRef.current) return;
+      if (myReq !== reqIdRef.current) return;
       setValidations(v);
       setBaselines(b);
       setSchoolCount(count || 0);
@@ -101,28 +94,15 @@ export const useBloombergDashboard = () => {
   };
 
   useEffect(() => {
-    // Invalidate any in-flight reload so it can't clobber the dataset we set here.
     const myReq = ++reqIdRef.current;
-    if (simulate) {
-      // Swap in a fully synthetic dataset so the dashboard renders exactly as it
-      // would with real validations — no backend reads, no writes.
-      const sim = generateBloombergSimulation();
-      setValidations(sim.validations);
-      setBaselines(sim.baselines);
-      setSchoolCount(sim.schoolCount);
-      setLoading(false);
-    } else {
-      // Clear stale simulated data immediately, then fetch real data.
-      setValidations([]);
-      setBaselines([]);
-      setSchoolCount(0);
-      void reload();
-    }
+    setValidations([]);
+    setBaselines([]);
+    setSchoolCount(0);
+    void reload();
     return () => {
-      // On unmount/re-toggle, bump so late async results are ignored.
       if (myReq === reqIdRef.current) reqIdRef.current++;
     };
-  }, [simulate]);
+  }, []);
 
 
   const baselineByKey = useMemo(() => {
@@ -132,7 +112,7 @@ export const useBloombergDashboard = () => {
   }, [baselines]);
 
   const stats = useMemo(() => {
-    const submitted = validations.filter((v) => v.status === "sent" || v.status === "finalized");
+    const submitted = validations.filter((v) => v.status === "sent");
     const draft = validations.filter((v) => v.status === "draft");
     const validatedTotal = submitted.reduce((s, v) => s + (v.grand_total ?? 0), 0);
     const validatedMale = submitted.reduce((s, v) => s + (v.total_male ?? 0), 0);
@@ -186,7 +166,7 @@ export const useBloombergDashboard = () => {
   // Each state aggregates its LGAs; each level carries submission counts,
   // validated pupils and baseline (for validated schools) plus variance.
   const stateBreakdown = useMemo(() => {
-    const submitted = validations.filter((v) => v.status === "sent" || v.status === "finalized");
+    const submitted = validations.filter((v) => v.status === "sent");
 
     interface Agg {
       submissions: number;
