@@ -453,7 +453,7 @@ export const useBloombergDashboard = () => {
           a.lga.localeCompare(b.lga) ||
           a.school.localeCompare(b.school),
       );
-  }, [schools, submittedValidations, baselineByKey]);
+  }, [schools, submittedValidations, baselineByKey, labelMaps]);
 
   // Owner-only hard delete of validation entries. Removes the rows from the
   // database so they immediately disappear from every dashboard view.
