@@ -807,6 +807,15 @@ export type Database = {
           p6_male: number | null
           p6_total: number | null
           school_key: string
+          ss1_female: number | null
+          ss1_male: number | null
+          ss1_total: number | null
+          ss2_female: number | null
+          ss2_male: number | null
+          ss2_total: number | null
+          ss3_female: number | null
+          ss3_male: number | null
+          ss3_total: number | null
           total_female: number | null
           total_male: number | null
         }
@@ -843,6 +852,15 @@ export type Database = {
           p6_male?: number | null
           p6_total?: number | null
           school_key: string
+          ss1_female?: number | null
+          ss1_male?: number | null
+          ss1_total?: number | null
+          ss2_female?: number | null
+          ss2_male?: number | null
+          ss2_total?: number | null
+          ss3_female?: number | null
+          ss3_male?: number | null
+          ss3_total?: number | null
           total_female?: number | null
           total_male?: number | null
         }
@@ -879,6 +897,15 @@ export type Database = {
           p6_male?: number | null
           p6_total?: number | null
           school_key?: string
+          ss1_female?: number | null
+          ss1_male?: number | null
+          ss1_total?: number | null
+          ss2_female?: number | null
+          ss2_male?: number | null
+          ss2_total?: number | null
+          ss3_female?: number | null
+          ss3_male?: number | null
+          ss3_total?: number | null
           total_female?: number | null
           total_male?: number | null
         }
@@ -6708,6 +6735,7 @@ export type Database = {
         Returns: Json
       }
       owner_factory_reset: { Args: { _confirm: string }; Returns: Json }
+      owner_reset_bloomberg_validation_data: { Args: never; Returns: Json }
       set_proximity_conversation_flag: {
         Args: { _action: string; _conversation_id: string }
         Returns: undefined
