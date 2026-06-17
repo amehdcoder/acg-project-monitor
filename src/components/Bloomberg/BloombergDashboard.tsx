@@ -626,6 +626,53 @@ export default function BloombergDashboard({ onClose }: Props) {
           )}
         </div>
 
+        {/* Schools not yet validated — baseline figures only, validated blank */}
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="mb-1 flex items-center gap-2">
+            <School className="h-4 w-4 text-amber-500" />
+            <h3 className="text-sm font-semibold text-foreground">Schools Not Yet Validated</h3>
+            <span className="ml-auto rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700">{fmt(notValidatedTable.length)}</span>
+          </div>
+          <p className="mb-3 text-xs text-muted-foreground">Schools in the register awaiting field validation. Baseline (LEA) enrolment is shown; validated enrolment is left blank until collected. Rows are color-coded by LGA.</p>
+          {notValidatedTable.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Every school in the register has been validated. 🎉</p>
+          ) : (
+            <div className="max-h-[480px] overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-card">
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <th className="py-2 pr-3">State</th>
+                    <th className="py-2 px-3">LGA</th>
+                    <th className="py-2 px-3">School</th>
+                    <th className="py-2 px-3 text-right">Baseline (Boys)</th>
+                    <th className="py-2 px-3 text-right">Baseline (Girls)</th>
+                    <th className="py-2 px-3 text-right">Baseline Total</th>
+                    <th className="py-2 pl-3 text-right">Validated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {notValidatedTable.map((r) => (
+                    <tr key={r.id} className="border-b border-border/50 last:border-0" style={{ background: `${labelPillStyle(r.lga).background as string}55` }}>
+                      <td className="py-2 pr-3"><Label name={r.state} /></td>
+                      <td className="py-2 px-3"><Label name={r.lga} /></td>
+                      <td className="py-2 px-3">
+                        <div className="font-medium text-foreground">{r.school}</div>
+                        <div className="text-[11px] text-muted-foreground">{r.code} · {r.type}</div>
+                      </td>
+                      <td className="py-2 px-3 text-right tabular-nums">{r.baselineMale != null ? fmt(r.baselineMale) : "—"}</td>
+                      <td className="py-2 px-3 text-right tabular-nums">{r.baselineFemale != null ? fmt(r.baselineFemale) : "—"}</td>
+                      <td className="py-2 px-3 text-right font-semibold tabular-nums">{r.hasBaseline ? fmt(r.baseline) : "—"}</td>
+                      <td className="py-2 pl-3 text-right">
+                        <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-400">Pending</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
         {/* Owner-only management register — lists every entry (any status) so it is always deletable */}
         {canDelete && (
           <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
