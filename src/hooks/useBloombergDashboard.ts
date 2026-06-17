@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ALL_CLASSES, NOT_FOUND_REASONS, OPERATIONAL_STATUS } from "@/lib/bloomberg/definition";
 import { buildAccountability, type ProfileLite } from "@/lib/accountability";
+import { prettyAdminLabel } from "@/lib/formLabelUtils";
 
 export interface ValidationVerification {
   school_exists?: "yes" | "no" | "";
