@@ -107,6 +107,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
     setWard(r.ward || "");
     setLocation(r.location || "");
     setSchoolKey(r.schoolKey || "");
+    setSpecified(r.specified_locations || r.specified || {});
     setGps(r.gps || savedEntry.gps || null);
     setSchoolExists(r.verification?.school_exists || "");
     setNotFoundReason(r.verification?.not_found_reason || "");
