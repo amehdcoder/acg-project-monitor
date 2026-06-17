@@ -385,7 +385,7 @@ export const useBloombergDashboard = () => {
       .sort((a, b) => b.count - a.count);
 
     return { rows, reasonAnalysis, total: rows.length };
-  }, [submittedValidations]);
+  }, [submittedValidations, labelMaps]);
 
   // Full register of validated schools with status & variance vs baseline.
   const validatedTable = useMemo(() => {
