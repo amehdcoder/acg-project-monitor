@@ -14,6 +14,7 @@ import BloombergStateLGADrilldown from "@/components/Bloomberg/BloombergStateLGA
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { exportSchoolTemplate, importSchoolTemplate } from "@/lib/bloomberg/schoolTemplate";
+import { exportCollectedData } from "@/lib/bloomberg/collectedDataExport";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
