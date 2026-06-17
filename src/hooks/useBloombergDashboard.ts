@@ -61,9 +61,19 @@ async function fetchAll<T>(table: string, columns: string): Promise<T[]> {
   return all;
 }
 
+export interface SchoolLite {
+  school_key: string;
+  school_name: string | null;
+  school_type: string | null;
+  school_code: string | null;
+  state: string | null;
+  lga: string | null;
+}
+
 export const useBloombergDashboard = () => {
   const [validations, setValidations] = useState<ValidationRow[]>([]);
   const [baselines, setBaselines] = useState<BaselineRow[]>([]);
+  const [schools, setSchools] = useState<SchoolLite[]>([]);
   const [schoolCount, setSchoolCount] = useState(0);
   const [profileMap, setProfileMap] = useState<Map<string, ProfileLite>>(new Map());
   const [loading, setLoading] = useState(true);
