@@ -302,7 +302,21 @@ const LiveTrackingDashboard = () => {
     mapReadyRef.current = true;
     refreshSources();
 
+    // Leaflet needs an explicit size recalculation when its container is first
+    // laid out or later resized (tab switches, viewport changes, orientation
+    // flips) — without this the satellite tiles render greyed/partial.
+    const fixSize = () => map.invalidateSize({ animate: false });
+    const t0 = window.setTimeout(fixSize, 0);
+    const t1 = window.setTimeout(fixSize, 300);
+    const ro = new ResizeObserver(fixSize);
+    if (mapContainer.current) ro.observe(mapContainer.current);
+    window.addEventListener("resize", fixSize);
+
     return () => {
+      window.clearTimeout(t0);
+      window.clearTimeout(t1);
+      ro.disconnect();
+      window.removeEventListener("resize", fixSize);
       mapReadyRef.current = false;
       markersRef.current.clear();
       map.remove();
