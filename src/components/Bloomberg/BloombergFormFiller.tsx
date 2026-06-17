@@ -10,7 +10,7 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import { useBloombergSchools } from "@/hooks/useBloombergData";
 import { toast } from "sonner";
 import {
-  PRIMARY_CLASSES, JSS_CLASSES, ALL_CLASSES, emptyEnrolment, sectionTotals,
+  PRIMARY_CLASSES, JSS_CLASSES, SSS_CLASSES, ALL_CLASSES, emptyEnrolment, sectionTotals,
   grandTotals, OPERATIONAL_STATUS, NOT_FOUND_REASONS, type EnrolmentCounts,
   type BloombergSchool, normalizeMissingLabel,
 } from "@/lib/bloomberg/definition";
@@ -26,9 +26,9 @@ import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { mirrorSpecialForm, BLOOMBERG_FORM_ID } from "@/lib/specialFormBridge";
+import { BLOOMBERG_FORM_ID, BLOOMBERG_SPECIAL_FORM_KEY } from "@/lib/specialFormBridge";
 import { queueOrUploadMedia } from "@/lib/offlineMedia";
-import { queueOrInsert } from "@/lib/offlineSubmissions";
+import { saveSavedEntry, newEntryId, type SavedFormEntry, type SavedFormStatus } from "@/lib/savedForms";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
 
 const NAVY = "#0c2340";
@@ -36,6 +36,9 @@ const STEPS = ["School", "Verify", "Enrolment", "Evidence"];
 
 interface Props {
   onClose: () => void;
+  projectId?: string | null;
+  savedEntry?: SavedFormEntry | null;
+  onSavedLocally?: () => void;
 }
 
 const uniq = (rows: BloombergSchool[], val: keyof BloombergSchool, lbl: keyof BloombergSchool) => {
@@ -47,7 +50,7 @@ const uniq = (rows: BloombergSchool[], val: keyof BloombergSchool, lbl: keyof Bl
   return [...m.entries()].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
 };
 
-export default function BloombergFormFiller({ onClose }: Props) {
+export default function BloombergFormFiller({ onClose, projectId = null, savedEntry = null, onSavedLocally }: Props) {
   const { user } = useAuth();
   const { schools, loading, fromCache } = useBloombergSchools();
   const geo = useGeolocation();
