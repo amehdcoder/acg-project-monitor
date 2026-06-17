@@ -241,6 +241,13 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
         school_level: selectedSchool?.school_level ?? (savedEntry?.responses as any)?.school_level ?? null,
         ownership: selectedSchool?.ownership ?? (savedEntry?.responses as any)?.ownership ?? null,
       };
+      // Only persist specify values for fields whose option was the "Not Specified" placeholder.
+      const specifiedLocations: Record<string, string> = {};
+      if (needState && specified.state?.trim()) specifiedLocations.state = specified.state.trim();
+      if (needLga && specified.lga?.trim()) specifiedLocations.lga = specified.lga.trim();
+      if (needWard && specified.ward?.trim()) specifiedLocations.ward = specified.ward.trim();
+      if (needLocation && specified.location?.trim()) specifiedLocations.location = specified.location.trim();
+      if (needSchool && specified.school?.trim()) specifiedLocations.school = specified.school.trim();
       const submissionData = {
         validator_id: user.id,
         school_key: schoolKey || null,
@@ -249,13 +256,14 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
         gps_lat: gps?.lat ?? null, gps_lng: gps?.lng ?? null, gps_accuracy: gps?.accuracy ?? null,
         verification,
         enrolment: enrolPayload,
+        specified_locations: specifiedLocations,
         total_male: gt.male, total_female: gt.female, grand_total: gt.total,
         evidence, remarks,
       };
       const responses = {
         state, lga, ward, location, schoolKey, gps,
         ...schoolMeta,
-        verification, enrolment: enrolPayload, evidence, remarks, confirmed,
+        verification, enrolment: enrolPayload, specified_locations: specifiedLocations, evidence, remarks, confirmed,
         total_male: gt.male, total_female: gt.female, grand_total: gt.total,
       };
       const now = new Date().toISOString();
