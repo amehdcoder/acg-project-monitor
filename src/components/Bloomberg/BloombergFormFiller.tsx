@@ -273,6 +273,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
 
   const pt = sectionTotals(enrol, PRIMARY_CLASSES);
   const jt = sectionTotals(enrol, JSS_CLASSES);
+  const st = sectionTotals(enrol, SSS_CLASSES);
   const gt = grandTotals(enrol);
 
   return (
@@ -395,6 +396,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
                 <p className="rounded-lg bg-[#eef4ff] p-3 text-xs text-[#1f6feb]">Enter the actual number of pupils/students by class and sex. Do not estimate — use the school register or verified head count.</p>
                 <EnrolTable title="Primary Section (P1 – P6)" classes={PRIMARY_CLASSES} enrol={enrol} onChange={setCount} totals={pt} />
                 <EnrolTable title="Junior Secondary (JSS1 – JSS3)" classes={JSS_CLASSES} enrol={enrol} onChange={setCount} totals={jt} />
+                <EnrolTable title="Senior Secondary (SS1 – SS3)" classes={SSS_CLASSES} enrol={enrol} onChange={setCount} totals={st} />
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <Stat label="Total Male" value={gt.male} color="#2563eb" />
                   <Stat label="Total Female" value={gt.female} color="#db2777" />
@@ -451,7 +453,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
           ) : (
             <>
               <Button variant="outline" className="flex-1" disabled={saving} onClick={() => submit(true)}><Save className="mr-1 h-4 w-4" /> Save Draft</Button>
-              <Button className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8]" disabled={saving} onClick={() => submit(false)}>{saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />} Submit Validation</Button>
+              <Button className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8]" disabled={saving} onClick={() => submit(false)}>{saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />} Finalize</Button>
             </>
           )}
         </div>
