@@ -293,8 +293,8 @@ const LiveTrackingDashboard = () => {
   useEffect(() => {
     if (!allowed || !online || !mapContainer.current || mapRef.current) return;
     const map = L.map(mapContainer.current, { center: [9.082, 8.6753], zoom: 6, zoomControl: false });
-    L.tileLayer(SAT_URL, { attribution: "&copy; Esri World Imagery", maxZoom: 20 }).addTo(map);
-    L.tileLayer(LABELS_URL, { maxZoom: 20, opacity: 0.6 }).addTo(map);
+    L.tileLayer(SAT_URL, { attribution: "Tiles &copy; Esri — World Imagery", maxZoom: 23, maxNativeZoom: 19, detectRetina: true, crossOrigin: true }).addTo(map);
+    L.tileLayer(LABELS_URL, { maxZoom: 23, maxNativeZoom: 19, opacity: 0.85, pane: "overlayPane" }).addTo(map);
     L.control.zoom({ position: "topright" }).addTo(map);
     const group = L.layerGroup().addTo(map);
     layerGroupRef.current = group;
