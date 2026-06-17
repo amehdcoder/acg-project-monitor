@@ -4,6 +4,7 @@ import {
   EQUIPMENT_ITEMS, EQUIP_STATUS_META, readinessBand, type EquipStatus,
 } from "@/lib/seeclear/definition";
 import { generateSeeClearSimulation } from "@/lib/seeclear/simulation";
+import { buildAccountability, type ProfileLite } from "@/lib/accountability";
 
 export interface MonitoringRow {
   id: string;
