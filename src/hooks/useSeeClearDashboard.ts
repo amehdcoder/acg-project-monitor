@@ -293,6 +293,6 @@ export const useSeeClearDashboard = () => {
   return {
     rows, loading, reload, simulate, setSimulate,
     stats, byLevel, byOwnership, readinessByLevel, equipment, referrals,
-    dataQuality, flagged, challenges, points, draftCount, deleteFacilities,
+    dataQuality, flagged, challenges, points, draftCount, deleteFacilities, accountability,
   };
 };
