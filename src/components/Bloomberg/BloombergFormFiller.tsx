@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  ArrowLeft, ArrowRight, Check, MapPin, Loader2, Camera, Save, Send,
+  ArrowLeft, ArrowRight, Check, MapPin, Loader2, Camera, Send,
   School as SchoolIcon, ClipboardCheck, ImageIcon, ChevronDown, Search, ChevronsUpDown,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -27,7 +27,8 @@ import {
 import { cn } from "@/lib/utils";
 import { BLOOMBERG_FORM_ID, BLOOMBERG_SPECIAL_FORM_KEY } from "@/lib/specialFormBridge";
 import { queueOrUploadMedia } from "@/lib/offlineMedia";
-import { saveSavedEntry, newEntryId, type SavedFormEntry, type SavedFormStatus } from "@/lib/savedForms";
+import { saveSavedEntry, newEntryId, type SavedFormEntry } from "@/lib/savedForms";
+import { queueOrInsert } from "@/lib/offlineSubmissions";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
 
 const NAVY = "#0c2340";
@@ -195,33 +196,35 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
     return true;
   };
 
-  const submit = async (asDraft: boolean) => {
+  // Single, unified submission path. The validation is sent straight to the
+  // server (bloomberg_validations) and reflects immediately on the dashboard,
+  // or is queued offline and replayed automatically when connectivity returns.
+  // No more separate Draft / Finalize states — "Submit Validation" is the only
+  // and final action, so no submission can get stuck between states.
+  const submit = async () => {
     if (!user?.id) return;
-    const status: SavedFormStatus = asDraft ? "draft" : "finalized";
-    if (!asDraft) {
-      if (!(state && lga && ward && location && schoolKey && gps)) {
-        toast.error("Complete all school information."); setStep(0); return;
-      }
-      if (specifyMissing.length > 0) {
-        toast.error(`Please specify: ${specifyMissing.join(", ")}.`); setStep(0); return;
-      }
-      if (schoolExists === "" || (schoolExists === "no" && !notFoundReason) ||
-          (schoolExists === "yes" && !(operationalStatus && headTeacher.trim() && headPhone.trim() && dateOfVisit))) {
-        toast.error("Complete all verification fields."); setStep(1); return;
-      }
-      if (!enrolComplete) {
-        toast.error("Enter male and female counts for every class."); setStep(2); return;
-      }
-      if (!evidenceComplete) {
-        toast.error("Attach all required photo evidence."); return;
-      }
-      if (!remarks.trim()) {
-        toast.error("Validator remarks are required."); return;
-      }
-      if (!confirmed) {
-        toast.error("Please confirm the figures were taken from the register.");
-        return;
-      }
+    if (!(state && lga && ward && location && schoolKey && gps)) {
+      toast.error("Complete all school information."); setStep(0); return;
+    }
+    if (specifyMissing.length > 0) {
+      toast.error(`Please specify: ${specifyMissing.join(", ")}.`); setStep(0); return;
+    }
+    if (schoolExists === "" || (schoolExists === "no" && !notFoundReason) ||
+        (schoolExists === "yes" && !(operationalStatus && headTeacher.trim() && headPhone.trim() && dateOfVisit))) {
+      toast.error("Complete all verification fields."); setStep(1); return;
+    }
+    if (!enrolComplete) {
+      toast.error("Enter male and female counts for every class."); setStep(2); return;
+    }
+    if (!evidenceComplete) {
+      toast.error("Attach all required photo evidence."); return;
+    }
+    if (!remarks.trim()) {
+      toast.error("Validator remarks are required."); return;
+    }
+    if (!confirmed) {
+      toast.error("Please confirm the figures were taken from the register.");
+      return;
     }
     setSaving(true);
     try {
@@ -267,6 +270,20 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
         total_male: gt.male, total_female: gt.female, grand_total: gt.total,
       };
       const now = new Date().toISOString();
+
+      // 1) Send straight to the server (or queue offline). Upsert on the stable
+      // submissionId means re-submitting an edited entry overwrites the prior
+      // row rather than creating a duplicate.
+      const dbRow = {
+        ...submissionData,
+        id: submissionId,
+        status: "sent",
+        submitted_at: now,
+      };
+      const { queued } = await queueOrInsert("bloomberg_validations", dbRow, true);
+
+      // 2) Mirror into the saved-forms store as "sent" so the Forms page shows a
+      // consistent record (under Sent), with no orphaned draft/finalized copy.
       await saveSavedEntry({
         id: savedEntry?.id || newEntryId(),
         userId: user.id,
@@ -286,25 +303,28 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
         submissionLocation: gps ? { lat: gps.lat, lng: gps.lng } : null,
         withinGeofence: null,
         submissionType: BLOOMBERG_FORM_ID,
-        status,
+        status: "sent",
         createdAt: savedEntry?.createdAt || now,
         updatedAt: now,
-        finalizedAt: status === "finalized" ? now : savedEntry?.finalizedAt ?? null,
-        sentAt: null,
+        finalizedAt: now,
+        sentAt: queued ? null : now,
         submissionId,
-        offline: false,
+        offline: queued,
       });
       toast.success(
-        asDraft ? "Draft saved — find it under Edit Saved Forms" : "Validation finalized — send it from Send Finalized",
+        queued
+          ? "Saved offline — it will submit automatically when you're back online."
+          : "Validation submitted — it's now on the dashboard.",
       );
       onSavedLocally?.();
       onClose();
     } catch (e: any) {
-      toast.error(e.message || "Could not save");
+      toast.error(e.message || "Could not submit");
     } finally {
       setSaving(false);
     }
   };
+
 
   const pt = sectionTotals(enrol, PRIMARY_CLASSES);
   const jt = sectionTotals(enrol, JSS_CLASSES);
@@ -491,10 +511,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
           {step < STEPS.length - 1 ? (
             <Button className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8]" disabled={!canNext()} onClick={() => setStep((s) => s + 1)}>Continue <ArrowRight className="ml-1 h-4 w-4" /></Button>
           ) : (
-            <>
-              <Button variant="outline" className="flex-1" disabled={saving} onClick={() => submit(true)}><Save className="mr-1 h-4 w-4" /> Save Draft</Button>
-              <Button className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8]" disabled={saving} onClick={() => submit(false)}>{saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />} Finalize</Button>
-            </>
+            <Button className="flex-1 bg-[#16a34a] hover:bg-[#15803d]" disabled={saving} onClick={() => submit()}>{saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />} Submit Validation</Button>
           )}
         </div>
       </div>

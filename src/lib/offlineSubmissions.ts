@@ -20,6 +20,7 @@ export interface PendingInsert {
   created_at: string;
   attempts: number;
   last_error?: string | null;
+  upsertOnId?: boolean;
 }
 
 let flushing = false;
@@ -75,14 +76,22 @@ const isOnline = () => (typeof navigator === "undefined" ? true : navigator.onLi
 /**
  * Insert a row now if online, otherwise queue it offline. Always resolves;
  * `queued` is true when the insert is waiting for connectivity.
+ *
+ * When `upsertOnId` is true the row is written with an upsert keyed on `id`,
+ * so re-submitting an edited record overwrites the existing row instead of
+ * creating a duplicate. The same flag is preserved on the queued record and
+ * honoured when the offline queue is flushed.
  */
 export async function queueOrInsert(
   table: string,
   row: Record<string, any>,
+  upsertOnId = false,
 ): Promise<{ queued: boolean }> {
   if (isOnline()) {
     try {
-      const { error } = await supabase.from(table as any).insert(row);
+      const { error } = upsertOnId
+        ? await supabase.from(table as any).upsert(row, { onConflict: "id" })
+        : await supabase.from(table as any).insert(row);
       if (error) throw error;
       return { queued: false };
     } catch {
@@ -96,6 +105,7 @@ export async function queueOrInsert(
     created_at: new Date().toISOString(),
     attempts: 0,
     last_error: null,
+    upsertOnId,
   });
   ensureListeners();
   return { queued: true };
@@ -120,7 +130,9 @@ export async function flushSubmissionQueue(): Promise<{ inserted: number; remain
     for (const rec of records) {
       if (!isOnline()) break;
       try {
-        const { error } = await supabase.from(rec.table as any).insert(rec.row);
+        const { error } = rec.upsertOnId
+          ? await supabase.from(rec.table as any).upsert(rec.row, { onConflict: "id" })
+          : await supabase.from(rec.table as any).insert(rec.row);
         if (error) throw error;
         await deleteRecord(rec.id);
         inserted++;

@@ -97,6 +97,6 @@ export async function syncSpecialSavedForm(
     submitted_at: now,
   };
 
-  const { queued } = await queueOrInsert("bloomberg_validations", row);
+  const { queued } = await queueOrInsert("bloomberg_validations", row, true);
   return { success: true, offline: queued, id };
 }
