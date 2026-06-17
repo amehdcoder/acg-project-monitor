@@ -429,7 +429,7 @@ export const useBloombergDashboard = () => {
   };
 
   return {
-    validations, baselines, stats, byState, stateBreakdown, points, nonExistent, validatedTable, accountability,
+    validations, baselines, stats, byState, stateBreakdown, points, nonExistent, validatedTable, notValidatedTable, accountability,
     loading, reload, deleteValidations, ALL_CLASSES,
   };
 };
