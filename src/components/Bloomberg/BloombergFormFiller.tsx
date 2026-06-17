@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import {
   PRIMARY_CLASSES, JSS_CLASSES, SSS_CLASSES, ALL_CLASSES, emptyEnrolment, sectionTotals,
   grandTotals, OPERATIONAL_STATUS, NOT_FOUND_REASONS, type EnrolmentCounts,
-  type BloombergSchool, type ClassDef, normalizeMissingLabel,
+  type BloombergSchool, type ClassDef, normalizeMissingLabel, MISSING_LOCATION_LABEL,
 } from "@/lib/bloomberg/definition";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +64,10 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
   const [location, setLocation] = useState("");
   const [schoolKey, setSchoolKey] = useState("");
   const [gps, setGps] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
+  // User-typed names for any School Information field whose chosen cascade option
+  // is "Not Specified in the LGA School Enrolment Dataset".
+  const [specified, setSpecified] = useState<Record<string, string>>({});
+  const setSpec = (k: string, v: string) => setSpecified((s) => ({ ...s, [k]: v }));
 
   // Step 2 — verification
   const [schoolExists, setSchoolExists] = useState<"yes" | "no" | "">("");
@@ -95,6 +99,26 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
   );
   const selectedSchool = useMemo(() => schools.find((s) => s.school_key === schoolKey) || null, [schools, schoolKey]);
 
+  // True when the currently chosen option for a cascade field is the
+  // "Not Specified in the LGA School Enrolment Dataset" placeholder.
+  const isUnspecified = (val: string, opts: { value: string; label: string }[]) =>
+    !!val && (opts.find((o) => o.value === val)?.label === MISSING_LOCATION_LABEL);
+  const needState = isUnspecified(state, stateOpts);
+  const needLga = isUnspecified(lga, lgaOpts);
+  const needWard = isUnspecified(ward, wardOpts);
+  const needLocation = isUnspecified(location, locOpts);
+  const needSchool = !!selectedSchool && normalizeMissingLabel(selectedSchool.school_name) === MISSING_LOCATION_LABEL;
+  // Which "specify" inputs are required & still empty.
+  const specifyMissing = useMemo(() => {
+    const out: string[] = [];
+    if (needState && !specified.state?.trim()) out.push("State");
+    if (needLga && !specified.lga?.trim()) out.push("LGA");
+    if (needWard && !specified.ward?.trim()) out.push("Ward");
+    if (needLocation && !specified.location?.trim()) out.push("Community / Location");
+    if (needSchool && !specified.school?.trim()) out.push("School Name");
+    return out;
+  }, [needState, needLga, needWard, needLocation, needSchool, specified]);
+
   useEffect(() => {
     if (!savedEntry) return;
     const r = savedEntry.responses || {};
@@ -103,6 +127,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
     setWard(r.ward || "");
     setLocation(r.location || "");
     setSchoolKey(r.schoolKey || "");
+    setSpecified(r.specified_locations || r.specified || {});
     setGps(r.gps || savedEntry.gps || null);
     setSchoolExists(r.verification?.school_exists || "");
     setNotFoundReason(r.verification?.not_found_reason || "");
@@ -160,7 +185,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
   const evidenceComplete = REQUIRED_EVIDENCE.every((s) => !!evidence[s]);
 
   const canNext = () => {
-    if (step === 0) return !!(state && lga && ward && location && schoolKey && gps);
+    if (step === 0) return !!(state && lga && ward && location && schoolKey && gps) && specifyMissing.length === 0;
     if (step === 1) {
       if (schoolExists === "") return false;
       if (schoolExists === "no") return !!notFoundReason;
@@ -176,6 +201,9 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
     if (!asDraft) {
       if (!(state && lga && ward && location && schoolKey && gps)) {
         toast.error("Complete all school information."); setStep(0); return;
+      }
+      if (specifyMissing.length > 0) {
+        toast.error(`Please specify: ${specifyMissing.join(", ")}.`); setStep(0); return;
       }
       if (schoolExists === "" || (schoolExists === "no" && !notFoundReason) ||
           (schoolExists === "yes" && !(operationalStatus && headTeacher.trim() && headPhone.trim() && dateOfVisit))) {
@@ -213,6 +241,13 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
         school_level: selectedSchool?.school_level ?? (savedEntry?.responses as any)?.school_level ?? null,
         ownership: selectedSchool?.ownership ?? (savedEntry?.responses as any)?.ownership ?? null,
       };
+      // Only persist specify values for fields whose option was the "Not Specified" placeholder.
+      const specifiedLocations: Record<string, string> = {};
+      if (needState && specified.state?.trim()) specifiedLocations.state = specified.state.trim();
+      if (needLga && specified.lga?.trim()) specifiedLocations.lga = specified.lga.trim();
+      if (needWard && specified.ward?.trim()) specifiedLocations.ward = specified.ward.trim();
+      if (needLocation && specified.location?.trim()) specifiedLocations.location = specified.location.trim();
+      if (needSchool && specified.school?.trim()) specifiedLocations.school = specified.school.trim();
       const submissionData = {
         validator_id: user.id,
         school_key: schoolKey || null,
@@ -221,13 +256,14 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
         gps_lat: gps?.lat ?? null, gps_lng: gps?.lng ?? null, gps_accuracy: gps?.accuracy ?? null,
         verification,
         enrolment: enrolPayload,
+        specified_locations: specifiedLocations,
         total_male: gt.male, total_female: gt.female, grand_total: gt.total,
         evidence, remarks,
       };
       const responses = {
         state, lga, ward, location, schoolKey, gps,
         ...schoolMeta,
-        verification, enrolment: enrolPayload, evidence, remarks, confirmed,
+        verification, enrolment: enrolPayload, specified_locations: specifiedLocations, evidence, remarks, confirmed,
         total_male: gt.male, total_female: gt.female, grand_total: gt.total,
       };
       const now = new Date().toISOString();
@@ -325,9 +361,13 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
                 <p className="mb-4 rounded-lg bg-[#eef4ff] p-3 text-xs text-[#1f6feb]">Select the assigned school. LEA baseline enrolment figures are hidden from validators.</p>
                 <div className="space-y-3">
                   <Field label="State" required><Sel value={state} onChange={(v) => { setState(v); setLga(""); setWard(""); setLocation(""); setSchoolKey(""); }} options={stateOpts} placeholder="Select state" /></Field>
+                  {needState && <SpecifyInput label="State" value={specified.state || ""} onChange={(v) => setSpec("state", v)} />}
                   <Field label="LGA" required><Sel value={lga} onChange={(v) => { setLga(v); setWard(""); setLocation(""); setSchoolKey(""); }} options={lgaOpts} placeholder="Select LGA" disabled={!state} /></Field>
+                  {needLga && <SpecifyInput label="LGA" value={specified.lga || ""} onChange={(v) => setSpec("lga", v)} />}
                   <Field label="Ward" required><Sel value={ward} onChange={(v) => { setWard(v); setLocation(""); setSchoolKey(""); }} options={wardOpts} placeholder="Select ward" disabled={!lga} /></Field>
+                  {needWard && <SpecifyInput label="Ward" value={specified.ward || ""} onChange={(v) => setSpec("ward", v)} />}
                   <Field label="Community / Location" required><Sel value={location} onChange={(v) => { setLocation(v); setSchoolKey(""); }} options={locOpts} placeholder="Select community or location" disabled={!ward} /></Field>
+                  {needLocation && <SpecifyInput label="Community / Location" value={specified.location || ""} onChange={(v) => setSpec("location", v)} />}
                   <Field label="School Name" required>
                     <SchoolSearchCombobox
                       schools={schoolOpts}
@@ -335,6 +375,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
                       onChange={(v) => setSchoolKey(v)}
                     />
                   </Field>
+                  {needSchool && <SpecifyInput label="School Name" value={specified.school || ""} onChange={(v) => setSpec("school", v)} />}
                   {selectedSchool && (
                     <div className="grid grid-cols-2 gap-2 rounded-lg bg-[#f4f6fb] p-3 text-sm">
                       <span className="text-muted-foreground">Code</span><span className="font-semibold">{selectedSchool.school_code || "—"}</span>
@@ -477,6 +518,26 @@ const Sel = ({ value, onChange, options, placeholder, disabled }: { value: strin
       {options.map((o) => <SelectItem key={o.value} value={o.value} className="text-lg">{o.label}</SelectItem>)}
     </SelectContent>
   </Select>
+);
+
+// Inline "please specify" prompt shown when a cascade option resolves to the
+// "Not Specified in the LGA School Enrolment Dataset" placeholder.
+const SpecifyInput = ({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) => (
+  <div className="-mt-1 rounded-xl border border-[#f0b429] bg-[#fffbeb] p-3">
+    <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-[#92600a]">
+      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#f0b429] text-[10px] font-bold text-white">!</span>
+      Specify the {label} <span className="text-[#dc2626]">*</span>
+    </label>
+    <p className="mb-2 text-[11px] text-[#92600a]/80">
+      This {label.toLowerCase()} was not in the LGA enrolment dataset. Enter the correct name so it is captured in the collected data.
+    </p>
+    <Input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={`Type the ${label.toLowerCase()} name`}
+      className="h-[3.25rem] border-[#f0b429] bg-white text-lg focus-visible:ring-[#f0b429]"
+    />
+  </div>
 );
 
 const Stat = ({ label, value, color }: { label: string; value: number; color: string }) => (

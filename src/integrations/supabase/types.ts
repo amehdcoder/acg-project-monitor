@@ -998,6 +998,7 @@ export type Database = {
           school_level: string | null
           school_name: string | null
           school_type: string | null
+          specified_locations: Json
           state: string | null
           status: string
           submitted_at: string
@@ -1026,6 +1027,7 @@ export type Database = {
           school_level?: string | null
           school_name?: string | null
           school_type?: string | null
+          specified_locations?: Json
           state?: string | null
           status?: string
           submitted_at?: string
@@ -1054,6 +1056,7 @@ export type Database = {
           school_level?: string | null
           school_name?: string | null
           school_type?: string | null
+          specified_locations?: Json
           state?: string | null
           status?: string
           submitted_at?: string
