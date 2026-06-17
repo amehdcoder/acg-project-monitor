@@ -257,25 +257,25 @@ export const useBloombergDashboard = () => {
       reported.map((v) => ({
         userId: v.validator_id,
         unitName: v.school_name || "Unnamed school",
-        state: v.state || "—",
-        lga: v.lga || "—",
+        state: stateName(v.state),
+        lga: lgaName(v.state, v.lga),
         start: v.created_at,
         end: v.submitted_at || v.updated_at,
         status: v.status || "sent",
       })),
       profileMap,
     );
-  }, [validations, profileMap]);
+  }, [validations, profileMap, labelMaps]);
 
 
   const byState = useMemo(() => {
     const m = new Map<string, number>();
     submittedValidations.forEach((v) => {
-      const key = (v.state || "Unknown").toString();
+      const key = stateName(v.state);
       m.set(key, (m.get(key) || 0) + 1);
     });
     return [...m.entries()].map(([state, count]) => ({ state, count })).sort((a, b) => b.count - a.count);
-  }, [submittedValidations]);
+  }, [submittedValidations, labelMaps]);
 
   // State → LGA disaggregation for the Validation Dashboard drill-down.
   // Each state aggregates its LGAs; each level carries submission counts,
