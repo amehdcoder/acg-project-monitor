@@ -21,6 +21,23 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
 import { pctTone, toneColor, varianceTone } from "@/lib/conditionalFormatting";
+import { labelPillStyle } from "@/lib/lgaColors";
+
+// Professional, color-coded label pill for admin units (State / LGA). Same name
+// always renders with the same beautiful tint across every table.
+const Label = ({ name }: { name: string | null | undefined }) => {
+  const text = (name || "").trim();
+  if (!text || text === "—") return <span className="text-muted-foreground">—</span>;
+  return (
+    <span
+      className="inline-block max-w-[160px] truncate rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+      style={labelPillStyle(text)}
+      title={text}
+    >
+      {text}
+    </span>
+  );
+};
 
 
 const NAVY = "#0c2340";
