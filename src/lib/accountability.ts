@@ -96,14 +96,23 @@ export function buildAccountability(
 
   records.forEach((r) => {
     const uid = r.userId || "unassigned";
+    // Start = the moment the form was opened (created_at); End = submission time
+    // (submitted_at). Legacy rows that were re-synced can have a created_at AFTER
+    // submitted_at (an inverted span). In that case the created_at is unreliable,
+    // so we drop it and keep the trustworthy submission time as the end.
+    const sTime = r.start ? new Date(r.start).getTime() : NaN;
+    const eTime = r.end ? new Date(r.end).getTime() : NaN;
+    const inverted = !isNaN(sTime) && !isNaN(eTime) && sTime > eTime;
+    const start = inverted ? null : r.start;
+    const end = r.end;
     const visit: AccountabilityVisit = {
       unitName: r.unitName || "Unnamed",
       state: r.state || "—",
       lga: r.lga || "—",
-      start: r.start,
-      end: r.end,
-      durationMs: durationMs(r.start, r.end),
-      date: dayKey(r.start) || dayKey(r.end) || "",
+      start,
+      end,
+      durationMs: durationMs(start, end),
+      date: dayKey(start) || dayKey(end) || "",
       status: r.status,
     };
     if (!byUser.has(uid)) byUser.set(uid, []);

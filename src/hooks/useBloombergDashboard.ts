@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ALL_CLASSES, NOT_FOUND_REASONS, OPERATIONAL_STATUS } from "@/lib/bloomberg/definition";
 import { buildAccountability, type ProfileLite } from "@/lib/accountability";
+import { prettyAdminLabel } from "@/lib/formLabelUtils";
 
 export interface ValidationVerification {
   school_exists?: "yes" | "no" | "";
@@ -68,6 +69,12 @@ export interface SchoolLite {
   school_code: string | null;
   state: string | null;
   lga: string | null;
+  state_label?: string | null;
+  lga_label?: string | null;
+  ward_label?: string | null;
+  location_label?: string | null;
+  ward?: string | null;
+  location?: string | null;
 }
 
 export const useBloombergDashboard = () => {
@@ -91,7 +98,10 @@ export const useBloombergDashboard = () => {
           "id,validator_id,school_key,school_name,school_type,school_code,state,lga,ward,gps_lat,gps_lng,total_male,total_female,grand_total,verification,status,submitted_at,updated_at,created_at",
         ),
         fetchAll<BaselineRow>("bloomberg_school_baselines", "school_key,total_male,total_female,grand_total"),
-        fetchAll<SchoolLite>("bloomberg_schools", "school_key,school_name,school_type,school_code,state,lga"),
+        fetchAll<SchoolLite>(
+          "bloomberg_schools",
+          "school_key,school_name,school_type,school_code,state,lga,ward,location,state_label,lga_label,ward_label,location_label",
+        ),
       ]);
       const count = s.length;
 
@@ -138,6 +148,37 @@ export const useBloombergDashboard = () => {
     baselines.forEach((b) => m.set(b.school_key, b));
     return m;
   }, [baselines]);
+
+  // Human-readable admin-unit labels. Submissions store raw option codes
+  // (state="bauchi", lga="bauchi_ganjuwa"); the schools register carries the
+  // matching display labels (state_label="Bauchi", lga_label="Ganjuwa"). We
+  // build code→label maps from the register so every table on the dashboard
+  // renders proper names instead of raw codes. Falls back to a deterministic
+  // prettifier for any code not present in the register.
+  const labelMaps = useMemo(() => {
+    const state = new Map<string, string>();
+    const lga = new Map<string, string>();
+    const ward = new Map<string, string>();
+    const loc = new Map<string, string>();
+    schools.forEach((s) => {
+      if (s.state && s.state_label) state.set(s.state, s.state_label);
+      if (s.lga && s.lga_label) lga.set(s.lga, s.lga_label);
+      if (s.ward && s.ward_label) ward.set(s.ward, s.ward_label);
+      if (s.location && s.location_label) loc.set(s.location, s.location_label);
+    });
+    return { state, lga, ward, loc };
+  }, [schools]);
+
+  const stateName = (code: string | null | undefined) =>
+    (code && labelMaps.state.get(code)) || prettyAdminLabel(code) || "—";
+  const lgaName = (stateCode: string | null | undefined, code: string | null | undefined) =>
+    (code && labelMaps.lga.get(code)) || prettyAdminLabel(code, stateCode) || "—";
+  const wardName = (
+    stateCode: string | null | undefined,
+    lgaCode: string | null | undefined,
+    code: string | null | undefined,
+  ) => (code && labelMaps.ward.get(code)) || prettyAdminLabel(code, lgaCode || stateCode) || "—";
+
 
   // De-duplicate validated schools: a single school must appear only ONCE on the
   // dashboard, otherwise totals, coverage and discrepancy analysis are inflated
@@ -216,25 +257,25 @@ export const useBloombergDashboard = () => {
       reported.map((v) => ({
         userId: v.validator_id,
         unitName: v.school_name || "Unnamed school",
-        state: v.state || "—",
-        lga: v.lga || "—",
+        state: stateName(v.state),
+        lga: lgaName(v.state, v.lga),
         start: v.created_at,
         end: v.submitted_at || v.updated_at,
         status: v.status || "sent",
       })),
       profileMap,
     );
-  }, [validations, profileMap]);
+  }, [validations, profileMap, labelMaps]);
 
 
   const byState = useMemo(() => {
     const m = new Map<string, number>();
     submittedValidations.forEach((v) => {
-      const key = (v.state || "Unknown").toString();
+      const key = stateName(v.state);
       m.set(key, (m.get(key) || 0) + 1);
     });
     return [...m.entries()].map(([state, count]) => ({ state, count })).sort((a, b) => b.count - a.count);
-  }, [submittedValidations]);
+  }, [submittedValidations, labelMaps]);
 
   // State → LGA disaggregation for the Validation Dashboard drill-down.
   // Each state aggregates its LGAs; each level carries submission counts,
@@ -279,7 +320,7 @@ export const useBloombergDashboard = () => {
 
     return [...states.entries()]
       .map(([state, node]) => ({
-        state,
+        state: stateName(state),
         submissions: node.agg.submissions,
         validatedSchools: node.agg.validatedSchools.size,
         validated: node.agg.validated,
@@ -288,7 +329,7 @@ export const useBloombergDashboard = () => {
         variancePct: variance(node.agg),
         lgas: [...node.lgas.entries()]
           .map(([lga, a]) => ({
-            lga,
+            lga: lgaName(state, lga),
             submissions: a.submissions,
             validatedSchools: a.validatedSchools.size,
             validated: a.validated,
@@ -299,7 +340,7 @@ export const useBloombergDashboard = () => {
           .sort((x, y) => y.submissions - x.submissions || x.lga.localeCompare(y.lga)),
       }))
       .sort((x, y) => y.submissions - x.submissions || x.state.localeCompare(y.state));
-  }, [submittedValidations, baselineByKey]);
+  }, [submittedValidations, baselineByKey, labelMaps]);
 
   const points = useMemo(
     () =>
@@ -319,9 +360,9 @@ export const useBloombergDashboard = () => {
           id: v.id,
           school: v.school_name || "Unknown",
           code: v.school_code || v.school_key || "—",
-          state: v.state || "—",
-          lga: v.lga || "—",
-          ward: v.ward || "—",
+          state: stateName(v.state),
+          lga: lgaName(v.state, v.lga),
+          ward: wardName(v.state, v.lga, v.ward),
           reasonValue: reasonVal,
           reason: REASON_LABEL.get(reasonVal) || reasonVal || "Other",
           status: v.status || "draft",
@@ -344,7 +385,7 @@ export const useBloombergDashboard = () => {
       .sort((a, b) => b.count - a.count);
 
     return { rows, reasonAnalysis, total: rows.length };
-  }, [submittedValidations]);
+  }, [submittedValidations, labelMaps]);
 
   // Full register of validated schools with status & variance vs baseline.
   const validatedTable = useMemo(() => {
@@ -364,8 +405,8 @@ export const useBloombergDashboard = () => {
           id: v.id,
           school: v.school_name || "Unknown",
           code: v.school_code || v.school_key || "—",
-          state: v.state || "—",
-          lga: v.lga || "—",
+          state: stateName(v.state),
+          lga: lgaName(v.state, v.lga),
           type: v.school_type || "—",
           baseline,
           validated,
@@ -379,7 +420,7 @@ export const useBloombergDashboard = () => {
         };
       })
       .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct) || a.school.localeCompare(b.school));
-  }, [submittedValidations, baselineByKey]);
+  }, [submittedValidations, baselineByKey, labelMaps]);
 
   // Schools that have NOT been validated yet — every school in the register that
   // has no submitted/validated entry. Baseline enrolment figures are shown;
@@ -397,8 +438,8 @@ export const useBloombergDashboard = () => {
           id: s.school_key,
           school: s.school_name || "Unnamed school",
           code: s.school_code || s.school_key || "—",
-          state: s.state || "—",
-          lga: s.lga || "—",
+          state: stateName(s.state),
+          lga: lgaName(s.state, s.lga),
           type: s.school_type || "—",
           baseline,
           hasBaseline: baseline > 0,
@@ -412,7 +453,7 @@ export const useBloombergDashboard = () => {
           a.lga.localeCompare(b.lga) ||
           a.school.localeCompare(b.school),
       );
-  }, [schools, submittedValidations, baselineByKey]);
+  }, [schools, submittedValidations, baselineByKey, labelMaps]);
 
   // Owner-only hard delete of validation entries. Removes the rows from the
   // database so they immediately disappear from every dashboard view.
