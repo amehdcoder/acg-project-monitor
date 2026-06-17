@@ -152,21 +152,26 @@ export const useBloombergDashboard = () => {
     };
   }, [validations, baselineByKey, schoolCount]);
 
+  const submittedValidations = useMemo(
+    () => validations.filter((v) => v.status === "sent"),
+    [validations],
+  );
+
   // Submissions by state for the map.
   const byState = useMemo(() => {
     const m = new Map<string, number>();
-    validations.forEach((v) => {
+    submittedValidations.forEach((v) => {
       const key = (v.state || "Unknown").toString();
       m.set(key, (m.get(key) || 0) + 1);
     });
     return [...m.entries()].map(([state, count]) => ({ state, count })).sort((a, b) => b.count - a.count);
-  }, [validations]);
+  }, [submittedValidations]);
 
   // State → LGA disaggregation for the Validation Dashboard drill-down.
   // Each state aggregates its LGAs; each level carries submission counts,
   // validated pupils and baseline (for validated schools) plus variance.
   const stateBreakdown = useMemo(() => {
-    const submitted = validations.filter((v) => v.status === "sent");
+    const submitted = submittedValidations;
 
     interface Agg {
       submissions: number;
@@ -225,19 +230,19 @@ export const useBloombergDashboard = () => {
           .sort((x, y) => y.submissions - x.submissions || x.lga.localeCompare(y.lga)),
       }))
       .sort((x, y) => y.submissions - x.submissions || x.state.localeCompare(y.state));
-  }, [validations, baselineByKey]);
+  }, [submittedValidations, baselineByKey]);
 
   const points = useMemo(
     () =>
-      validations
+      submittedValidations
         .filter((v) => v.gps_lat != null && v.gps_lng != null)
         .map((v) => ({ lat: v.gps_lat as number, lng: v.gps_lng as number, status: v.status || "draft", name: v.school_name || "" })),
-    [validations],
+    [submittedValidations],
   );
 
   // Schools reported as not existing / not found during field validation.
   const nonExistent = useMemo(() => {
-    const rows = validations
+    const rows = submittedValidations
       .filter((v) => v.verification?.school_exists === "no")
       .map((v) => {
         const reasonVal = v.verification?.not_found_reason || "other";
@@ -270,11 +275,11 @@ export const useBloombergDashboard = () => {
       .sort((a, b) => b.count - a.count);
 
     return { rows, reasonAnalysis, total: rows.length };
-  }, [validations]);
+  }, [submittedValidations]);
 
   // Full register of validated schools with status & variance vs baseline.
   const validatedTable = useMemo(() => {
-    return validations
+    return submittedValidations
       .filter((v) => v.verification?.school_exists !== "no")
       .map((v) => {
         const b = v.school_key ? baselineByKey.get(v.school_key) : undefined;
@@ -305,7 +310,7 @@ export const useBloombergDashboard = () => {
         };
       })
       .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct) || a.school.localeCompare(b.school));
-  }, [validations, baselineByKey]);
+  }, [submittedValidations, baselineByKey]);
 
   // Owner-only hard delete of validation entries. Removes the rows from the
   // database so they immediately disappear from every dashboard view.
