@@ -130,7 +130,9 @@ export async function flushSubmissionQueue(): Promise<{ inserted: number; remain
     for (const rec of records) {
       if (!isOnline()) break;
       try {
-        const { error } = await supabase.from(rec.table as any).insert(rec.row);
+        const { error } = rec.upsertOnId
+          ? await supabase.from(rec.table as any).upsert(rec.row, { onConflict: "id" })
+          : await supabase.from(rec.table as any).insert(rec.row);
         if (error) throw error;
         await deleteRecord(rec.id);
         inserted++;
