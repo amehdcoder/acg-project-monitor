@@ -560,8 +560,9 @@ export default function BloombergDashboard({ onClose }: Props) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                    <th className="py-2 pr-3">School</th>
-                    <th className="py-2 px-3">State / LGA</th>
+                    <th className="py-2 pr-3">State</th>
+                    <th className="py-2 px-3">LGA</th>
+                    <th className="py-2 px-3">School</th>
                     <th className="py-2 px-3">Operational</th>
                     <th className="py-2 px-3 text-right">Baseline</th>
                     <th className="py-2 px-3 text-right">Validated</th>
@@ -578,11 +579,12 @@ export default function BloombergDashboard({ onClose }: Props) {
                     const rowBg = sev === 3 ? "bg-red-50/70" : sev === 2 ? "bg-amber-50/60" : sev === 1 ? "bg-yellow-50/40" : "bg-emerald-50/40";
                     return (
                       <tr key={i} className={`border-b border-border/50 last:border-0 ${rowBg}`}>
-                        <td className="py-2 pr-3">
+                        <td className="py-2 pr-3"><Label name={r.state} /></td>
+                        <td className="py-2 px-3"><Label name={r.lga} /></td>
+                        <td className="py-2 px-3">
                           <div className="font-medium text-foreground">{r.school}</div>
                           <div className="text-[11px] text-muted-foreground">{r.code} · {r.type}</div>
                         </td>
-                        <td className="py-2 px-3 text-xs">{r.state}<br /><span className="text-muted-foreground">{r.lga}</span></td>
                         <td className="py-2 px-3"><OpBadge value={r.operationalValue} label={r.operational} /></td>
                         <td className="py-2 px-3 text-right tabular-nums">{r.hasBaseline ? fmt(r.baseline) : "—"}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{fmt(r.validated)}</td>
