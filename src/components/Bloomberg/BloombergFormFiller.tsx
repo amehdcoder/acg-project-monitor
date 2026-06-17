@@ -243,11 +243,11 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
       };
       // Only persist specify values for fields whose option was the "Not Specified" placeholder.
       const specifiedLocations: Record<string, string> = {};
-      if (needState && specified.state?.trim()) specifiedLocations.state = specified.state.trim();
-      if (needLga && specified.lga?.trim()) specifiedLocations.lga = specified.lga.trim();
-      if (needWard && specified.ward?.trim()) specifiedLocations.ward = specified.ward.trim();
-      if (needLocation && specified.location?.trim()) specifiedLocations.location = specified.location.trim();
-      if (needSchool && specified.school?.trim()) specifiedLocations.school = specified.school.trim();
+      if ((needState || specified.state) && specified.state?.trim()) specifiedLocations.state = specified.state.trim();
+      if ((needLga || specified.lga) && specified.lga?.trim()) specifiedLocations.lga = specified.lga.trim();
+      if ((needWard || specified.ward) && specified.ward?.trim()) specifiedLocations.ward = specified.ward.trim();
+      if ((needLocation || specified.location) && specified.location?.trim()) specifiedLocations.location = specified.location.trim();
+      if ((needSchool || specified.school) && specified.school?.trim()) specifiedLocations.school = specified.school.trim();
       const submissionData = {
         validator_id: user.id,
         school_key: schoolKey || null,
@@ -361,13 +361,13 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
                 <p className="mb-4 rounded-lg bg-[#eef4ff] p-3 text-xs text-[#1f6feb]">Select the assigned school. LEA baseline enrolment figures are hidden from validators.</p>
                 <div className="space-y-3">
                   <Field label="State" required><Sel value={state} onChange={(v) => { setState(v); setLga(""); setWard(""); setLocation(""); setSchoolKey(""); }} options={stateOpts} placeholder="Select state" /></Field>
-                  {needState && <SpecifyInput label="State" value={specified.state || ""} onChange={(v) => setSpec("state", v)} />}
+                  {(needState || !!specified.state) && <SpecifyInput label="State" value={specified.state || ""} onChange={(v) => setSpec("state", v)} />}
                   <Field label="LGA" required><Sel value={lga} onChange={(v) => { setLga(v); setWard(""); setLocation(""); setSchoolKey(""); }} options={lgaOpts} placeholder="Select LGA" disabled={!state} /></Field>
-                  {needLga && <SpecifyInput label="LGA" value={specified.lga || ""} onChange={(v) => setSpec("lga", v)} />}
+                  {(needLga || !!specified.lga) && <SpecifyInput label="LGA" value={specified.lga || ""} onChange={(v) => setSpec("lga", v)} />}
                   <Field label="Ward" required><Sel value={ward} onChange={(v) => { setWard(v); setLocation(""); setSchoolKey(""); }} options={wardOpts} placeholder="Select ward" disabled={!lga} /></Field>
-                  {needWard && <SpecifyInput label="Ward" value={specified.ward || ""} onChange={(v) => setSpec("ward", v)} />}
+                  {(needWard || !!specified.ward) && <SpecifyInput label="Ward" value={specified.ward || ""} onChange={(v) => setSpec("ward", v)} />}
                   <Field label="Community / Location" required><Sel value={location} onChange={(v) => { setLocation(v); setSchoolKey(""); }} options={locOpts} placeholder="Select community or location" disabled={!ward} /></Field>
-                  {needLocation && <SpecifyInput label="Community / Location" value={specified.location || ""} onChange={(v) => setSpec("location", v)} />}
+                  {(needLocation || !!specified.location) && <SpecifyInput label="Community / Location" value={specified.location || ""} onChange={(v) => setSpec("location", v)} />}
                   <Field label="School Name" required>
                     <SchoolSearchCombobox
                       schools={schoolOpts}
@@ -375,7 +375,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
                       onChange={(v) => setSchoolKey(v)}
                     />
                   </Field>
-                  {needSchool && <SpecifyInput label="School Name" value={specified.school || ""} onChange={(v) => setSpec("school", v)} />}
+                  {(needSchool || !!specified.school) && <SpecifyInput label="School Name" value={specified.school || ""} onChange={(v) => setSpec("school", v)} />}
                   {selectedSchool && (
                     <div className="grid grid-cols-2 gap-2 rounded-lg bg-[#f4f6fb] p-3 text-sm">
                       <span className="text-muted-foreground">Code</span><span className="font-semibold">{selectedSchool.school_code || "—"}</span>
