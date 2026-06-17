@@ -121,6 +121,7 @@ export function generateSeeClearSimulation(seed = 5125): SeeClearSimDataset {
 
       rows.push({
         id: `sim-sc-${idx}`,
+        monitor_id: `sim-monitor-${1 + (idx % 6)}`,
         date_of_visit: daysAgo(idx % 50).slice(0, 10),
         state: "Plateau",
         lga: place.lga,
