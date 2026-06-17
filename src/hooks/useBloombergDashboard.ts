@@ -97,7 +97,10 @@ export const useBloombergDashboard = () => {
           "id,validator_id,school_key,school_name,school_type,school_code,state,lga,ward,gps_lat,gps_lng,total_male,total_female,grand_total,verification,status,submitted_at,updated_at,created_at",
         ),
         fetchAll<BaselineRow>("bloomberg_school_baselines", "school_key,total_male,total_female,grand_total"),
-        fetchAll<SchoolLite>("bloomberg_schools", "school_key,school_name,school_type,school_code,state,lga"),
+        fetchAll<SchoolLite>(
+          "bloomberg_schools",
+          "school_key,school_name,school_type,school_code,state,lga,ward,location,state_label,lga_label,ward_label,location_label",
+        ),
       ]);
       const count = s.length;
 
