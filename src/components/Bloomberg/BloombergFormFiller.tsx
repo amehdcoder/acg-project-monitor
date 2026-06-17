@@ -202,6 +202,9 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
       if (!(state && lga && ward && location && schoolKey && gps)) {
         toast.error("Complete all school information."); setStep(0); return;
       }
+      if (specifyMissing.length > 0) {
+        toast.error(`Please specify: ${specifyMissing.join(", ")}.`); setStep(0); return;
+      }
       if (schoolExists === "" || (schoolExists === "no" && !notFoundReason) ||
           (schoolExists === "yes" && !(operationalStatus && headTeacher.trim() && headPhone.trim() && dateOfVisit))) {
         toast.error("Complete all verification fields."); setStep(1); return;
