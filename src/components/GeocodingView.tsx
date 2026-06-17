@@ -292,7 +292,7 @@ export default function GeocodingView() {
                   <span>Address</span><span className="w-24 text-center">Latitude</span>
                   <span className="w-24 text-center">Longitude</span><span className="w-16 text-center">Action</span>
                 </div>
-                <div className="max-h-[360px] overflow-y-auto">v
+                <div className="max-h-[360px] overflow-y-auto">
                   {rows.map((r) => (
                     <div key={r.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center px-3 py-1.5 border-t border-border">
                       <Input
