@@ -148,6 +148,37 @@ export const useBloombergDashboard = () => {
     return m;
   }, [baselines]);
 
+  // Human-readable admin-unit labels. Submissions store raw option codes
+  // (state="bauchi", lga="bauchi_ganjuwa"); the schools register carries the
+  // matching display labels (state_label="Bauchi", lga_label="Ganjuwa"). We
+  // build code→label maps from the register so every table on the dashboard
+  // renders proper names instead of raw codes. Falls back to a deterministic
+  // prettifier for any code not present in the register.
+  const labelMaps = useMemo(() => {
+    const state = new Map<string, string>();
+    const lga = new Map<string, string>();
+    const ward = new Map<string, string>();
+    const loc = new Map<string, string>();
+    schools.forEach((s) => {
+      if (s.state && s.state_label) state.set(s.state, s.state_label);
+      if (s.lga && s.lga_label) lga.set(s.lga, s.lga_label);
+      if (s.ward && s.ward_label) ward.set(s.ward, s.ward_label);
+      if (s.location && s.location_label) loc.set(s.location, s.location_label);
+    });
+    return { state, lga, ward, loc };
+  }, [schools]);
+
+  const stateName = (code: string | null | undefined) =>
+    (code && labelMaps.state.get(code)) || prettyAdminLabel(code) || "—";
+  const lgaName = (stateCode: string | null | undefined, code: string | null | undefined) =>
+    (code && labelMaps.lga.get(code)) || prettyAdminLabel(code, stateCode) || "—";
+  const wardName = (
+    stateCode: string | null | undefined,
+    lgaCode: string | null | undefined,
+    code: string | null | undefined,
+  ) => (code && labelMaps.ward.get(code)) || prettyAdminLabel(code, lgaCode || stateCode) || "—";
+
+
   // De-duplicate validated schools: a single school must appear only ONCE on the
   // dashboard, otherwise totals, coverage and discrepancy analysis are inflated
   // and misleading. When the same school has multiple sent submissions we keep
