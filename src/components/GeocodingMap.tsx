@@ -48,8 +48,8 @@ export default function GeocodingMap({ points }: { points: GeoPoint[] }) {
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     const map = L.map(containerRef.current, { center: [9.082, 8.6753], zoom: 6, zoomControl: false });
-    L.tileLayer(SAT_URL, { attribution: "&copy; Esri World Imagery", maxZoom: 19 }).addTo(map);
-    L.tileLayer(LABELS_URL, { maxZoom: 19, opacity: 0.55 }).addTo(map);
+    L.tileLayer(SAT_URL, { attribution: "Tiles &copy; Esri — World Imagery", maxZoom: 23, maxNativeZoom: 19, detectRetina: true, crossOrigin: true }).addTo(map);
+    L.tileLayer(LABELS_URL, { maxZoom: 23, maxNativeZoom: 19, opacity: 0.85, pane: "overlayPane" }).addTo(map);
     L.control.zoom({ position: "topright" }).addTo(map);
     layerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
