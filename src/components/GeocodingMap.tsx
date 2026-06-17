@@ -53,7 +53,20 @@ export default function GeocodingMap({ points }: { points: GeoPoint[] }) {
     L.control.zoom({ position: "topright" }).addTo(map);
     layerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
+
+    // Recalculate tile layout once the container is sized / resized.
+    const fixSize = () => map.invalidateSize({ animate: false });
+    const t0 = window.setTimeout(fixSize, 0);
+    const t1 = window.setTimeout(fixSize, 300);
+    const ro = new ResizeObserver(fixSize);
+    if (containerRef.current) ro.observe(containerRef.current);
+    window.addEventListener("resize", fixSize);
+
     return () => {
+      window.clearTimeout(t0);
+      window.clearTimeout(t1);
+      ro.disconnect();
+      window.removeEventListener("resize", fixSize);
       map.remove();
       mapRef.current = null;
       layerRef.current = null;
