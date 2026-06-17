@@ -381,6 +381,39 @@ export const useBloombergDashboard = () => {
       .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct) || a.school.localeCompare(b.school));
   }, [submittedValidations, baselineByKey]);
 
+  // Schools that have NOT been validated yet — every school in the register that
+  // has no submitted/validated entry. Baseline enrolment figures are shown;
+  // the validated enrolment is intentionally left blank (not yet collected).
+  const notValidatedTable = useMemo(() => {
+    const validatedKeys = new Set(
+      submittedValidations.map((v) => v.school_key).filter(Boolean) as string[],
+    );
+    return schools
+      .filter((s) => !validatedKeys.has(s.school_key))
+      .map((s) => {
+        const b = baselineByKey.get(s.school_key);
+        const baseline = b?.grand_total ?? 0;
+        return {
+          id: s.school_key,
+          school: s.school_name || "Unnamed school",
+          code: s.school_code || s.school_key || "—",
+          state: s.state || "—",
+          lga: s.lga || "—",
+          type: s.school_type || "—",
+          baseline,
+          hasBaseline: baseline > 0,
+          baselineMale: b?.total_male ?? null,
+          baselineFemale: b?.total_female ?? null,
+        };
+      })
+      .sort(
+        (a, b) =>
+          a.state.localeCompare(b.state) ||
+          a.lga.localeCompare(b.lga) ||
+          a.school.localeCompare(b.school),
+      );
+  }, [schools, submittedValidations, baselineByKey]);
+
   // Owner-only hard delete of validation entries. Removes the rows from the
   // database so they immediately disappear from every dashboard view.
   const deleteValidations = async (ids: string[]): Promise<void> => {
