@@ -282,6 +282,9 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
         ...submissionData,
         id: submissionId,
         status: "sent",
+        // Start time = when this validator opened the form (or the original
+        // start when editing an existing entry); end time = submission time.
+        created_at: savedEntry?.createdAt || formStartedAtRef.current,
         submitted_at: now,
       };
       const { queued } = await queueOrInsert("bloomberg_validations", dbRow, true);
