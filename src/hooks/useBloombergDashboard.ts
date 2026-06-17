@@ -85,16 +85,15 @@ export const useBloombergDashboard = () => {
     const myReq = ++reqIdRef.current;
     setLoading(true);
     try {
-      const [v, b] = await Promise.all([
+      const [v, b, s] = await Promise.all([
         fetchAll<ValidationRow>(
           "bloomberg_validations",
           "id,validator_id,school_key,school_name,school_type,school_code,state,lga,ward,gps_lat,gps_lng,total_male,total_female,grand_total,verification,status,submitted_at,updated_at,created_at",
         ),
         fetchAll<BaselineRow>("bloomberg_school_baselines", "school_key,total_male,total_female,grand_total"),
+        fetchAll<SchoolLite>("bloomberg_schools", "school_key,school_name,school_type,school_code,state,lga"),
       ]);
-      const { count } = await supabase
-        .from("bloomberg_schools")
-        .select("school_key", { count: "exact", head: true });
+      const count = s.length;
 
       // Resolve validator names for the accountability table.
       const ids = [...new Set(v.map((r) => r.validator_id).filter(Boolean))] as string[];
