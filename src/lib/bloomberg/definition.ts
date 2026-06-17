@@ -26,7 +26,7 @@ export const normalizeMissingLabel = (text: string | null | undefined): string |
 export interface ClassDef {
   key: string;
   label: string;
-  section: "primary" | "jss";
+  section: "primary" | "jss" | "sss";
 }
 
 export const PRIMARY_CLASSES: ClassDef[] = [
@@ -44,7 +44,13 @@ export const JSS_CLASSES: ClassDef[] = [
   { key: "jss3", label: "JSS 3", section: "jss" },
 ];
 
-export const ALL_CLASSES: ClassDef[] = [...PRIMARY_CLASSES, ...JSS_CLASSES];
+export const SSS_CLASSES: ClassDef[] = [
+  { key: "ss1", label: "SS1", section: "sss" },
+  { key: "ss2", label: "SS2", section: "sss" },
+  { key: "ss3", label: "SS3", section: "sss" },
+];
+
+export const ALL_CLASSES: ClassDef[] = [...PRIMARY_CLASSES, ...JSS_CLASSES, ...SSS_CLASSES];
 
 // Cascade fields the Owner can scope a user to (global feature).
 export type CascadeFieldKey = "state" | "lga" | "ward" | "location" | "school_key";
