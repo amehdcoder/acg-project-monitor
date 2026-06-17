@@ -520,6 +520,26 @@ const Sel = ({ value, onChange, options, placeholder, disabled }: { value: strin
   </Select>
 );
 
+// Inline "please specify" prompt shown when a cascade option resolves to the
+// "Not Specified in the LGA School Enrolment Dataset" placeholder.
+const SpecifyInput = ({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) => (
+  <div className="-mt-1 rounded-xl border border-[#f0b429] bg-[#fffbeb] p-3">
+    <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-[#92600a]">
+      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#f0b429] text-[10px] font-bold text-white">!</span>
+      Specify the {label} <span className="text-[#dc2626]">*</span>
+    </label>
+    <p className="mb-2 text-[11px] text-[#92600a]/80">
+      This {label.toLowerCase()} was not in the LGA enrolment dataset. Enter the correct name so it is captured in the collected data.
+    </p>
+    <Input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={`Type the ${label.toLowerCase()} name`}
+      className="h-[3.25rem] border-[#f0b429] bg-white text-lg focus-visible:ring-[#f0b429]"
+    />
+  </div>
+);
+
 const Stat = ({ label, value, color }: { label: string; value: number; color: string }) => (
   <div className="rounded-xl bg-white p-3 shadow-sm">
     <div className="text-lg font-bold" style={{ color }}>{value.toLocaleString()}</div>
