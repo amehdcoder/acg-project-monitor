@@ -193,8 +193,8 @@ export const useBloombergDashboard = () => {
   }, [dedupedSent, validations, baselineByKey, schoolCount]);
 
   const submittedValidations = useMemo(
-    () => validations.filter((v) => v.status === "sent"),
-    [validations],
+    () => dedupedSent,
+    [dedupedSent],
   );
 
   // Per-user accountability: only schools actually visited & reported
