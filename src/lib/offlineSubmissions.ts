@@ -20,6 +20,7 @@ export interface PendingInsert {
   created_at: string;
   attempts: number;
   last_error?: string | null;
+  upsertOnId?: boolean;
 }
 
 let flushing = false;
