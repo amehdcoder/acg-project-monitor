@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin, Download, Upload, Loader2, FileImage, Sparkles, XCircle, ClipboardList, Trash2 } from "lucide-react";
+import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin, Download, Upload, Loader2, FileImage, XCircle, ClipboardList, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -91,11 +91,11 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function BloombergDashboard({ onClose }: Props) {
-  const { validations, stats, byState, stateBreakdown, points, nonExistent, validatedTable, loading, reload, deleteValidations, simulate, setSimulate } = useBloombergDashboard();
+  const { validations, stats, byState, stateBreakdown, points, nonExistent, validatedTable, loading, reload, deleteValidations } = useBloombergDashboard();
   const { isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
   const canManage = isOwner || isSuperAdmin;
   // Hard-delete of validation entries is restricted to the Owner / Co-owner.
-  const canDelete = isOwnerLevel && !simulate;
+  const canDelete = isOwnerLevel;
   const [deleting, setDeleting] = useState<string | null>(null);
   const handleDeleteRow = async (id: string, label: string) => {
     if (!window.confirm(`Permanently delete the validation entry for "${label}"?\n\nThis removes it from the database and every dashboard view. This cannot be undone.`)) return;
@@ -111,6 +111,7 @@ export default function BloombergDashboard({ onClose }: Props) {
   };
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const captureRef = useRef<HTMLDivElement | null>(null);
@@ -201,6 +202,21 @@ export default function BloombergDashboard({ onClose }: Props) {
     } finally {
       setImporting(false);
       if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const handleFactoryReset = async () => {
+    if (!window.confirm("Factory reset all user-entered Bloomberg validation data?\n\nThis removes validation submissions only. The school register and baseline figures are preserved.")) return;
+    setResetting(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("owner_reset_bloomberg_validation_data");
+      if (error) throw error;
+      toast.success(`Bloomberg validation data reset (${data?.validations_deleted ?? 0} entries removed)`);
+      reload();
+    } catch (e: any) {
+      toast.error(e?.message || "Factory reset failed");
+    } finally {
+      setResetting(false);
     }
   };
 
