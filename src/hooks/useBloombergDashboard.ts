@@ -61,9 +61,19 @@ async function fetchAll<T>(table: string, columns: string): Promise<T[]> {
   return all;
 }
 
+export interface SchoolLite {
+  school_key: string;
+  school_name: string | null;
+  school_type: string | null;
+  school_code: string | null;
+  state: string | null;
+  lga: string | null;
+}
+
 export const useBloombergDashboard = () => {
   const [validations, setValidations] = useState<ValidationRow[]>([]);
   const [baselines, setBaselines] = useState<BaselineRow[]>([]);
+  const [schools, setSchools] = useState<SchoolLite[]>([]);
   const [schoolCount, setSchoolCount] = useState(0);
   const [profileMap, setProfileMap] = useState<Map<string, ProfileLite>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -75,16 +85,15 @@ export const useBloombergDashboard = () => {
     const myReq = ++reqIdRef.current;
     setLoading(true);
     try {
-      const [v, b] = await Promise.all([
+      const [v, b, s] = await Promise.all([
         fetchAll<ValidationRow>(
           "bloomberg_validations",
           "id,validator_id,school_key,school_name,school_type,school_code,state,lga,ward,gps_lat,gps_lng,total_male,total_female,grand_total,verification,status,submitted_at,updated_at,created_at",
         ),
         fetchAll<BaselineRow>("bloomberg_school_baselines", "school_key,total_male,total_female,grand_total"),
+        fetchAll<SchoolLite>("bloomberg_schools", "school_key,school_name,school_type,school_code,state,lga"),
       ]);
-      const { count } = await supabase
-        .from("bloomberg_schools")
-        .select("school_key", { count: "exact", head: true });
+      const count = s.length;
 
       // Resolve validator names for the accountability table.
       const ids = [...new Set(v.map((r) => r.validator_id).filter(Boolean))] as string[];
@@ -103,6 +112,7 @@ export const useBloombergDashboard = () => {
       if (myReq !== reqIdRef.current) return;
       setValidations(v);
       setBaselines(b);
+      setSchools(s);
       setSchoolCount(count || 0);
       setProfileMap(pm);
     } finally {
@@ -114,6 +124,7 @@ export const useBloombergDashboard = () => {
     const myReq = ++reqIdRef.current;
     setValidations([]);
     setBaselines([]);
+    setSchools([]);
     setSchoolCount(0);
     void reload();
     return () => {
@@ -370,6 +381,39 @@ export const useBloombergDashboard = () => {
       .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct) || a.school.localeCompare(b.school));
   }, [submittedValidations, baselineByKey]);
 
+  // Schools that have NOT been validated yet — every school in the register that
+  // has no submitted/validated entry. Baseline enrolment figures are shown;
+  // the validated enrolment is intentionally left blank (not yet collected).
+  const notValidatedTable = useMemo(() => {
+    const validatedKeys = new Set(
+      submittedValidations.map((v) => v.school_key).filter(Boolean) as string[],
+    );
+    return schools
+      .filter((s) => !validatedKeys.has(s.school_key))
+      .map((s) => {
+        const b = baselineByKey.get(s.school_key);
+        const baseline = b?.grand_total ?? 0;
+        return {
+          id: s.school_key,
+          school: s.school_name || "Unnamed school",
+          code: s.school_code || s.school_key || "—",
+          state: s.state || "—",
+          lga: s.lga || "—",
+          type: s.school_type || "—",
+          baseline,
+          hasBaseline: baseline > 0,
+          baselineMale: b?.total_male ?? null,
+          baselineFemale: b?.total_female ?? null,
+        };
+      })
+      .sort(
+        (a, b) =>
+          a.state.localeCompare(b.state) ||
+          a.lga.localeCompare(b.lga) ||
+          a.school.localeCompare(b.school),
+      );
+  }, [schools, submittedValidations, baselineByKey]);
+
   // Owner-only hard delete of validation entries. Removes the rows from the
   // database so they immediately disappear from every dashboard view.
   const deleteValidations = async (ids: string[]): Promise<void> => {
@@ -385,7 +429,7 @@ export const useBloombergDashboard = () => {
   };
 
   return {
-    validations, baselines, stats, byState, stateBreakdown, points, nonExistent, validatedTable, accountability,
+    validations, baselines, stats, byState, stateBreakdown, points, nonExistent, validatedTable, notValidatedTable, accountability,
     loading, reload, deleteValidations, ALL_CLASSES,
   };
 };

@@ -21,6 +21,23 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
 import { pctTone, toneColor, varianceTone } from "@/lib/conditionalFormatting";
+import { labelPillStyle } from "@/lib/lgaColors";
+
+// Professional, color-coded label pill for admin units (State / LGA). Same name
+// always renders with the same beautiful tint across every table.
+const Label = ({ name }: { name: string | null | undefined }) => {
+  const text = (name || "").trim();
+  if (!text || text === "—") return <span className="text-muted-foreground">—</span>;
+  return (
+    <span
+      className="inline-block max-w-[160px] truncate rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+      style={labelPillStyle(text)}
+      title={text}
+    >
+      {text}
+    </span>
+  );
+};
 
 
 const NAVY = "#0c2340";
@@ -94,7 +111,7 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function BloombergDashboard({ onClose }: Props) {
-  const { validations, stats, byState, stateBreakdown, points, nonExistent, validatedTable, accountability, loading, reload, deleteValidations } = useBloombergDashboard();
+  const { validations, stats, byState, stateBreakdown, points, nonExistent, validatedTable, notValidatedTable, accountability, loading, reload, deleteValidations } = useBloombergDashboard();
   const { isOwner, isSuperAdmin, isOwnerLevel, isAdmin } = useAuth();
   const canManage = isOwner || isSuperAdmin;
   const [downloadingData, setDownloadingData] = useState(false);
@@ -511,8 +528,8 @@ export default function BloombergDashboard({ onClose }: Props) {
                       <tr key={i} className="border-b border-border/50 last:border-0">
                         <td className="py-2 pr-3 font-medium text-foreground">{r.school}</td>
                         <td className="py-2 px-3 text-xs text-muted-foreground">{r.code}</td>
-                        <td className="py-2 px-3">{r.state}</td>
-                        <td className="py-2 px-3">{r.lga}</td>
+                        <td className="py-2 px-3"><Label name={r.state} /></td>
+                        <td className="py-2 px-3"><Label name={r.lga} /></td>
                         <td className="py-2 px-3">
                           <span className="inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold text-white" style={{ background: REASON_COLORS[r.reasonValue] || "#64748b" }}>
                             {r.reason}
@@ -543,8 +560,9 @@ export default function BloombergDashboard({ onClose }: Props) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                    <th className="py-2 pr-3">School</th>
-                    <th className="py-2 px-3">State / LGA</th>
+                    <th className="py-2 pr-3">State</th>
+                    <th className="py-2 px-3">LGA</th>
+                    <th className="py-2 px-3">School</th>
                     <th className="py-2 px-3">Operational</th>
                     <th className="py-2 px-3 text-right">Baseline</th>
                     <th className="py-2 px-3 text-right">Validated</th>
@@ -561,11 +579,12 @@ export default function BloombergDashboard({ onClose }: Props) {
                     const rowBg = sev === 3 ? "bg-red-50/70" : sev === 2 ? "bg-amber-50/60" : sev === 1 ? "bg-yellow-50/40" : "bg-emerald-50/40";
                     return (
                       <tr key={i} className={`border-b border-border/50 last:border-0 ${rowBg}`}>
-                        <td className="py-2 pr-3">
+                        <td className="py-2 pr-3"><Label name={r.state} /></td>
+                        <td className="py-2 px-3"><Label name={r.lga} /></td>
+                        <td className="py-2 px-3">
                           <div className="font-medium text-foreground">{r.school}</div>
                           <div className="text-[11px] text-muted-foreground">{r.code} · {r.type}</div>
                         </td>
-                        <td className="py-2 px-3 text-xs">{r.state}<br /><span className="text-muted-foreground">{r.lga}</span></td>
                         <td className="py-2 px-3"><OpBadge value={r.operationalValue} label={r.operational} /></td>
                         <td className="py-2 px-3 text-right tabular-nums">{r.hasBaseline ? fmt(r.baseline) : "—"}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{fmt(r.validated)}</td>
@@ -607,6 +626,53 @@ export default function BloombergDashboard({ onClose }: Props) {
           )}
         </div>
 
+        {/* Schools not yet validated — baseline figures only, validated blank */}
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="mb-1 flex items-center gap-2">
+            <School className="h-4 w-4 text-amber-500" />
+            <h3 className="text-sm font-semibold text-foreground">Schools Not Yet Validated</h3>
+            <span className="ml-auto rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700">{fmt(notValidatedTable.length)}</span>
+          </div>
+          <p className="mb-3 text-xs text-muted-foreground">Schools in the register awaiting field validation. Baseline (LEA) enrolment is shown; validated enrolment is left blank until collected. Rows are color-coded by LGA.</p>
+          {notValidatedTable.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Every school in the register has been validated. 🎉</p>
+          ) : (
+            <div className="max-h-[480px] overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-card">
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <th className="py-2 pr-3">State</th>
+                    <th className="py-2 px-3">LGA</th>
+                    <th className="py-2 px-3">School</th>
+                    <th className="py-2 px-3 text-right">Baseline (Boys)</th>
+                    <th className="py-2 px-3 text-right">Baseline (Girls)</th>
+                    <th className="py-2 px-3 text-right">Baseline Total</th>
+                    <th className="py-2 pl-3 text-right">Validated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {notValidatedTable.map((r) => (
+                    <tr key={r.id} className="border-b border-border/50 last:border-0" style={{ background: `${labelPillStyle(r.lga).background as string}55` }}>
+                      <td className="py-2 pr-3"><Label name={r.state} /></td>
+                      <td className="py-2 px-3"><Label name={r.lga} /></td>
+                      <td className="py-2 px-3">
+                        <div className="font-medium text-foreground">{r.school}</div>
+                        <div className="text-[11px] text-muted-foreground">{r.code} · {r.type}</div>
+                      </td>
+                      <td className="py-2 px-3 text-right tabular-nums">{r.baselineMale != null ? fmt(r.baselineMale) : "—"}</td>
+                      <td className="py-2 px-3 text-right tabular-nums">{r.baselineFemale != null ? fmt(r.baselineFemale) : "—"}</td>
+                      <td className="py-2 px-3 text-right font-semibold tabular-nums">{r.hasBaseline ? fmt(r.baseline) : "—"}</td>
+                      <td className="py-2 pl-3 text-right">
+                        <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-400">Pending</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
         {/* Owner-only management register — lists every entry (any status) so it is always deletable */}
         {canDelete && (
           <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -624,7 +690,8 @@ export default function BloombergDashboard({ onClose }: Props) {
                   <thead>
                     <tr className="border-b border-border text-left text-xs text-muted-foreground">
                       <th className="py-2 pr-3">School</th>
-                      <th className="py-2 px-3">State / LGA</th>
+                      <th className="py-2 px-3">State</th>
+                      <th className="py-2 px-3">LGA</th>
                       <th className="py-2 px-3">Status</th>
                       <th className="py-2 pl-3 text-right">Manage</th>
                     </tr>
@@ -633,7 +700,8 @@ export default function BloombergDashboard({ onClose }: Props) {
                     {validations.map((r) => (
                       <tr key={r.id} className="border-b border-border/50 last:border-0">
                         <td className="py-2 pr-3 font-medium text-foreground">{r.school_name || "Unnamed school"}</td>
-                        <td className="py-2 px-3 text-xs">{r.state || "—"}<br /><span className="text-muted-foreground">{r.lga || ""}</span></td>
+                        <td className="py-2 px-3"><Label name={r.state} /></td>
+                        <td className="py-2 px-3"><Label name={r.lga} /></td>
                         <td className="py-2 px-3"><StatusBadge status={r.status || "draft"} /></td>
                         <td className="py-2 pl-3 text-right">
                           <button

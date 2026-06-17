@@ -57,6 +57,10 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
 
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  // Captures the moment the validator opens / starts filling this form. Used as
+  // the submission's start time (created_at) so accountability analytics show an
+  // accurate "Start time → End time" span rather than a zero-duration record.
+  const formStartedAtRef = useRef<string>(new Date().toISOString());
 
   // Step 1 — school selection
   const [state, setState] = useState("");
@@ -278,6 +282,9 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
         ...submissionData,
         id: submissionId,
         status: "sent",
+        // Start time = when this validator opened the form (or the original
+        // start when editing an existing entry); end time = submission time.
+        created_at: savedEntry?.createdAt || formStartedAtRef.current,
         submitted_at: now,
       };
       const { queued } = await queueOrInsert("bloomberg_validations", dbRow, true);
