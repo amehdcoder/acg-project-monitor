@@ -64,6 +64,10 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
   const [location, setLocation] = useState("");
   const [schoolKey, setSchoolKey] = useState("");
   const [gps, setGps] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
+  // User-typed names for any School Information field whose chosen cascade option
+  // is "Not Specified in the LGA School Enrolment Dataset".
+  const [specified, setSpecified] = useState<Record<string, string>>({});
+  const setSpec = (k: string, v: string) => setSpecified((s) => ({ ...s, [k]: v }));
 
   // Step 2 — verification
   const [schoolExists, setSchoolExists] = useState<"yes" | "no" | "">("");
