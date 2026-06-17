@@ -41,6 +41,7 @@ import {
   type SavedFormEntry,
   type SavedFormStatus,
 } from "@/lib/savedForms";
+import { syncSpecialSavedForm } from "@/lib/specialFormBridge";
 
 export type SavedFormsMode = "edit" | "send" | "view" | "delete";
 
@@ -151,14 +152,15 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
     try {
       for (const entry of targets) {
         try {
-          const result = await saveSubmission(
-            entry.formId,
-            userId,
-            entry.submissionData || entry.responses,
-            entry.submissionLocation || null,
-            entry.withinGeofence ?? null,
-            entry.submissionType || "regular",
-          );
+          const result = (await syncSpecialSavedForm(entry)) ||
+            (await saveSubmission(
+              entry.formId,
+              userId,
+              entry.submissionData || entry.responses,
+              entry.submissionLocation || null,
+              entry.withinGeofence ?? null,
+              entry.submissionType || "regular",
+            ));
           if (result.success) {
             await setSavedEntryStatus(entry.id, "sent", {
               submissionId: result.id,
