@@ -528,8 +528,8 @@ export default function BloombergDashboard({ onClose }: Props) {
                       <tr key={i} className="border-b border-border/50 last:border-0">
                         <td className="py-2 pr-3 font-medium text-foreground">{r.school}</td>
                         <td className="py-2 px-3 text-xs text-muted-foreground">{r.code}</td>
-                        <td className="py-2 px-3">{r.state}</td>
-                        <td className="py-2 px-3">{r.lga}</td>
+                        <td className="py-2 px-3"><Label name={r.state} /></td>
+                        <td className="py-2 px-3"><Label name={r.lga} /></td>
                         <td className="py-2 px-3">
                           <span className="inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold text-white" style={{ background: REASON_COLORS[r.reasonValue] || "#64748b" }}>
                             {r.reason}
