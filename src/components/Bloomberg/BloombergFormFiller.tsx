@@ -375,7 +375,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
                       onChange={(v) => setSchoolKey(v)}
                     />
                   </Field>
-                  {needSchool && <SpecifyInput label="School Name" value={specified.school || ""} onChange={(v) => setSpec("school", v)} />}
+                  {(needSchool || !!specified.school) && <SpecifyInput label="School Name" value={specified.school || ""} onChange={(v) => setSpec("school", v)} />}
                   {selectedSchool && (
                     <div className="grid grid-cols-2 gap-2 rounded-lg bg-[#f4f6fb] p-3 text-sm">
                       <span className="text-muted-foreground">Code</span><span className="font-semibold">{selectedSchool.school_code || "—"}</span>
