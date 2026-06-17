@@ -653,7 +653,8 @@ export default function BloombergDashboard({ onClose }: Props) {
                     {validations.map((r) => (
                       <tr key={r.id} className="border-b border-border/50 last:border-0">
                         <td className="py-2 pr-3 font-medium text-foreground">{r.school_name || "Unnamed school"}</td>
-                        <td className="py-2 px-3 text-xs">{r.state || "—"}<br /><span className="text-muted-foreground">{r.lga || ""}</span></td>
+                        <td className="py-2 px-3"><Label name={r.state} /></td>
+                        <td className="py-2 px-3"><Label name={r.lga} /></td>
                         <td className="py-2 px-3"><StatusBadge status={r.status || "draft"} /></td>
                         <td className="py-2 pl-3 text-right">
                           <button
