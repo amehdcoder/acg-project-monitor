@@ -119,31 +119,71 @@ export default function GeocodingView() {
   };
 
 
-  const geocodeRow = async (row: GeoRow) => {
-    if (!row.address.trim()) return;
-    updateRow(row.id, { status: "loading" });
-    try {
-      const d = await callGeo({ action: "geocode", address: row.address });
-      if (d.found) {
-        updateRow(row.id, { status: "done", lat: d.lat, lng: d.lng, resolved: d.display_name, source: d.source });
-      } else {
-        updateRow(row.id, { status: "error", resolved: "No match found", lat: null, lng: null });
-      }
-    } catch (e) {
-      updateRow(row.id, { status: "error", resolved: (e as Error).message });
+  // Build progressively-simplified variants of an address so that hard-to-match
+  // entries (extra unit numbers, landmarks, typos in the street part) still
+  // resolve to at least their locality. This dramatically raises the hit-rate
+  // so (almost) every address gets plotted on the map.
+  const addressVariants = (raw: string): string[] => {
+    const a = raw.trim().replace(/\s+/g, " ");
+    const variants = new Set<string>();
+    variants.add(a);
+    // Drop a leading house/plot number ("12 Marina Road" -> "Marina Road").
+    variants.add(a.replace(/^\s*(no\.?\s*)?\d+[a-z]?[,\s]+/i, "").trim());
+    // Append Nigeria when no country is mentioned (helps Nominatim disambiguate).
+    if (!/nigeria/i.test(a)) variants.add(`${a}, Nigeria`);
+    // Comma-separated tail components (locality, LGA, state).
+    const parts = a.split(",").map((p) => p.trim()).filter(Boolean);
+    for (let i = 1; i < parts.length; i++) {
+      variants.add(parts.slice(i).join(", "));
     }
+    return Array.from(variants).filter((v) => v.length >= 3);
+  };
+
+  const geocodeRow = async (row: GeoRow): Promise<boolean> => {
+    if (!row.address.trim()) return false;
+    updateRow(row.id, { status: "loading" });
+    const variants = addressVariants(row.address);
+    for (let i = 0; i < variants.length; i++) {
+      try {
+        const d = await callGeo({ action: "geocode", address: variants[i] });
+        if (d.found) {
+          updateRow(row.id, {
+            status: "done",
+            lat: d.lat,
+            lng: d.lng,
+            resolved: i === 0 ? d.display_name : `≈ ${d.display_name}`,
+            source: d.source,
+          });
+          return true;
+        }
+      } catch (e) {
+        // Network/rate-limit hiccup — keep trying the next variant.
+      }
+      // Respect Nominatim's 1 req/sec policy between variant attempts.
+      if (i < variants.length - 1) await new Promise((r) => setTimeout(r, 1100));
+    }
+    updateRow(row.id, { status: "error", resolved: "No match found", lat: null, lng: null });
+    return false;
   };
 
   const runBatch = async () => {
     setBatchRunning(true);
-    for (const row of rows) {
-      if (row.address.trim()) {
-        await geocodeRow(row);
-        await new Promise((r) => setTimeout(r, 1100)); // respect Nominatim rate limit
-      }
+    const pending = rows.filter((r) => r.address.trim() && r.lat == null);
+    let ok = 0;
+    for (let i = 0; i < pending.length; i++) {
+      const success = await geocodeRow(pending[i]);
+      if (success) ok++;
+      if (i < pending.length - 1) await new Promise((r) => setTimeout(r, 1100));
     }
     setBatchRunning(false);
-    toast.success("Batch geocoding complete");
+    const failed = pending.length - ok;
+    if (pending.length === 0) {
+      toast.success("All addresses are already geocoded");
+    } else if (failed === 0) {
+      toast.success(`Geocoded all ${ok} address${ok === 1 ? "" : "es"}`);
+    } else {
+      toast.warning(`Geocoded ${ok} of ${pending.length}. ${failed} could not be matched — refine those addresses and run again.`);
+    }
   };
 
   const exportCsv = () => {
