@@ -320,7 +320,7 @@ export const useBloombergDashboard = () => {
 
     return [...states.entries()]
       .map(([state, node]) => ({
-        state,
+        state: stateName(state),
         submissions: node.agg.submissions,
         validatedSchools: node.agg.validatedSchools.size,
         validated: node.agg.validated,
@@ -329,7 +329,7 @@ export const useBloombergDashboard = () => {
         variancePct: variance(node.agg),
         lgas: [...node.lgas.entries()]
           .map(([lga, a]) => ({
-            lga,
+            lga: lgaName(state, lga),
             submissions: a.submissions,
             validatedSchools: a.validatedSchools.size,
             validated: a.validated,
@@ -340,7 +340,7 @@ export const useBloombergDashboard = () => {
           .sort((x, y) => y.submissions - x.submissions || x.lga.localeCompare(y.lga)),
       }))
       .sort((x, y) => y.submissions - x.submissions || x.state.localeCompare(y.state));
-  }, [submittedValidations, baselineByKey]);
+  }, [submittedValidations, baselineByKey, labelMaps]);
 
   const points = useMemo(
     () =>
