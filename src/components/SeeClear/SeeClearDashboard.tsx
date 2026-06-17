@@ -210,6 +210,11 @@ export default function SeeClearDashboard({ onClose }: Props) {
           )}
         </div>
 
+        {/* Field worker accountability */}
+        <AccountabilityTable users={accountability} unitLabel="Health Facility" unitLabelPlural="Health Facilities" accent={TEAL} />
+
+
+
         {/* Owner-only management register */}
         {canDelete && (
           <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
