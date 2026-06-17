@@ -33,6 +33,7 @@ import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import FormFiller from "@/components/FormFiller/FormFiller";
 import SentFormViewer from "@/components/FormFiller/SentFormViewer";
+import BloombergFormFiller from "@/components/Bloomberg/BloombergFormFiller";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import {
   listSavedEntries,
@@ -41,6 +42,7 @@ import {
   type SavedFormEntry,
   type SavedFormStatus,
 } from "@/lib/savedForms";
+import { isBloombergSavedEntry, syncSpecialSavedForm } from "@/lib/specialFormBridge";
 
 export type SavedFormsMode = "edit" | "send" | "view" | "delete";
 
@@ -151,14 +153,15 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
     try {
       for (const entry of targets) {
         try {
-          const result = await saveSubmission(
-            entry.formId,
-            userId,
-            entry.submissionData || entry.responses,
-            entry.submissionLocation || null,
-            entry.withinGeofence ?? null,
-            entry.submissionType || "regular",
-          );
+          const result = (await syncSpecialSavedForm(entry)) ||
+            (await saveSubmission(
+              entry.formId,
+              userId,
+              entry.submissionData || entry.responses,
+              entry.submissionLocation || null,
+              entry.withinGeofence ?? null,
+              entry.submissionType || "regular",
+            ));
           if (result.success) {
             await setSavedEntryStatus(entry.id, "sent", {
               submissionId: result.id,
@@ -215,6 +218,19 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   }
 
   if (editing) {
+    if (isBloombergSavedEntry(editing)) {
+      return (
+        <BloombergFormFiller
+          projectId={editing.projectId}
+          savedEntry={editing}
+          onClose={() => setEditing(null)}
+          onSavedLocally={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      );
+    }
     return (
       <FormFiller
         formId={editing.formId}

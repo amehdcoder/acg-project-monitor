@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ALL_CLASSES, NOT_FOUND_REASONS, OPERATIONAL_STATUS } from "@/lib/bloomberg/definition";
-import { generateBloombergSimulation } from "@/lib/bloomberg/bloombergSimulation";
 
 export interface ValidationVerification {
   school_exists?: "yes" | "no" | "";
@@ -64,18 +63,10 @@ export const useBloombergDashboard = () => {
   const [baselines, setBaselines] = useState<BaselineRow[]>([]);
   const [schoolCount, setSchoolCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [simulate, setSimulate] = useState(false);
 
-  // Monotonic request id: any async load tags itself with the current value,
-  // and discards its result if a newer load/toggle has happened meanwhile.
-  // This prevents an in-flight reload() from overwriting simulated data
-  // (and vice versa) when the Simulate toggle is flipped — the root cause of
-  // the dashboard "flickering" / showing the wrong dataset.
+  // Monotonic request id: any async load tags itself with the current value
+  // and discards its result if a newer load has started.
   const reqIdRef = useRef(0);
-  // Mirror of `simulate` readable inside async callbacks without re-creating them.
-  const simulateRef = useRef(simulate);
-  simulateRef.current = simulate;
-
   const reload = async () => {
     const myReq = ++reqIdRef.current;
     setLoading(true);
@@ -90,8 +81,7 @@ export const useBloombergDashboard = () => {
       const { count } = await supabase
         .from("bloomberg_schools")
         .select("school_key", { count: "exact", head: true });
-      // Discard if a newer request started, or if we've since switched to simulate.
-      if (myReq !== reqIdRef.current || simulateRef.current) return;
+      if (myReq !== reqIdRef.current) return;
       setValidations(v);
       setBaselines(b);
       setSchoolCount(count || 0);
@@ -101,28 +91,15 @@ export const useBloombergDashboard = () => {
   };
 
   useEffect(() => {
-    // Invalidate any in-flight reload so it can't clobber the dataset we set here.
     const myReq = ++reqIdRef.current;
-    if (simulate) {
-      // Swap in a fully synthetic dataset so the dashboard renders exactly as it
-      // would with real validations — no backend reads, no writes.
-      const sim = generateBloombergSimulation();
-      setValidations(sim.validations);
-      setBaselines(sim.baselines);
-      setSchoolCount(sim.schoolCount);
-      setLoading(false);
-    } else {
-      // Clear stale simulated data immediately, then fetch real data.
-      setValidations([]);
-      setBaselines([]);
-      setSchoolCount(0);
-      void reload();
-    }
+    setValidations([]);
+    setBaselines([]);
+    setSchoolCount(0);
+    void reload();
     return () => {
-      // On unmount/re-toggle, bump so late async results are ignored.
       if (myReq === reqIdRef.current) reqIdRef.current++;
     };
-  }, [simulate]);
+  }, []);
 
 
   const baselineByKey = useMemo(() => {
@@ -132,7 +109,7 @@ export const useBloombergDashboard = () => {
   }, [baselines]);
 
   const stats = useMemo(() => {
-    const submitted = validations.filter((v) => v.status === "sent" || v.status === "finalized");
+    const submitted = validations.filter((v) => v.status === "sent");
     const draft = validations.filter((v) => v.status === "draft");
     const validatedTotal = submitted.reduce((s, v) => s + (v.grand_total ?? 0), 0);
     const validatedMale = submitted.reduce((s, v) => s + (v.total_male ?? 0), 0);
@@ -172,21 +149,26 @@ export const useBloombergDashboard = () => {
     };
   }, [validations, baselineByKey, schoolCount]);
 
+  const submittedValidations = useMemo(
+    () => validations.filter((v) => v.status === "sent"),
+    [validations],
+  );
+
   // Submissions by state for the map.
   const byState = useMemo(() => {
     const m = new Map<string, number>();
-    validations.forEach((v) => {
+    submittedValidations.forEach((v) => {
       const key = (v.state || "Unknown").toString();
       m.set(key, (m.get(key) || 0) + 1);
     });
     return [...m.entries()].map(([state, count]) => ({ state, count })).sort((a, b) => b.count - a.count);
-  }, [validations]);
+  }, [submittedValidations]);
 
   // State → LGA disaggregation for the Validation Dashboard drill-down.
   // Each state aggregates its LGAs; each level carries submission counts,
   // validated pupils and baseline (for validated schools) plus variance.
   const stateBreakdown = useMemo(() => {
-    const submitted = validations.filter((v) => v.status === "sent" || v.status === "finalized");
+    const submitted = submittedValidations;
 
     interface Agg {
       submissions: number;
@@ -245,19 +227,19 @@ export const useBloombergDashboard = () => {
           .sort((x, y) => y.submissions - x.submissions || x.lga.localeCompare(y.lga)),
       }))
       .sort((x, y) => y.submissions - x.submissions || x.state.localeCompare(y.state));
-  }, [validations, baselineByKey]);
+  }, [submittedValidations, baselineByKey]);
 
   const points = useMemo(
     () =>
-      validations
+      submittedValidations
         .filter((v) => v.gps_lat != null && v.gps_lng != null)
         .map((v) => ({ lat: v.gps_lat as number, lng: v.gps_lng as number, status: v.status || "draft", name: v.school_name || "" })),
-    [validations],
+    [submittedValidations],
   );
 
   // Schools reported as not existing / not found during field validation.
   const nonExistent = useMemo(() => {
-    const rows = validations
+    const rows = submittedValidations
       .filter((v) => v.verification?.school_exists === "no")
       .map((v) => {
         const reasonVal = v.verification?.not_found_reason || "other";
@@ -290,11 +272,11 @@ export const useBloombergDashboard = () => {
       .sort((a, b) => b.count - a.count);
 
     return { rows, reasonAnalysis, total: rows.length };
-  }, [validations]);
+  }, [submittedValidations]);
 
   // Full register of validated schools with status & variance vs baseline.
   const validatedTable = useMemo(() => {
-    return validations
+    return submittedValidations
       .filter((v) => v.verification?.school_exists !== "no")
       .map((v) => {
         const b = v.school_key ? baselineByKey.get(v.school_key) : undefined;
@@ -325,7 +307,7 @@ export const useBloombergDashboard = () => {
         };
       })
       .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct) || a.school.localeCompare(b.school));
-  }, [validations, baselineByKey]);
+  }, [submittedValidations, baselineByKey]);
 
   // Owner-only hard delete of validation entries. Removes the rows from the
   // database so they immediately disappear from every dashboard view.
@@ -343,6 +325,6 @@ export const useBloombergDashboard = () => {
 
   return {
     validations, baselines, stats, byState, stateBreakdown, points, nonExistent, validatedTable,
-    loading, reload, deleteValidations, ALL_CLASSES, simulate, setSimulate,
+    loading, reload, deleteValidations, ALL_CLASSES,
   };
 };

@@ -13,10 +13,13 @@ import {
   type SavedFormEntry,
   type SavedFormStatus,
 } from "@/lib/savedForms";
+import { queueOrInsert } from "@/lib/offlineSubmissions";
 
 // Stable synthetic form ids so mirrored entries group nicely.
 export const BLOOMBERG_FORM_ID = "bloomberg-school-enrolment-validation";
 export const SEECLEAR_FORM_ID = "seeclear-eye-health-facility-checklist";
+export const BLOOMBERG_SPECIAL_FORM_KEY = "bloomberg";
+export const SEECLEAR_SPECIAL_FORM_KEY = "seeclear";
 
 interface MirrorArgs {
   userId: string;
@@ -65,4 +68,26 @@ export async function mirrorSpecialForm(args: MirrorArgs): Promise<void> {
   } catch (e) {
     console.warn("mirrorSpecialForm failed (non-fatal):", e);
   }
+}
+
+export const isBloombergSavedEntry = (entry: SavedFormEntry | null | undefined): boolean =>
+  !!entry && entry.formId === BLOOMBERG_FORM_ID && entry.settings?.specialForm === BLOOMBERG_SPECIAL_FORM_KEY;
+
+export async function syncSpecialSavedForm(
+  entry: SavedFormEntry,
+): Promise<{ success: boolean; offline: boolean; id: string } | null> {
+  if (!isBloombergSavedEntry(entry)) return null;
+
+  const now = new Date().toISOString();
+  const id = entry.submissionId || crypto.randomUUID();
+  const row = {
+    ...(entry.submissionData || {}),
+    id,
+    validator_id: entry.userId,
+    status: "sent",
+    submitted_at: now,
+  };
+
+  const { queued } = await queueOrInsert("bloomberg_validations", row);
+  return { success: true, offline: queued, id };
 }

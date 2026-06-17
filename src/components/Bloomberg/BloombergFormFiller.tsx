@@ -4,15 +4,14 @@ import {
   ArrowLeft, ArrowRight, Check, MapPin, Loader2, Camera, Save, Send,
   School as SchoolIcon, ClipboardCheck, ImageIcon, ChevronDown, Search, ChevronsUpDown,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useBloombergSchools } from "@/hooks/useBloombergData";
 import { toast } from "sonner";
 import {
-  PRIMARY_CLASSES, JSS_CLASSES, ALL_CLASSES, emptyEnrolment, sectionTotals,
+  PRIMARY_CLASSES, JSS_CLASSES, SSS_CLASSES, ALL_CLASSES, emptyEnrolment, sectionTotals,
   grandTotals, OPERATIONAL_STATUS, NOT_FOUND_REASONS, type EnrolmentCounts,
-  type BloombergSchool, normalizeMissingLabel,
+  type BloombergSchool, type ClassDef, normalizeMissingLabel,
 } from "@/lib/bloomberg/definition";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,9 +25,9 @@ import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { mirrorSpecialForm, BLOOMBERG_FORM_ID } from "@/lib/specialFormBridge";
+import { BLOOMBERG_FORM_ID, BLOOMBERG_SPECIAL_FORM_KEY } from "@/lib/specialFormBridge";
 import { queueOrUploadMedia } from "@/lib/offlineMedia";
-import { queueOrInsert } from "@/lib/offlineSubmissions";
+import { saveSavedEntry, newEntryId, type SavedFormEntry, type SavedFormStatus } from "@/lib/savedForms";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
 
 const NAVY = "#0c2340";
@@ -36,6 +35,9 @@ const STEPS = ["School", "Verify", "Enrolment", "Evidence"];
 
 interface Props {
   onClose: () => void;
+  projectId?: string | null;
+  savedEntry?: SavedFormEntry | null;
+  onSavedLocally?: () => void;
 }
 
 const uniq = (rows: BloombergSchool[], val: keyof BloombergSchool, lbl: keyof BloombergSchool) => {
@@ -47,7 +49,7 @@ const uniq = (rows: BloombergSchool[], val: keyof BloombergSchool, lbl: keyof Bl
   return [...m.entries()].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
 };
 
-export default function BloombergFormFiller({ onClose }: Props) {
+export default function BloombergFormFiller({ onClose, projectId = null, savedEntry = null, onSavedLocally }: Props) {
   const { user } = useAuth();
   const { schools, loading, fromCache } = useBloombergSchools();
   const geo = useGeolocation();
@@ -92,6 +94,28 @@ export default function BloombergFormFiller({ onClose }: Props) {
     [schools, state, lga, ward, location],
   );
   const selectedSchool = useMemo(() => schools.find((s) => s.school_key === schoolKey) || null, [schools, schoolKey]);
+
+  useEffect(() => {
+    if (!savedEntry) return;
+    const r = savedEntry.responses || {};
+    setState(r.state || "");
+    setLga(r.lga || "");
+    setWard(r.ward || "");
+    setLocation(r.location || "");
+    setSchoolKey(r.schoolKey || "");
+    setGps(r.gps || savedEntry.gps || null);
+    setSchoolExists(r.verification?.school_exists || "");
+    setNotFoundReason(r.verification?.not_found_reason || "");
+    setOperationalStatus(r.verification?.operational_status || "operational");
+    setHeadTeacher(r.verification?.head_teacher || "");
+    setHeadPhone(r.verification?.head_phone || "");
+    setDateOfVisit(r.verification?.date_of_visit || new Date().toISOString().slice(0, 10));
+    setRegisterAvailable(r.verification?.register_available ?? true);
+    setEnrol({ ...emptyEnrolment(), ...(r.enrolment || {}) });
+    setEvidence(r.evidence || {});
+    setRemarks(r.remarks || "");
+    setConfirmed(!!r.confirmed);
+  }, [savedEntry?.id]);
 
   const captureGps = () => {
     geo.getCurrentPosition();
@@ -148,6 +172,7 @@ export default function BloombergFormFiller({ onClose }: Props) {
 
   const submit = async (asDraft: boolean) => {
     if (!user?.id) return;
+    const status: SavedFormStatus = asDraft ? "draft" : "finalized";
     if (!asDraft) {
       if (!(state && lga && ward && location && schoolKey && gps)) {
         toast.error("Complete all school information."); setStep(0); return;
@@ -175,42 +200,68 @@ export default function BloombergFormFiller({ onClose }: Props) {
       const gt = grandTotals(enrol);
       const enrolPayload: Record<string, any> = {};
       ALL_CLASSES.forEach((c) => (enrolPayload[c.key] = enrol[c.key]));
-      const { queued } = await queueOrInsert("bloomberg_validations", {
+      const verification = {
+        school_exists: schoolExists, not_found_reason: notFoundReason,
+        operational_status: operationalStatus, head_teacher: headTeacher,
+        head_phone: headPhone, date_of_visit: dateOfVisit, register_available: registerAvailable,
+      };
+      const submissionId = savedEntry?.submissionId || crypto.randomUUID();
+      const schoolMeta = {
+        school_name: selectedSchool?.school_name ?? (savedEntry?.responses as any)?.school_name ?? null,
+        school_code: selectedSchool?.school_code ?? (savedEntry?.responses as any)?.school_code ?? null,
+        school_type: selectedSchool?.school_type ?? (savedEntry?.responses as any)?.school_type ?? null,
+        school_level: selectedSchool?.school_level ?? (savedEntry?.responses as any)?.school_level ?? null,
+        ownership: selectedSchool?.ownership ?? (savedEntry?.responses as any)?.ownership ?? null,
+      };
+      const submissionData = {
         validator_id: user.id,
         school_key: schoolKey || null,
         state, lga, ward, location,
-        school_name: selectedSchool?.school_name ?? null,
-        school_code: selectedSchool?.school_code ?? null,
-        school_type: selectedSchool?.school_type ?? null,
-        school_level: selectedSchool?.school_level ?? null,
-        ownership: selectedSchool?.ownership ?? null,
+        ...schoolMeta,
         gps_lat: gps?.lat ?? null, gps_lng: gps?.lng ?? null, gps_accuracy: gps?.accuracy ?? null,
-        verification: {
-          school_exists: schoolExists, not_found_reason: notFoundReason,
-          operational_status: operationalStatus, head_teacher: headTeacher,
-          head_phone: headPhone, date_of_visit: dateOfVisit, register_available: registerAvailable,
-        },
+        verification,
         enrolment: enrolPayload,
         total_male: gt.male, total_female: gt.female, grand_total: gt.total,
         evidence, remarks,
-        status: asDraft ? "draft" : "sent",
-      });
-      await mirrorSpecialForm({
+      };
+      const responses = {
+        state, lga, ward, location, schoolKey, gps,
+        ...schoolMeta,
+        verification, enrolment: enrolPayload, evidence, remarks, confirmed,
+        total_male: gt.male, total_female: gt.female, grand_total: gt.total,
+      };
+      const now = new Date().toISOString();
+      await saveSavedEntry({
+        id: savedEntry?.id || newEntryId(),
         userId: user.id,
         formId: BLOOMBERG_FORM_ID,
         formName: "Bloomberg School Enrolment Validation",
         formDescription: selectedSchool?.school_name
           ? `${selectedSchool.school_name} — ${state}, ${lga}`
           : `${state}, ${lga}`,
-        status: asDraft ? "draft" : "sent",
-        responses: { enrolment: enrolPayload, total_male: gt.male, total_female: gt.female, grand_total: gt.total },
+        projectId: projectId || savedEntry?.projectId || "",
+        questions: [],
+        groups: [],
+        geofence: null,
+        settings: { specialBridge: true, specialForm: BLOOMBERG_SPECIAL_FORM_KEY },
+        responses,
         gps: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy } : null,
+        submissionData,
+        submissionLocation: gps ? { lat: gps.lat, lng: gps.lng } : null,
+        withinGeofence: null,
+        submissionType: BLOOMBERG_FORM_ID,
+        status,
+        createdAt: savedEntry?.createdAt || now,
+        updatedAt: now,
+        finalizedAt: status === "finalized" ? now : savedEntry?.finalizedAt ?? null,
+        sentAt: null,
+        submissionId,
+        offline: false,
       });
       toast.success(
-        queued
-          ? (asDraft ? "Draft saved offline — will sync automatically" : "Submitted offline — will sync automatically")
-          : (asDraft ? "Draft saved" : "Validation submitted"),
+        asDraft ? "Draft saved — find it under Edit Saved Forms" : "Validation finalized — send it from Send Finalized",
       );
+      onSavedLocally?.();
       onClose();
     } catch (e: any) {
       toast.error(e.message || "Could not save");
@@ -221,6 +272,7 @@ export default function BloombergFormFiller({ onClose }: Props) {
 
   const pt = sectionTotals(enrol, PRIMARY_CLASSES);
   const jt = sectionTotals(enrol, JSS_CLASSES);
+  const st = sectionTotals(enrol, SSS_CLASSES);
   const gt = grandTotals(enrol);
 
   return (
@@ -343,6 +395,7 @@ export default function BloombergFormFiller({ onClose }: Props) {
                 <p className="rounded-lg bg-[#eef4ff] p-3 text-xs text-[#1f6feb]">Enter the actual number of pupils/students by class and sex. Do not estimate — use the school register or verified head count.</p>
                 <EnrolTable title="Primary Section (P1 – P6)" classes={PRIMARY_CLASSES} enrol={enrol} onChange={setCount} totals={pt} />
                 <EnrolTable title="Junior Secondary (JSS1 – JSS3)" classes={JSS_CLASSES} enrol={enrol} onChange={setCount} totals={jt} />
+                <EnrolTable title="Senior Secondary (SS1 – SS3)" classes={SSS_CLASSES} enrol={enrol} onChange={setCount} totals={st} />
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <Stat label="Total Male" value={gt.male} color="#2563eb" />
                   <Stat label="Total Female" value={gt.female} color="#db2777" />
@@ -399,7 +452,7 @@ export default function BloombergFormFiller({ onClose }: Props) {
           ) : (
             <>
               <Button variant="outline" className="flex-1" disabled={saving} onClick={() => submit(true)}><Save className="mr-1 h-4 w-4" /> Save Draft</Button>
-              <Button className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8]" disabled={saving} onClick={() => submit(false)}>{saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />} Submit Validation</Button>
+              <Button className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8]" disabled={saving} onClick={() => submit(false)}>{saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />} Finalize</Button>
             </>
           )}
         </div>
@@ -433,7 +486,7 @@ const Stat = ({ label, value, color }: { label: string; value: number; color: st
   </div>
 );
 
-const EnrolTable = ({ title, classes, enrol, onChange, totals }: { title: string; classes: typeof PRIMARY_CLASSES; enrol: EnrolmentCounts; onChange: (k: string, s: "male" | "female", v: string) => void; totals: { male: number; female: number; total: number } }) => (
+const EnrolTable = ({ title, classes, enrol, onChange, totals }: { title: string; classes: ClassDef[]; enrol: EnrolmentCounts; onChange: (k: string, s: "male" | "female", v: string) => void; totals: { male: number; female: number; total: number } }) => (
   <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
     <div className="bg-[#eef4ff] px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-[#1f6feb]">{title}</div>
     <table className="w-full text-base">
