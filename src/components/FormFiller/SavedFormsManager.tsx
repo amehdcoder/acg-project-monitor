@@ -33,6 +33,7 @@ import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import FormFiller from "@/components/FormFiller/FormFiller";
 import SentFormViewer from "@/components/FormFiller/SentFormViewer";
+import BloombergFormFiller from "@/components/Bloomberg/BloombergFormFiller";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import {
   listSavedEntries,
@@ -41,7 +42,7 @@ import {
   type SavedFormEntry,
   type SavedFormStatus,
 } from "@/lib/savedForms";
-import { syncSpecialSavedForm } from "@/lib/specialFormBridge";
+import { isBloombergSavedEntry, syncSpecialSavedForm } from "@/lib/specialFormBridge";
 
 export type SavedFormsMode = "edit" | "send" | "view" | "delete";
 
@@ -217,6 +218,19 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   }
 
   if (editing) {
+    if (isBloombergSavedEntry(editing)) {
+      return (
+        <BloombergFormFiller
+          projectId={editing.projectId}
+          savedEntry={editing}
+          onClose={() => setEditing(null)}
+          onSavedLocally={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      );
+    }
     return (
       <FormFiller
         formId={editing.formId}
