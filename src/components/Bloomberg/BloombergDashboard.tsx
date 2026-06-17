@@ -11,6 +11,7 @@ import MapVisualization from "@/components/MapVisualization/MapVisualization";
 import { MapMarker } from "@/components/MapVisualization/types";
 import { useBloombergDashboard } from "@/hooks/useBloombergDashboard";
 import BloombergStateLGADrilldown from "@/components/Bloomberg/BloombergStateLGADrilldown";
+import AccountabilityTable from "@/components/shared/AccountabilityTable";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { exportSchoolTemplate, importSchoolTemplate } from "@/lib/bloomberg/schoolTemplate";
@@ -93,7 +94,7 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function BloombergDashboard({ onClose }: Props) {
-  const { validations, stats, byState, stateBreakdown, points, nonExistent, validatedTable, loading, reload, deleteValidations } = useBloombergDashboard();
+  const { validations, stats, byState, stateBreakdown, points, nonExistent, validatedTable, accountability, loading, reload, deleteValidations } = useBloombergDashboard();
   const { isOwner, isSuperAdmin, isOwnerLevel, isAdmin } = useAuth();
   const canManage = isOwner || isSuperAdmin;
   const [downloadingData, setDownloadingData] = useState(false);
@@ -424,6 +425,10 @@ export default function BloombergDashboard({ onClose }: Props) {
 
         {/* State → LGA disaggregation drill-down */}
         <BloombergStateLGADrilldown data={stateBreakdown} />
+
+        {/* Field worker accountability */}
+        <AccountabilityTable users={accountability} unitLabel="School" unitLabelPlural="Schools" accent={BLUE} />
+
 
         {/* Top discrepancies */}
         <div className="rounded-xl border border-border bg-card p-4 shadow-sm">

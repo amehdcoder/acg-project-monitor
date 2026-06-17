@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ALL_CLASSES, NOT_FOUND_REASONS, OPERATIONAL_STATUS } from "@/lib/bloomberg/definition";
+import { buildAccountability, type ProfileLite } from "@/lib/accountability";
 
 export interface ValidationVerification {
   school_exists?: "yes" | "no" | "";
@@ -14,6 +15,7 @@ export interface ValidationVerification {
 
 export interface ValidationRow {
   id: string;
+  validator_id: string | null;
   school_key: string | null;
   school_name: string | null;
   school_type: string | null;
@@ -29,6 +31,7 @@ export interface ValidationRow {
   verification: ValidationVerification | null;
   status: string | null;
   submitted_at: string | null;
+  updated_at: string | null;
   created_at: string;
 }
 
@@ -62,6 +65,7 @@ export const useBloombergDashboard = () => {
   const [validations, setValidations] = useState<ValidationRow[]>([]);
   const [baselines, setBaselines] = useState<BaselineRow[]>([]);
   const [schoolCount, setSchoolCount] = useState(0);
+  const [profileMap, setProfileMap] = useState<Map<string, ProfileLite>>(new Map());
   const [loading, setLoading] = useState(true);
 
   // Monotonic request id: any async load tags itself with the current value
@@ -74,17 +78,33 @@ export const useBloombergDashboard = () => {
       const [v, b] = await Promise.all([
         fetchAll<ValidationRow>(
           "bloomberg_validations",
-          "id,school_key,school_name,school_type,school_code,state,lga,ward,gps_lat,gps_lng,total_male,total_female,grand_total,verification,status,submitted_at,created_at",
+          "id,validator_id,school_key,school_name,school_type,school_code,state,lga,ward,gps_lat,gps_lng,total_male,total_female,grand_total,verification,status,submitted_at,updated_at,created_at",
         ),
         fetchAll<BaselineRow>("bloomberg_school_baselines", "school_key,total_male,total_female,grand_total"),
       ]);
       const { count } = await supabase
         .from("bloomberg_schools")
         .select("school_key", { count: "exact", head: true });
+
+      // Resolve validator names for the accountability table.
+      const ids = [...new Set(v.map((r) => r.validator_id).filter(Boolean))] as string[];
+      const pm = new Map<string, ProfileLite>();
+      if (ids.length) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("user_id,first_name,last_name,email")
+          .in("user_id", ids);
+        (profs || []).forEach((p: any) => {
+          const name = `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email || "User";
+          pm.set(p.user_id, { name, email: p.email || "" });
+        });
+      }
+
       if (myReq !== reqIdRef.current) return;
       setValidations(v);
       setBaselines(b);
       setSchoolCount(count || 0);
+      setProfileMap(pm);
     } finally {
       if (myReq === reqIdRef.current) setLoading(false);
     }
@@ -154,7 +174,25 @@ export const useBloombergDashboard = () => {
     [validations],
   );
 
-  // Submissions by state for the map.
+  // Per-user accountability: only schools actually visited & reported
+  // (submitted or finalized), grouped by the field validator who did the work.
+  const accountability = useMemo(() => {
+    const reported = validations.filter((v) => v.status === "sent" || v.status === "finalized");
+    return buildAccountability(
+      reported.map((v) => ({
+        userId: v.validator_id,
+        unitName: v.school_name || "Unnamed school",
+        state: v.state || "—",
+        lga: v.lga || "—",
+        start: v.created_at,
+        end: v.submitted_at || v.updated_at,
+        status: v.status || "sent",
+      })),
+      profileMap,
+    );
+  }, [validations, profileMap]);
+
+
   const byState = useMemo(() => {
     const m = new Map<string, number>();
     submittedValidations.forEach((v) => {
@@ -324,7 +362,7 @@ export const useBloombergDashboard = () => {
   };
 
   return {
-    validations, baselines, stats, byState, stateBreakdown, points, nonExistent, validatedTable,
+    validations, baselines, stats, byState, stateBreakdown, points, nonExistent, validatedTable, accountability,
     loading, reload, deleteValidations, ALL_CLASSES,
   };
 };

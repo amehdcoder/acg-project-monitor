@@ -11,6 +11,7 @@ import {
 import MapVisualization from "@/components/MapVisualization/MapVisualization";
 import { MapMarker } from "@/components/MapVisualization/types";
 import { useSeeClearDashboard } from "@/hooks/useSeeClearDashboard";
+import AccountabilityTable from "@/components/shared/AccountabilityTable";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
@@ -43,7 +44,7 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function SeeClearDashboard({ onClose }: Props) {
-  const { rows, stats, byLevel, byOwnership, readinessByLevel, equipment, referrals, dataQuality, flagged, challenges, points, draftCount, loading, reload, simulate, setSimulate, deleteFacilities } = useSeeClearDashboard();
+  const { rows, stats, byLevel, byOwnership, readinessByLevel, equipment, referrals, dataQuality, flagged, challenges, points, draftCount, loading, reload, simulate, setSimulate, deleteFacilities, accountability } = useSeeClearDashboard();
   const { isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
   const [capturing, setCapturing] = useState(false);
   const captureRef = useRef<HTMLDivElement | null>(null);
@@ -208,6 +209,11 @@ export default function SeeClearDashboard({ onClose }: Props) {
             </div>
           )}
         </div>
+
+        {/* Field worker accountability */}
+        <AccountabilityTable users={accountability} unitLabel="Health Facility" unitLabelPlural="Health Facilities" accent={TEAL} />
+
+
 
         {/* Owner-only management register */}
         {canDelete && (

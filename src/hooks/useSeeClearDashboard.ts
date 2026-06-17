@@ -4,9 +4,11 @@ import {
   EQUIPMENT_ITEMS, EQUIP_STATUS_META, readinessBand, type EquipStatus,
 } from "@/lib/seeclear/definition";
 import { generateSeeClearSimulation } from "@/lib/seeclear/simulation";
+import { buildAccountability, type ProfileLite } from "@/lib/accountability";
 
 export interface MonitoringRow {
   id: string;
+  monitor_id: string | null;
   date_of_visit: string | null;
   state: string | null;
   lga: string | null;
@@ -29,11 +31,12 @@ export interface MonitoringRow {
   gps_lat: number | null;
   gps_lng: number | null;
   status: string | null;
+  updated_at: string | null;
   created_at: string;
 }
 
 const COLUMNS =
-  "id,date_of_visit,state,lga,ward,community,facility_name,facility_level,ownership,is_functional,essential_supplies,complete_records,referral_compliance,referrals_made,referrals_completed,readiness_score,equipment,challenges,recommendations,critical_gap,gps_lat,gps_lng,status,created_at";
+  "id,monitor_id,date_of_visit,state,lga,ward,community,facility_name,facility_level,ownership,is_functional,essential_supplies,complete_records,referral_compliance,referrals_made,referrals_completed,readiness_score,equipment,challenges,recommendations,critical_gap,gps_lat,gps_lng,status,updated_at,created_at";
 
 async function fetchAll(): Promise<MonitoringRow[]> {
   const all: MonitoringRow[] = [];
@@ -54,6 +57,7 @@ const LEVEL_LABEL: Record<string, string> = { primary: "Primary (PHC)", secondar
 
 export const useSeeClearDashboard = () => {
   const [rows, setRows] = useState<MonitoringRow[]>([]);
+  const [profileMap, setProfileMap] = useState<Map<string, ProfileLite>>(new Map());
   const [loading, setLoading] = useState(true);
   const [simulate, setSimulate] = useState(false);
 
@@ -66,8 +70,24 @@ export const useSeeClearDashboard = () => {
     setLoading(true);
     try {
       const data = await fetchAll();
+
+      // Resolve monitor names for the accountability table.
+      const ids = [...new Set(data.map((r) => r.monitor_id).filter(Boolean))] as string[];
+      const pm = new Map<string, ProfileLite>();
+      if (ids.length) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("user_id,first_name,last_name,email")
+          .in("user_id", ids);
+        (profs || []).forEach((p: any) => {
+          const name = `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email || "User";
+          pm.set(p.user_id, { name, email: p.email || "" });
+        });
+      }
+
       if (myReq !== reqIdRef.current || simulateRef.current) return;
       setRows(data);
+      setProfileMap(pm);
     } finally {
       if (myReq === reqIdRef.current) setLoading(false);
     }
@@ -78,6 +98,10 @@ export const useSeeClearDashboard = () => {
     if (simulate) {
       const sim = generateSeeClearSimulation();
       setRows(sim.rows);
+      const names = ["Amaka Obi", "Ibrahim Sani", "Grace Danjuma", "Yusuf Bello", "Ngozi Eze", "Peter Gyang"];
+      const pm = new Map<string, ProfileLite>();
+      names.forEach((n, i) => pm.set(`sim-monitor-${i + 1}`, { name: n, email: `${n.split(" ")[0].toLowerCase()}@example.org` }));
+      setProfileMap(pm);
       setLoading(false);
     } else {
       setRows([]);
@@ -237,6 +261,23 @@ export const useSeeClearDashboard = () => {
 
   const draftCount = useMemo(() => rows.filter((r) => r.status === "draft").length, [rows]);
 
+  // Per-user accountability: facilities actually visited & reported, grouped by monitor.
+  const accountability = useMemo(() => {
+    const reported = rows.filter((r) => r.status === "sent" || r.status === "finalized");
+    return buildAccountability(
+      reported.map((r) => ({
+        userId: r.monitor_id,
+        unitName: r.facility_name || "Unnamed facility",
+        state: r.state || "—",
+        lga: r.lga || "—",
+        start: r.created_at,
+        end: r.updated_at || r.created_at,
+        status: r.status || "sent",
+      })),
+      profileMap,
+    );
+  }, [rows, profileMap]);
+
   // Owner-only hard delete of monitoring entries.
   const deleteFacilities = async (ids: string[]): Promise<void> => {
     if (!ids.length) return;
@@ -252,6 +293,6 @@ export const useSeeClearDashboard = () => {
   return {
     rows, loading, reload, simulate, setSimulate,
     stats, byLevel, byOwnership, readinessByLevel, equipment, referrals,
-    dataQuality, flagged, challenges, points, draftCount, deleteFacilities,
+    dataQuality, flagged, challenges, points, draftCount, deleteFacilities, accountability,
   };
 };
