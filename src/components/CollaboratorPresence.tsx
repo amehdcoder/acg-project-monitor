@@ -14,7 +14,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Tooltip,
   TooltipContent,
@@ -156,7 +155,7 @@ const CollaboratorPresence = () => {
           </span>
         </div>
 
-        <div className="max-h-80 overflow-y-auto">v
+        <div className="max-h-80 overflow-y-auto">
           {total === 0 ? (
             <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
               <Users className="h-8 w-8 text-muted-foreground/50" />
@@ -190,7 +189,7 @@ const CollaboratorPresence = () => {
               })}
             </ul>
           )}
-        </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );
