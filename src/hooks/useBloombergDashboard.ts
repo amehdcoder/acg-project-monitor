@@ -64,11 +64,8 @@ export const useBloombergDashboard = () => {
   const [schoolCount, setSchoolCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Monotonic request id: any async load tags itself with the current value,
-  // and discards its result if a newer load/toggle has happened meanwhile.
-  // This prevents an in-flight reload() from overwriting simulated data
-  // (and vice versa) when the Simulate toggle is flipped — the root cause of
-  // the dashboard "flickering" / showing the wrong dataset.
+  // Monotonic request id: any async load tags itself with the current value
+  // and discards its result if a newer load has started.
   const reqIdRef = useRef(0);
   const reload = async () => {
     const myReq = ++reqIdRef.current;
