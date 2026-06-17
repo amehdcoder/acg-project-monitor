@@ -154,7 +154,7 @@ export default function AccountabilityTable({ users, unitLabel, unitLabelPlural,
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>
