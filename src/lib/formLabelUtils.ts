@@ -62,3 +62,29 @@ export const getFieldLabel = (key: string, labelMap?: QuestionLabelMap): string 
   }
   return cleanFieldKey(key);
 };
+
+/**
+ * Prettify an administrative-unit option code (state / LGA / ward / community)
+ * into a human-readable label, e.g. "bauchi" → "Bauchi",
+ * "akwa_ibom" → "Akwa Ibom". When `stripPrefix` is provided (typically the
+ * parent code such as the state code for an LGA), it is removed first so that
+ * "bauchi_ganjuwa" with prefix "bauchi" → "Ganjuwa".
+ */
+export const prettyAdminLabel = (
+  code: string | null | undefined,
+  stripPrefix?: string | null,
+): string => {
+  let raw = String(code ?? "").trim();
+  if (!raw) return "";
+  if (stripPrefix) {
+    const p = String(stripPrefix).trim();
+    if (p && raw.toLowerCase().startsWith(p.toLowerCase() + "_")) {
+      raw = raw.slice(p.length + 1);
+    }
+  }
+  return raw
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (l) => l.toUpperCase())
+    .trim();
+};
