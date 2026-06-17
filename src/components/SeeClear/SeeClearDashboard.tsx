@@ -11,6 +11,7 @@ import {
 import MapVisualization from "@/components/MapVisualization/MapVisualization";
 import { MapMarker } from "@/components/MapVisualization/types";
 import { useSeeClearDashboard } from "@/hooks/useSeeClearDashboard";
+import AccountabilityTable from "@/components/shared/AccountabilityTable";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
