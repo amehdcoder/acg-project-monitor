@@ -98,6 +98,10 @@ export const useSeeClearDashboard = () => {
     if (simulate) {
       const sim = generateSeeClearSimulation();
       setRows(sim.rows);
+      const names = ["Amaka Obi", "Ibrahim Sani", "Grace Danjuma", "Yusuf Bello", "Ngozi Eze", "Peter Gyang"];
+      const pm = new Map<string, ProfileLite>();
+      names.forEach((n, i) => pm.set(`sim-monitor-${i + 1}`, { name: n, email: `${n.split(" ")[0].toLowerCase()}@example.org` }));
+      setProfileMap(pm);
       setLoading(false);
     } else {
       setRows([]);
