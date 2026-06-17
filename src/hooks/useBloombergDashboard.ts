@@ -174,7 +174,25 @@ export const useBloombergDashboard = () => {
     [validations],
   );
 
-  // Submissions by state for the map.
+  // Per-user accountability: only schools actually visited & reported
+  // (submitted or finalized), grouped by the field validator who did the work.
+  const accountability = useMemo(() => {
+    const reported = validations.filter((v) => v.status === "sent" || v.status === "finalized");
+    return buildAccountability(
+      reported.map((v) => ({
+        userId: v.validator_id,
+        unitName: v.school_name || "Unnamed school",
+        state: v.state || "—",
+        lga: v.lga || "—",
+        start: v.created_at,
+        end: v.submitted_at || v.updated_at,
+        status: v.status || "sent",
+      })),
+      profileMap,
+    );
+  }, [validations, profileMap]);
+
+
   const byState = useMemo(() => {
     const m = new Map<string, number>();
     submittedValidations.forEach((v) => {
