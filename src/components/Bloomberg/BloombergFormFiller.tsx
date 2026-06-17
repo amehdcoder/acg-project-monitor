@@ -280,7 +280,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
         status: "sent",
         submitted_at: now,
       };
-      const { queued } = await queueOrInsert("bloomberg_validations", dbRow);
+      const { queued } = await queueOrInsert("bloomberg_validations", dbRow, true);
 
       // 2) Mirror into the saved-forms store as "sent" so the Forms page shows a
       // consistent record (under Sent), with no orphaned draft/finalized copy.
