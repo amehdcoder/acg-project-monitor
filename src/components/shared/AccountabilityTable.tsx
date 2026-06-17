@@ -78,8 +78,8 @@ export default function AccountabilityTable({ users, unitLabel, unitLabelPlural,
                 const expanded = open.has(u.userId);
                 const stripe = i % 2 === 0 ? "bg-card" : "bg-muted/30";
                 return (
-                  <>
-                    <tr key={u.userId} className={`border-b border-border/50 ${stripe} hover:bg-muted/50 transition-colors`}>
+                  <Fragment key={u.userId}>
+                    <tr className={`border-b border-border/50 ${stripe} hover:bg-muted/50 transition-colors`}>
                       <td className="py-2 pr-2">
                         <button
                           type="button"
