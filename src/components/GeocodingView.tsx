@@ -335,7 +335,7 @@ export default function GeocodingView() {
                       )}
                     </div>
                   ))}
-                </ScrollArea>
+                </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={addRow}><Plus className="h-4 w-4 mr-1.5" />Add row</Button>
