@@ -8,6 +8,7 @@ import { buildAccountability, type ProfileLite } from "@/lib/accountability";
 
 export interface MonitoringRow {
   id: string;
+  monitor_id: string | null;
   date_of_visit: string | null;
   state: string | null;
   lga: string | null;
@@ -30,11 +31,12 @@ export interface MonitoringRow {
   gps_lat: number | null;
   gps_lng: number | null;
   status: string | null;
+  updated_at: string | null;
   created_at: string;
 }
 
 const COLUMNS =
-  "id,date_of_visit,state,lga,ward,community,facility_name,facility_level,ownership,is_functional,essential_supplies,complete_records,referral_compliance,referrals_made,referrals_completed,readiness_score,equipment,challenges,recommendations,critical_gap,gps_lat,gps_lng,status,created_at";
+  "id,monitor_id,date_of_visit,state,lga,ward,community,facility_name,facility_level,ownership,is_functional,essential_supplies,complete_records,referral_compliance,referrals_made,referrals_completed,readiness_score,equipment,challenges,recommendations,critical_gap,gps_lat,gps_lng,status,updated_at,created_at";
 
 async function fetchAll(): Promise<MonitoringRow[]> {
   const all: MonitoringRow[] = [];
