@@ -190,7 +190,7 @@ export const useBloombergDashboard = () => {
       coveragePct,
       discrepancies: discrepancies.slice(0, 10),
     };
-  }, [validations, baselineByKey, schoolCount]);
+  }, [dedupedSent, validations, baselineByKey, schoolCount]);
 
   const submittedValidations = useMemo(
     () => validations.filter((v) => v.status === "sent"),
