@@ -96,6 +96,28 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
   );
   const selectedSchool = useMemo(() => schools.find((s) => s.school_key === schoolKey) || null, [schools, schoolKey]);
 
+  useEffect(() => {
+    if (!savedEntry) return;
+    const r = savedEntry.responses || {};
+    setState(r.state || "");
+    setLga(r.lga || "");
+    setWard(r.ward || "");
+    setLocation(r.location || "");
+    setSchoolKey(r.schoolKey || "");
+    setGps(r.gps || savedEntry.gps || null);
+    setSchoolExists(r.verification?.school_exists || "");
+    setNotFoundReason(r.verification?.not_found_reason || "");
+    setOperationalStatus(r.verification?.operational_status || "operational");
+    setHeadTeacher(r.verification?.head_teacher || "");
+    setHeadPhone(r.verification?.head_phone || "");
+    setDateOfVisit(r.verification?.date_of_visit || new Date().toISOString().slice(0, 10));
+    setRegisterAvailable(r.verification?.register_available ?? true);
+    setEnrol({ ...emptyEnrolment(), ...(r.enrolment || {}) });
+    setEvidence(r.evidence || {});
+    setRemarks(r.remarks || "");
+    setConfirmed(!!r.confirmed);
+  }, [savedEntry?.id]);
+
   const captureGps = () => {
     geo.getCurrentPosition();
   };
