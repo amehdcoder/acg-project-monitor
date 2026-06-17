@@ -261,6 +261,23 @@ export const useSeeClearDashboard = () => {
 
   const draftCount = useMemo(() => rows.filter((r) => r.status === "draft").length, [rows]);
 
+  // Per-user accountability: facilities actually visited & reported, grouped by monitor.
+  const accountability = useMemo(() => {
+    const reported = rows.filter((r) => r.status === "sent" || r.status === "finalized");
+    return buildAccountability(
+      reported.map((r) => ({
+        userId: r.monitor_id,
+        unitName: r.facility_name || "Unnamed facility",
+        state: r.state || "—",
+        lga: r.lga || "—",
+        start: r.created_at,
+        end: r.updated_at || r.created_at,
+        status: r.status || "sent",
+      })),
+      profileMap,
+    );
+  }, [rows, profileMap]);
+
   // Owner-only hard delete of monitoring entries.
   const deleteFacilities = async (ids: string[]): Promise<void> => {
     if (!ids.length) return;
