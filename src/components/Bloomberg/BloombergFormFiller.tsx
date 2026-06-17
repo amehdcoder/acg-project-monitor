@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  ArrowLeft, ArrowRight, Check, MapPin, Loader2, Camera, Save, Send,
+  ArrowLeft, ArrowRight, Check, MapPin, Loader2, Camera, Send,
   School as SchoolIcon, ClipboardCheck, ImageIcon, ChevronDown, Search, ChevronsUpDown,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
