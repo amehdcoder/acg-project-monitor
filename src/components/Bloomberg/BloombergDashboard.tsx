@@ -280,6 +280,11 @@ export default function BloombergDashboard({ onClose }: Props) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => handleDownloadData()} disabled={downloadingData}>
+                    <Download className="mr-2 h-4 w-4" /> Download Collected Data (Excel)
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => exportPDF()}>
                   <FileText className="mr-2 h-4 w-4" /> Export as PDF
                 </DropdownMenuItem>
