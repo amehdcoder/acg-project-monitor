@@ -144,8 +144,8 @@ export function generateSeeClearSimulation(seed = 5125): SeeClearSimDataset {
         gps_lat: lat,
         gps_lng: lng,
         status,
-        created_at: daysAgo((idx % 50) + 1),
-        updated_at: daysAgo(idx % 50),
+        created_at: (() => { const d = new Date(); d.setDate(d.getDate() - (idx % 50)); d.setHours(8 + (idx % 6), (idx * 7) % 60, 0, 0); return d.toISOString(); })(),
+        updated_at: (() => { const d = new Date(); d.setDate(d.getDate() - (idx % 50)); d.setHours(8 + (idx % 6), (idx * 7) % 60, 0, 0); d.setMinutes(d.getMinutes() + 45 + Math.floor(rng() * 120)); return d.toISOString(); })(),
       });
     }
   }
