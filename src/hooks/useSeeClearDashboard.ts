@@ -57,6 +57,7 @@ const LEVEL_LABEL: Record<string, string> = { primary: "Primary (PHC)", secondar
 
 export const useSeeClearDashboard = () => {
   const [rows, setRows] = useState<MonitoringRow[]>([]);
+  const [profileMap, setProfileMap] = useState<Map<string, ProfileLite>>(new Map());
   const [loading, setLoading] = useState(true);
   const [simulate, setSimulate] = useState(false);
 
@@ -69,8 +70,24 @@ export const useSeeClearDashboard = () => {
     setLoading(true);
     try {
       const data = await fetchAll();
+
+      // Resolve monitor names for the accountability table.
+      const ids = [...new Set(data.map((r) => r.monitor_id).filter(Boolean))] as string[];
+      const pm = new Map<string, ProfileLite>();
+      if (ids.length) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("user_id,first_name,last_name,email")
+          .in("user_id", ids);
+        (profs || []).forEach((p: any) => {
+          const name = `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email || "User";
+          pm.set(p.user_id, { name, email: p.email || "" });
+        });
+      }
+
       if (myReq !== reqIdRef.current || simulateRef.current) return;
       setRows(data);
+      setProfileMap(pm);
     } finally {
       if (myReq === reqIdRef.current) setLoading(false);
     }
