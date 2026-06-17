@@ -185,7 +185,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
   const evidenceComplete = REQUIRED_EVIDENCE.every((s) => !!evidence[s]);
 
   const canNext = () => {
-    if (step === 0) return !!(state && lga && ward && location && schoolKey && gps);
+    if (step === 0) return !!(state && lga && ward && location && schoolKey && gps) && specifyMissing.length === 0;
     if (step === 1) {
       if (schoolExists === "") return false;
       if (schoolExists === "no") return !!notFoundReason;
