@@ -30,7 +30,8 @@ const ANIM_DURATION = 5000;
 const MAX_PATH = 500;
 
 const SAT_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-const LABELS_URL = "https://stamen-tiles.a.ssl.fastly.net/toner-labels/{z}/{x}/{y}.png";
+// Esri reference labels — identical overlay to the Coverage Evaluation satellite map.
+const LABELS_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
 
 interface UserState {
   user_id: string;
