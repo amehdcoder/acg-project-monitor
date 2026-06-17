@@ -68,6 +68,12 @@ export interface SchoolLite {
   school_code: string | null;
   state: string | null;
   lga: string | null;
+  state_label?: string | null;
+  lga_label?: string | null;
+  ward_label?: string | null;
+  location_label?: string | null;
+  ward?: string | null;
+  location?: string | null;
 }
 
 export const useBloombergDashboard = () => {
