@@ -305,6 +305,12 @@ export default function BloombergDashboard({ onClose }: Props) {
               {importing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Upload className="mr-1.5 h-4 w-4" />}
               Import Schools & Baselines
             </Button>
+            {isOwner && (
+              <Button size="sm" onClick={handleFactoryReset} disabled={resetting} className="h-9 bg-red-500 text-white hover:bg-red-600 border-0 font-semibold">
+                {resetting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />}
+                Factory Reset Validation Data
+              </Button>
+            )}
           </div>
         )}
       </div>
