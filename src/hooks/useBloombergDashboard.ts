@@ -112,6 +112,7 @@ export const useBloombergDashboard = () => {
       if (myReq !== reqIdRef.current) return;
       setValidations(v);
       setBaselines(b);
+      setSchools(s);
       setSchoolCount(count || 0);
       setProfileMap(pm);
     } finally {
