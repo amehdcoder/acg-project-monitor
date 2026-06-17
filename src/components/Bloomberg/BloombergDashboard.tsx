@@ -94,8 +94,20 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 
 export default function BloombergDashboard({ onClose }: Props) {
   const { validations, stats, byState, stateBreakdown, points, nonExistent, validatedTable, loading, reload, deleteValidations } = useBloombergDashboard();
-  const { isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
+  const { isOwner, isSuperAdmin, isOwnerLevel, isAdmin } = useAuth();
   const canManage = isOwner || isSuperAdmin;
+  const [downloadingData, setDownloadingData] = useState(false);
+  const handleDownloadData = async () => {
+    setDownloadingData(true);
+    try {
+      const n = await exportCollectedData();
+      toast.success(n > 0 ? `Exported ${n.toLocaleString()} validation record(s) to Excel` : "No submitted data to export yet");
+    } catch (e: any) {
+      toast.error(e?.message || "Could not export collected data");
+    } finally {
+      setDownloadingData(false);
+    }
+  };
   // Hard-delete of validation entries is restricted to the Owner / Co-owner.
   const canDelete = isOwnerLevel;
   const [deleting, setDeleting] = useState<string | null>(null);
