@@ -420,7 +420,7 @@ export const useBloombergDashboard = () => {
         };
       })
       .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct) || a.school.localeCompare(b.school));
-  }, [submittedValidations, baselineByKey]);
+  }, [submittedValidations, baselineByKey, labelMaps]);
 
   // Schools that have NOT been validated yet — every school in the register that
   // has no submitted/validated entry. Baseline enrolment figures are shown;
