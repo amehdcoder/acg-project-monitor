@@ -145,6 +145,7 @@ export function generateSeeClearSimulation(seed = 5125): SeeClearSimDataset {
         gps_lng: lng,
         status,
         created_at: daysAgo((idx % 50) + 1),
+        updated_at: daysAgo(idx % 50),
       });
     }
   }
