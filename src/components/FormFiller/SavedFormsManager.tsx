@@ -42,7 +42,7 @@ import {
   type SavedFormEntry,
   type SavedFormStatus,
 } from "@/lib/savedForms";
-import { isBloombergSavedEntry, syncSpecialSavedForm } from "@/lib/specialFormBridge";
+import { isBloombergSavedEntry, isSpecialBridgeEntry, syncSpecialSavedForm } from "@/lib/specialFormBridge";
 
 export type SavedFormsMode = "edit" | "send" | "view" | "delete";
 
@@ -115,7 +115,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
     setLoading(true);
     try {
       let rows = await listSavedEntries(userId, cfg.status);
-      if (projectId) rows = rows.filter((r) => r.projectId === projectId);
+      if (projectId) rows = rows.filter((r) => r.projectId === projectId || isSpecialBridgeEntry(r));
       setEntries(rows);
       setSelected(new Set());
     } catch {

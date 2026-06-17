@@ -73,6 +73,15 @@ export async function mirrorSpecialForm(args: MirrorArgs): Promise<void> {
 export const isBloombergSavedEntry = (entry: SavedFormEntry | null | undefined): boolean =>
   !!entry && entry.formId === BLOOMBERG_FORM_ID && entry.settings?.specialForm === BLOOMBERG_SPECIAL_FORM_KEY;
 
+// Special bridge forms (Bloomberg / SeeClear) are not strictly bound to a single
+// project context, so they must surface in the Forms tabs regardless of which
+// project happens to be selected when viewing the saved-forms lists.
+export const isSpecialBridgeEntry = (entry: SavedFormEntry | null | undefined): boolean =>
+  !!entry &&
+  (entry.settings?.specialBridge === true ||
+    entry.settings?.specialForm === BLOOMBERG_SPECIAL_FORM_KEY ||
+    entry.settings?.specialForm === SEECLEAR_SPECIAL_FORM_KEY);
+
 export async function syncSpecialSavedForm(
   entry: SavedFormEntry,
 ): Promise<{ success: boolean; offline: boolean; id: string } | null> {
