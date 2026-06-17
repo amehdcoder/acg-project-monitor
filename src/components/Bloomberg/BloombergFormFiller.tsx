@@ -522,6 +522,13 @@ const Sel = ({ value, onChange, options, placeholder, disabled }: { value: strin
 
 // Inline "please specify" prompt shown when a cascade option resolves to the
 // "Not Specified in the LGA School Enrolment Dataset" placeholder.
+const toTitleCase = (str: string) =>
+  str
+    .toLowerCase()
+    .split(" ")
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ""))
+    .join(" ");
+
 const SpecifyInput = ({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) => (
   <div className="-mt-1 rounded-xl border border-[#f0b429] bg-[#fffbeb] p-3">
     <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-[#92600a]">
@@ -533,7 +540,7 @@ const SpecifyInput = ({ label, value, onChange }: { label: string; value: string
     </p>
     <Input
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => onChange(toTitleCase(e.target.value))}
       placeholder={`Type the ${label.toLowerCase()} name`}
       className="h-[3.25rem] border-[#f0b429] bg-white text-lg focus-visible:ring-[#f0b429]"
     />
