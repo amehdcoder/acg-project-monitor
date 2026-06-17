@@ -173,6 +173,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
 
   const submit = async (asDraft: boolean) => {
     if (!user?.id) return;
+    const status: SavedFormStatus = asDraft ? "draft" : "finalized";
     if (!asDraft) {
       if (!(state && lga && ward && location && schoolKey && gps)) {
         toast.error("Complete all school information."); setStep(0); return;
@@ -200,42 +201,68 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
       const gt = grandTotals(enrol);
       const enrolPayload: Record<string, any> = {};
       ALL_CLASSES.forEach((c) => (enrolPayload[c.key] = enrol[c.key]));
-      const { queued } = await queueOrInsert("bloomberg_validations", {
+      const verification = {
+        school_exists: schoolExists, not_found_reason: notFoundReason,
+        operational_status: operationalStatus, head_teacher: headTeacher,
+        head_phone: headPhone, date_of_visit: dateOfVisit, register_available: registerAvailable,
+      };
+      const submissionId = savedEntry?.submissionId || crypto.randomUUID();
+      const schoolMeta = {
+        school_name: selectedSchool?.school_name ?? (savedEntry?.responses as any)?.school_name ?? null,
+        school_code: selectedSchool?.school_code ?? (savedEntry?.responses as any)?.school_code ?? null,
+        school_type: selectedSchool?.school_type ?? (savedEntry?.responses as any)?.school_type ?? null,
+        school_level: selectedSchool?.school_level ?? (savedEntry?.responses as any)?.school_level ?? null,
+        ownership: selectedSchool?.ownership ?? (savedEntry?.responses as any)?.ownership ?? null,
+      };
+      const submissionData = {
         validator_id: user.id,
         school_key: schoolKey || null,
         state, lga, ward, location,
-        school_name: selectedSchool?.school_name ?? null,
-        school_code: selectedSchool?.school_code ?? null,
-        school_type: selectedSchool?.school_type ?? null,
-        school_level: selectedSchool?.school_level ?? null,
-        ownership: selectedSchool?.ownership ?? null,
+        ...schoolMeta,
         gps_lat: gps?.lat ?? null, gps_lng: gps?.lng ?? null, gps_accuracy: gps?.accuracy ?? null,
-        verification: {
-          school_exists: schoolExists, not_found_reason: notFoundReason,
-          operational_status: operationalStatus, head_teacher: headTeacher,
-          head_phone: headPhone, date_of_visit: dateOfVisit, register_available: registerAvailable,
-        },
+        verification,
         enrolment: enrolPayload,
         total_male: gt.male, total_female: gt.female, grand_total: gt.total,
         evidence, remarks,
-        status: asDraft ? "draft" : "sent",
-      });
-      await mirrorSpecialForm({
+      };
+      const responses = {
+        state, lga, ward, location, schoolKey, gps,
+        ...schoolMeta,
+        verification, enrolment: enrolPayload, evidence, remarks, confirmed,
+        total_male: gt.male, total_female: gt.female, grand_total: gt.total,
+      };
+      const now = new Date().toISOString();
+      await saveSavedEntry({
+        id: savedEntry?.id || newEntryId(),
         userId: user.id,
         formId: BLOOMBERG_FORM_ID,
         formName: "Bloomberg School Enrolment Validation",
         formDescription: selectedSchool?.school_name
           ? `${selectedSchool.school_name} — ${state}, ${lga}`
           : `${state}, ${lga}`,
-        status: asDraft ? "draft" : "sent",
-        responses: { enrolment: enrolPayload, total_male: gt.male, total_female: gt.female, grand_total: gt.total },
+        projectId: projectId || savedEntry?.projectId || "",
+        questions: [],
+        groups: [],
+        geofence: null,
+        settings: { specialBridge: true, specialForm: BLOOMBERG_SPECIAL_FORM_KEY },
+        responses,
         gps: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy } : null,
+        submissionData,
+        submissionLocation: gps ? { lat: gps.lat, lng: gps.lng } : null,
+        withinGeofence: null,
+        submissionType: BLOOMBERG_FORM_ID,
+        status,
+        createdAt: savedEntry?.createdAt || now,
+        updatedAt: now,
+        finalizedAt: status === "finalized" ? now : savedEntry?.finalizedAt ?? null,
+        sentAt: null,
+        submissionId,
+        offline: false,
       });
       toast.success(
-        queued
-          ? (asDraft ? "Draft saved offline — will sync automatically" : "Submitted offline — will sync automatically")
-          : (asDraft ? "Draft saved" : "Validation submitted"),
+        asDraft ? "Draft saved — find it under Edit Saved Forms" : "Validation finalized — send it from Send Finalized",
       );
+      onSavedLocally?.();
       onClose();
     } catch (e: any) {
       toast.error(e.message || "Could not save");
