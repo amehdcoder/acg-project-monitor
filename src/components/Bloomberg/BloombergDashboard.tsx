@@ -111,7 +111,7 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function BloombergDashboard({ onClose }: Props) {
-  const { validations, stats, byState, stateBreakdown, points, nonExistent, validatedTable, accountability, loading, reload, deleteValidations } = useBloombergDashboard();
+  const { validations, stats, byState, stateBreakdown, points, nonExistent, validatedTable, notValidatedTable, accountability, loading, reload, deleteValidations } = useBloombergDashboard();
   const { isOwner, isSuperAdmin, isOwnerLevel, isAdmin } = useAuth();
   const canManage = isOwner || isSuperAdmin;
   const [downloadingData, setDownloadingData] = useState(false);
