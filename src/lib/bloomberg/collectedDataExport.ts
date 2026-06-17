@@ -319,7 +319,6 @@ export async function exportCollectedData(): Promise<number> {
       const b = v.school_key ? baselineByKey.get(v.school_key) : undefined;
       return s + (num(b?.grand_total) ?? 0);
     }, 0);
-    const vmCol = totalCols - 3 - 3 - ALL_CLASSES.length - 3 + 1; // not precise; set explicit below
     // Explicit known columns:
     const validatedTotalCol = 22 + ALL_CLASSES.length * 3 + 3; // last of validated block
     tRow.getCell(validatedTotalCol - 2).value = valMale;
