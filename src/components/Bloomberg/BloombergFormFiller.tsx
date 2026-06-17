@@ -243,11 +243,11 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
       };
       // Only persist specify values for fields whose option was the "Not Specified" placeholder.
       const specifiedLocations: Record<string, string> = {};
-      if (needState && specified.state?.trim()) specifiedLocations.state = specified.state.trim();
-      if (needLga && specified.lga?.trim()) specifiedLocations.lga = specified.lga.trim();
-      if (needWard && specified.ward?.trim()) specifiedLocations.ward = specified.ward.trim();
-      if (needLocation && specified.location?.trim()) specifiedLocations.location = specified.location.trim();
-      if (needSchool && specified.school?.trim()) specifiedLocations.school = specified.school.trim();
+      if ((needState || specified.state) && specified.state?.trim()) specifiedLocations.state = specified.state.trim();
+      if ((needLga || specified.lga) && specified.lga?.trim()) specifiedLocations.lga = specified.lga.trim();
+      if ((needWard || specified.ward) && specified.ward?.trim()) specifiedLocations.ward = specified.ward.trim();
+      if ((needLocation || specified.location) && specified.location?.trim()) specifiedLocations.location = specified.location.trim();
+      if ((needSchool || specified.school) && specified.school?.trim()) specifiedLocations.school = specified.school.trim();
       const submissionData = {
         validator_id: user.id,
         school_key: schoolKey || null,
