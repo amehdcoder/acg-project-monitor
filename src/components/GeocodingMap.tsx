@@ -16,7 +16,10 @@ export interface GeoPoint {
 
 const SAT_URL =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-const LABELS_URL = "https://stamen-tiles.a.ssl.fastly.net/toner-labels/{z}/{x}/{y}.png";
+// Esri reference labels (streets, places, POIs) — identical overlay to the
+// Coverage Evaluation satellite map (the Stamen toner endpoint is dead).
+const LABELS_URL =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
 
 // A pleasant categorical palette assigned per data source.
 const PALETTE = [
@@ -45,12 +48,25 @@ export default function GeocodingMap({ points }: { points: GeoPoint[] }) {
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     const map = L.map(containerRef.current, { center: [9.082, 8.6753], zoom: 6, zoomControl: false });
-    L.tileLayer(SAT_URL, { attribution: "&copy; Esri World Imagery", maxZoom: 19 }).addTo(map);
-    L.tileLayer(LABELS_URL, { maxZoom: 19, opacity: 0.55 }).addTo(map);
+    L.tileLayer(SAT_URL, { attribution: "Tiles &copy; Esri — World Imagery", maxZoom: 23, maxNativeZoom: 19, detectRetina: true, crossOrigin: true }).addTo(map);
+    L.tileLayer(LABELS_URL, { maxZoom: 23, maxNativeZoom: 19, opacity: 0.85, pane: "overlayPane" }).addTo(map);
     L.control.zoom({ position: "topright" }).addTo(map);
     layerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
+
+    // Recalculate tile layout once the container is sized / resized.
+    const fixSize = () => map.invalidateSize({ animate: false });
+    const t0 = window.setTimeout(fixSize, 0);
+    const t1 = window.setTimeout(fixSize, 300);
+    const ro = new ResizeObserver(fixSize);
+    if (containerRef.current) ro.observe(containerRef.current);
+    window.addEventListener("resize", fixSize);
+
     return () => {
+      window.clearTimeout(t0);
+      window.clearTimeout(t1);
+      ro.disconnect();
+      window.removeEventListener("resize", fixSize);
       map.remove();
       mapRef.current = null;
       layerRef.current = null;

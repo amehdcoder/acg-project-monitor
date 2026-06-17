@@ -30,7 +30,8 @@ const ANIM_DURATION = 5000;
 const MAX_PATH = 500;
 
 const SAT_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-const LABELS_URL = "https://stamen-tiles.a.ssl.fastly.net/toner-labels/{z}/{x}/{y}.png";
+// Esri reference labels — identical overlay to the Coverage Evaluation satellite map.
+const LABELS_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
 
 interface UserState {
   user_id: string;
@@ -292,8 +293,8 @@ const LiveTrackingDashboard = () => {
   useEffect(() => {
     if (!allowed || !online || !mapContainer.current || mapRef.current) return;
     const map = L.map(mapContainer.current, { center: [9.082, 8.6753], zoom: 6, zoomControl: false });
-    L.tileLayer(SAT_URL, { attribution: "&copy; Esri World Imagery", maxZoom: 20 }).addTo(map);
-    L.tileLayer(LABELS_URL, { maxZoom: 20, opacity: 0.6 }).addTo(map);
+    L.tileLayer(SAT_URL, { attribution: "Tiles &copy; Esri — World Imagery", maxZoom: 23, maxNativeZoom: 19, detectRetina: true, crossOrigin: true }).addTo(map);
+    L.tileLayer(LABELS_URL, { maxZoom: 23, maxNativeZoom: 19, opacity: 0.85, pane: "overlayPane" }).addTo(map);
     L.control.zoom({ position: "topright" }).addTo(map);
     const group = L.layerGroup().addTo(map);
     layerGroupRef.current = group;
@@ -301,7 +302,21 @@ const LiveTrackingDashboard = () => {
     mapReadyRef.current = true;
     refreshSources();
 
+    // Leaflet needs an explicit size recalculation when its container is first
+    // laid out or later resized (tab switches, viewport changes, orientation
+    // flips) — without this the satellite tiles render greyed/partial.
+    const fixSize = () => map.invalidateSize({ animate: false });
+    const t0 = window.setTimeout(fixSize, 0);
+    const t1 = window.setTimeout(fixSize, 300);
+    const ro = new ResizeObserver(fixSize);
+    if (mapContainer.current) ro.observe(mapContainer.current);
+    window.addEventListener("resize", fixSize);
+
     return () => {
+      window.clearTimeout(t0);
+      window.clearTimeout(t1);
+      ro.disconnect();
+      window.removeEventListener("resize", fixSize);
       mapReadyRef.current = false;
       markersRef.current.clear();
       map.remove();

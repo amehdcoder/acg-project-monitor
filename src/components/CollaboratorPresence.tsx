@@ -156,7 +156,7 @@ const CollaboratorPresence = () => {
           </span>
         </div>
 
-        <ScrollArea className="max-h-80">
+        <div className="max-h-80 overflow-y-auto">v
           {total === 0 ? (
             <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
               <Users className="h-8 w-8 text-muted-foreground/50" />
