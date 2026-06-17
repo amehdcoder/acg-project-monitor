@@ -42,7 +42,7 @@ import {
   type SavedFormEntry,
   type SavedFormStatus,
 } from "@/lib/savedForms";
-import { isBloombergSavedEntry, syncSpecialSavedForm } from "@/lib/specialFormBridge";
+import { isBloombergSavedEntry, isSpecialBridgeEntry, syncSpecialSavedForm } from "@/lib/specialFormBridge";
 
 export type SavedFormsMode = "edit" | "send" | "view" | "delete";
 
