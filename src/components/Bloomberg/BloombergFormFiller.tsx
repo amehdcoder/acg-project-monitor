@@ -99,6 +99,26 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
   );
   const selectedSchool = useMemo(() => schools.find((s) => s.school_key === schoolKey) || null, [schools, schoolKey]);
 
+  // True when the currently chosen option for a cascade field is the
+  // "Not Specified in the LGA School Enrolment Dataset" placeholder.
+  const isUnspecified = (val: string, opts: { value: string; label: string }[]) =>
+    !!val && (opts.find((o) => o.value === val)?.label === MISSING_LOCATION_LABEL);
+  const needState = isUnspecified(state, stateOpts);
+  const needLga = isUnspecified(lga, lgaOpts);
+  const needWard = isUnspecified(ward, wardOpts);
+  const needLocation = isUnspecified(location, locOpts);
+  const needSchool = !!selectedSchool && normalizeMissingLabel(selectedSchool.school_name) === MISSING_LOCATION_LABEL;
+  // Which "specify" inputs are required & still empty.
+  const specifyMissing = useMemo(() => {
+    const out: string[] = [];
+    if (needState && !specified.state?.trim()) out.push("State");
+    if (needLga && !specified.lga?.trim()) out.push("LGA");
+    if (needWard && !specified.ward?.trim()) out.push("Ward");
+    if (needLocation && !specified.location?.trim()) out.push("Community / Location");
+    if (needSchool && !specified.school?.trim()) out.push("School Name");
+    return out;
+  }, [needState, needLga, needWard, needLocation, needSchool, specified]);
+
   useEffect(() => {
     if (!savedEntry) return;
     const r = savedEntry.responses || {};
