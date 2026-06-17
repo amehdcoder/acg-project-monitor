@@ -15,6 +15,7 @@ export interface ValidationVerification {
 
 export interface ValidationRow {
   id: string;
+  validator_id: string | null;
   school_key: string | null;
   school_name: string | null;
   school_type: string | null;
@@ -30,6 +31,7 @@ export interface ValidationRow {
   verification: ValidationVerification | null;
   status: string | null;
   submitted_at: string | null;
+  updated_at: string | null;
   created_at: string;
 }
 
