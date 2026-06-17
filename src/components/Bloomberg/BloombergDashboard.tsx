@@ -426,6 +426,10 @@ export default function BloombergDashboard({ onClose }: Props) {
         {/* State → LGA disaggregation drill-down */}
         <BloombergStateLGADrilldown data={stateBreakdown} />
 
+        {/* Field worker accountability */}
+        <AccountabilityTable users={accountability} unitLabel="School" unitLabelPlural="Schools" accent={BLUE} />
+
+
         {/* Top discrepancies */}
         <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="mb-3 flex items-center gap-2">
