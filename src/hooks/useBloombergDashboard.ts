@@ -65,6 +65,7 @@ export const useBloombergDashboard = () => {
   const [validations, setValidations] = useState<ValidationRow[]>([]);
   const [baselines, setBaselines] = useState<BaselineRow[]>([]);
   const [schoolCount, setSchoolCount] = useState(0);
+  const [profileMap, setProfileMap] = useState<Map<string, ProfileLite>>(new Map());
   const [loading, setLoading] = useState(true);
 
   // Monotonic request id: any async load tags itself with the current value
@@ -77,17 +78,33 @@ export const useBloombergDashboard = () => {
       const [v, b] = await Promise.all([
         fetchAll<ValidationRow>(
           "bloomberg_validations",
-          "id,school_key,school_name,school_type,school_code,state,lga,ward,gps_lat,gps_lng,total_male,total_female,grand_total,verification,status,submitted_at,created_at",
+          "id,validator_id,school_key,school_name,school_type,school_code,state,lga,ward,gps_lat,gps_lng,total_male,total_female,grand_total,verification,status,submitted_at,updated_at,created_at",
         ),
         fetchAll<BaselineRow>("bloomberg_school_baselines", "school_key,total_male,total_female,grand_total"),
       ]);
       const { count } = await supabase
         .from("bloomberg_schools")
         .select("school_key", { count: "exact", head: true });
+
+      // Resolve validator names for the accountability table.
+      const ids = [...new Set(v.map((r) => r.validator_id).filter(Boolean))] as string[];
+      const pm = new Map<string, ProfileLite>();
+      if (ids.length) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("user_id,first_name,last_name,email")
+          .in("user_id", ids);
+        (profs || []).forEach((p: any) => {
+          const name = `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email || "User";
+          pm.set(p.user_id, { name, email: p.email || "" });
+        });
+      }
+
       if (myReq !== reqIdRef.current) return;
       setValidations(v);
       setBaselines(b);
       setSchoolCount(count || 0);
+      setProfileMap(pm);
     } finally {
       if (myReq === reqIdRef.current) setLoading(false);
     }
