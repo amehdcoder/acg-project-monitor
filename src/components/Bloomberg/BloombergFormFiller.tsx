@@ -4,7 +4,6 @@ import {
   ArrowLeft, ArrowRight, Check, MapPin, Loader2, Camera, Save, Send,
   School as SchoolIcon, ClipboardCheck, ImageIcon, ChevronDown, Search, ChevronsUpDown,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useBloombergSchools } from "@/hooks/useBloombergData";
