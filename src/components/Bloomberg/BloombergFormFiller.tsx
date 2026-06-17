@@ -57,6 +57,10 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
 
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  // Captures the moment the validator opens / starts filling this form. Used as
+  // the submission's start time (created_at) so accountability analytics show an
+  // accurate "Start time → End time" span rather than a zero-duration record.
+  const formStartedAtRef = useRef<string>(new Date().toISOString());
 
   // Step 1 — school selection
   const [state, setState] = useState("");
