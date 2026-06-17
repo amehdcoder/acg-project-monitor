@@ -511,10 +511,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
           {step < STEPS.length - 1 ? (
             <Button className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8]" disabled={!canNext()} onClick={() => setStep((s) => s + 1)}>Continue <ArrowRight className="ml-1 h-4 w-4" /></Button>
           ) : (
-            <>
-              <Button variant="outline" className="flex-1" disabled={saving} onClick={() => submit(true)}><Save className="mr-1 h-4 w-4" /> Save Draft</Button>
-              <Button className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8]" disabled={saving} onClick={() => submit(false)}>{saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />} Finalize</Button>
-            </>
+            <Button className="flex-1 bg-[#16a34a] hover:bg-[#15803d]" disabled={saving} onClick={() => submit()}>{saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />} Submit Validation</Button>
           )}
         </div>
       </div>
