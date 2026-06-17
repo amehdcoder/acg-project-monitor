@@ -124,6 +124,7 @@ export const useBloombergDashboard = () => {
     const myReq = ++reqIdRef.current;
     setValidations([]);
     setBaselines([]);
+    setSchools([]);
     setSchoolCount(0);
     void reload();
     return () => {
