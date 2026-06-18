@@ -96,6 +96,19 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   const [rows, setRows] = useState<GeoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [notInMicroplan, setNotInMicroplan] = useState(false);
+  // States the project was designed for (from project scope) — used as the
+  // cascade fallback when no microplan is linked to the project.
+  const [projectStates, setProjectStates] = useState<string[]>([]);
+
+  // Load the project's designed state scope (fallback for the cascade).
+  useEffect(() => {
+    if (!projectId) { setProjectStates([]); return; }
+    let cancelled = false;
+    fetchProjectScope(projectId)
+      .then((s) => { if (!cancelled) setProjectStates(s.states || []); })
+      .catch(() => { if (!cancelled) setProjectStates([]); });
+    return () => { cancelled = true; };
+  }, [projectId]);
 
   // ── Load microplan geography ──────────────────────────────────────────
   // The MDA checklist often lives in a *different* project than the one used
