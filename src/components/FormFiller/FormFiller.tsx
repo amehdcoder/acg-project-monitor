@@ -401,6 +401,18 @@ const FormFiller = ({
     questions.forEach((qq) => { if (qq.name) map[qq.name] = qq.id; });
     return map;
   }, [groups, questions]);
+  // Field metadata (name/label/type) so the MDA summary can adapt to edits:
+  // drop cards whose source field was removed/retyped and auto-discover other
+  // numeric fields to keep the summary insightful.
+  const mdaFields = useMemo(() => {
+    const out: { name: string; label: string; type: string }[] = [];
+    const push = (qq: { name?: string; label?: string; type?: string }) => {
+      if (qq.name) out.push({ name: qq.name, label: qq.label || qq.name, type: String(qq.type || "") });
+    };
+    groups.forEach((g) => g.questions.forEach(push));
+    questions.forEach(push);
+    return out;
+  }, [groups, questions]);
   const [lastSubmissionOffline, setLastSubmissionOffline] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
