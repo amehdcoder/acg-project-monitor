@@ -333,25 +333,24 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
 
       {loading || scope.loading ? (
         <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading microplan geography…
-        </div>
-      ) : microplanIsEmpty && !notInMicroplan ? (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <div>
-            <p className="font-semibold">No microplan data in your scope yet.</p>
-            <p className="text-xs">
-              Capture communities in the Geo Microplanning module first, or enable
-              the “Not in microplan” option below if this community received
-              medicine without being microplanned.
-            </p>
-          </div>
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading geography…
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <>
+          {microplanIsEmpty && (
+            <div className="flex items-start gap-3 rounded-xl border border-sky-300 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
+              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+              <p className="text-xs">
+                {hasStateScope
+                  ? `No microplan is linked to this project. Using the cascade for ${Array.from(allowedStates).join(", ")}.`
+                  : "No microplan is linked to this project and no state was assigned. Select any Nigerian state below — the LGA and Ward will cascade from your choice."}
+              </p>
+            </div>
+          )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {LEVELS.map(({ key, label, optional }) => {
             const isFreeText =
-              notInMicroplan &&
+              useAdminHierarchy &&
               (key === "flhf_name" || key === "community_name" || key === "settlement_name");
             const opts = options(key);
             // Gap-tolerant: ready when all preceding *captured* levels are chosen,
