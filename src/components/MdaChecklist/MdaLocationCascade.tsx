@@ -397,7 +397,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
               </div>
             );
           })}
-        </div>
+          </div>
+        </>
       )}
 
       {/* Not-in-microplan provision */}
