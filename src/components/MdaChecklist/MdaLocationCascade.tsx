@@ -370,9 +370,14 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
           )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {LEVELS.map(({ key, label, optional }) => {
+            const isLeafGeo =
+              key === "flhf_name" || key === "community_name" || key === "settlement_name";
+            // FLHF / Community / Settlement become free-text when there is no
+            // microplan to pick from — either globally (admin-hierarchy mode) or
+            // because the chosen upstream area has no captured microplan rows.
             const isFreeText =
-              useAdminHierarchy &&
-              (key === "flhf_name" || key === "community_name" || key === "settlement_name");
+              isLeafGeo &&
+              (useAdminHierarchy || (levelReady(key) && microplanOptions(key).length === 0));
             const opts = options(key);
             // Gap-tolerant: ready when all preceding *captured* levels are chosen,
             // skipping levels the microplan never captured so they can't dead-end.
