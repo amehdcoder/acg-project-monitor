@@ -258,6 +258,21 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
 
   const microplanIsEmpty = !loading && !scope.loading && scopedRows.length === 0;
 
+  // Use the full Nigerian administrative hierarchy cascade when the supervisor
+  // explicitly flags an off-microplan community OR when the project simply has
+  // no microplan linked yet. This guarantees the cascade always works.
+  const useAdminHierarchy = notInMicroplan || microplanIsEmpty;
+
+  // When falling back to the admin hierarchy and the project was designed for a
+  // single state, preselect it so the supervisor goes straight to LGA.
+  useEffect(() => {
+    if (loading || scope.loading) return;
+    if (!useAdminHierarchy || sel.state) return;
+    const list = Array.from(allowedStates);
+    if (list.length === 1) setLevel("state", list[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, scope.loading, useAdminHierarchy, sel.state, allowedStates.size]);
+
   // Gap-tolerant readiness check.
   // The microplan is frequently captured to varying depths — e.g. State→LGA→Ward
   // with no FLHF, or down to Community with no Settlement. A naive "immediate
