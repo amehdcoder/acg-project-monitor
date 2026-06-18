@@ -29,6 +29,9 @@ import {
   ArrowDown,
   Copy,
   Ungroup,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import { getFollowUpIcon } from "@/components/FormFiller/followUpIcons";
 
