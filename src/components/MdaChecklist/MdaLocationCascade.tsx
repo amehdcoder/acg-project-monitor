@@ -418,6 +418,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         </div>
         <Switch checked={notInMicroplan} onCheckedChange={toggleNotInMicroplan} />
       </div>
+      )}
 
       {notInMicroplan && (
         <div className="flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-2 text-xs text-primary">
