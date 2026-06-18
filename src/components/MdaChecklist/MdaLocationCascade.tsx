@@ -137,10 +137,16 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     return () => { cancelled = true; };
   }, [projectId]);
 
-  // Admin-defined state restriction for this form (empty/undefined → all states).
+  // The state restriction used for BOTH the microplan filter and the off-microplan
+  // / no-microplan cascade: the admin-defined form state scope takes priority,
+  // otherwise the state(s) the project itself was designed for. Empty → all states.
+  const effectiveScopeList = useMemo(
+    () => ((stateScope && stateScope.length > 0) ? stateScope : projectStates),
+    [stateScope, projectStates],
+  );
   const allowedStates = useMemo(
-    () => new Set((stateScope || []).map((s) => s.trim()).filter(Boolean)),
-    [stateScope],
+    () => new Set(effectiveScopeList.map((s) => s.trim()).filter(Boolean)),
+    [effectiveScopeList],
   );
   const hasStateScope = allowedStates.size > 0;
 
