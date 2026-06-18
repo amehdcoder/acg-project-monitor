@@ -3449,7 +3449,7 @@ const FormFiller = ({
                 {/* MDA Supervisory Checklist insight panels */}
                 {isMdaChecklist && (
                   <div className="space-y-4">
-                    <MdaSummaryCards responses={responses} nameToId={mdaNameToId} />
+                    <MdaSummaryCards responses={responses} nameToId={mdaNameToId} fields={mdaFields} />
                     <MdaQuickActions />
                     <MdaReminder />
                   </div>
