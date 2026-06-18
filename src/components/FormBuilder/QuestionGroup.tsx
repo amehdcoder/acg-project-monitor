@@ -29,6 +29,9 @@ import {
   ArrowDown,
   Copy,
   Ungroup,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import { getFollowUpIcon } from "@/components/FormFiller/followUpIcons";
 
@@ -65,7 +68,24 @@ const QuestionGroupComponent = ({
   children,
 }: QuestionGroupProps) => {
   const [isOpen, setIsOpen] = useState(true);
+  const [editingName, setEditingName] = useState(false);
+  const [draftLabel, setDraftLabel] = useState(group.label);
   const FollowUpIcon = followUpMode ? getFollowUpIcon(group.label, group.name) : Folder;
+
+  const startEditName = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDraftLabel(group.label);
+    setEditingName(true);
+  };
+  const saveName = () => {
+    const next = draftLabel.trim();
+    if (next && next !== group.label) onUpdate({ ...group, label: next });
+    setEditingName(false);
+  };
+  const cancelName = () => {
+    setDraftLabel(group.label);
+    setEditingName(false);
+  };
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -90,7 +110,34 @@ const QuestionGroupComponent = ({
                 <FollowUpIcon className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-medium text-foreground">{group.label}</h3>
+                {editingName ? (
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Input
+                      autoFocus
+                      value={draftLabel}
+                      onChange={(e) => setDraftLabel(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); saveName(); }
+                        if (e.key === "Escape") { e.preventDefault(); cancelName(); }
+                      }}
+                      className="h-8 w-56 max-w-[60vw]"
+                      placeholder="Group name"
+                    />
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" title="Save name" onClick={(e) => { e.stopPropagation(); saveName(); }}>
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" title="Cancel" onClick={(e) => { e.stopPropagation(); cancelName(); }}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="font-medium text-foreground">{group.label}</h3>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" title="Rename group" onClick={startEditName}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   {followUpMode && (
                     <span className="flex items-center gap-1 font-medium text-accent-foreground/80">

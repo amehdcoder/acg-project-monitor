@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
@@ -547,8 +547,8 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
   }, []);
 
   // Main data refresh function
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       await fetchProjects();
       const formsData = await fetchForms();
@@ -559,19 +559,46 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
         calculateLocationAnalytics(submissionsData);
       }
     } catch (error: any) {
-      toast({
-        title: "Error loading analytics",
-        description: error.message,
-        variant: "destructive",
-      });
+      if (!silent) {
+        toast({
+          title: "Error loading analytics",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [fetchProjects, fetchForms, fetchSubmissions, calculateKPIs, calculateFormAnalytics, calculateLocationAnalytics]);
 
   useEffect(() => {
     refresh();
   }, [filters.projectId, filters.formId, filters.state, filters.startDate, filters.endDate]);
+
+  // Realtime: when new submissions land (e.g. a "Send Checklist" submit), the
+  // dashboard refreshes silently (no loading flash) so data appears instantly.
+  // A single debounced timer coalesces high-volume bursts so the UI stays
+  // steady even under very large submission volumes.
+  const rtTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const filter = filters.formId ? `form_id=eq.${filters.formId}` : undefined;
+    const channel = supabase
+      .channel(`analytics-submissions-${filters.formId ?? "all"}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "form_submissions", ...(filter ? { filter } : {}) },
+        () => {
+          if (rtTimer.current) clearTimeout(rtTimer.current);
+          rtTimer.current = setTimeout(() => refresh(true), 1200);
+        },
+      )
+      .subscribe();
+    return () => {
+      if (rtTimer.current) clearTimeout(rtTimer.current);
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.formId]);
 
   // Get unique states for filtering
   const availableStates = useMemo(() => {

@@ -26,6 +26,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/fetchAllRows";
+import { fetchProjectScope } from "@/lib/projectScope";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useAuth } from "@/hooks/useAuth";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
@@ -38,7 +39,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
-  MapPinned, Lock, PlusCircle, Loader2, Info, AlertTriangle, CheckCircle2,
+  MapPinned, Lock, PlusCircle, Loader2, Info, CheckCircle2,
 } from "lucide-react";
 
 interface GeoRow {
@@ -95,6 +96,19 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   const [rows, setRows] = useState<GeoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [notInMicroplan, setNotInMicroplan] = useState(false);
+  // States the project was designed for (from project scope) — used as the
+  // cascade fallback when no microplan is linked to the project.
+  const [projectStates, setProjectStates] = useState<string[]>([]);
+
+  // Load the project's designed state scope (fallback for the cascade).
+  useEffect(() => {
+    if (!projectId) { setProjectStates([]); return; }
+    let cancelled = false;
+    fetchProjectScope(projectId)
+      .then((s) => { if (!cancelled) setProjectStates(s.states || []); })
+      .catch(() => { if (!cancelled) setProjectStates([]); });
+    return () => { cancelled = true; };
+  }, [projectId]);
 
   // ── Load microplan geography ──────────────────────────────────────────
   // The MDA checklist often lives in a *different* project than the one used
@@ -123,10 +137,16 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     return () => { cancelled = true; };
   }, [projectId]);
 
-  // Admin-defined state restriction for this form (empty/undefined → all states).
+  // The state restriction used for BOTH the microplan filter and the off-microplan
+  // / no-microplan cascade: the admin-defined form state scope takes priority,
+  // otherwise the state(s) the project itself was designed for. Empty → all states.
+  const effectiveScopeList = useMemo(
+    () => ((stateScope && stateScope.length > 0) ? stateScope : projectStates),
+    [stateScope, projectStates],
+  );
   const allowedStates = useMemo(
-    () => new Set((stateScope || []).map((s) => s.trim()).filter(Boolean)),
-    [stateScope],
+    () => new Set(effectiveScopeList.map((s) => s.trim()).filter(Boolean)),
+    [effectiveScopeList],
   );
   const hasStateScope = allowedStates.size > 0;
 
@@ -176,10 +196,10 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   };
 
   const options = (level: keyof GeoRow): string[] => {
-    // Off-microplan path: State → LGA → Ward come from the full Nigerian
-    // administrative hierarchy (the community is, by definition, not in the
-    // microplan), still bounded by any admin-defined state scope.
-    if (notInMicroplan) {
+    // Off-microplan / no-microplan path: State → LGA → Ward come from the full
+    // Nigerian administrative hierarchy, bounded by the project's designed state
+    // scope (or all states when the project has no assigned state).
+    if (useAdminHierarchy) {
       if (level === "state") {
         const all = getAllStates();
         return hasStateScope ? all.filter((s) => allowedStates.has(s)) : all;
@@ -238,6 +258,21 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
 
   const microplanIsEmpty = !loading && !scope.loading && scopedRows.length === 0;
 
+  // Use the full Nigerian administrative hierarchy cascade when the supervisor
+  // explicitly flags an off-microplan community OR when the project simply has
+  // no microplan linked yet. This guarantees the cascade always works.
+  const useAdminHierarchy = notInMicroplan || microplanIsEmpty;
+
+  // When falling back to the admin hierarchy and the project was designed for a
+  // single state, preselect it so the supervisor goes straight to LGA.
+  useEffect(() => {
+    if (loading || scope.loading) return;
+    if (!useAdminHierarchy || sel.state) return;
+    const list = Array.from(allowedStates);
+    if (list.length === 1) setLevel("state", list[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, scope.loading, useAdminHierarchy, sel.state, allowedStates.size]);
+
   // Gap-tolerant readiness check.
   // The microplan is frequently captured to varying depths — e.g. State→LGA→Ward
   // with no FLHF, or down to Community with no Settlement. A naive "immediate
@@ -253,8 +288,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   const levelReady = (key: keyof GeoRow): boolean => {
     const idx = LEVEL_ORDER.indexOf(key);
     if (idx <= 0) return true;
-    if (notInMicroplan) {
-      // Off-microplan: State→LGA→Ward is a strict admin-hierarchy chain;
+    if (useAdminHierarchy) {
+      // Admin-hierarchy: State→LGA→Ward is a strict chain;
       // FLHF/Community/Settlement are free text gated only by Ward.
       const parent = LEVEL_ORDER[idx - 1];
       return !!sel[parent];
@@ -277,7 +312,9 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
           <div>
             <h4 className="text-sm font-bold text-foreground sm:text-base">Supervision Location</h4>
             <p className="text-xs text-muted-foreground">
-              Driven by the microplan — pick the area you are supervising
+              {microplanIsEmpty
+                ? "No microplan linked — pick the area from the State cascade"
+                : "Driven by the microplan — pick the area you are supervising"}
             </p>
           </div>
         </div>
@@ -289,32 +326,31 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
             </Badge>
           )}
           <Badge variant="outline" className="gap-1 border-primary/40 text-primary">
-            <Lock className="h-3 w-3" /> Microplan-locked
+            <Lock className="h-3 w-3" /> {microplanIsEmpty ? "State cascade" : "Microplan-locked"}
           </Badge>
         </div>
       </div>
 
       {loading || scope.loading ? (
         <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading microplan geography…
-        </div>
-      ) : microplanIsEmpty && !notInMicroplan ? (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <div>
-            <p className="font-semibold">No microplan data in your scope yet.</p>
-            <p className="text-xs">
-              Capture communities in the Geo Microplanning module first, or enable
-              the “Not in microplan” option below if this community received
-              medicine without being microplanned.
-            </p>
-          </div>
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading geography…
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <>
+          {microplanIsEmpty && (
+            <div className="flex items-start gap-3 rounded-xl border border-sky-300 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
+              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+              <p className="text-xs">
+                {hasStateScope
+                  ? `No microplan is linked to this project. Using the cascade for ${Array.from(allowedStates).join(", ")}.`
+                  : "No microplan is linked to this project and no state was assigned. Select any Nigerian state below — the LGA and Ward will cascade from your choice."}
+              </p>
+            </div>
+          )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {LEVELS.map(({ key, label, optional }) => {
             const isFreeText =
-              notInMicroplan &&
+              useAdminHierarchy &&
               (key === "flhf_name" || key === "community_name" || key === "settlement_name");
             const opts = options(key);
             // Gap-tolerant: ready when all preceding *captured* levels are chosen,
@@ -361,10 +397,12 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
               </div>
             );
           })}
-        </div>
+          </div>
+        </>
       )}
 
-      {/* Not-in-microplan provision */}
+      {/* Not-in-microplan provision (only relevant when a microplan exists) */}
+      {!microplanIsEmpty && (
       <div className="flex flex-col gap-2 rounded-xl border border-dashed border-primary/40 bg-background/60 p-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-2">
           <PlusCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
@@ -380,6 +418,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         </div>
         <Switch checked={notInMicroplan} onCheckedChange={toggleNotInMicroplan} />
       </div>
+      )}
 
       {notInMicroplan && (
         <div className="flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-2 text-xs text-primary">
