@@ -13,6 +13,7 @@ import {
   Send, Filter, RefreshCw, User, Calendar, ChevronDown, ChevronUp, Bell
 } from "lucide-react";
 import { format } from "date-fns";
+import AfterHoursAnomaliesPanel from "@/components/AfterHoursAnomaliesPanel";
 
 interface FeedbackItem {
   id: string;
