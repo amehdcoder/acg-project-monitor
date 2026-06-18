@@ -225,6 +225,26 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
     }
   };
 
+  const [exporting, setExporting] = useState(false);
+  const handleExportExcel = async () => {
+    const toExport = filteredSubmissions;
+    if (toExport.length === 0) {
+      toast({ title: "Nothing to export", description: "No submissions match the current view." });
+      return;
+    }
+    try {
+      setExporting(true);
+      const count = await exportFormDataToExcel(toExport as any, formLabelMaps, "amehnities-form-data");
+      toast({ title: "Excel exported", description: `${count.toLocaleString()} submission(s) exported.` });
+    } catch (e: any) {
+      console.error("Excel export error", e);
+      toast({ title: "Export failed", description: e?.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+
   const handleDeletePending = async (id: string) => {
     try {
       // This would need to be exposed from useOfflineStorage
