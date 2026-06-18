@@ -3269,7 +3269,7 @@ const FormFiller = ({
                   </div>
 
                   {/* Supervision summary + quick actions + reminder */}
-                  <MdaSummaryCards responses={responses} nameToId={mdaNameToId} />
+                  <MdaSummaryCards responses={responses} nameToId={mdaNameToId} fields={mdaFields} />
                   <MdaQuickActions />
                   <MdaReminder />
                 </div>
