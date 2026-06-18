@@ -22,11 +22,12 @@ import jsPDF from "jspdf";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
 import { pctTone, toneColor, varianceTone } from "@/lib/conditionalFormatting";
 import { labelPillStyle } from "@/lib/lgaColors";
+import { prettyAdminLabel } from "@/lib/formLabelUtils";
 
 // Professional, color-coded label pill for admin units (State / LGA). Same name
 // always renders with the same beautiful tint across every table.
-const Label = ({ name }: { name: string | null | undefined }) => {
-  const text = (name || "").trim();
+const Label = ({ name, prefix }: { name?: string | null; prefix?: string | null }) => {
+  const text = prettyAdminLabel(name, prefix);
   if (!text || text === "—") return <span className="text-muted-foreground">—</span>;
   return (
     <span
@@ -575,15 +576,12 @@ export default function BloombergDashboard({ onClose }: Props) {
                 </thead>
                 <tbody>
                   {validatedTable.map((r, i) => {
-                    const sev = !r.hasVariance ? 0 : Math.abs(r.pct) >= 20 ? 3 : Math.abs(r.pct) >= 10 ? 2 : 1;
-                    const rowBg = sev === 3 ? "bg-red-50/70" : sev === 2 ? "bg-amber-50/60" : sev === 1 ? "bg-yellow-50/40" : "bg-emerald-50/40";
                     return (
-                      <tr key={i} className={`border-b border-border/50 last:border-0 ${rowBg}`}>
-                        <td className="py-2 pr-3"><Label name={r.state} /></td>
-                        <td className="py-2 px-3"><Label name={r.lga} /></td>
-                        <td className="py-2 px-3">
-                          <div className="font-medium text-foreground">{r.school}</div>
-                          <div className="text-[11px] text-muted-foreground">{r.code} · {r.type}</div>
+                      <tr key={i} className="border-b border-border/50 last:border-0 bg-white hover:bg-muted/30">
+                        <td className="py-2 pr-3 align-top"><Label name={r.state} /></td>
+                        <td className="py-2 px-3 align-top"><Label name={r.lga} prefix={r.state} /></td>
+                        <td className="py-2 px-3 align-top">
+                          <div className="font-medium text-foreground whitespace-normal break-words">{r.school}</div>
                         </td>
                         <td className="py-2 px-3"><OpBadge value={r.operationalValue} label={r.operational} /></td>
                         <td className="py-2 px-3 text-right tabular-nums">{r.hasBaseline ? fmt(r.baseline) : "—"}</td>
@@ -701,7 +699,7 @@ export default function BloombergDashboard({ onClose }: Props) {
                       <tr key={r.id} className="border-b border-border/50 last:border-0">
                         <td className="py-2 pr-3 font-medium text-foreground">{r.school_name || "Unnamed school"}</td>
                         <td className="py-2 px-3"><Label name={r.state} /></td>
-                        <td className="py-2 px-3"><Label name={r.lga} /></td>
+                        <td className="py-2 px-3"><Label name={r.lga} prefix={r.state} /></td>
                         <td className="py-2 px-3"><StatusBadge status={r.status || "draft"} /></td>
                         <td className="py-2 pl-3 text-right">
                           <button

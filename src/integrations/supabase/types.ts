@@ -5820,6 +5820,72 @@ export type Database = {
           },
         ]
       }
+      submission_anomalies: {
+        Row: {
+          anomaly_type: string
+          collector_email: string | null
+          collector_id: string | null
+          collector_name: string | null
+          created_at: string
+          form_id: string | null
+          form_name: string | null
+          id: string
+          local_time: string | null
+          project_id: string | null
+          project_name: string | null
+          reason: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          resolved_by_name: string | null
+          status: string
+          submission_id: string
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          anomaly_type?: string
+          collector_email?: string | null
+          collector_id?: string | null
+          collector_name?: string | null
+          created_at?: string
+          form_id?: string | null
+          form_name?: string | null
+          id?: string
+          local_time?: string | null
+          project_id?: string | null
+          project_name?: string | null
+          reason?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          resolved_by_name?: string | null
+          status?: string
+          submission_id: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          anomaly_type?: string
+          collector_email?: string | null
+          collector_id?: string | null
+          collector_name?: string | null
+          created_at?: string
+          form_id?: string | null
+          form_name?: string | null
+          id?: string
+          local_time?: string | null
+          project_id?: string | null
+          project_name?: string | null
+          reason?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          resolved_by_name?: string | null
+          status?: string
+          submission_id?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       submission_versions: {
         Row: {
           change_summary: string | null

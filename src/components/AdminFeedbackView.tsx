@@ -13,6 +13,7 @@ import {
   Send, Filter, RefreshCw, User, Calendar, ChevronDown, ChevronUp, Bell
 } from "lucide-react";
 import { format } from "date-fns";
+import AfterHoursAnomaliesPanel from "@/components/AfterHoursAnomaliesPanel";
 
 interface FeedbackItem {
   id: string;
@@ -169,6 +170,13 @@ const AdminFeedbackView = () => {
           Refresh
         </Button>
       </div>
+
+      {/* After-hours data-quality anomalies */}
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+        <AfterHoursAnomaliesPanel />
+      </div>
+
+
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
