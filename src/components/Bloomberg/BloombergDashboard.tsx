@@ -23,6 +23,76 @@ import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
 import { pctTone, toneColor, varianceTone } from "@/lib/conditionalFormatting";
 import { labelPillStyle } from "@/lib/lgaColors";
 import { prettyAdminLabel } from "@/lib/formLabelUtils";
+import { formatP } from "@/lib/statisticalInference";
+import { useTablePagination } from "@/hooks/useTablePagination";
+import { Sigma, ChevronLeft, ChevronRight } from "lucide-react";
+
+// Compact pager for large registers — keeps the DOM small on big datasets.
+const Pager = ({
+  page, totalPages, totalItems, startIndex, pageSize, onPrev, onNext, hasPrev, hasNext,
+}: {
+  page: number; totalPages: number; totalItems: number; startIndex: number; pageSize: number;
+  onPrev: () => void; onNext: () => void; hasPrev: boolean; hasNext: boolean;
+}) => {
+  if (totalItems <= pageSize) return null;
+  const from = startIndex + 1;
+  const to = Math.min(startIndex + pageSize, totalItems);
+  return (
+    <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+      <span className="tabular-nums">{from.toLocaleString()}–{to.toLocaleString()} of {totalItems.toLocaleString()}</span>
+      <div className="flex items-center gap-1">
+        <button type="button" onClick={onPrev} disabled={!hasPrev}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border transition-colors hover:bg-muted disabled:opacity-40">
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span className="px-1 tabular-nums">Page {page} / {totalPages}</span>
+        <button type="button" onClick={onNext} disabled={!hasNext}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border transition-colors hover:bg-muted disabled:opacity-40">
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// One-way ANOVA verdict card: tells the user whether enrolment variance
+// genuinely differs across the level (State / LGA) at the 95% confidence level.
+const AnovaCard = ({
+  title,
+  result,
+}: {
+  title: string;
+  result: { groups: number; n: number; fStat: number; dfBetween: number; dfWithin: number; pValue: number; etaSquared: number; significant: boolean } | null;
+}) => {
+  if (!result) {
+    return (
+      <div className="rounded-lg border border-border bg-muted/30 p-3">
+        <p className="text-xs font-semibold text-foreground">{title}</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">Not enough comparable data yet (need ≥ 2 groups with baselines).</p>
+      </div>
+    );
+  }
+  const tint = result.significant ? "#dc2626" : "#15803d";
+  return (
+    <div className="rounded-lg border border-border bg-card p-3" style={{ background: `linear-gradient(135deg, ${tint}0d, transparent 70%)` }}>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-foreground">{title}</p>
+        <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: `${tint}1a`, color: tint }}>
+          {result.significant ? "Significant" : "Not significant"}
+        </span>
+      </div>
+      <p className="mt-1.5 text-[11px] tabular-nums text-muted-foreground">
+        F({result.dfBetween}, {result.dfWithin}) = {result.fStat.toFixed(2)} · {formatP(result.pValue)} · η² = {result.etaSquared.toFixed(3)}
+      </p>
+      <p className="mt-0.5 text-[11px] text-muted-foreground">
+        {result.groups} groups · n = {result.n} schools.{" "}
+        {result.significant
+          ? "Differences across groups are unlikely to be chance."
+          : "Differences are within expected random variation."}
+      </p>
+    </div>
+  );
+};
 
 // Professional, color-coded label pill for admin units (State / LGA). Same name
 // always renders with the same beautiful tint across every table.
@@ -112,9 +182,14 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function BloombergDashboard({ onClose }: Props) {
-  const { validations, stats, byState, stateBreakdown, points, nonExistent, validatedTable, notValidatedTable, accountability, loading, reload, deleteValidations } = useBloombergDashboard();
+  const { validations, stats, byState, stateBreakdown, inference, points, nonExistent, validatedTable, notValidatedTable, accountability, loading, reload, deleteValidations } = useBloombergDashboard();
   const { isOwner, isSuperAdmin, isOwnerLevel, isAdmin } = useAuth();
   const canManage = isOwner || isSuperAdmin;
+  // Pagination keeps very large registers fast — only a page of rows is ever
+  // mounted to the DOM at once, so the dashboard stays responsive on big data.
+  const validatedPg = useTablePagination(validatedTable, 25);
+  const notValidatedPg = useTablePagination(notValidatedTable, 25);
+  const managePg = useTablePagination(validations, 25);
   const [downloadingData, setDownloadingData] = useState(false);
   const handleDownloadData = async () => {
     setDownloadingData(true);
@@ -442,6 +517,23 @@ export default function BloombergDashboard({ onClose }: Props) {
         </div>
 
         {/* State → LGA disaggregation drill-down */}
+        {/* Statistical inference — overall significance of variance */}
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="mb-1 flex items-center gap-2">
+            <Sigma className="h-4 w-4 text-[#2563eb]" />
+            <h3 className="text-sm font-semibold text-foreground">Statistical Significance (95% Confidence)</h3>
+          </div>
+          <p className="mb-3 text-xs text-muted-foreground">
+            One-way ANOVA on each school's enrolment variance (validated vs LEA baseline), testing whether the differences
+            across States and across LGAs are statistically significant or just random noise.
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <AnovaCard title="Variance across States" result={inference.byState} />
+            <AnovaCard title="Variance across LGAs" result={inference.byLga} />
+          </div>
+        </div>
+
+        {/* State → LGA disaggregation drill-down */}
         <BloombergStateLGADrilldown data={stateBreakdown} />
 
         {/* Field worker accountability */}
@@ -575,7 +667,7 @@ export default function BloombergDashboard({ onClose }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {validatedTable.map((r, i) => {
+                  {validatedPg.paginatedData.map((r, i) => {
                     return (
                       <tr key={i} className="border-b border-border/50 last:border-0 bg-white hover:bg-muted/30">
                         <td className="py-2 pr-3 align-top"><Label name={r.state} /></td>
@@ -620,6 +712,7 @@ export default function BloombergDashboard({ onClose }: Props) {
                   })}
                 </tbody>
               </table>
+              <Pager page={validatedPg.currentPage} totalPages={validatedPg.totalPages} totalItems={validatedPg.totalItems} startIndex={validatedPg.startIndex} pageSize={validatedPg.pageSize} onPrev={validatedPg.prevPage} onNext={validatedPg.nextPage} hasPrev={validatedPg.hasPrev} hasNext={validatedPg.hasNext} />
             </div>
           )}
         </div>
@@ -635,6 +728,7 @@ export default function BloombergDashboard({ onClose }: Props) {
           {notValidatedTable.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">Every school in the register has been validated. 🎉</p>
           ) : (
+            <>
             <div className="max-h-[480px] overflow-auto">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-card">
@@ -649,7 +743,7 @@ export default function BloombergDashboard({ onClose }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {notValidatedTable.map((r) => (
+                  {notValidatedPg.paginatedData.map((r) => (
                     <tr key={r.id} className="border-b border-border/50 last:border-0" style={{ background: `${labelPillStyle(r.lga).background as string}55` }}>
                       <td className="py-2 pr-3"><Label name={r.state} /></td>
                       <td className="py-2 px-3"><Label name={r.lga} /></td>
@@ -668,6 +762,8 @@ export default function BloombergDashboard({ onClose }: Props) {
                 </tbody>
               </table>
             </div>
+            <Pager page={notValidatedPg.currentPage} totalPages={notValidatedPg.totalPages} totalItems={notValidatedPg.totalItems} startIndex={notValidatedPg.startIndex} pageSize={notValidatedPg.pageSize} onPrev={notValidatedPg.prevPage} onNext={notValidatedPg.nextPage} hasPrev={notValidatedPg.hasPrev} hasNext={notValidatedPg.hasNext} />
+            </>
           )}
         </div>
 
@@ -695,7 +791,7 @@ export default function BloombergDashboard({ onClose }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {validations.map((r) => (
+                    {managePg.paginatedData.map((r) => (
                       <tr key={r.id} className="border-b border-border/50 last:border-0">
                         <td className="py-2 pr-3 font-medium text-foreground">{r.school_name || "Unnamed school"}</td>
                         <td className="py-2 px-3"><Label name={r.state} /></td>
@@ -718,6 +814,7 @@ export default function BloombergDashboard({ onClose }: Props) {
                 </table>
               </div>
             )}
+            <Pager page={managePg.currentPage} totalPages={managePg.totalPages} totalItems={managePg.totalItems} startIndex={managePg.startIndex} pageSize={managePg.pageSize} onPrev={managePg.prevPage} onNext={managePg.nextPage} hasPrev={managePg.hasPrev} hasNext={managePg.hasNext} />
           </div>
         )}
       </div>

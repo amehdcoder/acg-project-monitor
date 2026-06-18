@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ALL_CLASSES, NOT_FOUND_REASONS, OPERATIONAL_STATUS } from "@/lib/bloomberg/definition";
 import { buildAccountability, type ProfileLite } from "@/lib/accountability";
 import { prettyAdminLabel } from "@/lib/formLabelUtils";
+import { meanConfidenceInterval, oneWayAnova } from "@/lib/statisticalInference";
 
 export interface ValidationVerification {
   school_exists?: "yes" | "no" | "";
@@ -279,7 +280,9 @@ export const useBloombergDashboard = () => {
 
   // State → LGA disaggregation for the Validation Dashboard drill-down.
   // Each state aggregates its LGAs; each level carries submission counts,
-  // validated pupils and baseline (for validated schools) plus variance.
+  // validated pupils, baseline and variance — plus a 95% confidence interval
+  // and a statistical-significance verdict computed from the per-school
+  // percent-variance sample within that unit.
   const stateBreakdown = useMemo(() => {
     const submitted = submittedValidations;
 
@@ -289,8 +292,11 @@ export const useBloombergDashboard = () => {
       validated: number;
       baseline: number;
       notFound: number;
+      // Per-school percent variance (only schools with a baseline) — the
+      // sample used for inference at this level.
+      sample: number[];
     }
-    const newAgg = (): Agg => ({ submissions: 0, validatedSchools: new Set(), validated: 0, baseline: 0, notFound: 0 });
+    const newAgg = (): Agg => ({ submissions: 0, validatedSchools: new Set(), validated: 0, baseline: 0, notFound: 0, sample: [] });
 
     const states = new Map<string, { agg: Agg; lgas: Map<string, Agg> }>();
 
@@ -306,6 +312,7 @@ export const useBloombergDashboard = () => {
       const bt = b?.grand_total ?? 0;
       const val = v.grand_total ?? 0;
       const isNotFound = v.verification?.school_exists === "no";
+      const schoolPct = bt > 0 ? ((val - bt) / bt) * 100 : null;
 
       [node.agg, lgaAgg].forEach((a) => {
         a.submissions += 1;
@@ -313,12 +320,23 @@ export const useBloombergDashboard = () => {
         a.validated += val;
         a.baseline += bt;
         if (isNotFound) a.notFound += 1;
+        if (schoolPct !== null) a.sample.push(schoolPct);
       });
     });
 
     const variance = (a: Agg) => (a.baseline > 0 ? ((a.validated - a.baseline) / a.baseline) * 100 : 0);
+    const ciOf = (a: Agg) => {
+      const ci = meanConfidenceInterval(a.sample);
+      return {
+        sampleSize: a.sample.length,
+        ciLow: ci?.ciLow ?? null,
+        ciHigh: ci?.ciHigh ?? null,
+        significant: ci?.significant ?? false,
+        pValue: ci?.pValue ?? null,
+      };
+    };
 
-    return [...states.entries()]
+    const rows = [...states.entries()]
       .map(([state, node]) => ({
         state: stateName(state),
         submissions: node.agg.submissions,
@@ -327,6 +345,7 @@ export const useBloombergDashboard = () => {
         baseline: node.agg.baseline,
         notFound: node.agg.notFound,
         variancePct: variance(node.agg),
+        ...ciOf(node.agg),
         lgas: [...node.lgas.entries()]
           .map(([lga, a]) => ({
             lga: lgaName(state, lga),
@@ -336,11 +355,36 @@ export const useBloombergDashboard = () => {
             baseline: a.baseline,
             notFound: a.notFound,
             variancePct: variance(a),
+            ...ciOf(a),
           }))
           .sort((x, y) => y.submissions - x.submissions || x.lga.localeCompare(y.lga)),
       }))
       .sort((x, y) => y.submissions - x.submissions || x.state.localeCompare(y.state));
+
+    return rows;
   }, [submittedValidations, baselineByKey, labelMaps]);
+
+  // Overall statistical inference: one-way ANOVA tests whether the enrolment
+  // variance genuinely differs across States (and across LGAs) at the 95%
+  // confidence level, rather than being random noise.
+  const inference = useMemo(() => {
+    const stateSamples = new Map<string, number[]>();
+    const lgaSamples = new Map<string, number[]>();
+    submittedValidations.forEach((v) => {
+      const b = v.school_key ? baselineByKey.get(v.school_key) : undefined;
+      const bt = b?.grand_total ?? 0;
+      if (bt <= 0) return;
+      const pct = (((v.grand_total ?? 0) - bt) / bt) * 100;
+      const st = (v.state || "Unknown").toString();
+      const lga = `${st}::${(v.lga || "Unknown").toString()}`;
+      (stateSamples.get(st) || stateSamples.set(st, []).get(st)!).push(pct);
+      (lgaSamples.get(lga) || lgaSamples.set(lga, []).get(lga)!).push(pct);
+    });
+    return {
+      byState: oneWayAnova([...stateSamples.values()]),
+      byLga: oneWayAnova([...lgaSamples.values()]),
+    };
+  }, [submittedValidations, baselineByKey]);
 
   const points = useMemo(
     () =>
@@ -470,7 +514,7 @@ export const useBloombergDashboard = () => {
   };
 
   return {
-    validations, baselines, stats, byState, stateBreakdown, points, nonExistent, validatedTable, notValidatedTable, accountability,
+    validations, baselines, stats, byState, stateBreakdown, inference, points, nonExistent, validatedTable, notValidatedTable, accountability,
     loading, reload, deleteValidations, ALL_CLASSES,
   };
 };
