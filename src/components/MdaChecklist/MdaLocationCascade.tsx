@@ -196,10 +196,10 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   };
 
   const options = (level: keyof GeoRow): string[] => {
-    // Off-microplan path: State → LGA → Ward come from the full Nigerian
-    // administrative hierarchy (the community is, by definition, not in the
-    // microplan), still bounded by any admin-defined state scope.
-    if (notInMicroplan) {
+    // Off-microplan / no-microplan path: State → LGA → Ward come from the full
+    // Nigerian administrative hierarchy, bounded by the project's designed state
+    // scope (or all states when the project has no assigned state).
+    if (useAdminHierarchy) {
       if (level === "state") {
         const all = getAllStates();
         return hasStateScope ? all.filter((s) => allowedStates.has(s)) : all;
