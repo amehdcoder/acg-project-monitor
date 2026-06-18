@@ -64,6 +64,7 @@ import { extractLocationInfo, formatLocationShort, LocationInfo } from "@/lib/lo
 import FormDataTable from "@/components/FormDataTable";
 import { buildLabelMap, type QuestionLabelMap } from "@/lib/formLabelUtils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { exportFormDataToExcel } from "@/lib/formDataExport";
 import { useSwipeToDelete } from "@/hooks/useSwipeToDelete";
 
 interface Submission {
