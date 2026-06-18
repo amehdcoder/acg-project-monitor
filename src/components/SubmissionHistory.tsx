@@ -17,6 +17,7 @@ import {
   Pencil,
   Save,
   X,
+  Download,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ import { extractLocationInfo, formatLocationShort, LocationInfo } from "@/lib/lo
 import FormDataTable from "@/components/FormDataTable";
 import { buildLabelMap, type QuestionLabelMap } from "@/lib/formLabelUtils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { exportFormDataToExcel } from "@/lib/formDataExport";
 import { useSwipeToDelete } from "@/hooks/useSwipeToDelete";
 
 interface Submission {
@@ -223,6 +225,26 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
     }
   };
 
+  const [exporting, setExporting] = useState(false);
+  const handleExportExcel = async () => {
+    const toExport = filteredSubmissions;
+    if (toExport.length === 0) {
+      toast({ title: "Nothing to export", description: "No submissions match the current view." });
+      return;
+    }
+    try {
+      setExporting(true);
+      const count = await exportFormDataToExcel(toExport as any, formLabelMaps, "amehnities-form-data");
+      toast({ title: "Excel exported", description: `${count.toLocaleString()} submission(s) exported.` });
+    } catch (e: any) {
+      console.error("Excel export error", e);
+      toast({ title: "Export failed", description: e?.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+
   const handleDeletePending = async (id: string) => {
     try {
       // This would need to be exposed from useOfflineStorage
@@ -303,6 +325,19 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            disabled={exporting}
+          >
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {exporting ? "Exporting…" : "Export to Excel"}
+          </Button>
           {/* Sync Status */}
           <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
             {isOnline ? (
