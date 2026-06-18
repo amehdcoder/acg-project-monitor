@@ -195,21 +195,42 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     });
   };
 
+  // State → LGA → Ward options derived from the full Nigerian administrative
+  // hierarchy, bounded by the project's designed state scope.
+  const adminOptions = (level: keyof GeoRow): string[] => {
+    if (level === "state") {
+      const all = getAllStates();
+      return hasStateScope ? all.filter((s) => allowedStates.has(s)) : all;
+    }
+    if (level === "lga") return sel.state ? getLGAsForState(sel.state) : [];
+    if (level === "ward") return sel.state && sel.lga ? getWardsForLGA(sel.state, sel.lga) : [];
+    return [];
+  };
+
+  // True when a geo level resolves to the admin hierarchy (State/LGA/Ward only).
+  const isGeoLevel = (level: keyof GeoRow) =>
+    level === "state" || level === "lga" || level === "ward";
+
+  // Microplan-only options for a level given current upstream selections.
+  const microplanOptions = (level: keyof GeoRow): string[] =>
+    uniqSorted(filteredFor(level).map((r) => r[level]));
+
   const options = (level: keyof GeoRow): string[] => {
     // Off-microplan / no-microplan path: State → LGA → Ward come from the full
-    // Nigerian administrative hierarchy, bounded by the project's designed state
-    // scope (or all states when the project has no assigned state).
+    // Nigerian administrative hierarchy.
     if (useAdminHierarchy) {
-      if (level === "state") {
-        const all = getAllStates();
-        return hasStateScope ? all.filter((s) => allowedStates.has(s)) : all;
-      }
-      if (level === "lga") return sel.state ? getLGAsForState(sel.state) : [];
-      if (level === "ward") return sel.state && sel.lga ? getWardsForLGA(sel.state, sel.lga) : [];
+      if (isGeoLevel(level)) return adminOptions(level);
       // FLHF / community / settlement are entered as free text below.
       return [];
     }
-    return uniqSorted(filteredFor(level).map((r) => r[level]));
+    // Microplan-driven path. If the microplan captured values for this level,
+    // use them. Otherwise — to guarantee the cascade NEVER dead-ends (e.g. the
+    // microplan covers some LGAs but not the one chosen, or wards were never
+    // captured) — fall back to the full admin hierarchy for State/LGA/Ward.
+    const mp = microplanOptions(level);
+    if (mp.length > 0) return mp;
+    if (isGeoLevel(level)) return adminOptions(level);
+    return [];
   };
 
   // ── Write a level + clear downstream selections ───────────────────────
