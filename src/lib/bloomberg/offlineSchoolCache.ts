@@ -124,8 +124,31 @@ const SCHOOL_COLUMNS =
  * Validation form works fully offline even if the user never opened it while
  * online. Safe to call repeatedly; it's a best-effort online-only refresh.
  */
+// In-memory guard so concurrent callers in the same tab don't each kick off a
+// full register download.
+let prewarmInFlight: Promise<number> | null = null;
+// How long a freshly downloaded register stays "fresh" before we refetch it.
+// The register changes rarely, so refetching on every token refresh / reconnect
+// was the single biggest source of slow, repeated full-table scans.
+const PREWARM_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
 export async function prewarmBloombergOffline(userId: string): Promise<number> {
   if (!navigator.onLine) return 0;
+  if (prewarmInFlight) return prewarmInFlight;
+
+  // Skip entirely when we already hold a fresh cached register. This avoids
+  // re-running the expensive RLS-filtered full-table scan on every session
+  // restore, token refresh, or reconnect.
+  try {
+    const { schools, cachedAt } = await readCachedBloombergSchools();
+    if (schools.length > 0 && cachedAt && Date.now() - cachedAt < PREWARM_TTL_MS) {
+      return schools.length;
+    }
+  } catch {
+    /* fall through and refetch */
+  }
+
+  prewarmInFlight = (async () => {
   try {
     const all: BloombergSchool[] = [];
     const PAGE = 1000;
