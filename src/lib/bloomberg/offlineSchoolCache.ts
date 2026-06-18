@@ -188,5 +188,9 @@ export async function prewarmBloombergOffline(userId: string): Promise<number> {
     return all.length;
   } catch {
     return 0;
+  } finally {
+    prewarmInFlight = null;
   }
+  })();
+  return prewarmInFlight;
 }
