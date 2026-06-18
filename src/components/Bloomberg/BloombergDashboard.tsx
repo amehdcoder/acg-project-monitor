@@ -22,6 +22,7 @@ import jsPDF from "jspdf";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
 import { pctTone, toneColor, varianceTone } from "@/lib/conditionalFormatting";
 import { labelPillStyle } from "@/lib/lgaColors";
+import { prettyAdminLabel } from "@/lib/formLabelUtils";
 
 // Professional, color-coded label pill for admin units (State / LGA). Same name
 // always renders with the same beautiful tint across every table.
