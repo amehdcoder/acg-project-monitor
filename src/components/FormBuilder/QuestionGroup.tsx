@@ -68,7 +68,24 @@ const QuestionGroupComponent = ({
   children,
 }: QuestionGroupProps) => {
   const [isOpen, setIsOpen] = useState(true);
+  const [editingName, setEditingName] = useState(false);
+  const [draftLabel, setDraftLabel] = useState(group.label);
   const FollowUpIcon = followUpMode ? getFollowUpIcon(group.label, group.name) : Folder;
+
+  const startEditName = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDraftLabel(group.label);
+    setEditingName(true);
+  };
+  const saveName = () => {
+    const next = draftLabel.trim();
+    if (next && next !== group.label) onUpdate({ ...group, label: next });
+    setEditingName(false);
+  };
+  const cancelName = () => {
+    setDraftLabel(group.label);
+    setEditingName(false);
+  };
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
