@@ -312,7 +312,9 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
           <div>
             <h4 className="text-sm font-bold text-foreground sm:text-base">Supervision Location</h4>
             <p className="text-xs text-muted-foreground">
-              Driven by the microplan — pick the area you are supervising
+              {microplanIsEmpty
+                ? "No microplan linked — pick the area from the State cascade"
+                : "Driven by the microplan — pick the area you are supervising"}
             </p>
           </div>
         </div>
@@ -324,7 +326,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
             </Badge>
           )}
           <Badge variant="outline" className="gap-1 border-primary/40 text-primary">
-            <Lock className="h-3 w-3" /> Microplan-locked
+            <Lock className="h-3 w-3" /> {microplanIsEmpty ? "State cascade" : "Microplan-locked"}
           </Badge>
         </div>
       </div>
