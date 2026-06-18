@@ -288,8 +288,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   const levelReady = (key: keyof GeoRow): boolean => {
     const idx = LEVEL_ORDER.indexOf(key);
     if (idx <= 0) return true;
-    if (notInMicroplan) {
-      // Off-microplan: State→LGA→Ward is a strict admin-hierarchy chain;
+    if (useAdminHierarchy) {
+      // Admin-hierarchy: State→LGA→Ward is a strict chain;
       // FLHF/Community/Settlement are free text gated only by Ward.
       const parent = LEVEL_ORDER[idx - 1];
       return !!sel[parent];
