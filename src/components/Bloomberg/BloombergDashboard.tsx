@@ -25,8 +25,8 @@ import { labelPillStyle } from "@/lib/lgaColors";
 
 // Professional, color-coded label pill for admin units (State / LGA). Same name
 // always renders with the same beautiful tint across every table.
-const Label = ({ name }: { name: string | null | undefined }) => {
-  const text = (name || "").trim();
+const Label = ({ name, prefix }: { name?: string | null; prefix?: string | null }) => {
+  const text = prettyAdminLabel(name, prefix);
   if (!text || text === "—") return <span className="text-muted-foreground">—</span>;
   return (
     <span
