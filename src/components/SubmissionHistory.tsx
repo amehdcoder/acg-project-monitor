@@ -325,6 +325,19 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            disabled={exporting}
+          >
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {exporting ? "Exporting…" : "Export to Excel"}
+          </Button>
           {/* Sync Status */}
           <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
             {isOnline ? (
