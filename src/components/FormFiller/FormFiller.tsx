@@ -103,7 +103,6 @@ import { useNavigate } from "react-router-dom";
 import fgnEmblem from "@/assets/fgn-emblem.png";
 import {
   MdaChecklistSidebar,
-  MdaSummaryCards,
   MdaQuickActions,
   MdaReminder,
 } from "@/components/MdaChecklist/MdaChecklistChrome";
@@ -1649,6 +1648,47 @@ const FormFiller = ({
     setValidationErrors(errors);
     return { isValid: Object.keys(errors).length === 0, errors };
   }, [questions, responses, gpsPosition, backgroundLocation, effectiveRequireLocation, effectiveEnforceGeofence, geofenceValidation, groups, repeatCounts, incompleteRepeatReasons]);
+
+  // Per-section mandatory-field gate for the MDA paginated experience.
+  // Blocks advancing to the next section until every required, visible question
+  // in the current section has an answer. Geography questions (state/lga/ward/
+  // community) are answered through <MdaLocationCascade> and validated here too,
+  // so an incomplete location cascade also blocks navigation.
+  const validateMdaSection = useCallback((groupIndex: number): boolean => {
+    const group = groups[groupIndex];
+    if (!group) return true;
+    const errs: Record<string, string> = {};
+    const iterations = group.repeat ? (repeatCounts[group.id] || 1) : 1;
+    const visible = group.questions.filter(shouldShowQuestion);
+    for (let iterIdx = 0; iterIdx < iterations; iterIdx++) {
+      for (const q of visible) {
+        if (NON_INPUT_TYPES.has(q.type)) continue;
+        if (q.required !== true) continue;
+        const qKey = group.repeat && iterations > 1 ? getRepeatKey(q.id, iterIdx) : q.id;
+        const v = responses[qKey];
+        if (v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0)) {
+          errs[qKey] = q.constraintMessage || "This field is required";
+        }
+      }
+    }
+    if (Object.keys(errs).length > 0) {
+      setValidationErrors((prev) => ({ ...prev, ...errs }));
+      const firstKey = Object.keys(errs)[0];
+      toast({
+        title: "Complete this section first",
+        description: `${Object.keys(errs).length} required question(s) in this section still need an answer before you can continue.`,
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        const el =
+          document.getElementById(`question-${firstKey}`) ||
+          document.querySelector(`[data-question-name]`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 60);
+      return false;
+    }
+    return true;
+  }, [groups, responses, repeatCounts, shouldShowQuestion]);
 
   const handleSaveDraft = async () => {
     const hasRealResponses = Object.values(responses).some(
@@ -3249,7 +3289,7 @@ const FormFiller = ({
                     {!isLast ? (
                       <Button
                         size="lg"
-                        onClick={() => goToMdaSection(idx + 1)}
+                        onClick={() => { if (validateMdaSection(idx)) goToMdaSection(idx + 1); }}
                         className="gap-2 bg-gradient-to-r from-indigo-600 to-blue-700 text-white shadow-md shadow-indigo-900/20 hover:from-indigo-700 hover:to-blue-800"
                       >
                         Next Section
@@ -3268,8 +3308,7 @@ const FormFiller = ({
                     )}
                   </div>
 
-                  {/* Supervision summary + quick actions + reminder */}
-                  <MdaSummaryCards responses={responses} nameToId={mdaNameToId} fields={mdaFields} />
+                  {/* Quick actions + reminder (Supervision Summary removed per request) */}
                   <MdaQuickActions />
                   <MdaReminder />
                 </div>
@@ -3446,10 +3485,9 @@ const FormFiller = ({
                 {/* Follow-up modules are NOT shown during registration. They live
                     on the Cases page and activate once registration is finalized. */}
 
-                {/* MDA Supervisory Checklist insight panels */}
+                {/* MDA Supervisory Checklist insight panels (Supervision Summary removed per request) */}
                 {isMdaChecklist && (
                   <div className="space-y-4">
-                    <MdaSummaryCards responses={responses} nameToId={mdaNameToId} fields={mdaFields} />
                     <MdaQuickActions />
                     <MdaReminder />
                   </div>

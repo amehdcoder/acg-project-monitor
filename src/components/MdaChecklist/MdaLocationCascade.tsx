@@ -23,10 +23,10 @@
  * name). FLHF/Settlement, which may not have a dedicated question, are still
  * persisted under their canonical names.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/fetchAllRows";
-import { fetchProjectScope } from "@/lib/projectScope";
+import { fetchProjectScope, EMPTY_SCOPE } from "@/lib/projectScope";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useAuth } from "@/hooks/useAuth";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
@@ -95,36 +95,45 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   // States the project was designed for (from project scope) — used as the
   // cascade fallback when no microplan is linked to the project.
   const [projectStates, setProjectStates] = useState<string[]>([]);
+  // Guarantees the single-state auto-select runs at most once and can never
+  // clobber a selection the supervisor has already made.
+  const didAutoselectRef = useRef(false);
 
-  // Load the project's designed state scope (fallback for the cascade).
-  useEffect(() => {
-    if (!projectId) { setProjectStates([]); return; }
-    let cancelled = false;
-    fetchProjectScope(projectId)
-      .then((s) => { if (!cancelled) setProjectStates(s.states || []); })
-      .catch(() => { if (!cancelled) setProjectStates([]); });
-    return () => { cancelled = true; };
-  }, [projectId]);
+  // Stable key for the (optional) admin-defined state scope so the loader effect
+  // only re-runs when its contents actually change (not on every render).
+  const stateScopeKey = useMemo(() => (stateScope ?? []).join("|"), [stateScope]);
 
-  // ── Load microplan geography ──────────────────────────────────────────
+  // ── Resolve scope + load microplan geography in ONE pass ──────────────
   // The MDA checklist often lives in a *different* project than the one used
-  // for Geo Microplanning. Tying the cascade to the form's project_id would
-  // therefore show "No microplan data" even though the user has captured
-  // communities. Instead we load ALL microplan geography the user can see
-  // (RLS + the designation-scope filter below restrict it to their areas).
+  // for Geo Microplanning, so we never tie the cascade to the form's project_id.
+  // Instead we:
+  //   1) resolve the project's designed state scope,
+  //   2) load ONLY the microplan rows for the in-scope state(s) — so the query
+  //      stays fast no matter how large microplan_entries gets, and the
+  //      "microplan empty?" decision is correct on the very first settle (no
+  //      microplan→admin-hierarchy flicker that previously dropped selections).
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
     (async () => {
       setLoading(true);
       try {
-        const data = await fetchAllRows<GeoRow>((from, to) =>
-          supabase
+        const pScope = projectId ? await fetchProjectScope(projectId) : { ...EMPTY_SCOPE };
+        const pStates = pScope.states || [];
+        if (!cancelled) setProjectStates(pStates);
+
+        // Admin form scope wins, otherwise the project's designed states.
+        const scopeStates = (stateScope && stateScope.length > 0) ? stateScope : pStates;
+
+        const buildQuery = (from: number, to: number) => {
+          let q = supabase
             .from("microplan_entries")
-            .select("state, lga, ward, flhf_name, community_name, settlement_name")
-            .range(from, to)
-            .abortSignal(controller.signal),
-        );
+            .select("state, lga, ward, flhf_name, community_name, settlement_name");
+          if (scopeStates.length > 0) q = q.in("state", scopeStates);
+          return q.range(from, to).abortSignal(controller.signal);
+        };
+
+        const data = await fetchAllRows<GeoRow>(buildQuery);
         if (!cancelled) setRows(data || []);
       } catch {
         if (!cancelled) setRows([]);
@@ -132,9 +141,9 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         if (!cancelled) setLoading(false);
       }
     })();
-    // Cancel the in-flight paged request if the effect re-runs / unmounts.
     return () => { cancelled = true; controller.abort(); };
-  }, [projectId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, stateScopeKey]);
 
   // The state restriction used for BOTH the microplan filter and the off-microplan
   // / no-microplan cascade: the admin-defined form state scope takes priority,
@@ -304,11 +313,18 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
 
   // When falling back to the admin hierarchy and the project was designed for a
   // single state, preselect it so the supervisor goes straight to LGA.
+  // Runs at most once (didAutoselectRef) and only when nothing is selected yet,
+  // so it can NEVER reset an LGA/Ward the supervisor has already chosen.
   useEffect(() => {
     if (loading || scope.loading) return;
-    if (!useAdminHierarchy || sel.state) return;
+    if (!useAdminHierarchy) return;
+    if (didAutoselectRef.current) return;
+    if (sel.state) { didAutoselectRef.current = true; return; }
     const list = Array.from(allowedStates);
-    if (list.length === 1) setLevel("state", list[0]);
+    if (list.length === 1) {
+      didAutoselectRef.current = true;
+      setLevel("state", list[0]);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, scope.loading, useAdminHierarchy, sel.state, allowedStates.size]);
 
