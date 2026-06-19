@@ -45,6 +45,8 @@ const TrendsProjectionsChart = ({ selectedProjectId }: TrendsProps) => {
     const channel = supabase
       .channel("dss-trends")
       .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, () => fetchRef.current())
+      .on("postgres_changes", { event: "*", schema: "public", table: "bloomberg_validations" }, () => fetchRef.current())
+      .on("postgres_changes", { event: "*", schema: "public", table: "seeclear_monitoring" }, () => fetchRef.current())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [selectedProjectId]);
@@ -52,11 +54,15 @@ const TrendsProjectionsChart = ({ selectedProjectId }: TrendsProps) => {
 
   async function fetchTrendsData() {
     try {
+      const isSpecialProject =
+        selectedProjectId === BLOOMBERG_PROJECT_ID || selectedProjectId === SEECLEAR_PROJECT_ID;
+      const includeSpecial = !selectedProjectId || isSpecialProject;
+
       let formIds: string[] | null = null;
-      if (selectedProjectId) {
+      if (selectedProjectId && !isSpecialProject) {
         const { data: forms } = await supabase.from("forms").select("id").eq("project_id", selectedProjectId);
         formIds = (forms || []).map(f => f.id);
-        if (formIds.length === 0) { setChartData([]); setLoading(false); return; }
+        if (formIds.length === 0 && !includeSpecial) { setChartData([]); setLoading(false); return; }
       }
 
       // Fetch only the last 14 days to make the chart accurate for any volume
@@ -65,15 +71,17 @@ const TrendsProjectionsChart = ({ selectedProjectId }: TrendsProps) => {
       since.setDate(since.getDate() - 13);
       since.setHours(0, 0, 0, 0);
 
-      let query = supabase
-        .from("form_submissions")
-        .select("created_at, form_id")
-        .gte("created_at", since.toISOString())
-        .order("created_at", { ascending: false });
-      if (formIds) query = query.in("form_id", formIds);
-      const { data: submissions } = await query;
-
-      if (!submissions || submissions.length === 0) { setChartData([]); setLoading(false); return; }
+      let submissions: any[] = [];
+      if (!isSpecialProject) {
+        let query = supabase
+          .from("form_submissions")
+          .select("created_at, form_id")
+          .gte("created_at", since.toISOString())
+          .order("created_at", { ascending: false });
+        if (formIds) query = query.in("form_id", formIds);
+        const { data } = await query;
+        submissions = data || [];
+      }
 
       const dailyCounts: Record<string, number> = {};
       const now = new Date();
@@ -87,6 +95,26 @@ const TrendsProjectionsChart = ({ selectedProjectId }: TrendsProps) => {
         const day = s.created_at.split("T")[0];
         if (day in dailyCounts) dailyCounts[day]++;
       });
+
+      // Merge standalone special-form activity (Bloomberg, SeeClear) into the trend.
+      if (includeSpecial) {
+        try {
+          const specialRows = await fetchSpecialFormSubmissions({ dateFrom: since });
+          specialRows.forEach((r) => {
+            if (selectedProjectId && r.project_id !== selectedProjectId) return;
+            const ts = r.submitted_at || r.created_at;
+            if (!ts) return;
+            const day = ts.split("T")[0];
+            if (day in dailyCounts) dailyCounts[day]++;
+          });
+        } catch (e) {
+          console.warn("Trends special-form merge failed (non-fatal):", e);
+        }
+      }
+
+      if (Object.values(dailyCounts).every((v) => v === 0)) { setChartData([]); setLoading(false); return; }
+
+
 
       const sortedDays = Object.entries(dailyCounts).sort(([a], [b]) => a.localeCompare(b));
       const values = sortedDays.map(([_, count]) => count);
