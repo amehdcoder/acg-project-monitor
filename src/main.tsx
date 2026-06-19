@@ -4,6 +4,7 @@ import RootErrorBoundary from "./components/RootErrorBoundary";
 import { installGlobalErrorReporter, recordError } from "./lib/errorReporter";
 import { initOfflineMedia } from "./lib/offlineMedia";
 import { initOfflineSubmissions } from "./lib/offlineSubmissions";
+import { prepareSilentFormRestoreForUpdate } from "./lib/formProgressPersistence";
 import "./index.css";
 
 // Drain any queued offline media + submissions as soon as the app boots /
@@ -43,6 +44,7 @@ const tryChunkRecover = async (msg: string) => {
   try {
     if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) return;
     sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+    prepareSilentFormRestoreForUpdate();
     try { const k = await caches.keys(); await Promise.all(k.map((x) => caches.delete(x))); } catch {}
     const u = new URL(location.href);
     u.searchParams.set("__chunk_retry", String(Date.now()));
@@ -128,6 +130,7 @@ setTimeout(async () => {
   try {
     if (sessionStorage.getItem(WHITE_SCREEN_GUARD_KEY)) return; // already tried once this session
     sessionStorage.setItem(WHITE_SCREEN_GUARD_KEY, "1");
+    prepareSilentFormRestoreForUpdate();
     try { recordError("error", new Error("white-screen-watchdog: #root empty after 8s"), {}); } catch {}
     try {
       const regs = await navigator.serviceWorker?.getRegistrations();
