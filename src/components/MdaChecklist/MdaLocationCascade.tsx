@@ -118,6 +118,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   // (RLS + the designation-scope filter below restrict it to their areas).
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     (async () => {
       setLoading(true);
       try {
@@ -125,7 +126,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
           supabase
             .from("microplan_entries")
             .select("state, lga, ward, flhf_name, community_name, settlement_name")
-            .range(from, to),
+            .range(from, to)
+            .abortSignal(controller.signal),
         );
         if (!cancelled) setRows(data || []);
       } catch {
@@ -134,7 +136,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    // Cancel the in-flight paged request if the effect re-runs / unmounts.
+    return () => { cancelled = true; controller.abort(); };
   }, [projectId]);
 
   // The state restriction used for BOTH the microplan filter and the off-microplan
