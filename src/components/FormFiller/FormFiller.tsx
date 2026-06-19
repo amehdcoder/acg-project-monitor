@@ -116,6 +116,12 @@ import { ExpertFieldValidator } from "./ExpertFieldValidator";
 import { useLocationEnforcement, ACCURACY_HARD_LIMIT } from "@/hooks/useLocationEnforcement";
 import type { FieldContext } from "@/hooks/useMoEExperts";
 import { scrollToAppTop } from "@/lib/scrollToAppTop";
+import {
+  ACTIVE_FORM_FILL_KEY,
+  SILENT_UPDATE_RESTORE_KEY,
+  getFormDraftKey,
+  hasMeaningfulFormResponses,
+} from "@/lib/formProgressPersistence";
 
 // Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
 
@@ -457,7 +463,7 @@ const FormFiller = ({
     if (userInteractedRef.current && Object.keys(responses).length > 0) {
       try {
         localStorage.setItem(
-          `form_draft_${formId}`,
+          getFormDraftKey(formId),
           JSON.stringify({ formId, responses, gpsPosition, savedAt: new Date().toISOString(), userEntered: true }),
         );
       } catch {
@@ -1109,6 +1115,24 @@ const FormFiller = ({
   const effectiveAutoSave = settings.autoSave ?? true;
   const effectiveEnforceGeofence = settings.enforceGeofence ?? isGeofenceEnabled ?? false;
   const autoSaveInterval = settings.autoSaveInterval ?? 30;
+  const draftKey = useMemo(() => getFormDraftKey(formId), [formId]);
+
+  const persistCurrentDraft = useCallback(() => {
+    if (!effectiveAutoSave || !userInteractedRef.current || Object.keys(responses).length === 0) return false;
+    if (!hasMeaningfulFormResponses(responses)) return false;
+    try {
+      const savedAt = new Date().toISOString();
+      localStorage.setItem(draftKey, JSON.stringify({ formId, responses, gpsPosition, savedAt, userEntered: true }));
+      localStorage.setItem(
+        ACTIVE_FORM_FILL_KEY,
+        JSON.stringify({ formId, projectId, savedAt, hasUserProgress: true, expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 }),
+      );
+      window.dispatchEvent(new Event("amehnities:form-progress-changed"));
+      return true;
+    } catch {
+      return false;
+    }
+  }, [draftKey, effectiveAutoSave, formId, gpsPosition, projectId, responses]);
 
   // Stationary geofence for battery optimization
   const stationaryState = useStationaryGeofence({
@@ -1152,22 +1176,12 @@ const FormFiller = ({
     // This prevents "empty" drafts created purely from pre-populated/computed values.
     if (!effectiveAutoSave || !userInteractedRef.current || Object.keys(responses).length === 0) return;
     const t = setTimeout(() => {
-      try {
-        const draft = {
-          formId,
-          responses,
-          gpsPosition,
-          savedAt: new Date().toISOString(),
-          userEntered: true,
-        };
-        localStorage.setItem(`form_draft_${formId}`, JSON.stringify(draft));
+      if (persistCurrentDraft()) {
         setLastAutoSave(new Date());
-      } catch (e) {
-        // Quota exceeded etc. — silently ignore, will retry next change.
       }
     }, 400); // debounce 400ms
     return () => clearTimeout(t);
-  }, [effectiveAutoSave, responses, gpsPosition, formId]);
+  }, [effectiveAutoSave, responses, persistCurrentDraft]);
 
   // When editing an existing locally-saved entry, hydrate its responses and
   // skip the resume-from-crash prompt entirely.
@@ -1181,21 +1195,31 @@ const FormFiller = ({
   // On-mount: detect any saved draft and OFFER to resume (don't silently overwrite)
   useEffect(() => {
     if (savedEntry) return; // editing a saved entry — no crash-resume prompt
-    const draftKey = `form_draft_${formId}`;
     const saved = localStorage.getItem(draftKey);
     if (!saved) return;
     try {
       const draft = JSON.parse(saved);
-      const hasRealResponses =
-        draft?.responses &&
-        Object.values(draft.responses).some(
-          (v) => v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0)
-        );
+      const hasRealResponses = hasMeaningfulFormResponses(draft?.responses);
       // Only offer to resume genuine drafts (explicitly flagged as user-entered,
       // or — for legacy drafts — containing at least one real answer).
       if (hasRealResponses && (draft.userEntered === undefined || draft.userEntered === true)) {
-        setPendingDraft(draft);
-        setShowResumeDialog(true);
+        const silentRestore = (() => {
+          try {
+            const restore = JSON.parse(sessionStorage.getItem(SILENT_UPDATE_RESTORE_KEY) || "null");
+            return restore?.formId === formId && restore?.draftKey === draftKey;
+          } catch {
+            return false;
+          }
+        })();
+        if (silentRestore) {
+          setResponses(draft.responses || {});
+          if (draft.gpsPosition) setGpsPosition(draft.gpsPosition);
+          userInteractedRef.current = true;
+          sessionStorage.removeItem(SILENT_UPDATE_RESTORE_KEY);
+        } else {
+          setPendingDraft(draft);
+          setShowResumeDialog(true);
+        }
       } else {
         localStorage.removeItem(draftKey);
       }
@@ -1204,29 +1228,39 @@ const FormFiller = ({
       localStorage.removeItem(draftKey);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formId]);
+  }, [draftKey, formId, savedEntry]);
 
   // Also autosave when the page is about to unload (refresh, close, crash)
   useEffect(() => {
-    const handler = () => {
-      if (!effectiveAutoSave || !userInteractedRef.current || Object.keys(responses).length === 0) return;
-      try {
-        localStorage.setItem(
-          `form_draft_${formId}`,
-          JSON.stringify({ formId, responses, gpsPosition, savedAt: new Date().toISOString(), userEntered: true })
-        );
-      } catch {}
-    };
+    const handler = () => { persistCurrentDraft(); };
     window.addEventListener("beforeunload", handler);
     window.addEventListener("pagehide", handler);
-    document.addEventListener("visibilitychange", () => {
+    window.addEventListener("amehnities:before-silent-update", handler);
+    const visibilityHandler = () => {
       if (document.visibilityState === "hidden") handler();
-    });
+    };
+    document.addEventListener("visibilitychange", visibilityHandler);
     return () => {
       window.removeEventListener("beforeunload", handler);
       window.removeEventListener("pagehide", handler);
+      window.removeEventListener("amehnities:before-silent-update", handler);
+      document.removeEventListener("visibilitychange", visibilityHandler);
     };
-  }, [effectiveAutoSave, responses, gpsPosition, formId]);
+  }, [persistCurrentDraft]);
+
+  useEffect(() => {
+    return () => {
+      try {
+        const restoring = JSON.parse(sessionStorage.getItem(SILENT_UPDATE_RESTORE_KEY) || "null");
+        if (restoring?.formId === formId) return;
+        const active = JSON.parse(localStorage.getItem(ACTIVE_FORM_FILL_KEY) || "null");
+        if (active?.formId === formId) {
+          localStorage.removeItem(ACTIVE_FORM_FILL_KEY);
+          window.dispatchEvent(new Event("amehnities:form-progress-changed"));
+        }
+      } catch {}
+    };
+  }, [formId]);
 
   const geofenceValidation = useMemo(() => {
     if (!gpsPosition || !isGeofenceEnabled) return null;
@@ -1391,7 +1425,9 @@ const FormFiller = ({
   );
 
   useEffect(() => {
-    const cascadeChildren = allFormQuestions.filter(q => q.cascadeParentId);
+    const cascadeChildren = allFormQuestions.filter(q =>
+      q.cascadeParentId && !((isMdaChecklist || useMicroplanCascade) && MDA_GEO_NAMES.has(q.name || q.id))
+    );
     if (cascadeChildren.length === 0) return;
 
     setResponses(prev => {
@@ -1423,7 +1459,7 @@ const FormFiller = ({
     });
   // Re-run whenever any response changes — cheap comparison guards the actual update.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [responses, allFormQuestions]);
+  }, [responses, allFormQuestions, isMdaChecklist, useMicroplanCascade]);
 
   const shouldShowQuestion = (question: Question): boolean => {
     // Calculate questions are always "shown" (their value is computed silently)
@@ -1710,13 +1746,15 @@ const FormFiller = ({
       savedAt: new Date().toISOString(),
       userEntered: true,
     };
-    localStorage.setItem(`form_draft_${formId}`, JSON.stringify(draft));
+    localStorage.setItem(draftKey, JSON.stringify(draft));
     setLastAutoSave(new Date());
     toast({ title: "Draft Saved", description: "Your form has been saved locally." });
   };
 
   const clearDraft = () => {
-    localStorage.removeItem(`form_draft_${formId}`);
+    localStorage.removeItem(draftKey);
+    try { localStorage.removeItem(ACTIVE_FORM_FILL_KEY); } catch {}
+    window.dispatchEvent(new Event("amehnities:form-progress-changed"));
   };
 
   // ---- Local-first workflow: Save As Draft / Finalize ----
@@ -3695,7 +3733,9 @@ const FormFiller = ({
             <AlertDialogCancel
               onClick={() => {
                 // Start fresh — discard saved draft
-                localStorage.removeItem(`form_draft_${formId}`);
+                localStorage.removeItem(draftKey);
+                try { localStorage.removeItem(ACTIVE_FORM_FILL_KEY); } catch {}
+                window.dispatchEvent(new Event("amehnities:form-progress-changed"));
                 setPendingDraft(null);
                 setShowResumeDialog(false);
                 toast({ title: "Starting fresh", description: "Previous progress discarded." });

@@ -1,4 +1,5 @@
 import { lazy, ComponentType } from "react";
+import { prepareSilentFormRestoreForUpdate } from "@/lib/formProgressPersistence";
 
 /**
  * lazyWithRetry: wraps React.lazy with automatic retry + a one-time hard refresh
@@ -35,6 +36,7 @@ export function lazyWithRetry<T extends ComponentType<any>>(
           const already = sessionStorage.getItem(RELOAD_KEY);
           if (!already) {
             sessionStorage.setItem(RELOAD_KEY, "1");
+            prepareSilentFormRestoreForUpdate();
             // Best-effort cache purge so the next load sees fresh assets
             try {
               const keys = await caches.keys();

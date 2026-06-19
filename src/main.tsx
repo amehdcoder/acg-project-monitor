@@ -4,6 +4,7 @@ import RootErrorBoundary from "./components/RootErrorBoundary";
 import { installGlobalErrorReporter, recordError } from "./lib/errorReporter";
 import { initOfflineMedia } from "./lib/offlineMedia";
 import { initOfflineSubmissions } from "./lib/offlineSubmissions";
+import { prepareSilentFormRestoreForUpdate } from "./lib/formProgressPersistence";
 import "./index.css";
 
 // Drain any queued offline media + submissions as soon as the app boots /
@@ -26,7 +27,7 @@ window.addEventListener("error", (e) => {
           <div style="font-size:42px;">⚠️</div>
           <h1 style="font-size:20px;margin:8px 0;">App failed to start</h1>
           <p style="font-size:13px;color:#64748b;margin:0 0 16px;">${(e?.message || "Unknown error").toString().slice(0, 200)}</p>
-          <button onclick="(async()=>{try{const n=await caches.keys();await Promise.all(n.map(x=>caches.delete(x)));const r=await navigator.serviceWorker?.getRegistrations();await Promise.all((r||[]).map(x=>x.unregister()));}catch(_){};const u=new URL(location.href);u.searchParams.set('__app_update',Date.now());location.replace(u.toString());})()" style="padding:10px 18px;border:none;border-radius:8px;background:#2563eb;color:white;font-weight:600;cursor:pointer;">Refresh to latest</button>
+          <button onclick="(async()=>{try{const a=JSON.parse(localStorage.getItem('amehnities_active_form_fill_v1')||'null');if(a&&a.formId&&a.hasUserProgress===true){sessionStorage.setItem('amehnities_silent_update_restore_v1',JSON.stringify({formId:a.formId,draftKey:'form_draft_'+a.formId,at:Date.now()}));}}catch(_){}try{const n=await caches.keys();await Promise.all(n.map(x=>caches.delete(x)));const r=await navigator.serviceWorker?.getRegistrations();await Promise.all((r||[]).map(x=>x.unregister()));}catch(_){};const u=new URL(location.href);u.searchParams.set('__app_update',Date.now());location.replace(u.toString());})()" style="padding:10px 18px;border:none;border-radius:8px;background:#2563eb;color:white;font-weight:600;cursor:pointer;">Refresh to latest</button>
         </div>
       </div>`;
   }
@@ -43,6 +44,7 @@ const tryChunkRecover = async (msg: string) => {
   try {
     if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) return;
     sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+    prepareSilentFormRestoreForUpdate();
     try { const k = await caches.keys(); await Promise.all(k.map((x) => caches.delete(x))); } catch {}
     const u = new URL(location.href);
     u.searchParams.set("__chunk_retry", String(Date.now()));
@@ -128,6 +130,7 @@ setTimeout(async () => {
   try {
     if (sessionStorage.getItem(WHITE_SCREEN_GUARD_KEY)) return; // already tried once this session
     sessionStorage.setItem(WHITE_SCREEN_GUARD_KEY, "1");
+    prepareSilentFormRestoreForUpdate();
     try { recordError("error", new Error("white-screen-watchdog: #root empty after 8s"), {}); } catch {}
     try {
       const regs = await navigator.serviceWorker?.getRegistrations();

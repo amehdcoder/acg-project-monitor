@@ -82,6 +82,49 @@ const LEVELS: { key: keyof GeoRow; label: string; optional?: boolean }[] = [
   { key: "settlement_name", label: "Settlement", optional: true },
 ];
 
+const normGeo = (value: string | null | undefined) =>
+  String(value || "")
+    .trim()
+    .replace(/__/g, " ")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s+(state|lga|local government area)$/i, "")
+    .toLowerCase();
+
+const humanizeGeoToken = (value: string | null | undefined) => {
+  const raw = String(value || "").trim();
+  const tail = raw.includes("__") ? raw.split("__").pop() || raw : raw;
+  return tail.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+};
+
+const sameGeo = (a: string | null | undefined, b: string | null | undefined) =>
+  normGeo(a) === normGeo(b);
+
+const canonicalStateName = (value: string | null | undefined) => {
+  const raw = humanizeGeoToken(value).replace(/\s+state$/i, "");
+  if (!raw) return "";
+  return getAllStates().find((s) => sameGeo(s, raw)) || raw;
+};
+
+const canonicalLgaName = (state: string, value: string | null | undefined) => {
+  const raw = humanizeGeoToken(value).replace(/\s+(lga|local government area)$/i, "");
+  if (!raw) return "";
+  return getLGAsForState(canonicalStateName(state)).find((l) => sameGeo(l, raw)) || raw;
+};
+
+const canonicalWardName = (state: string, lga: string, value: string | null | undefined) => {
+  const raw = humanizeGeoToken(value);
+  if (!raw) return "";
+  const st = canonicalStateName(state);
+  const lg = canonicalLgaName(st, lga);
+  return getWardsForLGA(st, lg).find((w) => sameGeo(w, raw)) || raw;
+};
+
+const uniqueSorted = (values: string[]) =>
+  Array.from(new Map(values.map((v) => [normGeo(v), v.trim().replace(/\s+/g, " ")])).values())
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+
 
 
 
@@ -123,7 +166,13 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         if (!cancelled) setProjectStates(pStates);
 
         // Admin form scope wins, otherwise the project's designed states.
-        const scopeStates = (stateScope && stateScope.length > 0) ? stateScope : pStates;
+        const rawScopeStates = (stateScope && stateScope.length > 0) ? stateScope : pStates;
+        const scopeStates = uniqueSorted(rawScopeStates.flatMap((s) => {
+          const raw = String(s || "").trim();
+          const canonical = canonicalStateName(raw);
+          const slug = canonical.toLowerCase().replace(/\s+/g, "_");
+          return [raw, canonical, `${canonical} State`, raw.toLowerCase(), raw.toUpperCase(), slug].filter(Boolean);
+        }));
 
         const buildQuery = (from: number, to: number) => {
           let q = supabase
@@ -149,7 +198,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   // / no-microplan cascade: the admin-defined form state scope takes priority,
   // otherwise the state(s) the project itself was designed for. Empty → all states.
   const effectiveScopeList = useMemo(
-    () => ((stateScope && stateScope.length > 0) ? stateScope : projectStates),
+    () => ((stateScope && stateScope.length > 0) ? stateScope : projectStates).map(canonicalStateName).filter(Boolean),
     [stateScope, projectStates],
   );
   const allowedStates = useMemo(
@@ -172,15 +221,20 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
           }),
         );
     if (!hasStateScope) return base;
-    return base.filter((r) => r.state && allowedStates.has(r.state));
+    return base.filter((r) => r.state && allowedStates.has(canonicalStateName(r.state)));
   }, [rows, scope, hasStateScope, allowedStates]);
 
   // ── Current selection (read from responses by question id) ────────────
   const getVal = (key: keyof GeoRow): string => {
     const qName = QUESTION_NAME[key];
     const id = nameToId[qName];
-    const v = (id && responses[id]) ?? responses[key] ?? responses[qName];
-    return typeof v === "string" ? v : "";
+    const idValue = id ? responses[id] : undefined;
+    const v = idValue !== undefined && idValue !== null && idValue !== "" ? idValue : (responses[key] ?? responses[qName]);
+    if (typeof v !== "string") return "";
+    if (key === "state") return canonicalStateName(v);
+    if (key === "lga") return canonicalLgaName(getVal("state"), v);
+    if (key === "ward") return canonicalWardName(getVal("state"), getVal("lga"), v);
+    return v;
   };
   const sel = {
     state: getVal("state"),
@@ -203,12 +257,15 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     };
     for (let i = 0; i < scopedRows.length; i++) {
       const r = scopedRows[i];
-      if (r.state) sets.state.add(r.state);
-      if (sel.state && r.state !== sel.state) continue;
-      if (r.lga) sets.lga.add(r.lga);
-      if (sel.lga && r.lga !== sel.lga) continue;
-      if (r.ward) sets.ward.add(r.ward);
-      if (sel.ward && r.ward !== sel.ward) continue;
+      const rowState = canonicalStateName(r.state);
+      const rowLga = canonicalLgaName(rowState, r.lga);
+      const rowWard = canonicalWardName(rowState, rowLga, r.ward);
+      if (rowState) sets.state.add(rowState);
+      if (sel.state && !sameGeo(rowState, sel.state)) continue;
+      if (rowLga) sets.lga.add(rowLga);
+      if (sel.lga && !sameGeo(rowLga, sel.lga)) continue;
+      if (rowWard) sets.ward.add(rowWard);
+      if (sel.ward && !sameGeo(rowWard, sel.ward)) continue;
       if (r.flhf_name) sets.flhf_name.add(r.flhf_name);
       if (sel.flhf_name && r.flhf_name !== sel.flhf_name) continue;
       if (r.community_name) sets.community_name.add(r.community_name);
@@ -230,8 +287,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
       const all = getAllStates();
       return hasStateScope ? all.filter((s) => allowedStates.has(s)) : all;
     }
-    if (level === "lga") return sel.state ? getLGAsForState(sel.state) : [];
-    if (level === "ward") return sel.state && sel.lga ? getWardsForLGA(sel.state, sel.lga) : [];
+    if (level === "lga") return sel.state ? getLGAsForState(canonicalStateName(sel.state)) : [];
+    if (level === "ward") return sel.state && sel.lga ? getWardsForLGA(canonicalStateName(sel.state), canonicalLgaName(sel.state, sel.lga)) : [];
     return [];
   };
 
@@ -265,8 +322,13 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     const order: (keyof GeoRow)[] = ["state", "lga", "ward", "flhf_name", "community_name", "settlement_name"];
     const startIdx = order.indexOf(level);
     const updates: Record<string, any> = {};
+    const canonicalValue =
+      level === "state" ? canonicalStateName(value)
+      : level === "lga" ? canonicalLgaName(sel.state, value)
+      : level === "ward" ? canonicalWardName(sel.state, sel.lga, value)
+      : value;
     order.slice(startIdx).forEach((k, i) => {
-      const v = i === 0 ? value : "";
+      const v = i === 0 ? canonicalValue : "";
       const qName = QUESTION_NAME[k];
       const id = nameToId[qName];
       if (id) updates[id] = v;

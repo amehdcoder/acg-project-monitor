@@ -1,3 +1,5 @@
+import { hasActiveUserFormProgress, prepareSilentFormRestoreForUpdate } from "@/lib/formProgressPersistence";
+
 export type AppUpdateStatus = "idle" | "checking" | "current" | "available" | "updating" | "error";
 
 export interface AppUpdateState {
@@ -198,7 +200,7 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
     });
     // Auto-apply when stale build is detected with a high-confidence version.json
     // probe AND the user has not snoozed and auto-update is enabled.
-    if (changed && source === "version" && isAutoUpdateEnabled() && !isSnoozed(latestBuildId)) {
+    if (changed && source === "version" && isAutoUpdateEnabled() && !isSnoozed(latestBuildId) && !hasActiveUserFormProgress()) {
       try { console.info("[UpdateManager] Stale build detected — forcing hard refresh", { currentBuildId, latestBuildId }); } catch {}
       void hardReloadToLatest();
     }
@@ -251,6 +253,7 @@ try {
 
 export const hardReloadToLatest = async () => {
   setState({ status: "updating", error: null });
+  prepareSilentFormRestoreForUpdate();
   try {
     if ("caches" in window) {
       const names = await caches.keys();
