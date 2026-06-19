@@ -149,10 +149,15 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId, isSyncing }: Props)
       const todaySubs = allSubs.filter((s: any) => new Date(s.created_at) >= today).length;
       const rate = totalSubs > 0 ? Math.round((synced / totalSubs) * 100) : 0;
 
+      // Count distinct special projects that actually carried submissions so the
+      // "Active Projects" KPI reflects standalone forms too.
+      const specialProjectIds = new Set(
+        allSubs.filter((s: any) => s.__special_project_id).map((s: any) => s.__special_project_id),
+      );
       const activeProjectIds = selectedProjectId
         ? new Set([selectedProjectId])
-        : new Set((projectListRes.data || []).map((p: any) => p.id));
-      const activeProjectCount = selectedProjectId ? 1 : (projectListRes.data || []).length;
+        : new Set([...(projectListRes.data || []).map((p: any) => p.id), ...specialProjectIds]);
+      const activeProjectCount = selectedProjectId ? 1 : activeProjectIds.size;
 
       const profileMap = new Map<string, { state: string | null; lga: string | null; name: string; email: string }>();
       (profilesRes.data || []).forEach((p: any) => {
