@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin, Download, Upload, Loader2, FileImage, XCircle, ClipboardList, Trash2 } from "lucide-react";
+import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin, Download, Upload, Loader2, FileImage, XCircle, ClipboardList, Trash2, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -182,7 +182,7 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function BloombergDashboard({ onClose }: Props) {
-  const { validations, stats, byState, stateBreakdown, inference, points, nonExistent, validatedTable, notValidatedTable, accountability, loading, reload, deleteValidations } = useBloombergDashboard();
+  const { validations, stats, byState, stateBreakdown, inference, points, nonExistent, validatedTable, notValidatedTable, accountability, recovery, loading, reload, deleteValidations } = useBloombergDashboard();
   const { isOwner, isSuperAdmin, isOwnerLevel, isAdmin } = useAuth();
   const canManage = isOwner || isSuperAdmin;
   // Pagination keeps very large registers fast — only a page of rows is ever
@@ -457,6 +457,46 @@ export default function BloombergDashboard({ onClose }: Props) {
           <Kpi icon={Users} label="Boys" value={fmt(stats.validatedMale)} tint={BLUE} />
           <Kpi icon={Users} label="Girls" value={fmt(stats.validatedFemale)} tint={PINK} />
         </div>
+
+        {/* Admin-only: submissions auto-recovered from devices' "Ready to send"
+            tab (collected with the old draft/finalize form). */}
+        {canManage && recovery.total > 0 && (
+          <div className="rounded-xl border border-emerald-300/60 bg-emerald-50 p-4 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/30">
+            <div className="mb-2 flex items-center gap-2">
+              <History className="h-4 w-4 text-emerald-600" />
+              <h3 className="text-sm font-semibold text-foreground">Recovered Submissions</h3>
+              <span className="ml-auto rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">
+                {fmt(recovery.total)} total
+              </span>
+            </div>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Entries auto-recovered from {recovery.validatorCount} validator{recovery.validatorCount === 1 ? "" : "s"}’ devices
+              (stuck in the old “Ready to send” tab) and merged into this dashboard.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-emerald-200 text-left text-muted-foreground dark:border-emerald-900">
+                    <th className="py-1.5 pr-3 font-semibold">Validator</th>
+                    <th className="py-1.5 pr-3 text-right font-semibold">Recovered</th>
+                    <th className="py-1.5 font-semibold">Last recovered</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recovery.validators.map((r, i) => (
+                    <tr key={i} className="border-b border-emerald-100/60 last:border-0 dark:border-emerald-900/40">
+                      <td className="py-1.5 pr-3 text-foreground">{r.name}</td>
+                      <td className="py-1.5 pr-3 text-right font-semibold text-foreground">{fmt(r.count)}</td>
+                      <td className="py-1.5 text-muted-foreground">
+                        {r.lastAt ? new Date(r.lastAt).toLocaleString() : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Map */}
         <div className="rounded-xl border border-border bg-card p-3 shadow-sm">

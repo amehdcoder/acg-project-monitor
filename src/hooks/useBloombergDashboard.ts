@@ -502,6 +502,38 @@ export const useBloombergDashboard = () => {
       );
   }, [schools, submittedValidations, baselineByKey, labelMaps]);
 
+  // Recovered submissions: entries that were stuck in a device's "Ready to
+  // send" tab (old draft/finalize form) and auto-pushed to the server by the
+  // client migration. Tagged via verification._recovered_from_ready_to_send.
+  // Surfaced as an admin-only indicator so supervisors can see how many
+  // entries each validator's device recovered after signing in.
+  const recovery = useMemo(() => {
+    const recovered = validations.filter(
+      (v) => (v.verification as any)?._recovered_from_ready_to_send === true,
+    );
+    const byValidator = new Map<string, { name: string; count: number; lastAt: number }>();
+    recovered.forEach((v) => {
+      const id = v.validator_id || "unknown";
+      const name = (v.validator_id && profileMap.get(v.validator_id)?.name) || "Unknown user";
+      const at = Date.parse((v.verification as any)?._recovered_at || v.created_at) || 0;
+      const prev = byValidator.get(id);
+      if (prev) {
+        prev.count += 1;
+        if (at > prev.lastAt) prev.lastAt = at;
+      } else {
+        byValidator.set(id, { name, count: 1, lastAt: at });
+      }
+    });
+    const validators = [...byValidator.values()]
+      .map((r) => ({ ...r, lastAt: r.lastAt ? new Date(r.lastAt).toISOString() : null }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    return {
+      total: recovered.length,
+      validatorCount: validators.length,
+      validators,
+    };
+  }, [validations, profileMap]);
+
   // Owner-only hard delete of validation entries. Removes the rows from the
   // database so they immediately disappear from every dashboard view.
   const deleteValidations = async (ids: string[]): Promise<void> => {
@@ -518,6 +550,6 @@ export const useBloombergDashboard = () => {
 
   return {
     validations, baselines, stats, byState, stateBreakdown, inference, points, nonExistent, validatedTable, notValidatedTable, accountability,
-    loading, reload, deleteValidations, ALL_CLASSES,
+    recovery, loading, reload, deleteValidations, ALL_CLASSES,
   };
 };
