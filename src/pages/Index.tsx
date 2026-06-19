@@ -11,6 +11,7 @@ import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useCallNotifications } from "@/hooks/useCallNotifications";
 import { useAppUpdateNotifications } from "@/hooks/useAppUpdateNotifications";
 import { useSurveillanceTracking } from "@/hooks/useSurveillanceTracking";
+import { runReadyToSendMigrationOnce } from "@/lib/bloomberg/readyToSendMigration";
 import { IncomingCallManager } from "@/components/ProjectChat/IncomingCallManager";
 
 import Header from "@/components/Header";
