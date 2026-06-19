@@ -85,27 +85,35 @@ const LEVELS: { key: keyof GeoRow; label: string; optional?: boolean }[] = [
 const normGeo = (value: string | null | undefined) =>
   String(value || "")
     .trim()
+    .replace(/__/g, " ")
+    .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
     .replace(/\s+(state|lga|local government area)$/i, "")
     .toLowerCase();
+
+const humanizeGeoToken = (value: string | null | undefined) => {
+  const raw = String(value || "").trim();
+  const tail = raw.includes("__") ? raw.split("__").pop() || raw : raw;
+  return tail.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+};
 
 const sameGeo = (a: string | null | undefined, b: string | null | undefined) =>
   normGeo(a) === normGeo(b);
 
 const canonicalStateName = (value: string | null | undefined) => {
-  const raw = String(value || "").trim().replace(/\s+/g, " ").replace(/\s+state$/i, "");
+  const raw = humanizeGeoToken(value).replace(/\s+state$/i, "");
   if (!raw) return "";
   return getAllStates().find((s) => sameGeo(s, raw)) || raw;
 };
 
 const canonicalLgaName = (state: string, value: string | null | undefined) => {
-  const raw = String(value || "").trim().replace(/\s+/g, " ").replace(/\s+(lga|local government area)$/i, "");
+  const raw = humanizeGeoToken(value).replace(/\s+(lga|local government area)$/i, "");
   if (!raw) return "";
   return getLGAsForState(canonicalStateName(state)).find((l) => sameGeo(l, raw)) || raw;
 };
 
 const canonicalWardName = (state: string, lga: string, value: string | null | undefined) => {
-  const raw = String(value || "").trim().replace(/\s+/g, " ");
+  const raw = humanizeGeoToken(value);
   if (!raw) return "";
   const st = canonicalStateName(state);
   const lg = canonicalLgaName(st, lga);
