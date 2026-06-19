@@ -1425,7 +1425,9 @@ const FormFiller = ({
   );
 
   useEffect(() => {
-    const cascadeChildren = allFormQuestions.filter(q => q.cascadeParentId && !MDA_GEO_NAMES.has(q.name || q.id));
+    const cascadeChildren = allFormQuestions.filter(q =>
+      q.cascadeParentId && !((isMdaChecklist || useMicroplanCascade) && MDA_GEO_NAMES.has(q.name || q.id))
+    );
     if (cascadeChildren.length === 0) return;
 
     setResponses(prev => {
@@ -1457,7 +1459,7 @@ const FormFiller = ({
     });
   // Re-run whenever any response changes — cheap comparison guards the actual update.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [responses, allFormQuestions]);
+  }, [responses, allFormQuestions, isMdaChecklist, useMicroplanCascade]);
 
   const shouldShowQuestion = (question: Question): boolean => {
     // Calculate questions are always "shown" (their value is computed silently)
