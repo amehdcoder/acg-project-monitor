@@ -13,7 +13,7 @@ import {
   getAppUpdateState,
   isAutoUpdateEnabled,
 } from "@/lib/appUpdateManager";
-import { hasActiveUserFormProgress } from "@/lib/formProgressPersistence";
+import { hasActiveUserFormProgress, prepareSilentFormRestoreForUpdate } from "@/lib/formProgressPersistence";
 
 interface InnerProps {
   onAvailable: () => void;
@@ -212,6 +212,7 @@ const PWAUpdatePrompt = () => {
                       // Clears every cache + storage flag and hard-reloads with a cache-buster.
                       setIsUpdating(true);
                       try {
+                        prepareSilentFormRestoreForUpdate();
                         try { localStorage.removeItem("app_last_applied_build_id"); } catch {}
                         try { localStorage.removeItem("app_last_applied_at"); } catch {}
                         try { sessionStorage.removeItem("app_html_build_id_v1"); } catch {}
