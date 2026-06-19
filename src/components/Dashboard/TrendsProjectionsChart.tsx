@@ -15,6 +15,7 @@ import {
 import { TrendingUp, AlertTriangle, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { fetchSpecialFormSubmissions, BLOOMBERG_PROJECT_ID, SEECLEAR_PROJECT_ID } from "@/lib/specialFormActivity";
 
 interface DayData {
   date: string;
