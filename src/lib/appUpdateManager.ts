@@ -254,6 +254,7 @@ try {
 export const hardReloadToLatest = async () => {
   setState({ status: "updating", error: null });
   try {
+    window.dispatchEvent(new Event("amehnities:before-silent-update"));
     const active = JSON.parse(localStorage.getItem(ACTIVE_FORM_FILL_KEY) || "null");
     if (active?.formId && active?.hasUserProgress === true) {
       sessionStorage.setItem(
