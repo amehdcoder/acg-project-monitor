@@ -170,7 +170,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         const scopeStates = uniqueSorted(rawScopeStates.flatMap((s) => {
           const raw = String(s || "").trim();
           const canonical = canonicalStateName(raw);
-          return [raw, canonical, raw.toLowerCase(), raw.toUpperCase()].filter(Boolean);
+          const slug = canonical.toLowerCase().replace(/\s+/g, "_");
+          return [raw, canonical, `${canonical} State`, raw.toLowerCase(), raw.toUpperCase(), slug].filter(Boolean);
         }));
 
         const buildQuery = (from: number, to: number) => {
