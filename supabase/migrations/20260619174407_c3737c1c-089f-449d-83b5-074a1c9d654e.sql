@@ -1,0 +1,1 @@
+ALTER TABLE public.acsm_reports ADD COLUMN IF NOT EXISTS disaggregation jsonb DEFAULT '{}'::jsonb;
