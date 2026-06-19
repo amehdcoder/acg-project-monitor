@@ -1254,7 +1254,10 @@ const FormFiller = ({
         const restoring = JSON.parse(sessionStorage.getItem(SILENT_UPDATE_RESTORE_KEY) || "null");
         if (restoring?.formId === formId) return;
         const active = JSON.parse(localStorage.getItem(ACTIVE_FORM_FILL_KEY) || "null");
-        if (active?.formId === formId) localStorage.removeItem(ACTIVE_FORM_FILL_KEY);
+        if (active?.formId === formId) {
+          localStorage.removeItem(ACTIVE_FORM_FILL_KEY);
+          window.dispatchEvent(new Event("amehnities:form-progress-changed"));
+        }
       } catch {}
     };
   }, [formId]);
