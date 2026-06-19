@@ -1127,6 +1127,7 @@ const FormFiller = ({
         ACTIVE_FORM_FILL_KEY,
         JSON.stringify({ formId, projectId, savedAt, hasUserProgress: true, expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 }),
       );
+      window.dispatchEvent(new Event("amehnities:form-progress-changed"));
       return true;
     } catch {
       return false;
@@ -1748,6 +1749,7 @@ const FormFiller = ({
   const clearDraft = () => {
     localStorage.removeItem(draftKey);
     try { localStorage.removeItem(ACTIVE_FORM_FILL_KEY); } catch {}
+    window.dispatchEvent(new Event("amehnities:form-progress-changed"));
   };
 
   // ---- Local-first workflow: Save As Draft / Finalize ----
@@ -3728,6 +3730,7 @@ const FormFiller = ({
                 // Start fresh — discard saved draft
                 localStorage.removeItem(draftKey);
                 try { localStorage.removeItem(ACTIVE_FORM_FILL_KEY); } catch {}
+                window.dispatchEvent(new Event("amehnities:form-progress-changed"));
                 setPendingDraft(null);
                 setShowResumeDialog(false);
                 toast({ title: "Starting fresh", description: "Previous progress discarded." });
