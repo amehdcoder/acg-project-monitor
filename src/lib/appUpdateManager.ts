@@ -1,4 +1,4 @@
-import { ACTIVE_FORM_FILL_KEY, SILENT_UPDATE_RESTORE_KEY, hasActiveUserFormProgress } from "@/lib/formProgressPersistence";
+import { hasActiveUserFormProgress, prepareSilentFormRestoreForUpdate } from "@/lib/formProgressPersistence";
 
 export type AppUpdateStatus = "idle" | "checking" | "current" | "available" | "updating" | "error";
 
@@ -253,16 +253,7 @@ try {
 
 export const hardReloadToLatest = async () => {
   setState({ status: "updating", error: null });
-  try {
-    window.dispatchEvent(new Event("amehnities:before-silent-update"));
-    const active = JSON.parse(localStorage.getItem(ACTIVE_FORM_FILL_KEY) || "null");
-    if (active?.formId && active?.hasUserProgress === true) {
-      sessionStorage.setItem(
-        SILENT_UPDATE_RESTORE_KEY,
-        JSON.stringify({ formId: active.formId, draftKey: `form_draft_${active.formId}`, at: Date.now() }),
-      );
-    }
-  } catch {}
+  prepareSilentFormRestoreForUpdate();
   try {
     if ("caches" in window) {
       const names = await caches.keys();
