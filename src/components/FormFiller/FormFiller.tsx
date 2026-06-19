@@ -3486,10 +3486,9 @@ const FormFiller = ({
                 {/* Follow-up modules are NOT shown during registration. They live
                     on the Cases page and activate once registration is finalized. */}
 
-                {/* MDA Supervisory Checklist insight panels */}
+                {/* MDA Supervisory Checklist insight panels (Supervision Summary removed per request) */}
                 {isMdaChecklist && (
                   <div className="space-y-4">
-                    <MdaSummaryCards responses={responses} nameToId={mdaNameToId} fields={mdaFields} />
                     <MdaQuickActions />
                     <MdaReminder />
                   </div>
