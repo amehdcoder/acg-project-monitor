@@ -65,6 +65,8 @@ const DashboardKPIChart = ({ onProjectClick, selectedProjectId }: DashboardKPICh
     const channel = supabase
       .channel("dss-kpi-chart-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, fetchData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "bloomberg_validations" }, fetchData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "seeclear_monitoring" }, fetchData)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [selectedProjectId]);
