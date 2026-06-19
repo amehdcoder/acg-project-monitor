@@ -126,6 +126,7 @@ export async function fetchSpecialFormSubmissions(opts: FetchOpts = {}): Promise
         id: r.id,
         user_id: r.monitor_id,
         form_id: SEECLEAR_FORM_ID,
+        project_id: SEECLEAR_PROJECT_ID,
         submitted_at: r.created_at,
         created_at: r.created_at,
         data: {
