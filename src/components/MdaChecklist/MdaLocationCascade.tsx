@@ -23,10 +23,10 @@
  * name). FLHF/Settlement, which may not have a dedicated question, are still
  * persisted under their canonical names.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/fetchAllRows";
-import { fetchProjectScope } from "@/lib/projectScope";
+import { fetchProjectScope, EMPTY_SCOPE } from "@/lib/projectScope";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useAuth } from "@/hooks/useAuth";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
