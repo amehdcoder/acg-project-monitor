@@ -1125,13 +1125,13 @@ const FormFiller = ({
       localStorage.setItem(draftKey, JSON.stringify({ formId, responses, gpsPosition, savedAt, userEntered: true }));
       localStorage.setItem(
         ACTIVE_FORM_FILL_KEY,
-        JSON.stringify({ formId, savedAt, hasUserProgress: true, expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 }),
+        JSON.stringify({ formId, projectId, savedAt, hasUserProgress: true, expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 }),
       );
       return true;
     } catch {
       return false;
     }
-  }, [draftKey, effectiveAutoSave, formId, gpsPosition, responses]);
+  }, [draftKey, effectiveAutoSave, formId, gpsPosition, projectId, responses]);
 
   // Stationary geofence for battery optimization
   const stationaryState = useStationaryGeofence({
