@@ -34,3 +34,21 @@ export const hasActiveUserFormProgress = (): boolean => {
     return false;
   }
 };
+
+export const prepareSilentFormRestoreForUpdate = (): boolean => {
+  try {
+    window.dispatchEvent(new Event("amehnities:before-silent-update"));
+    const active = JSON.parse(localStorage.getItem(ACTIVE_FORM_FILL_KEY) || "null");
+    if (!active?.formId || active.hasUserProgress !== true) return false;
+    const draftKey = getFormDraftKey(active.formId);
+    const draft = JSON.parse(localStorage.getItem(draftKey) || "null");
+    if (draft?.userEntered !== true || !hasMeaningfulFormResponses(draft.responses)) return false;
+    sessionStorage.setItem(
+      SILENT_UPDATE_RESTORE_KEY,
+      JSON.stringify({ formId: active.formId, draftKey, at: Date.now() }),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+};
