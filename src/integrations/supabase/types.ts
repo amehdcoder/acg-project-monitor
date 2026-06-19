@@ -188,6 +188,7 @@ export type Database = {
           created_by: string | null
           data_source: string | null
           date_reported: string | null
+          disaggregation: Json | null
           engagement_type: string | null
           evidence: Json | null
           female_count: number | null
@@ -229,6 +230,7 @@ export type Database = {
           created_by?: string | null
           data_source?: string | null
           date_reported?: string | null
+          disaggregation?: Json | null
           engagement_type?: string | null
           evidence?: Json | null
           female_count?: number | null
@@ -270,6 +272,7 @@ export type Database = {
           created_by?: string | null
           data_source?: string | null
           date_reported?: string | null
+          disaggregation?: Json | null
           engagement_type?: string | null
           evidence?: Json | null
           female_count?: number | null
