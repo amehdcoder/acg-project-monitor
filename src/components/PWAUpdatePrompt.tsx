@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw, Sparkles, X, Loader2 } from "lucide-react";
 import {
   hardReloadToLatest,
-  hasActiveUserFormProgress,
   isSnoozed,
   markServiceWorkerUpdateAvailable,
   registerServiceWorkerUpdater,
@@ -14,6 +13,7 @@ import {
   getAppUpdateState,
   isAutoUpdateEnabled,
 } from "@/lib/appUpdateManager";
+import { hasActiveUserFormProgress } from "@/lib/formProgressPersistence";
 
 interface InnerProps {
   onAvailable: () => void;
