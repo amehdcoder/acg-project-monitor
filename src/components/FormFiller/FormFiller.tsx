@@ -1234,6 +1234,7 @@ const FormFiller = ({
     const handler = () => { persistCurrentDraft(); };
     window.addEventListener("beforeunload", handler);
     window.addEventListener("pagehide", handler);
+    window.addEventListener("amehnities:before-silent-update", handler);
     const visibilityHandler = () => {
       if (document.visibilityState === "hidden") handler();
     };
@@ -1241,6 +1242,7 @@ const FormFiller = ({
     return () => {
       window.removeEventListener("beforeunload", handler);
       window.removeEventListener("pagehide", handler);
+      window.removeEventListener("amehnities:before-silent-update", handler);
       document.removeEventListener("visibilitychange", visibilityHandler);
     };
   }, [persistCurrentDraft]);
