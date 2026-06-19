@@ -149,8 +149,21 @@ export async function migrateReadyToSendBloomberg(
     const createdIso = new Date(collectionTime(e) || finalizeTime(e)).toISOString();
     const submittedIso = new Date(finalizeTime(e)).toISOString();
 
+    const baseData = (e.submissionData || {}) as Record<string, any>;
+    // Tag the verification payload so the dashboard can surface an admin-only
+    // "Recovered submissions" indicator without needing a separate table. The
+    // marker is additive and never overwrites real verification fields.
+    const verification = {
+      ...((baseData.verification && typeof baseData.verification === "object"
+        ? baseData.verification
+        : {}) as Record<string, any>),
+      _recovered_from_ready_to_send: true,
+      _recovered_at: new Date().toISOString(),
+    };
+
     const row = {
-      ...((e.submissionData || {}) as Record<string, any>),
+      ...baseData,
+      verification,
       id: submissionId,
       validator_id: userId,
       status: "sent",
