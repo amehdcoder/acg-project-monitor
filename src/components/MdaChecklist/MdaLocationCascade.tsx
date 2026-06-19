@@ -229,7 +229,11 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     const id = nameToId[qName];
     const idValue = id ? responses[id] : undefined;
     const v = idValue !== undefined && idValue !== null && idValue !== "" ? idValue : (responses[key] ?? responses[qName]);
-    return typeof v === "string" ? v : "";
+    if (typeof v !== "string") return "";
+    if (key === "state") return canonicalStateName(v);
+    if (key === "lga") return canonicalLgaName(getVal("state"), v);
+    if (key === "ward") return canonicalWardName(getVal("state"), getVal("lga"), v);
+    return v;
   };
   const sel = {
     state: getVal("state"),
