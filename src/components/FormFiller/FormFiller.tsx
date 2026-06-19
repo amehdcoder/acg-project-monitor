@@ -103,7 +103,6 @@ import { useNavigate } from "react-router-dom";
 import fgnEmblem from "@/assets/fgn-emblem.png";
 import {
   MdaChecklistSidebar,
-  MdaSummaryCards,
   MdaQuickActions,
   MdaReminder,
 } from "@/components/MdaChecklist/MdaChecklistChrome";
