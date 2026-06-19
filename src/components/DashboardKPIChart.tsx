@@ -117,6 +117,26 @@ const DashboardKPIChart = ({ onProjectClick, selectedProjectId }: DashboardKPICh
         if (sub.status === "draft" || !sub.synced_at) projectKPIs[pid].pending++;
       }
 
+      // Merge standalone special-form activity (Bloomberg, SeeClear) as their own
+      // synthetic projects so the "by project" chart reflects ALL app submissions.
+      const projectNameMap = new Map<string, string>([
+        [BLOOMBERG_PROJECT_ID, BLOOMBERG_PROJECT_NAME],
+        [SEECLEAR_PROJECT_ID, SEECLEAR_PROJECT_NAME],
+      ]);
+      try {
+        const specialRows = await fetchSpecialFormSubmissions();
+        for (const r of specialRows) {
+          const pid = r.project_id;
+          if (!projectKPIs[pid]) projectKPIs[pid] = { forms: new Set(), subs: 0, synced: 0, pending: 0 };
+          projectKPIs[pid].forms.add(r.form_id);
+          projectKPIs[pid].subs++;
+          projectKPIs[pid].synced++; // standalone forms persist server-side
+        }
+        projectNameMap.forEach((name, pid) => { if (!projectMap.has(pid)) projectMap.set(pid, name); });
+      } catch (e) {
+        console.warn("KPI chart special-form merge failed (non-fatal):", e);
+      }
+
       const chartData: ProjectKPI[] = Object.entries(projectKPIs)
         .map(([pid, kpi]) => {
           const fullName = projectMap.get(pid) || "Unknown";
