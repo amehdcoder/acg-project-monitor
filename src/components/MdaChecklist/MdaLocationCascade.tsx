@@ -215,7 +215,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   const getVal = (key: keyof GeoRow): string => {
     const qName = QUESTION_NAME[key];
     const id = nameToId[qName];
-    const v = (id && responses[id]) ?? responses[key] ?? responses[qName];
+    const idValue = id ? responses[id] : undefined;
+    const v = idValue !== undefined && idValue !== null && idValue !== "" ? idValue : (responses[key] ?? responses[qName]);
     return typeof v === "string" ? v : "";
   };
   const sel = {
