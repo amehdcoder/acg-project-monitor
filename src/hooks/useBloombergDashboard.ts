@@ -138,7 +138,10 @@ export const useBloombergDashboard = () => {
     setSchools([]);
     setSchoolCount(0);
     void reload();
+    const onMigrated = () => void reload();
+    window.addEventListener("bloomberg:ready-to-send-migrated", onMigrated);
     return () => {
+      window.removeEventListener("bloomberg:ready-to-send-migrated", onMigrated);
       if (myReq === reqIdRef.current) reqIdRef.current++;
     };
   }, []);
