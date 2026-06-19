@@ -71,10 +71,12 @@ const PWAUpdatePrompt = () => {
     refresh();
     const id = setInterval(refresh, 3000);
     window.addEventListener("storage", refresh);
+    window.addEventListener("amehnities:form-progress-changed", refresh);
     window.addEventListener("amehnities:before-silent-update", refresh);
     return () => {
       clearInterval(id);
       window.removeEventListener("storage", refresh);
+      window.removeEventListener("amehnities:form-progress-changed", refresh);
       window.removeEventListener("amehnities:before-silent-update", refresh);
     };
   }, []);
