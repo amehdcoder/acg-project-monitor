@@ -419,13 +419,21 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       const active = JSON.parse(localStorage.getItem(ACTIVE_FORM_FILL_KEY) || "null");
       const formId = restore?.formId || active?.formId;
       if (!formId) return;
-      const form = forms.find((f) => f.id === formId);
+      const offlineMatches = offlineForms.map((of) => {
+        const allItems = (of.questions as unknown as any[]) || [];
+        const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
+        const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
+        return { ...of, questions: ungroupedQuestions, groups: groupItems, submissions_count: 0, created_at: of.downloaded_at } as Form;
+      });
+      const form = forms.find((f) => f.id === formId) || offlineMatches.find((f) => f.id === formId);
       if (form) {
         setFillingForm(form);
         if (form.project_id && form.project_id !== currentProjectId) setCurrentProjectId(form.project_id);
+      } else if (active?.projectId && active.projectId !== currentProjectId) {
+        setCurrentProjectId(active.projectId);
       }
     } catch {}
-  }, [authLoading, currentProjectId, fillingForm, forms]);
+  }, [authLoading, currentProjectId, fillingForm, forms, offlineForms]);
 
   const fetchProjects = async () => {
     try {
