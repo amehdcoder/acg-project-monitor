@@ -83,19 +83,23 @@ const LEVELS: { key: keyof GeoRow; label: string; optional?: boolean }[] = [
 ];
 
 const normGeo = (value: string | null | undefined) =>
-  String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+  String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\s+(state|lga|local government area)$/i, "")
+    .toLowerCase();
 
 const sameGeo = (a: string | null | undefined, b: string | null | undefined) =>
   normGeo(a) === normGeo(b);
 
 const canonicalStateName = (value: string | null | undefined) => {
-  const raw = String(value || "").trim().replace(/\s+/g, " ");
+  const raw = String(value || "").trim().replace(/\s+/g, " ").replace(/\s+state$/i, "");
   if (!raw) return "";
   return getAllStates().find((s) => sameGeo(s, raw)) || raw;
 };
 
 const canonicalLgaName = (state: string, value: string | null | undefined) => {
-  const raw = String(value || "").trim().replace(/\s+/g, " ");
+  const raw = String(value || "").trim().replace(/\s+/g, " ").replace(/\s+(lga|local government area)$/i, "");
   if (!raw) return "";
   return getLGAsForState(canonicalStateName(state)).find((l) => sameGeo(l, raw)) || raw;
 };
