@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchSpecialFormSubmissions, SPECIAL_FORM_TABLES } from "@/lib/specialFormActivity";
 import {
   Tooltip,
   TooltipContent,
