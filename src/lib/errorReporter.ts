@@ -7,6 +7,7 @@
  * exposes helpers for the root error boundary to display & copy a diagnostic
  * payload that field teams can share with support.
  */
+import { prepareSilentFormRestoreForUpdate } from "@/lib/formProgressPersistence";
 
 const REPORTS_KEY = "app_error_reports_v1";
 const BREADCRUMBS_KEY = "app_error_breadcrumbs_v1";
@@ -179,6 +180,7 @@ export const downloadReport = (r: ErrorReport) => {
  * and hard-reloads with a cache-buster. Safe to call from any recovery UI.
  */
 export const refreshToLatest = async () => {
+  prepareSilentFormRestoreForUpdate();
   try { localStorage.removeItem("app_last_applied_build_id"); } catch {}
   try { localStorage.removeItem("app_last_applied_at"); } catch {}
   try { sessionStorage.removeItem("app_html_build_id_v1"); } catch {}
