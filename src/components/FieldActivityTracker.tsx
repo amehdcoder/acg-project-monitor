@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchSpecialFormSubmissions, SPECIAL_FORM_TABLES } from "@/lib/specialFormActivity";
 
 interface SubmissionUser {
   user_id: string;
@@ -171,20 +172,24 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
         from += PAGE;
       }
 
-      if (allSubData.length === 0) { setSubmissions([]); setLastUpdated(new Date()); return; }
-
       const userIds = [...new Set(allSubData.map(s => s.user_id))];
       const formIds = [...new Set(allSubData.map(s => s.form_id))];
 
       const [profilesRes, formsRes] = await Promise.all([
-        supabase.from("profiles").select("user_id, first_name, last_name, designation, state, lga").in("user_id", userIds),
-        supabase.from("forms").select("id, name, project_id, questions").in("id", formIds),
+        userIds.length
+          ? supabase.from("profiles").select("user_id, first_name, last_name, designation, state, lga").in("user_id", userIds)
+          : Promise.resolve({ data: [] as any[] }),
+        formIds.length
+          ? supabase.from("forms").select("id, name, project_id, questions").in("id", formIds)
+          : Promise.resolve({ data: [] as any[] }),
       ]);
 
 
       // Get project names
       const projectIds = [...new Set((formsRes.data || []).map(f => f.project_id))];
-      const { data: projectsData } = await supabase.from("projects").select("id, name").in("id", projectIds);
+      const { data: projectsData } = projectIds.length
+        ? await supabase.from("projects").select("id, name").in("id", projectIds)
+        : { data: [] as any[] };
 
       const profilesMap = new Map((profilesRes.data || []).map(p => [p.user_id, p]));
       const formsMap = new Map((formsRes.data || []).map(f => [f.id, f]));
@@ -203,7 +208,27 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
         };
       });
 
-      setSubmissions(transformed);
+      // Merge standalone special-form activity (Bloomberg / SeeClear) which lives
+      // in dedicated tables rather than form_submissions. These forms are not
+      // bound to a single project, so include them only when viewing all projects.
+      let special: SubmissionEntry[] = [];
+      if (!selectedProjectId) {
+        const sp = await fetchSpecialFormSubmissions({ dateFrom, dateTo });
+        const missingIds = [...new Set(sp.map(s => s.user_id))].filter(id => !profilesMap.has(id));
+        if (missingIds.length) {
+          const { data: spProfiles } = await supabase
+            .from("profiles")
+            .select("user_id, first_name, last_name, designation, state, lga")
+            .in("user_id", missingIds);
+          (spProfiles || []).forEach(p => profilesMap.set(p.user_id, p));
+        }
+        special = sp.map(s => ({
+          ...s,
+          user: profilesMap.get(s.user_id) || undefined,
+        })) as unknown as SubmissionEntry[];
+      }
+
+      setSubmissions([...transformed, ...special]);
       setLastUpdated(new Date());
     } catch (error) {
       console.error(error);
@@ -219,10 +244,13 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
   useEffect(() => { fetchDataRef.current(); }, [dateFrom, dateTo, selectedProjectId]);
 
   useEffect(() => {
-    const channel = supabase
+    let channel = supabase
       .channel("submission-activity-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, () => fetchDataRef.current())
-      .subscribe();
+      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, () => fetchDataRef.current());
+    SPECIAL_FORM_TABLES.forEach((table) => {
+      channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, () => fetchDataRef.current());
+    });
+    channel.subscribe();
     const interval = setInterval(() => fetchDataRef.current(), 60000);
     return () => { supabase.removeChannel(channel); clearInterval(interval); };
   }, []);
