@@ -30,6 +30,7 @@ import {
   buildCommunityTreatmentRegister, COMMUNITY_TREATMENT_REGISTER_NAME,
 } from "@/lib/treatmentDataForms";
 import { generateTreatmentRollupWorkbook } from "@/lib/treatmentRollup";
+import { ACTIVE_FORM_FILL_KEY, SILENT_UPDATE_RESTORE_KEY } from "@/lib/formProgressPersistence";
 import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck, BarChart3 } from "lucide-react";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
 import {
@@ -410,6 +411,21 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentProjectId, authLoading, user?.id, role, isSuperAdmin, isOwnerLevel]);
+
+  useEffect(() => {
+    if (authLoading || fillingForm || forms.length === 0) return;
+    try {
+      const restore = JSON.parse(sessionStorage.getItem(SILENT_UPDATE_RESTORE_KEY) || "null");
+      const active = JSON.parse(localStorage.getItem(ACTIVE_FORM_FILL_KEY) || "null");
+      const formId = restore?.formId || active?.formId;
+      if (!formId) return;
+      const form = forms.find((f) => f.id === formId);
+      if (form) {
+        setFillingForm(form);
+        if (form.project_id && form.project_id !== currentProjectId) setCurrentProjectId(form.project_id);
+      }
+    } catch {}
+  }, [authLoading, currentProjectId, fillingForm, forms]);
 
   const fetchProjects = async () => {
     try {
