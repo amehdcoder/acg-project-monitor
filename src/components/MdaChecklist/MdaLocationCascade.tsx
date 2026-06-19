@@ -396,9 +396,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
             // FLHF / Community / Settlement become free-text when there is no
             // microplan to pick from — either globally (admin-hierarchy mode) or
             // because the chosen upstream area has no captured microplan rows.
-            const isFreeText =
-              isLeafGeo &&
-              (useAdminHierarchy || (levelReady(key) && microplanOptions(key).length === 0));
+            // FLHF / Community / Settlement use a type-and-add combobox below.
+
             const opts = options(key);
             // Gap-tolerant: ready when all preceding *captured* levels are chosen,
             // skipping levels the microplan never captured so they can't dead-end.
