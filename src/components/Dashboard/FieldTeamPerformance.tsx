@@ -55,10 +55,13 @@ const FieldTeamPerformance = ({ selectedProjectId }: FieldTeamPerformanceProps) 
 
   useEffect(() => {
     fetchTeamData();
-    const channel = supabase
+    let channel = supabase
       .channel("dss-field-team")
-      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, fetchTeamData)
-      .subscribe();
+      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, fetchTeamData);
+    SPECIAL_FORM_TABLES.forEach((table) => {
+      channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, fetchTeamData);
+    });
+    channel.subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [selectedProjectId]);
 
