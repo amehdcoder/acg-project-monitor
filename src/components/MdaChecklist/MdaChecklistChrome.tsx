@@ -144,7 +144,12 @@ export const MdaChecklistSidebar = memo(function MdaChecklistSidebar({ groups, s
   );
 });
 
-interface FieldMeta { name: string; label: string; type: string }
+import {
+  buildAdaptiveCards,
+  type FieldMeta,
+  type Tint,
+  type ResolvedCard,
+} from "@/lib/mdaSummaryRules";
 
 interface SummaryProps {
   responses: Record<string, any>;
@@ -153,23 +158,13 @@ interface SummaryProps {
   fields?: FieldMeta[];
 }
 
-const num = (v: any): number | null => {
-  const n = parseFloat(String(v));
-  return Number.isFinite(n) ? n : null;
+const ICON_MAP: Record<ResolvedCard["icon"], LucideIcon> = {
+  ClipboardCheck,
+  ShieldCheck,
+  Users,
+  Percent,
+  BarChart3,
 };
-
-const stripTags = (s: string) => s.replace(/<[^>]*>/g, "").trim();
-
-type Tint = "sky" | "emerald" | "amber" | "violet" | "rose" | "teal";
-
-interface SummaryCard {
-  key: string;
-  icon: LucideIcon;
-  tint: Tint;
-  value: string;
-  title: string;
-  band: string;
-}
 
 const TINTS: Record<Tint, { box: string; icon: string; value: string; badge: string }> = {
   sky:     { box: "bg-sky-50 dark:bg-sky-950/30",         icon: "text-sky-600",     value: "text-sky-700 dark:text-sky-300",         badge: "bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300" },
