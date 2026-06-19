@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchSpecialFormSubmissions, SPECIAL_FORM_TABLES } from "@/lib/specialFormActivity";
 import {
   Tooltip,
   TooltipContent,
@@ -54,10 +55,13 @@ const FieldTeamPerformance = ({ selectedProjectId }: FieldTeamPerformanceProps) 
 
   useEffect(() => {
     fetchTeamData();
-    const channel = supabase
+    let channel = supabase
       .channel("dss-field-team")
-      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, fetchTeamData)
-      .subscribe();
+      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, fetchTeamData);
+    SPECIAL_FORM_TABLES.forEach((table) => {
+      channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, fetchTeamData);
+    });
+    channel.subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [selectedProjectId]);
 
@@ -100,6 +104,22 @@ const FieldTeamPerformance = ({ selectedProjectId }: FieldTeamPerformanceProps) 
         from += PAGE_SIZE;
       }
 
+      // Merge standalone special-form activity (Bloomberg / SeeClear) which is
+      // stored in dedicated tables rather than form_submissions. Not bound to a
+      // single project, so include only when viewing all projects.
+      if (!selectedProjectId) {
+        const sp = await fetchSpecialFormSubmissions();
+        sp.forEach((s) => {
+          allSubmissions.push({
+            user_id: s.user_id,
+            within_geofence: s.within_geofence,
+            status: s.status,
+            form_id: s.form_id,
+            submission_type: s.submission_type,
+          });
+        });
+      }
+
       const [profilesRes, assignmentsRes, formsRes] = await Promise.all([
         supabase.from("profiles").select("user_id, first_name, last_name, designation, is_active").eq("is_active", true),
         supabase.from("user_form_assignments").select("user_id, form_id"),
@@ -107,6 +127,7 @@ const FieldTeamPerformance = ({ selectedProjectId }: FieldTeamPerformanceProps) 
       ]);
 
       const filteredSubs = allSubmissions;
+
 
 
       const profiles = profilesRes.data;
