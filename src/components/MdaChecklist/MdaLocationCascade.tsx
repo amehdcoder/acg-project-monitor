@@ -410,36 +410,47 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
                   {label}{!optional && <span className="ml-0.5 text-destructive">*</span>}
                 </Label>
 
-                {isFreeText ? (
-                  <Input
+                {isLeafGeo ? (
+                  // FLHF / Community / Settlement: virtualized, type-and-add
+                  // combobox. Pick from the microplan OR type a value that is
+                  // not in the list and add it (flagged for reconciliation).
+                  <LocationCombobox
                     value={sel[key]}
-                    onChange={(e) => setFreeText(key as any, e.target.value)}
-                    placeholder={`Enter ${label.toLowerCase()} (not in microplan)`}
-                    className="bg-background"
+                    options={opts}
+                    disabled={!parentOk}
+                    allowAdd
+                    placeholder={
+                      !parentOk
+                        ? "Select the level above first"
+                        : opts.length === 0
+                          ? `Type to add ${label.toLowerCase()}`
+                          : `Select or add ${label.toLowerCase()}`
+                    }
+                    emptyLabel="No microplan match — type to add"
+                    onChange={(v) => {
+                      const isNew = !!v && !microplanOptions(key).includes(v);
+                      if (isNew) {
+                        onSet({ community_not_in_microplan: true, received_medicine_not_microplanned: true });
+                      }
+                      setLevel(key, v);
+                    }}
                   />
                 ) : (
-                  <Select
-                    value={sel[key] || undefined}
-                    onValueChange={(v) => setLevel(key, v)}
+                  // State / LGA / Ward: virtualized searchable picker (no add).
+                  <LocationCombobox
+                    value={sel[key]}
+                    options={opts}
                     disabled={!parentOk || opts.length === 0}
-                  >
-                    <SelectTrigger className="bg-background">
-                      <SelectValue
-                        placeholder={
-                          !parentOk
-                            ? "Select the level above first"
-                            : opts.length === 0
-                              ? "Not captured in microplan — skip"
-                              : `Select ${label.toLowerCase()}`
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-72">
-                      {opts.map((o) => (
-                        <SelectItem key={o} value={o}>{o}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    allowAdd={false}
+                    placeholder={
+                      !parentOk
+                        ? "Select the level above first"
+                        : opts.length === 0
+                          ? "Not captured — skip"
+                          : `Select ${label.toLowerCase()}`
+                    }
+                    onChange={(v) => setLevel(key, v)}
+                  />
                 )}
               </div>
             );
