@@ -1247,6 +1247,17 @@ const FormFiller = ({
     };
   }, [persistCurrentDraft]);
 
+  useEffect(() => {
+    return () => {
+      try {
+        const restoring = JSON.parse(sessionStorage.getItem(SILENT_UPDATE_RESTORE_KEY) || "null");
+        if (restoring?.formId === formId) return;
+        const active = JSON.parse(localStorage.getItem(ACTIVE_FORM_FILL_KEY) || "null");
+        if (active?.formId === formId) localStorage.removeItem(ACTIVE_FORM_FILL_KEY);
+      } catch {}
+    };
+  }, [formId]);
+
   const geofenceValidation = useMemo(() => {
     if (!gpsPosition || !isGeofenceEnabled) return null;
     return validatePosition(gpsPosition.lat, gpsPosition.lng);
