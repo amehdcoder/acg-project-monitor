@@ -30,12 +30,9 @@ import { fetchProjectScope } from "@/lib/projectScope";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useAuth } from "@/hooks/useAuth";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import LocationCombobox from "@/components/MdaChecklist/LocationCombobox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
