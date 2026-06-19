@@ -7,6 +7,13 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart3 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  fetchSpecialFormSubmissions,
+  BLOOMBERG_PROJECT_ID,
+  SEECLEAR_PROJECT_ID,
+  BLOOMBERG_PROJECT_NAME,
+  SEECLEAR_PROJECT_NAME,
+} from "@/lib/specialFormActivity";
 
 interface ProjectKPI {
   projectId: string;
