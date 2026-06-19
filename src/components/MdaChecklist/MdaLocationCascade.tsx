@@ -312,11 +312,18 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
 
   // When falling back to the admin hierarchy and the project was designed for a
   // single state, preselect it so the supervisor goes straight to LGA.
+  // Runs at most once (didAutoselectRef) and only when nothing is selected yet,
+  // so it can NEVER reset an LGA/Ward the supervisor has already chosen.
   useEffect(() => {
     if (loading || scope.loading) return;
-    if (!useAdminHierarchy || sel.state) return;
+    if (!useAdminHierarchy) return;
+    if (didAutoselectRef.current) return;
+    if (sel.state) { didAutoselectRef.current = true; return; }
     const list = Array.from(allowedStates);
-    if (list.length === 1) setLevel("state", list[0]);
+    if (list.length === 1) {
+      didAutoselectRef.current = true;
+      setLevel("state", list[0]);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, scope.loading, useAdminHierarchy, sel.state, allowedStates.size]);
 
