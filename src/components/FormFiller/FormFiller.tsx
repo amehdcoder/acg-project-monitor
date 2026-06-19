@@ -1727,13 +1727,14 @@ const FormFiller = ({
       savedAt: new Date().toISOString(),
       userEntered: true,
     };
-    localStorage.setItem(`form_draft_${formId}`, JSON.stringify(draft));
+    localStorage.setItem(draftKey, JSON.stringify(draft));
     setLastAutoSave(new Date());
     toast({ title: "Draft Saved", description: "Your form has been saved locally." });
   };
 
   const clearDraft = () => {
-    localStorage.removeItem(`form_draft_${formId}`);
+    localStorage.removeItem(draftKey);
+    try { localStorage.removeItem(ACTIVE_FORM_FILL_KEY); } catch {}
   };
 
   // ---- Local-first workflow: Save As Draft / Finalize ----
@@ -3712,7 +3713,8 @@ const FormFiller = ({
             <AlertDialogCancel
               onClick={() => {
                 // Start fresh — discard saved draft
-                localStorage.removeItem(`form_draft_${formId}`);
+                localStorage.removeItem(draftKey);
+                try { localStorage.removeItem(ACTIVE_FORM_FILL_KEY); } catch {}
                 setPendingDraft(null);
                 setShowResumeDialog(false);
                 toast({ title: "Starting fresh", description: "Previous progress discarded." });
