@@ -186,17 +186,37 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     settlement_name: getVal("settlement_name"),
   };
 
-  // Cascading filtered rows for option building.
-  const filteredFor = (level: keyof GeoRow): GeoRow[] => {
-    return scopedRows.filter((r) => {
-      if (level !== "state" && sel.state && r.state !== sel.state) return false;
-      if (["ward", "flhf_name", "community_name", "settlement_name"].includes(level) && sel.lga && r.lga !== sel.lga) return false;
-      if (["flhf_name", "community_name", "settlement_name"].includes(level) && sel.ward && r.ward !== sel.ward) return false;
-      if (["community_name", "settlement_name"].includes(level) && sel.flhf_name && r.flhf_name !== sel.flhf_name) return false;
-      if (level === "settlement_name" && sel.community_name && r.community_name !== sel.community_name) return false;
-      return true;
+  // ── Memoised microplan option index ───────────────────────────────────
+  // Instead of re-filtering the (potentially huge) scopedRows array once per
+  // level on every render, we build ALL six levels' option sets in a SINGLE
+  // pass, memoised on the data + the upstream selections. This keeps the
+  // cascade responsive no matter how many microplan rows exist.
+  const microplanOptionMap = useMemo(() => {
+    const sets: Record<keyof GeoRow, Set<string>> = {
+      state: new Set(), lga: new Set(), ward: new Set(),
+      flhf_name: new Set(), community_name: new Set(), settlement_name: new Set(),
+    };
+    for (let i = 0; i < scopedRows.length; i++) {
+      const r = scopedRows[i];
+      if (r.state) sets.state.add(r.state);
+      if (sel.state && r.state !== sel.state) continue;
+      if (r.lga) sets.lga.add(r.lga);
+      if (sel.lga && r.lga !== sel.lga) continue;
+      if (r.ward) sets.ward.add(r.ward);
+      if (sel.ward && r.ward !== sel.ward) continue;
+      if (r.flhf_name) sets.flhf_name.add(r.flhf_name);
+      if (sel.flhf_name && r.flhf_name !== sel.flhf_name) continue;
+      if (r.community_name) sets.community_name.add(r.community_name);
+      if (sel.community_name && r.community_name !== sel.community_name) continue;
+      if (r.settlement_name) sets.settlement_name.add(r.settlement_name);
+    }
+    const out = {} as Record<keyof GeoRow, string[]>;
+    (Object.keys(sets) as (keyof GeoRow)[]).forEach((k) => {
+      out[k] = Array.from(sets[k]).filter((v) => v && v.trim() !== "").sort((a, b) => a.localeCompare(b));
     });
-  };
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopedRows, sel.state, sel.lga, sel.ward, sel.flhf_name, sel.community_name]);
 
   // State → LGA → Ward options derived from the full Nigerian administrative
   // hierarchy, bounded by the project's designed state scope.
@@ -215,8 +235,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     level === "state" || level === "lga" || level === "ward";
 
   // Microplan-only options for a level given current upstream selections.
-  const microplanOptions = (level: keyof GeoRow): string[] =>
-    uniqSorted(filteredFor(level).map((r) => r[level]));
+  const microplanOptions = (level: keyof GeoRow): string[] => microplanOptionMap[level] ?? [];
 
   const options = (level: keyof GeoRow): string[] => {
     // Off-microplan / no-microplan path: State → LGA → Ward come from the full
