@@ -144,7 +144,12 @@ export const MdaChecklistSidebar = memo(function MdaChecklistSidebar({ groups, s
   );
 });
 
-interface FieldMeta { name: string; label: string; type: string }
+import {
+  buildAdaptiveCards,
+  type FieldMeta,
+  type Tint,
+  type ResolvedCard,
+} from "@/lib/mdaSummaryRules";
 
 interface SummaryProps {
   responses: Record<string, any>;
@@ -153,23 +158,13 @@ interface SummaryProps {
   fields?: FieldMeta[];
 }
 
-const num = (v: any): number | null => {
-  const n = parseFloat(String(v));
-  return Number.isFinite(n) ? n : null;
+const ICON_MAP: Record<ResolvedCard["icon"], LucideIcon> = {
+  ClipboardCheck,
+  ShieldCheck,
+  Users,
+  Percent,
+  BarChart3,
 };
-
-const stripTags = (s: string) => s.replace(/<[^>]*>/g, "").trim();
-
-type Tint = "sky" | "emerald" | "amber" | "violet" | "rose" | "teal";
-
-interface SummaryCard {
-  key: string;
-  icon: LucideIcon;
-  tint: Tint;
-  value: string;
-  title: string;
-  band: string;
-}
 
 const TINTS: Record<Tint, { box: string; icon: string; value: string; badge: string }> = {
   sky:     { box: "bg-sky-50 dark:bg-sky-950/30",         icon: "text-sky-600",     value: "text-sky-700 dark:text-sky-300",         badge: "bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300" },
@@ -180,130 +175,34 @@ const TINTS: Record<Tint, { box: string; icon: string; value: string; badge: str
   teal:    { box: "bg-teal-50 dark:bg-teal-950/30",       icon: "text-teal-600",    value: "text-teal-700 dark:text-teal-300",       badge: "bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300" },
 };
 
-const NUMERIC_TYPES = new Set(["number", "integer", "decimal", "calculate", "range"]);
-// Field name fragments that read naturally as a percentage / rate.
-const PCT_HINTS = ["coverage", "percent", "percentage", "rate", "score", "ratio", "proportion"];
-
 /**
  * Auto-calculated supervision summary cards.
  *
- * The summary adapts to form edits: a canonical card is only rendered when the
- * field it computes from still exists in the (possibly edited) form AND has a
- * value. When canonical cards drop out, their slots are filled with other
- * numeric fields discovered in the current form so the summary always stays
- * insightful — never showing a metric that can no longer be auto-computed.
+ * Real-time & rule-driven: the cards are recomputed (via useMemo keyed on the
+ * live responses + current form fields) on every edit — when a field is
+ * removed, transformed, or re-added. A vacated canonical slot is only filled by
+ * a SUBSTITUTE metric that is mathematically compatible with the original
+ * intent (see mdaSummaryRules), and the substitution source is shown in the UI.
  */
 export function MdaSummaryCards({ responses, nameToId, fields }: SummaryProps) {
-  const get = (name: string) => responses[nameToId[name]];
-  // A field is present in the current form only when it still maps to a question.
-  const has = (name: string) => Object.prototype.hasOwnProperty.call(nameToId, name);
-
-  const cards: SummaryCard[] = [];
-  const usedNames = new Set<string>();
-
-  // ── Canonical card 1: Implementation Score ──────────────────────────────
-  if (has("implementation_score")) {
-    const score = num(get("implementation_score"));
-    if (score != null) {
-      usedNames.add("implementation_score");
-      cards.push({
-        key: "implementation_score",
-        icon: ClipboardCheck,
-        tint: "sky",
-        value: `${score}%`,
-        title: "Implementation Score",
-        band: score >= 80 ? "Good" : score >= 60 ? "Fair" : "Needs Attention",
-      });
-    }
-  }
-
-  // ── Canonical card 2: Risk Category ─────────────────────────────────────
-  if (has("risk_category")) {
-    const risk = String(get("risk_category") || "").toLowerCase();
-    if (risk) {
-      usedNames.add("risk_category");
-      cards.push({
-        key: "risk_category",
-        icon: ShieldCheck,
-        tint: "emerald",
-        value: risk.charAt(0).toUpperCase() + risk.slice(1),
-        title: "Risk Category",
-        band: risk === "low" ? "Acceptable" : risk === "medium" ? "Monitor" : risk === "high" ? "Action needed" : "Recorded",
-      });
-    }
-  }
-
-  // ── Canonical card 3: Individuals Treated ───────────────────────────────
-  {
-    const treatedName = has("individuals_treated") ? "individuals_treated" : has("persons_treated") ? "persons_treated" : null;
-    const treated = treatedName ? num(get(treatedName)) : null;
-    if (treatedName && treated != null) {
-      usedNames.add(treatedName);
-      cards.push({
-        key: "treated",
-        icon: Users,
-        tint: "amber",
-        value: treated.toLocaleString(),
-        title: "Individuals Treated",
-        band: "Recorded",
-      });
-    }
-  }
-
-  // ── Canonical card 4: Coverage Achieved ─────────────────────────────────
-  {
-    const covName = has("coverage_achieved") ? "coverage_achieved" : has("verified_coverage") ? "verified_coverage" : null;
-    const coverage = covName ? num(get(covName)) : null;
-    if (covName && coverage != null) {
-      usedNames.add(covName);
-      cards.push({
-        key: "coverage",
-        icon: Percent,
-        tint: "violet",
-        value: `${coverage}%`,
-        title: "Coverage Achieved",
-        band: "Computed",
-      });
-    }
-  }
-
-  // ── Auto-discovered replacements ────────────────────────────────────────
-  // Fill remaining slots (target 4 cards) with other numeric fields in the form
-  // that currently have a value, so a removed/retyped canonical metric is
-  // replaced by something that CAN be auto-computed from the edited form.
-  const replacementTints: Tint[] = ["teal", "rose", "amber", "violet", "sky", "emerald"];
-  if (fields && fields.length > 0) {
-    for (const f of fields) {
-      if (cards.length >= 4) break;
-      if (usedNames.has(f.name)) continue;
-      if (!NUMERIC_TYPES.has(f.type)) continue;
-      const v = num(get(f.name));
-      if (v == null) continue;
-      usedNames.add(f.name);
-      const lname = (f.name + " " + f.label).toLowerCase();
-      const isPct = PCT_HINTS.some((h) => lname.includes(h)) && v <= 100;
-      cards.push({
-        key: `auto_${f.name}`,
-        icon: isPct ? Percent : BarChart3,
-        tint: replacementTints[cards.length % replacementTints.length],
-        value: isPct ? `${v}%` : v.toLocaleString(),
-        title: stripTags(f.label) || f.name,
-        band: "Auto-computed",
-      });
-    }
-  }
+  const cards = useMemo(() => {
+    const get = (name: string) => responses[nameToId[name]];
+    const has = (name: string) => Object.prototype.hasOwnProperty.call(nameToId, name);
+    return buildAdaptiveCards(get, has, fields ?? [], 4);
+    // Recompute whenever responses, the field schema, or the name→id map change.
+  }, [responses, nameToId, fields]);
 
   if (cards.length === 0) return null;
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <p className="mb-3 text-sm font-semibold text-primary">
-        SUPERVISION SUMMARY <span className="font-normal text-muted-foreground">(Auto-calculated)</span>
+        SUPERVISION SUMMARY <span className="font-normal text-muted-foreground">(Auto-calculated · live)</span>
       </p>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {cards.map((c) => {
           const t = TINTS[c.tint];
-          const Icon = c.icon;
+          const Icon = ICON_MAP[c.icon];
           return (
             <div key={c.key} className={`rounded-lg p-4 ${t.box}`}>
               <div className="flex items-center gap-2">
@@ -314,6 +213,11 @@ export function MdaSummaryCards({ responses, nameToId, fields }: SummaryProps) {
               <span className={`mt-2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium ${t.badge}`}>
                 <CheckCircle2 className="h-3 w-3" />{c.band}
               </span>
+              {c.substitutedFrom && (
+                <p className="mt-1.5 text-[10px] italic leading-tight text-muted-foreground">
+                  Substituted from “{c.substitutedFrom}”
+                </p>
+              )}
             </div>
           );
         })}
@@ -321,6 +225,7 @@ export function MdaSummaryCards({ responses, nameToId, fields }: SummaryProps) {
     </div>
   );
 }
+
 
 const QUICK_ACTIONS: { icon: LucideIcon; label: string; target?: string; tint: string }[] = [
   { icon: Camera, label: "Capture Photo", target: "location_photos", tint: "text-emerald-600 bg-emerald-50" },

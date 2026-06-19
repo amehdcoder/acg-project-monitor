@@ -30,12 +30,9 @@ import { fetchProjectScope } from "@/lib/projectScope";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useAuth } from "@/hooks/useAuth";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import LocationCombobox from "@/components/MdaChecklist/LocationCombobox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
@@ -85,9 +82,8 @@ const LEVELS: { key: keyof GeoRow; label: string; optional?: boolean }[] = [
   { key: "settlement_name", label: "Settlement", optional: true },
 ];
 
-const uniqSorted = (vals: (string | null | undefined)[]) =>
-  Array.from(new Set(vals.filter((v): v is string => !!v && v.trim() !== "")))
-    .sort((a, b) => a.localeCompare(b));
+
+
 
 export default function MdaLocationCascade({ projectId, responses, nameToId, onSet, stateScope }: Props) {
   const { isOwner, isAdmin } = useAuth();
@@ -118,6 +114,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   // (RLS + the designation-scope filter below restrict it to their areas).
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     (async () => {
       setLoading(true);
       try {
@@ -125,7 +122,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
           supabase
             .from("microplan_entries")
             .select("state, lga, ward, flhf_name, community_name, settlement_name")
-            .range(from, to),
+            .range(from, to)
+            .abortSignal(controller.signal),
         );
         if (!cancelled) setRows(data || []);
       } catch {
@@ -134,7 +132,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    // Cancel the in-flight paged request if the effect re-runs / unmounts.
+    return () => { cancelled = true; controller.abort(); };
   }, [projectId]);
 
   // The state restriction used for BOTH the microplan filter and the off-microplan
@@ -183,17 +182,37 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     settlement_name: getVal("settlement_name"),
   };
 
-  // Cascading filtered rows for option building.
-  const filteredFor = (level: keyof GeoRow): GeoRow[] => {
-    return scopedRows.filter((r) => {
-      if (level !== "state" && sel.state && r.state !== sel.state) return false;
-      if (["ward", "flhf_name", "community_name", "settlement_name"].includes(level) && sel.lga && r.lga !== sel.lga) return false;
-      if (["flhf_name", "community_name", "settlement_name"].includes(level) && sel.ward && r.ward !== sel.ward) return false;
-      if (["community_name", "settlement_name"].includes(level) && sel.flhf_name && r.flhf_name !== sel.flhf_name) return false;
-      if (level === "settlement_name" && sel.community_name && r.community_name !== sel.community_name) return false;
-      return true;
+  // ── Memoised microplan option index ───────────────────────────────────
+  // Instead of re-filtering the (potentially huge) scopedRows array once per
+  // level on every render, we build ALL six levels' option sets in a SINGLE
+  // pass, memoised on the data + the upstream selections. This keeps the
+  // cascade responsive no matter how many microplan rows exist.
+  const microplanOptionMap = useMemo(() => {
+    const sets: Record<keyof GeoRow, Set<string>> = {
+      state: new Set(), lga: new Set(), ward: new Set(),
+      flhf_name: new Set(), community_name: new Set(), settlement_name: new Set(),
+    };
+    for (let i = 0; i < scopedRows.length; i++) {
+      const r = scopedRows[i];
+      if (r.state) sets.state.add(r.state);
+      if (sel.state && r.state !== sel.state) continue;
+      if (r.lga) sets.lga.add(r.lga);
+      if (sel.lga && r.lga !== sel.lga) continue;
+      if (r.ward) sets.ward.add(r.ward);
+      if (sel.ward && r.ward !== sel.ward) continue;
+      if (r.flhf_name) sets.flhf_name.add(r.flhf_name);
+      if (sel.flhf_name && r.flhf_name !== sel.flhf_name) continue;
+      if (r.community_name) sets.community_name.add(r.community_name);
+      if (sel.community_name && r.community_name !== sel.community_name) continue;
+      if (r.settlement_name) sets.settlement_name.add(r.settlement_name);
+    }
+    const out = {} as Record<keyof GeoRow, string[]>;
+    (Object.keys(sets) as (keyof GeoRow)[]).forEach((k) => {
+      out[k] = Array.from(sets[k]).filter((v) => v && v.trim() !== "").sort((a, b) => a.localeCompare(b));
     });
-  };
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopedRows, sel.state, sel.lga, sel.ward, sel.flhf_name, sel.community_name]);
 
   // State → LGA → Ward options derived from the full Nigerian administrative
   // hierarchy, bounded by the project's designed state scope.
@@ -212,8 +231,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     level === "state" || level === "lga" || level === "ward";
 
   // Microplan-only options for a level given current upstream selections.
-  const microplanOptions = (level: keyof GeoRow): string[] =>
-    uniqSorted(filteredFor(level).map((r) => r[level]));
+  const microplanOptions = (level: keyof GeoRow): string[] => microplanOptionMap[level] ?? [];
 
   const options = (level: keyof GeoRow): string[] => {
     // Off-microplan / no-microplan path: State → LGA → Ward come from the full
@@ -375,9 +393,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
             // FLHF / Community / Settlement become free-text when there is no
             // microplan to pick from — either globally (admin-hierarchy mode) or
             // because the chosen upstream area has no captured microplan rows.
-            const isFreeText =
-              isLeafGeo &&
-              (useAdminHierarchy || (levelReady(key) && microplanOptions(key).length === 0));
+            // FLHF / Community / Settlement use a type-and-add combobox below.
+
             const opts = options(key);
             // Gap-tolerant: ready when all preceding *captured* levels are chosen,
             // skipping levels the microplan never captured so they can't dead-end.
@@ -389,36 +406,47 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
                   {label}{!optional && <span className="ml-0.5 text-destructive">*</span>}
                 </Label>
 
-                {isFreeText ? (
-                  <Input
+                {isLeafGeo ? (
+                  // FLHF / Community / Settlement: virtualized, type-and-add
+                  // combobox. Pick from the microplan OR type a value that is
+                  // not in the list and add it (flagged for reconciliation).
+                  <LocationCombobox
                     value={sel[key]}
-                    onChange={(e) => setFreeText(key as any, e.target.value)}
-                    placeholder={`Enter ${label.toLowerCase()} (not in microplan)`}
-                    className="bg-background"
+                    options={opts}
+                    disabled={!parentOk}
+                    allowAdd
+                    placeholder={
+                      !parentOk
+                        ? "Select the level above first"
+                        : opts.length === 0
+                          ? `Type to add ${label.toLowerCase()}`
+                          : `Select or add ${label.toLowerCase()}`
+                    }
+                    emptyLabel="No microplan match — type to add"
+                    onChange={(v) => {
+                      const isNew = !!v && !microplanOptions(key).includes(v);
+                      if (isNew) {
+                        onSet({ community_not_in_microplan: true, received_medicine_not_microplanned: true });
+                      }
+                      setLevel(key, v);
+                    }}
                   />
                 ) : (
-                  <Select
-                    value={sel[key] || undefined}
-                    onValueChange={(v) => setLevel(key, v)}
+                  // State / LGA / Ward: virtualized searchable picker (no add).
+                  <LocationCombobox
+                    value={sel[key]}
+                    options={opts}
                     disabled={!parentOk || opts.length === 0}
-                  >
-                    <SelectTrigger className="bg-background">
-                      <SelectValue
-                        placeholder={
-                          !parentOk
-                            ? "Select the level above first"
-                            : opts.length === 0
-                              ? "Not captured in microplan — skip"
-                              : `Select ${label.toLowerCase()}`
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-72">
-                      {opts.map((o) => (
-                        <SelectItem key={o} value={o}>{o}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    allowAdd={false}
+                    placeholder={
+                      !parentOk
+                        ? "Select the level above first"
+                        : opts.length === 0
+                          ? "Not captured — skip"
+                          : `Select ${label.toLowerCase()}`
+                    }
+                    onChange={(v) => setLevel(key, v)}
+                  />
                 )}
               </div>
             );
