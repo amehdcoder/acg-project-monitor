@@ -6,6 +6,7 @@ import { extractLocationInfo, getStateFromGPS, normalizeStateName } from "@/lib/
 import { NIGERIA_ADMIN_DATA } from "@/lib/nigeriaAdminData";
 import KPIDrillDownSheet, { KPIDrillDownData, DrillDownItem } from "./KPIDrillDownSheet";
 import KPIPrimaryDataDialog, { KPIPrimaryRequest, KPIPrimaryKind } from "./KPIPrimaryDataDialog";
+import { fetchSpecialFormSubmissions, BLOOMBERG_PROJECT_ID, SEECLEAR_PROJECT_ID, BLOOMBERG_PROJECT_NAME, SEECLEAR_PROJECT_NAME } from "@/lib/specialFormActivity";
 
 interface KPIData {
   totalSubmissions: number;
@@ -105,6 +106,38 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId, isSyncing }: Props)
       // Fetch ALL submissions with pagination
       const allSubs = await fetchAllSubmissions("user_id, form_id, data, location, within_geofence, status, synced_at, created_at", projectFormIds ? { projectFormIds } : undefined);
 
+      // Merge standalone special-form activity (Bloomberg, SeeClear) so totals,
+      // collectors and project disaggregation reflect EVERY submission on the app
+      // — not just rows stored in form_submissions. These forms are not bound to a
+      // standard project, so they only appear under "All Projects" or when their
+      // own synthetic project is selected.
+      const includeSpecial =
+        !selectedProjectId ||
+        selectedProjectId === BLOOMBERG_PROJECT_ID ||
+        selectedProjectId === SEECLEAR_PROJECT_ID;
+      if (includeSpecial) {
+        const since90Date = new Date(Date.now() - 90 * 86400000);
+        const specialRows = await fetchSpecialFormSubmissions({ dateFrom: since90Date });
+        for (const r of specialRows) {
+          if (selectedProjectId && r.project_id !== selectedProjectId) continue;
+          allSubs.push({
+            user_id: r.user_id,
+            form_id: r.form_id,
+            data: r.data,
+            location: r.location,
+            within_geofence: r.within_geofence,
+            status: r.status,
+            synced_at: r.submitted_at || r.created_at, // standalone forms persist server-side => synced
+            created_at: r.created_at,
+            __special_project_id: r.project_id,
+            __special_project_name: r.project_name,
+            __special_form_name: r.form_name,
+          } as any);
+        }
+      }
+
+
+
       // Count totals with project filter.
       // Synced vs pending must be MUTUALLY EXCLUSIVE & EXHAUSTIVE so the rate is
       // always trustworthy: a submission is "synced" iff it carries a synced_at
@@ -116,10 +149,15 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId, isSyncing }: Props)
       const todaySubs = allSubs.filter((s: any) => new Date(s.created_at) >= today).length;
       const rate = totalSubs > 0 ? Math.round((synced / totalSubs) * 100) : 0;
 
+      // Count distinct special projects that actually carried submissions so the
+      // "Active Projects" KPI reflects standalone forms too.
+      const specialProjectIds = new Set(
+        allSubs.filter((s: any) => s.__special_project_id).map((s: any) => s.__special_project_id),
+      );
       const activeProjectIds = selectedProjectId
         ? new Set([selectedProjectId])
-        : new Set((projectListRes.data || []).map((p: any) => p.id));
-      const activeProjectCount = selectedProjectId ? 1 : (projectListRes.data || []).length;
+        : new Set([...(projectListRes.data || []).map((p: any) => p.id), ...specialProjectIds]);
+      const activeProjectCount = selectedProjectId ? 1 : activeProjectIds.size;
 
       const profileMap = new Map<string, { state: string | null; lga: string | null; name: string; email: string }>();
       (profilesRes.data || []).forEach((p: any) => {
@@ -180,7 +218,7 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId, isSyncing }: Props)
       allSubs.forEach((s: any) => {
         if (s.user_id) collectors.set(s.user_id, (collectors.get(s.user_id) || 0) + 1);
 
-        const fName = formNameMap.get(s.form_id) || "Unknown";
+        const fName = (s as any).__special_form_name || formNameMap.get(s.form_id) || "Unknown";
         if (!subsByForm[s.form_id]) subsByForm[s.form_id] = { formName: fName, count: 0, synced: 0, pending: 0 };
         subsByForm[s.form_id].count++;
         if (s.synced_at) subsByForm[s.form_id].synced++;
@@ -313,9 +351,18 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId, isSyncing }: Props)
         }
       });
       allSubs.forEach((s: any) => {
+        if (s.__special_project_id) {
+          const spid = s.__special_project_id as string;
+          if (selectedProjectId && spid !== selectedProjectId) return;
+          if (!projectStats[spid]) projectStats[spid] = { name: s.__special_project_name || "Special Form", forms: new Set(), subs: 0 };
+          projectStats[spid].forms.add(s.form_id);
+          projectStats[spid].subs++;
+          return;
+        }
         const pid = formProjectMap.get(s.form_id);
         if (pid && projectStats[pid]) projectStats[pid].subs++;
       });
+
 
       const projectsList = Object.values(projectStats).map(p => ({ name: p.name, forms: p.forms.size, submissions: p.subs })).sort((a, b) => b.submissions - a.submissions);
       const statesList = Object.entries(stateSubsMap).map(([state, d]) => ({
@@ -364,6 +411,8 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId, isSyncing }: Props)
     const channel = supabase
       .channel("dss-kpi-strip")
       .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, fetchKPIs)
+      .on("postgres_changes", { event: "*", schema: "public", table: "bloomberg_validations" }, fetchKPIs)
+      .on("postgres_changes", { event: "*", schema: "public", table: "seeclear_monitoring" }, fetchKPIs)
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, fetchKPIs)
       .subscribe();
     return () => { supabase.removeChannel(channel); };

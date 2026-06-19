@@ -45,6 +45,7 @@ import DashboardKPIChart from "@/components/DashboardKPIChart";
 import FieldActivityTracker from "@/components/FieldActivityTracker";
 import DashboardRouteMap from "@/components/DashboardRouteMap";
 import PowerBIDashboard from "@/components/Dashboard/PowerBIDashboard";
+import { BLOOMBERG_PROJECT_ID, SEECLEAR_PROJECT_ID, BLOOMBERG_PROJECT_NAME, SEECLEAR_PROJECT_NAME } from "@/lib/specialFormActivity";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
@@ -227,7 +228,18 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
         query = query.in("id", assignedIds);
       }
       const { data } = await query;
-      setProjects((data || []).map((p: any) => ({ id: p.id, name: p.name })));
+      const realProjects = (data || []).map((p: any) => ({ id: p.id, name: p.name }));
+      // Append standalone special-form "projects" (Bloomberg, SeeClear) so they
+      // can be filtered just like real projects. Only the owner / users without
+      // explicit project restrictions see them.
+      const canSeeSpecial = isOwnerUser || assignedIds.length === 0;
+      const specialProjects = canSeeSpecial
+        ? [
+            { id: BLOOMBERG_PROJECT_ID, name: BLOOMBERG_PROJECT_NAME },
+            { id: SEECLEAR_PROJECT_ID, name: SEECLEAR_PROJECT_NAME },
+          ]
+        : [];
+      setProjects([...realProjects, ...specialProjects]);
     } catch {
       setProjects([]);
     }

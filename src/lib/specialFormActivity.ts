@@ -17,6 +17,7 @@ export interface SpecialFormSubmission {
   id: string;
   user_id: string;
   form_id: string;
+  project_id: string;
   submitted_at: string | null;
   created_at: string;
   data: Record<string, any>;
@@ -27,6 +28,13 @@ export interface SpecialFormSubmission {
   within_geofence: boolean | null;
   status: string;
 }
+
+// Synthetic project ids/names so standalone special forms disaggregate cleanly
+// alongside real projects in the Dashboard's "by project" widgets.
+export const BLOOMBERG_PROJECT_ID = "__bloomberg_validation__";
+export const SEECLEAR_PROJECT_ID = "__seeclear_monitoring__";
+export const BLOOMBERG_PROJECT_NAME = "Bloomberg Validation";
+export const SEECLEAR_PROJECT_NAME = "SeeClear Monitoring";
 
 // Realtime-subscribable tables that hold standalone special-form activity.
 export const SPECIAL_FORM_TABLES = ["bloomberg_validations", "seeclear_monitoring"] as const;
@@ -90,6 +98,7 @@ export async function fetchSpecialFormSubmissions(opts: FetchOpts = {}): Promise
         id: r.id,
         user_id: r.validator_id,
         form_id: BLOOMBERG_FORM_ID,
+        project_id: BLOOMBERG_PROJECT_ID,
         submitted_at: r.submitted_at || r.created_at,
         created_at: r.created_at,
         data: {
@@ -117,6 +126,7 @@ export async function fetchSpecialFormSubmissions(opts: FetchOpts = {}): Promise
         id: r.id,
         user_id: r.monitor_id,
         form_id: SEECLEAR_FORM_ID,
+        project_id: SEECLEAR_PROJECT_ID,
         submitted_at: r.created_at,
         created_at: r.created_at,
         data: {
