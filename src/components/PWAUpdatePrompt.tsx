@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw, Sparkles, X, Loader2 } from "lucide-react";
 import {
   hardReloadToLatest,
+  hasActiveUserFormProgress,
   isSnoozed,
   markServiceWorkerUpdateAvailable,
   registerServiceWorkerUpdater,
@@ -60,10 +61,23 @@ const PWAUpdatePrompt = () => {
   const [updateState, setUpdateState] = useState(getAppUpdateState());
   const [showModal, setShowModal] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [activeFormProgress, setActiveFormProgress] = useState(false);
   const lastPromptedBuildRef = useRef("");
 
   useEffect(() => subscribeToAppUpdates(() => setUpdateState(getAppUpdateState())), []);
   useEffect(() => startAppUpdatePolling(), []);
+  useEffect(() => {
+    const refresh = () => setActiveFormProgress(hasActiveUserFormProgress());
+    refresh();
+    const id = setInterval(refresh, 3000);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("amehnities:before-silent-update", refresh);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("amehnities:before-silent-update", refresh);
+    };
+  }, []);
 
   useEffect(() => {
     if (!updateState.updateAvailable) return;
@@ -71,6 +85,11 @@ const PWAUpdatePrompt = () => {
     lastPromptedBuildRef.current = updateState.latestBuildId;
 
     const latestId = updateState.latestBuildId;
+
+    if (hasActiveUserFormProgress()) {
+      setShowModal(false);
+      return;
+    }
 
     // Loop guard: if we already auto-applied this exact build id, never re-apply it.
     let lastApplied = "";
@@ -93,7 +112,7 @@ const PWAUpdatePrompt = () => {
     // The polling layer also re-runs the check on the 'online' event.
     const isOffline = typeof navigator !== "undefined" && navigator.onLine === false;
 
-    if (isAutoUpdateEnabled() && !inCooldown && !isOffline && !shouldSkipServiceWorker) {
+    if (isAutoUpdateEnabled() && !inCooldown && !isOffline && !shouldSkipServiceWorker && !hasActiveUserFormProgress()) {
       try {
         localStorage.setItem("app_last_applied_build_id", latestId);
         localStorage.setItem("app_last_applied_at", String(Date.now()));
@@ -135,7 +154,7 @@ const PWAUpdatePrompt = () => {
     <>
       {!shouldSkipServiceWorker && <SwRegistrar onAvailable={handleAvailable} registerSelf={registerSelf} />}
 
-      {updateState.updateAvailable && (
+      {updateState.updateAvailable && !activeFormProgress && (
         <>
           <div
             className="fixed inset-x-0 top-0 z-[10000] flex items-center justify-center gap-3 border-b-2 border-primary bg-gradient-to-r from-primary/95 via-primary to-primary/95 px-4 py-2 text-primary-foreground shadow-lg animate-in slide-in-from-top duration-300"
