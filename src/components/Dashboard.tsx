@@ -45,6 +45,7 @@ import DashboardKPIChart from "@/components/DashboardKPIChart";
 import FieldActivityTracker from "@/components/FieldActivityTracker";
 import DashboardRouteMap from "@/components/DashboardRouteMap";
 import PowerBIDashboard from "@/components/Dashboard/PowerBIDashboard";
+import { BLOOMBERG_PROJECT_ID, SEECLEAR_PROJECT_ID, BLOOMBERG_PROJECT_NAME, SEECLEAR_PROJECT_NAME } from "@/lib/specialFormActivity";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
