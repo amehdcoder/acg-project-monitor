@@ -189,6 +189,13 @@ const Index = () => {
     }
   }, [loading, user, isAdhoc, activeTab]);
 
+  // Rescue Bloomberg validations stuck in this device's "Ready to send" tab
+  // (collected with the old draft/finalize form) and push them to the server.
+  useEffect(() => {
+    if (loading || !user?.id) return;
+    void runReadyToSendMigrationOnce(user.id);
+  }, [loading, user?.id]);
+
   useEffect(() => {
     if (loading || !user) return;
     const params = new URLSearchParams(window.location.search);
