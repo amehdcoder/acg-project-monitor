@@ -3290,7 +3290,7 @@ const FormFiller = ({
                     {!isLast ? (
                       <Button
                         size="lg"
-                        onClick={() => goToMdaSection(idx + 1)}
+                        onClick={() => { if (validateMdaSection(idx)) goToMdaSection(idx + 1); }}
                         className="gap-2 bg-gradient-to-r from-indigo-600 to-blue-700 text-white shadow-md shadow-indigo-900/20 hover:from-indigo-700 hover:to-blue-800"
                       >
                         Next Section
@@ -3309,8 +3309,7 @@ const FormFiller = ({
                     )}
                   </div>
 
-                  {/* Supervision summary + quick actions + reminder */}
-                  <MdaSummaryCards responses={responses} nameToId={mdaNameToId} fields={mdaFields} />
+                  {/* Quick actions + reminder (Supervision Summary removed per request) */}
                   <MdaQuickActions />
                   <MdaReminder />
                 </div>
