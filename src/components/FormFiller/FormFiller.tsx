@@ -1421,7 +1421,7 @@ const FormFiller = ({
   );
 
   useEffect(() => {
-    const cascadeChildren = allFormQuestions.filter(q => q.cascadeParentId && !(q.name && MDA_GEO_NAMES.has(q.name)));
+    const cascadeChildren = allFormQuestions.filter(q => q.cascadeParentId && !MDA_GEO_NAMES.has(q.name || q.id));
     if (cascadeChildren.length === 0) return;
 
     setResponses(prev => {
