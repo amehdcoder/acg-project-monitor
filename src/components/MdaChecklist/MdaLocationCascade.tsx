@@ -269,8 +269,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
       const all = getAllStates();
       return hasStateScope ? all.filter((s) => allowedStates.has(s)) : all;
     }
-    if (level === "lga") return sel.state ? getLGAsForState(sel.state) : [];
-    if (level === "ward") return sel.state && sel.lga ? getWardsForLGA(sel.state, sel.lga) : [];
+    if (level === "lga") return sel.state ? getLGAsForState(canonicalStateName(sel.state)) : [];
+    if (level === "ward") return sel.state && sel.lga ? getWardsForLGA(canonicalStateName(sel.state), canonicalLgaName(sel.state, sel.lga)) : [];
     return [];
   };
 
@@ -304,8 +304,13 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     const order: (keyof GeoRow)[] = ["state", "lga", "ward", "flhf_name", "community_name", "settlement_name"];
     const startIdx = order.indexOf(level);
     const updates: Record<string, any> = {};
+    const canonicalValue =
+      level === "state" ? canonicalStateName(value)
+      : level === "lga" ? canonicalLgaName(sel.state, value)
+      : level === "ward" ? canonicalWardName(sel.state, sel.lga, value)
+      : value;
     order.slice(startIdx).forEach((k, i) => {
-      const v = i === 0 ? value : "";
+      const v = i === 0 ? canonicalValue : "";
       const qName = QUESTION_NAME[k];
       const id = nameToId[qName];
       if (id) updates[id] = v;
