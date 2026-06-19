@@ -31,7 +31,7 @@ const C = {
 const fmt = (n: number) => n.toLocaleString();
 
 export default function ACSMDashboard({ projectId, onClose }: Props) {
-  const [category, setCategory] = useState<AcsmCategory | "all">("advocacy");
+  const [category, setCategory] = useState<AcsmCategory | "all">("results_of_advocacy");
   const {
     stats, statusDistribution, trend, topLocations, indicatorRows, points,
     dataQuality, loading, reload, simulate, setSimulate,
@@ -54,11 +54,14 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
     description: `${p.pct}% achievement`, markerColor: achievementColor(p.pct),
   }));
 
-  const navItems = [
-    { label: "Advocacy", icon: Megaphone, value: "advocacy" },
-    { label: "Communication", icon: MessageSquare, value: "communication" },
-    { label: "Social Mobilization", icon: Radio, value: "social_mobilization" },
-  ];
+  const navIcons: Record<string, any> = {
+    results_of_advocacy: Megaphone,
+    capacities_for_advocacy: ShieldCheck,
+    stakeholder_engagement: Users,
+  };
+  const navItems = ACSM_CATEGORIES.map((c) => ({
+    label: c.short, icon: navIcons[c.value] || Layers, value: c.value,
+  }));
 
   return (
     <div className="min-h-screen" style={{ background: C.bg, color: C.text }}>
