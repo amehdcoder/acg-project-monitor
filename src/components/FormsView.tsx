@@ -413,12 +413,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }, [currentProjectId, authLoading, user?.id, role, isSuperAdmin, isOwnerLevel]);
 
   useEffect(() => {
-    if (authLoading || fillingForm || forms.length === 0) return;
+    if (authLoading || fillingForm) return;
     try {
       const restore = JSON.parse(sessionStorage.getItem(SILENT_UPDATE_RESTORE_KEY) || "null");
       const active = JSON.parse(localStorage.getItem(ACTIVE_FORM_FILL_KEY) || "null");
       const formId = restore?.formId || active?.formId;
       if (!formId) return;
+      if (forms.length === 0 && offlineForms.length === 0 && active?.projectId && active.projectId !== currentProjectId) {
+        setCurrentProjectId(active.projectId);
+        return;
+      }
       const offlineMatches = offlineForms.map((of) => {
         const allItems = (of.questions as unknown as any[]) || [];
         const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
