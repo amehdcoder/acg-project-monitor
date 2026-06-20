@@ -887,7 +887,13 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const TERRAIN_EMOJI: Record<string, string> = { flat: "🌾", hilly: "⛰️", mountainous: "🏔️", riverine: "🌊", swampy: "🏝️", desert: "🏜️", forest: "🌲" };
 
   // Medicine allocation: unique LGAs from current entries
-  const allLgasForMedicine = useMemo(() => [...new Set(displayEntries.map(e => e.lga))].sort(), [displayEntries]);
+  // When the user has uploaded ad-hoc population rows, the medicine breakdown
+  // computes from those instead of the saved microplan entries.
+  const medicineSourceEntries = useMemo(
+    () => (uploadedMedEntries.length > 0 ? (uploadedMedEntries as any[]) : displayEntries),
+    [uploadedMedEntries, displayEntries],
+  );
+  const allLgasForMedicine = useMemo(() => [...new Set(medicineSourceEntries.map((e: any) => e.lga))].sort(), [medicineSourceEntries]);
 
   const getTargetPop = (e: any) => {
     return calcTargetPop(e) || (e.estimated_total_population || 0);
