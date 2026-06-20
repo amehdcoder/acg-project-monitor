@@ -1348,7 +1348,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     toast({ title: "PDF exported", description: `${medicineAllocationData.length} rows exported.` });
   };
 
-  const addMedAllocRow = () => setMedAllocEntries(prev => [...prev, { lga: "", amount: "", jrsm: "" }]);
+  const addMedAllocRow = () => setMedAllocEntries(prev => [...prev, { lga: "", ward: "", flhf: "", amount: "", jrsm: "" }]);
   const removeMedAllocRow = async (idx: number) => {
     const row = medAllocEntries[idx];
     if (row?.id) {
