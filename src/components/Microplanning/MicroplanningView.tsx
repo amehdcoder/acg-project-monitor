@@ -1083,6 +1083,26 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     return { newCount, dupeCount, internalDupes, total: uploadedMedEntries.length };
   }, [uploadedMedEntries, entries]);
 
+  // Side-by-side preview rows: computed target population + duplicate flags.
+  const uploadPreviewRows = useMemo(() => {
+    const existing: Record<string, any> = {};
+    entries.forEach((e) => { existing[dupKey(e)] = e; });
+    const seen = new Set<string>();
+    return uploadedMedEntries.map((u) => {
+      const k = dupKey(u);
+      const existingMatch = existing[k];
+      const internalDup = seen.has(k);
+      seen.add(k);
+      return {
+        row: u,
+        targetPop: Math.round((Number(u.estimated_total_population) || 0) * (medTargetPct / 100)),
+        existingMatch: existingMatch || null,
+        internalDup,
+        isDup: !!existingMatch || internalDup,
+      };
+    });
+  }, [uploadedMedEntries, entries, medTargetPct]);
+
   // Map an uploaded population row to a microplan_entries payload.
   const uploadedToEntry = (u: UploadedMedicineEntry) => ({
     project_id: selectedProjectId,
