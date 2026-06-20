@@ -4331,6 +4331,7 @@ export type Database = {
           campaign_type: string | null
           created_at: string
           created_by: string
+          flhf: string | null
           id: string
           lga: string
           medicine_name: string | null
@@ -4339,6 +4340,7 @@ export type Database = {
           state: string | null
           updated_at: string
           updated_by: string | null
+          ward: string | null
           year: number
         }
         Insert: {
@@ -4346,6 +4348,7 @@ export type Database = {
           campaign_type?: string | null
           created_at?: string
           created_by: string
+          flhf?: string | null
           id?: string
           lga: string
           medicine_name?: string | null
@@ -4354,6 +4357,7 @@ export type Database = {
           state?: string | null
           updated_at?: string
           updated_by?: string | null
+          ward?: string | null
           year?: number
         }
         Update: {
@@ -4361,6 +4365,7 @@ export type Database = {
           campaign_type?: string | null
           created_at?: string
           created_by?: string
+          flhf?: string | null
           id?: string
           lga?: string
           medicine_name?: string | null
@@ -4369,6 +4374,7 @@ export type Database = {
           state?: string | null
           updated_at?: string
           updated_by?: string | null
+          ward?: string | null
           year?: number
         }
         Relationships: []
