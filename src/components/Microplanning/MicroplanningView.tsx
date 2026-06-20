@@ -1072,7 +1072,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     created_by: user?.id,
     updated_by: user?.id,
     year_of_microplanning: u.year_of_microplanning,
-    source_population_data: "Upload & Compute",
+    population_source: "Upload & Compute",
     state: u.state,
     lga: u.lga,
     ward: u.ward === "—" ? null : u.ward,
