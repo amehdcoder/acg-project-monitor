@@ -1392,6 +1392,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         const payload = {
           project_id: selectedProjectId,
           lga: row.lga,
+          ward: row.ward || null,
+          flhf: row.flhf || null,
           amount: Number(row.amount),
           medicine_name: row.medicine_name || null,
           year: row.year || new Date().getFullYear(),
