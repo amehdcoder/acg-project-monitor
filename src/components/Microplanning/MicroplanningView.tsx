@@ -723,7 +723,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         return;
       }
 
-      const headers: string[] = allRows[headerRowIdx].map((h: any) => String(h).trim());
+      const headers: string[] = allRows[headerRowIdx].map((h: any) => String(h).trim().replace(/\s*\*+$/, ""));
       const dataRows = allRows.slice(headerRowIdx + 1).filter(row => row && row.some((cell: any) => cell !== undefined && cell !== ""));
 
       if (dataRows.length === 0) {
