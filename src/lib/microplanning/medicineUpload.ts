@@ -102,7 +102,10 @@ function buildEntry(raw: {
   const state = String(raw.state ?? "").trim();
   const lga = String(raw.lga ?? "").trim();
   const community = String(raw.community ?? "").trim();
-  const pop = Math.max(0, Math.round(Number(raw.population) || 0));
+  // Tolerate thousands separators, spaces, currency-like prefixes, and stray
+  // characters so values such as "1,234", "1 234", or "1234.0" all parse.
+  const cleanedPop = String(raw.population ?? "").replace(/[^0-9.\-]/g, "");
+  const pop = Math.max(0, Math.round(Number(cleanedPop) || 0));
   // Require at least State + LGA + a community/settlement + a population.
   if (!state || !lga || !community || pop <= 0) return null;
 
