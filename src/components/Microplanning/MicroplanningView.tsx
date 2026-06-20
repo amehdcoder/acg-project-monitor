@@ -923,7 +923,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     for (const me of validEntries) {
       const totalMedicine = Number(me.amount);
       const jrsmTotal = Number(me.jrsm) || 0;
-      const lgaEntries = displayEntries.filter(e => e.lga === me.lga);
+      const lgaEntries = medicineSourceEntries.filter((e: any) => e.lga === me.lga);
       if (lgaEntries.length === 0) continue;
 
       const rows = lgaEntries.map(e => ({
