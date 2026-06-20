@@ -1152,6 +1152,85 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     toast({ title: "Upload cleared", description: "Medicine breakdown reverted to saved microplan entries." });
   };
 
+  const totalUploadedPop = useMemo(
+    () => uploadedMedEntries.reduce((s, e) => s + (e.estimated_total_population || 0), 0),
+    [uploadedMedEntries],
+  );
+
+  // Colorful, insightful confirmation that adopts uploaded population as project data.
+  const renderAdoptDialog = () => (
+    <Dialog open={showAdoptDialog} onOpenChange={(o) => { if (!adopting) setShowAdoptDialog(o); }}>
+      <DialogContent className="max-w-lg p-0 overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-600 p-5 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2 text-lg">
+              <Building2 className="h-5 w-5" /> Use this data as Project Microplan?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-white/90 text-sm mt-2">
+            Adopt the uploaded population as the official microplanning data for this project. Once adopted, new
+            submissions from the <strong>New Entry</strong> form will add new rows or update matching ones, and you can
+            edit or delete any entry from the list.
+          </p>
+        </div>
+        <div className="p-5 space-y-4">
+          {/* Insight cards */}
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/30 p-2">
+              <div className="text-xl font-extrabold text-emerald-600">{adoptionStats.newCount.toLocaleString()}</div>
+              <div className="text-[10px] text-muted-foreground font-medium">New rows</div>
+            </div>
+            <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/30 p-2">
+              <div className="text-xl font-extrabold text-amber-600">{adoptionStats.dupeCount.toLocaleString()}</div>
+              <div className="text-[10px] text-muted-foreground font-medium">Duplicates found</div>
+            </div>
+            <div className="rounded-lg border bg-blue-50 dark:bg-blue-950/30 p-2">
+              <div className="text-xl font-extrabold text-blue-600">{totalUploadedPop.toLocaleString()}</div>
+              <div className="text-[10px] text-muted-foreground font-medium">Total population</div>
+            </div>
+          </div>
+
+          {adoptionStats.dupeCount > 0 && (
+            <div className="rounded-lg border border-amber-300/70 bg-amber-50/70 dark:bg-amber-950/20 p-3 text-[12px] text-amber-800 dark:text-amber-300 flex gap-2">
+              <span className="text-base">⚠️</span>
+              <span>
+                <strong>{adoptionStats.dupeCount.toLocaleString()}</strong> uploaded row(s) match existing entries
+                (same State · LGA · Ward · FLHF · Community). Choose whether to skip them or overwrite with the uploaded
+                values.
+                {adoptionStats.internalDupes > 0 && (
+                  <> {adoptionStats.internalDupes.toLocaleString()} duplicate row(s) within your file will be collapsed.</>
+                )}
+              </span>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2">
+            <Button
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+              disabled={adopting || adoptionStats.newCount === 0 && adoptionStats.dupeCount === 0}
+              onClick={() => adoptUploadedData("skip")}
+            >
+              {adopting ? "Adopting…" : `✅ Add ${adoptionStats.newCount.toLocaleString()} new (skip duplicates)`}
+            </Button>
+            {adoptionStats.dupeCount > 0 && (
+              <Button
+                variant="outline"
+                className="w-full gap-2 border-amber-400 text-amber-700 hover:bg-amber-50"
+                disabled={adopting}
+                onClick={() => adoptUploadedData("update")}
+              >
+                🔄 Add new & update {adoptionStats.dupeCount.toLocaleString()} duplicates
+              </Button>
+            )}
+            <Button variant="ghost" className="w-full text-muted-foreground" disabled={adopting} onClick={() => setShowAdoptDialog(false)}>
+              Not now — keep it for medicine breakdown only
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
   const applySuggestedJrsm = (idx: number, newJrsm: number) => {
     setMedAllocEntries(prev => prev.map((row, i) => i === idx ? { ...row, jrsm: String(newJrsm) } : row));
     toast({ title: "✅ JRSM target adjusted", description: `Set to ${newJrsm.toLocaleString()} people (ratio ≈ ${TARGET_RATIO_MID.toFixed(2)}).` });
