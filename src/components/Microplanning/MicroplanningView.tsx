@@ -416,6 +416,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [uploadingMed, setUploadingMed] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const medUploadRef = useRef<HTMLInputElement>(null);
+  // % of total population that should be computed as the target population
+  const [medTargetPct, setMedTargetPct] = useState<number>(() => {
+    const v = parseFloat(localStorage.getItem("microplanning.medTargetPct") || "");
+    return Number.isFinite(v) && v > 0 && v <= 100 ? v : 100;
+  });
+  useEffect(() => { localStorage.setItem("microplanning.medTargetPct", String(medTargetPct)); }, [medTargetPct]);
+  // Adoption flow: prompt admin to use uploaded population as project microplan data
+  const [showAdoptDialog, setShowAdoptDialog] = useState(false);
+  const [adopting, setAdopting] = useState(false);
 
   // User access management state
   const [showAccessManager, setShowAccessManager] = useState(false);
@@ -616,9 +625,26 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         if (error) throw error;
         toast({ title: didOverride ? "✅ Entry updated (GPS saved as override)" : "✅ Entry updated" });
       } else {
+        // Flag duplicate community rows (same State · LGA · Ward · FLHF · Community).
+        const newKey = dupKey(payload);
+        const existingMatch = entries.find((e) => dupKey(e) === newKey);
+        if (existingMatch) {
+          const overwrite = window.confirm(
+            `A matching entry already exists for "${payload.community_name}" (${payload.lga}).\n\nClick OK to UPDATE the existing entry with these values, or Cancel to add it as a separate new row.`,
+          );
+          if (overwrite) {
+            const { error } = await supabase.from("microplan_entries").update(payload).eq("id", existingMatch.id);
+            if (error) throw error;
+            toast({ title: "🔄 Existing entry updated", description: "Duplicate detected — the matching entry was updated." });
+            setShowForm(false);
+            setEditingEntry(null);
+            fetchEntries();
+            return;
+          }
+        }
         const { error } = await supabase.from("microplan_entries").insert(payload);
         if (error) throw error;
-        toast({ title: "✅ Entry added" });
+        toast({ title: existingMatch ? "✅ Entry added (duplicate kept separate)" : "✅ Entry added" });
       }
       setShowForm(false);
       setEditingEntry(null);
@@ -896,6 +922,10 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const allLgasForMedicine = useMemo(() => [...new Set(medicineSourceEntries.map((e: any) => e.lga))].sort(), [medicineSourceEntries]);
 
   const getTargetPop = (e: any) => {
+    // Uploaded population rows: target population = total population × chosen %.
+    if (e && e.__uploaded) {
+      return Math.round((Number(e.estimated_total_population) || 0) * (medTargetPct / 100));
+    }
     return calcTargetPop(e) || (e.estimated_total_population || 0);
   };
 
@@ -971,7 +1001,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
 
     return allRows;
-  }, [medAllocEntries, medicineSourceEntries, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
+  }, [medAllocEntries, medicineSourceEntries, medTargetPct, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
 
   // Per-LGA adjustment suggestions (drug/person ratio → 2.5–3.0)
   const lgaAdjustmentSuggestions = useMemo(() => {
@@ -1018,6 +1048,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         title: `✅ ${entries.length.toLocaleString()} rows ready`,
         description: `Target population computed from ${total.toLocaleString()} rows${skipped > 0 ? ` · ${skipped.toLocaleString()} skipped` : ""}. Enter medicine per LGA below.`,
       });
+      // Offer admins to adopt this population as the project's microplan data.
+      if (isAdmin && selectedProjectId) setShowAdoptDialog(true);
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     } finally {
@@ -1027,10 +1059,194 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
   };
 
+  // Stable duplicate key for a microplan/community row.
+  const dupKey = (e: any) =>
+    [e.state, e.lga, e.ward, e.flhf_name, e.community_name]
+      .map((v) => String(v ?? "").trim().toLowerCase())
+      .join("|");
+
+  // Duplicate analysis between the uploaded rows and existing project entries.
+  const adoptionStats = useMemo(() => {
+    const existing: Record<string, any> = {};
+    entries.forEach((e) => { existing[dupKey(e)] = e; });
+    let newCount = 0;
+    let dupeCount = 0;
+    const seenInUpload = new Set<string>();
+    let internalDupes = 0;
+    for (const u of uploadedMedEntries) {
+      const k = dupKey(u);
+      if (seenInUpload.has(k)) internalDupes++;
+      seenInUpload.add(k);
+      if (existing[k]) dupeCount++;
+      else newCount++;
+    }
+    return { newCount, dupeCount, internalDupes, total: uploadedMedEntries.length };
+  }, [uploadedMedEntries, entries]);
+
+  // Map an uploaded population row to a microplan_entries payload.
+  const uploadedToEntry = (u: UploadedMedicineEntry) => ({
+    project_id: selectedProjectId,
+    created_by: user?.id,
+    updated_by: user?.id,
+    year_of_microplanning: u.year_of_microplanning,
+    population_source: "Upload & Compute",
+    state: u.state,
+    lga: u.lga,
+    ward: u.ward === "—" ? null : u.ward,
+    flhf_name: u.flhf_name === "—" ? null : u.flhf_name,
+    community_name: u.community_name,
+    settlement_name: u.settlement_name === "—" ? null : u.settlement_name,
+    estimated_total_population: u.estimated_total_population,
+    estimated_children_0_4: u.estimated_children_0_4,
+    estimated_children_5_14: u.estimated_children_5_14,
+    estimated_adults_15_plus: u.estimated_adults_15_plus,
+    trachoma_0_5_months: u.trachoma_0_5_months,
+    trachoma_6m_6y: u.trachoma_6m_6y,
+    trachoma_7_14y: u.trachoma_7_14y,
+    trachoma_15_plus: u.trachoma_15_plus,
+  });
+
+  // Adopt uploaded population as project microplan data.
+  // mode: "skip" = insert new only; "update" = insert new + overwrite duplicates.
+  const adoptUploadedData = async (mode: "skip" | "update") => {
+    if (!user?.id || !selectedProjectId || uploadedMedEntries.length === 0) return;
+    setAdopting(true);
+    try {
+      const existing: Record<string, any> = {};
+      entries.forEach((e) => { existing[dupKey(e)] = e; });
+
+      const toInsert: any[] = [];
+      const toUpdate: { id: string; payload: any }[] = [];
+      const seen = new Set<string>();
+
+      for (const u of uploadedMedEntries) {
+        const k = dupKey(u);
+        if (seen.has(k)) continue; // collapse internal duplicates
+        seen.add(k);
+        const match = existing[k];
+        const payload = uploadedToEntry(u);
+        if (match) {
+          if (mode === "update") toUpdate.push({ id: match.id, payload });
+        } else {
+          toInsert.push(payload);
+        }
+      }
+
+      // Bulk insert in chunks to stay responsive on large files.
+      for (let i = 0; i < toInsert.length; i += 200) {
+        const batch = toInsert.slice(i, i + 200);
+        const { error } = await supabase.from("microplan_entries").insert(batch);
+        if (error) throw error;
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      // Update duplicates if requested.
+      for (let i = 0; i < toUpdate.length; i += 50) {
+        const batch = toUpdate.slice(i, i + 50);
+        await Promise.all(
+          batch.map(({ id, payload }) =>
+            supabase.from("microplan_entries").update(payload).eq("id", id),
+          ),
+        );
+        await new Promise((r) => setTimeout(r, 0));
+      }
+
+      toast({
+        title: "✅ Adopted as project microplan data",
+        description: `${toInsert.length.toLocaleString()} new${toUpdate.length > 0 ? ` · ${toUpdate.length.toLocaleString()} updated` : mode === "skip" && adoptionStats.dupeCount > 0 ? ` · ${adoptionStats.dupeCount.toLocaleString()} duplicates skipped` : ""}.`,
+      });
+      setShowAdoptDialog(false);
+      setUploadedMedEntries([]);
+      fetchEntries();
+    } catch (err: any) {
+      toast({ title: "Adoption failed", description: err.message, variant: "destructive" });
+    } finally {
+      setAdopting(false);
+    }
+  };
+
   const clearMedicineUpload = () => {
     setUploadedMedEntries([]);
     toast({ title: "Upload cleared", description: "Medicine breakdown reverted to saved microplan entries." });
   };
+
+  const totalUploadedPop = useMemo(
+    () => uploadedMedEntries.reduce((s, e) => s + (e.estimated_total_population || 0), 0),
+    [uploadedMedEntries],
+  );
+
+  // Colorful, insightful confirmation that adopts uploaded population as project data.
+  const renderAdoptDialog = () => (
+    <Dialog open={showAdoptDialog} onOpenChange={(o) => { if (!adopting) setShowAdoptDialog(o); }}>
+      <DialogContent className="max-w-lg p-0 overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-600 p-5 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2 text-lg">
+              <Building2 className="h-5 w-5" /> Use this data as Project Microplan?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-white/90 text-sm mt-2">
+            Adopt the uploaded population as the official microplanning data for this project. Once adopted, new
+            submissions from the <strong>New Entry</strong> form will add new rows or update matching ones, and you can
+            edit or delete any entry from the list.
+          </p>
+        </div>
+        <div className="p-5 space-y-4">
+          {/* Insight cards */}
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/30 p-2">
+              <div className="text-xl font-extrabold text-emerald-600">{adoptionStats.newCount.toLocaleString()}</div>
+              <div className="text-[10px] text-muted-foreground font-medium">New rows</div>
+            </div>
+            <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/30 p-2">
+              <div className="text-xl font-extrabold text-amber-600">{adoptionStats.dupeCount.toLocaleString()}</div>
+              <div className="text-[10px] text-muted-foreground font-medium">Duplicates found</div>
+            </div>
+            <div className="rounded-lg border bg-blue-50 dark:bg-blue-950/30 p-2">
+              <div className="text-xl font-extrabold text-blue-600">{totalUploadedPop.toLocaleString()}</div>
+              <div className="text-[10px] text-muted-foreground font-medium">Total population</div>
+            </div>
+          </div>
+
+          {adoptionStats.dupeCount > 0 && (
+            <div className="rounded-lg border border-amber-300/70 bg-amber-50/70 dark:bg-amber-950/20 p-3 text-[12px] text-amber-800 dark:text-amber-300 flex gap-2">
+              <span className="text-base">⚠️</span>
+              <span>
+                <strong>{adoptionStats.dupeCount.toLocaleString()}</strong> uploaded row(s) match existing entries
+                (same State · LGA · Ward · FLHF · Community). Choose whether to skip them or overwrite with the uploaded
+                values.
+                {adoptionStats.internalDupes > 0 && (
+                  <> {adoptionStats.internalDupes.toLocaleString()} duplicate row(s) within your file will be collapsed.</>
+                )}
+              </span>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2">
+            <Button
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+              disabled={adopting || adoptionStats.newCount === 0 && adoptionStats.dupeCount === 0}
+              onClick={() => adoptUploadedData("skip")}
+            >
+              {adopting ? "Adopting…" : `✅ Add ${adoptionStats.newCount.toLocaleString()} new (skip duplicates)`}
+            </Button>
+            {adoptionStats.dupeCount > 0 && (
+              <Button
+                variant="outline"
+                className="w-full gap-2 border-amber-400 text-amber-700 hover:bg-amber-50"
+                disabled={adopting}
+                onClick={() => adoptUploadedData("update")}
+              >
+                🔄 Add new & update {adoptionStats.dupeCount.toLocaleString()} duplicates
+              </Button>
+            )}
+            <Button variant="ghost" className="w-full text-muted-foreground" disabled={adopting} onClick={() => setShowAdoptDialog(false)}>
+              Not now — keep it for medicine breakdown only
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 
   const applySuggestedJrsm = (idx: number, newJrsm: number) => {
     setMedAllocEntries(prev => prev.map((row, i) => i === idx ? { ...row, jrsm: String(newJrsm) } : row));
@@ -1606,6 +1822,29 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                   <p className="text-[11px] text-muted-foreground">
                     Upload a simple sheet with <strong>Year, State, LGA, Ward, FLHF, Community or Settlement, Total Population</strong>. The target population is computed automatically and the medicine you enter per LGA is broken down across every community/settlement.
                   </p>
+                  {/* Target % of total population */}
+                  <div className="rounded-md border border-amber-300/60 bg-amber-50/70 dark:bg-amber-950/20 px-3 py-2 flex items-center gap-3 flex-wrap">
+                    <Target className="h-4 w-4 text-amber-600 shrink-0" />
+                    <div className="flex-1 min-w-[180px]">
+                      <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-300">Target population = % of Total Population</p>
+                      <p className="text-[10px] text-amber-700/80 dark:text-amber-400/80">Set the share of the uploaded total population that should be treated as the target (e.g. 100% for whole community, or your eligible-cohort %).</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        value={medTargetPct}
+                        onChange={(e) => {
+                          const v = parseFloat(e.target.value);
+                          setMedTargetPct(Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 0);
+                        }}
+                        className="h-8 w-20 text-xs text-center font-bold"
+                        min={0}
+                        max={100}
+                        step={0.5}
+                      />
+                      <span className="text-sm font-bold text-amber-700">%</span>
+                    </div>
+                  </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1" onClick={() => exportMedicineUploadTemplate()}>
                       <FileSpreadsheet className="h-3 w-3" /> Download Upload Template
@@ -1627,11 +1866,23 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                     />
                   </div>
                   {uploadedMedEntries.length > 0 && (
-                    <p className="text-[10px] text-emerald-700 dark:text-emerald-400">
-                      ✓ Breakdown is using your uploaded data. Clear the upload to switch back to saved microplan entries.
-                    </p>
+                    <div className="space-y-2">
+                      <p className="text-[10px] text-emerald-700 dark:text-emerald-400">
+                        ✓ Breakdown is using your uploaded data. Clear the upload to switch back to saved microplan entries.
+                      </p>
+                      {isAdmin && (
+                        <Button
+                          size="sm"
+                          className="h-8 text-[11px] gap-1 bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-600 hover:opacity-90 text-white shadow-md"
+                          onClick={() => setShowAdoptDialog(true)}
+                        >
+                          <Building2 className="h-3.5 w-3.5" /> Use as Project Microplan Data…
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
+                {renderAdoptDialog()}
 
                 {/* Multiple LGA entry rows */}
                 <div className="space-y-2">
