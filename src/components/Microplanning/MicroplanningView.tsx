@@ -408,7 +408,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Medicine Allocation state - multiple LGAs (in-edit buffer)
-  const [medAllocEntries, setMedAllocEntries] = useState<{ id?: string; lga: string; amount: string; jrsm?: string; medicine_name?: string; year?: number }[]>([{ lga: "", amount: "", jrsm: "" }]);
+  const [medAllocEntries, setMedAllocEntries] = useState<{ id?: string; lga: string; ward?: string; flhf?: string; amount: string; jrsm?: string; medicine_name?: string; year?: number }[]>([{ lga: "", ward: "", flhf: "", amount: "", jrsm: "" }]);
   const [savedAllocations, setSavedAllocations] = useState<any[]>([]);
   const [savingAllocations, setSavingAllocations] = useState(false);
   // Medicine "upload & compute" — ad-hoc population rows used as the breakdown source
@@ -553,12 +553,14 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       setMedAllocEntries(data.map((d: any) => ({
         id: d.id,
         lga: d.lga,
+        ward: d.ward || "",
+        flhf: d.flhf || "",
         amount: String(d.amount ?? ""),
         medicine_name: d.medicine_name || "",
         year: d.year,
       })));
     } else {
-      setMedAllocEntries([{ lga: "", amount: "" }]);
+      setMedAllocEntries([{ lga: "", ward: "", flhf: "", amount: "" }]);
     }
   }, [selectedProjectId]);
   useEffect(() => { fetchAllocations(); }, [fetchAllocations]);
@@ -920,6 +922,20 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     [uploadedMedEntries, displayEntries],
   );
   const allLgasForMedicine = useMemo(() => [...new Set(medicineSourceEntries.map((e: any) => e.lga))].sort(), [medicineSourceEntries]);
+  // Cascaded option lookups for optional Ward / FLHF drill-down
+  const wardsForLga = useCallback(
+    (lga: string) => [...new Set(medicineSourceEntries.filter((e: any) => e.lga === lga).map((e: any) => e.ward).filter(Boolean))].sort() as string[],
+    [medicineSourceEntries],
+  );
+  const flhfsForWard = useCallback(
+    (lga: string, ward: string) => [...new Set(
+      medicineSourceEntries
+        .filter((e: any) => e.lga === lga && (!ward || e.ward === ward))
+        .map((e: any) => e.flhf_name)
+        .filter(Boolean),
+    )].sort() as string[],
+    [medicineSourceEntries],
+  );
 
   const getTargetPop = (e: any) => {
     // Uploaded population rows: target population = total population × chosen %.
@@ -953,7 +969,10 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     for (const me of validEntries) {
       const totalMedicine = Number(me.amount);
       const jrsmTotal = Number(me.jrsm) || 0;
-      const lgaEntries = medicineSourceEntries.filter((e: any) => e.lga === me.lga);
+      const lgaEntries = medicineSourceEntries.filter((e: any) =>
+        e.lga === me.lga &&
+        (!me.ward || e.ward === me.ward) &&
+        (!me.flhf || e.flhf_name === me.flhf));
       if (lgaEntries.length === 0) continue;
 
       const rows = lgaEntries.map(e => ({
@@ -1329,7 +1348,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     toast({ title: "PDF exported", description: `${medicineAllocationData.length} rows exported.` });
   };
 
-  const addMedAllocRow = () => setMedAllocEntries(prev => [...prev, { lga: "", amount: "", jrsm: "" }]);
+  const addMedAllocRow = () => setMedAllocEntries(prev => [...prev, { lga: "", ward: "", flhf: "", amount: "", jrsm: "" }]);
   const removeMedAllocRow = async (idx: number) => {
     const row = medAllocEntries[idx];
     if (row?.id) {
@@ -1348,8 +1367,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
     setMedAllocEntries(prev => prev.filter((_, i) => i !== idx));
   };
-  const updateMedAllocRow = (idx: number, field: "lga" | "amount" | "jrsm", value: string) => {
-    setMedAllocEntries(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
+  const updateMedAllocRow = (idx: number, field: "lga" | "ward" | "flhf" | "amount" | "jrsm", value: string) => {
+    setMedAllocEntries(prev => prev.map((row, i) => {
+      if (i !== idx) return row;
+      const next = { ...row, [field]: value };
+      // Reset deeper levels when a parent changes to keep the cascade valid
+      if (field === "lga") { next.ward = ""; next.flhf = ""; }
+      if (field === "ward") { next.flhf = ""; }
+      return next;
+    }));
   };
 
   // Persist all current allocation rows (insert new, update changed)
@@ -1366,6 +1392,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         const payload = {
           project_id: selectedProjectId,
           lga: row.lga,
+          ward: row.ward || null,
+          flhf: row.flhf || null,
           amount: Number(row.amount),
           medicine_name: row.medicine_name || null,
           year: row.year || new Date().getFullYear(),
@@ -1977,6 +2005,42 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                           <SelectContent>
                             {allLgasForMedicine.map(l => (
                               <SelectItem key={l} value={l}>{l}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1 flex-1 min-w-[150px]">
+                        {idx === 0 && <label className="text-xs font-medium text-foreground">Ward <span className="text-muted-foreground font-normal">(optional)</span></label>}
+                        <Select
+                          value={entry.ward || "__all__"}
+                          onValueChange={v => updateMedAllocRow(idx, "ward", v === "__all__" ? "" : v)}
+                          disabled={!entry.lga}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="All wards" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__all__">All wards</SelectItem>
+                            {wardsForLga(entry.lga).map(w => (
+                              <SelectItem key={w} value={w}>{w}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1 flex-1 min-w-[150px]">
+                        {idx === 0 && <label className="text-xs font-medium text-foreground">FLHF <span className="text-muted-foreground font-normal">(optional)</span></label>}
+                        <Select
+                          value={entry.flhf || "__all__"}
+                          onValueChange={v => updateMedAllocRow(idx, "flhf", v === "__all__" ? "" : v)}
+                          disabled={!entry.lga}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="All FLHFs" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__all__">All FLHFs</SelectItem>
+                            {flhfsForWard(entry.lga, entry.ward || "").map(f => (
+                              <SelectItem key={f} value={f}>{f}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
