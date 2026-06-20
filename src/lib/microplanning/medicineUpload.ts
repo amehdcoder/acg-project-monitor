@@ -172,19 +172,38 @@ export async function parseMedicineUploadFile(
   const entries: UploadedMedicineEntry[] = [];
   let skipped = 0;
 
+  // Forward-fill carry-over for hierarchical columns. Hierarchical microplan
+  // sheets frequently MERGE the State/LGA/Ward/FLHF (and sometimes Year/Community)
+  // cells across the rows of a group, so only the first row of the group holds a
+  // value and the rest are read as blank. Without carry-down those rows are
+  // wrongly skipped (losing ~half the communities). We remember the last
+  // non-empty value per hierarchical column and reuse it when a cell is blank.
+  const carry: Partial<Record<keyof typeof FIELD_KEYS, any>> = {};
+  const CARRY_KEYS: (keyof typeof FIELD_KEYS)[] = ["year", "state", "lga", "ward", "flhf"];
+  const isBlank = (v: any) => v === undefined || v === null || String(v).trim() === "";
+  const pick = (r: any[], key: keyof typeof FIELD_KEYS, fill: boolean) => {
+    const idx = colMap[key];
+    let v = idx !== undefined ? r[idx] : undefined;
+    if (fill) {
+      if (!isBlank(v)) carry[key] = v;
+      else if (!isBlank(carry[key])) v = carry[key];
+    }
+    return v;
+  };
+
   const CHUNK = 5000;
   for (let i = 0; i < total; i++) {
     const r = dataRows[i] || [];
     if (!r.some((c) => c !== undefined && c !== null && c !== "")) continue;
     const entry = buildEntry(
       {
-        year: colMap.year !== undefined ? r[colMap.year] : undefined,
-        state: colMap.state !== undefined ? r[colMap.state] : undefined,
-        lga: colMap.lga !== undefined ? r[colMap.lga] : undefined,
-        ward: colMap.ward !== undefined ? r[colMap.ward] : undefined,
-        flhf: colMap.flhf !== undefined ? r[colMap.flhf] : undefined,
-        community: colMap.community !== undefined ? r[colMap.community] : undefined,
-        population: colMap.population !== undefined ? r[colMap.population] : undefined,
+        year: pick(r, "year", true),
+        state: pick(r, "state", true),
+        lga: pick(r, "lga", true),
+        ward: pick(r, "ward", true),
+        flhf: pick(r, "flhf", true),
+        community: pick(r, "community", false),
+        population: pick(r, "population", false),
       },
       entries.length,
     );
