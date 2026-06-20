@@ -670,48 +670,30 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     fetchAllUsers();
   };
 
-  // ---- EXPORT: Blank template or filled data ----
-  const handleExportTemplate = (filled: boolean) => {
-    const wb = XLSX.utils.book_new();
-
-    // Title row
-    const titleRow = ["NTDs MICROPLAN TEMPLATE"];
-    const subtitleRow = ["Microplanning based on population of Communities, Settlement and catchment areas"];
-
-    const rows: any[][] = [titleRow, subtitleRow, [], TEMPLATE_HEADERS];
-
-    if (filled && entries.length > 0) {
-      entries.forEach(entry => {
-        const row = TEMPLATE_HEADERS.map(header => {
-          const field = HEADER_TO_FIELD[header];
-          if (!field) return "";
-          const val = entry[field];
-          if (field === "cdd_from_community") return val ? "Yes" : "No";
-          return val ?? "";
-        });
-        rows.push(row);
-      });
-    }
-
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-
-    // Set column widths
-    ws["!cols"] = TEMPLATE_HEADERS.map(h => ({ wch: Math.max(h.length + 2, 18) }));
-
-    // Merge title rows
-    ws["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: TEMPLATE_HEADERS.length - 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: TEMPLATE_HEADERS.length - 1 } },
-    ];
-
-    XLSX.utils.book_append_sheet(wb, ws, "Microplan");
+  // ---- EXPORT: Blank branded template or filled data ----
+  const handleExportTemplate = async (filled: boolean) => {
+    const dataRows = filled
+      ? entries.map((entry) =>
+          TEMPLATE_HEADERS.map((header) => {
+            const field = HEADER_TO_FIELD[header];
+            if (!field) return "";
+            const val = (entry as any)[field];
+            if (field === "cdd_from_community") return val ? "Yes" : "No";
+            return (val ?? "") as string | number;
+          }),
+        )
+      : [];
 
     const fileName = filled
       ? `Microplan_Data_${selectedProjectId.slice(0, 8)}.xlsx`
-      : `Microplan_Template_Blank.xlsx`;
+      : "NTDs_Microplan_Template_Blank.xlsx";
 
-    XLSX.writeFile(wb, fileName);
-    toast({ title: filled ? "📊 Data exported" : "📋 Template downloaded", description: fileName });
+    try {
+      await exportMicroplanWorkbook({ filled, dataRows, fileName });
+      toast({ title: filled ? "📊 Data exported" : "📋 Template downloaded", description: fileName });
+    } catch (err: any) {
+      toast({ title: "Export failed", description: err?.message, variant: "destructive" });
+    }
   };
 
   // ---- IMPORT: Read xlsx and insert entries ----
