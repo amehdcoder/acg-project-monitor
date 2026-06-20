@@ -1031,12 +1031,119 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         title: `✅ ${entries.length.toLocaleString()} rows ready`,
         description: `Target population computed from ${total.toLocaleString()} rows${skipped > 0 ? ` · ${skipped.toLocaleString()} skipped` : ""}. Enter medicine per LGA below.`,
       });
+      // Offer admins to adopt this population as the project's microplan data.
+      if (isAdmin && selectedProjectId) setShowAdoptDialog(true);
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     } finally {
       setUploadingMed(false);
       setUploadProgress(0);
       if (medUploadRef.current) medUploadRef.current.value = "";
+    }
+  };
+
+  // Stable duplicate key for a microplan/community row.
+  const dupKey = (e: any) =>
+    [e.state, e.lga, e.ward, e.flhf_name, e.community_name]
+      .map((v) => String(v ?? "").trim().toLowerCase())
+      .join("|");
+
+  // Duplicate analysis between the uploaded rows and existing project entries.
+  const adoptionStats = useMemo(() => {
+    const existing = new Map<string, any>();
+    entries.forEach((e) => existing.set(dupKey(e), e));
+    let newCount = 0;
+    let dupeCount = 0;
+    const seenInUpload = new Set<string>();
+    let internalDupes = 0;
+    for (const u of uploadedMedEntries) {
+      const k = dupKey(u);
+      if (seenInUpload.has(k)) internalDupes++;
+      seenInUpload.add(k);
+      if (existing.has(k)) dupeCount++;
+      else newCount++;
+    }
+    return { newCount, dupeCount, internalDupes, total: uploadedMedEntries.length };
+  }, [uploadedMedEntries, entries]);
+
+  // Map an uploaded population row to a microplan_entries payload.
+  const uploadedToEntry = (u: UploadedMedicineEntry) => ({
+    project_id: selectedProjectId,
+    created_by: user?.id,
+    updated_by: user?.id,
+    year_of_microplanning: u.year_of_microplanning,
+    source_population_data: "Upload & Compute",
+    state: u.state,
+    lga: u.lga,
+    ward: u.ward === "—" ? null : u.ward,
+    flhf_name: u.flhf_name === "—" ? null : u.flhf_name,
+    community_name: u.community_name,
+    settlement_name: u.settlement_name === "—" ? null : u.settlement_name,
+    estimated_total_population: u.estimated_total_population,
+    estimated_children_0_4: u.estimated_children_0_4,
+    estimated_children_5_14: u.estimated_children_5_14,
+    estimated_adults_15_plus: u.estimated_adults_15_plus,
+    trachoma_0_5_months: u.trachoma_0_5_months,
+    trachoma_6m_6y: u.trachoma_6m_6y,
+    trachoma_7_14y: u.trachoma_7_14y,
+    trachoma_15_plus: u.trachoma_15_plus,
+  });
+
+  // Adopt uploaded population as project microplan data.
+  // mode: "skip" = insert new only; "update" = insert new + overwrite duplicates.
+  const adoptUploadedData = async (mode: "skip" | "update") => {
+    if (!user?.id || !selectedProjectId || uploadedMedEntries.length === 0) return;
+    setAdopting(true);
+    try {
+      const existing = new Map<string, any>();
+      entries.forEach((e) => existing.set(dupKey(e), e));
+
+      const toInsert: any[] = [];
+      const toUpdate: { id: string; payload: any }[] = [];
+      const seen = new Set<string>();
+
+      for (const u of uploadedMedEntries) {
+        const k = dupKey(u);
+        if (seen.has(k)) continue; // collapse internal duplicates
+        seen.add(k);
+        const match = existing.get(k);
+        const payload = uploadedToEntry(u);
+        if (match) {
+          if (mode === "update") toUpdate.push({ id: match.id, payload });
+        } else {
+          toInsert.push(payload);
+        }
+      }
+
+      // Bulk insert in chunks to stay responsive on large files.
+      for (let i = 0; i < toInsert.length; i += 200) {
+        const batch = toInsert.slice(i, i + 200);
+        const { error } = await supabase.from("microplan_entries").insert(batch);
+        if (error) throw error;
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      // Update duplicates if requested.
+      for (let i = 0; i < toUpdate.length; i += 50) {
+        const batch = toUpdate.slice(i, i + 50);
+        await Promise.all(
+          batch.map(({ id, payload }) =>
+            supabase.from("microplan_entries").update(payload).eq("id", id),
+          ),
+        );
+        await new Promise((r) => setTimeout(r, 0));
+      }
+
+      toast({
+        title: "✅ Adopted as project microplan data",
+        description: `${toInsert.length.toLocaleString()} new${toUpdate.length > 0 ? ` · ${toUpdate.length.toLocaleString()} updated` : mode === "skip" && adoptionStats.dupeCount > 0 ? ` · ${adoptionStats.dupeCount.toLocaleString()} duplicates skipped` : ""}.`,
+      });
+      setShowAdoptDialog(false);
+      setUploadedMedEntries([]);
+      fetchEntries();
+    } catch (err: any) {
+      toast({ title: "Adoption failed", description: err.message, variant: "destructive" });
+    } finally {
+      setAdopting(false);
     }
   };
 
