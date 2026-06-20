@@ -999,6 +999,39 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     return out;
   }, [medAllocEntries, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
 
+  // ---- Medicine "upload & compute" handlers ----
+  const handleMedicineUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingMed(true);
+    setUploadProgress(0);
+    try {
+      const { entries, skipped, total } = await parseMedicineUploadFile(file, (done, tot) => {
+        setUploadProgress(tot > 0 ? Math.round((done / tot) * 100) : 100);
+      });
+      if (entries.length === 0) {
+        toast({ title: "No valid rows", description: "Ensure State, LGA, Community/Settlement and Total Population are filled.", variant: "destructive" });
+        return;
+      }
+      setUploadedMedEntries(entries);
+      toast({
+        title: `✅ ${entries.length.toLocaleString()} rows ready`,
+        description: `Target population computed from ${total.toLocaleString()} rows${skipped > 0 ? ` · ${skipped.toLocaleString()} skipped` : ""}. Enter medicine per LGA below.`,
+      });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingMed(false);
+      setUploadProgress(0);
+      if (medUploadRef.current) medUploadRef.current.value = "";
+    }
+  };
+
+  const clearMedicineUpload = () => {
+    setUploadedMedEntries([]);
+    toast({ title: "Upload cleared", description: "Medicine breakdown reverted to saved microplan entries." });
+  };
+
   const applySuggestedJrsm = (idx: number, newJrsm: number) => {
     setMedAllocEntries(prev => prev.map((row, i) => i === idx ? { ...row, jrsm: String(newJrsm) } : row));
     toast({ title: "✅ JRSM target adjusted", description: `Set to ${newJrsm.toLocaleString()} people (ratio ≈ ${TARGET_RATIO_MID.toFixed(2)}).` });
