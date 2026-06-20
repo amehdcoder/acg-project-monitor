@@ -649,7 +649,6 @@ export default function BloombergDashboard({ onClose }: Props) {
                   <thead>
                     <tr className="border-b border-border text-left text-xs text-muted-foreground">
                       <th className="py-2 pr-3">School</th>
-                      <th className="py-2 px-3">Code</th>
                       <th className="py-2 px-3">State</th>
                       <th className="py-2 px-3">LGA</th>
                       <th className="py-2 px-3">Reason</th>
@@ -660,7 +659,6 @@ export default function BloombergDashboard({ onClose }: Props) {
                     {nonExistent.rows.map((r, i) => (
                       <tr key={i} className="border-b border-border/50 last:border-0">
                         <td className="py-2 pr-3 font-medium text-foreground">{r.school}</td>
-                        <td className="py-2 px-3 text-xs text-muted-foreground">{r.code}</td>
                         <td className="py-2 px-3"><Label name={r.state} /></td>
                         <td className="py-2 px-3"><Label name={r.lga} /></td>
                         <td className="py-2 px-3">

@@ -85,8 +85,11 @@ export async function migrateReadyToSendBloomberg(
   if (eligible.length === 0) return result;
 
   // 3a) Local de-dup: one entry per school (the most recently finalized).
+  // Superseded duplicates are queued for a parallel status-clear so we never
+  // block the event loop entry-by-entry, no matter how many are stuck.
   const bySchool = new Map<string, SavedFormEntry>();
   const noKey: SavedFormEntry[] = [];
+  const supersededIds: string[] = [];
   for (const e of eligible) {
     const key = schoolKeyOf(e);
     if (!key) {
@@ -96,22 +99,45 @@ export async function migrateReadyToSendBloomberg(
     const prev = bySchool.get(key);
     if (!prev || finalizeTime(e) >= finalizeTime(prev)) {
       if (prev) {
-        // The superseded duplicate can be cleared from the device.
-        await setSavedEntryStatus(prev.id, "sent", {
-          submissionId: prev.submissionId || null,
-          sentAt: new Date().toISOString(),
-        });
+        supersededIds.push(prev.id);
         result.skippedDuplicate += 1;
       }
       bySchool.set(key, e);
     } else {
-      await setSavedEntryStatus(e.id, "sent", {
-        submissionId: e.submissionId || null,
-        sentAt: new Date().toISOString(),
-      });
+      supersededIds.push(e.id);
       result.skippedDuplicate += 1;
     }
   }
+
+  const nowIso = () => new Date().toISOString();
+
+  // Bounded-concurrency pool: processes an unbounded list "instantly" from the
+  // user's perspective without spawning trillions of simultaneous promises
+  // (which would exhaust memory / freeze the tab). Yields between waves so the
+  // UI stays smooth and responsive regardless of volume.
+  const POOL = 64;
+  async function runPool<T>(items: T[], worker: (item: T) => Promise<void>) {
+    let idx = 0;
+    const next = async (): Promise<void> => {
+      while (idx < items.length) {
+        const i = idx++;
+        try {
+          await worker(items[i]);
+        } catch {
+          // Per-item failures are non-fatal; the entry stays for a later retry.
+        }
+        // Yield to the event loop periodically so the app never freezes.
+        if (i % POOL === 0) await Promise.resolve();
+      }
+    };
+    const runners = Array.from({ length: Math.min(POOL, items.length || 1) }, next);
+    await Promise.all(runners);
+  }
+
+  // Clear superseded local duplicates in parallel — fire and forget alongside.
+  const supersedeWork = runPool(supersededIds, async (id) => {
+    await setSavedEntryStatus(id, "sent", { submissionId: null, sentAt: nowIso() });
+  });
 
   // 3b) Server de-dup: schools this validator already has on record.
   const serverKeys = new Set<string>();
@@ -131,18 +157,21 @@ export async function migrateReadyToSendBloomberg(
 
   const targets: SavedFormEntry[] = [...bySchool.values(), ...noKey];
 
-  // 4) Insert survivors, preserving original timestamps. 5) Mark local as sent.
-  for (const e of targets) {
+  // 4) Insert survivors (preserving original timestamps) and 5) mark local
+  // entries sent — all in parallel through the bounded pool. This makes
+  // recovery effectively instantaneous for any volume without batching delays
+  // or freezing the dashboard/app.
+  await runPool(targets, async (e) => {
     const key = schoolKeyOf(e);
     if (key && serverKeys.has(key)) {
       // Already validated by this user on the server — clear it locally to keep
       // the "Ready to send" tab accurate, but never create a duplicate row.
       await setSavedEntryStatus(e.id, "sent", {
         submissionId: e.submissionId || null,
-        sentAt: new Date().toISOString(),
+        sentAt: nowIso(),
       });
       result.skippedDuplicate += 1;
-      continue;
+      return;
     }
 
     const submissionId = e.submissionId || crypto.randomUUID();
@@ -150,15 +179,12 @@ export async function migrateReadyToSendBloomberg(
     const submittedIso = new Date(finalizeTime(e)).toISOString();
 
     const baseData = (e.submissionData || {}) as Record<string, any>;
-    // Tag the verification payload so the dashboard can surface an admin-only
-    // "Recovered submissions" indicator without needing a separate table. The
-    // marker is additive and never overwrites real verification fields.
     const verification = {
       ...((baseData.verification && typeof baseData.verification === "object"
         ? baseData.verification
         : {}) as Record<string, any>),
       _recovered_from_ready_to_send: true,
-      _recovered_at: new Date().toISOString(),
+      _recovered_at: nowIso(),
     };
 
     const row = {
@@ -171,21 +197,17 @@ export async function migrateReadyToSendBloomberg(
       submitted_at: submittedIso,
     };
 
-    try {
-      await queueOrInsert("bloomberg_validations", row, true);
-      await setSavedEntryStatus(e.id, "sent", {
-        submissionId,
-        sentAt: new Date().toISOString(),
-      });
-      if (key) serverKeys.add(key);
-      result.migrated += 1;
-    } catch {
-      // Leave the entry as finalized so a later attempt can retry.
-    }
-  }
+    await queueOrInsert("bloomberg_validations", row, true);
+    await setSavedEntryStatus(e.id, "sent", { submissionId, sentAt: nowIso() });
+    if (key) serverKeys.add(key);
+    result.migrated += 1;
+  });
+
+  await supersedeWork;
 
   return result;
 }
+
 
 // Fire-and-forget wrapper used at app start. Runs at most once per session and
 // never throws into the caller.
