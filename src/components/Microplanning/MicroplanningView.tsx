@@ -1060,7 +1060,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       const k = dupKey(u);
       if (seenInUpload.has(k)) internalDupes++;
       seenInUpload.add(k);
-      if (existing.has(k)) dupeCount++;
+      if (existing[k]) dupeCount++;
       else newCount++;
     }
     return { newCount, dupeCount, internalDupes, total: uploadedMedEntries.length };
