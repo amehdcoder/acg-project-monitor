@@ -32,6 +32,7 @@ import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import { exportMicroplanWorkbook } from "@/lib/microplanning/microplanTemplate";
+import { parseMedicineUploadFile, exportMedicineUploadTemplate, type UploadedMedicineEntry } from "@/lib/microplanning/medicineUpload";
 
 // Exact template column headers matching the NTDs Microplan Template
 const TEMPLATE_HEADERS = [
@@ -410,6 +411,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [medAllocEntries, setMedAllocEntries] = useState<{ id?: string; lga: string; amount: string; jrsm?: string; medicine_name?: string; year?: number }[]>([{ lga: "", amount: "", jrsm: "" }]);
   const [savedAllocations, setSavedAllocations] = useState<any[]>([]);
   const [savingAllocations, setSavingAllocations] = useState(false);
+  // Medicine "upload & compute" — ad-hoc population rows used as the breakdown source
+  const [uploadedMedEntries, setUploadedMedEntries] = useState<UploadedMedicineEntry[]>([]);
+  const [uploadingMed, setUploadingMed] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const medUploadRef = useRef<HTMLInputElement>(null);
 
   // User access management state
   const [showAccessManager, setShowAccessManager] = useState(false);
@@ -881,7 +887,13 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const TERRAIN_EMOJI: Record<string, string> = { flat: "🌾", hilly: "⛰️", mountainous: "🏔️", riverine: "🌊", swampy: "🏝️", desert: "🏜️", forest: "🌲" };
 
   // Medicine allocation: unique LGAs from current entries
-  const allLgasForMedicine = useMemo(() => [...new Set(displayEntries.map(e => e.lga))].sort(), [displayEntries]);
+  // When the user has uploaded ad-hoc population rows, the medicine breakdown
+  // computes from those instead of the saved microplan entries.
+  const medicineSourceEntries = useMemo(
+    () => (uploadedMedEntries.length > 0 ? (uploadedMedEntries as any[]) : displayEntries),
+    [uploadedMedEntries, displayEntries],
+  );
+  const allLgasForMedicine = useMemo(() => [...new Set(medicineSourceEntries.map((e: any) => e.lga))].sort(), [medicineSourceEntries]);
 
   const getTargetPop = (e: any) => {
     return calcTargetPop(e) || (e.estimated_total_population || 0);
@@ -911,7 +923,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     for (const me of validEntries) {
       const totalMedicine = Number(me.amount);
       const jrsmTotal = Number(me.jrsm) || 0;
-      const lgaEntries = displayEntries.filter(e => e.lga === me.lga);
+      const lgaEntries = medicineSourceEntries.filter((e: any) => e.lga === me.lga);
       if (lgaEntries.length === 0) continue;
 
       const rows = lgaEntries.map(e => ({
@@ -959,7 +971,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
 
     return allRows;
-  }, [medAllocEntries, displayEntries, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
+  }, [medAllocEntries, medicineSourceEntries, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
 
   // Per-LGA adjustment suggestions (drug/person ratio → 2.5–3.0)
   const lgaAdjustmentSuggestions = useMemo(() => {
@@ -986,6 +998,39 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     });
     return out;
   }, [medAllocEntries, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
+
+  // ---- Medicine "upload & compute" handlers ----
+  const handleMedicineUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingMed(true);
+    setUploadProgress(0);
+    try {
+      const { entries, skipped, total } = await parseMedicineUploadFile(file, (done, tot) => {
+        setUploadProgress(tot > 0 ? Math.round((done / tot) * 100) : 100);
+      });
+      if (entries.length === 0) {
+        toast({ title: "No valid rows", description: "Ensure State, LGA, Community/Settlement and Total Population are filled.", variant: "destructive" });
+        return;
+      }
+      setUploadedMedEntries(entries);
+      toast({
+        title: `✅ ${entries.length.toLocaleString()} rows ready`,
+        description: `Target population computed from ${total.toLocaleString()} rows${skipped > 0 ? ` · ${skipped.toLocaleString()} skipped` : ""}. Enter medicine per LGA below.`,
+      });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingMed(false);
+      setUploadProgress(0);
+      if (medUploadRef.current) medUploadRef.current.value = "";
+    }
+  };
+
+  const clearMedicineUpload = () => {
+    setUploadedMedEntries([]);
+    toast({ title: "Upload cleared", description: "Medicine breakdown reverted to saved microplan entries." });
+  };
 
   const applySuggestedJrsm = (idx: number, newJrsm: number) => {
     setMedAllocEntries(prev => prev.map((row, i) => i === idx ? { ...row, jrsm: String(newJrsm) } : row));
@@ -1546,6 +1591,47 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <p className="text-xs text-muted-foreground">
                   Add one or more LGAs with their allocated medicine quantities and the JRSM target (people to be treated). Both values are proportionally distributed across communities/settlements based on target population. The drug-per-person ratio should remain between <strong>2.5 and 3.0</strong>.
                 </p>
+
+                {/* Upload & Compute panel */}
+                <div className="rounded-lg border border-emerald-300/60 bg-gradient-to-br from-emerald-50/70 to-background dark:from-emerald-950/20 p-3 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-base">📤</span>
+                    <h3 className="text-xs font-bold text-foreground">Upload & Compute Target Population</h3>
+                    {uploadedMedEntries.length > 0 && (
+                      <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-600">
+                        {uploadedMedEntries.length.toLocaleString()} rows · {uploadedMedEntries.reduce((s, e) => s + e.estimated_total_population, 0).toLocaleString()} pop
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Upload a simple sheet with <strong>Year, State, LGA, Ward, FLHF, Community or Settlement, Total Population</strong>. The target population is computed automatically and the medicine you enter per LGA is broken down across every community/settlement.
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1" onClick={() => exportMedicineUploadTemplate()}>
+                      <FileSpreadsheet className="h-3 w-3" /> Download Upload Template
+                    </Button>
+                    <Button size="sm" className="h-7 text-[11px] gap-1 bg-emerald-600 hover:bg-emerald-700" onClick={() => medUploadRef.current?.click()} disabled={uploadingMed}>
+                      <Upload className="h-3 w-3" /> {uploadingMed ? `Computing… ${uploadProgress}%` : "Upload Population Data"}
+                    </Button>
+                    {uploadedMedEntries.length > 0 && !uploadingMed && (
+                      <Button size="sm" variant="ghost" className="h-7 text-[11px] gap-1 text-destructive" onClick={clearMedicineUpload}>
+                        <X className="h-3 w-3" /> Clear upload
+                      </Button>
+                    )}
+                    <input
+                      ref={medUploadRef}
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      className="hidden"
+                      onChange={handleMedicineUpload}
+                    />
+                  </div>
+                  {uploadedMedEntries.length > 0 && (
+                    <p className="text-[10px] text-emerald-700 dark:text-emerald-400">
+                      ✓ Breakdown is using your uploaded data. Clear the upload to switch back to saved microplan entries.
+                    </p>
+                  )}
+                </div>
 
                 {/* Multiple LGA entry rows */}
                 <div className="space-y-2">
