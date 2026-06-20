@@ -1095,8 +1095,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     if (!user?.id || !selectedProjectId || uploadedMedEntries.length === 0) return;
     setAdopting(true);
     try {
-      const existing = new Map<string, any>();
-      entries.forEach((e) => existing.set(dupKey(e), e));
+      const existing: Record<string, any> = {};
+      entries.forEach((e) => { existing[dupKey(e)] = e; });
 
       const toInsert: any[] = [];
       const toUpdate: { id: string; payload: any }[] = [];
@@ -1106,7 +1106,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         const k = dupKey(u);
         if (seen.has(k)) continue; // collapse internal duplicates
         seen.add(k);
-        const match = existing.get(k);
+        const match = existing[k];
         const payload = uploadedToEntry(u);
         if (match) {
           if (mode === "update") toUpdate.push({ id: match.id, payload });
