@@ -1770,11 +1770,23 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                     />
                   </div>
                   {uploadedMedEntries.length > 0 && (
-                    <p className="text-[10px] text-emerald-700 dark:text-emerald-400">
-                      ✓ Breakdown is using your uploaded data. Clear the upload to switch back to saved microplan entries.
-                    </p>
+                    <div className="space-y-2">
+                      <p className="text-[10px] text-emerald-700 dark:text-emerald-400">
+                        ✓ Breakdown is using your uploaded data. Clear the upload to switch back to saved microplan entries.
+                      </p>
+                      {isAdmin && (
+                        <Button
+                          size="sm"
+                          className="h-8 text-[11px] gap-1 bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-600 hover:opacity-90 text-white shadow-md"
+                          onClick={() => setShowAdoptDialog(true)}
+                        >
+                          <Building2 className="h-3.5 w-3.5" /> Use as Project Microplan Data…
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
+                {renderAdoptDialog()}
 
                 {/* Multiple LGA entry rows */}
                 <div className="space-y-2">
