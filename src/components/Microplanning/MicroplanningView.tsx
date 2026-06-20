@@ -1025,6 +1025,30 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     return allRows;
   }, [medAllocEntries, medicineSourceEntries, medTargetPct, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
 
+  // ---- Allocation validation ----
+  // Prevent allocations whose JRSM target (people to treat) exceeds the target
+  // population available at the chosen depth (LGA / Ward / FLHF). Returns the
+  // offending entries with their totals so the UI can show a precise error.
+  const allocationWarnings = useMemo(() => {
+    const out: { idx: number; lga: string; ward: string; flhf: string; depth: string; jrsm: number; targetPop: number; over: number }[] = [];
+    medAllocEntries.forEach((me, idx) => {
+      if (!me.lga) return;
+      const jrsm = Number(me.jrsm) || 0;
+      if (jrsm <= 0) return;
+      const scope = medicineSourceEntries.filter((e: any) =>
+        e.lga === me.lga &&
+        (!me.ward || e.ward === me.ward) &&
+        (!me.flhf || e.flhf_name === me.flhf));
+      if (scope.length === 0) return;
+      const targetPop = scope.reduce((s, e: any) => s + getTargetPop(e), 0);
+      if (targetPop > 0 && jrsm > targetPop) {
+        const depth = me.flhf ? "FLHF" : me.ward ? "Ward" : "LGA";
+        out.push({ idx, lga: me.lga, ward: me.ward || "—", flhf: me.flhf || "—", depth, jrsm, targetPop, over: jrsm - targetPop });
+      }
+    });
+    return out;
+  }, [medAllocEntries, medicineSourceEntries, medTargetPct]);
+
   // Per-LGA adjustment suggestions (drug/person ratio → 2.5–3.0)
   const lgaAdjustmentSuggestions = useMemo(() => {
     const out: { lga: string; idx: number; medicineTotal: number; jrsmCurrent: number; jrsmSuggested: number; ratioCurrent: number; scaleFactor: number; status: "ok" | "low" | "high" | "na" }[] = [];
