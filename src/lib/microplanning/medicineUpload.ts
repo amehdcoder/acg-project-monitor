@@ -348,3 +348,231 @@ export async function exportMedicineUploadTemplate(): Promise<void> {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+// ============================================================================
+// Allocation Plan upload — drives the whole Medicine allocation automatically
+// from a single uploaded sheet so the admin never has to manually pick the LGA,
+// drill down to the ward, or type the medicine allocated and JRSM target.
+//
+// Expected columns (extra columns / banners / ordering tolerated):
+//   State | LGA | Ward | SAC Requiring PC (JRSM-Target People)
+//         | Medicine Allocated by Ward | Medicine Allocated by LGA
+// ============================================================================
+
+export const ALLOCATION_PLAN_HEADERS = [
+  "State",
+  "LGA",
+  "Ward",
+  "SAC Requiring PC (JRSM-Target People)",
+  "Medicine Allocated by Ward",
+  "Medicine Allocated by LGA",
+] as const;
+
+type AllocField = "state" | "lga" | "ward" | "jrsm" | "medWard" | "medLga";
+
+function matchAllocHeader(h: string): AllocField | null {
+  const n = norm(h);
+  if (n === "state") return "state";
+  if (n === "lga" || n.includes("localgovern")) return "lga";
+  if (n === "ward") return "ward";
+  if (n.includes("sacrequiring") || n.includes("jrsm") || n.includes("targetpeople") || n.includes("targetpop")) return "jrsm";
+  if (n.includes("medicineallocatedbyward") || n === "medicinebyward") return "medWard";
+  if (n.includes("medicineallocatedbylga") || n === "medicinebylga") return "medLga";
+  return null;
+}
+
+export interface AllocationPlanRow {
+  state: string;
+  lga: string;
+  ward: string;
+  jrsm: number;
+  medicineByWard: number;
+  medicineByLga: number;
+}
+
+export interface AllocationPlanResult {
+  rows: AllocationPlanRow[];
+  skipped: number;
+  total: number;
+}
+
+const toNum = (v: any) => {
+  const cleaned = String(v ?? "").replace(/[^0-9.\-]/g, "");
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+};
+
+/** Parse an uploaded allocation-plan sheet. Tolerant of merged hierarchy cells. */
+export async function parseAllocationPlanFile(
+  file: File,
+  onProgress?: (done: number, total: number) => void,
+): Promise<AllocationPlanResult> {
+  const data = await file.arrayBuffer();
+  const wb = XLSX.read(data, { dense: true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
+
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 15); i++) {
+    const matched = (rows[i] || []).map((c) => matchAllocHeader(String(c)));
+    if (matched.includes("lga") && (matched.includes("medWard") || matched.includes("medLga") || matched.includes("jrsm"))) {
+      headerIdx = i;
+      break;
+    }
+  }
+  if (headerIdx === -1) {
+    throw new Error(
+      "Could not find a header row. Make sure the sheet has columns: State, LGA, Ward, SAC Requiring PC (JRSM-Target People), Medicine Allocated by Ward, Medicine Allocated by LGA.",
+    );
+  }
+
+  const colMap: Partial<Record<AllocField, number>> = {};
+  (rows[headerIdx] || []).forEach((c, idx) => {
+    const key = matchAllocHeader(String(c));
+    if (key && colMap[key] === undefined) colMap[key] = idx;
+  });
+
+  const dataRows = rows.slice(headerIdx + 1);
+  const total = dataRows.length;
+  const out: AllocationPlanRow[] = [];
+  let skipped = 0;
+
+  // Forward-fill State/LGA (and last LGA-level medicine) across merged cells.
+  const carry: Partial<Record<AllocField, any>> = {};
+  const isBlank = (v: any) => v === undefined || v === null || String(v).trim() === "";
+  const pick = (r: any[], key: AllocField, fill: boolean) => {
+    const idx = colMap[key];
+    let v = idx !== undefined ? r[idx] : undefined;
+    if (fill) {
+      if (!isBlank(v)) carry[key] = v;
+      else if (!isBlank(carry[key])) v = carry[key];
+    }
+    return v;
+  };
+
+  for (let i = 0; i < total; i++) {
+    const r = dataRows[i] || [];
+    if (!r.some((c) => c !== undefined && c !== null && c !== "")) continue;
+    const state = String(pick(r, "state", true) ?? "").trim();
+    const lga = String(pick(r, "lga", true) ?? "").trim();
+    const ward = String(pick(r, "ward", false) ?? "").trim();
+    const jrsm = Math.round(toNum(pick(r, "jrsm", false)));
+    const medicineByWard = Math.round(toNum(pick(r, "medWard", false)));
+    const medicineByLga = Math.round(toNum(pick(r, "medLga", true)));
+    if (!lga) { skipped++; continue; }
+    out.push({ state, lga, ward, jrsm, medicineByWard, medicineByLga });
+  }
+  onProgress?.(total, total);
+  return { rows: out, skipped, total };
+}
+
+/** Download a branded, dropdown-validated blank Allocation Plan template. */
+export async function exportAllocationPlanTemplate(): Promise<void> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Amehnities — HANDS Nigeria";
+  wb.created = new Date();
+  const ws = wb.addWorksheet("Allocation Plan", { views: [{ state: "frozen", ySplit: 5 }] });
+
+  const [fmoh, ameh, hands] = await Promise.all([
+    fetchImage(fmohLogo), fetchImage(amehLogo), fetchImage(handsLogo),
+  ]);
+  const addLogo = (buf: ArrayBuffer | null, col: number) => {
+    if (!buf) return;
+    const id = wb.addImage({ buffer: buf as any, extension: "png" });
+    ws.addImage(id, { tl: { col, row: 0.1 }, ext: { width: 60, height: 60 } });
+  };
+  addLogo(fmoh, 0);
+  addLogo(hands, 2);
+  addLogo(ameh, ALLOCATION_PLAN_HEADERS.length - 1);
+
+  ws.mergeCells(1, 2, 1, ALLOCATION_PLAN_HEADERS.length - 1);
+  const title = ws.getCell(1, 2);
+  title.value = "MEDICINE ALLOCATION PLAN";
+  title.font = { bold: true, size: 14, color: { argb: "FF0C5A3A" } };
+  title.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+
+  ws.mergeCells(2, 2, 3, ALLOCATION_PLAN_HEADERS.length - 1);
+  const sub = ws.getCell(2, 2);
+  sub.value = "Enter the JRSM target and medicine allocated per Ward (or per LGA). The app auto-distributes medicine & expected treatment to every community.";
+  sub.font = { italic: true, size: 10, color: { argb: "FF4B5563" } };
+  sub.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+  ws.getRow(1).height = 26;
+  ws.getRow(4).height = 6;
+
+  const HEADER_ROW = 5;
+  const header = ws.getRow(HEADER_ROW);
+  ALLOCATION_PLAN_HEADERS.forEach((c, i) => {
+    const cell = header.getCell(i + 1);
+    cell.value = c;
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0C5A3A" } };
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    cell.border = {
+      top: { style: "thin", color: { argb: "FF0A4A30" } },
+      bottom: { style: "thin", color: { argb: "FF0A4A30" } },
+      left: { style: "thin", color: { argb: "FF0A4A30" } },
+      right: { style: "thin", color: { argb: "FF0A4A30" } },
+    };
+  });
+  header.height = 40;
+  ALLOCATION_PLAN_HEADERS.forEach((c, i) => {
+    ws.getColumn(i + 1).width = Math.min(Math.max(c.length + 2, 14), 30);
+  });
+
+  const lastRow = HEADER_ROW + 1000;
+  for (let i = HEADER_ROW + 1; i <= lastRow; i++) {
+    const row = ws.getRow(i);
+    row.height = 18;
+    if ((i - HEADER_ROW) % 2 === 0) {
+      ALLOCATION_PLAN_HEADERS.forEach((_, ci) => {
+        row.getCell(ci + 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F7F4" } };
+      });
+    }
+  }
+
+  const stateCol = ALLOCATION_PLAN_HEADERS.indexOf("State" as any) + 1;
+  const stateLetter = ws.getColumn(stateCol).letter;
+  for (let i = HEADER_ROW + 1; i <= lastRow; i++) {
+    ws.getCell(`${stateLetter}${i}`).dataValidation = {
+      type: "list", allowBlank: true, formulae: [`"${NIGERIA_STATES.join(",")}"`],
+      showErrorMessage: true, errorTitle: "Invalid value", error: "Pick a state from the list.",
+    };
+  }
+  ["SAC Requiring PC (JRSM-Target People)", "Medicine Allocated by Ward", "Medicine Allocated by LGA"].forEach((h) => {
+    const col = ALLOCATION_PLAN_HEADERS.indexOf(h as any) + 1;
+    const letter = ws.getColumn(col).letter;
+    for (let i = HEADER_ROW + 1; i <= lastRow; i++) {
+      ws.getCell(`${letter}${i}`).dataValidation = {
+        type: "whole", operator: "greaterThanOrEqual", allowBlank: true, formulae: ["0"],
+        showErrorMessage: true, errorTitle: "Invalid number", error: "Enter a whole number (0 or more).",
+      };
+    }
+  });
+
+  const help = wb.addWorksheet("Instructions");
+  help.columns = [{ width: 36 }, { width: 92 }];
+  const head = help.getRow(1);
+  head.getCell(1).value = "Column";
+  head.getCell(2).value = "Guidance";
+  head.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  head.eachCell((c) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0C5A3A" } }; });
+  const note = (a: string, b: string) => {
+    const r = help.addRow([a, b]);
+    r.getCell(1).font = { bold: true };
+    r.getCell(2).alignment = { wrapText: true };
+  };
+  note("State / LGA / Ward", "Geographic hierarchy. Merged LGA cells are auto carried down.");
+  note("SAC Requiring PC (JRSM-Target People)", "People to treat for that Ward (the JRSM target).");
+  note("Medicine Allocated by Ward", "Units of medicine allocated to that Ward. Used to auto-build per-ward allocations.");
+  note("Medicine Allocated by LGA", "Total units for the LGA (optional). Used when no ward-level allocation is provided.");
+  note("Automation", "On upload, the app builds the allocation rows automatically and distributes medicine & expected treatment across every community. No manual selection needed.");
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "Medicine_Allocation_Plan_Template.xlsx";
+  a.click();
+  URL.revokeObjectURL(url);
+}

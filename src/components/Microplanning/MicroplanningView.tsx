@@ -32,7 +32,7 @@ import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import { exportMicroplanWorkbook } from "@/lib/microplanning/microplanTemplate";
-import { parseMedicineUploadFile, exportMedicineUploadTemplate, type UploadedMedicineEntry } from "@/lib/microplanning/medicineUpload";
+import { parseMedicineUploadFile, exportMedicineUploadTemplate, parseAllocationPlanFile, exportAllocationPlanTemplate, type UploadedMedicineEntry } from "@/lib/microplanning/medicineUpload";
 
 // Exact template column headers matching the NTDs Microplan Template
 const TEMPLATE_HEADERS = [
@@ -416,6 +416,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [uploadingMed, setUploadingMed] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const medUploadRef = useRef<HTMLInputElement>(null);
+  // Allocation Plan upload — auto-builds allocation rows from a single sheet
+  const [uploadingAlloc, setUploadingAlloc] = useState(false);
+  const allocUploadRef = useRef<HTMLInputElement>(null);
   // % of total population that should be computed as the target population
   const [medTargetPct, setMedTargetPct] = useState<number>(() => {
     const v = parseFloat(localStorage.getItem("microplanning.medTargetPct") || "");
@@ -1022,6 +1025,30 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     return allRows;
   }, [medAllocEntries, medicineSourceEntries, medTargetPct, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
 
+  // ---- Allocation validation ----
+  // Prevent allocations whose JRSM target (people to treat) exceeds the target
+  // population available at the chosen depth (LGA / Ward / FLHF). Returns the
+  // offending entries with their totals so the UI can show a precise error.
+  const allocationWarnings = useMemo(() => {
+    const out: { idx: number; lga: string; ward: string; flhf: string; depth: string; jrsm: number; targetPop: number; over: number }[] = [];
+    medAllocEntries.forEach((me, idx) => {
+      if (!me.lga) return;
+      const jrsm = Number(me.jrsm) || 0;
+      if (jrsm <= 0) return;
+      const scope = medicineSourceEntries.filter((e: any) =>
+        e.lga === me.lga &&
+        (!me.ward || e.ward === me.ward) &&
+        (!me.flhf || e.flhf_name === me.flhf));
+      if (scope.length === 0) return;
+      const targetPop = scope.reduce((s, e: any) => s + getTargetPop(e), 0);
+      if (targetPop > 0 && jrsm > targetPop) {
+        const depth = me.flhf ? "FLHF" : me.ward ? "Ward" : "LGA";
+        out.push({ idx, lga: me.lga, ward: me.ward || "—", flhf: me.flhf || "—", depth, jrsm, targetPop, over: jrsm - targetPop });
+      }
+    });
+    return out;
+  }, [medAllocEntries, medicineSourceEntries, medTargetPct]);
+
   // Per-LGA adjustment suggestions (drug/person ratio → 2.5–3.0)
   const lgaAdjustmentSuggestions = useMemo(() => {
     const out: { lga: string; idx: number; medicineTotal: number; jrsmCurrent: number; jrsmSuggested: number; ratioCurrent: number; scaleFactor: number; status: "ok" | "low" | "high" | "na" }[] = [];
@@ -1075,6 +1102,51 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       setUploadingMed(false);
       setUploadProgress(0);
       if (medUploadRef.current) medUploadRef.current.value = "";
+    }
+  };
+
+  // ---- Allocation Plan upload: auto-build allocation rows from one sheet ----
+  const handleAllocationPlanUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAlloc(true);
+    try {
+      const { rows, skipped, total } = await parseAllocationPlanFile(file);
+      if (rows.length === 0) {
+        toast({ title: "No valid rows", description: "Ensure LGA and at least one of JRSM / Medicine columns are filled.", variant: "destructive" });
+        return;
+      }
+      // Build allocation entries: prefer Ward-level rows; fall back to LGA total.
+      const built: typeof medAllocEntries = [];
+      const seen = new Set<string>();
+      const lgaHasWard = new Set(rows.filter(r => r.ward && r.medicineByWard > 0).map(r => r.lga));
+      for (const r of rows) {
+        if (r.ward && (r.medicineByWard > 0 || r.jrsm > 0)) {
+          const key = `${r.lga}|${r.ward}`.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          built.push({ lga: r.lga, ward: r.ward, flhf: "", amount: String(r.medicineByWard || 0), jrsm: r.jrsm ? String(r.jrsm) : "", year: new Date().getFullYear() });
+        } else if (!lgaHasWard.has(r.lga) && r.medicineByLga > 0) {
+          const key = `${r.lga}|`.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          built.push({ lga: r.lga, ward: "", flhf: "", amount: String(r.medicineByLga), jrsm: r.jrsm ? String(r.jrsm) : "", year: new Date().getFullYear() });
+        }
+      }
+      if (built.length === 0) {
+        toast({ title: "Nothing to allocate", description: "No medicine quantities found in the sheet.", variant: "destructive" });
+        return;
+      }
+      setMedAllocEntries(built);
+      toast({
+        title: `✅ ${built.length.toLocaleString()} allocation(s) built`,
+        description: `From ${total.toLocaleString()} rows${skipped > 0 ? ` · ${skipped.toLocaleString()} skipped` : ""}. Medicine & expected treatment auto-distributed per community.`,
+      });
+    } catch (err: any) {
+      toast({ title: "Allocation upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingAlloc(false);
+      if (allocUploadRef.current) allocUploadRef.current.value = "";
     }
   };
 
@@ -1299,6 +1371,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       Year: r.year, State: r.state, LGA: r.lga, Ward: r.ward, FLHF: r.flhf,
       Community: r.community, Settlement: r.settlement,
       "Target Population": r.targetPop, "Medicine Required": r.medicineRequired, "% Share": r.pct.toFixed(1),
+      "Expected Treatment (People)": r.peopleToTreat, "Drug/Person Ratio": r.ratio ? r.ratio.toFixed(2) : "—",
     })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Medicine Allocation");
@@ -1312,6 +1385,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       Year: r.year, State: r.state, LGA: r.lga, Ward: r.ward, FLHF: r.flhf,
       Community: r.community, Settlement: r.settlement,
       "Target Population": r.targetPop, "Medicine Required": r.medicineRequired, "% Share": Number(r.pct.toFixed(1)),
+      "Expected Treatment (People)": r.peopleToTreat, "Drug/Person Ratio": r.ratio ? Number(r.ratio.toFixed(2)) : 0,
     })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Medicine Allocation");
@@ -1383,6 +1457,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     if (!selectedProjectId || !user?.id) return;
     if (!isAdmin) {
       toast({ title: "Admin only", description: "Only admins can save medicine allocations.", variant: "destructive" });
+      return;
+    }
+    if (allocationWarnings.length > 0) {
+      const w = allocationWarnings[0];
+      toast({
+        title: "🚫 Allocation exceeds target population",
+        description: `${w.lga}${w.ward !== "—" ? ` · ${w.ward}` : ""}${w.flhf !== "—" ? ` · ${w.flhf}` : ""}: JRSM target ${w.jrsm.toLocaleString()} exceeds ${w.depth} target population ${w.targetPop.toLocaleString()} by ${w.over.toLocaleString()}.${allocationWarnings.length > 1 ? ` (+${allocationWarnings.length - 1} more)` : ""}`,
+        variant: "destructive",
+      });
       return;
     }
     setSavingAllocations(true);
@@ -1992,6 +2075,75 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 </div>
                 {renderAdoptDialog()}
 
+                {/* Upload Allocation Plan panel — fully automates allocation */}
+                <div className="rounded-lg border border-indigo-300/60 bg-gradient-to-br from-indigo-50/70 to-background dark:from-indigo-950/20 p-3 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-base">🧮</span>
+                    <h3 className="text-xs font-bold text-foreground">Upload Allocation Plan (auto-allocate)</h3>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Upload a sheet with <strong>State, LGA, Ward, SAC Requiring PC (JRSM-Target People), Medicine Allocated by Ward, Medicine Allocated by LGA</strong>. The app builds every allocation automatically — no need to select the LGA, drill down to the ward, or type the medicine/JRSM. Then download the allocation &amp; expected treatment per community below.
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1" onClick={() => exportAllocationPlanTemplate()}>
+                      <FileSpreadsheet className="h-3 w-3" /> Download Allocation Template
+                    </Button>
+                    <Button size="sm" className="h-7 text-[11px] gap-1 bg-indigo-600 hover:bg-indigo-700" onClick={() => allocUploadRef.current?.click()} disabled={uploadingAlloc}>
+                      <Upload className="h-3 w-3" /> {uploadingAlloc ? "Building…" : "Upload Allocation Plan"}
+                    </Button>
+                    <input
+                      ref={allocUploadRef}
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      className="hidden"
+                      onChange={handleAllocationPlanUpload}
+                    />
+                  </div>
+                </div>
+
+                {/* Validation: allocations exceeding target population at chosen depth */}
+                {allocationWarnings.length > 0 && (
+                  <div className="rounded-lg border-2 border-red-400/70 bg-red-50/80 dark:bg-red-950/20 p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🚫</span>
+                      <h3 className="text-xs font-bold text-red-700 dark:text-red-400">
+                        {allocationWarnings.length} allocation{allocationWarnings.length > 1 ? "s" : ""} exceed the target population
+                      </h3>
+                    </div>
+                    <p className="text-[11px] text-red-700/90 dark:text-red-300/90">
+                      The JRSM target (people to treat) cannot be larger than the target population available at the chosen depth. Reduce the target(s) below before saving.
+                    </p>
+                    <div className="overflow-auto rounded-md border border-red-300/60 bg-background">
+                      <table className="w-full text-[10px] border-collapse">
+                        <thead>
+                          <tr className="text-left text-muted-foreground bg-red-100/50 dark:bg-red-950/30">
+                            <th className="px-2 py-1.5 font-semibold border-b">LGA</th>
+                            <th className="px-2 py-1.5 font-semibold border-b">Ward</th>
+                            <th className="px-2 py-1.5 font-semibold border-b">FLHF</th>
+                            <th className="px-2 py-1.5 font-semibold border-b">Depth</th>
+                            <th className="px-2 py-1.5 font-semibold border-b text-right">JRSM Target</th>
+                            <th className="px-2 py-1.5 font-semibold border-b text-right">Target Pop</th>
+                            <th className="px-2 py-1.5 font-semibold border-b text-right">Over by</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allocationWarnings.map((w, i) => (
+                            <tr key={i} className="even:bg-red-50/40 dark:even:bg-red-950/10">
+                              <td className="px-2 py-1 border-b">{w.lga}</td>
+                              <td className="px-2 py-1 border-b">{w.ward}</td>
+                              <td className="px-2 py-1 border-b">{w.flhf}</td>
+                              <td className="px-2 py-1 border-b">{w.depth}</td>
+                              <td className="px-2 py-1 border-b text-right tabular-nums font-semibold">{w.jrsm.toLocaleString()}</td>
+                              <td className="px-2 py-1 border-b text-right tabular-nums">{w.targetPop.toLocaleString()}</td>
+                              <td className="px-2 py-1 border-b text-right tabular-nums font-bold text-red-600">+{w.over.toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
                 {/* Multiple LGA entry rows */}
                 <div className="space-y-2">
                   {medAllocEntries.map((entry, idx) => (
@@ -2079,7 +2231,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                       <Plus className="h-3 w-3" /> Add another LGA
                     </Button>
                     {isAdmin && (
-                      <Button size="sm" className="h-7 text-xs gap-1" onClick={saveAllocations} disabled={savingAllocations}>
+                      <Button size="sm" className="h-7 text-xs gap-1" onClick={saveAllocations} disabled={savingAllocations || allocationWarnings.length > 0}>
                         💾 {savingAllocations ? "Saving…" : "Save Allocations"}
                       </Button>
                     )}
