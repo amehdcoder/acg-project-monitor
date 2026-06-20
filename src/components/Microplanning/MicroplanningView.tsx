@@ -1367,8 +1367,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
     setMedAllocEntries(prev => prev.filter((_, i) => i !== idx));
   };
-  const updateMedAllocRow = (idx: number, field: "lga" | "amount" | "jrsm", value: string) => {
-    setMedAllocEntries(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
+  const updateMedAllocRow = (idx: number, field: "lga" | "ward" | "flhf" | "amount" | "jrsm", value: string) => {
+    setMedAllocEntries(prev => prev.map((row, i) => {
+      if (i !== idx) return row;
+      const next = { ...row, [field]: value };
+      // Reset deeper levels when a parent changes to keep the cascade valid
+      if (field === "lga") { next.ward = ""; next.flhf = ""; }
+      if (field === "ward") { next.flhf = ""; }
+      return next;
+    }));
   };
 
   // Persist all current allocation rows (insert new, update changed)
