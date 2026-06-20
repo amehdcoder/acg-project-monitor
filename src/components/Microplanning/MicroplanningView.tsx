@@ -1592,6 +1592,47 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                   Add one or more LGAs with their allocated medicine quantities and the JRSM target (people to be treated). Both values are proportionally distributed across communities/settlements based on target population. The drug-per-person ratio should remain between <strong>2.5 and 3.0</strong>.
                 </p>
 
+                {/* Upload & Compute panel */}
+                <div className="rounded-lg border border-emerald-300/60 bg-gradient-to-br from-emerald-50/70 to-background dark:from-emerald-950/20 p-3 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-base">📤</span>
+                    <h3 className="text-xs font-bold text-foreground">Upload & Compute Target Population</h3>
+                    {uploadedMedEntries.length > 0 && (
+                      <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-600">
+                        {uploadedMedEntries.length.toLocaleString()} rows · {uploadedMedEntries.reduce((s, e) => s + e.estimated_total_population, 0).toLocaleString()} pop
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Upload a simple sheet with <strong>Year, State, LGA, Ward, FLHF, Community or Settlement, Total Population</strong>. The target population is computed automatically and the medicine you enter per LGA is broken down across every community/settlement.
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1" onClick={() => exportMedicineUploadTemplate()}>
+                      <FileSpreadsheet className="h-3 w-3" /> Download Upload Template
+                    </Button>
+                    <Button size="sm" className="h-7 text-[11px] gap-1 bg-emerald-600 hover:bg-emerald-700" onClick={() => medUploadRef.current?.click()} disabled={uploadingMed}>
+                      <Upload className="h-3 w-3" /> {uploadingMed ? `Computing… ${uploadProgress}%` : "Upload Population Data"}
+                    </Button>
+                    {uploadedMedEntries.length > 0 && !uploadingMed && (
+                      <Button size="sm" variant="ghost" className="h-7 text-[11px] gap-1 text-destructive" onClick={clearMedicineUpload}>
+                        <X className="h-3 w-3" /> Clear upload
+                      </Button>
+                    )}
+                    <input
+                      ref={medUploadRef}
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      className="hidden"
+                      onChange={handleMedicineUpload}
+                    />
+                  </div>
+                  {uploadedMedEntries.length > 0 && (
+                    <p className="text-[10px] text-emerald-700 dark:text-emerald-400">
+                      ✓ Breakdown is using your uploaded data. Clear the upload to switch back to saved microplan entries.
+                    </p>
+                  )}
+                </div>
+
                 {/* Multiple LGA entry rows */}
                 <div className="space-y-2">
                   {medAllocEntries.map((entry, idx) => (
