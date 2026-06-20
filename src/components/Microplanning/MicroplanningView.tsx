@@ -553,12 +553,14 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       setMedAllocEntries(data.map((d: any) => ({
         id: d.id,
         lga: d.lga,
+        ward: d.ward || "",
+        flhf: d.flhf || "",
         amount: String(d.amount ?? ""),
         medicine_name: d.medicine_name || "",
         year: d.year,
       })));
     } else {
-      setMedAllocEntries([{ lga: "", amount: "" }]);
+      setMedAllocEntries([{ lga: "", ward: "", flhf: "", amount: "" }]);
     }
   }, [selectedProjectId]);
   useEffect(() => { fetchAllocations(); }, [fetchAllocations]);
