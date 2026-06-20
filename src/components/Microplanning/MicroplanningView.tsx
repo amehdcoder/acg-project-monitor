@@ -32,7 +32,7 @@ import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import { exportMicroplanWorkbook } from "@/lib/microplanning/microplanTemplate";
-import { parseMedicineUploadFile, exportMedicineUploadTemplate, type UploadedMedicineEntry } from "@/lib/microplanning/medicineUpload";
+import { parseMedicineUploadFile, exportMedicineUploadTemplate, parseAllocationPlanFile, exportAllocationPlanTemplate, type UploadedMedicineEntry } from "@/lib/microplanning/medicineUpload";
 
 // Exact template column headers matching the NTDs Microplan Template
 const TEMPLATE_HEADERS = [
