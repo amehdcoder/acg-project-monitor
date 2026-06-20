@@ -2073,6 +2073,75 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 </div>
                 {renderAdoptDialog()}
 
+                {/* Upload Allocation Plan panel — fully automates allocation */}
+                <div className="rounded-lg border border-indigo-300/60 bg-gradient-to-br from-indigo-50/70 to-background dark:from-indigo-950/20 p-3 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-base">🧮</span>
+                    <h3 className="text-xs font-bold text-foreground">Upload Allocation Plan (auto-allocate)</h3>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Upload a sheet with <strong>State, LGA, Ward, SAC Requiring PC (JRSM-Target People), Medicine Allocated by Ward, Medicine Allocated by LGA</strong>. The app builds every allocation automatically — no need to select the LGA, drill down to the ward, or type the medicine/JRSM. Then download the allocation &amp; expected treatment per community below.
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1" onClick={() => exportAllocationPlanTemplate()}>
+                      <FileSpreadsheet className="h-3 w-3" /> Download Allocation Template
+                    </Button>
+                    <Button size="sm" className="h-7 text-[11px] gap-1 bg-indigo-600 hover:bg-indigo-700" onClick={() => allocUploadRef.current?.click()} disabled={uploadingAlloc}>
+                      <Upload className="h-3 w-3" /> {uploadingAlloc ? "Building…" : "Upload Allocation Plan"}
+                    </Button>
+                    <input
+                      ref={allocUploadRef}
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      className="hidden"
+                      onChange={handleAllocationPlanUpload}
+                    />
+                  </div>
+                </div>
+
+                {/* Validation: allocations exceeding target population at chosen depth */}
+                {allocationWarnings.length > 0 && (
+                  <div className="rounded-lg border-2 border-red-400/70 bg-red-50/80 dark:bg-red-950/20 p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🚫</span>
+                      <h3 className="text-xs font-bold text-red-700 dark:text-red-400">
+                        {allocationWarnings.length} allocation{allocationWarnings.length > 1 ? "s" : ""} exceed the target population
+                      </h3>
+                    </div>
+                    <p className="text-[11px] text-red-700/90 dark:text-red-300/90">
+                      The JRSM target (people to treat) cannot be larger than the target population available at the chosen depth. Reduce the target(s) below before saving.
+                    </p>
+                    <div className="overflow-auto rounded-md border border-red-300/60 bg-background">
+                      <table className="w-full text-[10px] border-collapse">
+                        <thead>
+                          <tr className="text-left text-muted-foreground bg-red-100/50 dark:bg-red-950/30">
+                            <th className="px-2 py-1.5 font-semibold border-b">LGA</th>
+                            <th className="px-2 py-1.5 font-semibold border-b">Ward</th>
+                            <th className="px-2 py-1.5 font-semibold border-b">FLHF</th>
+                            <th className="px-2 py-1.5 font-semibold border-b">Depth</th>
+                            <th className="px-2 py-1.5 font-semibold border-b text-right">JRSM Target</th>
+                            <th className="px-2 py-1.5 font-semibold border-b text-right">Target Pop</th>
+                            <th className="px-2 py-1.5 font-semibold border-b text-right">Over by</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allocationWarnings.map((w, i) => (
+                            <tr key={i} className="even:bg-red-50/40 dark:even:bg-red-950/10">
+                              <td className="px-2 py-1 border-b">{w.lga}</td>
+                              <td className="px-2 py-1 border-b">{w.ward}</td>
+                              <td className="px-2 py-1 border-b">{w.flhf}</td>
+                              <td className="px-2 py-1 border-b">{w.depth}</td>
+                              <td className="px-2 py-1 border-b text-right tabular-nums font-semibold">{w.jrsm.toLocaleString()}</td>
+                              <td className="px-2 py-1 border-b text-right tabular-nums">{w.targetPop.toLocaleString()}</td>
+                              <td className="px-2 py-1 border-b text-right tabular-nums font-bold text-red-600">+{w.over.toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
                 {/* Multiple LGA entry rows */}
                 <div className="space-y-2">
                   {medAllocEntries.map((entry, idx) => (
