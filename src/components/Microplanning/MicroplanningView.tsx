@@ -1385,6 +1385,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       Year: r.year, State: r.state, LGA: r.lga, Ward: r.ward, FLHF: r.flhf,
       Community: r.community, Settlement: r.settlement,
       "Target Population": r.targetPop, "Medicine Required": r.medicineRequired, "% Share": Number(r.pct.toFixed(1)),
+      "Expected Treatment (People)": r.peopleToTreat, "Drug/Person Ratio": r.ratio ? Number(r.ratio.toFixed(2)) : 0,
     })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Medicine Allocation");
