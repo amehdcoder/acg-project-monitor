@@ -411,6 +411,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [medAllocEntries, setMedAllocEntries] = useState<{ id?: string; lga: string; amount: string; jrsm?: string; medicine_name?: string; year?: number }[]>([{ lga: "", amount: "", jrsm: "" }]);
   const [savedAllocations, setSavedAllocations] = useState<any[]>([]);
   const [savingAllocations, setSavingAllocations] = useState(false);
+  // Medicine "upload & compute" — ad-hoc population rows used as the breakdown source
+  const [uploadedMedEntries, setUploadedMedEntries] = useState<UploadedMedicineEntry[]>([]);
+  const [uploadingMed, setUploadingMed] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const medUploadRef = useRef<HTMLInputElement>(null);
 
   // User access management state
   const [showAccessManager, setShowAccessManager] = useState(false);
