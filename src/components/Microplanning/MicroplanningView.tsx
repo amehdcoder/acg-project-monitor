@@ -2229,7 +2229,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                       <Plus className="h-3 w-3" /> Add another LGA
                     </Button>
                     {isAdmin && (
-                      <Button size="sm" className="h-7 text-xs gap-1" onClick={saveAllocations} disabled={savingAllocations}>
+                      <Button size="sm" className="h-7 text-xs gap-1" onClick={saveAllocations} disabled={savingAllocations || allocationWarnings.length > 0}>
                         💾 {savingAllocations ? "Saving…" : "Save Allocations"}
                       </Button>
                     )}
