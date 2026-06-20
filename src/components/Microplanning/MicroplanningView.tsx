@@ -1050,8 +1050,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   // Duplicate analysis between the uploaded rows and existing project entries.
   const adoptionStats = useMemo(() => {
-    const existing = new Map<string, any>();
-    entries.forEach((e) => existing.set(dupKey(e), e));
+    const existing: Record<string, any> = {};
+    entries.forEach((e) => { existing[dupKey(e)] = e; });
     let newCount = 0;
     let dupeCount = 0;
     const seenInUpload = new Set<string>();
