@@ -649,7 +649,6 @@ export default function BloombergDashboard({ onClose }: Props) {
                   <thead>
                     <tr className="border-b border-border text-left text-xs text-muted-foreground">
                       <th className="py-2 pr-3">School</th>
-                      <th className="py-2 px-3">Code</th>
                       <th className="py-2 px-3">State</th>
                       <th className="py-2 px-3">LGA</th>
                       <th className="py-2 px-3">Reason</th>
