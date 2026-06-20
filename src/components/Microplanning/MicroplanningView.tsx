@@ -922,6 +922,20 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     [uploadedMedEntries, displayEntries],
   );
   const allLgasForMedicine = useMemo(() => [...new Set(medicineSourceEntries.map((e: any) => e.lga))].sort(), [medicineSourceEntries]);
+  // Cascaded option lookups for optional Ward / FLHF drill-down
+  const wardsForLga = useCallback(
+    (lga: string) => [...new Set(medicineSourceEntries.filter((e: any) => e.lga === lga).map((e: any) => e.ward).filter(Boolean))].sort() as string[],
+    [medicineSourceEntries],
+  );
+  const flhfsForWard = useCallback(
+    (lga: string, ward: string) => [...new Set(
+      medicineSourceEntries
+        .filter((e: any) => e.lga === lga && (!ward || e.ward === ward))
+        .map((e: any) => e.flhf_name)
+        .filter(Boolean),
+    )].sort() as string[],
+    [medicineSourceEntries],
+  );
 
   const getTargetPop = (e: any) => {
     // Uploaded population rows: target population = total population × chosen %.
