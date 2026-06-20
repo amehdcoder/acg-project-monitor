@@ -1105,6 +1105,51 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
   };
 
+  // ---- Allocation Plan upload: auto-build allocation rows from one sheet ----
+  const handleAllocationPlanUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAlloc(true);
+    try {
+      const { rows, skipped, total } = await parseAllocationPlanFile(file);
+      if (rows.length === 0) {
+        toast({ title: "No valid rows", description: "Ensure LGA and at least one of JRSM / Medicine columns are filled.", variant: "destructive" });
+        return;
+      }
+      // Build allocation entries: prefer Ward-level rows; fall back to LGA total.
+      const built: typeof medAllocEntries = [];
+      const seen = new Set<string>();
+      const lgaHasWard = new Set(rows.filter(r => r.ward && r.medicineByWard > 0).map(r => r.lga));
+      for (const r of rows) {
+        if (r.ward && (r.medicineByWard > 0 || r.jrsm > 0)) {
+          const key = `${r.lga}|${r.ward}`.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          built.push({ lga: r.lga, ward: r.ward, flhf: "", amount: String(r.medicineByWard || 0), jrsm: r.jrsm ? String(r.jrsm) : "", year: new Date().getFullYear() });
+        } else if (!lgaHasWard.has(r.lga) && r.medicineByLga > 0) {
+          const key = `${r.lga}|`.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          built.push({ lga: r.lga, ward: "", flhf: "", amount: String(r.medicineByLga), jrsm: r.jrsm ? String(r.jrsm) : "", year: new Date().getFullYear() });
+        }
+      }
+      if (built.length === 0) {
+        toast({ title: "Nothing to allocate", description: "No medicine quantities found in the sheet.", variant: "destructive" });
+        return;
+      }
+      setMedAllocEntries(built);
+      toast({
+        title: `✅ ${built.length.toLocaleString()} allocation(s) built`,
+        description: `From ${total.toLocaleString()} rows${skipped > 0 ? ` · ${skipped.toLocaleString()} skipped` : ""}. Medicine & expected treatment auto-distributed per community.`,
+      });
+    } catch (err: any) {
+      toast({ title: "Allocation upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingAlloc(false);
+      if (allocUploadRef.current) allocUploadRef.current.value = "";
+    }
+  };
+
   // Stable duplicate key for a microplan/community row.
   const dupKey = (e: any) =>
     [e.state, e.lga, e.ward, e.flhf_name, e.community_name]
