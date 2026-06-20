@@ -2009,6 +2009,42 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                           </SelectContent>
                         </Select>
                       </div>
+                      <div className="space-y-1 flex-1 min-w-[150px]">
+                        {idx === 0 && <label className="text-xs font-medium text-foreground">Ward <span className="text-muted-foreground font-normal">(optional)</span></label>}
+                        <Select
+                          value={entry.ward || "__all__"}
+                          onValueChange={v => updateMedAllocRow(idx, "ward", v === "__all__" ? "" : v)}
+                          disabled={!entry.lga}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="All wards" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__all__">All wards</SelectItem>
+                            {wardsForLga(entry.lga).map(w => (
+                              <SelectItem key={w} value={w}>{w}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1 flex-1 min-w-[150px]">
+                        {idx === 0 && <label className="text-xs font-medium text-foreground">FLHF <span className="text-muted-foreground font-normal">(optional)</span></label>}
+                        <Select
+                          value={entry.flhf || "__all__"}
+                          onValueChange={v => updateMedAllocRow(idx, "flhf", v === "__all__" ? "" : v)}
+                          disabled={!entry.lga}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="All FLHFs" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__all__">All FLHFs</SelectItem>
+                            {flhfsForWard(entry.lga, entry.ward || "").map(f => (
+                              <SelectItem key={f} value={f}>{f}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div className="space-y-1 w-[140px]">
                         {idx === 0 && <label className="text-xs font-medium text-foreground">Medicine Allocated</label>}
                         <Input
