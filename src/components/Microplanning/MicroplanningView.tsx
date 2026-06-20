@@ -905,6 +905,10 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const allLgasForMedicine = useMemo(() => [...new Set(medicineSourceEntries.map((e: any) => e.lga))].sort(), [medicineSourceEntries]);
 
   const getTargetPop = (e: any) => {
+    // Uploaded population rows: target population = total population × chosen %.
+    if (e && e.__uploaded) {
+      return Math.round((Number(e.estimated_total_population) || 0) * (medTargetPct / 100));
+    }
     return calcTargetPop(e) || (e.estimated_total_population || 0);
   };
 
