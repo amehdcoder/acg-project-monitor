@@ -416,6 +416,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [uploadingMed, setUploadingMed] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const medUploadRef = useRef<HTMLInputElement>(null);
+  // Allocation Plan upload — auto-builds allocation rows from a single sheet
+  const [uploadingAlloc, setUploadingAlloc] = useState(false);
+  const allocUploadRef = useRef<HTMLInputElement>(null);
   // % of total population that should be computed as the target population
   const [medTargetPct, setMedTargetPct] = useState<number>(() => {
     const v = parseFloat(localStorage.getItem("microplanning.medTargetPct") || "");
