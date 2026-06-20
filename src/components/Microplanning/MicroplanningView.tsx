@@ -416,6 +416,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [uploadingMed, setUploadingMed] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const medUploadRef = useRef<HTMLInputElement>(null);
+  // % of total population that should be computed as the target population
+  const [medTargetPct, setMedTargetPct] = useState<number>(() => {
+    const v = parseFloat(localStorage.getItem("microplanning.medTargetPct") || "");
+    return Number.isFinite(v) && v > 0 && v <= 100 ? v : 100;
+  });
+  useEffect(() => { localStorage.setItem("microplanning.medTargetPct", String(medTargetPct)); }, [medTargetPct]);
+  // Adoption flow: prompt admin to use uploaded population as project microplan data
+  const [showAdoptDialog, setShowAdoptDialog] = useState(false);
+  const [adopting, setAdopting] = useState(false);
 
   // User access management state
   const [showAccessManager, setShowAccessManager] = useState(false);
