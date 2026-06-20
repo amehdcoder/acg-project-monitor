@@ -1457,6 +1457,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       toast({ title: "Admin only", description: "Only admins can save medicine allocations.", variant: "destructive" });
       return;
     }
+    if (allocationWarnings.length > 0) {
+      const w = allocationWarnings[0];
+      toast({
+        title: "🚫 Allocation exceeds target population",
+        description: `${w.lga}${w.ward !== "—" ? ` · ${w.ward}` : ""}${w.flhf !== "—" ? ` · ${w.flhf}` : ""}: JRSM target ${w.jrsm.toLocaleString()} exceeds ${w.depth} target population ${w.targetPop.toLocaleString()} by ${w.over.toLocaleString()}.${allocationWarnings.length > 1 ? ` (+${allocationWarnings.length - 1} more)` : ""}`,
+        variant: "destructive",
+      });
+      return;
+    }
     setSavingAllocations(true);
     try {
       const valid = medAllocEntries.filter(r => r.lga && r.amount && Number(r.amount) > 0);
