@@ -1726,6 +1726,29 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                   <p className="text-[11px] text-muted-foreground">
                     Upload a simple sheet with <strong>Year, State, LGA, Ward, FLHF, Community or Settlement, Total Population</strong>. The target population is computed automatically and the medicine you enter per LGA is broken down across every community/settlement.
                   </p>
+                  {/* Target % of total population */}
+                  <div className="rounded-md border border-amber-300/60 bg-amber-50/70 dark:bg-amber-950/20 px-3 py-2 flex items-center gap-3 flex-wrap">
+                    <Target className="h-4 w-4 text-amber-600 shrink-0" />
+                    <div className="flex-1 min-w-[180px]">
+                      <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-300">Target population = % of Total Population</p>
+                      <p className="text-[10px] text-amber-700/80 dark:text-amber-400/80">Set the share of the uploaded total population that should be treated as the target (e.g. 100% for whole community, or your eligible-cohort %).</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        value={medTargetPct}
+                        onChange={(e) => {
+                          const v = parseFloat(e.target.value);
+                          setMedTargetPct(Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 0);
+                        }}
+                        className="h-8 w-20 text-xs text-center font-bold"
+                        min={0}
+                        max={100}
+                        step={0.5}
+                      />
+                      <span className="text-sm font-bold text-amber-700">%</span>
+                    </div>
+                  </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1" onClick={() => exportMedicineUploadTemplate()}>
                       <FileSpreadsheet className="h-3 w-3" /> Download Upload Template
