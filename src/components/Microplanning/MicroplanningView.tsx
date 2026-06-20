@@ -625,9 +625,26 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         if (error) throw error;
         toast({ title: didOverride ? "✅ Entry updated (GPS saved as override)" : "✅ Entry updated" });
       } else {
+        // Flag duplicate community rows (same State · LGA · Ward · FLHF · Community).
+        const newKey = dupKey(payload);
+        const existingMatch = entries.find((e) => dupKey(e) === newKey);
+        if (existingMatch) {
+          const overwrite = window.confirm(
+            `A matching entry already exists for "${payload.community_name}" (${payload.lga}).\n\nClick OK to UPDATE the existing entry with these values, or Cancel to add it as a separate new row.`,
+          );
+          if (overwrite) {
+            const { error } = await supabase.from("microplan_entries").update(payload).eq("id", existingMatch.id);
+            if (error) throw error;
+            toast({ title: "🔄 Existing entry updated", description: "Duplicate detected — the matching entry was updated." });
+            setShowForm(false);
+            setEditingEntry(null);
+            fetchEntries();
+            return;
+          }
+        }
         const { error } = await supabase.from("microplan_entries").insert(payload);
         if (error) throw error;
-        toast({ title: "✅ Entry added" });
+        toast({ title: existingMatch ? "✅ Entry added (duplicate kept separate)" : "✅ Entry added" });
       }
       setShowForm(false);
       setEditingEntry(null);
