@@ -234,6 +234,7 @@ export default function SeeClearFormFiller({ onClose }: Props) {
         status: asDraft ? "draft" : "sent",
         responses: { general, equipment: equip, readiness_score: scores.overallPct },
         gps: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy } : null,
+        offline: queued,
       });
       toast.success(
         queued
