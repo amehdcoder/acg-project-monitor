@@ -106,6 +106,14 @@ const getAllRecords = async (): Promise<PendingInsert[]> => {
 
 const isOnline = () => (typeof navigator === "undefined" ? true : navigator.onLine);
 
+const retryWithoutBrokenSchoolKey = async (table: string, row: Record<string, unknown>, error: unknown) => {
+  const message = String((error as { message?: string; code?: string })?.message || "");
+  const code = (error as { code?: string })?.code;
+  if (table !== "bloomberg_validations" || code !== "23503" || !/school_key/i.test(message)) return null;
+  const safeRow = { ...row, school_key: null };
+  return supabase.from(table as never).upsert(safeRow as never, { onConflict: "id" });
+};
+
 /**
  * Insert a row now if online, otherwise queue it offline. Always resolves;
  * `queued` is true when the insert is waiting for connectivity.
@@ -126,7 +134,11 @@ export async function queueOrInsert(
       const { error } = upsertOnId
         ? await supabase.from(table as any).upsert(row, { onConflict: "id" })
         : await supabase.from(table as any).insert(row);
-      if (error) throw error;
+      if (error) {
+        const retried = upsertOnId ? await retryWithoutBrokenSchoolKey(table, row, error) : null;
+        if (retried?.error) throw retried.error;
+        if (!retried) throw error;
+      }
       // Confirmed on the server — reconcile the UI mirror right away.
       await markMirrorSent(opts.mirrorEntryId);
       return { queued: false };
@@ -178,7 +190,11 @@ export async function flushSubmissionQueue(): Promise<{ inserted: number; remain
         const { error } = rec.upsertOnId
           ? await supabase.from(rec.table as any).upsert(rec.row, { onConflict: "id" })
           : await supabase.from(rec.table as any).insert(rec.row);
-        if (error) throw error;
+        if (error) {
+          const retried = rec.upsertOnId ? await retryWithoutBrokenSchoolKey(rec.table, rec.row, error) : null;
+          if (retried?.error) throw retried.error;
+          if (!retried) throw error;
+        }
         await deleteRecord(rec.id);
         await markMirrorSent(rec.mirrorEntryId);
         inserted++;
