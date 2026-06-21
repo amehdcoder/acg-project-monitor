@@ -924,6 +924,16 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     () => (uploadedMedEntries.length > 0 ? (uploadedMedEntries as any[]) : displayEntries),
     [uploadedMedEntries, displayEntries],
   );
+  // Normalised geographic key so allocation rows (which may write "MARMA") match
+  // population rows (which may read "MARMA WARD") despite case, whitespace, or a
+  // trailing "ward"/"district" suffix. Without this, communities silently fail to
+  // match an allocation and render blank.
+  const normGeo = useCallback((s: unknown) =>
+    String(s ?? "")
+      .toLowerCase()
+      .replace(/\b(ward|district)\b/g, " ")
+      .replace(/[^a-z0-9]/g, ""), []);
+  const geoEq = useCallback((a: unknown, b: unknown) => normGeo(a) === normGeo(b), [normGeo]);
   const allLgasForMedicine = useMemo(() => [...new Set(medicineSourceEntries.map((e: any) => e.lga))].sort(), [medicineSourceEntries]);
   // Cascaded option lookups for optional Ward / FLHF drill-down
   const wardsForLga = useCallback(
@@ -973,9 +983,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       const totalMedicine = Number(me.amount);
       const jrsmTotal = Number(me.jrsm) || 0;
       const lgaEntries = medicineSourceEntries.filter((e: any) =>
-        e.lga === me.lga &&
-        (!me.ward || e.ward === me.ward) &&
-        (!me.flhf || e.flhf_name === me.flhf));
+        geoEq(e.lga, me.lga) &&
+        (!me.ward || geoEq(e.ward, me.ward)) &&
+        (!me.flhf || geoEq(e.flhf_name, me.flhf)));
       if (lgaEntries.length === 0) continue;
 
       const rows = lgaEntries.map(e => ({
@@ -1023,7 +1033,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
 
     return allRows;
-  }, [medAllocEntries, medicineSourceEntries, medTargetPct, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
+  }, [medAllocEntries, medicineSourceEntries, medTargetPct, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID, geoEq]);
 
   // ---- Allocation validation ----
   // Prevent allocations whose JRSM target (people to treat) exceeds the target
@@ -1036,9 +1046,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       const jrsm = Number(me.jrsm) || 0;
       if (jrsm <= 0) return;
       const scope = medicineSourceEntries.filter((e: any) =>
-        e.lga === me.lga &&
-        (!me.ward || e.ward === me.ward) &&
-        (!me.flhf || e.flhf_name === me.flhf));
+        geoEq(e.lga, me.lga) &&
+        (!me.ward || geoEq(e.ward, me.ward)) &&
+        (!me.flhf || geoEq(e.flhf_name, me.flhf)));
       if (scope.length === 0) return;
       const targetPop = scope.reduce((s, e: any) => s + getTargetPop(e), 0);
       if (targetPop > 0 && jrsm > targetPop) {
@@ -1047,7 +1057,49 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       }
     });
     return out;
-  }, [medAllocEntries, medicineSourceEntries, medTargetPct]);
+  }, [medAllocEntries, medicineSourceEntries, medTargetPct, geoEq]);
+
+  // ---- Wards present in the population data but NOT covered by the allocation ----
+  // After uploading/entering an allocation plan, surface every ward that the
+  // "Upload Population Data" feature imported but the allocation plan never
+  // covered (either by a ward-level row or an LGA-wide row). The admin can add
+  // them to the allocation table and type values so they spread to communities.
+  const missingAllocationWards = useMemo(() => {
+    // Only relevant once at least one allocation row exists.
+    const hasAlloc = medAllocEntries.some((me) => me.lga);
+    if (!hasAlloc) return [] as { lga: string; ward: string; communities: number; targetPop: number }[];
+
+    // LGAs covered by an LGA-wide allocation row (no ward) cover all their wards.
+    const lgaWide = new Set(
+      medAllocEntries.filter((me) => me.lga && !me.ward).map((me) => normGeo(me.lga)),
+    );
+    const coveredWard = new Set(
+      medAllocEntries
+        .filter((me) => me.lga && me.ward)
+        .map((me) => `${normGeo(me.lga)}|${normGeo(me.ward)}`),
+    );
+
+    const agg: Record<string, { lga: string; ward: string; communities: number; targetPop: number }> = {};
+    for (const e of medicineSourceEntries as any[]) {
+      const ward = String(e.ward ?? "").trim();
+      const lga = String(e.lga ?? "").trim();
+      if (!lga || !ward || ward === "—") continue;
+      const nLga = normGeo(lga);
+      const nWard = normGeo(ward);
+      if (lgaWide.has(nLga)) continue; // whole LGA already allocated
+      if (coveredWard.has(`${nLga}|${nWard}`)) continue; // ward already allocated
+      const key = `${nLga}|${nWard}`;
+      const prev = agg[key] || { lga, ward, communities: 0, targetPop: 0 };
+      prev.communities += 1;
+      prev.targetPop += getTargetPop(e);
+      agg[key] = prev;
+    }
+    return Object.values(agg).sort((a, b) =>
+      a.lga === b.lga ? a.ward.localeCompare(b.ward) : a.lga.localeCompare(b.lga),
+    );
+  }, [medAllocEntries, medicineSourceEntries, normGeo, medTargetPct]);
+
+
 
   // Per-LGA adjustment suggestions (drug/person ratio → 2.5–3.0)
   const lgaAdjustmentSuggestions = useMemo(() => {
@@ -1218,8 +1270,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   });
 
   // Adopt uploaded population as project microplan data.
-  // mode: "skip" = insert new only; "update" = insert new + overwrite duplicates.
-  const adoptUploadedData = async (mode: "skip" | "update") => {
+  // mode: "skip" = insert new only · "update" = insert new + overwrite duplicates
+  //       "keep" = insert every uploaded row (duplicates included, nothing collapsed).
+  const adoptUploadedData = async (mode: "skip" | "update" | "keep") => {
     if (!user?.id || !selectedProjectId || uploadedMedEntries.length === 0) return;
     setAdopting(true);
     try {
@@ -1231,11 +1284,16 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       const seen = new Set<string>();
 
       for (const u of uploadedMedEntries) {
+        const payload = uploadedToEntry(u);
+        if (mode === "keep") {
+          // Keep every single row — no dedup, no collapsing internal duplicates.
+          toInsert.push(payload);
+          continue;
+        }
         const k = dupKey(u);
         if (seen.has(k)) continue; // collapse internal duplicates
         seen.add(k);
         const match = existing[k];
-        const payload = uploadedToEntry(u);
         if (match) {
           if (mode === "update") toUpdate.push({ id: match.id, payload });
         } else {
@@ -1350,6 +1408,14 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 🔄 Add new & update {adoptionStats.dupeCount.toLocaleString()} duplicates
               </Button>
             )}
+            <Button
+              variant="outline"
+              className="w-full gap-2 border-blue-400 text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+              disabled={adopting || adoptionStats.total === 0}
+              onClick={() => adoptUploadedData("keep")}
+            >
+              ➕ Add all {adoptionStats.total.toLocaleString()} rows (keep duplicates)
+            </Button>
             <Button variant="ghost" className="w-full text-muted-foreground" disabled={adopting} onClick={() => setShowAdoptDialog(false)}>
               Not now — keep it for medicine breakdown only
             </Button>
@@ -1423,6 +1489,31 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   };
 
   const addMedAllocRow = () => setMedAllocEntries(prev => [...prev, { lga: "", ward: "", flhf: "", amount: "", jrsm: "" }]);
+  // Add an uncovered (missing) ward to the allocation table, ready for the admin
+  // to type its medicine amount / JRSM target so it spreads to its communities.
+  const addMissingWardRow = (lga: string, ward: string) => {
+    setMedAllocEntries(prev => {
+      const exists = prev.some(p => normGeo(p.lga) === normGeo(lga) && normGeo(p.ward) === normGeo(ward));
+      if (exists) return prev;
+      // Drop the leading empty placeholder row if present.
+      const base = prev.length === 1 && !prev[0].lga && !prev[0].amount ? [] : prev;
+      return [...base, { lga, ward, flhf: "", amount: "", jrsm: "", year: new Date().getFullYear() }];
+    });
+    toast({ title: "Ward added", description: `${ward} (${lga}) added — enter its medicine & JRSM target.` });
+  };
+  const addAllMissingWardRows = () => {
+    if (missingAllocationWards.length === 0) return;
+    setMedAllocEntries(prev => {
+      const base = prev.length === 1 && !prev[0].lga && !prev[0].amount ? [] : [...prev];
+      const out = [...base];
+      for (const m of missingAllocationWards) {
+        const exists = out.some(p => normGeo(p.lga) === normGeo(m.lga) && normGeo(p.ward) === normGeo(m.ward));
+        if (!exists) out.push({ lga: m.lga, ward: m.ward, flhf: "", amount: "", jrsm: "", year: new Date().getFullYear() });
+      }
+      return out;
+    });
+    toast({ title: `✅ ${missingAllocationWards.length} ward(s) added`, description: "Enter medicine & JRSM targets to spread them to communities." });
+  };
   const removeMedAllocRow = async (idx: number) => {
     const row = medAllocEntries[idx];
     if (row?.id) {
@@ -2143,6 +2234,65 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                     </div>
                   </div>
                 )}
+
+                {/* Wards imported from population data but missing from the allocation plan */}
+                {missingAllocationWards.length > 0 && (
+                  <div className="rounded-lg border-2 border-amber-400/70 bg-gradient-to-br from-amber-50/90 to-orange-50/70 dark:from-amber-950/30 dark:to-orange-950/20 p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🧭</span>
+                        <h3 className="text-xs font-bold text-amber-800 dark:text-amber-300">
+                          {missingAllocationWards.length} ward{missingAllocationWards.length > 1 ? "s" : ""} in your population data {missingAllocationWards.length > 1 ? "are" : "is"} not in the allocation plan
+                        </h3>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs gap-1 bg-amber-600 hover:bg-amber-700 text-white"
+                        onClick={addAllMissingWardRows}
+                      >
+                        ➕ Add all to allocation table
+                      </Button>
+                    </div>
+                    <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90">
+                      These wards were imported by <strong>Upload Population Data</strong> but no matching row exists in the
+                      <strong> Allocation Plan</strong>. Add them to the table below and type their medicine &amp; JRSM target so they spread to their communities.
+                    </p>
+                    <div className="overflow-auto rounded-md border border-amber-300/60 bg-background max-h-56">
+                      <table className="w-full text-[10px] border-collapse">
+                        <thead className="sticky top-0">
+                          <tr className="text-left text-muted-foreground bg-amber-100/60 dark:bg-amber-950/40">
+                            <th className="px-2 py-1.5 font-semibold border-b">LGA</th>
+                            <th className="px-2 py-1.5 font-semibold border-b">Ward</th>
+                            <th className="px-2 py-1.5 font-semibold border-b text-right">Communities</th>
+                            <th className="px-2 py-1.5 font-semibold border-b text-right">Target Pop</th>
+                            <th className="px-2 py-1.5 font-semibold border-b text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {missingAllocationWards.map((m, i) => (
+                            <tr key={`${m.lga}-${m.ward}-${i}`} className="even:bg-amber-50/40 dark:even:bg-amber-950/10">
+                              <td className="px-2 py-1 border-b">{m.lga}</td>
+                              <td className="px-2 py-1 border-b font-medium">{m.ward}</td>
+                              <td className="px-2 py-1 border-b text-right tabular-nums">{m.communities.toLocaleString()}</td>
+                              <td className="px-2 py-1 border-b text-right tabular-nums">{m.targetPop.toLocaleString()}</td>
+                              <td className="px-2 py-1 border-b text-right">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-6 px-2 text-[10px] gap-1 border-amber-400 text-amber-700 hover:bg-amber-100"
+                                  onClick={() => addMissingWardRow(m.lga, m.ward)}
+                                >
+                                  ➕ Add
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
 
                 {/* Multiple LGA entry rows */}
                 <div className="space-y-2">
