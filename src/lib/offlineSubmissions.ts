@@ -111,7 +111,7 @@ const retryWithoutBrokenSchoolKey = async (table: string, row: Record<string, un
   const code = (error as { code?: string })?.code;
   if (table !== "bloomberg_validations" || code !== "23503" || !/school_key/i.test(message)) return null;
   const safeRow = { ...row, school_key: null };
-  return supabase.from(table as never).upsert(safeRow as never, { onConflict: "id" });
+  return supabase.from(table as any).upsert(safeRow as any, { onConflict: "id" });
 };
 
 /**
