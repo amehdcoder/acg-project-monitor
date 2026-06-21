@@ -1079,7 +1079,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         .map((me) => `${normGeo(me.lga)}|${normGeo(me.ward)}`),
     );
 
-    const agg = new Map<string, { lga: string; ward: string; communities: number; targetPop: number }>();
+    const agg: Record<string, { lga: string; ward: string; communities: number; targetPop: number }> = {};
     for (const e of medicineSourceEntries as any[]) {
       const ward = String(e.ward ?? "").trim();
       const lga = String(e.lga ?? "").trim();
@@ -1089,12 +1089,12 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       if (lgaWide.has(nLga)) continue; // whole LGA already allocated
       if (coveredWard.has(`${nLga}|${nWard}`)) continue; // ward already allocated
       const key = `${nLga}|${nWard}`;
-      const prev = agg.get(key) || { lga, ward, communities: 0, targetPop: 0 };
+      const prev = agg[key] || { lga, ward, communities: 0, targetPop: 0 };
       prev.communities += 1;
       prev.targetPop += getTargetPop(e);
-      agg.set(key, prev);
+      agg[key] = prev;
     }
-    return [...agg.values()].sort((a, b) =>
+    return Object.values(agg).sort((a, b) =>
       a.lga === b.lga ? a.ward.localeCompare(b.ward) : a.lga.localeCompare(b.lga),
     );
   }, [medAllocEntries, medicineSourceEntries, normGeo, medTargetPct]);
