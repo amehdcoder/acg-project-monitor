@@ -8,7 +8,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { sealRecord, unsealRecord } from "@/lib/deviceCrypto";
-import { setSavedEntryStatus } from "@/lib/savedForms";
+import { getSavedEntry, setSavedEntryStatus } from "@/lib/savedForms";
 
 const DB_NAME = "acg_offline_submissions";
 const DB_VERSION = 1;
@@ -32,9 +32,12 @@ export interface PendingInsert {
 async function markMirrorSent(mirrorEntryId?: string | null) {
   if (!mirrorEntryId) return;
   try {
+    const now = new Date().toISOString();
+    const existing = await getSavedEntry(mirrorEntryId);
     await setSavedEntryStatus(mirrorEntryId, "sent", {
       offline: false,
-      sentAt: new Date().toISOString(),
+      sentAt: now,
+      settings: { ...(existing?.settings || {}), serverVerifiedAt: now },
     });
   } catch {
     // mirror reconciliation is best-effort
@@ -43,6 +46,18 @@ async function markMirrorSent(mirrorEntryId?: string | null) {
 
 let flushing = false;
 let listenersBound = false;
+let flushTimer: number | null = null;
+
+const RETRY_DELAYS_MS = [1_000, 5_000, 15_000, 30_000, 60_000];
+
+function scheduleFlush(delay = 1_000) {
+  if (typeof window === "undefined" || !isOnline()) return;
+  if (flushTimer !== null) window.clearTimeout(flushTimer);
+  flushTimer = window.setTimeout(() => {
+    flushTimer = null;
+    void flushSubmissionQueue();
+  }, delay);
+}
 
 const openDB = (): Promise<IDBDatabase> =>
   new Promise((resolve, reject) => {
@@ -91,6 +106,14 @@ const getAllRecords = async (): Promise<PendingInsert[]> => {
 
 const isOnline = () => (typeof navigator === "undefined" ? true : navigator.onLine);
 
+const retryWithoutBrokenSchoolKey = async (table: string, row: Record<string, unknown>, error: unknown) => {
+  const message = String((error as { message?: string; code?: string })?.message || "");
+  const code = (error as { code?: string })?.code;
+  if (table !== "bloomberg_validations" || code !== "23503" || !/school_key/i.test(message)) return null;
+  const safeRow = { ...row, school_key: null };
+  return supabase.from(table as any).upsert(safeRow as any, { onConflict: "id" });
+};
+
 /**
  * Insert a row now if online, otherwise queue it offline. Always resolves;
  * `queued` is true when the insert is waiting for connectivity.
@@ -111,7 +134,11 @@ export async function queueOrInsert(
       const { error } = upsertOnId
         ? await supabase.from(table as any).upsert(row, { onConflict: "id" })
         : await supabase.from(table as any).insert(row);
-      if (error) throw error;
+      if (error) {
+        const retried = upsertOnId ? await retryWithoutBrokenSchoolKey(table, row, error) : null;
+        if (retried?.error) throw retried.error;
+        if (!retried) throw error;
+      }
       // Confirmed on the server — reconcile the UI mirror right away.
       await markMirrorSent(opts.mirrorEntryId);
       return { queued: false };
@@ -132,7 +159,7 @@ export async function queueOrInsert(
   ensureListeners();
   // Kick an immediate background flush attempt so a transient failure while
   // online does not leave the row sitting "queued" for the whole interval.
-  if (isOnline()) setTimeout(() => void flushSubmissionQueue(), 1500);
+  scheduleFlush(500);
   return { queued: true };
 }
 
@@ -152,24 +179,35 @@ export async function flushSubmissionQueue(): Promise<{ inserted: number; remain
   let inserted = 0;
   try {
     const records = await getAllRecords();
-    for (const rec of records) {
+    const due = records.filter((rec) => {
+      const delay = RETRY_DELAYS_MS[Math.min(rec.attempts, RETRY_DELAYS_MS.length - 1)];
+      const last = Date.parse(rec.created_at || "") || 0;
+      return rec.attempts === 0 || Date.now() - last >= delay;
+    });
+    for (const rec of due) {
       if (!isOnline()) break;
       try {
         const { error } = rec.upsertOnId
           ? await supabase.from(rec.table as any).upsert(rec.row, { onConflict: "id" })
           : await supabase.from(rec.table as any).insert(rec.row);
-        if (error) throw error;
+        if (error) {
+          const retried = rec.upsertOnId ? await retryWithoutBrokenSchoolKey(rec.table, rec.row, error) : null;
+          if (retried?.error) throw retried.error;
+          if (!retried) throw error;
+        }
         await deleteRecord(rec.id);
         await markMirrorSent(rec.mirrorEntryId);
         inserted++;
       } catch (e: any) {
-        await putRecord({ ...rec, attempts: rec.attempts + 1, last_error: e?.message || "insert failed" });
+        await putRecord({ ...rec, attempts: rec.attempts + 1, created_at: new Date().toISOString(), last_error: e?.message || "insert failed" });
       }
     }
   } finally {
     flushing = false;
   }
-  return { inserted, remaining: await getPendingInsertCount() };
+  const remaining = await getPendingInsertCount();
+  if (remaining > 0) scheduleFlush(5_000);
+  return { inserted, remaining };
 }
 
 function ensureListeners() {
@@ -183,10 +221,10 @@ function ensureListeners() {
       void flushSubmissionQueue();
     }
   });
-  // Poll every 20s so a queued row is never stuck for more than ~1 minute.
+  // Poll every 15s so a queued row is retried multiple times within a minute.
   window.setInterval(() => {
     if (isOnline()) void flushSubmissionQueue();
-  }, 20000);
+  }, 15000);
 }
 
 export function initOfflineSubmissions() {

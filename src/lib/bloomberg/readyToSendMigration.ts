@@ -7,15 +7,14 @@
 // This runs on the device that holds the data (we cannot reach another user's
 // IndexedDB from the server). It:
 //   1. Finds finalized Bloomberg saved entries.
-//   2. Keeps only those collected from 8:00 AM Nigerian time on 17/06/2026
-//      (the first day of live reporting) onward.
-//   3. De-duplicates by school so a single school is never validated twice by
+//   2. De-duplicates by school so a single school is never validated twice by
 //      the same validator — locally (keep the latest finalized per school) and
 //      against the server (skip schools this validator already has on record).
-//   4. Inserts the survivors into bloomberg_validations as "sent", preserving
+//   3. Inserts the survivors into bloomberg_validations as "sent", preserving
 //      the original collection/finalize timestamps so all dashboard math,
 //      coverage and statistics stay correct.
-//   5. Marks the local entries "sent" so they leave the "Ready to send" tab.
+//   4. Marks local entries as either confirmed sent or still queued, so the UI
+//      never falsely shows "sent" until the server has the row.
 //
 // Idempotent: rows are upserted on their stable submissionId, and once a local
 // entry is marked "sent" it is no longer picked up.
@@ -28,9 +27,6 @@ import {
 } from "@/lib/savedForms";
 import { isBloombergSavedEntry } from "@/lib/specialFormBridge";
 import { queueOrInsert } from "@/lib/offlineSubmissions";
-
-// 8:00 AM on 17/06/2026, Nigerian time (WAT = UTC+1) => 07:00 UTC.
-const LIVE_REPORTING_CUTOFF = Date.parse("2026-06-17T07:00:00.000Z");
 
 // Per-session guard so we only attempt the migration once per page load.
 let migrationRan = false;
@@ -54,10 +50,22 @@ const schoolKeyOf = (e: SavedFormEntry): string | null => {
   return (sd.school_key ?? r.school_key ?? r.schoolKey ?? null) || null;
 };
 
+const visitDateOf = (e: SavedFormEntry): string => {
+  const sd = (e.submissionData || {}) as Record<string, unknown>;
+  const r = (e.responses || {}) as Record<string, unknown>;
+  const verification = (sd.verification || r.verification || {}) as Record<string, unknown>;
+  return String(verification.date_of_visit || e.finalizedAt || e.updatedAt || e.createdAt || "").slice(0, 10);
+};
+
+const visitDedupKeyOf = (e: SavedFormEntry): string | null => {
+  const key = schoolKeyOf(e);
+  return key ? `${key}::${visitDateOf(e)}` : null;
+};
+
 export interface MigrationResult {
   migrated: number;
   skippedDuplicate: number;
-  skippedBeforeCutoff: number;
+  queued: number;
 }
 
 export async function migrateReadyToSendBloomberg(
@@ -66,7 +74,7 @@ export async function migrateReadyToSendBloomberg(
   const result: MigrationResult = {
     migrated: 0,
     skippedDuplicate: 0,
-    skippedBeforeCutoff: 0,
+    queued: 0,
   };
   if (!userId) return result;
 
@@ -76,22 +84,14 @@ export async function migrateReadyToSendBloomberg(
   );
   if (finalized.length === 0) return result;
 
-  // 2) Apply the live-reporting cutoff.
-  const eligible: SavedFormEntry[] = [];
-  for (const e of finalized) {
-    if (collectionTime(e) >= LIVE_REPORTING_CUTOFF) eligible.push(e);
-    else result.skippedBeforeCutoff += 1;
-  }
-  if (eligible.length === 0) return result;
-
   // 3a) Local de-dup: one entry per school (the most recently finalized).
   // Superseded duplicates are queued for a parallel status-clear so we never
   // block the event loop entry-by-entry, no matter how many are stuck.
   const bySchool = new Map<string, SavedFormEntry>();
   const noKey: SavedFormEntry[] = [];
   const supersededIds: string[] = [];
-  for (const e of eligible) {
-    const key = schoolKeyOf(e);
+  for (const e of finalized) {
+    const key = visitDedupKeyOf(e);
     if (!key) {
       noKey.push(e);
       continue;
@@ -144,11 +144,12 @@ export async function migrateReadyToSendBloomberg(
   try {
     const { data } = await supabase
       .from("bloomberg_validations")
-      .select("school_key")
+      .select("school_key,verification")
       .eq("validator_id", userId)
       .not("school_key", "is", null);
     (data || []).forEach((r: any) => {
-      if (r.school_key) serverKeys.add(r.school_key as string);
+      const visitDate = String(r.verification?.date_of_visit || "").slice(0, 10);
+      if (r.school_key) serverKeys.add(`${r.school_key as string}::${visitDate}`);
     });
   } catch {
     // If we cannot confirm server state, fall through — upsert-on-id below
@@ -162,13 +163,15 @@ export async function migrateReadyToSendBloomberg(
   // recovery effectively instantaneous for any volume without batching delays
   // or freezing the dashboard/app.
   await runPool(targets, async (e) => {
-    const key = schoolKeyOf(e);
+    const key = visitDedupKeyOf(e);
     if (key && serverKeys.has(key)) {
       // Already validated by this user on the server — clear it locally to keep
       // the "Ready to send" tab accurate, but never create a duplicate row.
       await setSavedEntryStatus(e.id, "sent", {
         submissionId: e.submissionId || null,
         sentAt: nowIso(),
+        offline: false,
+        settings: { ...(e.settings || {}), serverVerifiedAt: nowIso() },
       });
       result.skippedDuplicate += 1;
       return;
@@ -197,10 +200,21 @@ export async function migrateReadyToSendBloomberg(
       submitted_at: submittedIso,
     };
 
-    await queueOrInsert("bloomberg_validations", row, true);
-    await setSavedEntryStatus(e.id, "sent", { submissionId, sentAt: nowIso() });
-    if (key) serverKeys.add(key);
-    result.migrated += 1;
+    const { queued } = await queueOrInsert("bloomberg_validations", row, true, {
+      mirrorEntryId: e.id,
+    });
+    await setSavedEntryStatus(e.id, "sent", {
+      submissionId,
+      sentAt: queued ? null : nowIso(),
+      offline: queued,
+      settings: queued ? e.settings : { ...(e.settings || {}), serverVerifiedAt: nowIso() },
+    });
+    if (queued) {
+      result.queued += 1;
+    } else {
+      if (key) serverKeys.add(key);
+      result.migrated += 1;
+    }
   });
 
   await supersedeWork;

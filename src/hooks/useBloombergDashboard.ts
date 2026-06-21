@@ -47,6 +47,9 @@ export interface BaselineRow {
 const REASON_LABEL = new Map(NOT_FOUND_REASONS.map((r) => [r.value, r.label]));
 const OP_STATUS_LABEL = new Map(OPERATIONAL_STATUS.map((r) => [r.value, r.label]));
 
+const isReportedValidation = (v: Pick<ValidationRow, "status" | "submitted_at">) =>
+  ["sent", "submitted", "finalized"].includes(String(v.status || "").toLowerCase()) ||
+  (!!v.submitted_at && String(v.status || "").toLowerCase() !== "draft");
 
 async function fetchAll<T>(table: string, columns: string): Promise<T[]> {
   const all: T[] = [];
@@ -56,7 +59,8 @@ async function fetchAll<T>(table: string, columns: string): Promise<T[]> {
       .from(table as any)
       .select(columns)
       .range(from, from + PAGE - 1);
-    if (error || !data || data.length === 0) break;
+    if (error) throw error;
+    if (!data || data.length === 0) break;
     all.push(...(data as T[]));
     if (data.length < PAGE) break;
   }
@@ -89,6 +93,7 @@ export const useBloombergDashboard = () => {
   // Monotonic request id: any async load tags itself with the current value
   // and discards its result if a newer load has started.
   const reqIdRef = useRef(0);
+  const reloadTimerRef = useRef<number | null>(null);
   const reload = async () => {
     const myReq = ++reqIdRef.current;
     setLoading(true);
@@ -138,10 +143,27 @@ export const useBloombergDashboard = () => {
     setSchools([]);
     setSchoolCount(0);
     void reload();
-    const onMigrated = () => void reload();
+    const scheduleReload = () => {
+      if (reloadTimerRef.current !== null) window.clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = window.setTimeout(() => {
+        reloadTimerRef.current = null;
+        void reload();
+      }, 800);
+    };
+    const onMigrated = () => scheduleReload();
     window.addEventListener("bloomberg:ready-to-send-migrated", onMigrated);
+    const channel = supabase
+      .channel("bloomberg-validations-dashboard")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bloomberg_validations" },
+        () => scheduleReload(),
+      )
+      .subscribe();
     return () => {
       window.removeEventListener("bloomberg:ready-to-send-migrated", onMigrated);
+      if (reloadTimerRef.current !== null) window.clearTimeout(reloadTimerRef.current);
+      supabase.removeChannel(channel);
       if (myReq === reqIdRef.current) reqIdRef.current++;
     };
   }, []);
@@ -195,7 +217,7 @@ export const useBloombergDashboard = () => {
     const byKey = new Map<string, ValidationRow>();
     const noKey: ValidationRow[] = [];
     validations
-      .filter((v) => v.status === "sent")
+      .filter(isReportedValidation)
       .forEach((v) => {
         if (!v.school_key) {
           noKey.push(v);
@@ -256,7 +278,7 @@ export const useBloombergDashboard = () => {
   // Per-user accountability: only schools actually visited & reported
   // (submitted or finalized), grouped by the field validator who did the work.
   const accountability = useMemo(() => {
-    const reported = validations.filter((v) => v.status === "sent" || v.status === "finalized");
+    const reported = validations.filter(isReportedValidation);
     return buildAccountability(
       reported.map((v) => ({
         userId: v.validator_id,

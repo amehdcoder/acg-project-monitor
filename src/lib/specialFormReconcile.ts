@@ -13,11 +13,14 @@ import { flushSubmissionQueue } from "@/lib/offlineSubmissions";
 import {
   BLOOMBERG_FORM_ID,
   SEECLEAR_FORM_ID,
+  isBloombergSavedEntry,
+  syncSpecialSavedForm,
 } from "@/lib/specialFormBridge";
 
 // Map a mirror entry's synthetic form id to its authoritative server table.
 const TABLE_BY_FORM: Record<string, string> = {
   [BLOOMBERG_FORM_ID]: "bloomberg_validations",
+  bloomberg_enrolment: "bloomberg_validations",
   [SEECLEAR_FORM_ID]: "seeclear_monitoring",
 };
 
@@ -39,8 +42,16 @@ export async function reconcileQueuedSpecialForms(): Promise<{ reconciled: numbe
     // First make sure anything still pending is pushed up.
     await flushSubmissionQueue().catch(() => {});
 
+    const { data: auth } = await supabase.auth.getSession().catch(() => ({ data: null as any }));
+    const currentUserId = auth?.session?.user?.id || null;
+    if (!currentUserId) return { reconciled: 0 };
     const sent = await listAllSavedEntries("sent");
-    const queued = sent.filter((e) => e.offline === true && e.submissionId);
+    const queued = sent.filter(
+      (e) =>
+        !!e.submissionId &&
+        e.userId === currentUserId &&
+        (e.offline === true || (isBloombergSavedEntry(e) && !e.settings?.serverVerifiedAt)),
+    );
     if (queued.length === 0) return { reconciled: 0 };
 
     // Group the queued submissionIds by their target table.
@@ -69,11 +80,28 @@ export async function reconcileQueuedSpecialForms(): Promise<{ reconciled: numbe
             await setSavedEntryStatus(mirrorId, "sent", {
               offline: false,
               sentAt: new Date().toISOString(),
+              settings: { ...(queued.find((e) => e.id === mirrorId)?.settings || {}), serverVerifiedAt: new Date().toISOString() },
             });
             reconciled++;
+            idMap.delete(row.id);
           }
         } catch {
           // ignore — best-effort
+        }
+      }
+
+      // If the mirror says "queued" but the row is not on the server, rebuild
+      // and resend from the local saved snapshot. This repairs older app builds
+      // where the visual mirror was created but the insert queue was never
+      // linked, so the dashboard/accountability count stayed short.
+      for (const [missingSubmissionId, mirrorId] of idMap) {
+        const entry = queued.find((e) => e.id === mirrorId);
+        if (!entry || !isBloombergSavedEntry(entry)) continue;
+        try {
+          const result = await syncSpecialSavedForm({ ...entry, submissionId: missingSubmissionId });
+          if (result?.success && !result.offline) reconciled++;
+        } catch {
+          // keep queued; the normal queue/reconcile cadence will retry
         }
       }
     }
