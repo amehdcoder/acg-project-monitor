@@ -93,6 +93,7 @@ export const useBloombergDashboard = () => {
   // Monotonic request id: any async load tags itself with the current value
   // and discards its result if a newer load has started.
   const reqIdRef = useRef(0);
+  const reloadTimerRef = useRef<number | null>(null);
   const reload = async () => {
     const myReq = ++reqIdRef.current;
     setLoading(true);
@@ -142,18 +143,26 @@ export const useBloombergDashboard = () => {
     setSchools([]);
     setSchoolCount(0);
     void reload();
-    const onMigrated = () => void reload();
+    const scheduleReload = () => {
+      if (reloadTimerRef.current !== null) window.clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = window.setTimeout(() => {
+        reloadTimerRef.current = null;
+        void reload();
+      }, 800);
+    };
+    const onMigrated = () => scheduleReload();
     window.addEventListener("bloomberg:ready-to-send-migrated", onMigrated);
     const channel = supabase
       .channel("bloomberg-validations-dashboard")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bloomberg_validations" },
-        () => void reload(),
+        () => scheduleReload(),
       )
       .subscribe();
     return () => {
       window.removeEventListener("bloomberg:ready-to-send-migrated", onMigrated);
+      if (reloadTimerRef.current !== null) window.clearTimeout(reloadTimerRef.current);
       supabase.removeChannel(channel);
       if (myReq === reqIdRef.current) reqIdRef.current++;
     };
