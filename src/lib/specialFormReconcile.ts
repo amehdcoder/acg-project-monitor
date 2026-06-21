@@ -45,7 +45,12 @@ export async function reconcileQueuedSpecialForms(): Promise<{ reconciled: numbe
     const { data: auth } = await supabase.auth.getUser().catch(() => ({ data: null as any }));
     const currentUserId = auth?.user?.id || null;
     const sent = await listAllSavedEntries("sent");
-    const queued = sent.filter((e) => e.offline === true && e.submissionId && (!currentUserId || e.userId === currentUserId));
+    const queued = sent.filter(
+      (e) =>
+        !!e.submissionId &&
+        (!currentUserId || e.userId === currentUserId) &&
+        (e.offline === true || isBloombergSavedEntry(e)),
+    );
     if (queued.length === 0) return { reconciled: 0 };
 
     // Group the queued submissionIds by their target table.
