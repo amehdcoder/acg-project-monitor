@@ -1489,6 +1489,31 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   };
 
   const addMedAllocRow = () => setMedAllocEntries(prev => [...prev, { lga: "", ward: "", flhf: "", amount: "", jrsm: "" }]);
+  // Add an uncovered (missing) ward to the allocation table, ready for the admin
+  // to type its medicine amount / JRSM target so it spreads to its communities.
+  const addMissingWardRow = (lga: string, ward: string) => {
+    setMedAllocEntries(prev => {
+      const exists = prev.some(p => normGeo(p.lga) === normGeo(lga) && normGeo(p.ward) === normGeo(ward));
+      if (exists) return prev;
+      // Drop the leading empty placeholder row if present.
+      const base = prev.length === 1 && !prev[0].lga && !prev[0].amount ? [] : prev;
+      return [...base, { lga, ward, flhf: "", amount: "", jrsm: "", year: new Date().getFullYear() }];
+    });
+    toast({ title: "Ward added", description: `${ward} (${lga}) added — enter its medicine & JRSM target.` });
+  };
+  const addAllMissingWardRows = () => {
+    if (missingAllocationWards.length === 0) return;
+    setMedAllocEntries(prev => {
+      const base = prev.length === 1 && !prev[0].lga && !prev[0].amount ? [] : [...prev];
+      const out = [...base];
+      for (const m of missingAllocationWards) {
+        const exists = out.some(p => normGeo(p.lga) === normGeo(m.lga) && normGeo(p.ward) === normGeo(m.ward));
+        if (!exists) out.push({ lga: m.lga, ward: m.ward, flhf: "", amount: "", jrsm: "", year: new Date().getFullYear() });
+      }
+      return out;
+    });
+    toast({ title: `✅ ${missingAllocationWards.length} ward(s) added`, description: "Enter medicine & JRSM targets to spread them to communities." });
+  };
   const removeMedAllocRow = async (idx: number) => {
     const row = medAllocEntries[idx];
     if (row?.id) {
