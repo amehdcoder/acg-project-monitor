@@ -144,8 +144,17 @@ export const useBloombergDashboard = () => {
     void reload();
     const onMigrated = () => void reload();
     window.addEventListener("bloomberg:ready-to-send-migrated", onMigrated);
+    const channel = supabase
+      .channel("bloomberg-validations-dashboard")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bloomberg_validations" },
+        () => void reload(),
+      )
+      .subscribe();
     return () => {
       window.removeEventListener("bloomberg:ready-to-send-migrated", onMigrated);
+      supabase.removeChannel(channel);
       if (myReq === reqIdRef.current) reqIdRef.current++;
     };
   }, []);
