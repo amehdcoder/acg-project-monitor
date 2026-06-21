@@ -23,6 +23,7 @@ export const BLOOMBERG_SPECIAL_FORM_KEY = "bloomberg";
 export const SEECLEAR_SPECIAL_FORM_KEY = "seeclear";
 
 interface MirrorArgs {
+  id?: string;
   userId: string;
   formId: string;
   formName: string;
@@ -42,7 +43,7 @@ export async function mirrorSpecialForm(args: MirrorArgs): Promise<void> {
   try {
     const now = new Date().toISOString();
     const entry: SavedFormEntry = {
-      id: newEntryId(),
+      id: args.id || newEntryId(),
       userId: args.userId,
       formId: args.formId,
       formName: args.formName,
