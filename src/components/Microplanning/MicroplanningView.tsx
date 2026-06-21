@@ -409,6 +409,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   // Medicine Allocation state - multiple LGAs (in-edit buffer)
   const [medAllocEntries, setMedAllocEntries] = useState<{ id?: string; lga: string; ward?: string; flhf?: string; amount: string; jrsm?: string; medicine_name?: string; year?: number }[]>([{ lga: "", ward: "", flhf: "", amount: "", jrsm: "" }]);
+  // Debounced mirror of the allocation entries. Typing in the medicine / JRSM /
+  // population inputs updates `medAllocEntries` instantly (snappy UI) but the
+  // heavy per-community recomputation only runs ~400ms after the user pauses,
+  // so editing thousands of rows never blocks the main thread keystroke-by-keystroke.
+  const [debouncedAllocEntries, setDebouncedAllocEntries] = useState(medAllocEntries);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedAllocEntries(medAllocEntries), 400);
+    return () => clearTimeout(t);
+  }, [medAllocEntries]);
   const [savedAllocations, setSavedAllocations] = useState<any[]>([]);
   const [savingAllocations, setSavingAllocations] = useState(false);
   // Medicine "upload & compute" — ad-hoc population rows used as the breakdown source
