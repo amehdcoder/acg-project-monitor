@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Map, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity, Navigation, Home, Target, Globe, Heart } from "lucide-react";
+import { Plus, Map as MapIcon, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity, Navigation, Home, Target, Globe, Heart } from "lucide-react";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import TablePagination from "@/components/ui/table-pagination";
 import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
@@ -843,9 +843,12 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     return result;
   }, [baseEntries, isAdmin, scope, projectScope]);
 
-  // Filters
-  const uniqueStates = [...new Set(displayEntries.map(e => e.state))].sort();
-  const filtered = displayEntries.filter(e => {
+  // Filters (memoized — avoids re-deriving over millions of rows every render)
+  const uniqueStates = useMemo(
+    () => [...new Set(displayEntries.map(e => e.state))].sort(),
+    [displayEntries],
+  );
+  const filtered = useMemo(() => displayEntries.filter(e => {
     if (filterState !== "all" && e.state !== filterState) return false;
     if (filterAccessibility !== "all") {
       const acc = e.accessibility || "unset";
@@ -870,52 +873,69 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       return [e.community_name, e.settlement_name, e.flhf_name, e.lga, e.ward].some(v => v?.toLowerCase().includes(q));
     }
     return true;
-  });
+  }), [displayEntries, filterState, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, searchQuery]);
 
-  // ===== COMPREHENSIVE KPI ENGINE (computed from real entries) =====
-  const totalPop = filtered.reduce((s, e) => s + (e.estimated_total_population || 0), 0);
-  const totalChildren04 = filtered.reduce((s, e) => s + (e.estimated_children_0_4 || 0), 0);
-  const totalChildren514 = filtered.reduce((s, e) => s + (e.estimated_children_5_14 || 0), 0);
-  const totalAdults15 = filtered.reduce((s, e) => s + (e.estimated_adults_15_plus || 0), 0);
-  const totalHouseholds = filtered.reduce((s, e) => s + (e.number_of_households || 0), 0);
-  const targetPop = filtered.reduce((s, e) => s + calcTargetPop(e as any), 0);
-  const geotagged = filtered.filter(e => e.community_latitude && e.community_longitude).length;
-  const geotaggedPct = filtered.length > 0 ? (geotagged / filtered.length) * 100 : 0;
-  const hardToReach = filtered.filter(e => e.accessibility === "hard_to_reach" || e.accessibility === "inaccessible").length;
-  const uniqueStatesCount = new Set(filtered.map(e => e.state)).size;
-  const uniqueLGAsCount = new Set(filtered.map(e => e.lga)).size;
-  const uniqueWardsCount = new Set(filtered.map(e => e.ward)).size;
-  const uniqueFLHFs = new Set(filtered.map(e => e.flhf_name)).size;
-  const uniqueSettlements = filtered.filter(e => e.settlement_name).length;
-  const cddFromCommunity = filtered.filter(e => e.cdd_from_community).length;
-  const cddPct = filtered.length > 0 ? (cddFromCommunity / filtered.length) * 100 : 0;
-  const avgDistKm = (() => {
-    const dists = filtered.map(e => e.community_distance_to_flhf_km).filter((d): d is number => d != null && d > 0);
-    return dists.length ? (dists.reduce((a, b) => a + b, 0) / dists.length).toFixed(1) : "—";
-  })();
-  const avgHouseholdsPerCommunity = filtered.length > 0 && totalHouseholds > 0 ? Math.round(totalHouseholds / filtered.length) : 0;
-
-  // Accessibility breakdown
-  const accessStats = {
-    accessible: filtered.filter(e => e.accessibility === "accessible").length,
-    hard_to_reach: filtered.filter(e => e.accessibility === "hard_to_reach").length,
-    inaccessible: filtered.filter(e => e.accessibility === "inaccessible").length,
-    seasonal: filtered.filter(e => e.accessibility === "seasonal").length,
-    unset: filtered.filter(e => !e.accessibility).length,
-  };
-  const securityStats = {
-    cleared: filtered.filter(e => e.security_clearance === "cleared").length,
-    partial: filtered.filter(e => e.security_clearance === "partial").length,
-    not_cleared: filtered.filter(e => e.security_clearance === "not_cleared").length,
-    unknown: filtered.filter(e => !e.security_clearance || e.security_clearance === "unknown").length,
-  };
-  const terrainCounts = filtered.reduce<Record<string, number>>((acc, e) => {
-    const t = e.terrain_type || "unset";
-    acc[t] = (acc[t] || 0) + 1;
-    return acc;
-  }, {});
+  // ===== COMPREHENSIVE KPI ENGINE — single pass over `filtered` (memoized) =====
+  // Previously ~25 separate map/filter/reduce passes ran on EVERY render. With
+  // millions of rows that froze the page; now it's one loop, recomputed only
+  // when the filtered set actually changes.
+  const kpis = useMemo(() => {
+    let totalPop = 0, totalChildren04 = 0, totalChildren514 = 0, totalAdults15 = 0, totalHouseholds = 0, targetPop = 0;
+    let geotagged = 0, hardToReach = 0, uniqueSettlements = 0, cddFromCommunity = 0;
+    let distSum = 0, distCount = 0;
+    const stateSet = new Set<any>(), lgaSet = new Set<any>(), wardSet = new Set<any>(), flhfSet = new Set<any>();
+    const accessStats = { accessible: 0, hard_to_reach: 0, inaccessible: 0, seasonal: 0, unset: 0 };
+    const securityStats = { cleared: 0, partial: 0, not_cleared: 0, unknown: 0 };
+    const terrainCounts: Record<string, number> = {};
+    for (const e of filtered) {
+      totalPop += e.estimated_total_population || 0;
+      totalChildren04 += e.estimated_children_0_4 || 0;
+      totalChildren514 += e.estimated_children_5_14 || 0;
+      totalAdults15 += e.estimated_adults_15_plus || 0;
+      totalHouseholds += e.number_of_households || 0;
+      targetPop += calcTargetPop(e as any);
+      if (e.community_latitude && e.community_longitude) geotagged++;
+      const acc = e.accessibility;
+      if (acc === "hard_to_reach" || acc === "inaccessible") hardToReach++;
+      stateSet.add(e.state); lgaSet.add(e.lga); wardSet.add(e.ward); flhfSet.add(e.flhf_name);
+      if (e.settlement_name) uniqueSettlements++;
+      if (e.cdd_from_community) cddFromCommunity++;
+      const d = e.community_distance_to_flhf_km;
+      if (d != null && d > 0) { distSum += d; distCount++; }
+      if (acc === "accessible") accessStats.accessible++;
+      else if (acc === "hard_to_reach") accessStats.hard_to_reach++;
+      else if (acc === "inaccessible") accessStats.inaccessible++;
+      else if (acc === "seasonal") accessStats.seasonal++;
+      else if (!acc) accessStats.unset++;
+      const sc = e.security_clearance;
+      if (sc === "cleared") securityStats.cleared++;
+      else if (sc === "partial") securityStats.partial++;
+      else if (sc === "not_cleared") securityStats.not_cleared++;
+      else if (!sc || sc === "unknown") securityStats.unknown++;
+      const t = e.terrain_type || "unset";
+      terrainCounts[t] = (terrainCounts[t] || 0) + 1;
+    }
+    const count = filtered.length;
+    return {
+      totalPop, totalChildren04, totalChildren514, totalAdults15, totalHouseholds, targetPop,
+      geotagged, geotaggedPct: count > 0 ? (geotagged / count) * 100 : 0,
+      hardToReach,
+      uniqueStatesCount: stateSet.size, uniqueLGAsCount: lgaSet.size, uniqueWardsCount: wardSet.size, uniqueFLHFs: flhfSet.size,
+      uniqueSettlements, cddFromCommunity, cddPct: count > 0 ? (cddFromCommunity / count) * 100 : 0,
+      avgDistKm: distCount ? (distSum / distCount).toFixed(1) : "—",
+      avgHouseholdsPerCommunity: count > 0 && totalHouseholds > 0 ? Math.round(totalHouseholds / count) : 0,
+      accessStats, securityStats, terrainCounts,
+    };
+  }, [filtered, calcTargetPop]);
+  const {
+    totalPop, totalChildren04, totalChildren514, totalAdults15, totalHouseholds, targetPop,
+    geotagged, geotaggedPct, hardToReach, uniqueStatesCount, uniqueLGAsCount, uniqueWardsCount,
+    uniqueFLHFs, uniqueSettlements, cddFromCommunity, cddPct, avgDistKm, avgHouseholdsPerCommunity,
+    accessStats, securityStats, terrainCounts,
+  } = kpis;
 
   const TERRAIN_EMOJI: Record<string, string> = { flat: "🌾", hilly: "⛰️", mountainous: "🏔️", riverine: "🌊", swampy: "🏝️", desert: "🏜️", forest: "🌲" };
+
 
   // Medicine allocation: unique LGAs from current entries
   // When the user has uploaded ad-hoc population rows, the medicine breakdown
@@ -934,21 +954,92 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       .replace(/\b(ward|district)\b/g, " ")
       .replace(/[^a-z0-9]/g, ""), []);
   const geoEq = useCallback((a: unknown, b: unknown) => normGeo(a) === normGeo(b), [normGeo]);
-  const allLgasForMedicine = useMemo(() => [...new Set(medicineSourceEntries.map((e: any) => e.lga))].sort(), [medicineSourceEntries]);
-  // Cascaded option lookups for optional Ward / FLHF drill-down
+  // Pre-built geographic index of the population source. Built ONCE per dataset
+  // change instead of re-scanning millions of rows for every allocation row,
+  // option lookup, warning and missing-ward computation (was O(rows × allocs)).
+  const medicineIndex = useMemo(() => {
+    const tp = (e: any) =>
+      e && e.__uploaded
+        ? Math.round((Number(e.estimated_total_population) || 0) * (medTargetPct / 100))
+        : (calcTargetPop(e) || (e.estimated_total_population || 0));
+
+    type Node = { e: any; tp: number; nFlhf: string };
+    const byLga = new Map<string, Node[]>();        // normLga -> entries
+    const byWard = new Map<string, Node[]>();        // normLga|normWard -> entries
+    const byFlhf = new Map<string, Node[]>();        // normLga|normWard|normFlhf -> entries
+    const lgaSet = new Set<string>();                // raw LGA values for dropdown
+    const wardOpts = new Map<string, Set<string>>(); // raw LGA -> raw wards
+    const flhfByLgaWard = new Map<string, Set<string>>(); // raw LGA|ward -> raw flhfs
+    const flhfByLga = new Map<string, Set<string>>();     // raw LGA -> raw flhfs
+    const wardAgg = new Map<string, { lga: string; ward: string; nLga: string; nWard: string; communities: number; targetPop: number }>();
+
+    const push = (m: Map<string, Node[]>, k: string, n: Node) => {
+      const a = m.get(k);
+      if (a) a.push(n); else m.set(k, [n]);
+    };
+    const addOpt = (m: Map<string, Set<string>>, k: string, v: string) => {
+      let s = m.get(k);
+      if (!s) { s = new Set(); m.set(k, s); }
+      s.add(v);
+    };
+
+    for (const e of medicineSourceEntries as any[]) {
+      const rawLga = e.lga;
+      const nLga = normGeo(rawLga);
+      const nWard = normGeo(e.ward);
+      const nFlhf = normGeo(e.flhf_name);
+      const node: Node = { e, tp: tp(e), nFlhf };
+      if (rawLga) lgaSet.add(rawLga);
+      push(byLga, nLga, node);
+      if (nWard) push(byWard, `${nLga}|${nWard}`, node);
+      if (nWard && nFlhf) push(byFlhf, `${nLga}|${nWard}|${nFlhf}`, node);
+      // dropdown option maps (raw values preserved for display)
+      if (rawLga && e.ward) addOpt(wardOpts, rawLga, e.ward);
+      if (rawLga && e.flhf_name) {
+        addOpt(flhfByLga, rawLga, e.flhf_name);
+        if (e.ward) addOpt(flhfByLgaWard, `${rawLga}|${e.ward}`, e.flhf_name);
+      }
+      // per-ward aggregation for missing-ward detection
+      const wardStr = String(e.ward ?? "").trim();
+      const lgaStr = String(rawLga ?? "").trim();
+      if (lgaStr && wardStr && wardStr !== "—") {
+        const key = `${nLga}|${nWard}`;
+        const prev = wardAgg.get(key);
+        if (prev) { prev.communities++; prev.targetPop += node.tp; }
+        else wardAgg.set(key, { lga: lgaStr, ward: wardStr, nLga, nWard, communities: 1, targetPop: node.tp });
+      }
+    }
+    return { byLga, byWard, byFlhf, lgaSet, wardOpts, flhfByLgaWard, flhfByLga, wardAgg };
+  }, [medicineSourceEntries, medTargetPct, calcTargetPop, normGeo]);
+
+  // Resolve the population rows covered by an allocation row at its chosen depth.
+  const allocScope = useCallback((me: { lga?: string; ward?: string; flhf?: string }) => {
+    const nLga = normGeo(me.lga);
+    if (me.flhf && me.ward)
+      return medicineIndex.byFlhf.get(`${nLga}|${normGeo(me.ward)}|${normGeo(me.flhf)}`) || [];
+    if (me.ward)
+      return medicineIndex.byWard.get(`${nLga}|${normGeo(me.ward)}`) || [];
+    if (me.flhf) {
+      const nf = normGeo(me.flhf);
+      return (medicineIndex.byLga.get(nLga) || []).filter(n => n.nFlhf === nf);
+    }
+    return medicineIndex.byLga.get(nLga) || [];
+  }, [medicineIndex, normGeo]);
+
+  const allLgasForMedicine = useMemo(() => [...medicineIndex.lgaSet].sort(), [medicineIndex]);
+  // Cascaded option lookups for optional Ward / FLHF drill-down (O(1) map reads)
   const wardsForLga = useCallback(
-    (lga: string) => [...new Set(medicineSourceEntries.filter((e: any) => e.lga === lga).map((e: any) => e.ward).filter(Boolean))].sort() as string[],
-    [medicineSourceEntries],
+    (lga: string) => [...(medicineIndex.wardOpts.get(lga) || [])].sort(),
+    [medicineIndex],
   );
   const flhfsForWard = useCallback(
-    (lga: string, ward: string) => [...new Set(
-      medicineSourceEntries
-        .filter((e: any) => e.lga === lga && (!ward || e.ward === ward))
-        .map((e: any) => e.flhf_name)
-        .filter(Boolean),
-    )].sort() as string[],
-    [medicineSourceEntries],
+    (lga: string, ward: string) => {
+      if (ward) return [...(medicineIndex.flhfByLgaWard.get(`${lga}|${ward}`) || [])].sort();
+      return [...(medicineIndex.flhfByLga.get(lga) || [])].sort();
+    },
+    [medicineIndex],
   );
+
 
   const getTargetPop = (e: any) => {
     // Uploaded population rows: target population = total population × chosen %.
@@ -982,24 +1073,24 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     for (const me of validEntries) {
       const totalMedicine = Number(me.amount);
       const jrsmTotal = Number(me.jrsm) || 0;
-      const lgaEntries = medicineSourceEntries.filter((e: any) =>
-        geoEq(e.lga, me.lga) &&
-        (!me.ward || geoEq(e.ward, me.ward)) &&
-        (!me.flhf || geoEq(e.flhf_name, me.flhf)));
+      const lgaEntries = allocScope(me);
       if (lgaEntries.length === 0) continue;
 
-      const rows = lgaEntries.map(e => ({
-        entryId: e.id,
-        year: e.year_of_microplanning || new Date().getFullYear(),
-        state: e.state,
-        lga: e.lga,
-        ward: e.ward,
-        flhf: e.flhf_name,
-        community: e.community_name,
-        settlement: e.settlement_name || "—",
-        targetPop: getTargetPop(e),
-        medicineUsed: Number((e as any).medicine_used) || 0,
-      }));
+      const rows = lgaEntries.map(n => {
+        const e = n.e;
+        return {
+          entryId: e.id,
+          year: e.year_of_microplanning || new Date().getFullYear(),
+          state: e.state,
+          lga: e.lga,
+          ward: e.ward,
+          flhf: e.flhf_name,
+          community: e.community_name,
+          settlement: e.settlement_name || "—",
+          targetPop: n.tp,
+          medicineUsed: Number((e as any).medicine_used) || 0,
+        };
+      });
 
       const totalTargetPop = rows.reduce((s, r) => s + r.targetPop, 0);
 
@@ -1033,7 +1124,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
 
     return allRows;
-  }, [medAllocEntries, medicineSourceEntries, medTargetPct, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID, geoEq]);
+  }, [medAllocEntries, allocScope, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
 
   // ---- Allocation validation ----
   // Prevent allocations whose JRSM target (people to treat) exceeds the target
@@ -1045,19 +1136,16 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       if (!me.lga) return;
       const jrsm = Number(me.jrsm) || 0;
       if (jrsm <= 0) return;
-      const scope = medicineSourceEntries.filter((e: any) =>
-        geoEq(e.lga, me.lga) &&
-        (!me.ward || geoEq(e.ward, me.ward)) &&
-        (!me.flhf || geoEq(e.flhf_name, me.flhf)));
+      const scope = allocScope(me);
       if (scope.length === 0) return;
-      const targetPop = scope.reduce((s, e: any) => s + getTargetPop(e), 0);
+      const targetPop = scope.reduce((s, n) => s + n.tp, 0);
       if (targetPop > 0 && jrsm > targetPop) {
         const depth = me.flhf ? "FLHF" : me.ward ? "Ward" : "LGA";
         out.push({ idx, lga: me.lga, ward: me.ward || "—", flhf: me.flhf || "—", depth, jrsm, targetPop, over: jrsm - targetPop });
       }
     });
     return out;
-  }, [medAllocEntries, medicineSourceEntries, medTargetPct, geoEq]);
+  }, [medAllocEntries, allocScope]);
 
   // ---- Wards present in the population data but NOT covered by the allocation ----
   // After uploading/entering an allocation plan, surface every ward that the
@@ -1079,25 +1167,17 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         .map((me) => `${normGeo(me.lga)}|${normGeo(me.ward)}`),
     );
 
-    const agg: Record<string, { lga: string; ward: string; communities: number; targetPop: number }> = {};
-    for (const e of medicineSourceEntries as any[]) {
-      const ward = String(e.ward ?? "").trim();
-      const lga = String(e.lga ?? "").trim();
-      if (!lga || !ward || ward === "—") continue;
-      const nLga = normGeo(lga);
-      const nWard = normGeo(ward);
-      if (lgaWide.has(nLga)) continue; // whole LGA already allocated
-      if (coveredWard.has(`${nLga}|${nWard}`)) continue; // ward already allocated
-      const key = `${nLga}|${nWard}`;
-      const prev = agg[key] || { lga, ward, communities: 0, targetPop: 0 };
-      prev.communities += 1;
-      prev.targetPop += getTargetPop(e);
-      agg[key] = prev;
+    // Use the pre-aggregated per-ward index instead of rescanning every row.
+    const out: { lga: string; ward: string; communities: number; targetPop: number }[] = [];
+    for (const w of medicineIndex.wardAgg.values()) {
+      if (lgaWide.has(w.nLga)) continue; // whole LGA already allocated
+      if (coveredWard.has(`${w.nLga}|${w.nWard}`)) continue; // ward already allocated
+      out.push({ lga: w.lga, ward: w.ward, communities: w.communities, targetPop: w.targetPop });
     }
-    return Object.values(agg).sort((a, b) =>
+    return out.sort((a, b) =>
       a.lga === b.lga ? a.ward.localeCompare(b.ward) : a.lga.localeCompare(b.lga),
     );
-  }, [medAllocEntries, medicineSourceEntries, normGeo, medTargetPct]);
+  }, [medAllocEntries, medicineIndex, normGeo]);
 
 
 
@@ -1938,7 +2018,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <span className="hidden sm:inline text-xs">Gaps</span>
               </Button>
               <Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("map")}>
-                <Map className="h-3.5 w-3.5" />
+                <MapIcon className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline text-xs">Map</span>
               </Button>
               <Button variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
