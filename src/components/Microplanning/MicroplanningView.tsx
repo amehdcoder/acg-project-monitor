@@ -1136,19 +1136,16 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       if (!me.lga) return;
       const jrsm = Number(me.jrsm) || 0;
       if (jrsm <= 0) return;
-      const scope = medicineSourceEntries.filter((e: any) =>
-        geoEq(e.lga, me.lga) &&
-        (!me.ward || geoEq(e.ward, me.ward)) &&
-        (!me.flhf || geoEq(e.flhf_name, me.flhf)));
+      const scope = allocScope(me);
       if (scope.length === 0) return;
-      const targetPop = scope.reduce((s, e: any) => s + getTargetPop(e), 0);
+      const targetPop = scope.reduce((s, n) => s + n.tp, 0);
       if (targetPop > 0 && jrsm > targetPop) {
         const depth = me.flhf ? "FLHF" : me.ward ? "Ward" : "LGA";
         out.push({ idx, lga: me.lga, ward: me.ward || "—", flhf: me.flhf || "—", depth, jrsm, targetPop, over: jrsm - targetPop });
       }
     });
     return out;
-  }, [medAllocEntries, medicineSourceEntries, medTargetPct, geoEq]);
+  }, [medAllocEntries, allocScope]);
 
   // ---- Wards present in the population data but NOT covered by the allocation ----
   // After uploading/entering an allocation plan, surface every ward that the
