@@ -2611,8 +2611,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                             </tr>
                           </thead>
                           <tbody>
-                            {medicineAllocationData.map((row, i) => (
-                              <tr key={i} className={`border-b border-border/50 ${i % 2 === 0 ? "bg-background" : "bg-muted/20"} hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors`}>
+                            {medAllocPagination.paginatedData.map((row: any, i: number) => (
+                              <tr key={medAllocPagination.startIndex + i} className={`border-b border-border/50 ${i % 2 === 0 ? "bg-background" : "bg-muted/20"} hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors`}>
                                 <td className="px-3 py-2 border-r border-border/30">{row.year}</td>
                                 <td className="px-3 py-2 border-r border-border/30">{row.state}</td>
                                 <td className="px-3 py-2 border-r border-border/30 font-medium">{row.lga}</td>
@@ -2650,28 +2650,38 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                             <tr className="bg-emerald-700 text-white font-bold">
                               <td colSpan={7} className="px-3 py-2.5 border-r border-emerald-600">TOTAL</td>
                               <td className="px-3 py-2.5 text-right border-r border-emerald-600 tabular-nums">
-                                {medicineAllocationData.reduce((s, r) => s + r.targetPop, 0).toLocaleString()}
+                                {medAllocTotals.targetPop.toLocaleString()}
                               </td>
                               <td className="px-3 py-2.5 text-right tabular-nums border-r border-emerald-600">
-                                {medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0).toLocaleString()}
+                                {medAllocTotals.medicine.toLocaleString()}
                               </td>
                               <td className="px-3 py-2.5 text-right tabular-nums border-r border-emerald-600">
-                                {medicineAllocationData.reduce((s, r) => s + r.peopleToTreat, 0).toLocaleString()}
+                                {medAllocTotals.people.toLocaleString()}
                               </td>
                               <td className="px-3 py-2.5 text-right tabular-nums">
-                                {(() => {
-                                  const m = medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0);
-                                  const p = medicineAllocationData.reduce((s, r) => s + r.peopleToTreat, 0);
-                                  return p > 0 ? (m / p).toFixed(2) : "—";
-                                })()}
+                                {medAllocTotals.people > 0 ? medAllocTotals.ratio.toFixed(2) : "—"}
                               </td>
                             </tr>
                           </tfoot>
                         </table>
                       </div>
+                      {medAllocPagination.totalPages > 1 && (
+                        <TablePagination
+                          currentPage={medAllocPagination.currentPage}
+                          totalPages={medAllocPagination.totalPages}
+                          totalItems={medAllocPagination.totalItems}
+                          startIndex={medAllocPagination.startIndex}
+                          pageSize={medAllocPagination.pageSize}
+                          hasPrev={medAllocPagination.hasPrev}
+                          hasNext={medAllocPagination.hasNext}
+                          onPrev={medAllocPagination.prevPage}
+                          onNext={medAllocPagination.nextPage}
+                        />
+                      )}
                     </div>
                   </>
                 )}
+
 
                 {medicineAllocationData.length === 0 && medAllocEntries.every(e => !e.lga) && (
                   <div className="text-center py-12 text-muted-foreground">
