@@ -2235,6 +2235,65 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                   </div>
                 )}
 
+                {/* Wards imported from population data but missing from the allocation plan */}
+                {missingAllocationWards.length > 0 && (
+                  <div className="rounded-lg border-2 border-amber-400/70 bg-gradient-to-br from-amber-50/90 to-orange-50/70 dark:from-amber-950/30 dark:to-orange-950/20 p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🧭</span>
+                        <h3 className="text-xs font-bold text-amber-800 dark:text-amber-300">
+                          {missingAllocationWards.length} ward{missingAllocationWards.length > 1 ? "s" : ""} in your population data {missingAllocationWards.length > 1 ? "are" : "is"} not in the allocation plan
+                        </h3>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs gap-1 bg-amber-600 hover:bg-amber-700 text-white"
+                        onClick={addAllMissingWardRows}
+                      >
+                        ➕ Add all to allocation table
+                      </Button>
+                    </div>
+                    <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90">
+                      These wards were imported by <strong>Upload Population Data</strong> but no matching row exists in the
+                      <strong> Allocation Plan</strong>. Add them to the table below and type their medicine &amp; JRSM target so they spread to their communities.
+                    </p>
+                    <div className="overflow-auto rounded-md border border-amber-300/60 bg-background max-h-56">
+                      <table className="w-full text-[10px] border-collapse">
+                        <thead className="sticky top-0">
+                          <tr className="text-left text-muted-foreground bg-amber-100/60 dark:bg-amber-950/40">
+                            <th className="px-2 py-1.5 font-semibold border-b">LGA</th>
+                            <th className="px-2 py-1.5 font-semibold border-b">Ward</th>
+                            <th className="px-2 py-1.5 font-semibold border-b text-right">Communities</th>
+                            <th className="px-2 py-1.5 font-semibold border-b text-right">Target Pop</th>
+                            <th className="px-2 py-1.5 font-semibold border-b text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {missingAllocationWards.map((m, i) => (
+                            <tr key={`${m.lga}-${m.ward}-${i}`} className="even:bg-amber-50/40 dark:even:bg-amber-950/10">
+                              <td className="px-2 py-1 border-b">{m.lga}</td>
+                              <td className="px-2 py-1 border-b font-medium">{m.ward}</td>
+                              <td className="px-2 py-1 border-b text-right tabular-nums">{m.communities.toLocaleString()}</td>
+                              <td className="px-2 py-1 border-b text-right tabular-nums">{m.targetPop.toLocaleString()}</td>
+                              <td className="px-2 py-1 border-b text-right">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-6 px-2 text-[10px] gap-1 border-amber-400 text-amber-700 hover:bg-amber-100"
+                                  onClick={() => addMissingWardRow(m.lga, m.ward)}
+                                >
+                                  ➕ Add
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+
                 {/* Multiple LGA entry rows */}
                 <div className="space-y-2">
                   {medAllocEntries.map((entry, idx) => (
