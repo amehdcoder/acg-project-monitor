@@ -8,6 +8,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { sealRecord, unsealRecord } from "@/lib/deviceCrypto";
+import { setSavedEntryStatus } from "@/lib/savedForms";
 
 const DB_NAME = "acg_offline_submissions";
 const DB_VERSION = 1;
