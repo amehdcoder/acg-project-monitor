@@ -1057,7 +1057,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       }
     });
     return out;
-  }, [medAllocEntries, medicineSourceEntries, medTargetPct]);
+  }, [medAllocEntries, medicineSourceEntries, medTargetPct, geoEq]);
 
   // Per-LGA adjustment suggestions (drug/person ratio → 2.5–3.0)
   const lgaAdjustmentSuggestions = useMemo(() => {
