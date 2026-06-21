@@ -109,6 +109,7 @@ export async function syncSpecialSavedForm(
       submissionId: id,
       sentAt: now,
       offline: false,
+      settings: { ...(entry.settings || {}), serverVerifiedAt: now },
     });
   }
   return { success: true, offline: queued, id };
