@@ -1167,25 +1167,17 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         .map((me) => `${normGeo(me.lga)}|${normGeo(me.ward)}`),
     );
 
-    const agg: Record<string, { lga: string; ward: string; communities: number; targetPop: number }> = {};
-    for (const e of medicineSourceEntries as any[]) {
-      const ward = String(e.ward ?? "").trim();
-      const lga = String(e.lga ?? "").trim();
-      if (!lga || !ward || ward === "—") continue;
-      const nLga = normGeo(lga);
-      const nWard = normGeo(ward);
-      if (lgaWide.has(nLga)) continue; // whole LGA already allocated
-      if (coveredWard.has(`${nLga}|${nWard}`)) continue; // ward already allocated
-      const key = `${nLga}|${nWard}`;
-      const prev = agg[key] || { lga, ward, communities: 0, targetPop: 0 };
-      prev.communities += 1;
-      prev.targetPop += getTargetPop(e);
-      agg[key] = prev;
+    // Use the pre-aggregated per-ward index instead of rescanning every row.
+    const out: { lga: string; ward: string; communities: number; targetPop: number }[] = [];
+    for (const w of medicineIndex.wardAgg.values()) {
+      if (lgaWide.has(w.nLga)) continue; // whole LGA already allocated
+      if (coveredWard.has(`${w.nLga}|${w.nWard}`)) continue; // ward already allocated
+      out.push({ lga: w.lga, ward: w.ward, communities: w.communities, targetPop: w.targetPop });
     }
-    return Object.values(agg).sort((a, b) =>
+    return out.sort((a, b) =>
       a.lga === b.lga ? a.ward.localeCompare(b.ward) : a.lga.localeCompare(b.lga),
     );
-  }, [medAllocEntries, medicineSourceEntries, normGeo, medTargetPct]);
+  }, [medAllocEntries, medicineIndex, normGeo]);
 
 
 
