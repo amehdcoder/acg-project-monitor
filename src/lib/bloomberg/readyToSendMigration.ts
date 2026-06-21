@@ -192,6 +192,7 @@ export async function migrateReadyToSendBloomberg(
       submissionId,
       sentAt: queued ? null : nowIso(),
       offline: queued,
+      settings: queued ? e.settings : { ...(e.settings || {}), serverVerifiedAt: nowIso() },
     });
     if (queued) {
       result.queued += 1;
