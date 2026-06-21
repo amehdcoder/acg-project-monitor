@@ -1163,15 +1163,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   // them to the allocation table and type values so they spread to communities.
   const missingAllocationWards = useMemo(() => {
     // Only relevant once at least one allocation row exists.
-    const hasAlloc = medAllocEntries.some((me) => me.lga);
+    const hasAlloc = debouncedAllocEntries.some((me) => me.lga);
     if (!hasAlloc) return [] as { lga: string; ward: string; communities: number; targetPop: number }[];
 
     // LGAs covered by an LGA-wide allocation row (no ward) cover all their wards.
     const lgaWide = new Set(
-      medAllocEntries.filter((me) => me.lga && !me.ward).map((me) => normGeo(me.lga)),
+      debouncedAllocEntries.filter((me) => me.lga && !me.ward).map((me) => normGeo(me.lga)),
     );
     const coveredWard = new Set(
-      medAllocEntries
+      debouncedAllocEntries
         .filter((me) => me.lga && me.ward)
         .map((me) => `${normGeo(me.lga)}|${normGeo(me.ward)}`),
     );
