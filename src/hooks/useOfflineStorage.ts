@@ -167,6 +167,11 @@ export const useOfflineStorage = () => {
       return { synced: 0, failed: 0 };
     }
 
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session?.user) {
+      return { synced: 0, failed: 0 };
+    }
+
     isSyncingRef.current = true;
     setIsSyncing(true);
     let synced = 0;
