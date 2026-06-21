@@ -43,6 +43,18 @@ async function markMirrorSent(mirrorEntryId?: string | null) {
 
 let flushing = false;
 let listenersBound = false;
+let flushTimer: number | null = null;
+
+const RETRY_DELAYS_MS = [1_000, 5_000, 15_000, 30_000, 60_000];
+
+function scheduleFlush(delay = 1_000) {
+  if (typeof window === "undefined" || !isOnline()) return;
+  if (flushTimer !== null) window.clearTimeout(flushTimer);
+  flushTimer = window.setTimeout(() => {
+    flushTimer = null;
+    void flushSubmissionQueue();
+  }, delay);
+}
 
 const openDB = (): Promise<IDBDatabase> =>
   new Promise((resolve, reject) => {
@@ -132,7 +144,7 @@ export async function queueOrInsert(
   ensureListeners();
   // Kick an immediate background flush attempt so a transient failure while
   // online does not leave the row sitting "queued" for the whole interval.
-  if (isOnline()) setTimeout(() => void flushSubmissionQueue(), 1500);
+  scheduleFlush(500);
   return { queued: true };
 }
 
@@ -152,7 +164,12 @@ export async function flushSubmissionQueue(): Promise<{ inserted: number; remain
   let inserted = 0;
   try {
     const records = await getAllRecords();
-    for (const rec of records) {
+    const due = records.filter((rec) => {
+      const delay = RETRY_DELAYS_MS[Math.min(rec.attempts, RETRY_DELAYS_MS.length - 1)];
+      const last = Date.parse(rec.created_at || "") || 0;
+      return rec.attempts === 0 || Date.now() - last >= delay;
+    });
+    for (const rec of due) {
       if (!isOnline()) break;
       try {
         const { error } = rec.upsertOnId
@@ -163,13 +180,15 @@ export async function flushSubmissionQueue(): Promise<{ inserted: number; remain
         await markMirrorSent(rec.mirrorEntryId);
         inserted++;
       } catch (e: any) {
-        await putRecord({ ...rec, attempts: rec.attempts + 1, last_error: e?.message || "insert failed" });
+        await putRecord({ ...rec, attempts: rec.attempts + 1, created_at: new Date().toISOString(), last_error: e?.message || "insert failed" });
       }
     }
   } finally {
     flushing = false;
   }
-  return { inserted, remaining: await getPendingInsertCount() };
+  const remaining = await getPendingInsertCount();
+  if (remaining > 0) scheduleFlush(5_000);
+  return { inserted, remaining };
 }
 
 function ensureListeners() {
@@ -186,7 +205,7 @@ function ensureListeners() {
   // Poll every 20s so a queued row is never stuck for more than ~1 minute.
   window.setInterval(() => {
     if (isOnline()) void flushSubmissionQueue();
-  }, 20000);
+  }, 15000);
 }
 
 export function initOfflineSubmissions() {
