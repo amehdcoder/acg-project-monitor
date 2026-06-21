@@ -50,6 +50,18 @@ const schoolKeyOf = (e: SavedFormEntry): string | null => {
   return (sd.school_key ?? r.school_key ?? r.schoolKey ?? null) || null;
 };
 
+const visitDateOf = (e: SavedFormEntry): string => {
+  const sd = (e.submissionData || {}) as Record<string, unknown>;
+  const r = (e.responses || {}) as Record<string, unknown>;
+  const verification = (sd.verification || r.verification || {}) as Record<string, unknown>;
+  return String(verification.date_of_visit || e.finalizedAt || e.updatedAt || e.createdAt || "").slice(0, 10);
+};
+
+const visitDedupKeyOf = (e: SavedFormEntry): string | null => {
+  const key = schoolKeyOf(e);
+  return key ? `${key}::${visitDateOf(e)}` : null;
+};
+
 export interface MigrationResult {
   migrated: number;
   skippedDuplicate: number;
@@ -79,7 +91,7 @@ export async function migrateReadyToSendBloomberg(
   const noKey: SavedFormEntry[] = [];
   const supersededIds: string[] = [];
   for (const e of finalized) {
-    const key = schoolKeyOf(e);
+    const key = visitDedupKeyOf(e);
     if (!key) {
       noKey.push(e);
       continue;
@@ -132,11 +144,12 @@ export async function migrateReadyToSendBloomberg(
   try {
     const { data } = await supabase
       .from("bloomberg_validations")
-      .select("school_key")
+      .select("school_key,verification")
       .eq("validator_id", userId)
       .not("school_key", "is", null);
     (data || []).forEach((r: any) => {
-      if (r.school_key) serverKeys.add(r.school_key as string);
+      const visitDate = String(r.verification?.date_of_visit || "").slice(0, 10);
+      if (r.school_key) serverKeys.add(`${r.school_key as string}::${visitDate}`);
     });
   } catch {
     // If we cannot confirm server state, fall through — upsert-on-id below
@@ -150,7 +163,7 @@ export async function migrateReadyToSendBloomberg(
   // recovery effectively instantaneous for any volume without batching delays
   // or freezing the dashboard/app.
   await runPool(targets, async (e) => {
-    const key = schoolKeyOf(e);
+    const key = visitDedupKeyOf(e);
     if (key && serverKeys.has(key)) {
       // Already validated by this user on the server — clear it locally to keep
       // the "Ready to send" tab accurate, but never create a duplicate row.
