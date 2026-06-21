@@ -924,6 +924,16 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     () => (uploadedMedEntries.length > 0 ? (uploadedMedEntries as any[]) : displayEntries),
     [uploadedMedEntries, displayEntries],
   );
+  // Normalised geographic key so allocation rows (which may write "MARMA") match
+  // population rows (which may read "MARMA WARD") despite case, whitespace, or a
+  // trailing "ward"/"district" suffix. Without this, communities silently fail to
+  // match an allocation and render blank.
+  const normGeo = useCallback((s: unknown) =>
+    String(s ?? "")
+      .toLowerCase()
+      .replace(/\b(ward|district)\b/g, " ")
+      .replace(/[^a-z0-9]/g, ""), []);
+  const geoEq = useCallback((a: unknown, b: unknown) => normGeo(a) === normGeo(b), [normGeo]);
   const allLgasForMedicine = useMemo(() => [...new Set(medicineSourceEntries.map((e: any) => e.lga))].sort(), [medicineSourceEntries]);
   // Cascaded option lookups for optional Ward / FLHF drill-down
   const wardsForLga = useCallback(
