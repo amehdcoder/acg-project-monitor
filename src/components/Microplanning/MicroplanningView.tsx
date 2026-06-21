@@ -1186,7 +1186,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     return out.sort((a, b) =>
       a.lga === b.lga ? a.ward.localeCompare(b.ward) : a.lga.localeCompare(b.lga),
     );
-  }, [medAllocEntries, medicineIndex, normGeo]);
+  }, [debouncedAllocEntries, medicineIndex, normGeo]);
 
 
 
