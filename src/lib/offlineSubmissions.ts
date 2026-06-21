@@ -104,6 +104,7 @@ export async function queueOrInsert(
   table: string,
   row: Record<string, any>,
   upsertOnId = false,
+  opts: { mirrorEntryId?: string | null } = {},
 ): Promise<{ queued: boolean }> {
   if (isOnline()) {
     try {
@@ -111,6 +112,8 @@ export async function queueOrInsert(
         ? await supabase.from(table as any).upsert(row, { onConflict: "id" })
         : await supabase.from(table as any).insert(row);
       if (error) throw error;
+      // Confirmed on the server — reconcile the UI mirror right away.
+      await markMirrorSent(opts.mirrorEntryId);
       return { queued: false };
     } catch {
       // fall through to queue — never lose the submission
@@ -124,8 +127,12 @@ export async function queueOrInsert(
     attempts: 0,
     last_error: null,
     upsertOnId,
+    mirrorEntryId: opts.mirrorEntryId ?? null,
   });
   ensureListeners();
+  // Kick an immediate background flush attempt so a transient failure while
+  // online does not leave the row sitting "queued" for the whole interval.
+  if (isOnline()) setTimeout(() => void flushSubmissionQueue(), 1500);
   return { queued: true };
 }
 
