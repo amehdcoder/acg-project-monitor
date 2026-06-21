@@ -1074,7 +1074,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const TARGET_RATIO_MID = (TARGET_RATIO_MIN + TARGET_RATIO_MAX) / 2;
 
   const medicineAllocationData = useMemo(() => {
-    const validEntries = medAllocEntries.filter(me => me.lga && me.amount && Number(me.amount) > 0);
+    const validEntries = debouncedAllocEntries.filter(me => me.lga && me.amount && Number(me.amount) > 0);
     if (validEntries.length === 0) return [];
 
     const allRows: { entryId: string; year: number; state: string; lga: string; ward: string; flhf: string; community: string; settlement: string; targetPop: number; medicineRequired: number; medicineUsed: number; pct: number; jrsmTarget: number; peopleToTreat: number; ratio: number; ratioStatus: "ok" | "low" | "high" | "na"; suggestedPeople: number; scaleFactor: number }[] = [];
