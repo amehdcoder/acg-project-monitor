@@ -8,7 +8,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { sealRecord, unsealRecord } from "@/lib/deviceCrypto";
-import { setSavedEntryStatus } from "@/lib/savedForms";
+import { getSavedEntry, setSavedEntryStatus } from "@/lib/savedForms";
 
 const DB_NAME = "acg_offline_submissions";
 const DB_VERSION = 1;
@@ -33,10 +33,11 @@ async function markMirrorSent(mirrorEntryId?: string | null) {
   if (!mirrorEntryId) return;
   try {
     const now = new Date().toISOString();
+    const existing = await getSavedEntry(mirrorEntryId);
     await setSavedEntryStatus(mirrorEntryId, "sent", {
       offline: false,
       sentAt: now,
-      settings: { serverVerifiedAt: now },
+      settings: { ...(existing?.settings || {}), serverVerifiedAt: now },
     });
   } catch {
     // mirror reconciliation is best-effort
