@@ -10,6 +10,7 @@
 import {
   saveSavedEntry,
   newEntryId,
+  setSavedEntryStatus,
   type SavedFormEntry,
   type SavedFormStatus,
 } from "@/lib/savedForms";
@@ -71,7 +72,9 @@ export async function mirrorSpecialForm(args: MirrorArgs): Promise<void> {
 }
 
 export const isBloombergSavedEntry = (entry: SavedFormEntry | null | undefined): boolean =>
-  !!entry && entry.formId === BLOOMBERG_FORM_ID && entry.settings?.specialForm === BLOOMBERG_SPECIAL_FORM_KEY;
+  !!entry &&
+  (entry.formId === BLOOMBERG_FORM_ID || entry.formId === "bloomberg_enrolment") &&
+  (entry.settings?.specialForm === BLOOMBERG_SPECIAL_FORM_KEY || entry.settings?.specialBridge === true || /bloomberg/i.test(entry.formName || ""));
 
 // Special bridge forms (Bloomberg / SeeClear) are not strictly bound to a single
 // project context, so they must surface in the Forms tabs regardless of which
@@ -97,6 +100,15 @@ export async function syncSpecialSavedForm(
     submitted_at: now,
   };
 
-  const { queued } = await queueOrInsert("bloomberg_validations", row, true);
+  const { queued } = await queueOrInsert("bloomberg_validations", row, true, {
+    mirrorEntryId: entry.id,
+  });
+  if (!queued) {
+    await setSavedEntryStatus(entry.id, "sent", {
+      submissionId: id,
+      sentAt: now,
+      offline: false,
+    });
+  }
   return { success: true, offline: queued, id };
 }
