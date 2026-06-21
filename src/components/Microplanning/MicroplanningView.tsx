@@ -954,21 +954,92 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       .replace(/\b(ward|district)\b/g, " ")
       .replace(/[^a-z0-9]/g, ""), []);
   const geoEq = useCallback((a: unknown, b: unknown) => normGeo(a) === normGeo(b), [normGeo]);
-  const allLgasForMedicine = useMemo(() => [...new Set(medicineSourceEntries.map((e: any) => e.lga))].sort(), [medicineSourceEntries]);
-  // Cascaded option lookups for optional Ward / FLHF drill-down
+  // Pre-built geographic index of the population source. Built ONCE per dataset
+  // change instead of re-scanning millions of rows for every allocation row,
+  // option lookup, warning and missing-ward computation (was O(rows × allocs)).
+  const medicineIndex = useMemo(() => {
+    const tp = (e: any) =>
+      e && e.__uploaded
+        ? Math.round((Number(e.estimated_total_population) || 0) * (medTargetPct / 100))
+        : (calcTargetPop(e) || (e.estimated_total_population || 0));
+
+    type Node = { e: any; tp: number; nFlhf: string };
+    const byLga = new Map<string, Node[]>();        // normLga -> entries
+    const byWard = new Map<string, Node[]>();        // normLga|normWard -> entries
+    const byFlhf = new Map<string, Node[]>();        // normLga|normWard|normFlhf -> entries
+    const lgaSet = new Set<string>();                // raw LGA values for dropdown
+    const wardOpts = new Map<string, Set<string>>(); // raw LGA -> raw wards
+    const flhfByLgaWard = new Map<string, Set<string>>(); // raw LGA|ward -> raw flhfs
+    const flhfByLga = new Map<string, Set<string>>();     // raw LGA -> raw flhfs
+    const wardAgg = new Map<string, { lga: string; ward: string; nLga: string; nWard: string; communities: number; targetPop: number }>();
+
+    const push = (m: Map<string, Node[]>, k: string, n: Node) => {
+      const a = m.get(k);
+      if (a) a.push(n); else m.set(k, [n]);
+    };
+    const addOpt = (m: Map<string, Set<string>>, k: string, v: string) => {
+      let s = m.get(k);
+      if (!s) { s = new Set(); m.set(k, s); }
+      s.add(v);
+    };
+
+    for (const e of medicineSourceEntries as any[]) {
+      const rawLga = e.lga;
+      const nLga = normGeo(rawLga);
+      const nWard = normGeo(e.ward);
+      const nFlhf = normGeo(e.flhf_name);
+      const node: Node = { e, tp: tp(e), nFlhf };
+      if (rawLga) lgaSet.add(rawLga);
+      push(byLga, nLga, node);
+      if (nWard) push(byWard, `${nLga}|${nWard}`, node);
+      if (nWard && nFlhf) push(byFlhf, `${nLga}|${nWard}|${nFlhf}`, node);
+      // dropdown option maps (raw values preserved for display)
+      if (rawLga && e.ward) addOpt(wardOpts, rawLga, e.ward);
+      if (rawLga && e.flhf_name) {
+        addOpt(flhfByLga, rawLga, e.flhf_name);
+        if (e.ward) addOpt(flhfByLgaWard, `${rawLga}|${e.ward}`, e.flhf_name);
+      }
+      // per-ward aggregation for missing-ward detection
+      const wardStr = String(e.ward ?? "").trim();
+      const lgaStr = String(rawLga ?? "").trim();
+      if (lgaStr && wardStr && wardStr !== "—") {
+        const key = `${nLga}|${nWard}`;
+        const prev = wardAgg.get(key);
+        if (prev) { prev.communities++; prev.targetPop += node.tp; }
+        else wardAgg.set(key, { lga: lgaStr, ward: wardStr, nLga, nWard, communities: 1, targetPop: node.tp });
+      }
+    }
+    return { byLga, byWard, byFlhf, lgaSet, wardOpts, flhfByLgaWard, flhfByLga, wardAgg };
+  }, [medicineSourceEntries, medTargetPct, calcTargetPop, normGeo]);
+
+  // Resolve the population rows covered by an allocation row at its chosen depth.
+  const allocScope = useCallback((me: { lga?: string; ward?: string; flhf?: string }) => {
+    const nLga = normGeo(me.lga);
+    if (me.flhf && me.ward)
+      return medicineIndex.byFlhf.get(`${nLga}|${normGeo(me.ward)}|${normGeo(me.flhf)}`) || [];
+    if (me.ward)
+      return medicineIndex.byWard.get(`${nLga}|${normGeo(me.ward)}`) || [];
+    if (me.flhf) {
+      const nf = normGeo(me.flhf);
+      return (medicineIndex.byLga.get(nLga) || []).filter(n => n.nFlhf === nf);
+    }
+    return medicineIndex.byLga.get(nLga) || [];
+  }, [medicineIndex, normGeo]);
+
+  const allLgasForMedicine = useMemo(() => [...medicineIndex.lgaSet].sort(), [medicineIndex]);
+  // Cascaded option lookups for optional Ward / FLHF drill-down (O(1) map reads)
   const wardsForLga = useCallback(
-    (lga: string) => [...new Set(medicineSourceEntries.filter((e: any) => e.lga === lga).map((e: any) => e.ward).filter(Boolean))].sort() as string[],
-    [medicineSourceEntries],
+    (lga: string) => [...(medicineIndex.wardOpts.get(lga) || [])].sort(),
+    [medicineIndex],
   );
   const flhfsForWard = useCallback(
-    (lga: string, ward: string) => [...new Set(
-      medicineSourceEntries
-        .filter((e: any) => e.lga === lga && (!ward || e.ward === ward))
-        .map((e: any) => e.flhf_name)
-        .filter(Boolean),
-    )].sort() as string[],
-    [medicineSourceEntries],
+    (lga: string, ward: string) => {
+      if (ward) return [...(medicineIndex.flhfByLgaWard.get(`${lga}|${ward}`) || [])].sort();
+      return [...(medicineIndex.flhfByLga.get(lga) || [])].sort();
+    },
+    [medicineIndex],
   );
+
 
   const getTargetPop = (e: any) => {
     // Uploaded population rows: target population = total population × chosen %.
