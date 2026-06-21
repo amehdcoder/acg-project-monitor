@@ -80,6 +80,7 @@ export async function reconcileQueuedSpecialForms(): Promise<{ reconciled: numbe
             await setSavedEntryStatus(mirrorId, "sent", {
               offline: false,
               sentAt: new Date().toISOString(),
+              settings: { ...(queued.find((e) => e.id === mirrorId)?.settings || {}), serverVerifiedAt: new Date().toISOString() },
             });
             reconciled++;
             idMap.delete(row.id);
