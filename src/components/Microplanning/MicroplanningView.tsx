@@ -1228,8 +1228,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   });
 
   // Adopt uploaded population as project microplan data.
-  // mode: "skip" = insert new only; "update" = insert new + overwrite duplicates.
-  const adoptUploadedData = async (mode: "skip" | "update") => {
+  // mode: "skip" = insert new only · "update" = insert new + overwrite duplicates
+  //       "keep" = insert every uploaded row (duplicates included, nothing collapsed).
+  const adoptUploadedData = async (mode: "skip" | "update" | "keep") => {
     if (!user?.id || !selectedProjectId || uploadedMedEntries.length === 0) return;
     setAdopting(true);
     try {
@@ -1241,11 +1242,16 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       const seen = new Set<string>();
 
       for (const u of uploadedMedEntries) {
+        const payload = uploadedToEntry(u);
+        if (mode === "keep") {
+          // Keep every single row — no dedup, no collapsing internal duplicates.
+          toInsert.push(payload);
+          continue;
+        }
         const k = dupKey(u);
         if (seen.has(k)) continue; // collapse internal duplicates
         seen.add(k);
         const match = existing[k];
-        const payload = uploadedToEntry(u);
         if (match) {
           if (mode === "update") toUpdate.push({ id: match.id, payload });
         } else {
