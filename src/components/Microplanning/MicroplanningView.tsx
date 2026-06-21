@@ -843,9 +843,12 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     return result;
   }, [baseEntries, isAdmin, scope, projectScope]);
 
-  // Filters
-  const uniqueStates = [...new Set(displayEntries.map(e => e.state))].sort();
-  const filtered = displayEntries.filter(e => {
+  // Filters (memoized — avoids re-deriving over millions of rows every render)
+  const uniqueStates = useMemo(
+    () => [...new Set(displayEntries.map(e => e.state))].sort(),
+    [displayEntries],
+  );
+  const filtered = useMemo(() => displayEntries.filter(e => {
     if (filterState !== "all" && e.state !== filterState) return false;
     if (filterAccessibility !== "all") {
       const acc = e.accessibility || "unset";
@@ -870,52 +873,69 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       return [e.community_name, e.settlement_name, e.flhf_name, e.lga, e.ward].some(v => v?.toLowerCase().includes(q));
     }
     return true;
-  });
+  }), [displayEntries, filterState, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, searchQuery]);
 
-  // ===== COMPREHENSIVE KPI ENGINE (computed from real entries) =====
-  const totalPop = filtered.reduce((s, e) => s + (e.estimated_total_population || 0), 0);
-  const totalChildren04 = filtered.reduce((s, e) => s + (e.estimated_children_0_4 || 0), 0);
-  const totalChildren514 = filtered.reduce((s, e) => s + (e.estimated_children_5_14 || 0), 0);
-  const totalAdults15 = filtered.reduce((s, e) => s + (e.estimated_adults_15_plus || 0), 0);
-  const totalHouseholds = filtered.reduce((s, e) => s + (e.number_of_households || 0), 0);
-  const targetPop = filtered.reduce((s, e) => s + calcTargetPop(e as any), 0);
-  const geotagged = filtered.filter(e => e.community_latitude && e.community_longitude).length;
-  const geotaggedPct = filtered.length > 0 ? (geotagged / filtered.length) * 100 : 0;
-  const hardToReach = filtered.filter(e => e.accessibility === "hard_to_reach" || e.accessibility === "inaccessible").length;
-  const uniqueStatesCount = new Set(filtered.map(e => e.state)).size;
-  const uniqueLGAsCount = new Set(filtered.map(e => e.lga)).size;
-  const uniqueWardsCount = new Set(filtered.map(e => e.ward)).size;
-  const uniqueFLHFs = new Set(filtered.map(e => e.flhf_name)).size;
-  const uniqueSettlements = filtered.filter(e => e.settlement_name).length;
-  const cddFromCommunity = filtered.filter(e => e.cdd_from_community).length;
-  const cddPct = filtered.length > 0 ? (cddFromCommunity / filtered.length) * 100 : 0;
-  const avgDistKm = (() => {
-    const dists = filtered.map(e => e.community_distance_to_flhf_km).filter((d): d is number => d != null && d > 0);
-    return dists.length ? (dists.reduce((a, b) => a + b, 0) / dists.length).toFixed(1) : "—";
-  })();
-  const avgHouseholdsPerCommunity = filtered.length > 0 && totalHouseholds > 0 ? Math.round(totalHouseholds / filtered.length) : 0;
-
-  // Accessibility breakdown
-  const accessStats = {
-    accessible: filtered.filter(e => e.accessibility === "accessible").length,
-    hard_to_reach: filtered.filter(e => e.accessibility === "hard_to_reach").length,
-    inaccessible: filtered.filter(e => e.accessibility === "inaccessible").length,
-    seasonal: filtered.filter(e => e.accessibility === "seasonal").length,
-    unset: filtered.filter(e => !e.accessibility).length,
-  };
-  const securityStats = {
-    cleared: filtered.filter(e => e.security_clearance === "cleared").length,
-    partial: filtered.filter(e => e.security_clearance === "partial").length,
-    not_cleared: filtered.filter(e => e.security_clearance === "not_cleared").length,
-    unknown: filtered.filter(e => !e.security_clearance || e.security_clearance === "unknown").length,
-  };
-  const terrainCounts = filtered.reduce<Record<string, number>>((acc, e) => {
-    const t = e.terrain_type || "unset";
-    acc[t] = (acc[t] || 0) + 1;
-    return acc;
-  }, {});
+  // ===== COMPREHENSIVE KPI ENGINE — single pass over `filtered` (memoized) =====
+  // Previously ~25 separate map/filter/reduce passes ran on EVERY render. With
+  // millions of rows that froze the page; now it's one loop, recomputed only
+  // when the filtered set actually changes.
+  const kpis = useMemo(() => {
+    let totalPop = 0, totalChildren04 = 0, totalChildren514 = 0, totalAdults15 = 0, totalHouseholds = 0, targetPop = 0;
+    let geotagged = 0, hardToReach = 0, uniqueSettlements = 0, cddFromCommunity = 0;
+    let distSum = 0, distCount = 0;
+    const stateSet = new Set<any>(), lgaSet = new Set<any>(), wardSet = new Set<any>(), flhfSet = new Set<any>();
+    const accessStats = { accessible: 0, hard_to_reach: 0, inaccessible: 0, seasonal: 0, unset: 0 };
+    const securityStats = { cleared: 0, partial: 0, not_cleared: 0, unknown: 0 };
+    const terrainCounts: Record<string, number> = {};
+    for (const e of filtered) {
+      totalPop += e.estimated_total_population || 0;
+      totalChildren04 += e.estimated_children_0_4 || 0;
+      totalChildren514 += e.estimated_children_5_14 || 0;
+      totalAdults15 += e.estimated_adults_15_plus || 0;
+      totalHouseholds += e.number_of_households || 0;
+      targetPop += calcTargetPop(e as any);
+      if (e.community_latitude && e.community_longitude) geotagged++;
+      const acc = e.accessibility;
+      if (acc === "hard_to_reach" || acc === "inaccessible") hardToReach++;
+      stateSet.add(e.state); lgaSet.add(e.lga); wardSet.add(e.ward); flhfSet.add(e.flhf_name);
+      if (e.settlement_name) uniqueSettlements++;
+      if (e.cdd_from_community) cddFromCommunity++;
+      const d = e.community_distance_to_flhf_km;
+      if (d != null && d > 0) { distSum += d; distCount++; }
+      if (acc === "accessible") accessStats.accessible++;
+      else if (acc === "hard_to_reach") accessStats.hard_to_reach++;
+      else if (acc === "inaccessible") accessStats.inaccessible++;
+      else if (acc === "seasonal") accessStats.seasonal++;
+      else if (!acc) accessStats.unset++;
+      const sc = e.security_clearance;
+      if (sc === "cleared") securityStats.cleared++;
+      else if (sc === "partial") securityStats.partial++;
+      else if (sc === "not_cleared") securityStats.not_cleared++;
+      else if (!sc || sc === "unknown") securityStats.unknown++;
+      const t = e.terrain_type || "unset";
+      terrainCounts[t] = (terrainCounts[t] || 0) + 1;
+    }
+    const count = filtered.length;
+    return {
+      totalPop, totalChildren04, totalChildren514, totalAdults15, totalHouseholds, targetPop,
+      geotagged, geotaggedPct: count > 0 ? (geotagged / count) * 100 : 0,
+      hardToReach,
+      uniqueStatesCount: stateSet.size, uniqueLGAsCount: lgaSet.size, uniqueWardsCount: wardSet.size, uniqueFLHFs: flhfSet.size,
+      uniqueSettlements, cddFromCommunity, cddPct: count > 0 ? (cddFromCommunity / count) * 100 : 0,
+      avgDistKm: distCount ? (distSum / distCount).toFixed(1) : "—",
+      avgHouseholdsPerCommunity: count > 0 && totalHouseholds > 0 ? Math.round(totalHouseholds / count) : 0,
+      accessStats, securityStats, terrainCounts,
+    };
+  }, [filtered, calcTargetPop]);
+  const {
+    totalPop, totalChildren04, totalChildren514, totalAdults15, totalHouseholds, targetPop,
+    geotagged, geotaggedPct, hardToReach, uniqueStatesCount, uniqueLGAsCount, uniqueWardsCount,
+    uniqueFLHFs, uniqueSettlements, cddFromCommunity, cddPct, avgDistKm, avgHouseholdsPerCommunity,
+    accessStats, securityStats, terrainCounts,
+  } = kpis;
 
   const TERRAIN_EMOJI: Record<string, string> = { flat: "🌾", hilly: "⛰️", mountainous: "🏔️", riverine: "🌊", swampy: "🏝️", desert: "🏜️", forest: "🌲" };
+
 
   // Medicine allocation: unique LGAs from current entries
   // When the user has uploaded ad-hoc population rows, the medicine breakdown
