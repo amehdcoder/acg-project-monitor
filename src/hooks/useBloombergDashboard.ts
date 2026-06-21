@@ -199,7 +199,7 @@ export const useBloombergDashboard = () => {
     const byKey = new Map<string, ValidationRow>();
     const noKey: ValidationRow[] = [];
     validations
-      .filter((v) => v.status === "sent")
+      .filter(isReportedValidation)
       .forEach((v) => {
         if (!v.school_key) {
           noKey.push(v);
@@ -260,7 +260,7 @@ export const useBloombergDashboard = () => {
   // Per-user accountability: only schools actually visited & reported
   // (submitted or finalized), grouped by the field validator who did the work.
   const accountability = useMemo(() => {
-    const reported = validations.filter((v) => v.status === "sent" || v.status === "finalized");
+    const reported = validations.filter(isReportedValidation);
     return buildAccountability(
       reported.map((v) => ({
         userId: v.validator_id,
