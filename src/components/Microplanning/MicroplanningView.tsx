@@ -1076,18 +1076,21 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       const lgaEntries = allocScope(me);
       if (lgaEntries.length === 0) continue;
 
-      const rows = lgaEntries.map(e => ({
-        entryId: e.id,
-        year: e.year_of_microplanning || new Date().getFullYear(),
-        state: e.state,
-        lga: e.lga,
-        ward: e.ward,
-        flhf: e.flhf_name,
-        community: e.community_name,
-        settlement: e.settlement_name || "—",
-        targetPop: getTargetPop(e),
-        medicineUsed: Number((e as any).medicine_used) || 0,
-      }));
+      const rows = lgaEntries.map(n => {
+        const e = n.e;
+        return {
+          entryId: e.id,
+          year: e.year_of_microplanning || new Date().getFullYear(),
+          state: e.state,
+          lga: e.lga,
+          ward: e.ward,
+          flhf: e.flhf_name,
+          community: e.community_name,
+          settlement: e.settlement_name || "—",
+          targetPop: n.tp,
+          medicineUsed: Number((e as any).medicine_used) || 0,
+        };
+      });
 
       const totalTargetPop = rows.reduce((s, r) => s + r.targetPop, 0);
 
