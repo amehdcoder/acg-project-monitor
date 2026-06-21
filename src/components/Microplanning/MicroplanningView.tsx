@@ -1124,7 +1124,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
 
     return allRows;
-  }, [medAllocEntries, medicineSourceEntries, medTargetPct, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID, geoEq]);
+  }, [medAllocEntries, allocScope, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
 
   // ---- Allocation validation ----
   // Prevent allocations whose JRSM target (people to treat) exceeds the target
