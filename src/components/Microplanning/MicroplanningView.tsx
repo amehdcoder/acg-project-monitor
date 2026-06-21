@@ -983,9 +983,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       const totalMedicine = Number(me.amount);
       const jrsmTotal = Number(me.jrsm) || 0;
       const lgaEntries = medicineSourceEntries.filter((e: any) =>
-        e.lga === me.lga &&
-        (!me.ward || e.ward === me.ward) &&
-        (!me.flhf || e.flhf_name === me.flhf));
+        geoEq(e.lga, me.lga) &&
+        (!me.ward || geoEq(e.ward, me.ward)) &&
+        (!me.flhf || geoEq(e.flhf_name, me.flhf)));
       if (lgaEntries.length === 0) continue;
 
       const rows = lgaEntries.map(e => ({
