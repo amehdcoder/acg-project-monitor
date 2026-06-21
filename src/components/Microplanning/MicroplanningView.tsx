@@ -1366,6 +1366,14 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 🔄 Add new & update {adoptionStats.dupeCount.toLocaleString()} duplicates
               </Button>
             )}
+            <Button
+              variant="outline"
+              className="w-full gap-2 border-blue-400 text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+              disabled={adopting || adoptionStats.total === 0}
+              onClick={() => adoptUploadedData("keep")}
+            >
+              ➕ Add all {adoptionStats.total.toLocaleString()} rows (keep duplicates)
+            </Button>
             <Button variant="ghost" className="w-full text-muted-foreground" disabled={adopting} onClick={() => setShowAdoptDialog(false)}>
               Not now — keep it for medicine breakdown only
             </Button>
