@@ -157,6 +157,8 @@ export async function migrateReadyToSendBloomberg(
       await setSavedEntryStatus(e.id, "sent", {
         submissionId: e.submissionId || null,
         sentAt: nowIso(),
+        offline: false,
+        settings: { ...(e.settings || {}), serverVerifiedAt: nowIso() },
       });
       result.skippedDuplicate += 1;
       return;
