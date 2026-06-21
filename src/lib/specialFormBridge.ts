@@ -31,6 +31,7 @@ interface MirrorArgs {
   responses?: Record<string, any>;
   gps?: { lat: number; lng: number; accuracy?: number } | null;
   submissionId?: string | null;
+  offline?: boolean;
 }
 
 /**
@@ -61,9 +62,9 @@ export async function mirrorSpecialForm(args: MirrorArgs): Promise<void> {
       createdAt: now,
       updatedAt: now,
       finalizedAt: args.status !== "draft" ? now : null,
-      sentAt: args.status === "sent" ? now : null,
+      sentAt: args.status === "sent" && !args.offline ? now : null,
       submissionId: args.submissionId ?? null,
-      offline: false,
+      offline: !!args.offline,
     };
     await saveSavedEntry(entry);
   } catch (e) {
