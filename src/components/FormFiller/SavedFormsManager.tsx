@@ -384,6 +384,11 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
                           queued
                         </Badge>
                       )}
+                      {mode === "view" && !entry.offline && (
+                        <Badge variant="outline" className="text-[9px] h-4 px-1 border-green-500 text-green-600">
+                          Sent
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   {mode === "edit" && (
