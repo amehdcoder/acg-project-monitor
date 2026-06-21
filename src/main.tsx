@@ -12,6 +12,9 @@ import "./index.css";
 // regains connectivity.
 initOfflineMedia();
 initOfflineSubmissions();
+// Self-heal any special-form mirrors stuck showing "queued" after their row
+// already reached the server.
+initSpecialFormReconcile();
 
 // Install global error capture FIRST so any failure during bootstrap is logged.
 installGlobalErrorReporter();
