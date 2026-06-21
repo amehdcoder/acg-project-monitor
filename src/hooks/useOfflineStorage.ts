@@ -227,13 +227,12 @@ export const useOfflineStorage = () => {
         } catch (error: any) {
           console.error("Error syncing submission:", submission.id, error);
           const newRetryCount = submission.retryCount + 1;
-          if (newRetryCount >= 5) {
-            await removeFromOfflineStorage(submission.id);
-            failed++;
-          } else {
-            await updateRetryCount(submission.id, newRetryCount);
-            failed++;
-          }
+          // Never delete failed field submissions automatically. A persistent
+          // server/RLS/network problem must keep retrying until it succeeds or
+          // an admin intentionally repairs it; dropping after N attempts caused
+          // real field visits to disappear from dashboards.
+          await updateRetryCount(submission.id, newRetryCount);
+          failed++;
         }
       }
 
@@ -349,7 +348,7 @@ export const useOfflineStorage = () => {
 
     const interval = setInterval(() => {
       trySyncIfNeeded();
-    }, 30000);
+    }, 15000);
 
     return () => clearInterval(interval);
   }, [isOnline, trySyncIfNeeded]);
