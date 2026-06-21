@@ -23,6 +23,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { mirrorSpecialForm, SEECLEAR_FORM_ID } from "@/lib/specialFormBridge";
+import { newEntryId } from "@/lib/savedForms";
 import { queueOrUploadMedia } from "@/lib/offlineMedia";
 import { queueOrInsert } from "@/lib/offlineSubmissions";
 import handsLogo from "@/assets/logo-amehnities.png";
@@ -198,7 +199,10 @@ export default function SeeClearFormFiller({ onClose }: Props) {
     if (!asDraft && !reviewValid) { toast.error("Attach required photos, select challenges & recommendations, add remarks and both sign-offs."); setStep(2); return; }
     setSaving(true);
     try {
+      const submissionId = savedEntry?.submissionId || crypto.randomUUID();
+      const mirrorId = savedEntry?.id || newEntryId();
       const { queued } = await queueOrInsert("seeclear_monitoring", {
+        id: submissionId,
         monitor_id: user.id,
         date_of_visit: dateOfVisit,
         state, lga, ward, community,
@@ -225,8 +229,11 @@ export default function SeeClearFormFiller({ onClose }: Props) {
         officer_signature: officerSig, incharge_signature: inchargeSig,
         critical_gap: challenges[0] || null,
         status: asDraft ? "draft" : "sent",
+      }, true, {
+        mirrorEntryId: mirrorId,
       });
       await mirrorSpecialForm({
+        id: mirrorId,
         userId: user.id,
         formId: SEECLEAR_FORM_ID,
         formName: "See Clear Eye Health Facility Monitoring Checklist",
@@ -234,6 +241,7 @@ export default function SeeClearFormFiller({ onClose }: Props) {
         status: asDraft ? "draft" : "sent",
         responses: { general, equipment: equip, readiness_score: scores.overallPct },
         gps: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy } : null,
+        submissionId,
         offline: queued,
       });
       toast.success(
