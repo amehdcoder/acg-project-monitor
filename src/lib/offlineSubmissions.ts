@@ -32,9 +32,11 @@ export interface PendingInsert {
 async function markMirrorSent(mirrorEntryId?: string | null) {
   if (!mirrorEntryId) return;
   try {
+    const now = new Date().toISOString();
     await setSavedEntryStatus(mirrorEntryId, "sent", {
       offline: false,
-      sentAt: new Date().toISOString(),
+      sentAt: now,
+      settings: { serverVerifiedAt: now },
     });
   } catch {
     // mirror reconciliation is best-effort
