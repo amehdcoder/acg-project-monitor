@@ -199,8 +199,8 @@ export default function SeeClearFormFiller({ onClose }: Props) {
     if (!asDraft && !reviewValid) { toast.error("Attach required photos, select challenges & recommendations, add remarks and both sign-offs."); setStep(2); return; }
     setSaving(true);
     try {
-      const submissionId = savedEntry?.submissionId || crypto.randomUUID();
-      const mirrorId = savedEntry?.id || newEntryId();
+      const submissionId = crypto.randomUUID();
+      const mirrorId = newEntryId();
       const { queued } = await queueOrInsert("seeclear_monitoring", {
         id: submissionId,
         monitor_id: user.id,
