@@ -221,7 +221,7 @@ function ensureListeners() {
       void flushSubmissionQueue();
     }
   });
-  // Poll every 20s so a queued row is never stuck for more than ~1 minute.
+  // Poll every 15s so a queued row is retried multiple times within a minute.
   window.setInterval(() => {
     if (isOnline()) void flushSubmissionQueue();
   }, 15000);
