@@ -47,6 +47,9 @@ export interface BaselineRow {
 const REASON_LABEL = new Map(NOT_FOUND_REASONS.map((r) => [r.value, r.label]));
 const OP_STATUS_LABEL = new Map(OPERATIONAL_STATUS.map((r) => [r.value, r.label]));
 
+const isReportedValidation = (v: Pick<ValidationRow, "status" | "submitted_at">) =>
+  ["sent", "submitted", "finalized"].includes(String(v.status || "").toLowerCase()) ||
+  (!!v.submitted_at && String(v.status || "").toLowerCase() !== "draft");
 
 async function fetchAll<T>(table: string, columns: string): Promise<T[]> {
   const all: T[] = [];
@@ -56,7 +59,8 @@ async function fetchAll<T>(table: string, columns: string): Promise<T[]> {
       .from(table as any)
       .select(columns)
       .range(from, from + PAGE - 1);
-    if (error || !data || data.length === 0) break;
+    if (error) throw error;
+    if (!data || data.length === 0) break;
     all.push(...(data as T[]));
     if (data.length < PAGE) break;
   }
