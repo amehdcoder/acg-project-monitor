@@ -22,6 +22,23 @@ export interface PendingInsert {
   attempts: number;
   last_error?: string | null;
   upsertOnId?: boolean;
+  // Id of the saved-forms mirror entry to reconcile (mark "sent", clear the
+  // offline/queued flag) once this row lands on the server.
+  mirrorEntryId?: string | null;
+}
+
+// Best-effort: flip the UI mirror entry from "queued" to a confirmed "sent"
+// state. Never throws into the flush loop.
+async function markMirrorSent(mirrorEntryId?: string | null) {
+  if (!mirrorEntryId) return;
+  try {
+    await setSavedEntryStatus(mirrorEntryId, "sent", {
+      offline: false,
+      sentAt: new Date().toISOString(),
+    });
+  } catch {
+    // mirror reconciliation is best-effort
+  }
 }
 
 let flushing = false;
