@@ -176,9 +176,17 @@ function ensureListeners() {
   if (listenersBound || typeof window === "undefined") return;
   listenersBound = true;
   window.addEventListener("online", () => void flushSubmissionQueue());
+  // Drain again whenever the app returns to the foreground (mobile devices
+  // freeze background timers, so this guarantees a prompt retry on resume).
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && isOnline()) {
+      void flushSubmissionQueue();
+    }
+  });
+  // Poll every 20s so a queued row is never stuck for more than ~1 minute.
   window.setInterval(() => {
     if (isOnline()) void flushSubmissionQueue();
-  }, 30000);
+  }, 20000);
 }
 
 export function initOfflineSubmissions() {
