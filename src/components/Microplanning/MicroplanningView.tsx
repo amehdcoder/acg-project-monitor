@@ -1135,6 +1135,20 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     return allRows;
   }, [debouncedAllocEntries, allocScope, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
 
+  // Render the per-community allocation preview in pages of 100 so even a
+  // computed plan spanning tens of thousands of communities stays smooth and
+  // never floods the DOM (which previously froze / crashed the browser).
+  const medAllocPagination = useTablePagination(medicineAllocationData, 100);
+  // Memoized grand totals over the FULL dataset (independent of the visible page).
+  const medAllocTotals = useMemo(() => {
+    let targetPop = 0, medicine = 0, people = 0;
+    for (const r of medicineAllocationData) {
+      targetPop += r.targetPop; medicine += r.medicineRequired; people += r.peopleToTreat;
+    }
+    return { targetPop, medicine, people, ratio: people > 0 ? medicine / people : 0 };
+  }, [medicineAllocationData]);
+
+
   // ---- Allocation validation ----
   // Prevent allocations whose JRSM target (people to treat) exceeds the target
   // population available at the chosen depth (LGA / Ward / FLHF). Returns the
