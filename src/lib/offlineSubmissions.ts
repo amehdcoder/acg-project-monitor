@@ -160,6 +160,7 @@ export async function flushSubmissionQueue(): Promise<{ inserted: number; remain
           : await supabase.from(rec.table as any).insert(rec.row);
         if (error) throw error;
         await deleteRecord(rec.id);
+        await markMirrorSent(rec.mirrorEntryId);
         inserted++;
       } catch (e: any) {
         await putRecord({ ...rec, attempts: rec.attempts + 1, last_error: e?.message || "insert failed" });
