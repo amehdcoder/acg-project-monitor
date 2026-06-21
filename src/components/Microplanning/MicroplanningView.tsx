@@ -1059,6 +1059,48 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     return out;
   }, [medAllocEntries, medicineSourceEntries, medTargetPct, geoEq]);
 
+  // ---- Wards present in the population data but NOT covered by the allocation ----
+  // After uploading/entering an allocation plan, surface every ward that the
+  // "Upload Population Data" feature imported but the allocation plan never
+  // covered (either by a ward-level row or an LGA-wide row). The admin can add
+  // them to the allocation table and type values so they spread to communities.
+  const missingAllocationWards = useMemo(() => {
+    // Only relevant once at least one allocation row exists.
+    const hasAlloc = medAllocEntries.some((me) => me.lga);
+    if (!hasAlloc) return [] as { lga: string; ward: string; communities: number; targetPop: number }[];
+
+    // LGAs covered by an LGA-wide allocation row (no ward) cover all their wards.
+    const lgaWide = new Set(
+      medAllocEntries.filter((me) => me.lga && !me.ward).map((me) => normGeo(me.lga)),
+    );
+    const coveredWard = new Set(
+      medAllocEntries
+        .filter((me) => me.lga && me.ward)
+        .map((me) => `${normGeo(me.lga)}|${normGeo(me.ward)}`),
+    );
+
+    const agg = new Map<string, { lga: string; ward: string; communities: number; targetPop: number }>();
+    for (const e of medicineSourceEntries as any[]) {
+      const ward = String(e.ward ?? "").trim();
+      const lga = String(e.lga ?? "").trim();
+      if (!lga || !ward || ward === "—") continue;
+      const nLga = normGeo(lga);
+      const nWard = normGeo(ward);
+      if (lgaWide.has(nLga)) continue; // whole LGA already allocated
+      if (coveredWard.has(`${nLga}|${nWard}`)) continue; // ward already allocated
+      const key = `${nLga}|${nWard}`;
+      const prev = agg.get(key) || { lga, ward, communities: 0, targetPop: 0 };
+      prev.communities += 1;
+      prev.targetPop += getTargetPop(e);
+      agg.set(key, prev);
+    }
+    return [...agg.values()].sort((a, b) =>
+      a.lga === b.lga ? a.ward.localeCompare(b.ward) : a.lga.localeCompare(b.lga),
+    );
+  }, [medAllocEntries, medicineSourceEntries, normGeo, medTargetPct]);
+
+
+
   // Per-LGA adjustment suggestions (drug/person ratio → 2.5–3.0)
   const lgaAdjustmentSuggestions = useMemo(() => {
     const out: { lga: string; idx: number; medicineTotal: number; jrsmCurrent: number; jrsmSuggested: number; ratioCurrent: number; scaleFactor: number; status: "ok" | "low" | "high" | "na" }[] = [];
