@@ -1141,7 +1141,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   // offending entries with their totals so the UI can show a precise error.
   const allocationWarnings = useMemo(() => {
     const out: { idx: number; lga: string; ward: string; flhf: string; depth: string; jrsm: number; targetPop: number; over: number }[] = [];
-    medAllocEntries.forEach((me, idx) => {
+    debouncedAllocEntries.forEach((me, idx) => {
       if (!me.lga) return;
       const jrsm = Number(me.jrsm) || 0;
       if (jrsm <= 0) return;
