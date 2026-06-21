@@ -1154,7 +1154,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       }
     });
     return out;
-  }, [medAllocEntries, allocScope]);
+  }, [debouncedAllocEntries, allocScope]);
 
   // ---- Wards present in the population data but NOT covered by the allocation ----
   // After uploading/entering an allocation plan, surface every ward that the
