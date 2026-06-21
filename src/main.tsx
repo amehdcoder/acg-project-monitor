@@ -4,6 +4,7 @@ import RootErrorBoundary from "./components/RootErrorBoundary";
 import { installGlobalErrorReporter, recordError } from "./lib/errorReporter";
 import { initOfflineMedia } from "./lib/offlineMedia";
 import { initOfflineSubmissions } from "./lib/offlineSubmissions";
+import { initSpecialFormReconcile } from "./lib/specialFormReconcile";
 import { prepareSilentFormRestoreForUpdate } from "./lib/formProgressPersistence";
 import "./index.css";
 
@@ -11,6 +12,9 @@ import "./index.css";
 // regains connectivity.
 initOfflineMedia();
 initOfflineSubmissions();
+// Self-heal any special-form mirrors stuck showing "queued" after their row
+// already reached the server.
+initSpecialFormReconcile();
 
 // Install global error capture FIRST so any failure during bootstrap is logged.
 installGlobalErrorReporter();

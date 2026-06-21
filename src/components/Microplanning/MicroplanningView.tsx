@@ -409,6 +409,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   // Medicine Allocation state - multiple LGAs (in-edit buffer)
   const [medAllocEntries, setMedAllocEntries] = useState<{ id?: string; lga: string; ward?: string; flhf?: string; amount: string; jrsm?: string; medicine_name?: string; year?: number }[]>([{ lga: "", ward: "", flhf: "", amount: "", jrsm: "" }]);
+  // Debounced mirror of the allocation entries. Typing in the medicine / JRSM /
+  // population inputs updates `medAllocEntries` instantly (snappy UI) but the
+  // heavy per-community recomputation only runs ~400ms after the user pauses,
+  // so editing thousands of rows never blocks the main thread keystroke-by-keystroke.
+  const [debouncedAllocEntries, setDebouncedAllocEntries] = useState(medAllocEntries);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedAllocEntries(medAllocEntries), 400);
+    return () => clearTimeout(t);
+  }, [medAllocEntries]);
   const [savedAllocations, setSavedAllocations] = useState<any[]>([]);
   const [savingAllocations, setSavingAllocations] = useState(false);
   // Medicine "upload & compute" — ad-hoc population rows used as the breakdown source
@@ -1065,7 +1074,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const TARGET_RATIO_MID = (TARGET_RATIO_MIN + TARGET_RATIO_MAX) / 2;
 
   const medicineAllocationData = useMemo(() => {
-    const validEntries = medAllocEntries.filter(me => me.lga && me.amount && Number(me.amount) > 0);
+    const validEntries = debouncedAllocEntries.filter(me => me.lga && me.amount && Number(me.amount) > 0);
     if (validEntries.length === 0) return [];
 
     const allRows: { entryId: string; year: number; state: string; lga: string; ward: string; flhf: string; community: string; settlement: string; targetPop: number; medicineRequired: number; medicineUsed: number; pct: number; jrsmTarget: number; peopleToTreat: number; ratio: number; ratioStatus: "ok" | "low" | "high" | "na"; suggestedPeople: number; scaleFactor: number }[] = [];
@@ -1124,7 +1133,21 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
 
     return allRows;
-  }, [medAllocEntries, allocScope, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
+  }, [debouncedAllocEntries, allocScope, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
+
+  // Render the per-community allocation preview in pages of 100 so even a
+  // computed plan spanning tens of thousands of communities stays smooth and
+  // never floods the DOM (which previously froze / crashed the browser).
+  const medAllocPagination = useTablePagination(medicineAllocationData, 100);
+  // Memoized grand totals over the FULL dataset (independent of the visible page).
+  const medAllocTotals = useMemo(() => {
+    let targetPop = 0, medicine = 0, people = 0;
+    for (const r of medicineAllocationData) {
+      targetPop += r.targetPop; medicine += r.medicineRequired; people += r.peopleToTreat;
+    }
+    return { targetPop, medicine, people, ratio: people > 0 ? medicine / people : 0 };
+  }, [medicineAllocationData]);
+
 
   // ---- Allocation validation ----
   // Prevent allocations whose JRSM target (people to treat) exceeds the target
@@ -1132,7 +1155,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   // offending entries with their totals so the UI can show a precise error.
   const allocationWarnings = useMemo(() => {
     const out: { idx: number; lga: string; ward: string; flhf: string; depth: string; jrsm: number; targetPop: number; over: number }[] = [];
-    medAllocEntries.forEach((me, idx) => {
+    debouncedAllocEntries.forEach((me, idx) => {
       if (!me.lga) return;
       const jrsm = Number(me.jrsm) || 0;
       if (jrsm <= 0) return;
@@ -1145,7 +1168,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       }
     });
     return out;
-  }, [medAllocEntries, allocScope]);
+  }, [debouncedAllocEntries, allocScope]);
 
   // ---- Wards present in the population data but NOT covered by the allocation ----
   // After uploading/entering an allocation plan, surface every ward that the
@@ -1154,15 +1177,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   // them to the allocation table and type values so they spread to communities.
   const missingAllocationWards = useMemo(() => {
     // Only relevant once at least one allocation row exists.
-    const hasAlloc = medAllocEntries.some((me) => me.lga);
+    const hasAlloc = debouncedAllocEntries.some((me) => me.lga);
     if (!hasAlloc) return [] as { lga: string; ward: string; communities: number; targetPop: number }[];
 
     // LGAs covered by an LGA-wide allocation row (no ward) cover all their wards.
     const lgaWide = new Set(
-      medAllocEntries.filter((me) => me.lga && !me.ward).map((me) => normGeo(me.lga)),
+      debouncedAllocEntries.filter((me) => me.lga && !me.ward).map((me) => normGeo(me.lga)),
     );
     const coveredWard = new Set(
-      medAllocEntries
+      debouncedAllocEntries
         .filter((me) => me.lga && me.ward)
         .map((me) => `${normGeo(me.lga)}|${normGeo(me.ward)}`),
     );
@@ -1177,7 +1200,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     return out.sort((a, b) =>
       a.lga === b.lga ? a.ward.localeCompare(b.ward) : a.lga.localeCompare(b.lga),
     );
-  }, [medAllocEntries, medicineIndex, normGeo]);
+  }, [debouncedAllocEntries, medicineIndex, normGeo]);
 
 
 
@@ -2588,8 +2611,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                             </tr>
                           </thead>
                           <tbody>
-                            {medicineAllocationData.map((row, i) => (
-                              <tr key={i} className={`border-b border-border/50 ${i % 2 === 0 ? "bg-background" : "bg-muted/20"} hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors`}>
+                            {medAllocPagination.paginatedData.map((row: any, i: number) => (
+                              <tr key={medAllocPagination.startIndex + i} className={`border-b border-border/50 ${i % 2 === 0 ? "bg-background" : "bg-muted/20"} hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors`}>
                                 <td className="px-3 py-2 border-r border-border/30">{row.year}</td>
                                 <td className="px-3 py-2 border-r border-border/30">{row.state}</td>
                                 <td className="px-3 py-2 border-r border-border/30 font-medium">{row.lga}</td>
@@ -2627,28 +2650,38 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                             <tr className="bg-emerald-700 text-white font-bold">
                               <td colSpan={7} className="px-3 py-2.5 border-r border-emerald-600">TOTAL</td>
                               <td className="px-3 py-2.5 text-right border-r border-emerald-600 tabular-nums">
-                                {medicineAllocationData.reduce((s, r) => s + r.targetPop, 0).toLocaleString()}
+                                {medAllocTotals.targetPop.toLocaleString()}
                               </td>
                               <td className="px-3 py-2.5 text-right tabular-nums border-r border-emerald-600">
-                                {medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0).toLocaleString()}
+                                {medAllocTotals.medicine.toLocaleString()}
                               </td>
                               <td className="px-3 py-2.5 text-right tabular-nums border-r border-emerald-600">
-                                {medicineAllocationData.reduce((s, r) => s + r.peopleToTreat, 0).toLocaleString()}
+                                {medAllocTotals.people.toLocaleString()}
                               </td>
                               <td className="px-3 py-2.5 text-right tabular-nums">
-                                {(() => {
-                                  const m = medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0);
-                                  const p = medicineAllocationData.reduce((s, r) => s + r.peopleToTreat, 0);
-                                  return p > 0 ? (m / p).toFixed(2) : "—";
-                                })()}
+                                {medAllocTotals.people > 0 ? medAllocTotals.ratio.toFixed(2) : "—"}
                               </td>
                             </tr>
                           </tfoot>
                         </table>
                       </div>
+                      {medAllocPagination.totalPages > 1 && (
+                        <TablePagination
+                          currentPage={medAllocPagination.currentPage}
+                          totalPages={medAllocPagination.totalPages}
+                          totalItems={medAllocPagination.totalItems}
+                          startIndex={medAllocPagination.startIndex}
+                          pageSize={medAllocPagination.pageSize}
+                          hasPrev={medAllocPagination.hasPrev}
+                          hasNext={medAllocPagination.hasNext}
+                          onPrev={medAllocPagination.prevPage}
+                          onNext={medAllocPagination.nextPage}
+                        />
+                      )}
                     </div>
                   </>
                 )}
+
 
                 {medicineAllocationData.length === 0 && medAllocEntries.every(e => !e.lga) && (
                   <div className="text-center py-12 text-muted-foreground">

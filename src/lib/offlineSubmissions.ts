@@ -8,6 +8,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { sealRecord, unsealRecord } from "@/lib/deviceCrypto";
+import { setSavedEntryStatus } from "@/lib/savedForms";
 
 const DB_NAME = "acg_offline_submissions";
 const DB_VERSION = 1;
@@ -21,6 +22,23 @@ export interface PendingInsert {
   attempts: number;
   last_error?: string | null;
   upsertOnId?: boolean;
+  // Id of the saved-forms mirror entry to reconcile (mark "sent", clear the
+  // offline/queued flag) once this row lands on the server.
+  mirrorEntryId?: string | null;
+}
+
+// Best-effort: flip the UI mirror entry from "queued" to a confirmed "sent"
+// state. Never throws into the flush loop.
+async function markMirrorSent(mirrorEntryId?: string | null) {
+  if (!mirrorEntryId) return;
+  try {
+    await setSavedEntryStatus(mirrorEntryId, "sent", {
+      offline: false,
+      sentAt: new Date().toISOString(),
+    });
+  } catch {
+    // mirror reconciliation is best-effort
+  }
 }
 
 let flushing = false;
@@ -86,6 +104,7 @@ export async function queueOrInsert(
   table: string,
   row: Record<string, any>,
   upsertOnId = false,
+  opts: { mirrorEntryId?: string | null } = {},
 ): Promise<{ queued: boolean }> {
   if (isOnline()) {
     try {
@@ -93,6 +112,8 @@ export async function queueOrInsert(
         ? await supabase.from(table as any).upsert(row, { onConflict: "id" })
         : await supabase.from(table as any).insert(row);
       if (error) throw error;
+      // Confirmed on the server — reconcile the UI mirror right away.
+      await markMirrorSent(opts.mirrorEntryId);
       return { queued: false };
     } catch {
       // fall through to queue — never lose the submission
@@ -106,8 +127,12 @@ export async function queueOrInsert(
     attempts: 0,
     last_error: null,
     upsertOnId,
+    mirrorEntryId: opts.mirrorEntryId ?? null,
   });
   ensureListeners();
+  // Kick an immediate background flush attempt so a transient failure while
+  // online does not leave the row sitting "queued" for the whole interval.
+  if (isOnline()) setTimeout(() => void flushSubmissionQueue(), 1500);
   return { queued: true };
 }
 
@@ -135,6 +160,7 @@ export async function flushSubmissionQueue(): Promise<{ inserted: number; remain
           : await supabase.from(rec.table as any).insert(rec.row);
         if (error) throw error;
         await deleteRecord(rec.id);
+        await markMirrorSent(rec.mirrorEntryId);
         inserted++;
       } catch (e: any) {
         await putRecord({ ...rec, attempts: rec.attempts + 1, last_error: e?.message || "insert failed" });
@@ -150,9 +176,17 @@ function ensureListeners() {
   if (listenersBound || typeof window === "undefined") return;
   listenersBound = true;
   window.addEventListener("online", () => void flushSubmissionQueue());
+  // Drain again whenever the app returns to the foreground (mobile devices
+  // freeze background timers, so this guarantees a prompt retry on resume).
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && isOnline()) {
+      void flushSubmissionQueue();
+    }
+  });
+  // Poll every 20s so a queued row is never stuck for more than ~1 minute.
   window.setInterval(() => {
     if (isOnline()) void flushSubmissionQueue();
-  }, 30000);
+  }, 20000);
 }
 
 export function initOfflineSubmissions() {

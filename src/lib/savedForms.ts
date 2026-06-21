@@ -112,6 +112,25 @@ export const deleteSavedEntries = async (ids: string[]): Promise<void> => {
   });
 };
 
+// Return every saved entry across all users on this device, optionally
+// filtered by status. Used by the background reconciliation engine to detect
+// queued special-form mirrors that have already landed on the server.
+export const listAllSavedEntries = async (
+  status?: SavedFormStatus,
+): Promise<SavedFormEntry[]> => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readonly");
+    const req = tx.objectStore(STORE).getAll();
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      let rows = (req.result as SavedFormEntry[]) || [];
+      if (status) rows = rows.filter((r) => r.status === status);
+      resolve(rows);
+    };
+  });
+};
+
 export const setSavedEntryStatus = async (
   id: string,
   status: SavedFormStatus,

@@ -274,6 +274,9 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
         total_male: gt.male, total_female: gt.female, grand_total: gt.total,
       };
       const now = new Date().toISOString();
+      // Stable mirror id so the offline queue can flip THIS entry from
+      // "queued" to "sent" the moment its row lands on the server.
+      const mirrorId = savedEntry?.id || newEntryId();
 
       // 1) Send straight to the server (or queue offline). Upsert on the stable
       // submissionId means re-submitting an edited entry overwrites the prior
@@ -287,12 +290,14 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
         created_at: savedEntry?.createdAt || formStartedAtRef.current,
         submitted_at: now,
       };
-      const { queued } = await queueOrInsert("bloomberg_validations", dbRow, true);
+      const { queued } = await queueOrInsert("bloomberg_validations", dbRow, true, {
+        mirrorEntryId: mirrorId,
+      });
 
       // 2) Mirror into the saved-forms store as "sent" so the Forms page shows a
       // consistent record (under Sent), with no orphaned draft/finalized copy.
       await saveSavedEntry({
-        id: savedEntry?.id || newEntryId(),
+        id: mirrorId,
         userId: user.id,
         formId: BLOOMBERG_FORM_ID,
         formName: "Bloomberg School Enrolment Validation",
