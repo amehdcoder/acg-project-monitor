@@ -93,10 +93,32 @@ export async function syncSpecialSavedForm(
 
   const now = new Date().toISOString();
   const id = entry.submissionId || crypto.randomUUID();
+  const responses = (entry.responses || {}) as Record<string, any>;
   const row = {
     ...(entry.submissionData || {}),
     id,
     validator_id: entry.userId,
+    school_key: (entry.submissionData as any)?.school_key ?? responses.school_key ?? responses.schoolKey ?? null,
+    state: (entry.submissionData as any)?.state ?? responses.state ?? null,
+    lga: (entry.submissionData as any)?.lga ?? responses.lga ?? null,
+    ward: (entry.submissionData as any)?.ward ?? responses.ward ?? null,
+    location: (entry.submissionData as any)?.location ?? responses.location ?? null,
+    school_name: (entry.submissionData as any)?.school_name ?? responses.school_name ?? null,
+    school_code: (entry.submissionData as any)?.school_code ?? responses.school_code ?? null,
+    school_type: (entry.submissionData as any)?.school_type ?? responses.school_type ?? null,
+    school_level: (entry.submissionData as any)?.school_level ?? responses.school_level ?? null,
+    ownership: (entry.submissionData as any)?.ownership ?? responses.ownership ?? null,
+    gps_lat: (entry.submissionData as any)?.gps_lat ?? responses.gps?.lat ?? entry.gps?.lat ?? null,
+    gps_lng: (entry.submissionData as any)?.gps_lng ?? responses.gps?.lng ?? entry.gps?.lng ?? null,
+    gps_accuracy: (entry.submissionData as any)?.gps_accuracy ?? responses.gps?.accuracy ?? entry.gps?.accuracy ?? null,
+    verification: (entry.submissionData as any)?.verification ?? responses.verification ?? null,
+    enrolment: (entry.submissionData as any)?.enrolment ?? responses.enrolment ?? null,
+    specified_locations: (entry.submissionData as any)?.specified_locations ?? responses.specified_locations ?? null,
+    total_male: (entry.submissionData as any)?.total_male ?? responses.total_male ?? null,
+    total_female: (entry.submissionData as any)?.total_female ?? responses.total_female ?? null,
+    grand_total: (entry.submissionData as any)?.grand_total ?? responses.grand_total ?? null,
+    evidence: (entry.submissionData as any)?.evidence ?? responses.evidence ?? null,
+    remarks: (entry.submissionData as any)?.remarks ?? responses.remarks ?? null,
     status: "sent",
     submitted_at: now,
   };
