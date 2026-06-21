@@ -50,7 +50,7 @@ export async function reconcileQueuedSpecialForms(): Promise<{ reconciled: numbe
       (e) =>
         !!e.submissionId &&
         e.userId === currentUserId &&
-        (e.offline === true || isBloombergSavedEntry(e)),
+        (e.offline === true || (isBloombergSavedEntry(e) && !e.settings?.serverVerifiedAt)),
     );
     if (queued.length === 0) return { reconciled: 0 };
 
