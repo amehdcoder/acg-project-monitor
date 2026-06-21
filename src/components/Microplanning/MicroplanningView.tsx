@@ -1046,9 +1046,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       const jrsm = Number(me.jrsm) || 0;
       if (jrsm <= 0) return;
       const scope = medicineSourceEntries.filter((e: any) =>
-        e.lga === me.lga &&
-        (!me.ward || e.ward === me.ward) &&
-        (!me.flhf || e.flhf_name === me.flhf));
+        geoEq(e.lga, me.lga) &&
+        (!me.ward || geoEq(e.ward, me.ward)) &&
+        (!me.flhf || geoEq(e.flhf_name, me.flhf)));
       if (scope.length === 0) return;
       const targetPop = scope.reduce((s, e: any) => s + getTargetPop(e), 0);
       if (targetPop > 0 && jrsm > targetPop) {
