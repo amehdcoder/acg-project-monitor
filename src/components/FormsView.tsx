@@ -316,11 +316,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }, []);
 
   // Flat, folder-free list of the standard forms assigned to this user, rendered
-  // as a beautiful card grid instead of nested folders.
-  const assignedFormCards = useMemo(() => {
-    if (assignedStandardCodes.size === 0) return [] as Array<{
-      code: string; name: string; desc: string; Icon: any; bg: string; fg: string; ring: string;
-    }>;
+  // as a beautiful card grid instead of nested folders. Each card carries a
+  // status ("assigned" | "restricted") and whether it has required fields.
+  type YourFormCard = {
+    code: string; name: string; desc: string; group: string; Icon: any;
+    bg: string; fg: string; ring: string;
+    status: "assigned" | "restricted"; hasRequired: boolean;
+  };
+  const assignedFormCards = useMemo<YourFormCard[]>(() => {
+    if (assignedStandardCodes.size === 0) return [];
     const palette = [
       { bg: "bg-[#E3ECFB]", fg: "text-[#2F6FE6]", ring: "#2F6FE6" },
       { bg: "bg-[#E2F5EC]", fg: "text-[#22A55A]", ring: "#22A55A" },
@@ -342,19 +346,66 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       if (group === "Mental Health Forms") return BrainIcon;
       return FileText;
     };
+    const hasRequiredFor = (code: string, group: string): boolean => {
+      const def = (STANDARD_ASSESSMENTS as any)[code];
+      if (def) {
+        const all = [
+          ...(def.identification || []), ...(def.demographics || []),
+          ...(def.psychographics || []), ...(def.items || []), ...(def.closing || []),
+        ];
+        return all.some((q: any) => q?.required);
+      }
+      // Safeguarding, assessment and mental-health forms always carry required fields.
+      return ["Safeguarding Forms", "Assessment Forms", "Mental Health Forms"].includes(group);
+    };
     return ALL_STANDARD_FORMS
       .filter((f) => assignedStandardCodes.has(f.code))
       .map((f, i) => {
         const def = (STANDARD_ASSESSMENTS as any)[f.code];
+        // A form disabled at project level is "restricted" — assigned but locked.
+        const restricted = disabledStandardCodes.has(f.code as StandardFormCode);
         return {
           code: f.code,
           name: def?.shortName || f.name,
           desc: def?.description || f.group,
+          group: f.group,
           Icon: iconFor(f.code, f.group),
+          status: (restricted ? "restricted" : "assigned") as "assigned" | "restricted",
+          hasRequired: hasRequiredFor(f.code, f.group),
           ...palette[i % palette.length],
         };
       });
-  }, [assignedStandardCodes]);
+  }, [assignedStandardCodes, disabledStandardCodes]);
+
+  // Distinct categories present in the user's assigned forms (for filter chips).
+  const yourFormsGroups = useMemo(() => {
+    const s = new Set<string>();
+    assignedFormCards.forEach((c) => s.add(c.group));
+    return Array.from(s);
+  }, [assignedFormCards]);
+
+  // Apply search + category filter. Restricted forms stay visible (locked) so the
+  // user can see why a form can't be opened, but they can never be launched.
+  const filteredYourForms = useMemo(() => {
+    const q = yourFormsSearch.trim().toLowerCase();
+    return assignedFormCards.filter((c) => {
+      const matchGroup = yourFormsGroup === "all" || c.group === yourFormsGroup;
+      const matchSearch = !q || c.name.toLowerCase().includes(q) ||
+        c.code.toLowerCase().includes(q) || c.group.toLowerCase().includes(q);
+      return matchGroup && matchSearch;
+    });
+  }, [assignedFormCards, yourFormsSearch, yourFormsGroup]);
+
+  // Group the filtered cards by category for the folder-explorer view.
+  const filteredYourFormsByGroup = useMemo(() => {
+    const map = new Map<string, YourFormCard[]>();
+    filteredYourForms.forEach((c) => {
+      const arr = map.get(c.group) || [];
+      arr.push(c);
+      map.set(c.group, arr);
+    });
+    return Array.from(map.entries());
+  }, [filteredYourForms]);
 
   const { canBulk } = useBulkDataAccess();
   const { isOnline, downloadForm, cacheFormsForOffline, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
