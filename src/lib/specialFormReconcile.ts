@@ -8,7 +8,7 @@
 // minute once the device is online.
 
 import { supabase } from "@/integrations/supabase/client";
-import { listAllSavedEntries, setSavedEntryStatus } from "@/lib/savedForms";
+import { listAllSavedEntries, listSavedEntries, setSavedEntryStatus, type SavedFormEntry } from "@/lib/savedForms";
 import { flushSubmissionQueue } from "@/lib/offlineSubmissions";
 import {
   BLOOMBERG_FORM_ID,
@@ -46,19 +46,28 @@ export async function reconcileQueuedSpecialForms(): Promise<{ reconciled: numbe
     const currentUserId = auth?.session?.user?.id || null;
     if (!currentUserId) return { reconciled: 0 };
     const sent = await listAllSavedEntries("sent");
-    const queued = sent.filter(
-      (e) =>
-        !!e.submissionId &&
+    const finalized = await listSavedEntries(currentUserId, "finalized");
+    const byId = new Map<string, SavedFormEntry>();
+    [...sent, ...finalized]
+      .filter((e) =>
         e.userId === currentUserId &&
-        (e.offline === true || (isBloombergSavedEntry(e) && !e.settings?.serverVerifiedAt)),
-    );
+        isBloombergSavedEntry(e) &&
+        (e.status === "finalized" || e.offline === true || !e.submissionId || !e.settings?.serverVerifiedAt),
+      )
+      .forEach((e) => byId.set(e.id, e));
+    const queued = Array.from(byId.values());
     if (queued.length === 0) return { reconciled: 0 };
 
     // Group the queued submissionIds by their target table.
     const byTable = new Map<string, Map<string, string>>(); // table -> (submissionId -> mirrorEntryId)
+    const needsResend: SavedFormEntry[] = [];
     for (const e of queued) {
       const table = TABLE_BY_FORM[e.formId] || (e.submissionType && TABLE_BY_FORM[e.submissionType]);
-      if (!table || !e.submissionId) continue;
+      if (!table) continue;
+      if (!e.submissionId) {
+        needsResend.push(e);
+        continue;
+      }
       if (!byTable.has(table)) byTable.set(table, new Map());
       byTable.get(table)!.set(e.submissionId, e.id);
     }
@@ -103,6 +112,23 @@ export async function reconcileQueuedSpecialForms(): Promise<{ reconciled: numbe
         } catch {
           // keep queued; the normal queue/reconcile cadence will retry
         }
+      }
+    }
+
+    for (const entry of needsResend) {
+      try {
+        const result = await syncSpecialSavedForm(entry);
+        if (result?.success) {
+          await setSavedEntryStatus(entry.id, "sent", {
+            submissionId: result.id,
+            sentAt: result.offline ? null : new Date().toISOString(),
+            offline: result.offline,
+            settings: result.offline ? entry.settings : { ...(entry.settings || {}), serverVerifiedAt: new Date().toISOString() },
+          });
+          if (!result.offline) reconciled++;
+        }
+      } catch {
+        // keep queued/finalized; the next cadence will retry
       }
     }
     return { reconciled };

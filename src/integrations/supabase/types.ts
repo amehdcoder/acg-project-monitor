@@ -6822,6 +6822,7 @@ export type Database = {
         Args: { _other: string }
         Returns: string
       }
+      submit_bloomberg_validation: { Args: { _row: Json }; Returns: Json }
       submit_quiz_attempt: {
         Args: {
           p_answers: Json

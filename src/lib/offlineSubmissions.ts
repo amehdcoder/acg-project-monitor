@@ -114,6 +114,31 @@ const retryWithoutBrokenSchoolKey = async (table: string, row: Record<string, un
   return supabase.from(table as any).upsert(safeRow as any, { onConflict: "id" });
 };
 
+const isMissingRpc = (error: unknown) =>
+  (error as { code?: string })?.code === "42883" ||
+  /submit_bloomberg_validation/i.test(String((error as { message?: string })?.message || ""));
+
+async function writeRecordToServer(table: string, row: Record<string, any>, upsertOnId: boolean) {
+  // Bloomberg validations have already been affected in the field by RLS/FK/client
+  // edge-cases. Route them through the backend-owned RPC, which validates the
+  // signed-in user, repairs missing school keys, and performs an idempotent upsert.
+  if (table === "bloomberg_validations") {
+    const { error } = await (supabase as any).rpc("submit_bloomberg_validation", { _row: row });
+    if (!error) return { error: null };
+    // Keep local development/remix previews usable before the migration exists.
+    if (!isMissingRpc(error)) return { error };
+  }
+
+  const { error } = upsertOnId
+    ? await supabase.from(table as any).upsert(row, { onConflict: "id" })
+    : await supabase.from(table as any).insert(row);
+  if (error) {
+    const retried = upsertOnId ? await retryWithoutBrokenSchoolKey(table, row, error) : null;
+    if (retried) return { error: retried.error };
+  }
+  return { error };
+}
+
 /**
  * Insert a row now if online, otherwise queue it offline. Always resolves;
  * `queued` is true when the insert is waiting for connectivity.
@@ -131,14 +156,8 @@ export async function queueOrInsert(
 ): Promise<{ queued: boolean }> {
   if (isOnline()) {
     try {
-      const { error } = upsertOnId
-        ? await supabase.from(table as any).upsert(row, { onConflict: "id" })
-        : await supabase.from(table as any).insert(row);
-      if (error) {
-        const retried = upsertOnId ? await retryWithoutBrokenSchoolKey(table, row, error) : null;
-        if (retried?.error) throw retried.error;
-        if (!retried) throw error;
-      }
+      const { error } = await writeRecordToServer(table, row, upsertOnId);
+      if (error) throw error;
       // Confirmed on the server — reconcile the UI mirror right away.
       await markMirrorSent(opts.mirrorEntryId);
       return { queued: false };
@@ -187,14 +206,8 @@ export async function flushSubmissionQueue(): Promise<{ inserted: number; remain
     for (const rec of due) {
       if (!isOnline()) break;
       try {
-        const { error } = rec.upsertOnId
-          ? await supabase.from(rec.table as any).upsert(rec.row, { onConflict: "id" })
-          : await supabase.from(rec.table as any).insert(rec.row);
-        if (error) {
-          const retried = rec.upsertOnId ? await retryWithoutBrokenSchoolKey(rec.table, rec.row, error) : null;
-          if (retried?.error) throw retried.error;
-          if (!retried) throw error;
-        }
+        const { error } = await writeRecordToServer(rec.table, rec.row, rec.upsertOnId ?? false);
+        if (error) throw error;
         await deleteRecord(rec.id);
         await markMirrorSent(rec.mirrorEntryId);
         inserted++;

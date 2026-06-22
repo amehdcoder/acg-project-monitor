@@ -19,7 +19,6 @@
 // Idempotent: rows are upserted on their stable submissionId, and once a local
 // entry is marked "sent" it is no longer picked up.
 
-import { supabase } from "@/integrations/supabase/client";
 import {
   listSavedEntries,
   setSavedEntryStatus,
@@ -44,24 +43,6 @@ const finalizeTime = (e: SavedFormEntry): number => {
   return Number.isNaN(t) ? Date.now() : t;
 };
 
-const schoolKeyOf = (e: SavedFormEntry): string | null => {
-  const sd = (e.submissionData || {}) as Record<string, any>;
-  const r = (e.responses || {}) as Record<string, any>;
-  return (sd.school_key ?? r.school_key ?? r.schoolKey ?? null) || null;
-};
-
-const visitDateOf = (e: SavedFormEntry): string => {
-  const sd = (e.submissionData || {}) as Record<string, unknown>;
-  const r = (e.responses || {}) as Record<string, unknown>;
-  const verification = (sd.verification || r.verification || {}) as Record<string, unknown>;
-  return String(verification.date_of_visit || e.finalizedAt || e.updatedAt || e.createdAt || "").slice(0, 10);
-};
-
-const visitDedupKeyOf = (e: SavedFormEntry): string | null => {
-  const key = schoolKeyOf(e);
-  return key ? `${key}::${visitDateOf(e)}` : null;
-};
-
 export interface MigrationResult {
   migrated: number;
   skippedDuplicate: number;
@@ -84,30 +65,10 @@ export async function migrateReadyToSendBloomberg(
   );
   if (finalized.length === 0) return result;
 
-  // 3a) Local de-dup: one entry per school (the most recently finalized).
-  // Superseded duplicates are queued for a parallel status-clear so we never
-  // block the event loop entry-by-entry, no matter how many are stuck.
-  const bySchool = new Map<string, SavedFormEntry>();
-  const noKey: SavedFormEntry[] = [];
-  const supersededIds: string[] = [];
-  for (const e of finalized) {
-    const key = visitDedupKeyOf(e);
-    if (!key) {
-      noKey.push(e);
-      continue;
-    }
-    const prev = bySchool.get(key);
-    if (!prev || finalizeTime(e) >= finalizeTime(prev)) {
-      if (prev) {
-        supersededIds.push(prev.id);
-        result.skippedDuplicate += 1;
-      }
-      bySchool.set(key, e);
-    } else {
-      supersededIds.push(e.id);
-      result.skippedDuplicate += 1;
-    }
-  }
+  // Send every finalized local Bloomberg entry. Earlier builds de-duplicated by
+  // school/date before upload, which protected dashboards but also meant a real
+  // field visit could be marked locally as handled without ever landing on the
+  // server. Idempotency is now based only on the stable submission id.
 
   const nowIso = () => new Date().toISOString();
 
@@ -134,49 +95,13 @@ export async function migrateReadyToSendBloomberg(
     await Promise.all(runners);
   }
 
-  // Clear superseded local duplicates in parallel — fire and forget alongside.
-  const supersedeWork = runPool(supersededIds, async (id) => {
-    await setSavedEntryStatus(id, "sent", { submissionId: null, sentAt: nowIso() });
-  });
-
-  // 3b) Server de-dup: schools this validator already has on record.
-  const serverKeys = new Set<string>();
-  try {
-    const { data } = await supabase
-      .from("bloomberg_validations")
-      .select("school_key,verification")
-      .eq("validator_id", userId)
-      .not("school_key", "is", null);
-    (data || []).forEach((r: any) => {
-      const visitDate = String(r.verification?.date_of_visit || "").slice(0, 10);
-      if (r.school_key) serverKeys.add(`${r.school_key as string}::${visitDate}`);
-    });
-  } catch {
-    // If we cannot confirm server state, fall through — upsert-on-id below
-    // still prevents duplicate rows for the same submission.
-  }
-
-  const targets: SavedFormEntry[] = [...bySchool.values(), ...noKey];
+  const targets: SavedFormEntry[] = finalized;
 
   // 4) Insert survivors (preserving original timestamps) and 5) mark local
   // entries sent — all in parallel through the bounded pool. This makes
   // recovery effectively instantaneous for any volume without batching delays
   // or freezing the dashboard/app.
   await runPool(targets, async (e) => {
-    const key = visitDedupKeyOf(e);
-    if (key && serverKeys.has(key)) {
-      // Already validated by this user on the server — clear it locally to keep
-      // the "Ready to send" tab accurate, but never create a duplicate row.
-      await setSavedEntryStatus(e.id, "sent", {
-        submissionId: e.submissionId || null,
-        sentAt: nowIso(),
-        offline: false,
-        settings: { ...(e.settings || {}), serverVerifiedAt: nowIso() },
-      });
-      result.skippedDuplicate += 1;
-      return;
-    }
-
     const submissionId = e.submissionId || crypto.randomUUID();
     const createdIso = new Date(collectionTime(e) || finalizeTime(e)).toISOString();
     const submittedIso = new Date(finalizeTime(e)).toISOString();
@@ -212,12 +137,9 @@ export async function migrateReadyToSendBloomberg(
     if (queued) {
       result.queued += 1;
     } else {
-      if (key) serverKeys.add(key);
       result.migrated += 1;
     }
   });
-
-  await supersedeWork;
 
   return result;
 }
