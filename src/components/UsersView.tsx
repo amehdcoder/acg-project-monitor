@@ -1613,12 +1613,24 @@ const UsersView = () => {
             <TabsContent value="project" className="space-y-4 pt-4">
               <div className="space-y-2">
                 <Label>Select Project</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search projects..."
+                    value={projectFilter}
+                    onChange={(e) => setProjectFilter(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
                 <Select value={selectedProject} onValueChange={setSelectedProject}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a project" />
                   </SelectTrigger>
                   <SelectContent>
-                    {projects.map((project) => (
+                    {filteredProjects.length === 0 && (
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground">No projects match.</div>
+                    )}
+                    {filteredProjects.map((project) => (
                       <SelectItem key={project.id} value={project.id}>
                         {project.name}
                       </SelectItem>
