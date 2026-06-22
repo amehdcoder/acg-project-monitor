@@ -1553,20 +1553,47 @@ const UsersView = () => {
       <Dialog open={showBulkAssign} onOpenChange={setShowBulkAssign}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Assign Project to {selectedIds.size} User(s)</DialogTitle>
-            <DialogDescription>The selected users will be added to the chosen project.</DialogDescription>
+            <DialogTitle>Assign Project &amp; Forms to {selectedIds.size} User(s)</DialogTitle>
+            <DialogDescription>Pick a project and/or one or more forms. Selected users get everything you choose, all at once.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <Label>Project</Label>
-            <Select value={bulkProject} onValueChange={setBulkProject}>
+            <Label>Project (optional)</Label>
+            <Select value={bulkProject || "__none__"} onValueChange={(v) => setBulkProject(v === "__none__" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Select a project" /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="__none__">No project</SelectItem>
                 {projects.map((p) => (
                   <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Button className="w-full" disabled={!bulkProject || bulkBusy} onClick={handleBulkAssignProject}>
+            <div className="flex items-center justify-between">
+              <Label>Forms (optional)</Label>
+              {bulkForms.size > 0 && (
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setBulkForms(new Set())}>
+                  Clear ({bulkForms.size})
+                </Button>
+              )}
+            </div>
+            <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-2">
+              {forms.length === 0 && <p className="text-xs text-muted-foreground">No forms available.</p>}
+              {forms.map((f) => (
+                <label key={f.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted/50">
+                  <Checkbox
+                    checked={bulkForms.has(f.id)}
+                    onCheckedChange={() =>
+                      setBulkForms((prev) => {
+                        const next = new Set(prev);
+                        next.has(f.id) ? next.delete(f.id) : next.add(f.id);
+                        return next;
+                      })
+                    }
+                  />
+                  <span className="truncate">{f.name}</span>
+                </label>
+              ))}
+            </div>
+            <Button className="w-full" disabled={(!bulkProject && bulkForms.size === 0) || bulkBusy} onClick={handleBulkAssignProject}>
               {bulkBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FolderOpen className="mr-2 h-4 w-4" />}
               Assign to {selectedIds.size} User(s)
             </Button>
