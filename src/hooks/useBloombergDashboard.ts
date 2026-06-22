@@ -392,7 +392,7 @@ export const useBloombergDashboard = () => {
       coveragePct,
       discrepancies: discrepancies.slice(0, 10),
     };
-  }, [dedupedSent, validations, baselineByKey, schoolCount]);
+  }, [dedupedSent, validations, baselineByKey, schoolCount, duplicates]);
 
   const submittedValidations = useMemo(
     () => dedupedSent,
