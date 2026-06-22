@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 import acgLogo from "@/assets/acg-logo.png";
@@ -18,6 +18,7 @@ import SeeClearFormFiller from "@/components/SeeClear/SeeClearFormFiller";
 import SeeClearDashboard from "@/components/SeeClear/SeeClearDashboard";
 import { SEECLEAR_FORM_NAME, SEECLEAR_FORM_DESC, SEECLEAR_DASH_NAME, SEECLEAR_DASH_DESC } from "@/lib/seeclear/definition";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
+import { ALL_STANDARD_FORMS } from "@/lib/standardAssessments/allStandardForms";
 import ACSMFormFiller from "@/components/ACSM/ACSMFormFiller";
 import ACSMDashboard from "@/components/ACSM/ACSMDashboard";
 import { ACSM_FORM_NAME, ACSM_FORM_DESC, ACSM_DASH_NAME, ACSM_DASH_DESC } from "@/lib/acsm/definition";
@@ -278,6 +279,78 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     })();
     return () => { cancelled = true; };
   }, [user?.id, isAdhoc]);
+
+  // Launch the correct experience for an assigned standard-form code.
+  const launchStandardForm = useCallback((code: string) => {
+    switch (code) {
+      case "uprp": setShowUprp(true); break;
+      case "attendance": setShowDigitalAttendance(true); break;
+      case "action_tracker": setShowActionTracker(true); break;
+      case "workplan": setShowWorkplan(true); break;
+      case "mental_health": setShowMentalHealth(true); break;
+      case "bloomberg_form": setShowBloombergForm(true); break;
+      case "bloomberg_dash": setShowBloombergDash(true); break;
+      case "seeclear_form": setShowSeeClearForm(true); break;
+      case "seeclear_dash": setShowSeeClearDash(true); break;
+      case "acsm_form": setShowAcsmForm(true); break;
+      case "acsm_dash": setShowAcsmDash(true); break;
+      case "sbc_form": setShowSbcForm(true); break;
+      case "sbc_dash": setShowSbcDash(true); break;
+      case "microplan_entry": setMicroplanFillingActive(true); break;
+      case "srf":
+      case "incident":
+      case "leave":
+      case "stationery":
+        setOfficeFormsOpen({ codes: [code as "srf" | "incident" | "leave" | "stationery"] });
+        break;
+      default:
+        if ((STANDARD_ASSESSMENTS as any)[code]) {
+          setActiveStandardAssessment(code as StandardFormCode);
+        }
+    }
+  }, []);
+
+  // Flat, folder-free list of the standard forms assigned to this user, rendered
+  // as a beautiful card grid instead of nested folders.
+  const assignedFormCards = useMemo(() => {
+    if (assignedStandardCodes.size === 0) return [] as Array<{
+      code: string; name: string; desc: string; Icon: any; bg: string; fg: string; ring: string;
+    }>;
+    const palette = [
+      { bg: "bg-[#E3ECFB]", fg: "text-[#2F6FE6]", ring: "#2F6FE6" },
+      { bg: "bg-[#E2F5EC]", fg: "text-[#22A55A]", ring: "#22A55A" },
+      { bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]", ring: "#F08A2A" },
+      { bg: "bg-[#EDE7FE]", fg: "text-[#7C5CFF]", ring: "#7C5CFF" },
+      { bg: "bg-[#DCF3F0]", fg: "text-[#14b8a6]", ring: "#14b8a6" },
+      { bg: "bg-[#FCE9E9]", fg: "text-[#E25555]", ring: "#E25555" },
+    ];
+    const iconFor = (code: string, group: string) => {
+      if (code === "srf" || code === "incident") return ShieldCheck;
+      if (code === "uprp" || code === "attendance") return ClipboardCheck;
+      if (code === "action_tracker") return ClipboardList;
+      if (code === "workplan") return GanttChartSquare;
+      if (code === "microplan_entry") return MapPin;
+      if (code === "mental_health") return BrainIcon;
+      if (code.endsWith("_dash")) return BarChart3;
+      if (code.endsWith("_form")) return ClipboardCheck;
+      if (group === "Assessment Forms") return Stethoscope;
+      if (group === "Mental Health Forms") return BrainIcon;
+      return FileText;
+    };
+    return ALL_STANDARD_FORMS
+      .filter((f) => assignedStandardCodes.has(f.code))
+      .map((f, i) => {
+        const def = (STANDARD_ASSESSMENTS as any)[f.code];
+        return {
+          code: f.code,
+          name: def?.shortName || f.name,
+          desc: def?.description || f.group,
+          Icon: iconFor(f.code, f.group),
+          ...palette[i % palette.length],
+        };
+      });
+  }, [assignedStandardCodes]);
+
   const { canBulk } = useBulkDataAccess();
   const { isOnline, downloadForm, cacheFormsForOffline, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
@@ -1802,8 +1875,51 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               )}
             </div>
 
-            {/* Folder 2 — Standard Forms (hidden for adhoc users with no assigned standard form) */}
-            {(!isAdhoc || assignedStandardCodes.size > 0) && !standardRestricted && (
+            {/* Assigned Standard Forms — flat, folder-free beautiful grid.
+                Shown to users who have specific standard forms assigned to them. */}
+            {assignedFormCards.length > 0 && !standardRestricted && (
+              <div className="overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-[#F7F9FE] to-white shadow-sm">
+                <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-border/50">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#2F6FE6] to-[#7C5CFF] shadow-sm">
+                    <Sparkles className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-display text-base sm:text-lg font-bold text-foreground">Your Forms</h3>
+                    <p className="truncate text-xs sm:text-sm text-muted-foreground">Forms assigned to you — tap any to begin</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-[#E3ECFB] px-3 py-1 text-xs font-semibold text-[#1656BA]">
+                    {assignedFormCards.length}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 sm:p-4">
+                  {assignedFormCards.map(({ code, name, desc, Icon, bg, fg, ring }) => (
+                    <button
+                      key={code}
+                      onClick={() => launchStandardForm(code)}
+                      className="group relative flex items-center gap-3.5 overflow-hidden rounded-2xl border border-border/60 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                      style={{ ['--tw-ring-color' as any]: ring }}
+                    >
+                      <span
+                        aria-hidden
+                        className="absolute inset-y-0 left-0 w-1.5"
+                        style={{ backgroundColor: ring }}
+                      />
+                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${bg} transition-transform group-hover:scale-105`}>
+                        <Icon className={`h-6 w-6 ${fg}`} strokeWidth={2} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="truncate text-[15px] font-bold text-foreground">{name}</h4>
+                        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{desc}</p>
+                      </div>
+                      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:text-foreground" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Folder 2 — Standard Forms (admins see the full folder explorer) */}
+            {!isAdhoc && !standardRestricted && (
             <div className="overflow-hidden rounded-2xl border border-border/60 bg-white shadow-sm">
               <button
                 onClick={() => setOpenTopFolder((f) => (f === "standard" ? null : "standard"))}
