@@ -88,6 +88,7 @@ export const useBloombergDashboard = () => {
   const [schools, setSchools] = useState<SchoolLite[]>([]);
   const [schoolCount, setSchoolCount] = useState(0);
   const [profileMap, setProfileMap] = useState<Map<string, ProfileLite>>(new Map());
+  const [localAuditRows, setLocalAuditRows] = useState<LocalAuditRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Monotonic request id: any async load tags itself with the current value
