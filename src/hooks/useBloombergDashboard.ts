@@ -53,6 +53,10 @@ export interface LocalAuditRow {
   submitted: number | null;
   last_activity_at: string | null;
   updated_at: string | null;
+  drafts_screenshot_path: string | null;
+  ready_screenshot_path: string | null;
+  days_worked: number | null;
+  snapshot_captured_at: string | null;
 }
 
 const REASON_LABEL = new Map(NOT_FOUND_REASONS.map((r) => [r.value, r.label]));
