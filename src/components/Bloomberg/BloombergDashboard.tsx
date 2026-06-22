@@ -271,6 +271,26 @@ export default function BloombergDashboard({ onClose }: Props) {
       .filter((g) => g.copies.length > 0);
   }, [duplicates.groups, dupValidator, dupType, dupRowStatus]);
 
+  // Copy-level reconciliation for the active filter. The per-validator badges
+  // count SUPERSEDED copies, while a "school" can contain several copies, so a
+  // school count alone cannot be reconciled against the badge. We therefore
+  // surface the exact copy breakdown (total / superseded / retained) for the
+  // current filter — selecting a validator then shows a superseded figure that
+  // matches that validator's badge exactly.
+  const filteredCopyStats = useMemo(() => {
+    let entries = 0;
+    let superseded = 0;
+    let retained = 0;
+    filteredDupGroups.forEach((g) =>
+      g.copies.forEach((c) => {
+        entries += 1;
+        if (c.kept) retained += 1;
+        else superseded += 1;
+      }),
+    );
+    return { entries, superseded, retained, schools: filteredDupGroups.length };
+  }, [filteredDupGroups]);
+
   // Paginate by group so the DOM never mounts thousands of rows at once.
   const dupPg = useTablePagination(filteredDupGroups, 40);
 
