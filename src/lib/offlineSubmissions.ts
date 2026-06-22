@@ -206,14 +206,8 @@ export async function flushSubmissionQueue(): Promise<{ inserted: number; remain
     for (const rec of due) {
       if (!isOnline()) break;
       try {
-        const { error } = rec.upsertOnId
-          ? await supabase.from(rec.table as any).upsert(rec.row, { onConflict: "id" })
-          : await supabase.from(rec.table as any).insert(rec.row);
-        if (error) {
-          const retried = rec.upsertOnId ? await retryWithoutBrokenSchoolKey(rec.table, rec.row, error) : null;
-          if (retried?.error) throw retried.error;
-          if (!retried) throw error;
-        }
+        const { error } = await writeRecordToServer(rec.table, rec.row, rec.upsertOnId ?? false);
+        if (error) throw error;
         await deleteRecord(rec.id);
         await markMirrorSent(rec.mirrorEntryId);
         inserted++;
