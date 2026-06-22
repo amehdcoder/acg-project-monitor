@@ -450,6 +450,21 @@ const UsersView = () => {
           }
           parts.push(`${pageIds.length} page(s)`);
         }
+        if (bulkMinimalLock && !isAdminUser) {
+          // Lock to Forms, Project Chat & My Submissions only (non-admins).
+          const { data: alreadyMin } = await (supabase as any)
+            .from("user_minimal_access")
+            .select("id")
+            .eq("user_id", u.user_id)
+            .limit(1);
+          if (!alreadyMin || alreadyMin.length === 0) {
+            const { error: mErr } = await (supabase as any)
+              .from("user_minimal_access")
+              .insert({ user_id: u.user_id, restricted_by: currentUserProfile?.user_id });
+            if (mErr && mErr.code !== "23505") throw mErr;
+          }
+          parts.push("minimal access");
+        }
       } catch (err: any) {
         ok = false;
         results.push({ name, ok: false, message: err?.message || "Failed" });
