@@ -776,6 +776,45 @@ export type Database = {
         }
         Relationships: []
       }
+      bloomberg_local_form_audit: {
+        Row: {
+          created_at: string
+          device_id: string
+          device_label: string | null
+          drafts: number
+          id: string
+          last_activity_at: string | null
+          ready_to_send: number
+          submitted: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_id?: string
+          device_label?: string | null
+          drafts?: number
+          id?: string
+          last_activity_at?: string | null
+          ready_to_send?: number
+          submitted?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          device_label?: string | null
+          drafts?: number
+          id?: string
+          last_activity_at?: string | null
+          ready_to_send?: number
+          submitted?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bloomberg_school_baselines: {
         Row: {
           baseline_notes: string | null
