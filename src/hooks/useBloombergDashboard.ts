@@ -560,8 +560,9 @@ export const useBloombergDashboard = () => {
     const states = new Map<string, { agg: Agg; lgas: Map<string, Agg> }>();
 
     submitted.forEach((v) => {
-      const st = (v.state || "Unknown").toString();
-      const lga = (v.lga || "Unknown").toString();
+      const geo = resolveGeo(v);
+      const st = (geo.state || "__unspecified__").toString();
+      const lga = (geo.lga || "__unspecified__").toString();
       if (!states.has(st)) states.set(st, { agg: newAgg(), lgas: new Map() });
       const node = states.get(st)!;
       if (!node.lgas.has(lga)) node.lgas.set(lga, newAgg());
