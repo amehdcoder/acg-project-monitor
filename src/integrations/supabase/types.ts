@@ -5629,6 +5629,39 @@ export type Database = {
           },
         ]
       }
+      standard_form_assignment_audit: {
+        Row: {
+          action: string
+          changed_by: string
+          created_at: string
+          detail: string | null
+          form_code: string | null
+          id: string
+          project_id: string | null
+          target_user_id: string
+        }
+        Insert: {
+          action: string
+          changed_by: string
+          created_at?: string
+          detail?: string | null
+          form_code?: string | null
+          id?: string
+          project_id?: string | null
+          target_user_id: string
+        }
+        Update: {
+          action?: string
+          changed_by?: string
+          created_at?: string
+          detail?: string | null
+          form_code?: string | null
+          id?: string
+          project_id?: string | null
+          target_user_id?: string
+        }
+        Relationships: []
+      }
       standard_form_disabled: {
         Row: {
           disabled_at: string

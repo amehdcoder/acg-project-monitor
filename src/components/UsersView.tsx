@@ -476,6 +476,10 @@ const UsersView = () => {
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [selectedForm, setSelectedForm] = useState<string>("");
   const [selectedStandardForm, setSelectedStandardForm] = useState<string>("");
+  // Search / filter controls for the assignment selectors
+  const [projectFilter, setProjectFilter] = useState("");
+  const [stdFormSearch, setStdFormSearch] = useState("");
+  const [stdFormGroup, setStdFormGroup] = useState<string>("all");
   const [showDeviceDialog, setShowDeviceDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -632,6 +636,37 @@ const UsersView = () => {
     }
   };
 
+  // Record standard-form assignment / restriction events for auditing.
+  // Fire-and-forget: never block the assignment flow on an audit write.
+  const logStandardFormAudit = useCallback(
+    async (
+      rows: {
+        target_user_id: string;
+        project_id?: string | null;
+        form_code?: string | null;
+        action: "assigned" | "restricted" | "minimal_lock" | "unassigned";
+        detail?: string | null;
+      }[],
+    ) => {
+      if (!rows.length || !currentUserProfile?.user_id) return;
+      try {
+        await (supabase as any).from("standard_form_assignment_audit").insert(
+          rows.map((r) => ({
+            target_user_id: r.target_user_id,
+            project_id: r.project_id ?? null,
+            form_code: r.form_code ?? null,
+            action: r.action,
+            detail: r.detail ?? null,
+            changed_by: currentUserProfile.user_id,
+          })),
+        );
+      } catch {
+        /* auditing is best-effort */
+      }
+    },
+    [currentUserProfile?.user_id],
+  );
+
   const handleAssignProject = async () => {
     if (!selectedUser || !selectedProject) return;
 
@@ -682,12 +717,20 @@ const UsersView = () => {
       targets.length === 0
     )
       return;
-    const projName = bulkProject ? (projects.find((p) => p.id === bulkProject)?.name || "the project") : "";
-    const formNames = formIds.map((id) => forms.find((f) => f.id === id)?.name || "form");
+    const projName = bulkProject ? (projectById.get(bulkProject)?.name || "the project") : "";
+    const formNames = formIds.map((id) => formById.get(id)?.name || "form");
     setBulkBusy(true);
     setBulkResults([]);
     setBulkProgress({ done: 0, total: targets.length });
     const results: { name: string; ok: boolean; message: string }[] = [];
+    // Collected audit rows for standard-form assignments / restrictions.
+    const auditRows: {
+      target_user_id: string;
+      project_id?: string | null;
+      form_code?: string | null;
+      action: "assigned" | "restricted" | "minimal_lock" | "unassigned";
+      detail?: string | null;
+    }[] = [];
     // Roles that keep full default access regardless of restriction toggle.
     const adminRoles = new Set(["super_admin", "systems_admin"]);
     for (const u of targets) {
@@ -735,6 +778,15 @@ const UsersView = () => {
                 }))
               );
             if (error && error.code !== "23505") throw error;
+            toInsert.forEach((code) =>
+              auditRows.push({
+                target_user_id: u.user_id,
+                project_id: bulkProject || null,
+                form_code: code,
+                action: "assigned",
+                detail: ALL_STANDARD_FORMS.find((f) => f.code === code)?.name || code,
+              }),
+            );
           }
           // Restrict default visibility (non-admins only) so they ONLY see the
           // standard forms assigned above. Admins keep their full role access.
@@ -750,6 +802,12 @@ const UsersView = () => {
                 .insert({ user_id: u.user_id, restricted_by: currentUserProfile?.user_id });
               if (rErr && rErr.code !== "23505") throw rErr;
             }
+            auditRows.push({
+              target_user_id: u.user_id,
+              project_id: bulkProject || null,
+              action: "restricted",
+              detail: `Restricted to ${stdForms.length} standard form(s)`,
+            });
           }
           parts.push(`${stdForms.length} standard form(s)`);
         }
@@ -788,6 +846,12 @@ const UsersView = () => {
               .insert({ user_id: u.user_id, restricted_by: currentUserProfile?.user_id });
             if (mErr && mErr.code !== "23505") throw mErr;
           }
+          auditRows.push({
+            target_user_id: u.user_id,
+            project_id: bulkProject || null,
+            action: "minimal_lock",
+            detail: "Locked to Forms, Project Chat & My Submissions",
+          });
           parts.push("minimal access");
         }
       } catch (err: any) {
@@ -798,6 +862,7 @@ const UsersView = () => {
       setBulkProgress({ done: results.length, total: targets.length });
       setBulkResults([...results]);
     }
+    if (auditRows.length > 0) logStandardFormAudit(auditRows);
     const okCount = results.filter((r) => r.ok).length;
     const label = [
       projName,
@@ -956,6 +1021,14 @@ const UsersView = () => {
           assigned_by: currentUserProfile?.user_id,
         });
       if (error) throw error;
+      logStandardFormAudit([
+        {
+          target_user_id: selectedUser.user_id,
+          form_code: selectedStandardForm,
+          action: "assigned",
+          detail: ALL_STANDARD_FORMS.find((f) => f.code === selectedStandardForm)?.name || selectedStandardForm,
+        },
+      ]);
       toast({ title: "Standard Form Assigned", description: "User has been assigned the standard form." });
       setSelectedStandardForm("");
     } catch (error: any) {
@@ -1169,6 +1242,27 @@ const UsersView = () => {
     projects.forEach((p, idx) => m.set(p.id, PROJECT_PALETTE[idx % PROJECT_PALETTE.length]));
     return m;
   }, [projects]);
+
+  // ---------- Assignment selector search / filter (memoized) ----------
+  const filteredProjects = useMemo(() => {
+    const q = projectFilter.trim().toLowerCase();
+    if (!q) return projects;
+    return projects.filter((p) => (p.name || "").toLowerCase().includes(q));
+  }, [projects, projectFilter]);
+
+  const standardFormGroups = useMemo(
+    () => Array.from(new Set(ALL_STANDARD_FORMS.map((f) => f.group))),
+    [],
+  );
+  const filteredStandardForms = useMemo(() => {
+    const q = stdFormSearch.trim().toLowerCase();
+    return ALL_STANDARD_FORMS.filter((f) => {
+      const matchesGroup = stdFormGroup === "all" || f.group === stdFormGroup;
+      const matchesSearch =
+        !q || f.name.toLowerCase().includes(q) || f.group.toLowerCase().includes(q) || f.code.toLowerCase().includes(q);
+      return matchesGroup && matchesSearch;
+    });
+  }, [stdFormSearch, stdFormGroup]);
 
   const projectNameById = useCallback(
     (id: string) => projectById.get(id)?.name || "Unknown project",
@@ -1519,12 +1613,24 @@ const UsersView = () => {
             <TabsContent value="project" className="space-y-4 pt-4">
               <div className="space-y-2">
                 <Label>Select Project</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search projects..."
+                    value={projectFilter}
+                    onChange={(e) => setProjectFilter(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
                 <Select value={selectedProject} onValueChange={setSelectedProject}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a project" />
                   </SelectTrigger>
                   <SelectContent>
-                    {projects.map((project) => (
+                    {filteredProjects.length === 0 && (
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground">No projects match.</div>
+                    )}
+                    {filteredProjects.map((project) => (
                       <SelectItem key={project.id} value={project.id}>
                         {project.name}
                       </SelectItem>
@@ -1569,12 +1675,35 @@ const UsersView = () => {
             <TabsContent value="standard" className="space-y-4 pt-4">
               <div className="space-y-2">
                 <Label>Select Standard Form</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Search forms..."
+                      value={stdFormSearch}
+                      onChange={(e) => setStdFormSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <Select value={stdFormGroup} onValueChange={setStdFormGroup}>
+                    <SelectTrigger><SelectValue placeholder="All categories" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All categories</SelectItem>
+                      {standardFormGroups.map((g) => (
+                        <SelectItem key={g} value={g}>{g}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Select value={selectedStandardForm} onValueChange={setSelectedStandardForm}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a standard form" />
                   </SelectTrigger>
                   <SelectContent>
-                    {ALL_STANDARD_FORMS.map((def) => (
+                    {filteredStandardForms.length === 0 && (
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground">No standard forms match.</div>
+                    )}
+                    {filteredStandardForms.map((def) => (
                       <SelectItem key={def.code} value={def.code}>
                         {def.name}
                       </SelectItem>
@@ -1794,11 +1923,20 @@ const UsersView = () => {
           </DialogHeader>
           <div className="space-y-3">
             <Label>Project (optional)</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search projects..."
+                value={projectFilter}
+                onChange={(e) => setProjectFilter(e.target.value)}
+                className="pl-9"
+              />
+            </div>
             <Select value={bulkProject || "__none__"} onValueChange={(v) => setBulkProject(v === "__none__" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Select a project" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">No project</SelectItem>
-                {projects.map((p) => (
+                {filteredProjects.map((p) => (
                   <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -1839,8 +1977,31 @@ const UsersView = () => {
                 </Button>
               )}
             </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search forms..."
+                  value={stdFormSearch}
+                  onChange={(e) => setStdFormSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={stdFormGroup} onValueChange={setStdFormGroup}>
+                <SelectTrigger><SelectValue placeholder="All categories" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All categories</SelectItem>
+                  {standardFormGroups.map((g) => (
+                    <SelectItem key={g} value={g}>{g}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-2">
-              {ALL_STANDARD_FORMS.map((def) => (
+              {filteredStandardForms.length === 0 && (
+                <p className="text-xs text-muted-foreground">No standard forms match your search.</p>
+              )}
+              {filteredStandardForms.map((def) => (
                 <label key={def.code} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted/50">
                   <Checkbox
                     checked={bulkStandardForms.has(def.code)}
@@ -1853,6 +2014,7 @@ const UsersView = () => {
                     }
                   />
                   <span className="truncate">{def.name}</span>
+                  <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">{def.group}</span>
                 </label>
               ))}
             </div>
