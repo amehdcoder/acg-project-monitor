@@ -1484,12 +1484,29 @@ const UsersView = () => {
               <Users className="h-5 w-5" />
               All Users ({filteredUsers.length})
             </CardTitle>
-            {selectableUsers.length > 0 && (
-              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
-                <Checkbox checked={allFilteredSelected} onCheckedChange={toggleSelectAll} />
-                Select all
-              </label>
-            )}
+            <div className="flex items-center gap-2">
+              {groupedUsers.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  onClick={allCollapsed ? expandAllGroups : collapseAllGroups}
+                  title={allCollapsed ? "Expand all project folders" : "Collapse all project folders"}
+                >
+                  {allCollapsed ? (
+                    <><ChevronsUpDown className="mr-1.5 h-4 w-4" /> Expand all</>
+                  ) : (
+                    <><ChevronsDownUp className="mr-1.5 h-4 w-4" /> Collapse all</>
+                  )}
+                </Button>
+              )}
+              {selectableUsers.length > 0 && (
+                <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                  <Checkbox checked={allFilteredSelected} onCheckedChange={toggleSelectAll} />
+                  Select all
+                </label>
+              )}
+            </div>
           </div>
           {selectedIds.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-acg-gold/30 bg-acg-gold/5 p-3">
