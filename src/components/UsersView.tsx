@@ -667,6 +667,26 @@ const UsersView = () => {
     [currentUserProfile?.user_id],
   );
 
+  // Sends a professional email notifying a user of a new project/form assignment.
+  // Best-effort: never blocks the assignment flow.
+  const notifyAssignment = useCallback(
+    async (
+      user: { user_id: string; email?: string | null; first_name?: string | null } | null | undefined,
+      kind: "project" | "form",
+      items: string[],
+    ) => {
+      if (!user?.email || items.length === 0) return;
+      try {
+        await supabase.functions.invoke("notify-assignment", {
+          body: { email: user.email, firstName: user.first_name || "", kind, items },
+        });
+      } catch {
+        /* notification is best-effort */
+      }
+    },
+    [],
+  );
+
   const handleAssignProject = async () => {
     if (!selectedUser || !selectedProject) return;
 
@@ -686,6 +706,7 @@ const UsersView = () => {
         description: `User has been assigned to the project.`,
       });
 
+      notifyAssignment(selectedUser, "project", [projectById.get(selectedProject)?.name || "a project"]);
       setSelectedProject(""); fetchAssignments();
     } catch (error: any) {
       if (error.code === "23505") {
@@ -858,7 +879,11 @@ const UsersView = () => {
         ok = false;
         results.push({ name, ok: false, message: err?.message || "Failed" });
       }
-      if (ok) results.push({ name, ok: true, message: `Assigned ${parts.join(" + ")}` });
+      if (ok) {
+        results.push({ name, ok: true, message: `Assigned ${parts.join(" + ")}` });
+        if (bulkProject) notifyAssignment(u, "project", [projName]);
+        if (formIds.length > 0) notifyAssignment(u, "form", formNames);
+      }
       setBulkProgress({ done: results.length, total: targets.length });
       setBulkResults([...results]);
     }
@@ -993,6 +1018,7 @@ const UsersView = () => {
         description: `User has been assigned to the form.`,
       });
 
+      notifyAssignment(selectedUser, "form", [formById.get(selectedForm)?.name || "a form"]);
       setSelectedForm(""); fetchAssignments();
     } catch (error: any) {
       if (error.code === "23505") {
