@@ -1841,7 +1841,7 @@ const UsersView = () => {
               )}
             </div>
             <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-2">
-              {Object.values(STANDARD_ASSESSMENTS).map((def: any) => (
+              {ALL_STANDARD_FORMS.map((def) => (
                 <label key={def.code} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted/50">
                   <Checkbox
                     checked={bulkStandardForms.has(def.code)}
