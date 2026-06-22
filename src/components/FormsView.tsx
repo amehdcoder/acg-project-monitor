@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 import acgLogo from "@/assets/acg-logo.png";
