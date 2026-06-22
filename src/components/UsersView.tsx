@@ -349,7 +349,11 @@ const UsersView = () => {
     const stdForms = Array.from(bulkStandardForms);
     const pageIds = Array.from(bulkPages);
     if (
-      (!bulkProject && formIds.length === 0 && stdForms.length === 0 && pageIds.length === 0) ||
+      (!bulkProject &&
+        formIds.length === 0 &&
+        stdForms.length === 0 &&
+        pageIds.length === 0 &&
+        !bulkMinimalLock) ||
       targets.length === 0
     )
       return;
