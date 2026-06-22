@@ -837,7 +837,7 @@ const UsersView = () => {
             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-acg-gold/30 bg-acg-gold/5 p-3">
               <Badge variant="secondary">{selectedIds.size} selected</Badge>
               <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => setShowBulkAssign(true)}>
-                <FolderOpen className="mr-1.5 h-4 w-4" /> Assign Project
+                <FolderOpen className="mr-1.5 h-4 w-4" /> Assign Project / Forms
               </Button>
               <Button size="sm" variant="outline" disabled={bulkBusy} onClick={handleBulkResendInvite}>
                 {bulkBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Mail className="mr-1.5 h-4 w-4" />} Resend Invite
