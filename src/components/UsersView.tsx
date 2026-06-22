@@ -23,6 +23,10 @@ import {
   XCircle,
   AlertTriangle,
   Filter,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1335,6 +1339,22 @@ const UsersView = () => {
     return groups;
   }, [filteredUsers, projects, colorForProject, getUserProjectIds]);
 
+  // Track which project folders are collapsed (by group key).
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const toggleGroupCollapse = useCallback((key: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+  const collapseAllGroups = useCallback(() => {
+    setCollapsedGroups(new Set(groupedUsers.map((g) => g.key)));
+  }, [groupedUsers]);
+  const expandAllGroups = useCallback(() => setCollapsedGroups(new Set()), []);
+  const allCollapsed = groupedUsers.length > 0 && collapsedGroups.size >= groupedUsers.length;
+
   // Stable ref of all row action handlers — its identity never changes, so it
   // never forces memoized rows to re-render. Always points at the latest fns.
   const rowApiRef = useRef<any>({});
@@ -1464,12 +1484,29 @@ const UsersView = () => {
               <Users className="h-5 w-5" />
               All Users ({filteredUsers.length})
             </CardTitle>
-            {selectableUsers.length > 0 && (
-              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
-                <Checkbox checked={allFilteredSelected} onCheckedChange={toggleSelectAll} />
-                Select all
-              </label>
-            )}
+            <div className="flex items-center gap-2">
+              {groupedUsers.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  onClick={allCollapsed ? expandAllGroups : collapseAllGroups}
+                  title={allCollapsed ? "Expand all project folders" : "Collapse all project folders"}
+                >
+                  {allCollapsed ? (
+                    <><ChevronsUpDown className="mr-1.5 h-4 w-4" /> Expand all</>
+                  ) : (
+                    <><ChevronsDownUp className="mr-1.5 h-4 w-4" /> Collapse all</>
+                  )}
+                </Button>
+              )}
+              {selectableUsers.length > 0 && (
+                <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                  <Checkbox checked={allFilteredSelected} onCheckedChange={toggleSelectAll} />
+                  Select all
+                </label>
+              )}
+            </div>
           </div>
           {selectedIds.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-acg-gold/30 bg-acg-gold/5 p-3">
@@ -1542,7 +1579,9 @@ const UsersView = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              {groupedUsers.map((group) => (
+              {groupedUsers.map((group) => {
+                const collapsed = collapsedGroups.has(group.key);
+                return (
                 <div key={group.key} className="space-y-3">
                   <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${group.color.soft}`}>
                     {group.users.some((u) => !u.is_owner) && (
@@ -1553,12 +1592,25 @@ const UsersView = () => {
                         />
                       </label>
                     )}
-                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${group.color.bar}`} />
-                    <FolderOpen className="h-4 w-4 text-muted-foreground" />
-                    <h3 className="font-display text-sm font-semibold text-foreground">{group.name}</h3>
-                    <Badge variant="secondary" className="ml-auto">{group.users.length}</Badge>
+                    <button
+                      type="button"
+                      onClick={() => toggleGroupCollapse(group.key)}
+                      className="flex flex-1 items-center gap-2 text-left"
+                      aria-expanded={!collapsed}
+                      title={collapsed ? `Expand ${group.name}` : `Collapse ${group.name}`}
+                    >
+                      {collapsed ? (
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${group.color.bar}`} />
+                      <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                      <h3 className="font-display text-sm font-semibold text-foreground">{group.name}</h3>
+                      <Badge variant="secondary" className="ml-auto">{group.users.length}</Badge>
+                    </button>
                   </div>
-                  {group.users.map((user) => (
+                  {!collapsed && group.users.map((user) => (
                     <UserCard
                       key={`${group.key}-${user.id}`}
                       user={user}
@@ -1568,7 +1620,8 @@ const UsersView = () => {
                     />
                   ))}
                 </div>
-              ))}
+                );
+              })}
             </div>
 
           )}
