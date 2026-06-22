@@ -123,8 +123,20 @@ export const useBloombergDashboard = () => {
       ]);
       const count = s.length;
 
-      // Resolve validator names for the accountability table.
-      const ids = [...new Set(v.map((r) => r.validator_id).filter(Boolean))] as string[];
+      // Per-device local form audit reported by every user's device.
+      const audit = await fetchAll<LocalAuditRow>(
+        "bloomberg_local_form_audit",
+        "user_id,device_id,device_label,drafts,ready_to_send,submitted,last_activity_at,updated_at",
+      ).catch(() => [] as LocalAuditRow[]);
+
+      // Resolve validator names for the accountability table — include both
+      // submitters and any user who only has local drafts/ready-to-send.
+      const ids = [
+        ...new Set([
+          ...v.map((r) => r.validator_id).filter(Boolean),
+          ...audit.map((r) => r.user_id).filter(Boolean),
+        ]),
+      ] as string[];
       const pm = new Map<string, ProfileLite>();
       if (ids.length) {
         const { data: profs } = await supabase
@@ -138,6 +150,7 @@ export const useBloombergDashboard = () => {
       }
 
       if (myReq !== reqIdRef.current) return;
+      setLocalAuditRows(audit);
       setValidations(v);
       setBaselines(b);
       setSchools(s);
