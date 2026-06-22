@@ -229,6 +229,60 @@ export const useBloombergDashboard = () => {
     return [...byKey.values(), ...noKey];
   }, [validations]);
 
+  // Duplicate audit trail: a single school validated more than once. The most
+  // recent reported entry is the "survivor" that the dashboard counts; the older
+  // copies are superseded duplicates. This explains why the entries table (all
+  // rows) shows more records than the validated-schools count (distinct schools).
+  // Each copy carries the validator's name and the date it was sent.
+  const duplicates = useMemo(() => {
+    const ts = (v: ValidationRow) =>
+      new Date(v.submitted_at || v.updated_at || v.created_at).getTime();
+    const byKey = new Map<string, ValidationRow[]>();
+    validations.filter(isReportedValidation).forEach((v) => {
+      if (!v.school_key) return;
+      const arr = byKey.get(v.school_key) || [];
+      arr.push(v);
+      byKey.set(v.school_key, arr);
+    });
+    const nameOf = (v: ValidationRow) =>
+      (v.validator_id && profileMap.get(v.validator_id)?.name) || "Unknown user";
+    const dateOf = (v: ValidationRow) =>
+      v.submitted_at || v.updated_at || v.created_at || null;
+    let extraEntries = 0;
+    const groups: {
+      schoolKey: string;
+      school: string;
+      code: string;
+      state: string;
+      lga: string;
+      total: number;
+      extras: number;
+      copies: { id: string; validator: string; date: string | null; kept: boolean }[];
+    }[] = [];
+    byKey.forEach((arr, key) => {
+      if (arr.length < 2) return;
+      const sorted = [...arr].sort((a, b) => ts(b) - ts(a)); // newest first = survivor
+      extraEntries += arr.length - 1;
+      groups.push({
+        schoolKey: key,
+        school: sorted[0].school_name || "Unknown",
+        code: sorted[0].school_code || key,
+        state: stateName(sorted[0].state),
+        lga: lgaName(sorted[0].state, sorted[0].lga),
+        total: arr.length,
+        extras: arr.length - 1,
+        copies: sorted.map((v, i) => ({
+          id: v.id,
+          validator: nameOf(v),
+          date: dateOf(v),
+          kept: i === 0,
+        })),
+      });
+    });
+    groups.sort((a, b) => b.extras - a.extras || a.school.localeCompare(b.school));
+    return { schoolsWithDuplicates: groups.length, extraEntries, groups };
+  }, [validations, profileMap, labelMaps]);
+
   const stats = useMemo(() => {
     const submitted = dedupedSent;
     const draft = validations.filter((v) => v.status === "draft");
