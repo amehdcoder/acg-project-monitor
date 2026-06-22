@@ -131,6 +131,23 @@ export const usePageAccess = () => {
     return () => { cancelled = true; };
   }, [user?.id, authLoading]);
 
+  // Fetch the user's "minimal access" lock (Forms / Project Chat / My Submissions only).
+  // Admins are never minimal-locked.
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user || isAdmin || isOwner) { setMinimalAccess(false); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("user_minimal_access" as any)
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1);
+      if (!cancelled) setMinimalAccess(!!data && data.length > 0);
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, authLoading, isAdmin, isOwner]);
+
 
 
   // Realtime grant updates for any admin (Super Admin or Systems Admin), not the
