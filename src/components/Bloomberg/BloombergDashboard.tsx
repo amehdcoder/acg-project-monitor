@@ -665,36 +665,48 @@ export default function BloombergDashboard({ onClose }: Props) {
             {duplicates.validatorBreakdown.length > 0 && (
               <div className="mb-3 rounded-lg border border-amber-200 bg-white/60 p-2 dark:border-amber-900/50 dark:bg-amber-950/20">
                 <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Superseded copies by validator — total {fmt(duplicates.extraEntries)} (click a name to view that validator's superseded copies)
+                  Superseded copies by validator — total {fmt(duplicates.extraEntries)} (click a name to filter the table; use the arrow to open the full per-school drill-down)
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {duplicates.validatorBreakdown.map((v) => {
                     const active = dupValidator === v.validator && dupRowStatus === "superseded";
                     return (
-                      <button
+                      <span
                         key={v.validator}
-                        type="button"
-                        onClick={() => {
-                          if (active) {
-                            setDupValidator("all");
-                            setDupRowStatus("all");
-                          } else {
-                            setDupValidator(v.validator);
-                            setDupRowStatus("superseded");
-                            setDupType("all");
-                          }
-                          dupPg.resetPage();
-                        }}
-                        title={`${v.validator}: ${v.extras} superseded cop${v.extras === 1 ? "y" : "ies"}. Click to filter the table below.`}
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition ${
+                        className={`inline-flex items-center gap-1 rounded-full pl-2 pr-1 py-0.5 text-[11px] font-medium transition ${
                           active
                             ? "bg-amber-600 text-white"
-                            : "bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/50 dark:text-amber-200 dark:hover:bg-amber-900/70"
+                            : "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200"
                         }`}
                       >
-                        {v.validator}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (active) {
+                              setDupValidator("all");
+                              setDupRowStatus("all");
+                            } else {
+                              setDupValidator(v.validator);
+                              setDupRowStatus("superseded");
+                              setDupType("all");
+                            }
+                            dupPg.resetPage();
+                          }}
+                          title={`${v.validator}: ${v.extras} superseded cop${v.extras === 1 ? "y" : "ies"}. Click to filter the table below.`}
+                          className="hover:underline"
+                        >
+                          {v.validator}
+                        </button>
                         <span className={`rounded-full px-1.5 text-[10px] font-bold ${active ? "bg-white text-amber-700" : "bg-amber-600 text-white"}`}>{fmt(v.extras)}</span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => setDrilldownValidator(v.validator)}
+                          title={`Open full per-school duplicate drill-down for ${v.validator}`}
+                          className={`ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${active ? "bg-white/30 text-white hover:bg-white/50" : "bg-amber-200 text-amber-800 hover:bg-amber-300 dark:bg-amber-800 dark:text-amber-100"}`}
+                        >
+                          ↗
+                        </button>
+                      </span>
                     );
                   })}
                 </div>
