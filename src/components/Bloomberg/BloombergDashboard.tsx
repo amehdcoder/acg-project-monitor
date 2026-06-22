@@ -952,6 +952,9 @@ export default function BloombergDashboard({ onClose }: Props) {
               <span className="font-semibold text-foreground">{fmt(deviceAudit.totals.drafts)}</span> drafts and
               {" "}<span className="font-semibold text-foreground">{fmt(deviceAudit.totals.readyToSend)}</span> ready-to-send forms reported live from each user's device, plus
               {" "}<span className="font-semibold text-foreground">{fmt(deviceAudit.totals.submitted)}</span> successfully submitted (counted from the server, so it matches the Submissions KPI exactly).
+              <span className="mt-1 block">
+                The <span className="font-medium text-foreground">Snapshot</span> column shows each device's uploaded Drafts and Ready-to-Send screens (captured on sync). <span className="font-medium text-foreground">Days worked</span> is derived from each user's submission metadata. Click a user's name for their per-school duplicate drill-down.
+              </span>
             </p>
 
             {deviceAudit.rows.length === 0 ? (
@@ -967,7 +970,9 @@ export default function BloombergDashboard({ onClose }: Props) {
                       <th className="py-1.5 pr-3 text-right font-semibold">Drafts</th>
                       <th className="py-1.5 pr-3 text-right font-semibold">Ready to send</th>
                       <th className="py-1.5 pr-3 text-right font-semibold">Submitted</th>
+                      <th className="py-1.5 pr-3 text-right font-semibold">Days worked</th>
                       <th className="py-1.5 pr-3 text-right font-semibold">Devices</th>
+                      <th className="py-1.5 pr-3 font-semibold">Snapshot</th>
                       <th className="py-1.5 font-semibold">Last activity</th>
                     </tr>
                   </thead>
@@ -975,13 +980,29 @@ export default function BloombergDashboard({ onClose }: Props) {
                     {deviceAudit.rows.map((r) => (
                       <tr key={r.userId} className="border-b border-border/60 last:border-0">
                         <td className="py-1.5 pr-3 text-foreground">
-                          {r.name}
+                          <button
+                            type="button"
+                            onClick={() => setDrilldownValidator(r.name)}
+                            className="text-left font-medium hover:underline"
+                            title={`Open ${r.name}'s per-school duplicate drill-down`}
+                          >
+                            {r.name}
+                          </button>
                           {r.email ? <span className="block text-[10px] text-muted-foreground">{r.email}</span> : null}
                         </td>
                         <td className="py-1.5 pr-3 text-right font-semibold text-amber-600">{fmt(r.drafts)}</td>
                         <td className="py-1.5 pr-3 text-right font-semibold" style={{ color: BLUE }}>{fmt(r.readyToSend)}</td>
                         <td className="py-1.5 pr-3 text-right font-semibold text-emerald-600">{fmt(r.submitted)}</td>
+                        <td className="py-1.5 pr-3 text-right font-semibold text-foreground">{fmt(r.daysWorked)}</td>
                         <td className="py-1.5 pr-3 text-right text-muted-foreground">{fmt(r.devices)}</td>
+                        <td className="py-1.5 pr-3">
+                          <BloombergDeviceSnapshotViewer
+                            userName={r.name}
+                            draftsPath={r.draftsShot}
+                            readyPath={r.readyShot}
+                            capturedAt={r.snapshotAt}
+                          />
+                        </td>
                         <td className="py-1.5 text-muted-foreground">
                           {r.lastActivity ? new Date(r.lastActivity).toLocaleString() : "—"}
                         </td>
