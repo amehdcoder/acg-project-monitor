@@ -407,13 +407,17 @@ const UsersView = () => {
           // Restrict default visibility (non-admins only) so they ONLY see the
           // standard forms assigned above. Admins keep their full role access.
           if (bulkRestrictStandard && !isAdminUser) {
-            const { error: rErr } = await (supabase as any)
+            const { data: alreadyRestricted } = await (supabase as any)
               .from("standard_form_user_restrictions")
-              .upsert(
-                { user_id: u.user_id, restricted_by: currentUserProfile?.user_id },
-                { onConflict: "user_id", ignoreDuplicates: true }
-              );
-            if (rErr && rErr.code !== "23505") throw rErr;
+              .select("id")
+              .eq("user_id", u.user_id)
+              .limit(1);
+            if (!alreadyRestricted || alreadyRestricted.length === 0) {
+              const { error: rErr } = await (supabase as any)
+                .from("standard_form_user_restrictions")
+                .insert({ user_id: u.user_id, restricted_by: currentUserProfile?.user_id });
+              if (rErr && rErr.code !== "23505") throw rErr;
+            }
           }
           parts.push(`${stdForms.length} standard form(s)`);
         }
