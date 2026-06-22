@@ -202,6 +202,24 @@ export default function BloombergDashboard({ onClose }: Props) {
       setDownloadingData(false);
     }
   };
+  // Download every uploaded photo (signboard / classroom / register / extra) as
+  // a ZIP, foldered by State › LGA › School – Validator, with a manifest CSV.
+  const [downloadingPhotos, setDownloadingPhotos] = useState(false);
+  const [photoProgress, setPhotoProgress] = useState<{ done: number; total: number } | null>(null);
+  const handleDownloadPhotos = async () => {
+    setDownloadingPhotos(true);
+    setPhotoProgress(null);
+    try {
+      const { photos, schools } = await exportPhotoEvidence((p) => setPhotoProgress(p));
+      toast.success(`Downloaded ${photos.toLocaleString()} photo(s) across ${schools.toLocaleString()} school(s)`);
+    } catch (e: any) {
+      toast.error(e?.message || "Could not download photo evidence");
+    } finally {
+      setDownloadingPhotos(false);
+      setPhotoProgress(null);
+    }
+  };
+
   // Hard-delete of validation entries is restricted to the Owner / Co-owner.
   const canDelete = isOwnerLevel;
   const [deleting, setDeleting] = useState<string | null>(null);
