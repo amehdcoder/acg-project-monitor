@@ -172,6 +172,9 @@ const UsersView = () => {
   // Standard forms you assign here (instead of every form their designation
   // grants by default). Admins (Systems/Super) keep their full role access.
   const [bulkRestrictStandard, setBulkRestrictStandard] = useState(true);
+  // When on, selected NON-admin users are locked to ONLY Forms, Project Chat
+  // and My Submissions — regardless of their designation. Admins are exempt.
+  const [bulkMinimalLock, setBulkMinimalLock] = useState(false);
   const [showBulkRemove, setShowBulkRemove] = useState(false);
   // Per-user progress + outcome feedback for bulk operations
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
