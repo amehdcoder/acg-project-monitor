@@ -257,12 +257,27 @@ export const useBloombergDashboard = () => {
       lga: string;
       total: number;
       extras: number;
+      crossValidator: boolean;
+      validators: string[];
       copies: { id: string; validator: string; date: string | null; kept: boolean }[];
     }[] = [];
+    // Per-validator tally of how many SUPERSEDED (extra) copies each person produced.
+    const validatorExtras = new Map<string, number>();
+    let sameValidatorGroups = 0; // school re-validated by the same person
+    let crossValidatorGroups = 0; // school validated by different people
     byKey.forEach((arr, key) => {
       if (arr.length < 2) return;
       const sorted = [...arr].sort((a, b) => ts(b) - ts(a)); // newest first = survivor
       extraEntries += arr.length - 1;
+      const uniqueValidators = Array.from(new Set(sorted.map((v) => nameOf(v))));
+      const crossValidator = uniqueValidators.length > 1;
+      if (crossValidator) crossValidatorGroups += 1;
+      else sameValidatorGroups += 1;
+      // Attribute each superseded copy (all but the kept survivor) to its validator.
+      sorted.slice(1).forEach((v) => {
+        const n = nameOf(v);
+        validatorExtras.set(n, (validatorExtras.get(n) || 0) + 1);
+      });
       groups.push({
         schoolKey: key,
         school: sorted[0].school_name || "Unknown",
@@ -271,6 +286,8 @@ export const useBloombergDashboard = () => {
         lga: lgaName(sorted[0].state, sorted[0].lga),
         total: arr.length,
         extras: arr.length - 1,
+        crossValidator,
+        validators: uniqueValidators,
         copies: sorted.map((v, i) => ({
           id: v.id,
           validator: nameOf(v),
@@ -280,7 +297,19 @@ export const useBloombergDashboard = () => {
       });
     });
     groups.sort((a, b) => b.extras - a.extras || a.school.localeCompare(b.school));
-    return { schoolsWithDuplicates: groups.length, extraEntries, groups };
+    const validatorBreakdown = Array.from(validatorExtras.entries())
+      .map(([validator, extras]) => ({ validator, extras }))
+      .sort((a, b) => b.extras - a.extras);
+    const totalReported = validations.filter(isReportedValidation).length;
+    return {
+      schoolsWithDuplicates: groups.length,
+      extraEntries,
+      sameValidatorGroups,
+      crossValidatorGroups,
+      validatorBreakdown,
+      totalReported,
+      groups,
+    };
   }, [validations, profileMap, labelMaps]);
 
   const stats = useMemo(() => {
