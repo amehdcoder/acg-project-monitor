@@ -6273,6 +6273,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_minimal_access: {
+        Row: {
+          created_at: string
+          id: string
+          restricted_by: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          restricted_by?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          restricted_by?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_page_access: {
         Row: {
           created_at: string
@@ -6759,6 +6780,7 @@ export type Database = {
         Returns: boolean
       }
       has_field_designation: { Args: { _user_id: string }; Returns: boolean }
+      has_minimal_access: { Args: { _user_id: string }; Returns: boolean }
       has_page_access: {
         Args: { _page_id: string; _user_id: string }
         Returns: boolean

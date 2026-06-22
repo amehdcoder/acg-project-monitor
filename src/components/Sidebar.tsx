@@ -36,6 +36,7 @@ interface SidebarProps {
   isOwner?: boolean;
   isAdhoc?: boolean;
   canAccessPage?: (pageId: string) => boolean;
+  minimalAccess?: boolean;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }
@@ -68,7 +69,7 @@ const getRoleBadge = (role?: AppRole | null) => {
   return null;
 };
 
-const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdmin, isOwner, isAdhoc, canAccessPage, collapsed, onToggleCollapse }: SidebarProps) => {
+const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdmin, isOwner, isAdhoc, canAccessPage, minimalAccess, collapsed, onToggleCollapse }: SidebarProps) => {
   const roleBadge = getRoleBadge(role);
   const { t } = useLanguage();
   const { playNavigate, playClick } = useAudioCues();
@@ -151,6 +152,10 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     if ((item as any).ownerOnly && !isOwner) return false;
     // Regular users: collaboration features by default + owner-granted pages.
     if (isRegularUser) {
+      // Minimal-access lock: ONLY Forms, Project Chat and My Submissions.
+      if (minimalAccess) {
+        return ["forms", "project-chat", "my-submissions"].includes(item.id);
+      }
       if (DEFAULT_USER_PAGES.includes(item.id)) return true;
       if ((item as any).adhocOnly) return false; // my-submissions stays adhoc-only
       return canAccessPage ? canAccessPage(item.id) : false;

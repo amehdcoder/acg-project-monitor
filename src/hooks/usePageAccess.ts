@@ -46,6 +46,9 @@ export const usePageAccess = () => {
   // Tier 2: a "Manage Microplanning Form Access" grant unlocks the full
   // Geo Microplanning dashboard page (sidebar), even for non-admins.
   const [hasMicroplanFormAccess, setHasMicroplanFormAccess] = useState(false);
+  // "Minimal access" lock: when set, a non-admin user only sees Forms, Project
+  // Chat and My Submissions — regardless of their designation defaults.
+  const [minimalAccess, setMinimalAccess] = useState(false);
   const initialLoadDone = useRef(false);
   const lastUserId = useRef<string | null>(null);
 
@@ -127,6 +130,23 @@ export const usePageAccess = () => {
     })();
     return () => { cancelled = true; };
   }, [user?.id, authLoading]);
+
+  // Fetch the user's "minimal access" lock (Forms / Project Chat / My Submissions only).
+  // Admins are never minimal-locked.
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user || isAdmin || isOwner) { setMinimalAccess(false); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("user_minimal_access" as any)
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1);
+      if (!cancelled) setMinimalAccess(!!data && data.length > 0);
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, authLoading, isAdmin, isOwner]);
 
 
 
@@ -213,6 +233,11 @@ export const usePageAccess = () => {
       // Co-owners are owner-level ("near-full app rights") — grant every page,
       // including the restricted ones, just like the Owner.
       if (isOwnerLevel) return true;
+      // Minimal-access lock (non-admins only): ONLY Forms, Project Chat and My
+      // Submissions, regardless of designation or any other grant.
+      if (minimalAccess && !isAdmin) {
+        return pageId === "forms" || pageId === "project-chat" || pageId === "my-submissions";
+      }
       // Owner-granted, time-bounded per-user access works for any page id.
       if (canAccessUserPage(pageId)) return true;
       // Field designations (FLHF Supervisor, Enumerator, CDD) get default
@@ -233,7 +258,7 @@ export const usePageAccess = () => {
       if (pageId === "forms" || pageId === "cases" || pageId === "community-forum" || pageId === "project-chat") return true;
       return false;
     },
-    [isOwner, isOwnerLevel, isAdmin, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage, isFieldDesignation, hasMicroplanFormAccess]
+    [isOwner, isOwnerLevel, isAdmin, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage, isFieldDesignation, hasMicroplanFormAccess, minimalAccess]
   );
 
   const refetch = useCallback(async () => {
@@ -246,6 +271,6 @@ export const usePageAccess = () => {
   // Surface per-user grant loading too, so callers (e.g. Index's guardedPage
   // spinner) wait for time-bounded grants to resolve before deciding access —
   // preventing a brief "Access Restricted" flash for users who DO have a grant.
-  return { canAccessPage, grantedPages, loadingAccess: loadingAccess || loadingUserAccess, refetch };
+  return { canAccessPage, grantedPages, minimalAccess, loadingAccess: loadingAccess || loadingUserAccess, refetch };
 };
 
