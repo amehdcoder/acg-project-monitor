@@ -850,10 +850,11 @@ export default function BloombergDashboard({ onClose }: Props) {
               </span>
             </div>
             <p className="mb-3 text-xs text-muted-foreground">
-              On-device form lifecycle reported by each user's app: <span className="font-semibold text-foreground">{fmt(deviceAudit.totals.drafts)}</span> drafts,
-              {" "}<span className="font-semibold text-foreground">{fmt(deviceAudit.totals.readyToSend)}</span> ready to send and
-              {" "}<span className="font-semibold text-foreground">{fmt(deviceAudit.totals.submitted)}</span> successfully submitted across all devices.
+              <span className="font-semibold text-foreground">{fmt(deviceAudit.totals.drafts)}</span> drafts and
+              {" "}<span className="font-semibold text-foreground">{fmt(deviceAudit.totals.readyToSend)}</span> ready-to-send forms reported live from each user's device, plus
+              {" "}<span className="font-semibold text-foreground">{fmt(deviceAudit.totals.submitted)}</span> successfully submitted (counted from the server, so it matches the Submissions KPI exactly).
             </p>
+
             {deviceAudit.rows.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
                 No device reports yet. They appear once users open the validation form on their devices.
