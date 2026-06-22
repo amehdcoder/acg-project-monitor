@@ -182,7 +182,7 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function BloombergDashboard({ onClose }: Props) {
-  const { validations, stats, byState, stateBreakdown, inference, points, nonExistent, validatedTable, notValidatedTable, accountability, recovery, loading, reload, deleteValidations } = useBloombergDashboard();
+  const { validations, stats, byState, stateBreakdown, inference, points, nonExistent, validatedTable, notValidatedTable, accountability, recovery, duplicates, loading, reload, deleteValidations } = useBloombergDashboard();
   const { isOwner, isSuperAdmin, isOwnerLevel, isAdmin } = useAuth();
   const canManage = isOwner || isSuperAdmin;
   // Pagination keeps very large registers fast — only a page of rows is ever
