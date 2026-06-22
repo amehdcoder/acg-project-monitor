@@ -991,6 +991,14 @@ const UsersView = () => {
           assigned_by: currentUserProfile?.user_id,
         });
       if (error) throw error;
+      logStandardFormAudit([
+        {
+          target_user_id: selectedUser.user_id,
+          form_code: selectedStandardForm,
+          action: "assigned",
+          detail: ALL_STANDARD_FORMS.find((f) => f.code === selectedStandardForm)?.name || selectedStandardForm,
+        },
+      ]);
       toast({ title: "Standard Form Assigned", description: "User has been assigned the standard form." });
       setSelectedStandardForm("");
     } catch (error: any) {
