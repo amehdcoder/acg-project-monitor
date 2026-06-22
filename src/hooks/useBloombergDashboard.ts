@@ -474,14 +474,34 @@ export const useBloombergDashboard = () => {
   const deviceAudit = useMemo(() => {
     // Authoritative submitted count per validator (raw reported entries).
     const serverSubmitted = new Map<string, number>();
+    // Server-derived days worked: distinct calendar days a validator submitted,
+    // computed from each submission's metadata (submitted_at → created_at). This
+    // is verifiable from the server even when a device has not reported, and is
+    // what we reconcile the device-reported figure against.
+    const serverDays = new Map<string, Set<string>>();
     validations.filter(isReportedValidation).forEach((v) => {
       if (!v.validator_id) return;
       serverSubmitted.set(v.validator_id, (serverSubmitted.get(v.validator_id) || 0) + 1);
+      const t = v.submitted_at || v.updated_at || v.created_at;
+      if (t) {
+        const d = new Date(t);
+        if (!isNaN(d.getTime())) {
+          const key = d.toISOString().slice(0, 10);
+          if (!serverDays.has(v.validator_id)) serverDays.set(v.validator_id, new Set());
+          serverDays.get(v.validator_id)!.add(key);
+        }
+      }
     });
 
     const byUser = new Map<
       string,
-      { userId: string; name: string; email: string; drafts: number; readyToSend: number; submitted: number; devices: number; lastActivity: string | null }
+      {
+        userId: string; name: string; email: string;
+        drafts: number; readyToSend: number; submitted: number; devices: number;
+        lastActivity: string | null;
+        daysWorked: number;
+        draftsShot: string | null; readyShot: string | null; snapshotAt: string | null;
+      }
     >();
     const ensureRow = (userId: string) => {
       let row = byUser.get(userId);
@@ -496,13 +516,17 @@ export const useBloombergDashboard = () => {
           submitted: 0,
           devices: 0,
           lastActivity: null as string | null,
+          daysWorked: 0,
+          draftsShot: null as string | null,
+          readyShot: null as string | null,
+          snapshotAt: null as string | null,
         };
         byUser.set(userId, row);
       }
       return row;
     };
 
-    // Device-local drafts & ready-to-send.
+    // Device-local drafts & ready-to-send + the uploaded screenshots.
     localAuditRows.forEach((r) => {
       const row = ensureRow(r.user_id);
       row.drafts += r.drafts ?? 0;
@@ -512,12 +536,27 @@ export const useBloombergDashboard = () => {
       if (la && (!row.lastActivity || new Date(la).getTime() > new Date(row.lastActivity).getTime())) {
         row.lastActivity = la;
       }
+      // Keep the most recently captured snapshot per user.
+      const cap = r.snapshot_captured_at;
+      if (cap && (!row.snapshotAt || new Date(cap).getTime() > new Date(row.snapshotAt).getTime())) {
+        row.snapshotAt = cap;
+        row.draftsShot = r.drafts_screenshot_path || null;
+        row.readyShot = r.ready_screenshot_path || null;
+      } else if (!row.snapshotAt) {
+        row.draftsShot = row.draftsShot || r.drafts_screenshot_path || null;
+        row.readyShot = row.readyShot || r.ready_screenshot_path || null;
+      }
     });
 
-    // Authoritative submitted count (also surfaces users who submitted but have
-    // not yet reported a device audit row).
+    // Authoritative submitted count & days worked (also surfaces users who
+    // submitted but have not yet reported a device audit row). Server-derived
+    // days are the source of truth so the figure is verifiable for every user,
+    // including ones with unusual device clocks (e.g. Osongbule Sunday Godwin).
     serverSubmitted.forEach((count, userId) => {
       ensureRow(userId).submitted = count;
+    });
+    serverDays.forEach((set, userId) => {
+      ensureRow(userId).daysWorked = set.size;
     });
 
     const rows = [...byUser.values()].sort(
@@ -535,6 +574,37 @@ export const useBloombergDashboard = () => {
     );
     return { rows, totals, deviceCount: localAuditRows.length, userCount: rows.length };
   }, [localAuditRows, profileMap, validations]);
+
+  // Attribution of the "Unspecified location" test data: which validators
+  // submitted entries whose geography cannot be resolved (no state on the
+  // submission and no school_key to backfill it from the register), and how many
+  // each produced. This makes the otherwise opaque "Unknown / Unspecified" rows
+  // accountable to specific users.
+  const unspecifiedAttribution = useMemo(() => {
+    const byUser = new Map<string, { userId: string; name: string; email: string; count: number; lastAt: string | null }>();
+    let total = 0;
+    validations.filter(isReportedValidation).forEach((v) => {
+      const geo = resolveGeo(v);
+      const isUnspecified = !geo.state && !geo.lga;
+      if (!isUnspecified) return;
+      total += 1;
+      const id = v.validator_id || "unassigned";
+      const prof = v.validator_id ? profileMap.get(v.validator_id) : undefined;
+      const t = v.submitted_at || v.updated_at || v.created_at || null;
+      const row = byUser.get(id) || {
+        userId: id,
+        name: prof?.name || (id === "unassigned" ? "Unassigned" : "Unknown user"),
+        email: prof?.email || "",
+        count: 0,
+        lastAt: null as string | null,
+      };
+      row.count += 1;
+      if (t && (!row.lastAt || new Date(t).getTime() > new Date(row.lastAt).getTime())) row.lastAt = t;
+      byUser.set(id, row);
+    });
+    const rows = [...byUser.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    return { rows, total, userCount: rows.length };
+  }, [validations, profileMap, schoolMetaByKey]);
 
 
   const byState = useMemo(() => {
