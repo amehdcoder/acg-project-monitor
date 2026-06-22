@@ -279,6 +279,78 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     })();
     return () => { cancelled = true; };
   }, [user?.id, isAdhoc]);
+
+  // Launch the correct experience for an assigned standard-form code.
+  const launchStandardForm = useCallback((code: string) => {
+    switch (code) {
+      case "uprp": setShowUprp(true); break;
+      case "attendance": setShowDigitalAttendance(true); break;
+      case "action_tracker": setShowActionTracker(true); break;
+      case "workplan": setShowWorkplan(true); break;
+      case "mental_health": setShowMentalHealth(true); break;
+      case "bloomberg_form": setShowBloombergForm(true); break;
+      case "bloomberg_dash": setShowBloombergDash(true); break;
+      case "seeclear_form": setShowSeeClearForm(true); break;
+      case "seeclear_dash": setShowSeeClearDash(true); break;
+      case "acsm_form": setShowAcsmForm(true); break;
+      case "acsm_dash": setShowAcsmDash(true); break;
+      case "sbc_form": setShowSbcForm(true); break;
+      case "sbc_dash": setShowSbcDash(true); break;
+      case "microplan_entry": setMicroplanFillingActive(true); break;
+      case "srf":
+      case "incident":
+      case "leave":
+      case "stationery":
+        setOfficeFormsOpen({ codes: [code as "srf" | "incident" | "leave" | "stationery"] });
+        break;
+      default:
+        if ((STANDARD_ASSESSMENTS as any)[code]) {
+          setActiveStandardAssessment(code as StandardFormCode);
+        }
+    }
+  }, []);
+
+  // Flat, folder-free list of the standard forms assigned to this user, rendered
+  // as a beautiful card grid instead of nested folders.
+  const assignedFormCards = useMemo(() => {
+    if (assignedStandardCodes.size === 0) return [] as Array<{
+      code: string; name: string; desc: string; Icon: any; bg: string; fg: string; ring: string;
+    }>;
+    const palette = [
+      { bg: "bg-[#E3ECFB]", fg: "text-[#2F6FE6]", ring: "#2F6FE6" },
+      { bg: "bg-[#E2F5EC]", fg: "text-[#22A55A]", ring: "#22A55A" },
+      { bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]", ring: "#F08A2A" },
+      { bg: "bg-[#EDE7FE]", fg: "text-[#7C5CFF]", ring: "#7C5CFF" },
+      { bg: "bg-[#DCF3F0]", fg: "text-[#14b8a6]", ring: "#14b8a6" },
+      { bg: "bg-[#FCE9E9]", fg: "text-[#E25555]", ring: "#E25555" },
+    ];
+    const iconFor = (code: string, group: string) => {
+      if (code === "srf" || code === "incident") return ShieldCheck;
+      if (code === "uprp" || code === "attendance") return ClipboardCheck;
+      if (code === "action_tracker") return ClipboardList;
+      if (code === "workplan") return GanttChartSquare;
+      if (code === "microplan_entry") return MapPin;
+      if (code === "mental_health") return BrainIcon;
+      if (code.endsWith("_dash")) return BarChart3;
+      if (code.endsWith("_form")) return ClipboardCheck;
+      if (group === "Assessment Forms") return Stethoscope;
+      if (group === "Mental Health Forms") return BrainIcon;
+      return FileText;
+    };
+    return ALL_STANDARD_FORMS
+      .filter((f) => assignedStandardCodes.has(f.code))
+      .map((f, i) => {
+        const def = (STANDARD_ASSESSMENTS as any)[f.code];
+        return {
+          code: f.code,
+          name: def?.shortName || f.name,
+          desc: def?.description || f.group,
+          Icon: iconFor(f.code, f.group),
+          ...palette[i % palette.length],
+        };
+      });
+  }, [assignedStandardCodes]);
+
   const { canBulk } = useBulkDataAccess();
   const { isOnline, downloadForm, cacheFormsForOffline, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
