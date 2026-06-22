@@ -678,6 +678,22 @@ const UsersView = () => {
 
   const clearSelection = () => setSelectedIds(new Set());
 
+  // Select / deselect every selectable (non-owner) user within a group at once.
+  const groupIsAllSelected = (groupUsers: { user_id: string; is_owner?: boolean }[]) => {
+    const ids = groupUsers.filter((u) => !u.is_owner).map((u) => u.user_id);
+    return ids.length > 0 && ids.every((id) => selectedIds.has(id));
+  };
+  const toggleSelectGroup = (groupUsers: { user_id: string; is_owner?: boolean }[]) => {
+    const ids = groupUsers.filter((u) => !u.is_owner).map((u) => u.user_id);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const allSelected = ids.every((id) => next.has(id));
+      if (allSelected) ids.forEach((id) => next.delete(id));
+      else ids.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
   const selectedUserObjects = () =>
     users.filter((u) => selectedIds.has(u.user_id) && !u.is_owner);
 
