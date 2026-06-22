@@ -602,7 +602,14 @@ export default function BloombergDashboard({ onClose }: Props) {
                       >
                         <td className="py-1.5 pl-3 pr-3 text-foreground">
                           {idx === 0 ? (
-                            <span className="font-medium">{g.school} <span className="text-[10px] font-normal text-muted-foreground">({g.total} entries)</span></span>
+                            <span className="font-medium">
+                              {g.school} <span className="text-[10px] font-normal text-muted-foreground">({g.total} entries)</span>
+                              {g.crossValidator && (
+                                <span className="ml-1.5 rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-semibold text-rose-700 dark:bg-rose-950/50 dark:text-rose-300" title="Validated by more than one person">
+                                  multiple validators
+                                </span>
+                              )}
+                            </span>
                           ) : (
                             <span className="pl-3 text-muted-foreground">↳ {g.code}</span>
                           )}
