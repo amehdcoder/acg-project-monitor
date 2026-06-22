@@ -190,7 +190,9 @@ export async function getPendingInsertCount(): Promise<number> {
   }
 }
 
-export async function flushSubmissionQueue(): Promise<{ inserted: number; remaining: number }> {
+export async function flushSubmissionQueue(
+  options: { force?: boolean } = {},
+): Promise<{ inserted: number; remaining: number }> {
   if (flushing || !isOnline()) {
     return { inserted: 0, remaining: await getPendingInsertCount() };
   }
@@ -198,11 +200,17 @@ export async function flushSubmissionQueue(): Promise<{ inserted: number; remain
   let inserted = 0;
   try {
     const records = await getAllRecords();
-    const due = records.filter((rec) => {
-      const delay = RETRY_DELAYS_MS[Math.min(rec.attempts, RETRY_DELAYS_MS.length - 1)];
-      const last = Date.parse(rec.created_at || "") || 0;
-      return rec.attempts === 0 || Date.now() - last >= delay;
-    });
+    // A forced drain (e.g. app open / manual resync) ignores the exponential
+    // backoff window so a queue that has been stuck for days — like a field
+    // device that was offline through several work days — is retried in full
+    // immediately rather than trickling out one record per backoff interval.
+    const due = options.force
+      ? records
+      : records.filter((rec) => {
+          const delay = RETRY_DELAYS_MS[Math.min(rec.attempts, RETRY_DELAYS_MS.length - 1)];
+          const last = Date.parse(rec.created_at || "") || 0;
+          return rec.attempts === 0 || Date.now() - last >= delay;
+        });
 
     // Drain with bounded concurrency so a large backlog clears in seconds
     // instead of strictly one-at-a-time, while still capping simultaneous
@@ -235,12 +243,15 @@ export async function flushSubmissionQueue(): Promise<{ inserted: number; remain
 function ensureListeners() {
   if (listenersBound || typeof window === "undefined") return;
   listenersBound = true;
-  window.addEventListener("online", () => void flushSubmissionQueue());
+  // A returning device may have been offline for days with a large backlog, so
+  // force a full drain (ignoring backoff) whenever connectivity is regained or
+  // the app is brought back to the foreground.
+  window.addEventListener("online", () => void flushSubmissionQueue({ force: true }));
   // Drain again whenever the app returns to the foreground (mobile devices
   // freeze background timers, so this guarantees a prompt retry on resume).
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && isOnline()) {
-      void flushSubmissionQueue();
+      void flushSubmissionQueue({ force: true });
     }
   });
   // Poll every 15s so a queued row is retried multiple times within a minute.
@@ -251,5 +262,5 @@ function ensureListeners() {
 
 export function initOfflineSubmissions() {
   ensureListeners();
-  if (isOnline()) void flushSubmissionQueue();
+  if (isOnline()) void flushSubmissionQueue({ force: true });
 }

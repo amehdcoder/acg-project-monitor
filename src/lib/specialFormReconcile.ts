@@ -40,7 +40,7 @@ export async function reconcileQueuedSpecialForms(): Promise<{ reconciled: numbe
   let reconciled = 0;
   try {
     // First make sure anything still pending is pushed up.
-    await flushSubmissionQueue().catch(() => {});
+    await flushSubmissionQueue({ force: true }).catch(() => {});
 
     const { data: auth } = await supabase.auth.getSession().catch(() => ({ data: null as any }));
     const currentUserId = auth?.session?.user?.id || null;
