@@ -68,6 +68,9 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
   // the submission's start time (created_at) so accountability analytics show an
   // accurate "Start time → End time" span rather than a zero-duration record.
   const formStartedAtRef = useRef<string>(new Date().toISOString());
+  // Guards the auto-save effect so it does not overwrite the persisted draft
+  // before the one-time restore has run.
+  const restoredRef = useRef(false);
 
   // Step 1 — school selection
   const [state, setState] = useState("");
