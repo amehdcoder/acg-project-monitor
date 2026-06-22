@@ -130,7 +130,7 @@ export const useBloombergDashboard = () => {
       // Per-device local form audit reported by every user's device.
       const audit = await fetchAll<LocalAuditRow>(
         "bloomberg_local_form_audit",
-        "user_id,device_id,device_label,drafts,ready_to_send,submitted,last_activity_at,updated_at",
+        "user_id,device_id,device_label,drafts,ready_to_send,submitted,last_activity_at,updated_at,drafts_screenshot_path,ready_screenshot_path,days_worked,snapshot_captured_at",
       ).catch(() => [] as LocalAuditRow[]);
 
       // Resolve validator names for the accountability table — include both
