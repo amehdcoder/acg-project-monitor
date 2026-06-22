@@ -887,6 +887,6 @@ export const useBloombergDashboard = () => {
 
   return {
     validations, baselines, stats, byState, stateBreakdown, inference, points, nonExistent, validatedTable, notValidatedTable, accountability,
-    recovery, duplicates, deviceAudit, loading, reload, deleteValidations, ALL_CLASSES,
+    recovery, duplicates, deviceAudit, unspecifiedAttribution, loading, reload, deleteValidations, ALL_CLASSES,
   };
 };
