@@ -1215,6 +1215,60 @@ const UsersView = () => {
     return groups;
   }, [filteredUsers, projects, colorForProject, getUserProjectIds]);
 
+  // Stable ref of all row action handlers — its identity never changes, so it
+  // never forces memoized rows to re-render. Always points at the latest fns.
+  const rowApiRef = useRef<any>({});
+  rowApiRef.current = {
+    toggleSelect,
+    setSelectedUser,
+    setShowAssignDialog,
+    setCascadeUser,
+    setEditProfileData,
+    setShowEditProfileDialog,
+    setNewRole,
+    setShowRoleDialog,
+    setShowDeviceDialog,
+    setDeleteConfirmText,
+    setShowDeleteDialog,
+    setImpersonating,
+    startImpersonation,
+    logAction,
+    fetchUsers,
+    handleToggleActive,
+  };
+
+  // Shared per-row context. Changes only on the rare events that affect every
+  // row (role/impersonation/assignment data), not on checkbox toggles.
+  const rowCtx = useMemo(
+    () => ({
+      isOwner,
+      isCoOwner,
+      isSuperAdmin,
+      isImpersonating,
+      impersonatingId: impersonating,
+      projectNameById,
+      formNameById,
+      colorForProject,
+      getUserProjectIds,
+      getUserFormIds,
+      formById,
+      cascadeAssign,
+    }),
+    [
+      isOwner,
+      isCoOwner,
+      isSuperAdmin,
+      isImpersonating,
+      impersonating,
+      projectNameById,
+      formNameById,
+      colorForProject,
+      getUserProjectIds,
+      getUserFormIds,
+      formById,
+      cascadeAssign,
+    ],
+  );
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
