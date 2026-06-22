@@ -162,6 +162,7 @@ const UsersView = () => {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [bulkProject, setBulkProject] = useState<string>("");
+  const [bulkForms, setBulkForms] = useState<Set<string>>(new Set());
   const [showBulkRemove, setShowBulkRemove] = useState(false);
   // Per-user progress + outcome feedback for bulk operations
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
@@ -332,43 +333,63 @@ const UsersView = () => {
 
   const handleBulkAssignProject = async () => {
     const targets = selectedUserObjects();
-    if (!bulkProject || targets.length === 0) return;
-    const projName = projects.find((p) => p.id === bulkProject)?.name || "the project";
+    const formIds = Array.from(bulkForms);
+    if ((!bulkProject && formIds.length === 0) || targets.length === 0) return;
+    const projName = bulkProject ? (projects.find((p) => p.id === bulkProject)?.name || "the project") : "";
+    const formNames = formIds.map((id) => forms.find((f) => f.id === id)?.name || "form");
     setBulkBusy(true);
     setBulkResults([]);
     setBulkProgress({ done: 0, total: targets.length });
     const results: { name: string; ok: boolean; message: string }[] = [];
     for (const u of targets) {
       const name = getUserDisplayName(u);
+      const parts: string[] = [];
+      let ok = true;
       try {
-        const { error } = await supabase
-          .from("user_project_assignments")
-          .upsert(
-            { user_id: u.user_id, project_id: bulkProject, assigned_by: currentUserProfile?.user_id },
-            { onConflict: "user_id,project_id", ignoreDuplicates: true }
-          );
-        if (error) throw error;
-        results.push({ name, ok: true, message: `Assigned to ${projName}` });
+        if (bulkProject) {
+          const { error } = await supabase
+            .from("user_project_assignments")
+            .upsert(
+              { user_id: u.user_id, project_id: bulkProject, assigned_by: currentUserProfile?.user_id },
+              { onConflict: "user_id,project_id", ignoreDuplicates: true }
+            );
+          if (error) throw error;
+          parts.push(projName);
+        }
+        if (formIds.length > 0) {
+          const { error } = await supabase
+            .from("user_form_assignments")
+            .upsert(
+              formIds.map((fid) => ({ user_id: u.user_id, form_id: fid, assigned_by: currentUserProfile?.user_id })),
+              { onConflict: "user_id,form_id", ignoreDuplicates: true }
+            );
+          if (error) throw error;
+          parts.push(`${formIds.length} form(s)`);
+        }
       } catch (err: any) {
+        ok = false;
         results.push({ name, ok: false, message: err?.message || "Failed" });
       }
+      if (ok) results.push({ name, ok: true, message: `Assigned ${parts.join(" + ")}` });
       setBulkProgress({ done: results.length, total: targets.length });
       setBulkResults([...results]);
     }
     const okCount = results.filter((r) => r.ok).length;
+    const label = [projName, formNames.length ? `${formNames.length} form(s)` : ""].filter(Boolean).join(" + ");
     logAction(
       "assign_user_to_project",
-      `Bulk assigned ${okCount} user(s) to ${projName}`,
+      `Bulk assigned ${okCount} user(s) to ${label}`,
       undefined,
       undefined,
-      { user_ids: targets.map((u) => u.user_id), project_id: bulkProject }
+      { user_ids: targets.map((u) => u.user_id), project_id: bulkProject || null, form_ids: formIds }
     );
-    toast({ title: "Assignment complete", description: `${okCount} of ${targets.length} user(s) assigned to ${projName}.` });
+    toast({ title: "Assignment complete", description: `${okCount} of ${targets.length} user(s) assigned to ${label}.` });
     fetchAssignments();
-    if (okCount === targets.length) clearSelection();
+    if (okCount === targets.length) { clearSelection(); setBulkProject(""); setBulkForms(new Set()); }
     setBulkBusy(false);
     setBulkProgress(null);
   };
+
 
   const handleBulkResendInvite = async () => {
     const targets = selectedUserObjects();
@@ -657,6 +678,22 @@ const UsersView = () => {
 
   const clearSelection = () => setSelectedIds(new Set());
 
+  // Select / deselect every selectable (non-owner) user within a group at once.
+  const groupIsAllSelected = (groupUsers: { user_id: string; is_owner?: boolean }[]) => {
+    const ids = groupUsers.filter((u) => !u.is_owner).map((u) => u.user_id);
+    return ids.length > 0 && ids.every((id) => selectedIds.has(id));
+  };
+  const toggleSelectGroup = (groupUsers: { user_id: string; is_owner?: boolean }[]) => {
+    const ids = groupUsers.filter((u) => !u.is_owner).map((u) => u.user_id);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const allSelected = ids.every((id) => next.has(id));
+      if (allSelected) ids.forEach((id) => next.delete(id));
+      else ids.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
   const selectedUserObjects = () =>
     users.filter((u) => selectedIds.has(u.user_id) && !u.is_owner);
 
@@ -800,7 +837,7 @@ const UsersView = () => {
             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-acg-gold/30 bg-acg-gold/5 p-3">
               <Badge variant="secondary">{selectedIds.size} selected</Badge>
               <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => setShowBulkAssign(true)}>
-                <FolderOpen className="mr-1.5 h-4 w-4" /> Assign Project
+                <FolderOpen className="mr-1.5 h-4 w-4" /> Assign Project / Forms
               </Button>
               <Button size="sm" variant="outline" disabled={bulkBusy} onClick={handleBulkResendInvite}>
                 {bulkBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Mail className="mr-1.5 h-4 w-4" />} Resend Invite
@@ -870,6 +907,14 @@ const UsersView = () => {
               {groupedUsers.map((group) => (
                 <div key={group.key} className="space-y-3">
                   <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${group.color.soft}`}>
+                    {group.users.some((u) => !u.is_owner) && (
+                      <label className="flex items-center" title={`Select all in ${group.name}`}>
+                        <Checkbox
+                          checked={groupIsAllSelected(group.users)}
+                          onCheckedChange={() => toggleSelectGroup(group.users)}
+                        />
+                      </label>
+                    )}
                     <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${group.color.bar}`} />
                     <FolderOpen className="h-4 w-4 text-muted-foreground" />
                     <h3 className="font-display text-sm font-semibold text-foreground">{group.name}</h3>
@@ -1508,20 +1553,47 @@ const UsersView = () => {
       <Dialog open={showBulkAssign} onOpenChange={setShowBulkAssign}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Assign Project to {selectedIds.size} User(s)</DialogTitle>
-            <DialogDescription>The selected users will be added to the chosen project.</DialogDescription>
+            <DialogTitle>Assign Project &amp; Forms to {selectedIds.size} User(s)</DialogTitle>
+            <DialogDescription>Pick a project and/or one or more forms. Selected users get everything you choose, all at once.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <Label>Project</Label>
-            <Select value={bulkProject} onValueChange={setBulkProject}>
+            <Label>Project (optional)</Label>
+            <Select value={bulkProject || "__none__"} onValueChange={(v) => setBulkProject(v === "__none__" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Select a project" /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="__none__">No project</SelectItem>
                 {projects.map((p) => (
                   <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Button className="w-full" disabled={!bulkProject || bulkBusy} onClick={handleBulkAssignProject}>
+            <div className="flex items-center justify-between">
+              <Label>Forms (optional)</Label>
+              {bulkForms.size > 0 && (
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setBulkForms(new Set())}>
+                  Clear ({bulkForms.size})
+                </Button>
+              )}
+            </div>
+            <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-2">
+              {forms.length === 0 && <p className="text-xs text-muted-foreground">No forms available.</p>}
+              {forms.map((f) => (
+                <label key={f.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted/50">
+                  <Checkbox
+                    checked={bulkForms.has(f.id)}
+                    onCheckedChange={() =>
+                      setBulkForms((prev) => {
+                        const next = new Set(prev);
+                        next.has(f.id) ? next.delete(f.id) : next.add(f.id);
+                        return next;
+                      })
+                    }
+                  />
+                  <span className="truncate">{f.name}</span>
+                </label>
+              ))}
+            </div>
+            <Button className="w-full" disabled={(!bulkProject && bulkForms.size === 0) || bulkBusy} onClick={handleBulkAssignProject}>
               {bulkBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FolderOpen className="mr-2 h-4 w-4" />}
               Assign to {selectedIds.size} User(s)
             </Button>
