@@ -34,6 +34,13 @@ import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
 const NAVY = "#0c2340";
 const STEPS = ["School", "Verify", "Enrolment", "Evidence"];
 
+// Native camera capture (input capture / Capacitor) can suspend & RELOAD the
+// webview, wiping all in-memory React state and bouncing the validator back to
+// step 0. We mirror the entire in-progress form into sessionStorage so a reload
+// transparently restores everything (including the step and attached evidence).
+const bloombergDraftKey = (uid?: string | null) =>
+  `bloomberg_validation_draft_v2_${uid || "anon"}`;
+
 interface Props {
   onClose: () => void;
   projectId?: string | null;
