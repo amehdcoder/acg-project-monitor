@@ -44,6 +44,17 @@ export interface BaselineRow {
   grand_total: number | null;
 }
 
+export interface LocalAuditRow {
+  user_id: string;
+  device_id: string;
+  device_label: string | null;
+  drafts: number | null;
+  ready_to_send: number | null;
+  submitted: number | null;
+  last_activity_at: string | null;
+  updated_at: string | null;
+}
+
 const REASON_LABEL = new Map(NOT_FOUND_REASONS.map((r) => [r.value, r.label]));
 const OP_STATUS_LABEL = new Map(OPERATIONAL_STATUS.map((r) => [r.value, r.label]));
 
