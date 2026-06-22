@@ -135,14 +135,26 @@ const PWAUpdatePrompt = () => {
 
   const handleUpdate = async () => {
     setIsUpdating(true);
+    // Watchdog: guarantee the update completes from a single click even if the
+    // cache purge / service-worker swap hangs. After 6s force a cache-busted reload.
+    const watchdog = setTimeout(() => {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set("__v", String(Date.now()));
+        window.location.replace(url.toString());
+      } catch {
+        window.location.reload();
+      }
+    }, 6000);
     // Give UI a moment to show the spinner before the hard reload starts clearing caches
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise(r => setTimeout(r, 80));
     try {
       await hardReloadToLatest();
     } catch (err) {
       console.error("Update failed", err);
-      setIsUpdating(false);
+      // Let the watchdog recover instead of leaving the user stuck.
     }
+    void watchdog;
   };
 
   const handleSnooze = () => {
