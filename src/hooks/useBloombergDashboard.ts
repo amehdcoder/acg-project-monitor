@@ -370,10 +370,13 @@ export const useBloombergDashboard = () => {
     const overallPct = baselineTotal > 0 ? ((validatedTotal - baselineTotal) / baselineTotal) * 100 : 0;
 
     // Submissions = the TOTAL number of reported submissions from all users,
-    // irrespective of duplicates. The gap between this and the distinct
-    // validated-schools count is exactly the number of duplicate submissions.
+    // irrespective of duplicates. The duplicate count is the exact number of
+    // superseded copies surfaced in the Duplicate Validation Entries audit
+    // (duplicates.extraEntries), so the KPI card and the audit section always
+    // report the SAME figure. Entries without a school_key cannot be matched as
+    // duplicates and must not inflate the count.
     const submittedCount = validations.filter(isReportedValidation).length;
-    const duplicateCount = Math.max(0, submittedCount - validatedSchools);
+    const duplicateCount = duplicates.extraEntries;
 
     return {
       totalSchools: schoolCount,
