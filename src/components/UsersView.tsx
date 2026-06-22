@@ -135,6 +135,19 @@ const getUserDisplayName = (user: Partial<UserProfile> | null | undefined) => {
 const getRoleInfo = (role?: string | null) =>
   roleLabels[(role || "user") as keyof typeof roleLabels] || roleLabels.user;
 
+// Deterministic color-grade palette keyed by project index.
+const PROJECT_PALETTE = [
+  { chip: "bg-blue-100 text-blue-700 border-blue-200", bar: "bg-blue-500", soft: "bg-blue-50/60" },
+  { chip: "bg-emerald-100 text-emerald-700 border-emerald-200", bar: "bg-emerald-500", soft: "bg-emerald-50/60" },
+  { chip: "bg-violet-100 text-violet-700 border-violet-200", bar: "bg-violet-500", soft: "bg-violet-50/60" },
+  { chip: "bg-amber-100 text-amber-700 border-amber-200", bar: "bg-amber-500", soft: "bg-amber-50/60" },
+  { chip: "bg-rose-100 text-rose-700 border-rose-200", bar: "bg-rose-500", soft: "bg-rose-50/60" },
+  { chip: "bg-cyan-100 text-cyan-700 border-cyan-200", bar: "bg-cyan-500", soft: "bg-cyan-50/60" },
+  { chip: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200", bar: "bg-fuchsia-500", soft: "bg-fuchsia-50/60" },
+  { chip: "bg-teal-100 text-teal-700 border-teal-200", bar: "bg-teal-500", soft: "bg-teal-50/60" },
+];
+const NO_ACCESS = { chip: "bg-muted text-muted-foreground border-border", bar: "bg-muted-foreground/40", soft: "bg-muted/30" };
+
 const UsersView = () => {
   const { role: currentUserRole, profile: currentUserProfile, isOwner, isCoOwner, isAdmin } = useAuth();
   const { startImpersonation, isImpersonating } = useImpersonation();
