@@ -570,9 +570,13 @@ export default function BloombergDashboard({ onClose }: Props) {
             <p className="mb-3 text-xs text-muted-foreground">
               {fmt(duplicates.schoolsWithDuplicates)} school{duplicates.schoolsWithDuplicates === 1 ? "" : "s"} {duplicates.schoolsWithDuplicates === 1 ? "was" : "were"} validated more than once,
               producing <span className="font-semibold text-foreground">{fmt(duplicates.extraEntries)}</span> extra entr{duplicates.extraEntries === 1 ? "y" : "ies"}.
-              This is why the entries table shows {fmt(validations.length)} records while only {fmt(stats.validatedSchools)} distinct schools are counted as validated.
+              Reconciliation: <span className="font-semibold text-foreground">{fmt(stats.submittedCount)}</span> submissions
+              − <span className="font-semibold text-foreground">{fmt(stats.uniqueValidations)}</span> unique validations
+              = <span className="font-semibold text-foreground">{fmt(stats.duplicateCount)}</span> duplicates,
+              the same figure shown on the KPI card and totalled in the per-validator breakdown below.
               The most recent submission per school is kept; older copies are listed below with the validator and the date each was sent.
             </p>
+
 
             {/* Deeper duplicate insight: who and how */}
             <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
