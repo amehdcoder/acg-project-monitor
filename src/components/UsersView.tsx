@@ -667,6 +667,26 @@ const UsersView = () => {
     [currentUserProfile?.user_id],
   );
 
+  // Sends a professional email notifying a user of a new project/form assignment.
+  // Best-effort: never blocks the assignment flow.
+  const notifyAssignment = useCallback(
+    async (
+      user: { user_id: string; email?: string | null; first_name?: string | null } | null | undefined,
+      kind: "project" | "form",
+      items: string[],
+    ) => {
+      if (!user?.email || items.length === 0) return;
+      try {
+        await supabase.functions.invoke("notify-assignment", {
+          body: { email: user.email, firstName: user.first_name || "", kind, items },
+        });
+      } catch {
+        /* notification is best-effort */
+      }
+    },
+    [],
+  );
+
   const handleAssignProject = async () => {
     if (!selectedUser || !selectedProject) return;
 
