@@ -636,6 +636,37 @@ const UsersView = () => {
     }
   };
 
+  // Record standard-form assignment / restriction events for auditing.
+  // Fire-and-forget: never block the assignment flow on an audit write.
+  const logStandardFormAudit = useCallback(
+    async (
+      rows: {
+        target_user_id: string;
+        project_id?: string | null;
+        form_code?: string | null;
+        action: "assigned" | "restricted" | "minimal_lock" | "unassigned";
+        detail?: string | null;
+      }[],
+    ) => {
+      if (!rows.length || !currentUserProfile?.user_id) return;
+      try {
+        await (supabase as any).from("standard_form_assignment_audit").insert(
+          rows.map((r) => ({
+            target_user_id: r.target_user_id,
+            project_id: r.project_id ?? null,
+            form_code: r.form_code ?? null,
+            action: r.action,
+            detail: r.detail ?? null,
+            changed_by: currentUserProfile.user_id,
+          })),
+        );
+      } catch {
+        /* auditing is best-effort */
+      }
+    },
+    [currentUserProfile?.user_id],
+  );
+
   const handleAssignProject = async () => {
     if (!selectedUser || !selectedProject) return;
 
