@@ -778,6 +778,15 @@ const UsersView = () => {
                 }))
               );
             if (error && error.code !== "23505") throw error;
+            toInsert.forEach((code) =>
+              auditRows.push({
+                target_user_id: u.user_id,
+                project_id: bulkProject || null,
+                form_code: code,
+                action: "assigned",
+                detail: ALL_STANDARD_FORMS.find((f) => f.code === code)?.name || code,
+              }),
+            );
           }
           // Restrict default visibility (non-admins only) so they ONLY see the
           // standard forms assigned above. Admins keep their full role access.
@@ -793,6 +802,12 @@ const UsersView = () => {
                 .insert({ user_id: u.user_id, restricted_by: currentUserProfile?.user_id });
               if (rErr && rErr.code !== "23505") throw rErr;
             }
+            auditRows.push({
+              target_user_id: u.user_id,
+              project_id: bulkProject || null,
+              action: "restricted",
+              detail: `Restricted to ${stdForms.length} standard form(s)`,
+            });
           }
           parts.push(`${stdForms.length} standard form(s)`);
         }
