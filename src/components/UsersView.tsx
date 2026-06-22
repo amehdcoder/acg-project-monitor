@@ -907,6 +907,14 @@ const UsersView = () => {
               {groupedUsers.map((group) => (
                 <div key={group.key} className="space-y-3">
                   <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${group.color.soft}`}>
+                    {group.users.some((u) => !u.is_owner) && (
+                      <label className="flex items-center" title={`Select all in ${group.name}`}>
+                        <Checkbox
+                          checked={groupIsAllSelected(group.users)}
+                          onCheckedChange={() => toggleSelectGroup(group.users)}
+                        />
+                      </label>
+                    )}
                     <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${group.color.bar}`} />
                     <FolderOpen className="h-4 w-4 text-muted-foreground" />
                     <h3 className="font-display text-sm font-semibold text-foreground">{group.name}</h3>
