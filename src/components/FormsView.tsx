@@ -419,6 +419,55 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     return Array.from(map.entries());
   }, [filteredYourForms]);
 
+  // Single, consistent card renderer used by both the flat grid and folder views.
+  const renderYourFormCard = useCallback((c: YourFormCard) => {
+    const restricted = c.status === "restricted";
+    return (
+      <button
+        key={c.code}
+        onClick={() => launchStandardForm(c.code)}
+        disabled={restricted}
+        aria-disabled={restricted}
+        className={`group relative flex items-center gap-3.5 overflow-hidden rounded-2xl border bg-white p-4 text-left shadow-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+          restricted
+            ? "border-red-200 opacity-70 cursor-not-allowed"
+            : "border-border/60 hover:-translate-y-0.5 hover:shadow-md"
+        }`}
+        style={{ ['--tw-ring-color' as any]: c.ring }}
+      >
+        <span aria-hidden className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: restricted ? "#DC2626" : c.ring }} />
+        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${c.bg} transition-transform ${restricted ? "" : "group-hover:scale-105"}`}>
+          <c.Icon className={`h-6 w-6 ${c.fg}`} strokeWidth={2} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h4 className="truncate text-[15px] font-bold text-foreground">{c.name}</h4>
+          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{c.desc}</p>
+          {/* Status indicators — consistent, intuitive colouring across all cards. */}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {restricted ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600 ring-1 ring-inset ring-red-200">
+                <Lock className="h-3 w-3" /> Restricted
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 ring-1 ring-inset ring-emerald-200">
+                <CheckCircle className="h-3 w-3" /> Assigned
+              </span>
+            )}
+            {c.hasRequired && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-600 ring-1 ring-inset ring-amber-200">
+                <AlertTriangle className="h-3 w-3" /> Required fields
+              </span>
+            )}
+          </div>
+        </div>
+        {!restricted && (
+          <ChevronRight className="h-5 w-5 shrink-0 self-center text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:text-foreground" />
+        )}
+      </button>
+    );
+  }, [launchStandardForm]);
+
+
   const { canBulk } = useBulkDataAccess();
   const { isOnline, downloadForm, cacheFormsForOffline, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
