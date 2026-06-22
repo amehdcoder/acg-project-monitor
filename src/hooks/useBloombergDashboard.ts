@@ -205,6 +205,32 @@ export const useBloombergDashboard = () => {
     return m;
   }, [baselines]);
 
+  // School register lookup so a submission that is missing its own state/lga
+  // codes can still be placed in the correct geography via its school_key.
+  // This eliminates spurious "Unknown" rows in the State & LGA table whenever
+  // the school itself is known.
+  const schoolMetaByKey = useMemo(() => {
+    const m = new Map<string, { state: string | null; lga: string | null }>();
+    schools.forEach((s) => m.set(s.school_key, { state: s.state ?? null, lga: s.lga ?? null }));
+    return m;
+  }, [schools]);
+
+  // Resolve a submission's effective state/lga codes: prefer the values stored
+  // on the submission, else fall back to the school register by school_key.
+  const resolveGeo = (v: Pick<ValidationRow, "state" | "lga" | "school_key">) => {
+    let state = v.state;
+    let lga = v.lga;
+    if ((!state || !lga) && v.school_key) {
+      const meta = schoolMetaByKey.get(v.school_key);
+      if (meta) {
+        state = state || meta.state;
+        lga = lga || meta.lga;
+      }
+    }
+    return { state, lga };
+  };
+
+
   // Human-readable admin-unit labels. Submissions store raw option codes
   // (state="bauchi", lga="bauchi_ganjuwa"); the schools register carries the
   // matching display labels (state_label="Bauchi", lga_label="Ganjuwa"). We
