@@ -1015,8 +1015,55 @@ export default function BloombergDashboard({ onClose }: Props) {
           </div>
         )}
 
-
-
+        {/* Unspecified-location attribution — who generated the geo-less test
+            entries and how many each made, so the otherwise opaque
+            "Unspecified location" rows are accountable to specific users. */}
+        {canManage && unspecifiedAttribution.total > 0 && (
+          <div className="rounded-xl border border-rose-300/60 bg-rose-50 p-4 shadow-sm dark:border-rose-900/50 dark:bg-rose-950/30">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <MapPinOff className="h-4 w-4 text-rose-600" />
+              <h3 className="text-sm font-semibold text-foreground">Unspecified Location Entries — by User</h3>
+              <span className="ml-auto rounded-full bg-rose-600 px-2 py-0.5 text-xs font-bold text-white">
+                {fmt(unspecifiedAttribution.total)} entr{unspecifiedAttribution.total === 1 ? "y" : "ies"}
+              </span>
+            </div>
+            <p className="mb-3 text-xs text-muted-foreground">
+              These submissions carry no state/LGA and no matching school in the register, so they cannot be placed on the map
+              (they appear as “Unspecified location”). They are usually test data. Below is exactly which user generated them and how many each made —
+              click a name to open their per-school duplicate drill-down.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-rose-200 text-left text-muted-foreground dark:border-rose-900">
+                    <th className="py-1.5 pr-3 font-semibold">User</th>
+                    <th className="py-1.5 pr-3 text-right font-semibold">Unspecified entries</th>
+                    <th className="py-1.5 font-semibold">Last submitted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {unspecifiedAttribution.rows.map((r) => (
+                    <tr key={r.userId} className="border-b border-rose-100/60 last:border-0 dark:border-rose-900/40">
+                      <td className="py-1.5 pr-3 text-foreground">
+                        <button
+                          type="button"
+                          onClick={() => setDrilldownValidator(r.name)}
+                          className="text-left font-medium hover:underline"
+                          title={`Open ${r.name}'s per-school duplicate drill-down`}
+                        >
+                          {r.name}
+                        </button>
+                        {r.email ? <span className="block text-[10px] text-muted-foreground">{r.email}</span> : null}
+                      </td>
+                      <td className="py-1.5 pr-3 text-right font-semibold text-rose-600">{fmt(r.count)}</td>
+                      <td className="py-1.5 text-muted-foreground">{r.lastAt ? new Date(r.lastAt).toLocaleString() : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Top discrepancies */}
         <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
