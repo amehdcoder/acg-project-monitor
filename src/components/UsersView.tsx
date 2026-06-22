@@ -1339,6 +1339,22 @@ const UsersView = () => {
     return groups;
   }, [filteredUsers, projects, colorForProject, getUserProjectIds]);
 
+  // Track which project folders are collapsed (by group key).
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const toggleGroupCollapse = useCallback((key: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+  const collapseAllGroups = useCallback(() => {
+    setCollapsedGroups(new Set(groupedUsers.map((g) => g.key)));
+  }, [groupedUsers]);
+  const expandAllGroups = useCallback(() => setCollapsedGroups(new Set()), []);
+  const allCollapsed = groupedUsers.length > 0 && collapsedGroups.size >= groupedUsers.length;
+
   // Stable ref of all row action handlers — its identity never changes, so it
   // never forces memoized rows to re-render. Always points at the latest fns.
   const rowApiRef = useRef<any>({});
