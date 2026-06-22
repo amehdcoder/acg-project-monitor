@@ -420,7 +420,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
       {/* Navy header */}
       <div className="shrink-0 px-4 pb-5 pt-4 text-white" style={{ background: `linear-gradient(160deg, ${NAVY}, #163a63)` }}>
         <div className="flex items-center justify-between">
-          <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
+          <button onClick={() => { clearDraft(); onClose(); }} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-2">
