@@ -43,6 +43,7 @@ import {
   type SavedFormStatus,
 } from "@/lib/savedForms";
 import { isBloombergSavedEntry, isSpecialBridgeEntry, syncSpecialSavedForm } from "@/lib/specialFormBridge";
+import { captureAndUploadDeviceAuditSnapshots } from "@/lib/bloomberg/deviceAuditSnapshot";
 
 export type SavedFormsMode = "edit" | "send" | "view" | "delete";
 
