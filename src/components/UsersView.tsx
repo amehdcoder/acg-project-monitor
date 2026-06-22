@@ -162,6 +162,7 @@ const UsersView = () => {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [bulkProject, setBulkProject] = useState<string>("");
+  const [bulkForms, setBulkForms] = useState<Set<string>>(new Set());
   const [showBulkRemove, setShowBulkRemove] = useState(false);
   // Per-user progress + outcome feedback for bulk operations
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
