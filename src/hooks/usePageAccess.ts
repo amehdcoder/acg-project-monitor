@@ -271,6 +271,6 @@ export const usePageAccess = () => {
   // Surface per-user grant loading too, so callers (e.g. Index's guardedPage
   // spinner) wait for time-bounded grants to resolve before deciding access —
   // preventing a brief "Access Restricted" flash for users who DO have a grant.
-  return { canAccessPage, grantedPages, loadingAccess: loadingAccess || loadingUserAccess, refetch };
+  return { canAccessPage, grantedPages, minimalAccess, loadingAccess: loadingAccess || loadingUserAccess, refetch };
 };
 
