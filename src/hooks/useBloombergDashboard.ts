@@ -335,13 +335,21 @@ export const useBloombergDashboard = () => {
     });
     discrepancies.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
 
-    const coveragePct = schoolCount > 0 ? (new Set(submitted.map((v) => v.school_key)).size / schoolCount) * 100 : 0;
+    const validatedSchools = new Set(submitted.map((v) => v.school_key)).size;
+    const coveragePct = schoolCount > 0 ? (validatedSchools / schoolCount) * 100 : 0;
     const overallPct = baselineTotal > 0 ? ((validatedTotal - baselineTotal) / baselineTotal) * 100 : 0;
+
+    // Submissions = the TOTAL number of reported submissions from all users,
+    // irrespective of duplicates. The gap between this and the distinct
+    // validated-schools count is exactly the number of duplicate submissions.
+    const submittedCount = validations.filter(isReportedValidation).length;
+    const duplicateCount = Math.max(0, submittedCount - validatedSchools);
 
     return {
       totalSchools: schoolCount,
-      validatedSchools: new Set(submitted.map((v) => v.school_key)).size,
-      submittedCount: submitted.length,
+      validatedSchools,
+      submittedCount,
+      duplicateCount,
       draftCount: draft.length,
       validatedTotal,
       validatedMale,
