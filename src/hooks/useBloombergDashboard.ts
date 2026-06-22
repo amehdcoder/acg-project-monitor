@@ -536,7 +536,7 @@ export const useBloombergDashboard = () => {
   const byState = useMemo(() => {
     const m = new Map<string, number>();
     submittedValidations.forEach((v) => {
-      const key = stateName(v.state);
+      const key = stateName(resolveGeo(v).state);
       m.set(key, (m.get(key) || 0) + 1);
     });
     return [...m.entries()].map(([state, count]) => ({ state, count })).sort((a, b) => b.count - a.count);
