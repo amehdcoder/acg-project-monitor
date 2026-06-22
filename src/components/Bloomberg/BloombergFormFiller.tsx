@@ -69,6 +69,11 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
   // the submission's start time (created_at) so accountability analytics show an
   // accurate "Start time → End time" span rather than a zero-duration record.
   const formStartedAtRef = useRef<string>(new Date().toISOString());
+  // Report this device's local Bloomberg form audit (drafts / ready-to-send /
+  // submitted) to the central table the dashboard reads from.
+  useEffect(() => {
+    void reportBloombergLocalAudit();
+  }, []);
   // Guards the auto-save effect so it does not overwrite the persisted draft
   // before the one-time restore has run.
   const restoredRef = useRef(false);
