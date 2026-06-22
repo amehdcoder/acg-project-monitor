@@ -184,6 +184,11 @@ export const useBloombergDashboard = () => {
         { event: "*", schema: "public", table: "bloomberg_validations" },
         () => scheduleReload(),
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bloomberg_local_form_audit" },
+        () => scheduleReload(),
+      )
       .subscribe();
     return () => {
       window.removeEventListener("bloomberg:ready-to-send-migrated", onMigrated);
