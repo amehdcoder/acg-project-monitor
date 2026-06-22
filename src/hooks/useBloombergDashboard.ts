@@ -251,10 +251,15 @@ export const useBloombergDashboard = () => {
     return { state, lga, ward, loc };
   }, [schools]);
 
+  const UNSPECIFIED = "Unspecified location";
   const stateName = (code: string | null | undefined) =>
-    (code && labelMaps.state.get(code)) || prettyAdminLabel(code) || "—";
+    !code || code === "__unspecified__"
+      ? UNSPECIFIED
+      : labelMaps.state.get(code) || prettyAdminLabel(code) || "—";
   const lgaName = (stateCode: string | null | undefined, code: string | null | undefined) =>
-    (code && labelMaps.lga.get(code)) || prettyAdminLabel(code, stateCode) || "—";
+    !code || code === "__unspecified__"
+      ? UNSPECIFIED
+      : labelMaps.lga.get(code) || prettyAdminLabel(code, stateCode) || "—";
   const wardName = (
     stateCode: string | null | undefined,
     lgaCode: string | null | undefined,
