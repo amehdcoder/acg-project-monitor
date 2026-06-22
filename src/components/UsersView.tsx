@@ -234,9 +234,13 @@ const UsersView = () => {
 
       if (rolesError) throw rolesError;
 
+      const rolesByUser = new Map<string, UserRole>();
+      (roles || []).forEach((r: any) => {
+        if (r.user_id && !rolesByUser.has(r.user_id)) rolesByUser.set(r.user_id, r);
+      });
       const usersWithRoles = profiles?.map((profile) => ({
         ...profile,
-        role: roles?.find((r) => r.user_id === profile.user_id),
+        role: rolesByUser.get(profile.user_id),
       })) || [];
 
       setUsers(usersWithRoles);
