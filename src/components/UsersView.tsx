@@ -1782,10 +1782,24 @@ const UsersView = () => {
               ))}
             </div>
 
+            {/* Minimal-access lock */}
+            <label className="flex items-start gap-2 rounded-lg border bg-muted/30 p-2.5 text-sm">
+              <Switch checked={bulkMinimalLock} onCheckedChange={setBulkMinimalLock} className="mt-0.5" />
+              <span className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Lock to Forms, Project Chat &amp; My Submissions only.</span>{" "}
+                Non-admin users will see nothing else their designation would normally unlock.
+                Systems &amp; Super Admins are never affected.
+              </span>
+            </label>
+
             <Button
               className="w-full"
               disabled={
-                (!bulkProject && bulkForms.size === 0 && bulkStandardForms.size === 0 && bulkPages.size === 0) ||
+                (!bulkProject &&
+                  bulkForms.size === 0 &&
+                  bulkStandardForms.size === 0 &&
+                  bulkPages.size === 0 &&
+                  !bulkMinimalLock) ||
                 bulkBusy
               }
               onClick={handleBulkAssignProject}
