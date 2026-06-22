@@ -1014,6 +1014,7 @@ const UsersView = () => {
         description: `User has been assigned to the form.`,
       });
 
+      notifyAssignment(selectedUser, "form", [formById.get(selectedForm)?.name || "a form"]);
       setSelectedForm(""); fetchAssignments();
     } catch (error: any) {
       if (error.code === "23505") {
