@@ -516,6 +516,93 @@ export default function BloombergDashboard({ onClose }: Props) {
           </div>
         )}
 
+        {/* Duplicate validation audit trail */}
+        {canManage && duplicates.schoolsWithDuplicates > 0 && (
+          <div className="rounded-xl border border-amber-300/60 bg-amber-50 p-4 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/30">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <History className="h-4 w-4 text-amber-600" />
+              <h3 className="text-sm font-semibold text-foreground">Duplicate Validation Entries</h3>
+              <span className="ml-auto rounded-full bg-amber-600 px-2 py-0.5 text-xs font-bold text-white">
+                {fmt(duplicates.extraEntries)} duplicate{duplicates.extraEntries === 1 ? "" : "s"}
+              </span>
+            </div>
+            <p className="mb-3 text-xs text-muted-foreground">
+              {fmt(duplicates.schoolsWithDuplicates)} school{duplicates.schoolsWithDuplicates === 1 ? "" : "s"} {duplicates.schoolsWithDuplicates === 1 ? "was" : "were"} validated more than once,
+              producing <span className="font-semibold text-foreground">{fmt(duplicates.extraEntries)}</span> extra entr{duplicates.extraEntries === 1 ? "y" : "ies"}.
+              This is why the entries table shows {fmt(validations.length)} records while only {fmt(stats.validatedSchools)} distinct schools are counted as validated.
+              The most recent submission per school is kept; older copies are listed below with the validator and the date each was sent.
+            </p>
+            {canDelete && (
+              <button
+                onClick={handleRemoveAllDuplicates}
+                disabled={cleaningDupes}
+                className="mb-3 inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {cleaningDupes ? "Removing…" : `Remove all ${fmt(duplicates.extraEntries)} superseded duplicate${duplicates.extraEntries === 1 ? "" : "s"}`}
+              </button>
+            )}
+            <div className="max-h-[28rem] overflow-auto rounded-lg border border-amber-200 dark:border-amber-900">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-amber-100/80 backdrop-blur dark:bg-amber-950/60">
+                  <tr className="text-left text-muted-foreground">
+                    <th className="py-1.5 pl-3 pr-3 font-semibold">School</th>
+                    <th className="py-1.5 pr-3 font-semibold">State / LGA</th>
+                    <th className="py-1.5 pr-3 font-semibold">Validator</th>
+                    <th className="py-1.5 pr-3 font-semibold">Date sent</th>
+                    <th className="py-1.5 pr-3 font-semibold">Status</th>
+                    {canDelete && <th className="py-1.5 pr-3 text-right font-semibold">Action</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {duplicates.groups.flatMap((g) =>
+                    g.copies.map((c, idx) => (
+                      <tr
+                        key={c.id}
+                        className={`border-b border-amber-100/60 last:border-0 dark:border-amber-900/40 ${idx === 0 ? "border-t-2 border-t-amber-300/70 dark:border-t-amber-800" : ""}`}
+                      >
+                        <td className="py-1.5 pl-3 pr-3 text-foreground">
+                          {idx === 0 ? (
+                            <span className="font-medium">{g.school} <span className="text-[10px] font-normal text-muted-foreground">({g.total} entries)</span></span>
+                          ) : (
+                            <span className="pl-3 text-muted-foreground">↳ {g.code}</span>
+                          )}
+                        </td>
+                        <td className="py-1.5 pr-3 text-muted-foreground">{idx === 0 ? `${g.state} / ${g.lga}` : ""}</td>
+                        <td className="py-1.5 pr-3 text-foreground">{c.validator}</td>
+                        <td className="py-1.5 pr-3 text-muted-foreground">{c.date ? new Date(c.date).toLocaleString() : "—"}</td>
+                        <td className="py-1.5 pr-3">
+                          {c.kept ? (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">Kept</span>
+                          ) : (
+                            <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">Duplicate</span>
+                          )}
+                        </td>
+                        {canDelete && (
+                          <td className="py-1.5 pr-3 text-right">
+                            {!c.kept && (
+                              <button
+                                onClick={() => handleDeleteRow(c.id, `${g.school} (duplicate)`)}
+                                disabled={deleting === c.id}
+                                className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-amber-700 hover:bg-amber-200 disabled:opacity-50 dark:text-amber-300 dark:hover:bg-amber-900/50"
+                                title="Delete this duplicate entry"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    )),
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+
+
         {/* Map */}
         <div className="rounded-xl border border-border bg-card p-3 shadow-sm">
           <div className="mb-2 flex items-center gap-2">
