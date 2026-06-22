@@ -501,8 +501,9 @@ export default function BloombergDashboard({ onClose }: Props) {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Kpi icon={School} label="Total Schools" value={fmt(stats.totalSchools)} tint={NAVY} />
           <Kpi icon={CheckCircle2} label="Schools Validated" value={fmt(stats.validatedSchools)} tint={toneColor(pctTone(stats.coveragePct, { good: 75, ok: 50, warn: 25 }))} sub={`${stats.coveragePct.toFixed(1)}% coverage`} />
-          <Kpi icon={FileText} label="Submissions" value={fmt(stats.submittedCount)} tint={BLUE} sub={`${fmt(stats.duplicateCount)} duplicate${stats.duplicateCount === 1 ? "" : "s"} · ${stats.draftCount} drafts`} />
-          <Kpi icon={History} label="Duplicate Submissions" value={fmt(stats.duplicateCount)} tint={toneColor(stats.duplicateCount > 0 ? "warn" : "good")} sub="submissions − schools validated" />
+          <Kpi icon={FileText} label="Submissions" value={fmt(stats.submittedCount)} tint={BLUE} sub={`${fmt(stats.uniqueValidations)} unique · ${fmt(stats.duplicateCount)} duplicate${stats.duplicateCount === 1 ? "" : "s"}`} />
+          <Kpi icon={History} label="Duplicate Submissions" value={fmt(stats.duplicateCount)} tint={toneColor(stats.duplicateCount > 0 ? "warn" : "good")} sub={`across ${fmt(stats.schoolsWithDuplicates)} school${stats.schoolsWithDuplicates === 1 ? "" : "s"}`} />
+
           <Kpi icon={Users} label="Pupils Validated" value={fmt(stats.validatedTotal)} tint={PINK} />
           <Kpi icon={Users} label="Baseline (LEA)" value={fmt(stats.baselineTotal)} tint="#64748b" sub="for validated schools" />
           <Kpi
@@ -569,9 +570,13 @@ export default function BloombergDashboard({ onClose }: Props) {
             <p className="mb-3 text-xs text-muted-foreground">
               {fmt(duplicates.schoolsWithDuplicates)} school{duplicates.schoolsWithDuplicates === 1 ? "" : "s"} {duplicates.schoolsWithDuplicates === 1 ? "was" : "were"} validated more than once,
               producing <span className="font-semibold text-foreground">{fmt(duplicates.extraEntries)}</span> extra entr{duplicates.extraEntries === 1 ? "y" : "ies"}.
-              This is why the entries table shows {fmt(validations.length)} records while only {fmt(stats.validatedSchools)} distinct schools are counted as validated.
+              Reconciliation: <span className="font-semibold text-foreground">{fmt(stats.submittedCount)}</span> submissions
+              − <span className="font-semibold text-foreground">{fmt(stats.uniqueValidations)}</span> unique validations
+              = <span className="font-semibold text-foreground">{fmt(stats.duplicateCount)}</span> duplicates,
+              the same figure shown on the KPI card and totalled in the per-validator breakdown below.
               The most recent submission per school is kept; older copies are listed below with the validator and the date each was sent.
             </p>
+
 
             {/* Deeper duplicate insight: who and how */}
             <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -845,10 +850,11 @@ export default function BloombergDashboard({ onClose }: Props) {
               </span>
             </div>
             <p className="mb-3 text-xs text-muted-foreground">
-              On-device form lifecycle reported by each user's app: <span className="font-semibold text-foreground">{fmt(deviceAudit.totals.drafts)}</span> drafts,
-              {" "}<span className="font-semibold text-foreground">{fmt(deviceAudit.totals.readyToSend)}</span> ready to send and
-              {" "}<span className="font-semibold text-foreground">{fmt(deviceAudit.totals.submitted)}</span> successfully submitted across all devices.
+              <span className="font-semibold text-foreground">{fmt(deviceAudit.totals.drafts)}</span> drafts and
+              {" "}<span className="font-semibold text-foreground">{fmt(deviceAudit.totals.readyToSend)}</span> ready-to-send forms reported live from each user's device, plus
+              {" "}<span className="font-semibold text-foreground">{fmt(deviceAudit.totals.submitted)}</span> successfully submitted (counted from the server, so it matches the Submissions KPI exactly).
             </p>
+
             {deviceAudit.rows.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
                 No device reports yet. They appear once users open the validation form on their devices.

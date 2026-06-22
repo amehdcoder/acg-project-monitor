@@ -365,22 +365,32 @@ export const useBloombergDashboard = () => {
     });
     discrepancies.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
 
-    const validatedSchools = new Set(submitted.map((v) => v.school_key)).size;
+    // "Schools Validated" = distinct REGISTERED schools that were validated
+    // (those matched to a school_key). Entries without a school_key are not in
+    // the schools register, so they cannot count toward coverage.
+    const validatedSchools = new Set(
+      submitted.map((v) => v.school_key).filter(Boolean) as string[],
+    ).size;
     const coveragePct = schoolCount > 0 ? (validatedSchools / schoolCount) * 100 : 0;
     const overallPct = baselineTotal > 0 ? ((validatedTotal - baselineTotal) / baselineTotal) * 100 : 0;
 
-    // Submissions = the TOTAL number of reported submissions from all users,
-    // irrespective of duplicates. The duplicate count is the exact number of
-    // superseded copies surfaced in the Duplicate Validation Entries audit
-    // (duplicates.extraEntries), so the KPI card and the audit section always
-    // report the SAME figure. Entries without a school_key cannot be matched as
-    // duplicates and must not inflate the count.
+    // --- Single source of truth for the duplicate reconciliation ---
+    // Submissions          = every reported entry from all users (raw count).
+    // Unique validations    = the de-duplicated set the dashboard counts
+    //                         (one survivor per school + each unkeyed entry).
+    // Duplicate submissions = superseded copies = Submissions − Unique validations.
+    // This is IDENTICAL to duplicates.extraEntries (the exact rows listed in the
+    // Duplicate Validation Entries audit), so the KPI card, the audit header and
+    // the per-validator breakdown always reconcile to the SAME figure.
     const submittedCount = validations.filter(isReportedValidation).length;
-    const duplicateCount = duplicates.extraEntries;
+    const uniqueValidations = submitted.length; // dedupedSent
+    const duplicateCount = submittedCount - uniqueValidations;
 
     return {
       totalSchools: schoolCount,
       validatedSchools,
+      uniqueValidations,
+      schoolsWithDuplicates: duplicates.schoolsWithDuplicates,
       submittedCount,
       duplicateCount,
       draftCount: draft.length,
@@ -417,20 +427,33 @@ export const useBloombergDashboard = () => {
     );
   }, [validations, profileMap, labelMaps]);
 
-  // Cross-device form audit: aggregate the per-device counts that each user's
-  // device reports (drafts / ready-to-send / successfully submitted) into a
-  // per-user audit log for the Accountability section. This captures local form
-  // state — including drafts that never left the device — for ALL users.
+  // Cross-device form audit for the Accountability section. Two sources are
+  // combined so every figure is accurate and verifiable:
+  //   • Drafts & Ready-to-send live ONLY on each user's device, so they come
+  //     from the per-device reports in bloomberg_local_form_audit.
+  //   • Successfully submitted is taken from the SERVER (bloomberg_validations),
+  //     which is the authoritative record of what actually landed on the
+  //     dashboard. This avoids under/over-counting when local "sent" copies are
+  //     pruned, re-synced, or submitted from a different device — the submitted
+  //     column then reconciles exactly with the Submissions KPI.
   const deviceAudit = useMemo(() => {
+    // Authoritative submitted count per validator (raw reported entries).
+    const serverSubmitted = new Map<string, number>();
+    validations.filter(isReportedValidation).forEach((v) => {
+      if (!v.validator_id) return;
+      serverSubmitted.set(v.validator_id, (serverSubmitted.get(v.validator_id) || 0) + 1);
+    });
+
     const byUser = new Map<
       string,
       { userId: string; name: string; email: string; drafts: number; readyToSend: number; submitted: number; devices: number; lastActivity: string | null }
     >();
-    localAuditRows.forEach((r) => {
-      const prof = profileMap.get(r.user_id);
-      const row =
-        byUser.get(r.user_id) || {
-          userId: r.user_id,
+    const ensureRow = (userId: string) => {
+      let row = byUser.get(userId);
+      if (!row) {
+        const prof = profileMap.get(userId);
+        row = {
+          userId,
           name: prof?.name || "Unknown user",
           email: prof?.email || "",
           drafts: 0,
@@ -439,16 +462,29 @@ export const useBloombergDashboard = () => {
           devices: 0,
           lastActivity: null as string | null,
         };
+        byUser.set(userId, row);
+      }
+      return row;
+    };
+
+    // Device-local drafts & ready-to-send.
+    localAuditRows.forEach((r) => {
+      const row = ensureRow(r.user_id);
       row.drafts += r.drafts ?? 0;
       row.readyToSend += r.ready_to_send ?? 0;
-      row.submitted += r.submitted ?? 0;
       row.devices += 1;
       const la = r.last_activity_at || r.updated_at;
       if (la && (!row.lastActivity || new Date(la).getTime() > new Date(row.lastActivity).getTime())) {
         row.lastActivity = la;
       }
-      byUser.set(r.user_id, row);
     });
+
+    // Authoritative submitted count (also surfaces users who submitted but have
+    // not yet reported a device audit row).
+    serverSubmitted.forEach((count, userId) => {
+      ensureRow(userId).submitted = count;
+    });
+
     const rows = [...byUser.values()].sort(
       (a, b) =>
         b.drafts + b.readyToSend + b.submitted - (a.drafts + a.readyToSend + a.submitted) ||
@@ -463,7 +499,8 @@ export const useBloombergDashboard = () => {
       { drafts: 0, readyToSend: 0, submitted: 0 },
     );
     return { rows, totals, deviceCount: localAuditRows.length, userCount: rows.length };
-  }, [localAuditRows, profileMap]);
+  }, [localAuditRows, profileMap, validations]);
+
 
   const byState = useMemo(() => {
     const m = new Map<string, number>();
