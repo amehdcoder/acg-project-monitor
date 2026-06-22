@@ -333,43 +333,63 @@ const UsersView = () => {
 
   const handleBulkAssignProject = async () => {
     const targets = selectedUserObjects();
-    if (!bulkProject || targets.length === 0) return;
-    const projName = projects.find((p) => p.id === bulkProject)?.name || "the project";
+    const formIds = Array.from(bulkForms);
+    if ((!bulkProject && formIds.length === 0) || targets.length === 0) return;
+    const projName = bulkProject ? (projects.find((p) => p.id === bulkProject)?.name || "the project") : "";
+    const formNames = formIds.map((id) => forms.find((f) => f.id === id)?.name || "form");
     setBulkBusy(true);
     setBulkResults([]);
     setBulkProgress({ done: 0, total: targets.length });
     const results: { name: string; ok: boolean; message: string }[] = [];
     for (const u of targets) {
       const name = getUserDisplayName(u);
+      const parts: string[] = [];
+      let ok = true;
       try {
-        const { error } = await supabase
-          .from("user_project_assignments")
-          .upsert(
-            { user_id: u.user_id, project_id: bulkProject, assigned_by: currentUserProfile?.user_id },
-            { onConflict: "user_id,project_id", ignoreDuplicates: true }
-          );
-        if (error) throw error;
-        results.push({ name, ok: true, message: `Assigned to ${projName}` });
+        if (bulkProject) {
+          const { error } = await supabase
+            .from("user_project_assignments")
+            .upsert(
+              { user_id: u.user_id, project_id: bulkProject, assigned_by: currentUserProfile?.user_id },
+              { onConflict: "user_id,project_id", ignoreDuplicates: true }
+            );
+          if (error) throw error;
+          parts.push(projName);
+        }
+        if (formIds.length > 0) {
+          const { error } = await supabase
+            .from("user_form_assignments")
+            .upsert(
+              formIds.map((fid) => ({ user_id: u.user_id, form_id: fid, assigned_by: currentUserProfile?.user_id })),
+              { onConflict: "user_id,form_id", ignoreDuplicates: true }
+            );
+          if (error) throw error;
+          parts.push(`${formIds.length} form(s)`);
+        }
       } catch (err: any) {
+        ok = false;
         results.push({ name, ok: false, message: err?.message || "Failed" });
       }
+      if (ok) results.push({ name, ok: true, message: `Assigned ${parts.join(" + ")}` });
       setBulkProgress({ done: results.length, total: targets.length });
       setBulkResults([...results]);
     }
     const okCount = results.filter((r) => r.ok).length;
+    const label = [projName, formNames.length ? `${formNames.length} form(s)` : ""].filter(Boolean).join(" + ");
     logAction(
       "assign_user_to_project",
-      `Bulk assigned ${okCount} user(s) to ${projName}`,
+      `Bulk assigned ${okCount} user(s) to ${label}`,
       undefined,
       undefined,
-      { user_ids: targets.map((u) => u.user_id), project_id: bulkProject }
+      { user_ids: targets.map((u) => u.user_id), project_id: bulkProject || null, form_ids: formIds }
     );
-    toast({ title: "Assignment complete", description: `${okCount} of ${targets.length} user(s) assigned to ${projName}.` });
+    toast({ title: "Assignment complete", description: `${okCount} of ${targets.length} user(s) assigned to ${label}.` });
     fetchAssignments();
-    if (okCount === targets.length) clearSelection();
+    if (okCount === targets.length) { clearSelection(); setBulkProject(""); setBulkForms(new Set()); }
     setBulkBusy(false);
     setBulkProgress(null);
   };
+
 
   const handleBulkResendInvite = async () => {
     const targets = selectedUserObjects();
