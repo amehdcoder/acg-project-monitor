@@ -262,6 +262,8 @@ export default function BloombergDashboard({ onClose }: Props) {
   const [dupValidator, setDupValidator] = useState<string>("all");
   const [dupType, setDupType] = useState<"all" | "same" | "cross">("all");
   const [dupRowStatus, setDupRowStatus] = useState<"all" | "kept" | "superseded">("all");
+  // Admin drill-down: the validator whose per-school duplicate breakdown is open.
+  const [drilldownValidator, setDrilldownValidator] = useState<string | null>(null);
 
   // Distinct validators that appear anywhere in the duplicate groups.
   const dupValidators = useMemo(() => {
