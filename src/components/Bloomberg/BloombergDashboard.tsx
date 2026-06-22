@@ -714,8 +714,11 @@ export default function BloombergDashboard({ onClose }: Props) {
                   Clear filters
                 </button>
               )}
-              <span className="ml-auto self-center text-[11px] text-muted-foreground">
-                {fmt(filteredDupGroups.length)} school{filteredDupGroups.length === 1 ? "" : "s"} match
+              <span className="ml-auto self-center text-right text-[11px] text-muted-foreground">
+                {fmt(filteredCopyStats.schools)} school{filteredCopyStats.schools === 1 ? "" : "s"} ·{" "}
+                {fmt(filteredCopyStats.entries)} entr{filteredCopyStats.entries === 1 ? "y" : "ies"} ·{" "}
+                <span className="font-semibold text-amber-700 dark:text-amber-300">{fmt(filteredCopyStats.superseded)} superseded</span>
+                {" "}· {fmt(filteredCopyStats.retained)} retained
               </span>
             </div>
 
