@@ -474,22 +474,35 @@ export const useBloombergDashboard = () => {
   const deviceAudit = useMemo(() => {
     // Authoritative submitted count per validator (raw reported entries).
     const serverSubmitted = new Map<string, number>();
-    // Server-derived days worked: distinct calendar days a validator submitted,
-    // computed from each submission's metadata (submitted_at → created_at). This
-    // is verifiable from the server even when a device has not reported, and is
-    // what we reconcile the device-reported figure against.
+    // Server-derived days worked: distinct calendar days a validator actually
+    // worked in the field. We prefer the recorded date_of_visit metadata over
+    // the server insert timestamp, because a device that was offline for
+    // several days and then synced its whole backlog at once would otherwise
+    // collapse many real work days into the single batch-sync day. Falling back
+    // to submitted_at/created_at keeps the figure verifiable when a visit date
+    // is missing.
     const serverDays = new Map<string, Set<string>>();
     validations.filter(isReportedValidation).forEach((v) => {
       if (!v.validator_id) return;
       serverSubmitted.set(v.validator_id, (serverSubmitted.get(v.validator_id) || 0) + 1);
-      const t = v.submitted_at || v.updated_at || v.created_at;
-      if (t) {
-        const d = new Date(t);
-        if (!isNaN(d.getTime())) {
-          const key = d.toISOString().slice(0, 10);
-          if (!serverDays.has(v.validator_id)) serverDays.set(v.validator_id, new Set());
-          serverDays.get(v.validator_id)!.add(key);
+      const visit = (v as any).verification?.date_of_visit as string | undefined;
+      let key: string | null = null;
+      if (visit) {
+        const vd = new Date(visit);
+        key = isNaN(vd.getTime())
+          ? String(visit).slice(0, 10) || null
+          : vd.toISOString().slice(0, 10);
+      }
+      if (!key) {
+        const t = v.submitted_at || v.updated_at || v.created_at;
+        if (t) {
+          const d = new Date(t);
+          if (!isNaN(d.getTime())) key = d.toISOString().slice(0, 10);
         }
+      }
+      if (key) {
+        if (!serverDays.has(v.validator_id)) serverDays.set(v.validator_id, new Set());
+        serverDays.get(v.validator_id)!.add(key);
       }
     });
 
