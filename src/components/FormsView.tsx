@@ -245,6 +245,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [showFormsExplorer, setShowFormsExplorer] = useState(false);
   const [openTopFolder, setOpenTopFolder] = useState<"custom" | "standard" | null>("custom");
+  // "Your Forms" controls: search, category filter and grid/folder view toggle.
+  const [yourFormsSearch, setYourFormsSearch] = useState("");
+  const [yourFormsGroup, setYourFormsGroup] = useState<string>("all");
+  const [yourFormsView, setYourFormsView] = useState<"grid" | "folders">("grid");
+  const [openYourGroup, setOpenYourGroup] = useState<string | null>(null);
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
   const [bulkForm, setBulkForm] = useState<Form | null>(null);
   const [showBulkAccess, setShowBulkAccess] = useState(false);
