@@ -1673,14 +1673,37 @@ const UsersView = () => {
               </Button>
             </TabsContent>
             <TabsContent value="standard" className="space-y-4 pt-4">
-              <div className="space-y-2">
+              <div class="space-y-2" className="space-y-2">
                 <Label>Select Standard Form</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Search forms..."
+                      value={stdFormSearch}
+                      onChange={(e) => setStdFormSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <Select value={stdFormGroup} onValueChange={setStdFormGroup}>
+                    <SelectTrigger><SelectValue placeholder="All categories" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All categories</SelectItem>
+                      {standardFormGroups.map((g) => (
+                        <SelectItem key={g} value={g}>{g}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Select value={selectedStandardForm} onValueChange={setSelectedStandardForm}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a standard form" />
                   </SelectTrigger>
                   <SelectContent>
-                    {ALL_STANDARD_FORMS.map((def) => (
+                    {filteredStandardForms.length === 0 && (
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground">No standard forms match.</div>
+                    )}
+                    {filteredStandardForms.map((def) => (
                       <SelectItem key={def.code} value={def.code}>
                         {def.name}
                       </SelectItem>
