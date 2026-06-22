@@ -1992,12 +1992,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               )}
             </div>
 
-            {/* Assigned Standard Forms — flat, folder-free beautiful grid.
+            {/* Assigned Standard Forms — flat, folder-free beautiful grid with
+                search, category filters and a grid/folder view toggle.
                 Shown to users who have specific standard forms assigned to them. */}
             {assignedFormCards.length > 0 && !standardRestricted && (
               <div className="overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-[#F7F9FE] to-white shadow-sm">
                 <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-border/50">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#2F6FE6] to-[#7C5CFF] shadow-sm">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#15803D] via-[#2F6FE6] to-[#7C5CFF] shadow-sm">
                     <Sparkles className="h-5 w-5 text-white" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -2008,32 +2009,112 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     {assignedFormCards.length}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 sm:p-4">
-                  {assignedFormCards.map(({ code, name, desc, Icon, bg, fg, ring }) => (
+
+                {/* Controls: search + view toggle */}
+                <div className="flex flex-col gap-3 p-3 sm:p-4 sm:flex-row sm:items-center">
+                  <div className="relative flex-1">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={yourFormsSearch}
+                      onChange={(e) => setYourFormsSearch(e.target.value)}
+                      placeholder="Search Safeguarding, Programme Activity, Microplanning…"
+                      className="pl-9 rounded-xl bg-white"
+                    />
+                  </div>
+                  <div className="inline-flex shrink-0 items-center rounded-xl border border-border/60 bg-white p-0.5">
                     <button
-                      key={code}
-                      onClick={() => launchStandardForm(code)}
-                      className="group relative flex items-center gap-3.5 overflow-hidden rounded-2xl border border-border/60 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                      style={{ ['--tw-ring-color' as any]: ring }}
+                      type="button"
+                      onClick={() => setYourFormsView("grid")}
+                      aria-pressed={yourFormsView === "grid"}
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        yourFormsView === "grid" ? "bg-[#2F6FE6] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      }`}
                     >
-                      <span
-                        aria-hidden
-                        className="absolute inset-y-0 left-0 w-1.5"
-                        style={{ backgroundColor: ring }}
-                      />
-                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${bg} transition-transform group-hover:scale-105`}>
-                        <Icon className={`h-6 w-6 ${fg}`} strokeWidth={2} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h4 className="truncate text-[15px] font-bold text-foreground">{name}</h4>
-                        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{desc}</p>
-                      </div>
-                      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:text-foreground" />
+                      <LayoutGrid className="h-4 w-4" /> Grid
                     </button>
-                  ))}
+                    <button
+                      type="button"
+                      onClick={() => setYourFormsView("folders")}
+                      aria-pressed={yourFormsView === "folders"}
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        yourFormsView === "folders" ? "bg-[#2F6FE6] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Rows3 className="h-4 w-4" /> Folders
+                    </button>
+                  </div>
                 </div>
+
+                {/* Category filter chips */}
+                {yourFormsGroups.length > 1 && (
+                  <div className="flex flex-wrap gap-2 px-3 pb-1 sm:px-4">
+                    <button
+                      type="button"
+                      onClick={() => setYourFormsGroup("all")}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                        yourFormsGroup === "all" ? "bg-[#2F6FE6] text-white" : "bg-[#EEF2F7] text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      All
+                    </button>
+                    {yourFormsGroups.map((g) => (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => setYourFormsGroup(g)}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                          yourFormsGroup === g ? "bg-[#2F6FE6] text-white" : "bg-[#EEF2F7] text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Body — grid or folder view */}
+                {filteredYourForms.length === 0 ? (
+                  <div className="flex h-32 flex-col items-center justify-center text-center px-4">
+                    <Search className="h-8 w-8 text-muted-foreground/40" />
+                    <p className="mt-2 text-sm text-muted-foreground">No forms match your search.</p>
+                  </div>
+                ) : yourFormsView === "grid" ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 p-3 sm:p-4">
+                    {filteredYourForms.map((c) => renderYourFormCard(c))}
+                  </div>
+                ) : (
+                  <div className="space-y-2 p-3 sm:p-4">
+                    {filteredYourFormsByGroup.map(([group, cards]) => {
+                      const open = openYourGroup === group || filteredYourFormsByGroup.length === 1;
+                      return (
+                        <div key={group} className="overflow-hidden rounded-2xl border border-border/60 bg-white">
+                          <button
+                            type="button"
+                            onClick={() => setOpenYourGroup((g) => (g === group ? null : group))}
+                            className="flex w-full items-center gap-3 p-3 text-left hover:bg-[#F4F6F8]/70 transition-colors"
+                          >
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#E3ECFB]">
+                              {open ? <FolderOpen className="h-5 w-5 text-[#2F6FE6]" /> : <Folder className="h-5 w-5 text-[#2F6FE6]" />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h4 className="truncate font-display text-sm font-bold text-foreground">{group}</h4>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-[#E3ECFB] px-2.5 py-0.5 text-xs font-semibold text-[#1656BA]">{cards.length}</span>
+                            <ChevronRight className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
+                          </button>
+                          {open && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-border/60 p-3">
+                              {cards.map((c) => renderYourFormCard(c))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
+
 
             {/* Folder 2 — Standard Forms (admins see the full folder explorer) */}
             {!isAdhoc && !standardRestricted && (
