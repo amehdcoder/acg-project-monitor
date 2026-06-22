@@ -1174,6 +1174,27 @@ const UsersView = () => {
     return m;
   }, [projects]);
 
+  // ---------- Assignment selector search / filter (memoized) ----------
+  const filteredProjects = useMemo(() => {
+    const q = projectFilter.trim().toLowerCase();
+    if (!q) return projects;
+    return projects.filter((p) => (p.name || "").toLowerCase().includes(q));
+  }, [projects, projectFilter]);
+
+  const standardFormGroups = useMemo(
+    () => Array.from(new Set(ALL_STANDARD_FORMS.map((f) => f.group))),
+    [],
+  );
+  const filteredStandardForms = useMemo(() => {
+    const q = stdFormSearch.trim().toLowerCase();
+    return ALL_STANDARD_FORMS.filter((f) => {
+      const matchesGroup = stdFormGroup === "all" || f.group === stdFormGroup;
+      const matchesSearch =
+        !q || f.name.toLowerCase().includes(q) || f.group.toLowerCase().includes(q) || f.code.toLowerCase().includes(q);
+      return matchesGroup && matchesSearch;
+    });
+  }, [stdFormSearch, stdFormGroup]);
+
   const projectNameById = useCallback(
     (id: string) => projectById.get(id)?.name || "Unknown project",
     [projectById],
