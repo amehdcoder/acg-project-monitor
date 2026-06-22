@@ -406,6 +406,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
           : "Validation submitted — it's now on the dashboard.",
       );
       clearDraft();
+      void reportBloombergLocalAudit();
       onSavedLocally?.();
       onClose();
     } catch (e: any) {
