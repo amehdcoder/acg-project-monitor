@@ -399,6 +399,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
           ? "Saved offline — it will submit automatically when you're back online."
           : "Validation submitted — it's now on the dashboard.",
       );
+      clearDraft();
       onSavedLocally?.();
       onClose();
     } catch (e: any) {
