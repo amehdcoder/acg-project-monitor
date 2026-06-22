@@ -1575,7 +1575,7 @@ const UsersView = () => {
                     <SelectValue placeholder="Select a standard form" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.values(STANDARD_ASSESSMENTS).map((def: any) => (
+                    {ALL_STANDARD_FORMS.map((def) => (
                       <SelectItem key={def.code} value={def.code}>
                         {def.name}
                       </SelectItem>
