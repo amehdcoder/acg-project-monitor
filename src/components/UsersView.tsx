@@ -1648,10 +1648,13 @@ const UsersView = () => {
 
       {/* Bulk: Assign Project */}
       <Dialog open={showBulkAssign} onOpenChange={setShowBulkAssign}>
-        <DialogContent>
+        <DialogContent className="max-h-[88vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Assign Project &amp; Forms to {selectedIds.size} User(s)</DialogTitle>
-            <DialogDescription>Pick a project and/or one or more forms. Selected users get everything you choose, all at once.</DialogDescription>
+            <DialogTitle>Assign Access to {selectedIds.size} User(s)</DialogTitle>
+            <DialogDescription>
+              Pick a project, forms, standard forms and/or pages. Restricting standard forms limits
+              non-admin users to only what you assign here — Systems &amp; Super Admins keep their full role access.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <Label>Project (optional)</Label>
