@@ -409,8 +409,55 @@ export const useBloombergDashboard = () => {
     );
   }, [validations, profileMap, labelMaps]);
 
+  // Cross-device form audit: aggregate the per-device counts that each user's
+  // device reports (drafts / ready-to-send / successfully submitted) into a
+  // per-user audit log for the Accountability section. This captures local form
+  // state — including drafts that never left the device — for ALL users.
+  const deviceAudit = useMemo(() => {
+    const byUser = new Map<
+      string,
+      { userId: string; name: string; email: string; drafts: number; readyToSend: number; submitted: number; devices: number; lastActivity: string | null }
+    >();
+    localAuditRows.forEach((r) => {
+      const prof = profileMap.get(r.user_id);
+      const row =
+        byUser.get(r.user_id) || {
+          userId: r.user_id,
+          name: prof?.name || "Unknown user",
+          email: prof?.email || "",
+          drafts: 0,
+          readyToSend: 0,
+          submitted: 0,
+          devices: 0,
+          lastActivity: null as string | null,
+        };
+      row.drafts += r.drafts ?? 0;
+      row.readyToSend += r.ready_to_send ?? 0;
+      row.submitted += r.submitted ?? 0;
+      row.devices += 1;
+      const la = r.last_activity_at || r.updated_at;
+      if (la && (!row.lastActivity || new Date(la).getTime() > new Date(row.lastActivity).getTime())) {
+        row.lastActivity = la;
+      }
+      byUser.set(r.user_id, row);
+    });
+    const rows = [...byUser.values()].sort(
+      (a, b) =>
+        b.drafts + b.readyToSend + b.submitted - (a.drafts + a.readyToSend + a.submitted) ||
+        a.name.localeCompare(b.name),
+    );
+    const totals = rows.reduce(
+      (t, r) => ({
+        drafts: t.drafts + r.drafts,
+        readyToSend: t.readyToSend + r.readyToSend,
+        submitted: t.submitted + r.submitted,
+      }),
+      { drafts: 0, readyToSend: 0, submitted: 0 },
+    );
+    return { rows, totals, deviceCount: localAuditRows.length, userCount: rows.length };
+  }, [localAuditRows, profileMap]);
 
-  const byState = useMemo(() => {
+
     const m = new Map<string, number>();
     submittedValidations.forEach((v) => {
       const key = stateName(v.state);
