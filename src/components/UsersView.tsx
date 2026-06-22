@@ -879,7 +879,11 @@ const UsersView = () => {
         ok = false;
         results.push({ name, ok: false, message: err?.message || "Failed" });
       }
-      if (ok) results.push({ name, ok: true, message: `Assigned ${parts.join(" + ")}` });
+      if (ok) {
+        results.push({ name, ok: true, message: `Assigned ${parts.join(" + ")}` });
+        if (bulkProject) notifyAssignment(u, "project", [projName]);
+        if (formIds.length > 0) notifyAssignment(u, "form", formNames);
+      }
       setBulkProgress({ done: results.length, total: targets.length });
       setBulkResults([...results]);
     }
