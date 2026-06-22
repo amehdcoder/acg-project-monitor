@@ -1977,8 +1977,31 @@ const UsersView = () => {
                 </Button>
               )}
             </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search forms..."
+                  value={stdFormSearch}
+                  onChange={(e) => setStdFormSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={stdFormGroup} onValueChange={setStdFormGroup}>
+                <SelectTrigger><SelectValue placeholder="All categories" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All categories</SelectItem>
+                  {standardFormGroups.map((g) => (
+                    <SelectItem key={g} value={g}>{g}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-2">
-              {ALL_STANDARD_FORMS.map((def) => (
+              {filteredStandardForms.length === 0 && (
+                <p className="text-xs text-muted-foreground">No standard forms match your search.</p>
+              )}
+              {filteredStandardForms.map((def) => (
                 <label key={def.code} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted/50">
                   <Checkbox
                     checked={bulkStandardForms.has(def.code)}
@@ -1991,6 +2014,7 @@ const UsersView = () => {
                     }
                   />
                   <span className="truncate">{def.name}</span>
+                  <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">{def.group}</span>
                 </label>
               ))}
             </div>
