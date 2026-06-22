@@ -21,6 +21,7 @@ const formatRelative = (ts: number | null): string => {
 const AppUpdateButton = () => {
   const [updateState, setUpdateState] = useState(getAppUpdateState());
   const [appliedAt, setAppliedAt] = useState<number | null>(getLastAppliedAt());
+  const [installing, setInstalling] = useState(false);
 
   useEffect(() => subscribeToAppUpdates(() => {
     setUpdateState(getAppUpdateState());
@@ -34,20 +35,42 @@ const AppUpdateButton = () => {
   }, []);
 
   const handleClick = async () => {
-    // Guarantee a REAL update — never a fake one:
-    // 1. Force a fresh version probe (no-store) so we know the true latest build.
-    // 2. Clear caches + unregister service workers + cache-busted hard reload.
-    // hardReloadToLatest does the destructive work, so the next boot always
-    // serves the newest assets from the network.
+    if (installing) return;
+    // Single click = guaranteed install. Show feedback instantly so the control
+    // never feels frozen, then run the real update with a hard watchdog so a
+    // hung cache/probe can never leave the user stuck.
+    setInstalling(true);
+
+    // Watchdog: no matter what happens below (probe hang, cache API stall,
+    // service-worker timeout), force a cache-busted hard reload after 6s so the
+    // update ALWAYS completes from a single click.
+    const watchdog = setTimeout(() => {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set("__v", String(Date.now()));
+        window.location.replace(url.toString());
+      } catch {
+        window.location.reload();
+      }
+    }, 6000);
+
     try {
-      await checkForAppUpdate({ force: true, source: shouldSkipServiceWorker ? "html" : "version" });
+      // Force a fresh version probe (no-store) so we know the true latest build,
+      // but never let a slow probe delay the install beyond 2.5s.
+      await Promise.race([
+        checkForAppUpdate({ force: true, source: shouldSkipServiceWorker ? "html" : "version" }),
+        new Promise((resolve) => setTimeout(resolve, 2500)),
+      ]).catch(() => {});
+      await hardReloadToLatest();
     } catch {
-      /* even if the probe fails we still hard-reload to recover */
+      // even if everything failed, the watchdog reload will recover.
     }
-    await hardReloadToLatest();
+    // Note: we intentionally do NOT clear the watchdog — hardReloadToLatest
+    // navigates away on success; if it didn't, the watchdog guarantees a reload.
+    void watchdog;
   };
 
-  const isBusy = updateState.status === "checking" || updateState.status === "updating";
+  const isBusy = installing || updateState.status === "checking" || updateState.status === "updating";
   const hasUpdate = updateState.updateAvailable;
   const stamp = formatRelative(appliedAt);
 
