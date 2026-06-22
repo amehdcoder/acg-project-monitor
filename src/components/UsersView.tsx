@@ -74,7 +74,6 @@ import AdminReliabilityPanel from "@/components/OwnerTools/AdminReliabilityPanel
 import UserLoginDetailsDialog from "@/components/OwnerTools/UserLoginDetailsDialog";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import InactiveUsersPanel from "@/components/InactiveUsersPanel";
-import { STANDARD_ASSESSMENTS } from "@/lib/standardAssessments/definitions";
 import { ALL_STANDARD_FORMS } from "@/lib/standardAssessments/allStandardForms";
 
 interface UserProfile {
