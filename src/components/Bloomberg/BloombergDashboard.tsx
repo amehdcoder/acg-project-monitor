@@ -475,6 +475,14 @@ export default function BloombergDashboard({ onClose }: Props) {
                     <Download className="mr-2 h-4 w-4" /> Download Collected Data (Excel)
                   </DropdownMenuItem>
                 )}
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => handleDownloadPhotos()} disabled={downloadingPhotos}>
+                    {downloadingPhotos ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileImage className="mr-2 h-4 w-4" />}
+                    {downloadingPhotos && photoProgress
+                      ? `Downloading photos ${photoProgress.done}/${photoProgress.total}…`
+                      : "Download Photo Evidence (ZIP)"}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => exportPDF()}>
                   <FileText className="mr-2 h-4 w-4" /> Export as PDF
                 </DropdownMenuItem>
