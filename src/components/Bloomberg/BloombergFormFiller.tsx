@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { BLOOMBERG_FORM_ID, BLOOMBERG_SPECIAL_FORM_KEY } from "@/lib/specialFormBridge";
 import { queueOrUploadMedia } from "@/lib/offlineMedia";
 import { saveSavedEntry, newEntryId, type SavedFormEntry } from "@/lib/savedForms";
+import { reportBloombergLocalAudit } from "@/lib/bloomberg/localAuditReporter";
 import { queueOrInsert } from "@/lib/offlineSubmissions";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
 
@@ -68,6 +69,11 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
   // the submission's start time (created_at) so accountability analytics show an
   // accurate "Start time → End time" span rather than a zero-duration record.
   const formStartedAtRef = useRef<string>(new Date().toISOString());
+  // Report this device's local Bloomberg form audit (drafts / ready-to-send /
+  // submitted) to the central table the dashboard reads from.
+  useEffect(() => {
+    void reportBloombergLocalAudit();
+  }, []);
   // Guards the auto-save effect so it does not overwrite the persisted draft
   // before the one-time restore has run.
   const restoredRef = useRef(false);
@@ -400,6 +406,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
           : "Validation submitted — it's now on the dashboard.",
       );
       clearDraft();
+      void reportBloombergLocalAudit();
       onSavedLocally?.();
       onClose();
     } catch (e: any) {

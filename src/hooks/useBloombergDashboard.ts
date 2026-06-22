@@ -44,6 +44,17 @@ export interface BaselineRow {
   grand_total: number | null;
 }
 
+export interface LocalAuditRow {
+  user_id: string;
+  device_id: string;
+  device_label: string | null;
+  drafts: number | null;
+  ready_to_send: number | null;
+  submitted: number | null;
+  last_activity_at: string | null;
+  updated_at: string | null;
+}
+
 const REASON_LABEL = new Map(NOT_FOUND_REASONS.map((r) => [r.value, r.label]));
 const OP_STATUS_LABEL = new Map(OPERATIONAL_STATUS.map((r) => [r.value, r.label]));
 
@@ -88,6 +99,7 @@ export const useBloombergDashboard = () => {
   const [schools, setSchools] = useState<SchoolLite[]>([]);
   const [schoolCount, setSchoolCount] = useState(0);
   const [profileMap, setProfileMap] = useState<Map<string, ProfileLite>>(new Map());
+  const [localAuditRows, setLocalAuditRows] = useState<LocalAuditRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Monotonic request id: any async load tags itself with the current value
@@ -111,8 +123,20 @@ export const useBloombergDashboard = () => {
       ]);
       const count = s.length;
 
-      // Resolve validator names for the accountability table.
-      const ids = [...new Set(v.map((r) => r.validator_id).filter(Boolean))] as string[];
+      // Per-device local form audit reported by every user's device.
+      const audit = await fetchAll<LocalAuditRow>(
+        "bloomberg_local_form_audit",
+        "user_id,device_id,device_label,drafts,ready_to_send,submitted,last_activity_at,updated_at",
+      ).catch(() => [] as LocalAuditRow[]);
+
+      // Resolve validator names for the accountability table — include both
+      // submitters and any user who only has local drafts/ready-to-send.
+      const ids = [
+        ...new Set([
+          ...v.map((r) => r.validator_id).filter(Boolean),
+          ...audit.map((r) => r.user_id).filter(Boolean),
+        ]),
+      ] as string[];
       const pm = new Map<string, ProfileLite>();
       if (ids.length) {
         const { data: profs } = await supabase
@@ -126,6 +150,7 @@ export const useBloombergDashboard = () => {
       }
 
       if (myReq !== reqIdRef.current) return;
+      setLocalAuditRows(audit);
       setValidations(v);
       setBaselines(b);
       setSchools(s);
@@ -157,6 +182,11 @@ export const useBloombergDashboard = () => {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bloomberg_validations" },
+        () => scheduleReload(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bloomberg_local_form_audit" },
         () => scheduleReload(),
       )
       .subscribe();
@@ -335,13 +365,21 @@ export const useBloombergDashboard = () => {
     });
     discrepancies.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
 
-    const coveragePct = schoolCount > 0 ? (new Set(submitted.map((v) => v.school_key)).size / schoolCount) * 100 : 0;
+    const validatedSchools = new Set(submitted.map((v) => v.school_key)).size;
+    const coveragePct = schoolCount > 0 ? (validatedSchools / schoolCount) * 100 : 0;
     const overallPct = baselineTotal > 0 ? ((validatedTotal - baselineTotal) / baselineTotal) * 100 : 0;
+
+    // Submissions = the TOTAL number of reported submissions from all users,
+    // irrespective of duplicates. The gap between this and the distinct
+    // validated-schools count is exactly the number of duplicate submissions.
+    const submittedCount = validations.filter(isReportedValidation).length;
+    const duplicateCount = Math.max(0, submittedCount - validatedSchools);
 
     return {
       totalSchools: schoolCount,
-      validatedSchools: new Set(submitted.map((v) => v.school_key)).size,
-      submittedCount: submitted.length,
+      validatedSchools,
+      submittedCount,
+      duplicateCount,
       draftCount: draft.length,
       validatedTotal,
       validatedMale,
@@ -376,6 +414,53 @@ export const useBloombergDashboard = () => {
     );
   }, [validations, profileMap, labelMaps]);
 
+  // Cross-device form audit: aggregate the per-device counts that each user's
+  // device reports (drafts / ready-to-send / successfully submitted) into a
+  // per-user audit log for the Accountability section. This captures local form
+  // state — including drafts that never left the device — for ALL users.
+  const deviceAudit = useMemo(() => {
+    const byUser = new Map<
+      string,
+      { userId: string; name: string; email: string; drafts: number; readyToSend: number; submitted: number; devices: number; lastActivity: string | null }
+    >();
+    localAuditRows.forEach((r) => {
+      const prof = profileMap.get(r.user_id);
+      const row =
+        byUser.get(r.user_id) || {
+          userId: r.user_id,
+          name: prof?.name || "Unknown user",
+          email: prof?.email || "",
+          drafts: 0,
+          readyToSend: 0,
+          submitted: 0,
+          devices: 0,
+          lastActivity: null as string | null,
+        };
+      row.drafts += r.drafts ?? 0;
+      row.readyToSend += r.ready_to_send ?? 0;
+      row.submitted += r.submitted ?? 0;
+      row.devices += 1;
+      const la = r.last_activity_at || r.updated_at;
+      if (la && (!row.lastActivity || new Date(la).getTime() > new Date(row.lastActivity).getTime())) {
+        row.lastActivity = la;
+      }
+      byUser.set(r.user_id, row);
+    });
+    const rows = [...byUser.values()].sort(
+      (a, b) =>
+        b.drafts + b.readyToSend + b.submitted - (a.drafts + a.readyToSend + a.submitted) ||
+        a.name.localeCompare(b.name),
+    );
+    const totals = rows.reduce(
+      (t, r) => ({
+        drafts: t.drafts + r.drafts,
+        readyToSend: t.readyToSend + r.readyToSend,
+        submitted: t.submitted + r.submitted,
+      }),
+      { drafts: 0, readyToSend: 0, submitted: 0 },
+    );
+    return { rows, totals, deviceCount: localAuditRows.length, userCount: rows.length };
+  }, [localAuditRows, profileMap]);
 
   const byState = useMemo(() => {
     const m = new Map<string, number>();
@@ -655,6 +740,6 @@ export const useBloombergDashboard = () => {
 
   return {
     validations, baselines, stats, byState, stateBreakdown, inference, points, nonExistent, validatedTable, notValidatedTable, accountability,
-    recovery, duplicates, loading, reload, deleteValidations, ALL_CLASSES,
+    recovery, duplicates, deviceAudit, loading, reload, deleteValidations, ALL_CLASSES,
   };
 };

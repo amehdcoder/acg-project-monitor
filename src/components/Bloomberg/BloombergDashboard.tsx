@@ -182,7 +182,7 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function BloombergDashboard({ onClose }: Props) {
-  const { validations, stats, byState, stateBreakdown, inference, points, nonExistent, validatedTable, notValidatedTable, accountability, recovery, duplicates, loading, reload, deleteValidations } = useBloombergDashboard();
+  const { validations, stats, byState, stateBreakdown, inference, points, nonExistent, validatedTable, notValidatedTable, accountability, recovery, duplicates, deviceAudit, loading, reload, deleteValidations } = useBloombergDashboard();
   const { isOwner, isSuperAdmin, isOwnerLevel, isAdmin } = useAuth();
   const canManage = isOwner || isSuperAdmin;
   // Pagination keeps very large registers fast — only a page of rows is ever
@@ -501,7 +501,8 @@ export default function BloombergDashboard({ onClose }: Props) {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Kpi icon={School} label="Total Schools" value={fmt(stats.totalSchools)} tint={NAVY} />
           <Kpi icon={CheckCircle2} label="Schools Validated" value={fmt(stats.validatedSchools)} tint={toneColor(pctTone(stats.coveragePct, { good: 75, ok: 50, warn: 25 }))} sub={`${stats.coveragePct.toFixed(1)}% coverage`} />
-          <Kpi icon={FileText} label="Submissions" value={fmt(stats.submittedCount)} tint={BLUE} sub={`${stats.draftCount} drafts`} />
+          <Kpi icon={FileText} label="Submissions" value={fmt(stats.submittedCount)} tint={BLUE} sub={`${fmt(stats.duplicateCount)} duplicate${stats.duplicateCount === 1 ? "" : "s"} · ${stats.draftCount} drafts`} />
+          <Kpi icon={History} label="Duplicate Submissions" value={fmt(stats.duplicateCount)} tint={toneColor(stats.duplicateCount > 0 ? "warn" : "good")} sub="submissions − schools validated" />
           <Kpi icon={Users} label="Pupils Validated" value={fmt(stats.validatedTotal)} tint={PINK} />
           <Kpi icon={Users} label="Baseline (LEA)" value={fmt(stats.baselineTotal)} tint="#64748b" sub="for validated schools" />
           <Kpi
@@ -830,6 +831,65 @@ export default function BloombergDashboard({ onClose }: Props) {
 
         {/* Field worker accountability */}
         <AccountabilityTable users={accountability} unitLabel="School" unitLabelPlural="Schools" accent={BLUE} />
+
+        {/* Device form audit — drafts / ready-to-send / submitted reported by
+            every user's device, so the dashboard sees on-device form state for
+            all users (including drafts that never left the device). */}
+        {canManage && (
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <History className="h-4 w-4" style={{ color: BLUE }} />
+              <h3 className="text-sm font-semibold text-foreground">Device Form Audit (All Users)</h3>
+              <span className="ml-auto rounded-full px-2 py-0.5 text-xs font-bold text-white" style={{ backgroundColor: BLUE }}>
+                {fmt(deviceAudit.userCount)} user{deviceAudit.userCount === 1 ? "" : "s"} · {fmt(deviceAudit.deviceCount)} device{deviceAudit.deviceCount === 1 ? "" : "s"}
+              </span>
+            </div>
+            <p className="mb-3 text-xs text-muted-foreground">
+              On-device form lifecycle reported by each user's app: <span className="font-semibold text-foreground">{fmt(deviceAudit.totals.drafts)}</span> drafts,
+              {" "}<span className="font-semibold text-foreground">{fmt(deviceAudit.totals.readyToSend)}</span> ready to send and
+              {" "}<span className="font-semibold text-foreground">{fmt(deviceAudit.totals.submitted)}</span> successfully submitted across all devices.
+            </p>
+            {deviceAudit.rows.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No device reports yet. They appear once users open the validation form on their devices.
+              </p>
+            ) : (
+              <div className="overflow-x-auto" style={{ contentVisibility: "auto" }}>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border text-left text-muted-foreground">
+                      <th className="py-1.5 pr-3 font-semibold">User</th>
+                      <th className="py-1.5 pr-3 text-right font-semibold">Drafts</th>
+                      <th className="py-1.5 pr-3 text-right font-semibold">Ready to send</th>
+                      <th className="py-1.5 pr-3 text-right font-semibold">Submitted</th>
+                      <th className="py-1.5 pr-3 text-right font-semibold">Devices</th>
+                      <th className="py-1.5 font-semibold">Last activity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deviceAudit.rows.map((r) => (
+                      <tr key={r.userId} className="border-b border-border/60 last:border-0">
+                        <td className="py-1.5 pr-3 text-foreground">
+                          {r.name}
+                          {r.email ? <span className="block text-[10px] text-muted-foreground">{r.email}</span> : null}
+                        </td>
+                        <td className="py-1.5 pr-3 text-right font-semibold text-amber-600">{fmt(r.drafts)}</td>
+                        <td className="py-1.5 pr-3 text-right font-semibold" style={{ color: BLUE }}>{fmt(r.readyToSend)}</td>
+                        <td className="py-1.5 pr-3 text-right font-semibold text-emerald-600">{fmt(r.submitted)}</td>
+                        <td className="py-1.5 pr-3 text-right text-muted-foreground">{fmt(r.devices)}</td>
+                        <td className="py-1.5 text-muted-foreground">
+                          {r.lastActivity ? new Date(r.lastActivity).toLocaleString() : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+
 
 
         {/* Top discrepancies */}
