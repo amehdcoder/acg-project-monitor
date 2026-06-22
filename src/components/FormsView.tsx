@@ -67,6 +67,11 @@ import {
   ChevronRight,
   Home,
   Users,
+  Lock,
+  AlertTriangle,
+  LayoutGrid,
+  Rows3,
+
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
