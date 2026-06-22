@@ -152,6 +152,10 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     if ((item as any).ownerOnly && !isOwner) return false;
     // Regular users: collaboration features by default + owner-granted pages.
     if (isRegularUser) {
+      // Minimal-access lock: ONLY Forms, Project Chat and My Submissions.
+      if (minimalAccess) {
+        return ["forms", "project-chat", "my-submissions"].includes(item.id);
+      }
       if (DEFAULT_USER_PAGES.includes(item.id)) return true;
       if ((item as any).adhocOnly) return false; // my-submissions stays adhoc-only
       return canAccessPage ? canAccessPage(item.id) : false;
