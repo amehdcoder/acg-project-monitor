@@ -505,6 +505,7 @@ const UsersView = () => {
       setBulkForms(new Set());
       setBulkStandardForms(new Set());
       setBulkPages(new Set());
+      setBulkMinimalLock(false);
     }
     setBulkBusy(false);
     setBulkProgress(null);
