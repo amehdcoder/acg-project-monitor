@@ -217,6 +217,24 @@ export default function BloombergDashboard({ onClose }: Props) {
       setDeleting(null);
     }
   };
+  // Bulk-clean superseded duplicate copies, keeping the most recent entry per school.
+  const [cleaningDupes, setCleaningDupes] = useState(false);
+  const handleRemoveAllDuplicates = async () => {
+    const ids = duplicates.groups.flatMap((g) => g.copies.filter((c) => !c.kept).map((c) => c.id));
+    if (!ids.length) return;
+    if (!window.confirm(
+      `Remove ${ids.length} superseded duplicate entr${ids.length === 1 ? "y" : "ies"} across ${duplicates.schoolsWithDuplicates} school(s)?\n\nThe most recent validation for each school is kept. This cannot be undone.`,
+    )) return;
+    setCleaningDupes(true);
+    try {
+      await deleteValidations(ids);
+      toast.success(`Removed ${ids.length} duplicate entr${ids.length === 1 ? "y" : "ies"}`);
+    } catch (e) {
+      toast.error(`Could not remove duplicates: ${(e as Error).message}`);
+    } finally {
+      setCleaningDupes(false);
+    }
+  };
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [resetting, setResetting] = useState(false);
