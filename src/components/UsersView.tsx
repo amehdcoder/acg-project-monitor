@@ -1673,7 +1673,7 @@ const UsersView = () => {
               </Button>
             </TabsContent>
             <TabsContent value="standard" className="space-y-4 pt-4">
-              <div class="space-y-2" className="space-y-2">
+              <div className="space-y-2">
                 <Label>Select Standard Form</Label>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="relative">
