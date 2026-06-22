@@ -59,7 +59,9 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RESTRICTED_PAGES } from "@/hooks/usePageAccess";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -163,6 +165,13 @@ const UsersView = () => {
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [bulkProject, setBulkProject] = useState<string>("");
   const [bulkForms, setBulkForms] = useState<Set<string>>(new Set());
+  // Standard forms + restricted pages bulk assignment (scoped visibility control)
+  const [bulkStandardForms, setBulkStandardForms] = useState<Set<string>>(new Set());
+  const [bulkPages, setBulkPages] = useState<Set<string>>(new Set());
+  // When on, selected NON-admin users are restricted so they ONLY see the
+  // Standard forms you assign here (instead of every form their designation
+  // grants by default). Admins (Systems/Super) keep their full role access.
+  const [bulkRestrictStandard, setBulkRestrictStandard] = useState(true);
   const [showBulkRemove, setShowBulkRemove] = useState(false);
   // Per-user progress + outcome feedback for bulk operations
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
@@ -334,16 +343,25 @@ const UsersView = () => {
   const handleBulkAssignProject = async () => {
     const targets = selectedUserObjects();
     const formIds = Array.from(bulkForms);
-    if ((!bulkProject && formIds.length === 0) || targets.length === 0) return;
+    const stdForms = Array.from(bulkStandardForms);
+    const pageIds = Array.from(bulkPages);
+    if (
+      (!bulkProject && formIds.length === 0 && stdForms.length === 0 && pageIds.length === 0) ||
+      targets.length === 0
+    )
+      return;
     const projName = bulkProject ? (projects.find((p) => p.id === bulkProject)?.name || "the project") : "";
     const formNames = formIds.map((id) => forms.find((f) => f.id === id)?.name || "form");
     setBulkBusy(true);
     setBulkResults([]);
     setBulkProgress({ done: 0, total: targets.length });
     const results: { name: string; ok: boolean; message: string }[] = [];
+    // Roles that keep full default access regardless of restriction toggle.
+    const adminRoles = new Set(["super_admin", "systems_admin"]);
     for (const u of targets) {
       const name = getUserDisplayName(u);
       const parts: string[] = [];
+      const isAdminUser = adminRoles.has((u as any).role?.role) || u.is_owner;
       let ok = true;
       try {
         if (bulkProject) {
@@ -366,6 +384,65 @@ const UsersView = () => {
           if (error) throw error;
           parts.push(`${formIds.length} form(s)`);
         }
+        if (stdForms.length > 0) {
+          // Assign the specific standard forms (skip any the user already has).
+          const { data: existingStd } = await (supabase as any)
+            .from("user_standard_form_assignments")
+            .select("form_code")
+            .eq("user_id", u.user_id);
+          const have = new Set(((existingStd ?? []) as any[]).map((r) => r.form_code));
+          const toInsert = stdForms.filter((c) => !have.has(c));
+          if (toInsert.length > 0) {
+            const { error } = await (supabase as any)
+              .from("user_standard_form_assignments")
+              .insert(
+                toInsert.map((code) => ({
+                  user_id: u.user_id,
+                  form_code: code,
+                  assigned_by: currentUserProfile?.user_id,
+                }))
+              );
+            if (error && error.code !== "23505") throw error;
+          }
+          // Restrict default visibility (non-admins only) so they ONLY see the
+          // standard forms assigned above. Admins keep their full role access.
+          if (bulkRestrictStandard && !isAdminUser) {
+            const { data: alreadyRestricted } = await (supabase as any)
+              .from("standard_form_user_restrictions")
+              .select("id")
+              .eq("user_id", u.user_id)
+              .limit(1);
+            if (!alreadyRestricted || alreadyRestricted.length === 0) {
+              const { error: rErr } = await (supabase as any)
+                .from("standard_form_user_restrictions")
+                .insert({ user_id: u.user_id, restricted_by: currentUserProfile?.user_id });
+              if (rErr && rErr.code !== "23505") throw rErr;
+            }
+          }
+          parts.push(`${stdForms.length} standard form(s)`);
+        }
+        if (pageIds.length > 0) {
+          // Grant specific restricted pages (skip ones the user already has).
+          const { data: existingPg } = await supabase
+            .from("user_page_access")
+            .select("page_id")
+            .eq("user_id", u.user_id);
+          const havePg = new Set(((existingPg ?? []) as any[]).map((r) => r.page_id));
+          const toGrant = pageIds.filter((p) => !havePg.has(p));
+          if (toGrant.length > 0) {
+            const { error } = await supabase
+              .from("user_page_access")
+              .insert(
+                toGrant.map((pid) => ({
+                  user_id: u.user_id,
+                  page_id: pid,
+                  granted_by: currentUserProfile?.user_id,
+                }))
+              );
+            if (error && error.code !== "23505") throw error;
+          }
+          parts.push(`${pageIds.length} page(s)`);
+        }
       } catch (err: any) {
         ok = false;
         results.push({ name, ok: false, message: err?.message || "Failed" });
@@ -375,17 +452,37 @@ const UsersView = () => {
       setBulkResults([...results]);
     }
     const okCount = results.filter((r) => r.ok).length;
-    const label = [projName, formNames.length ? `${formNames.length} form(s)` : ""].filter(Boolean).join(" + ");
+    const label = [
+      projName,
+      formNames.length ? `${formNames.length} form(s)` : "",
+      stdForms.length ? `${stdForms.length} standard form(s)` : "",
+      pageIds.length ? `${pageIds.length} page(s)` : "",
+    ]
+      .filter(Boolean)
+      .join(" + ");
     logAction(
       "assign_user_to_project",
       `Bulk assigned ${okCount} user(s) to ${label}`,
       undefined,
       undefined,
-      { user_ids: targets.map((u) => u.user_id), project_id: bulkProject || null, form_ids: formIds }
+      {
+        user_ids: targets.map((u) => u.user_id),
+        project_id: bulkProject || null,
+        form_ids: formIds,
+        standard_form_codes: stdForms,
+        page_ids: pageIds,
+        restrict_standard: bulkRestrictStandard,
+      }
     );
     toast({ title: "Assignment complete", description: `${okCount} of ${targets.length} user(s) assigned to ${label}.` });
     fetchAssignments();
-    if (okCount === targets.length) { clearSelection(); setBulkProject(""); setBulkForms(new Set()); }
+    if (okCount === targets.length) {
+      clearSelection();
+      setBulkProject("");
+      setBulkForms(new Set());
+      setBulkStandardForms(new Set());
+      setBulkPages(new Set());
+    }
     setBulkBusy(false);
     setBulkProgress(null);
   };
@@ -1551,10 +1648,13 @@ const UsersView = () => {
 
       {/* Bulk: Assign Project */}
       <Dialog open={showBulkAssign} onOpenChange={setShowBulkAssign}>
-        <DialogContent>
+        <DialogContent className="max-h-[88vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Assign Project &amp; Forms to {selectedIds.size} User(s)</DialogTitle>
-            <DialogDescription>Pick a project and/or one or more forms. Selected users get everything you choose, all at once.</DialogDescription>
+            <DialogTitle>Assign Access to {selectedIds.size} User(s)</DialogTitle>
+            <DialogDescription>
+              Pick a project, forms, standard forms and/or pages. Restricting standard forms limits
+              non-admin users to only what you assign here — Systems &amp; Super Admins keep their full role access.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <Label>Project (optional)</Label>
@@ -1593,7 +1693,79 @@ const UsersView = () => {
                 </label>
               ))}
             </div>
-            <Button className="w-full" disabled={(!bulkProject && bulkForms.size === 0) || bulkBusy} onClick={handleBulkAssignProject}>
+
+            {/* Standard forms */}
+            <div className="flex items-center justify-between">
+              <Label>Standard forms (optional)</Label>
+              {bulkStandardForms.size > 0 && (
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setBulkStandardForms(new Set())}>
+                  Clear ({bulkStandardForms.size})
+                </Button>
+              )}
+            </div>
+            <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-2">
+              {Object.values(STANDARD_ASSESSMENTS).map((def: any) => (
+                <label key={def.code} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted/50">
+                  <Checkbox
+                    checked={bulkStandardForms.has(def.code)}
+                    onCheckedChange={() =>
+                      setBulkStandardForms((prev) => {
+                        const next = new Set(prev);
+                        next.has(def.code) ? next.delete(def.code) : next.add(def.code);
+                        return next;
+                      })
+                    }
+                  />
+                  <span className="truncate">{def.name}</span>
+                </label>
+              ))}
+            </div>
+            {bulkStandardForms.size > 0 && (
+              <label className="flex items-start gap-2 rounded-lg border bg-muted/30 p-2.5 text-sm">
+                <Switch checked={bulkRestrictStandard} onCheckedChange={setBulkRestrictStandard} className="mt-0.5" />
+                <span className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Restrict to only these standard forms.</span>{" "}
+                  Non-admin users will no longer see every standard form their designation grants — only the ones
+                  selected above. Systems &amp; Super Admins are never restricted.
+                </span>
+              </label>
+            )}
+
+            {/* Pages */}
+            <div className="flex items-center justify-between">
+              <Label>Pages (optional)</Label>
+              {bulkPages.size > 0 && (
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setBulkPages(new Set())}>
+                  Clear ({bulkPages.size})
+                </Button>
+              )}
+            </div>
+            <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-2">
+              {RESTRICTED_PAGES.map((pg) => (
+                <label key={pg.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted/50">
+                  <Checkbox
+                    checked={bulkPages.has(pg.id)}
+                    onCheckedChange={() =>
+                      setBulkPages((prev) => {
+                        const next = new Set(prev);
+                        next.has(pg.id) ? next.delete(pg.id) : next.add(pg.id);
+                        return next;
+                      })
+                    }
+                  />
+                  <span className="truncate">{pg.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <Button
+              className="w-full"
+              disabled={
+                (!bulkProject && bulkForms.size === 0 && bulkStandardForms.size === 0 && bulkPages.size === 0) ||
+                bulkBusy
+              }
+              onClick={handleBulkAssignProject}
+            >
               {bulkBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FolderOpen className="mr-2 h-4 w-4" />}
               Assign to {selectedIds.size} User(s)
             </Button>
