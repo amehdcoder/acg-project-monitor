@@ -1923,11 +1923,20 @@ const UsersView = () => {
           </DialogHeader>
           <div className="space-y-3">
             <Label>Project (optional)</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search projects..."
+                value={projectFilter}
+                onChange={(e) => setProjectFilter(e.target.value)}
+                className="pl-9"
+              />
+            </div>
             <Select value={bulkProject || "__none__"} onValueChange={(v) => setBulkProject(v === "__none__" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Select a project" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">No project</SelectItem>
-                {projects.map((p) => (
+                {filteredProjects.map((p) => (
                   <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
