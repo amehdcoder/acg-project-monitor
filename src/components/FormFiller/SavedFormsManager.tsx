@@ -191,6 +191,11 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
         });
       }
       await load();
+      // If any synced entry was a Bloomberg validation form, refresh this
+      // device's uploaded Drafts / Ready-to-Send snapshots for the dashboard.
+      if (targets.some((e) => isBloombergSavedEntry(e))) {
+        void captureAndUploadDeviceAuditSnapshots();
+      }
     } finally {
       setSyncing(false);
     }
