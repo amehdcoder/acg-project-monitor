@@ -287,6 +287,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   // Launch the correct experience for an assigned standard-form code.
   const launchStandardForm = useCallback((code: string) => {
+    // Hard guard: an adhoc user may only open forms explicitly assigned to them,
+    // and never a form that has been restricted (disabled) at project level.
+    if (isAdhoc && !assignedStandardCodes.has(code)) return;
+    if (disabledStandardCodes.has(code as StandardFormCode)) {
+      toast({ title: "Form restricted", description: "This form has been restricted by an administrator.", variant: "destructive" });
+      return;
+    }
     switch (code) {
       case "uprp": setShowUprp(true); break;
       case "attendance": setShowDigitalAttendance(true); break;
