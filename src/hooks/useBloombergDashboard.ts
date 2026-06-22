@@ -365,22 +365,32 @@ export const useBloombergDashboard = () => {
     });
     discrepancies.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
 
-    const validatedSchools = new Set(submitted.map((v) => v.school_key)).size;
+    // "Schools Validated" = distinct REGISTERED schools that were validated
+    // (those matched to a school_key). Entries without a school_key are not in
+    // the schools register, so they cannot count toward coverage.
+    const validatedSchools = new Set(
+      submitted.map((v) => v.school_key).filter(Boolean) as string[],
+    ).size;
     const coveragePct = schoolCount > 0 ? (validatedSchools / schoolCount) * 100 : 0;
     const overallPct = baselineTotal > 0 ? ((validatedTotal - baselineTotal) / baselineTotal) * 100 : 0;
 
-    // Submissions = the TOTAL number of reported submissions from all users,
-    // irrespective of duplicates. The duplicate count is the exact number of
-    // superseded copies surfaced in the Duplicate Validation Entries audit
-    // (duplicates.extraEntries), so the KPI card and the audit section always
-    // report the SAME figure. Entries without a school_key cannot be matched as
-    // duplicates and must not inflate the count.
+    // --- Single source of truth for the duplicate reconciliation ---
+    // Submissions          = every reported entry from all users (raw count).
+    // Unique validations    = the de-duplicated set the dashboard counts
+    //                         (one survivor per school + each unkeyed entry).
+    // Duplicate submissions = superseded copies = Submissions − Unique validations.
+    // This is IDENTICAL to duplicates.extraEntries (the exact rows listed in the
+    // Duplicate Validation Entries audit), so the KPI card, the audit header and
+    // the per-validator breakdown always reconcile to the SAME figure.
     const submittedCount = validations.filter(isReportedValidation).length;
-    const duplicateCount = duplicates.extraEntries;
+    const uniqueValidations = submitted.length; // dedupedSent
+    const duplicateCount = submittedCount - uniqueValidations;
 
     return {
       totalSchools: schoolCount,
       validatedSchools,
+      uniqueValidations,
+      schoolsWithDuplicates: duplicates.schoolsWithDuplicates,
       submittedCount,
       duplicateCount,
       draftCount: draft.length,
