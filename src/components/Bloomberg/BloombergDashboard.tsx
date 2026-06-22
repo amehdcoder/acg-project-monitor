@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { exportSchoolTemplate, importSchoolTemplate } from "@/lib/bloomberg/schoolTemplate";
 import { exportCollectedData } from "@/lib/bloomberg/collectedDataExport";
+import { exportPhotoEvidence } from "@/lib/bloomberg/photoEvidenceExport";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -202,6 +203,24 @@ export default function BloombergDashboard({ onClose }: Props) {
       setDownloadingData(false);
     }
   };
+  // Download every uploaded photo (signboard / classroom / register / extra) as
+  // a ZIP, foldered by State › LGA › School – Validator, with a manifest CSV.
+  const [downloadingPhotos, setDownloadingPhotos] = useState(false);
+  const [photoProgress, setPhotoProgress] = useState<{ done: number; total: number } | null>(null);
+  const handleDownloadPhotos = async () => {
+    setDownloadingPhotos(true);
+    setPhotoProgress(null);
+    try {
+      const { photos, schools } = await exportPhotoEvidence((p) => setPhotoProgress(p));
+      toast.success(`Downloaded ${photos.toLocaleString()} photo(s) across ${schools.toLocaleString()} school(s)`);
+    } catch (e: any) {
+      toast.error(e?.message || "Could not download photo evidence");
+    } finally {
+      setDownloadingPhotos(false);
+      setPhotoProgress(null);
+    }
+  };
+
   // Hard-delete of validation entries is restricted to the Owner / Co-owner.
   const canDelete = isOwnerLevel;
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -270,6 +289,26 @@ export default function BloombergDashboard({ onClose }: Props) {
       })
       .filter((g) => g.copies.length > 0);
   }, [duplicates.groups, dupValidator, dupType, dupRowStatus]);
+
+  // Copy-level reconciliation for the active filter. The per-validator badges
+  // count SUPERSEDED copies, while a "school" can contain several copies, so a
+  // school count alone cannot be reconciled against the badge. We therefore
+  // surface the exact copy breakdown (total / superseded / retained) for the
+  // current filter — selecting a validator then shows a superseded figure that
+  // matches that validator's badge exactly.
+  const filteredCopyStats = useMemo(() => {
+    let entries = 0;
+    let superseded = 0;
+    let retained = 0;
+    filteredDupGroups.forEach((g) =>
+      g.copies.forEach((c) => {
+        entries += 1;
+        if (c.kept) retained += 1;
+        else superseded += 1;
+      }),
+    );
+    return { entries, superseded, retained, schools: filteredDupGroups.length };
+  }, [filteredDupGroups]);
 
   // Paginate by group so the DOM never mounts thousands of rows at once.
   const dupPg = useTablePagination(filteredDupGroups, 40);
@@ -434,6 +473,14 @@ export default function BloombergDashboard({ onClose }: Props) {
                 {isAdmin && (
                   <DropdownMenuItem onClick={() => handleDownloadData()} disabled={downloadingData}>
                     <Download className="mr-2 h-4 w-4" /> Download Collected Data (Excel)
+                  </DropdownMenuItem>
+                )}
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => handleDownloadPhotos()} disabled={downloadingPhotos}>
+                    {downloadingPhotos ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileImage className="mr-2 h-4 w-4" />}
+                    {downloadingPhotos && photoProgress
+                      ? `Downloading photos ${photoProgress.done}/${photoProgress.total}…`
+                      : "Download Photo Evidence (ZIP)"}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={() => exportPDF()}>
@@ -601,18 +648,38 @@ export default function BloombergDashboard({ onClose }: Props) {
             {duplicates.validatorBreakdown.length > 0 && (
               <div className="mb-3 rounded-lg border border-amber-200 bg-white/60 p-2 dark:border-amber-900/50 dark:bg-amber-950/20">
                 <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Superseded copies by validator
+                  Superseded copies by validator — total {fmt(duplicates.extraEntries)} (click a name to view that validator's superseded copies)
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {duplicates.validatorBreakdown.map((v) => (
-                    <span
-                      key={v.validator}
-                      className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/50 dark:text-amber-200"
-                    >
-                      {v.validator}
-                      <span className="rounded-full bg-amber-600 px-1.5 text-[10px] font-bold text-white">{fmt(v.extras)}</span>
-                    </span>
-                  ))}
+                  {duplicates.validatorBreakdown.map((v) => {
+                    const active = dupValidator === v.validator && dupRowStatus === "superseded";
+                    return (
+                      <button
+                        key={v.validator}
+                        type="button"
+                        onClick={() => {
+                          if (active) {
+                            setDupValidator("all");
+                            setDupRowStatus("all");
+                          } else {
+                            setDupValidator(v.validator);
+                            setDupRowStatus("superseded");
+                            setDupType("all");
+                          }
+                          dupPg.resetPage();
+                        }}
+                        title={`${v.validator}: ${v.extras} superseded cop${v.extras === 1 ? "y" : "ies"}. Click to filter the table below.`}
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition ${
+                          active
+                            ? "bg-amber-600 text-white"
+                            : "bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/50 dark:text-amber-200 dark:hover:bg-amber-900/70"
+                        }`}
+                      >
+                        {v.validator}
+                        <span className={`rounded-full px-1.5 text-[10px] font-bold ${active ? "bg-white text-amber-700" : "bg-amber-600 text-white"}`}>{fmt(v.extras)}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -674,8 +741,11 @@ export default function BloombergDashboard({ onClose }: Props) {
                   Clear filters
                 </button>
               )}
-              <span className="ml-auto self-center text-[11px] text-muted-foreground">
-                {fmt(filteredDupGroups.length)} school{filteredDupGroups.length === 1 ? "" : "s"} match
+              <span className="ml-auto self-center text-right text-[11px] text-muted-foreground">
+                {fmt(filteredCopyStats.schools)} school{filteredCopyStats.schools === 1 ? "" : "s"} ·{" "}
+                {fmt(filteredCopyStats.entries)} entr{filteredCopyStats.entries === 1 ? "y" : "ies"} ·{" "}
+                <span className="font-semibold text-amber-700 dark:text-amber-300">{fmt(filteredCopyStats.superseded)} superseded</span>
+                {" "}· {fmt(filteredCopyStats.retained)} retained
               </span>
             </div>
 

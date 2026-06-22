@@ -205,6 +205,32 @@ export const useBloombergDashboard = () => {
     return m;
   }, [baselines]);
 
+  // School register lookup so a submission that is missing its own state/lga
+  // codes can still be placed in the correct geography via its school_key.
+  // This eliminates spurious "Unknown" rows in the State & LGA table whenever
+  // the school itself is known.
+  const schoolMetaByKey = useMemo(() => {
+    const m = new Map<string, { state: string | null; lga: string | null }>();
+    schools.forEach((s) => m.set(s.school_key, { state: s.state ?? null, lga: s.lga ?? null }));
+    return m;
+  }, [schools]);
+
+  // Resolve a submission's effective state/lga codes: prefer the values stored
+  // on the submission, else fall back to the school register by school_key.
+  const resolveGeo = (v: Pick<ValidationRow, "state" | "lga" | "school_key">) => {
+    let state = v.state;
+    let lga = v.lga;
+    if ((!state || !lga) && v.school_key) {
+      const meta = schoolMetaByKey.get(v.school_key);
+      if (meta) {
+        state = state || meta.state;
+        lga = lga || meta.lga;
+      }
+    }
+    return { state, lga };
+  };
+
+
   // Human-readable admin-unit labels. Submissions store raw option codes
   // (state="bauchi", lga="bauchi_ganjuwa"); the schools register carries the
   // matching display labels (state_label="Bauchi", lga_label="Ganjuwa"). We
@@ -225,10 +251,15 @@ export const useBloombergDashboard = () => {
     return { state, lga, ward, loc };
   }, [schools]);
 
+  const UNSPECIFIED = "Unspecified location";
   const stateName = (code: string | null | undefined) =>
-    (code && labelMaps.state.get(code)) || prettyAdminLabel(code) || "—";
+    !code || code === "__unspecified__"
+      ? UNSPECIFIED
+      : labelMaps.state.get(code) || prettyAdminLabel(code) || "—";
   const lgaName = (stateCode: string | null | undefined, code: string | null | undefined) =>
-    (code && labelMaps.lga.get(code)) || prettyAdminLabel(code, stateCode) || "—";
+    !code || code === "__unspecified__"
+      ? UNSPECIFIED
+      : labelMaps.lga.get(code) || prettyAdminLabel(code, stateCode) || "—";
   const wardName = (
     stateCode: string | null | undefined,
     lgaCode: string | null | undefined,
@@ -312,8 +343,8 @@ export const useBloombergDashboard = () => {
         schoolKey: key,
         school: sorted[0].school_name || "Unknown",
         code: sorted[0].school_code || key,
-        state: stateName(sorted[0].state),
-        lga: lgaName(sorted[0].state, sorted[0].lga),
+        state: stateName(resolveGeo(sorted[0]).state),
+        lga: lgaName(resolveGeo(sorted[0]).state, resolveGeo(sorted[0]).lga),
         total: arr.length,
         extras: arr.length - 1,
         crossValidator,
@@ -417,8 +448,8 @@ export const useBloombergDashboard = () => {
       reported.map((v) => ({
         userId: v.validator_id,
         unitName: v.school_name || "Unnamed school",
-        state: stateName(v.state),
-        lga: lgaName(v.state, v.lga),
+        state: stateName(resolveGeo(v).state),
+        lga: lgaName(resolveGeo(v).state, resolveGeo(v).lga),
         start: v.created_at,
         end: v.submitted_at || v.updated_at,
         status: v.status || "sent",
@@ -505,7 +536,7 @@ export const useBloombergDashboard = () => {
   const byState = useMemo(() => {
     const m = new Map<string, number>();
     submittedValidations.forEach((v) => {
-      const key = stateName(v.state);
+      const key = stateName(resolveGeo(v).state);
       m.set(key, (m.get(key) || 0) + 1);
     });
     return [...m.entries()].map(([state, count]) => ({ state, count })).sort((a, b) => b.count - a.count);
@@ -534,8 +565,9 @@ export const useBloombergDashboard = () => {
     const states = new Map<string, { agg: Agg; lgas: Map<string, Agg> }>();
 
     submitted.forEach((v) => {
-      const st = (v.state || "Unknown").toString();
-      const lga = (v.lga || "Unknown").toString();
+      const geo = resolveGeo(v);
+      const st = (geo.state || "__unspecified__").toString();
+      const lga = (geo.lga || "__unspecified__").toString();
       if (!states.has(st)) states.set(st, { agg: newAgg(), lgas: new Map() });
       const node = states.get(st)!;
       if (!node.lgas.has(lga)) node.lgas.set(lga, newAgg());
@@ -608,8 +640,9 @@ export const useBloombergDashboard = () => {
       const bt = b?.grand_total ?? 0;
       if (bt <= 0) return;
       const pct = (((v.grand_total ?? 0) - bt) / bt) * 100;
-      const st = (v.state || "Unknown").toString();
-      const lga = `${st}::${(v.lga || "Unknown").toString()}`;
+      const geo = resolveGeo(v);
+      const st = (geo.state || "__unspecified__").toString();
+      const lga = `${st}::${(geo.lga || "__unspecified__").toString()}`;
       (stateSamples.get(st) || stateSamples.set(st, []).get(st)!).push(pct);
       (lgaSamples.get(lga) || lgaSamples.set(lga, []).get(lga)!).push(pct);
     });
@@ -637,9 +670,9 @@ export const useBloombergDashboard = () => {
           id: v.id,
           school: v.school_name || "Unknown",
           code: v.school_code || v.school_key || "—",
-          state: stateName(v.state),
-          lga: lgaName(v.state, v.lga),
-          ward: wardName(v.state, v.lga, v.ward),
+          state: stateName(resolveGeo(v).state),
+          lga: lgaName(resolveGeo(v).state, resolveGeo(v).lga),
+          ward: wardName(resolveGeo(v).state, resolveGeo(v).lga, v.ward),
           reasonValue: reasonVal,
           reason: REASON_LABEL.get(reasonVal) || reasonVal || "Other",
           status: v.status || "draft",
@@ -682,8 +715,8 @@ export const useBloombergDashboard = () => {
           id: v.id,
           school: v.school_name || "Unknown",
           code: v.school_code || v.school_key || "—",
-          state: stateName(v.state),
-          lga: lgaName(v.state, v.lga),
+          state: stateName(resolveGeo(v).state),
+          lga: lgaName(resolveGeo(v).state, resolveGeo(v).lga),
           type: v.school_type || "—",
           baseline,
           validated,
