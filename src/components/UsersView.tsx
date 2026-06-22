@@ -1579,7 +1579,9 @@ const UsersView = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              {groupedUsers.map((group) => (
+              {groupedUsers.map((group) => {
+                const collapsed = collapsedGroups.has(group.key);
+                return (
                 <div key={group.key} className="space-y-3">
                   <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${group.color.soft}`}>
                     {group.users.some((u) => !u.is_owner) && (
@@ -1590,12 +1592,25 @@ const UsersView = () => {
                         />
                       </label>
                     )}
-                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${group.color.bar}`} />
-                    <FolderOpen className="h-4 w-4 text-muted-foreground" />
-                    <h3 className="font-display text-sm font-semibold text-foreground">{group.name}</h3>
-                    <Badge variant="secondary" className="ml-auto">{group.users.length}</Badge>
+                    <button
+                      type="button"
+                      onClick={() => toggleGroupCollapse(group.key)}
+                      className="flex flex-1 items-center gap-2 text-left"
+                      aria-expanded={!collapsed}
+                      title={collapsed ? `Expand ${group.name}` : `Collapse ${group.name}`}
+                    >
+                      {collapsed ? (
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${group.color.bar}`} />
+                      <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                      <h3 className="font-display text-sm font-semibold text-foreground">{group.name}</h3>
+                      <Badge variant="secondary" className="ml-auto">{group.users.length}</Badge>
+                    </button>
                   </div>
-                  {group.users.map((user) => (
+                  {!collapsed && group.users.map((user) => (
                     <UserCard
                       key={`${group.key}-${user.id}`}
                       user={user}
@@ -1605,7 +1620,8 @@ const UsersView = () => {
                     />
                   ))}
                 </div>
-              ))}
+                );
+              })}
             </div>
 
           )}
