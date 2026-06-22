@@ -233,6 +233,11 @@ export const usePageAccess = () => {
       // Co-owners are owner-level ("near-full app rights") — grant every page,
       // including the restricted ones, just like the Owner.
       if (isOwnerLevel) return true;
+      // Minimal-access lock (non-admins only): ONLY Forms, Project Chat and My
+      // Submissions, regardless of designation or any other grant.
+      if (minimalAccess && !isAdmin) {
+        return pageId === "forms" || pageId === "project-chat" || pageId === "my-submissions";
+      }
       // Owner-granted, time-bounded per-user access works for any page id.
       if (canAccessUserPage(pageId)) return true;
       // Field designations (FLHF Supervisor, Enumerator, CDD) get default
