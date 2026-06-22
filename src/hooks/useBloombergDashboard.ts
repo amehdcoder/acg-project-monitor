@@ -448,8 +448,8 @@ export const useBloombergDashboard = () => {
       reported.map((v) => ({
         userId: v.validator_id,
         unitName: v.school_name || "Unnamed school",
-        state: stateName(v.state),
-        lga: lgaName(v.state, v.lga),
+        state: stateName(resolveGeo(v).state),
+        lga: lgaName(resolveGeo(v).state, resolveGeo(v).lga),
         start: v.created_at,
         end: v.submitted_at || v.updated_at,
         status: v.status || "sent",
