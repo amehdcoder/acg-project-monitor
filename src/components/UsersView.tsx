@@ -686,6 +686,7 @@ const UsersView = () => {
         description: `User has been assigned to the project.`,
       });
 
+      notifyAssignment(selectedUser, "project", [projectById.get(selectedProject)?.name || "a project"]);
       setSelectedProject(""); fetchAssignments();
     } catch (error: any) {
       if (error.code === "23505") {
