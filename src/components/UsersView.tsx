@@ -717,12 +717,20 @@ const UsersView = () => {
       targets.length === 0
     )
       return;
-    const projName = bulkProject ? (projects.find((p) => p.id === bulkProject)?.name || "the project") : "";
-    const formNames = formIds.map((id) => forms.find((f) => f.id === id)?.name || "form");
+    const projName = bulkProject ? (projectById.get(bulkProject)?.name || "the project") : "";
+    const formNames = formIds.map((id) => formById.get(id)?.name || "form");
     setBulkBusy(true);
     setBulkResults([]);
     setBulkProgress({ done: 0, total: targets.length });
     const results: { name: string; ok: boolean; message: string }[] = [];
+    // Collected audit rows for standard-form assignments / restrictions.
+    const auditRows: {
+      target_user_id: string;
+      project_id?: string | null;
+      form_code?: string | null;
+      action: "assigned" | "restricted" | "minimal_lock" | "unassigned";
+      detail?: string | null;
+    }[] = [];
     // Roles that keep full default access regardless of restriction toggle.
     const adminRoles = new Set(["super_admin", "systems_admin"]);
     for (const u of targets) {
