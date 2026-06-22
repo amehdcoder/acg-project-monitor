@@ -11,6 +11,8 @@ import MapVisualization from "@/components/MapVisualization/MapVisualization";
 import { MapMarker } from "@/components/MapVisualization/types";
 import { useBloombergDashboard } from "@/hooks/useBloombergDashboard";
 import BloombergStateLGADrilldown from "@/components/Bloomberg/BloombergStateLGADrilldown";
+import BloombergValidatorDrilldown from "@/components/Bloomberg/BloombergValidatorDrilldown";
+import BloombergDeviceSnapshotViewer from "@/components/Bloomberg/BloombergDeviceSnapshotViewer";
 import AccountabilityTable from "@/components/shared/AccountabilityTable";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
