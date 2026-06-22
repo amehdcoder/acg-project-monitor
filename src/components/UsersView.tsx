@@ -74,7 +74,7 @@ import AdminReliabilityPanel from "@/components/OwnerTools/AdminReliabilityPanel
 import UserLoginDetailsDialog from "@/components/OwnerTools/UserLoginDetailsDialog";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import InactiveUsersPanel from "@/components/InactiveUsersPanel";
-import { STANDARD_ASSESSMENTS } from "@/lib/standardAssessments/definitions";
+import { ALL_STANDARD_FORMS } from "@/lib/standardAssessments/allStandardForms";
 
 interface UserProfile {
   id: string;
@@ -1574,7 +1574,7 @@ const UsersView = () => {
                     <SelectValue placeholder="Select a standard form" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.values(STANDARD_ASSESSMENTS).map((def: any) => (
+                    {ALL_STANDARD_FORMS.map((def) => (
                       <SelectItem key={def.code} value={def.code}>
                         {def.name}
                       </SelectItem>
@@ -1840,7 +1840,7 @@ const UsersView = () => {
               )}
             </div>
             <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-2">
-              {Object.values(STANDARD_ASSESSMENTS).map((def: any) => (
+              {ALL_STANDARD_FORMS.map((def) => (
                 <label key={def.code} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted/50">
                   <Checkbox
                     checked={bulkStandardForms.has(def.code)}
