@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
 import {
   Users,
   Plus,
@@ -135,6 +135,327 @@ const getUserDisplayName = (user: Partial<UserProfile> | null | undefined) => {
 const getRoleInfo = (role?: string | null) =>
   roleLabels[(role || "user") as keyof typeof roleLabels] || roleLabels.user;
 
+// Deterministic color-grade palette keyed by project index.
+const PROJECT_PALETTE = [
+  { chip: "bg-blue-100 text-blue-700 border-blue-200", bar: "bg-blue-500", soft: "bg-blue-50/60" },
+  { chip: "bg-emerald-100 text-emerald-700 border-emerald-200", bar: "bg-emerald-500", soft: "bg-emerald-50/60" },
+  { chip: "bg-violet-100 text-violet-700 border-violet-200", bar: "bg-violet-500", soft: "bg-violet-50/60" },
+  { chip: "bg-amber-100 text-amber-700 border-amber-200", bar: "bg-amber-500", soft: "bg-amber-50/60" },
+  { chip: "bg-rose-100 text-rose-700 border-rose-200", bar: "bg-rose-500", soft: "bg-rose-50/60" },
+  { chip: "bg-cyan-100 text-cyan-700 border-cyan-200", bar: "bg-cyan-500", soft: "bg-cyan-50/60" },
+  { chip: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200", bar: "bg-fuchsia-500", soft: "bg-fuchsia-50/60" },
+  { chip: "bg-teal-100 text-teal-700 border-teal-200", bar: "bg-teal-500", soft: "bg-teal-50/60" },
+];
+const NO_ACCESS = { chip: "bg-muted text-muted-foreground border-border", bar: "bg-muted-foreground/40", soft: "bg-muted/30" };
+
+// Memoized row. Only re-renders when its own `selected` flag (or the rarely
+// changing shared `ctx`) changes — so toggling one checkbox in a list of
+// hundreds of users no longer re-renders every other row.
+const UserCard = memo(function UserCard({
+  user,
+  selected,
+  ctx,
+  api,
+}: {
+  user: any;
+  selected: boolean;
+  ctx: any;
+  api: { current: any };
+}) {
+  const {
+    isOwner,
+    isCoOwner,
+    isSuperAdmin,
+    isImpersonating,
+    impersonatingId,
+    projectNameById,
+    formNameById,
+    colorForProject,
+    getUserProjectIds,
+    getUserFormIds,
+    formById,
+    cascadeAssign,
+  } = ctx;
+  const a = api.current;
+  const roleInfo = getRoleInfo(user.role?.role);
+  const RoleIcon = roleInfo.icon;
+  const displayName = getUserDisplayName(user);
+  const displayEmail = safeText(user.email);
+  const userProjectIds = getUserProjectIds(user.user_id);
+  const userFormIds = getUserFormIds(user.user_id);
+
+  return (
+    <div
+      className={`group flex flex-col gap-4 rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft sm:flex-row sm:items-center sm:justify-between ${
+        !user.is_active ? "opacity-60" : ""
+      }`}
+    >
+      <div className="flex items-start gap-4">
+        {!user.is_owner && (
+          <Checkbox
+            className="mt-5"
+            checked={selected}
+            onCheckedChange={() => a.toggleSelect(user.user_id)}
+          />
+        )}
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+          <User className="h-7 w-7 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="font-medium text-foreground">{displayName}</h4>
+            {user.is_owner && (
+              <Badge variant="outline" className="border-acg-gold text-acg-gold">
+                Owner
+              </Badge>
+            )}
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${roleInfo.color}`}>
+              <RoleIcon className="h-3 w-3" />
+              {roleInfo.label}
+            </span>
+            {!user.is_active && <Badge variant="secondary">Inactive</Badge>}
+            {user.approval_status === "pending" && (
+              <Badge variant="outline" className="border-amber-500 bg-amber-50 text-amber-700">Pending Approval</Badge>
+            )}
+            {user.approval_status === "rejected" && <Badge variant="destructive">Rejected</Badge>}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Mail className="h-3 w-3" />
+              {displayEmail}
+            </span>
+            {user.phone_number && (
+              <span className="flex items-center gap-1">
+                <Phone className="h-3 w-3" />
+                {safeText(user.phone_number)}
+              </span>
+            )}
+            {user.state && (
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                {safeText(user.state)}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground capitalize">
+            {(user.designation || "").replace("_", " ") || "—"}
+            {user.other_designation && ` - ${user.other_designation}`}
+          </p>
+          {/* Access: projects & forms (blank when none) */}
+          <div className="mt-2.5 flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Projects</span>
+              {userProjectIds.length > 0 ? (
+                userProjectIds.map((pid: string) => {
+                  const c = colorForProject(pid);
+                  return (
+                    <span key={pid} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${c.chip}`}>
+                      <FolderOpen className="h-3 w-3" />
+                      {projectNameById(pid)}
+                    </span>
+                  );
+                })
+              ) : (
+                <span className="text-[11px] italic text-muted-foreground/50">—</span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Forms</span>
+              {userFormIds.length > 0 ? (
+                userFormIds.map((fid: string) => {
+                  const f = formById.get(fid);
+                  const parentColor = f?.project_id ? colorForProject(f.project_id) : NO_ACCESS;
+                  return (
+                    <span key={fid} className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium ${parentColor.chip}`}>
+                      <FileText className="h-3 w-3" />
+                      {formNameById(fid)}
+                    </span>
+                  );
+                })
+              ) : (
+                <span className="text-[11px] italic text-muted-foreground/50">—</span>
+              )}
+            </div>
+            {(cascadeAssign[user.user_id]?.length ?? 0) > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Cascade scope</span>
+                {(cascadeAssign[user.user_id] || []).map((c: any, ci: number) => (
+                  <span key={ci} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                    <MapPin className="h-3 w-3" />
+                    <span className="capitalize opacity-60">{c.field_key.replace("_", " ")}:</span>
+                    {c.value_label || c.value}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            a.setSelectedUser(user);
+            a.setShowAssignDialog(true);
+          }}
+        >
+          <FolderOpen className="h-4 w-4" />
+          Assign
+        </Button>
+        {(isOwner || isCoOwner) && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => a.setCascadeUser(user)}
+            title="Link this user to cascade options (e.g. a State)"
+          >
+            <MapPin className="h-4 w-4" />
+            Cascade
+          </Button>
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {isSuperAdmin && (
+              <>
+                <DropdownMenuItem
+                  onClick={() => {
+                    a.setSelectedUser(user);
+                    a.setEditProfileData({
+                      first_name: user.first_name || "",
+                      last_name: user.last_name || "",
+                      phone_number: user.phone_number,
+                      state: user.state,
+                      lga: user.lga,
+                      ward: user.ward,
+                      designation: user.designation || "adhoc_user",
+                      other_designation: user.other_designation,
+                    });
+                    a.setShowEditProfileDialog(true);
+                  }}
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    a.setSelectedUser(user);
+                    a.setNewRole(user.role?.role || "user");
+                    a.setShowRoleDialog(true);
+                  }}
+                  disabled={user.is_owner}
+                >
+                  <UserCog className="mr-2 h-4 w-4" />
+                  Change Role
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={async () => {
+                    a.setImpersonating(user.user_id);
+                    const success = await a.startImpersonation(user.user_id, displayName);
+                    if (success) {
+                      await a.logAction(
+                        "impersonate_user",
+                        `Started impersonating ${displayName} (${displayEmail})`,
+                        "user",
+                        user.user_id,
+                      );
+                    }
+                    a.setImpersonating(null);
+                  }}
+                  disabled={user.is_owner || isImpersonating || impersonatingId === user.user_id}
+                >
+                  {impersonatingId === user.user_id ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <LogIn className="mr-2 h-4 w-4" />
+                  )}
+                  Sign in as User
+                </DropdownMenuItem>
+              </>
+            )}
+            {isSuperAdmin && (
+              <DropdownMenuItem
+                onClick={() => {
+                  a.setSelectedUser(user);
+                  a.setShowDeviceDialog(true);
+                }}
+              >
+                <Monitor className="mr-2 h-4 w-4" />
+                View Devices
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={() => a.handleToggleActive(user)} disabled={user.is_owner}>
+              <User className="mr-2 h-4 w-4" />
+              {user.is_active ? "Deactivate" : "Activate"}
+            </DropdownMenuItem>
+            {user.approval_status === "pending" && (
+              <>
+                <DropdownMenuItem
+                  onClick={async () => {
+                    await supabase.from("profiles").update({ approval_status: "approved" }).eq("id", user.id);
+                    await supabase.from("notifications").insert({
+                      user_id: user.user_id,
+                      title: "✅ Account Approved",
+                      message: "Your account has been approved! You now have full access to Amehnities.",
+                      type: "success",
+                      category: "registration",
+                    });
+                    await a.logAction("approve_user", `Approved user ${displayName} (${displayEmail})`, "user", user.user_id);
+                    toast({ title: "User Approved", description: `${displayName} has been approved.` });
+                    a.fetchUsers();
+                  }}
+                  className="text-green-600"
+                >
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Approve
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={async () => {
+                    await supabase.from("profiles").update({ approval_status: "rejected" }).eq("id", user.id);
+                    await supabase.from("notifications").insert({
+                      user_id: user.user_id,
+                      title: "❌ Account Rejected",
+                      message: "Your registration has been reviewed and was not approved. Please contact an administrator.",
+                      type: "error",
+                      category: "registration",
+                    });
+                    await a.logAction("reject_user", `Rejected user ${displayName} (${displayEmail})`, "user", user.user_id);
+                    toast({ title: "User Rejected", description: `${displayName} has been rejected.` });
+                    a.fetchUsers();
+                  }}
+                  className="text-destructive"
+                >
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  Reject
+                </DropdownMenuItem>
+              </>
+            )}
+            {isOwner && !user.is_owner && (
+              <DropdownMenuItem
+                onClick={() => {
+                  a.setSelectedUser(user);
+                  a.setDeleteConfirmText("");
+                  a.setShowDeleteDialog(true);
+                }}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Permanently
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+});
+
+
 const UsersView = () => {
   const { role: currentUserRole, profile: currentUserProfile, isOwner, isCoOwner, isAdmin } = useAuth();
   const { startImpersonation, isImpersonating } = useImpersonation();
@@ -234,9 +555,13 @@ const UsersView = () => {
 
       if (rolesError) throw rolesError;
 
+      const rolesByUser = new Map<string, UserRole>();
+      (roles || []).forEach((r: any) => {
+        if (r.user_id && !rolesByUser.has(r.user_id)) rolesByUser.set(r.user_id, r);
+      });
       const usersWithRoles = profiles?.map((profile) => ({
         ...profile,
-        role: roles?.find((r) => r.user_id === profile.user_id),
+        role: rolesByUser.get(profile.user_id),
       })) || [];
 
       setUsers(usersWithRoles);
@@ -767,28 +1092,31 @@ const UsersView = () => {
     }
   };
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch = `${safeText(user.first_name, "")} ${safeText(user.last_name, "")} ${safeText(user.email, "")}`
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesDesignation = filterDesignation === "all" || user.designation === "adhoc_user";
-    return matchesSearch && matchesDesignation;
-  });
+  const filteredUsers = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return users.filter((user) => {
+      const matchesSearch = `${safeText(user.first_name, "")} ${safeText(user.last_name, "")} ${safeText(user.email, "")}`
+        .toLowerCase()
+        .includes(q);
+      const matchesDesignation = filterDesignation === "all" || user.designation === "adhoc_user";
+      return matchesSearch && matchesDesignation;
+    });
+  }, [users, searchQuery, filterDesignation]);
 
   // ---------------- Bulk actions (selected users) ----------------
-  const selectableUsers = filteredUsers.filter((u) => !u.is_owner);
+  const selectableUsers = useMemo(() => filteredUsers.filter((u) => !u.is_owner), [filteredUsers]);
 
   const allFilteredSelected =
     selectableUsers.length > 0 &&
     selectableUsers.every((u) => selectedIds.has(u.user_id));
 
-  const toggleSelect = (userId: string) => {
+  const toggleSelect = useCallback((userId: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       next.has(userId) ? next.delete(userId) : next.add(userId);
       return next;
     });
-  };
+  }, []);
 
   const toggleSelectAll = () => {
     setSelectedIds((prev) => {
@@ -824,34 +1152,49 @@ const UsersView = () => {
   const isSuperAdmin = currentUserRole === "super_admin" || isOwner;
 
   // ---------- Access display: projects & forms per user ----------
-  const projectNameById = (id: string) => projects.find((p) => p.id === id)?.name || "Unknown project";
-  const formNameById = (id: string) => forms.find((f) => f.id === id)?.name || "Unknown form";
+  // Map-based lookups so per-row rendering is O(1) instead of scanning the
+  // full projects/forms arrays for every chip on every render.
+  const projectById = useMemo(() => {
+    const m = new Map<string, Project>();
+    projects.forEach((p) => m.set(p.id, p));
+    return m;
+  }, [projects]);
+  const formById = useMemo(() => {
+    const m = new Map<string, Form>();
+    forms.forEach((f) => m.set(f.id, f));
+    return m;
+  }, [forms]);
+  const projectColorById = useMemo(() => {
+    const m = new Map<string, typeof PROJECT_PALETTE[number]>();
+    projects.forEach((p, idx) => m.set(p.id, PROJECT_PALETTE[idx % PROJECT_PALETTE.length]));
+    return m;
+  }, [projects]);
 
-  const getUserProjectIds = (uid: string) =>
-    Array.from(new Set(projectAssign[uid] || [])).filter((id) => projects.some((p) => p.id === id));
-  const getUserFormIds = (uid: string) =>
-    Array.from(new Set(formAssign[uid] || [])).filter((id) => forms.some((f) => f.id === id));
+  const projectNameById = useCallback(
+    (id: string) => projectById.get(id)?.name || "Unknown project",
+    [projectById],
+  );
+  const formNameById = useCallback(
+    (id: string) => formById.get(id)?.name || "Unknown form",
+    [formById],
+  );
+  const colorForProject = useCallback(
+    (id: string) => projectColorById.get(id) || PROJECT_PALETTE[0],
+    [projectColorById],
+  );
 
-  // Deterministic color-grade palette keyed by project id.
-  const PROJECT_PALETTE = [
-    { chip: "bg-blue-100 text-blue-700 border-blue-200", bar: "bg-blue-500", soft: "bg-blue-50/60" },
-    { chip: "bg-emerald-100 text-emerald-700 border-emerald-200", bar: "bg-emerald-500", soft: "bg-emerald-50/60" },
-    { chip: "bg-violet-100 text-violet-700 border-violet-200", bar: "bg-violet-500", soft: "bg-violet-50/60" },
-    { chip: "bg-amber-100 text-amber-700 border-amber-200", bar: "bg-amber-500", soft: "bg-amber-50/60" },
-    { chip: "bg-rose-100 text-rose-700 border-rose-200", bar: "bg-rose-500", soft: "bg-rose-50/60" },
-    { chip: "bg-cyan-100 text-cyan-700 border-cyan-200", bar: "bg-cyan-500", soft: "bg-cyan-50/60" },
-    { chip: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200", bar: "bg-fuchsia-500", soft: "bg-fuchsia-50/60" },
-    { chip: "bg-teal-100 text-teal-700 border-teal-200", bar: "bg-teal-500", soft: "bg-teal-50/60" },
-  ];
-  const colorForProject = (id: string) => {
-    const idx = projects.findIndex((p) => p.id === id);
-    return PROJECT_PALETTE[(idx < 0 ? 0 : idx) % PROJECT_PALETTE.length];
-  };
-  const NO_ACCESS = { chip: "bg-muted text-muted-foreground border-border", bar: "bg-muted-foreground/40", soft: "bg-muted/30" };
+  const getUserProjectIds = useCallback(
+    (uid: string) => Array.from(new Set(projectAssign[uid] || [])).filter((id) => projectById.has(id)),
+    [projectAssign, projectById],
+  );
+  const getUserFormIds = useCallback(
+    (uid: string) => Array.from(new Set(formAssign[uid] || [])).filter((id) => formById.has(id)),
+    [formAssign, formById],
+  );
 
   // Group filtered users by the projects they have access to. A user assigned to
   // multiple projects appears under each; users with none fall into "No Project Access".
-  const groupedUsers = (() => {
+  const groupedUsers = useMemo(() => {
     const groups: { key: string; name: string; color: typeof NO_ACCESS; users: typeof filteredUsers }[] = [];
     const byKey = new Map<string, { key: string; name: string; color: typeof NO_ACCESS; users: typeof filteredUsers }>();
     const sortedProjects = [...projects].sort((a, b) => a.name.localeCompare(b.name));
@@ -870,8 +1213,62 @@ const UsersView = () => {
     byKey.forEach((g) => { if (g.users.length) groups.push(g); });
     if (noAccess.users.length) groups.push(noAccess);
     return groups;
-  })();
+  }, [filteredUsers, projects, colorForProject, getUserProjectIds]);
 
+  // Stable ref of all row action handlers — its identity never changes, so it
+  // never forces memoized rows to re-render. Always points at the latest fns.
+  const rowApiRef = useRef<any>({});
+  rowApiRef.current = {
+    toggleSelect,
+    setSelectedUser,
+    setShowAssignDialog,
+    setCascadeUser,
+    setEditProfileData,
+    setShowEditProfileDialog,
+    setNewRole,
+    setShowRoleDialog,
+    setShowDeviceDialog,
+    setDeleteConfirmText,
+    setShowDeleteDialog,
+    setImpersonating,
+    startImpersonation,
+    logAction,
+    fetchUsers,
+    handleToggleActive,
+  };
+
+  // Shared per-row context. Changes only on the rare events that affect every
+  // row (role/impersonation/assignment data), not on checkbox toggles.
+  const rowCtx = useMemo(
+    () => ({
+      isOwner,
+      isCoOwner,
+      isSuperAdmin,
+      isImpersonating,
+      impersonatingId: impersonating,
+      projectNameById,
+      formNameById,
+      colorForProject,
+      getUserProjectIds,
+      getUserFormIds,
+      formById,
+      cascadeAssign,
+    }),
+    [
+      isOwner,
+      isCoOwner,
+      isSuperAdmin,
+      isImpersonating,
+      impersonating,
+      projectNameById,
+      formNameById,
+      colorForProject,
+      getUserProjectIds,
+      getUserFormIds,
+      formById,
+      cascadeAssign,
+    ],
+  );
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
@@ -1041,300 +1438,15 @@ const UsersView = () => {
                     <h3 className="font-display text-sm font-semibold text-foreground">{group.name}</h3>
                     <Badge variant="secondary" className="ml-auto">{group.users.length}</Badge>
                   </div>
-                  {group.users.map((user) => {
-                const roleInfo = getRoleInfo(user.role?.role);
-                const RoleIcon = roleInfo.icon;
-                const displayName = getUserDisplayName(user);
-                const displayEmail = safeText(user.email);
-                const userProjectIds = getUserProjectIds(user.user_id);
-                const userFormIds = getUserFormIds(user.user_id);
-
-                return (
-                  <div
-                    key={`${group.key}-${user.id}`}
-                    className={`group flex flex-col gap-4 rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft sm:flex-row sm:items-center sm:justify-between ${
-                      !user.is_active ? "opacity-60" : ""
-                    }`}
-                  >
-                    <div className="flex items-start gap-4">
-
-                      {!user.is_owner && (
-                        <Checkbox
-                          className="mt-5"
-                          checked={selectedIds.has(user.user_id)}
-                          onCheckedChange={() => toggleSelect(user.user_id)}
-                        />
-                      )}
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                        <User className="h-7 w-7 text-primary" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-medium text-foreground">
-                            {displayName}
-                          </h4>
-                          {user.is_owner && (
-                            <Badge variant="outline" className="border-acg-gold text-acg-gold">
-                              Owner
-                            </Badge>
-                          )}
-                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${roleInfo.color}`}>
-                            <RoleIcon className="h-3 w-3" />
-                            {roleInfo.label}
-                          </span>
-                          {!user.is_active && (
-                            <Badge variant="secondary">Inactive</Badge>
-                          )}
-                          {user.approval_status === "pending" && (
-                            <Badge variant="outline" className="border-amber-500 bg-amber-50 text-amber-700">Pending Approval</Badge>
-                          )}
-                          {user.approval_status === "rejected" && (
-                            <Badge variant="destructive">Rejected</Badge>
-                          )}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                             {displayEmail}
-                          </span>
-                          {user.phone_number && (
-                            <span className="flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
-                               {safeText(user.phone_number)}
-                            </span>
-                          )}
-                          {user.state && (
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                               {safeText(user.state)}
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground capitalize">
-                          {(user.designation || "").replace("_", " ") || "—"}
-                          {user.other_designation && ` - ${user.other_designation}`}
-                        </p>
-                        {/* Access: projects & forms (blank when none) */}
-                        <div className="mt-2.5 flex flex-col gap-1.5">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Projects</span>
-                            {userProjectIds.length > 0 ? (
-                              userProjectIds.map((pid) => {
-                                const c = colorForProject(pid);
-                                return (
-                                  <span key={pid} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${c.chip}`}>
-                                    <FolderOpen className="h-3 w-3" />
-                                    {projectNameById(pid)}
-                                  </span>
-                                );
-                              })
-                            ) : (
-                              <span className="text-[11px] italic text-muted-foreground/50">—</span>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Forms</span>
-                            {userFormIds.length > 0 ? (
-                              userFormIds.map((fid) => {
-                                const parentColor = (() => {
-                                  const f = forms.find((x) => x.id === fid);
-                                  return f?.project_id ? colorForProject(f.project_id) : NO_ACCESS;
-                                })();
-                                return (
-                                  <span key={fid} className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium ${parentColor.chip}`}>
-                                    <FileText className="h-3 w-3" />
-                                    {formNameById(fid)}
-                                  </span>
-                                );
-                              })
-                            ) : (
-                              <span className="text-[11px] italic text-muted-foreground/50">—</span>
-                            )}
-                          </div>
-                          {(cascadeAssign[user.user_id]?.length ?? 0) > 0 && (
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Cascade scope</span>
-                              {(cascadeAssign[user.user_id] || []).map((c, ci) => (
-                                <span key={ci} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                                  <MapPin className="h-3 w-3" />
-                                  <span className="capitalize opacity-60">{c.field_key.replace("_", " ")}:</span>
-                                  {c.value_label || c.value}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setShowAssignDialog(true);
-                        }}
-                      >
-                        <FolderOpen className="h-4 w-4" />
-                        Assign
-                      </Button>
-                      {(isOwner || isCoOwner) && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCascadeUser(user)}
-                          title="Link this user to cascade options (e.g. a State)"
-                        >
-                          <MapPin className="h-4 w-4" />
-                          Cascade
-                        </Button>
-                      )}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                         <DropdownMenuContent align="end">
-                          {isSuperAdmin && (
-                            <>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedUser(user);
-                                  setEditProfileData({
-                                     first_name: user.first_name || "",
-                                     last_name: user.last_name || "",
-                                    phone_number: user.phone_number,
-                                    state: user.state,
-                                    lga: user.lga,
-                                    ward: user.ward,
-                                     designation: user.designation || "adhoc_user",
-                                    other_designation: user.other_designation,
-                                  });
-                                  setShowEditProfileDialog(true);
-                                }}
-                              >
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit Profile
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedUser(user);
-                                  setNewRole(user.role?.role || "user");
-                                  setShowRoleDialog(true);
-                                }}
-                                disabled={user.is_owner}
-                              >
-                                <UserCog className="mr-2 h-4 w-4" />
-                                Change Role
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={async () => {
-                                  setImpersonating(user.user_id);
-                                  const success = await startImpersonation(
-                                    user.user_id,
-                                     displayName
-                                  );
-                                  if (success) {
-                                    await logAction(
-                                      "impersonate_user",
-                                       `Started impersonating ${displayName} (${displayEmail})`,
-                                      "user",
-                                      user.user_id
-                                    );
-                                  }
-                                  setImpersonating(null);
-                                }}
-                                disabled={user.is_owner || isImpersonating || impersonating === user.user_id}
-                              >
-                                {impersonating === user.user_id ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                  <LogIn className="mr-2 h-4 w-4" />
-                                )}
-                                Sign in as User
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                          {isSuperAdmin && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setShowDeviceDialog(true);
-                              }}
-                            >
-                              <Monitor className="mr-2 h-4 w-4" />
-                              View Devices
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={() => handleToggleActive(user)}
-                            disabled={user.is_owner}
-                          >
-                            <User className="mr-2 h-4 w-4" />
-                            {user.is_active ? "Deactivate" : "Activate"}
-                          </DropdownMenuItem>
-                          {user.approval_status === "pending" && (
-                            <>
-                              <DropdownMenuItem
-                                onClick={async () => {
-                                  await supabase.from("profiles").update({ approval_status: "approved" }).eq("id", user.id);
-                                  await supabase.from("notifications").insert({
-                                    user_id: user.user_id,
-                                    title: "✅ Account Approved",
-                                    message: "Your account has been approved! You now have full access to Amehnities.",
-                                    type: "success",
-                                    category: "registration",
-                                  });
-                                   await logAction("approve_user", `Approved user ${displayName} (${displayEmail})`, "user", user.user_id);
-                                   toast({ title: "User Approved", description: `${displayName} has been approved.` });
-                                  fetchUsers();
-                                }}
-                                className="text-green-600"
-                              >
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                                Approve
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={async () => {
-                                  await supabase.from("profiles").update({ approval_status: "rejected" }).eq("id", user.id);
-                                  await supabase.from("notifications").insert({
-                                    user_id: user.user_id,
-                                    title: "❌ Account Rejected",
-                                    message: "Your registration has been reviewed and was not approved. Please contact an administrator.",
-                                    type: "error",
-                                    category: "registration",
-                                  });
-                                   await logAction("reject_user", `Rejected user ${displayName} (${displayEmail})`, "user", user.user_id);
-                                   toast({ title: "User Rejected", description: `${displayName} has been rejected.` });
-                                  fetchUsers();
-                                }}
-                                className="text-destructive"
-                              >
-                                <AlertTriangle className="mr-2 h-4 w-4" />
-                                Reject
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                          {isOwner && !user.is_owner && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setDeleteConfirmText("");
-                                setShowDeleteDialog(true);
-                              }}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete Permanently
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                );
-                  })}
+                  {group.users.map((user) => (
+                    <UserCard
+                      key={`${group.key}-${user.id}`}
+                      user={user}
+                      selected={selectedIds.has(user.user_id)}
+                      ctx={rowCtx}
+                      api={rowApiRef}
+                    />
+                  ))}
                 </div>
               ))}
             </div>
