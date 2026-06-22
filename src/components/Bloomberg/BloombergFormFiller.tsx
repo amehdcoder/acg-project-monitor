@@ -407,6 +407,9 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
       );
       clearDraft();
       void reportBloombergLocalAudit();
+      // After a successful sync, refresh this device's uploaded Drafts /
+      // Ready-to-Send snapshots so the dashboard's Device Form Audit stays current.
+      void captureAndUploadDeviceAuditSnapshots();
       onSavedLocally?.();
       onClose();
     } catch (e: any) {
