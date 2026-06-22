@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { BLOOMBERG_FORM_ID, BLOOMBERG_SPECIAL_FORM_KEY } from "@/lib/specialFormBridge";
 import { queueOrUploadMedia } from "@/lib/offlineMedia";
 import { saveSavedEntry, newEntryId, type SavedFormEntry } from "@/lib/savedForms";
+import { reportBloombergLocalAudit } from "@/lib/bloomberg/localAuditReporter";
 import { queueOrInsert } from "@/lib/offlineSubmissions";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
 
