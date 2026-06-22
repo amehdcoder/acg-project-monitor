@@ -125,9 +125,9 @@ const AppUpdateButton = () => {
       {/* Always render a readable label so the control is fully visible on
           every Android width — no cryptic single-letter fallback. */}
       <span className="hidden sm:inline">
-        {hasUpdate ? "Update now" : isBusy ? "Updating…" : stamp}
+        {isBusy ? busyLabel : hasUpdate ? "Update now" : stamp}
       </span>
-      <span className="sm:hidden">{hasUpdate ? "Update" : isBusy ? "…" : "Latest"}</span>
+      <span className="sm:hidden">{isBusy ? "…" : hasUpdate ? "Update" : "Latest"}</span>
     </Button>
   );
 };
