@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin, Download, Upload, Loader2, FileImage, XCircle, ClipboardList, Trash2, History } from "lucide-react";
+import { ArrowLeft, RefreshCw, School, CheckCircle2, FileText, Users, TrendingUp, AlertTriangle, MapPin, Download, Upload, Loader2, FileImage, XCircle, ClipboardList, Trash2, History, MapPinOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -11,6 +11,8 @@ import MapVisualization from "@/components/MapVisualization/MapVisualization";
 import { MapMarker } from "@/components/MapVisualization/types";
 import { useBloombergDashboard } from "@/hooks/useBloombergDashboard";
 import BloombergStateLGADrilldown from "@/components/Bloomberg/BloombergStateLGADrilldown";
+import BloombergValidatorDrilldown from "@/components/Bloomberg/BloombergValidatorDrilldown";
+import BloombergDeviceSnapshotViewer from "@/components/Bloomberg/BloombergDeviceSnapshotViewer";
 import AccountabilityTable from "@/components/shared/AccountabilityTable";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -183,7 +185,7 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 );
 
 export default function BloombergDashboard({ onClose }: Props) {
-  const { validations, stats, byState, stateBreakdown, inference, points, nonExistent, validatedTable, notValidatedTable, accountability, recovery, duplicates, deviceAudit, loading, reload, deleteValidations } = useBloombergDashboard();
+  const { validations, stats, byState, stateBreakdown, inference, points, nonExistent, validatedTable, notValidatedTable, accountability, recovery, duplicates, deviceAudit, unspecifiedAttribution, loading, reload, deleteValidations } = useBloombergDashboard();
   const { isOwner, isSuperAdmin, isOwnerLevel, isAdmin } = useAuth();
   const canManage = isOwner || isSuperAdmin;
   // Pagination keeps very large registers fast — only a page of rows is ever
@@ -260,6 +262,8 @@ export default function BloombergDashboard({ onClose }: Props) {
   const [dupValidator, setDupValidator] = useState<string>("all");
   const [dupType, setDupType] = useState<"all" | "same" | "cross">("all");
   const [dupRowStatus, setDupRowStatus] = useState<"all" | "kept" | "superseded">("all");
+  // Admin drill-down: the validator whose per-school duplicate breakdown is open.
+  const [drilldownValidator, setDrilldownValidator] = useState<string | null>(null);
 
   // Distinct validators that appear anywhere in the duplicate groups.
   const dupValidators = useMemo(() => {
@@ -448,6 +452,19 @@ export default function BloombergDashboard({ onClose }: Props) {
     { name: "Baseline (LEA)", value: stats.baselineTotal, color: "#94a3b8" },
     { name: "Validated", value: stats.validatedTotal, color: TEAL },
   ];
+
+  if (drilldownValidator) {
+    return (
+      <BloombergValidatorDrilldown
+        validator={drilldownValidator}
+        groups={duplicates.groups}
+        onClose={() => setDrilldownValidator(null)}
+        canDelete={canDelete}
+        onDelete={handleDeleteRow}
+        deletingId={deleting}
+      />
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#f4f6fb]">
@@ -648,36 +665,48 @@ export default function BloombergDashboard({ onClose }: Props) {
             {duplicates.validatorBreakdown.length > 0 && (
               <div className="mb-3 rounded-lg border border-amber-200 bg-white/60 p-2 dark:border-amber-900/50 dark:bg-amber-950/20">
                 <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Superseded copies by validator — total {fmt(duplicates.extraEntries)} (click a name to view that validator's superseded copies)
+                  Superseded copies by validator — total {fmt(duplicates.extraEntries)} (click a name to filter the table; use the arrow to open the full per-school drill-down)
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {duplicates.validatorBreakdown.map((v) => {
                     const active = dupValidator === v.validator && dupRowStatus === "superseded";
                     return (
-                      <button
+                      <span
                         key={v.validator}
-                        type="button"
-                        onClick={() => {
-                          if (active) {
-                            setDupValidator("all");
-                            setDupRowStatus("all");
-                          } else {
-                            setDupValidator(v.validator);
-                            setDupRowStatus("superseded");
-                            setDupType("all");
-                          }
-                          dupPg.resetPage();
-                        }}
-                        title={`${v.validator}: ${v.extras} superseded cop${v.extras === 1 ? "y" : "ies"}. Click to filter the table below.`}
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition ${
+                        className={`inline-flex items-center gap-1 rounded-full pl-2 pr-1 py-0.5 text-[11px] font-medium transition ${
                           active
                             ? "bg-amber-600 text-white"
-                            : "bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/50 dark:text-amber-200 dark:hover:bg-amber-900/70"
+                            : "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200"
                         }`}
                       >
-                        {v.validator}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (active) {
+                              setDupValidator("all");
+                              setDupRowStatus("all");
+                            } else {
+                              setDupValidator(v.validator);
+                              setDupRowStatus("superseded");
+                              setDupType("all");
+                            }
+                            dupPg.resetPage();
+                          }}
+                          title={`${v.validator}: ${v.extras} superseded cop${v.extras === 1 ? "y" : "ies"}. Click to filter the table below.`}
+                          className="hover:underline"
+                        >
+                          {v.validator}
+                        </button>
                         <span className={`rounded-full px-1.5 text-[10px] font-bold ${active ? "bg-white text-amber-700" : "bg-amber-600 text-white"}`}>{fmt(v.extras)}</span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => setDrilldownValidator(v.validator)}
+                          title={`Open full per-school duplicate drill-down for ${v.validator}`}
+                          className={`ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${active ? "bg-white/30 text-white hover:bg-white/50" : "bg-amber-200 text-amber-800 hover:bg-amber-300 dark:bg-amber-800 dark:text-amber-100"}`}
+                        >
+                          ↗
+                        </button>
+                      </span>
                     );
                   })}
                 </div>
@@ -923,6 +952,9 @@ export default function BloombergDashboard({ onClose }: Props) {
               <span className="font-semibold text-foreground">{fmt(deviceAudit.totals.drafts)}</span> drafts and
               {" "}<span className="font-semibold text-foreground">{fmt(deviceAudit.totals.readyToSend)}</span> ready-to-send forms reported live from each user's device, plus
               {" "}<span className="font-semibold text-foreground">{fmt(deviceAudit.totals.submitted)}</span> successfully submitted (counted from the server, so it matches the Submissions KPI exactly).
+              <span className="mt-1 block">
+                The <span className="font-medium text-foreground">Snapshot</span> column shows each device's uploaded Drafts and Ready-to-Send screens (captured on sync). <span className="font-medium text-foreground">Days worked</span> is derived from each user's submission metadata. Click a user's name for their per-school duplicate drill-down.
+              </span>
             </p>
 
             {deviceAudit.rows.length === 0 ? (
@@ -938,7 +970,9 @@ export default function BloombergDashboard({ onClose }: Props) {
                       <th className="py-1.5 pr-3 text-right font-semibold">Drafts</th>
                       <th className="py-1.5 pr-3 text-right font-semibold">Ready to send</th>
                       <th className="py-1.5 pr-3 text-right font-semibold">Submitted</th>
+                      <th className="py-1.5 pr-3 text-right font-semibold">Days worked</th>
                       <th className="py-1.5 pr-3 text-right font-semibold">Devices</th>
+                      <th className="py-1.5 pr-3 font-semibold">Snapshot</th>
                       <th className="py-1.5 font-semibold">Last activity</th>
                     </tr>
                   </thead>
@@ -946,13 +980,29 @@ export default function BloombergDashboard({ onClose }: Props) {
                     {deviceAudit.rows.map((r) => (
                       <tr key={r.userId} className="border-b border-border/60 last:border-0">
                         <td className="py-1.5 pr-3 text-foreground">
-                          {r.name}
+                          <button
+                            type="button"
+                            onClick={() => setDrilldownValidator(r.name)}
+                            className="text-left font-medium hover:underline"
+                            title={`Open ${r.name}'s per-school duplicate drill-down`}
+                          >
+                            {r.name}
+                          </button>
                           {r.email ? <span className="block text-[10px] text-muted-foreground">{r.email}</span> : null}
                         </td>
                         <td className="py-1.5 pr-3 text-right font-semibold text-amber-600">{fmt(r.drafts)}</td>
                         <td className="py-1.5 pr-3 text-right font-semibold" style={{ color: BLUE }}>{fmt(r.readyToSend)}</td>
                         <td className="py-1.5 pr-3 text-right font-semibold text-emerald-600">{fmt(r.submitted)}</td>
+                        <td className="py-1.5 pr-3 text-right font-semibold text-foreground">{fmt(r.daysWorked)}</td>
                         <td className="py-1.5 pr-3 text-right text-muted-foreground">{fmt(r.devices)}</td>
+                        <td className="py-1.5 pr-3">
+                          <BloombergDeviceSnapshotViewer
+                            userName={r.name}
+                            draftsPath={r.draftsShot}
+                            readyPath={r.readyShot}
+                            capturedAt={r.snapshotAt}
+                          />
+                        </td>
                         <td className="py-1.5 text-muted-foreground">
                           {r.lastActivity ? new Date(r.lastActivity).toLocaleString() : "—"}
                         </td>
@@ -965,8 +1015,55 @@ export default function BloombergDashboard({ onClose }: Props) {
           </div>
         )}
 
-
-
+        {/* Unspecified-location attribution — who generated the geo-less test
+            entries and how many each made, so the otherwise opaque
+            "Unspecified location" rows are accountable to specific users. */}
+        {canManage && unspecifiedAttribution.total > 0 && (
+          <div className="rounded-xl border border-rose-300/60 bg-rose-50 p-4 shadow-sm dark:border-rose-900/50 dark:bg-rose-950/30">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <MapPinOff className="h-4 w-4 text-rose-600" />
+              <h3 className="text-sm font-semibold text-foreground">Unspecified Location Entries — by User</h3>
+              <span className="ml-auto rounded-full bg-rose-600 px-2 py-0.5 text-xs font-bold text-white">
+                {fmt(unspecifiedAttribution.total)} entr{unspecifiedAttribution.total === 1 ? "y" : "ies"}
+              </span>
+            </div>
+            <p className="mb-3 text-xs text-muted-foreground">
+              These submissions carry no state/LGA and no matching school in the register, so they cannot be placed on the map
+              (they appear as “Unspecified location”). They are usually test data. Below is exactly which user generated them and how many each made —
+              click a name to open their per-school duplicate drill-down.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-rose-200 text-left text-muted-foreground dark:border-rose-900">
+                    <th className="py-1.5 pr-3 font-semibold">User</th>
+                    <th className="py-1.5 pr-3 text-right font-semibold">Unspecified entries</th>
+                    <th className="py-1.5 font-semibold">Last submitted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {unspecifiedAttribution.rows.map((r) => (
+                    <tr key={r.userId} className="border-b border-rose-100/60 last:border-0 dark:border-rose-900/40">
+                      <td className="py-1.5 pr-3 text-foreground">
+                        <button
+                          type="button"
+                          onClick={() => setDrilldownValidator(r.name)}
+                          className="text-left font-medium hover:underline"
+                          title={`Open ${r.name}'s per-school duplicate drill-down`}
+                        >
+                          {r.name}
+                        </button>
+                        {r.email ? <span className="block text-[10px] text-muted-foreground">{r.email}</span> : null}
+                      </td>
+                      <td className="py-1.5 pr-3 text-right font-semibold text-rose-600">{fmt(r.count)}</td>
+                      <td className="py-1.5 text-muted-foreground">{r.lastAt ? new Date(r.lastAt).toLocaleString() : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Top discrepancies */}
         <div className="rounded-xl border border-border bg-card p-4 shadow-sm">

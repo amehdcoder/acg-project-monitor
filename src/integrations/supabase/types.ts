@@ -779,36 +779,48 @@ export type Database = {
       bloomberg_local_form_audit: {
         Row: {
           created_at: string
+          days_worked: number
           device_id: string
           device_label: string | null
           drafts: number
+          drafts_screenshot_path: string | null
           id: string
           last_activity_at: string | null
+          ready_screenshot_path: string | null
           ready_to_send: number
+          snapshot_captured_at: string | null
           submitted: number
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          days_worked?: number
           device_id?: string
           device_label?: string | null
           drafts?: number
+          drafts_screenshot_path?: string | null
           id?: string
           last_activity_at?: string | null
+          ready_screenshot_path?: string | null
           ready_to_send?: number
+          snapshot_captured_at?: string | null
           submitted?: number
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
+          days_worked?: number
           device_id?: string
           device_label?: string | null
           drafts?: number
+          drafts_screenshot_path?: string | null
           id?: string
           last_activity_at?: string | null
+          ready_screenshot_path?: string | null
           ready_to_send?: number
+          snapshot_captured_at?: string | null
           submitted?: number
           updated_at?: string
           user_id?: string

@@ -43,6 +43,7 @@ import {
   type SavedFormStatus,
 } from "@/lib/savedForms";
 import { isBloombergSavedEntry, isSpecialBridgeEntry, syncSpecialSavedForm } from "@/lib/specialFormBridge";
+import { captureAndUploadDeviceAuditSnapshots } from "@/lib/bloomberg/deviceAuditSnapshot";
 
 export type SavedFormsMode = "edit" | "send" | "view" | "delete";
 
@@ -190,6 +191,11 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
         });
       }
       await load();
+      // If any synced entry was a Bloomberg validation form, refresh this
+      // device's uploaded Drafts / Ready-to-Send snapshots for the dashboard.
+      if (targets.some((e) => isBloombergSavedEntry(e))) {
+        void captureAndUploadDeviceAuditSnapshots();
+      }
     } finally {
       setSyncing(false);
     }
