@@ -862,6 +862,7 @@ const UsersView = () => {
       setBulkProgress({ done: results.length, total: targets.length });
       setBulkResults([...results]);
     }
+    if (auditRows.length > 0) logStandardFormAudit(auditRows);
     const okCount = results.filter((r) => r.ok).length;
     const label = [
       projName,
