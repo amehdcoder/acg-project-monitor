@@ -479,6 +479,7 @@ const UsersView = () => {
       formNames.length ? `${formNames.length} form(s)` : "",
       stdForms.length ? `${stdForms.length} standard form(s)` : "",
       pageIds.length ? `${pageIds.length} page(s)` : "",
+      bulkMinimalLock ? "minimal access" : "",
     ]
       .filter(Boolean)
       .join(" + ");
