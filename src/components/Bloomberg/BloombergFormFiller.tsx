@@ -157,6 +157,67 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
     setConfirmed(!!r.confirmed);
   }, [savedEntry?.id]);
 
+  // ---- Crash/reload-safe draft persistence ----------------------------------
+  // Restore an in-progress draft once on mount (only when NOT editing a saved
+  // entry — that path has its own hydration above).
+  useEffect(() => {
+    if (savedEntry) { restoredRef.current = true; return; }
+    try {
+      const raw = sessionStorage.getItem(bloombergDraftKey(user?.id));
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d && typeof d === "object") {
+          if (typeof d.step === "number") setStep(d.step);
+          if (d.state != null) setState(d.state);
+          if (d.lga != null) setLga(d.lga);
+          if (d.ward != null) setWard(d.ward);
+          if (d.location != null) setLocation(d.location);
+          if (d.schoolKey != null) setSchoolKey(d.schoolKey);
+          if (d.gps !== undefined) setGps(d.gps);
+          if (d.specified) setSpecified(d.specified);
+          if (d.schoolExists != null) setSchoolExists(d.schoolExists);
+          if (d.notFoundReason != null) setNotFoundReason(d.notFoundReason);
+          if (d.operationalStatus != null) setOperationalStatus(d.operationalStatus);
+          if (d.headTeacher != null) setHeadTeacher(d.headTeacher);
+          if (d.headPhone != null) setHeadPhone(d.headPhone);
+          if (d.dateOfVisit != null) setDateOfVisit(d.dateOfVisit);
+          if (typeof d.registerAvailable === "boolean") setRegisterAvailable(d.registerAvailable);
+          if (d.enrol) setEnrol({ ...emptyEnrolment(), ...d.enrol });
+          if (d.evidence) setEvidence(d.evidence);
+          if (d.remarks != null) setRemarks(d.remarks);
+          if (typeof d.confirmed === "boolean") setConfirmed(d.confirmed);
+          if (d.startedAt) formStartedAtRef.current = d.startedAt;
+        }
+      }
+    } catch { /* ignore corrupt draft */ }
+    restoredRef.current = true;
+  }, [savedEntry?.id, user?.id]);
+
+  // Mirror the full in-progress state to sessionStorage on every change so a
+  // camera-triggered webview reload restores the form exactly where it was.
+  useEffect(() => {
+    if (!restoredRef.current) return;
+    try {
+      sessionStorage.setItem(
+        bloombergDraftKey(user?.id),
+        JSON.stringify({
+          step, state, lga, ward, location, schoolKey, gps, specified,
+          schoolExists, notFoundReason, operationalStatus, headTeacher, headPhone,
+          dateOfVisit, registerAvailable, enrol, evidence, remarks, confirmed,
+          startedAt: formStartedAtRef.current,
+        }),
+      );
+    } catch { /* storage full / unavailable — non-fatal */ }
+  }, [
+    step, state, lga, ward, location, schoolKey, gps, specified, schoolExists,
+    notFoundReason, operationalStatus, headTeacher, headPhone, dateOfVisit,
+    registerAvailable, enrol, evidence, remarks, confirmed, user?.id,
+  ]);
+
+  const clearDraft = () => {
+    try { sessionStorage.removeItem(bloombergDraftKey(user?.id)); } catch { /* noop */ }
+  };
+
   const captureGps = () => {
     geo.getCurrentPosition();
   };
