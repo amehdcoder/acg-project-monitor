@@ -457,7 +457,7 @@ export const useBloombergDashboard = () => {
     return { rows, totals, deviceCount: localAuditRows.length, userCount: rows.length };
   }, [localAuditRows, profileMap]);
 
-
+  const byState = useMemo(() => {
     const m = new Map<string, number>();
     submittedValidations.forEach((v) => {
       const key = stateName(v.state);
