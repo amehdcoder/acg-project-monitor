@@ -67,6 +67,11 @@ import {
   ChevronRight,
   Home,
   Users,
+  Lock,
+  AlertTriangle,
+  LayoutGrid,
+  Rows3,
+
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -245,6 +250,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [showFormsExplorer, setShowFormsExplorer] = useState(false);
   const [openTopFolder, setOpenTopFolder] = useState<"custom" | "standard" | null>("custom");
+  // "Your Forms" controls: search, category filter and grid/folder view toggle.
+  const [yourFormsSearch, setYourFormsSearch] = useState("");
+  const [yourFormsGroup, setYourFormsGroup] = useState<string>("all");
+  const [yourFormsView, setYourFormsView] = useState<"grid" | "folders">("grid");
+  const [openYourGroup, setOpenYourGroup] = useState<string | null>(null);
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
   const [bulkForm, setBulkForm] = useState<Form | null>(null);
   const [showBulkAccess, setShowBulkAccess] = useState(false);
@@ -282,6 +292,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   // Launch the correct experience for an assigned standard-form code.
   const launchStandardForm = useCallback((code: string) => {
+    // Hard guard: an adhoc user may only open forms explicitly assigned to them,
+    // and never a form that has been restricted (disabled) at project level.
+    if (isAdhoc && !assignedStandardCodes.has(code)) return;
+    if (disabledStandardCodes.has(code as StandardFormCode)) {
+      toast({ title: "Form restricted", description: "This form has been restricted by an administrator.", variant: "destructive" });
+      return;
+    }
     switch (code) {
       case "uprp": setShowUprp(true); break;
       case "attendance": setShowDigitalAttendance(true); break;
@@ -308,14 +325,18 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           setActiveStandardAssessment(code as StandardFormCode);
         }
     }
-  }, []);
+  }, [isAdhoc, assignedStandardCodes, disabledStandardCodes]);
 
   // Flat, folder-free list of the standard forms assigned to this user, rendered
-  // as a beautiful card grid instead of nested folders.
-  const assignedFormCards = useMemo(() => {
-    if (assignedStandardCodes.size === 0) return [] as Array<{
-      code: string; name: string; desc: string; Icon: any; bg: string; fg: string; ring: string;
-    }>;
+  // as a beautiful card grid instead of nested folders. Each card carries a
+  // status ("assigned" | "restricted") and whether it has required fields.
+  type YourFormCard = {
+    code: string; name: string; desc: string; group: string; Icon: any;
+    bg: string; fg: string; ring: string;
+    status: "assigned" | "restricted"; hasRequired: boolean;
+  };
+  const assignedFormCards = useMemo<YourFormCard[]>(() => {
+    if (assignedStandardCodes.size === 0) return [];
     const palette = [
       { bg: "bg-[#E3ECFB]", fg: "text-[#2F6FE6]", ring: "#2F6FE6" },
       { bg: "bg-[#E2F5EC]", fg: "text-[#22A55A]", ring: "#22A55A" },
@@ -337,19 +358,115 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       if (group === "Mental Health Forms") return BrainIcon;
       return FileText;
     };
+    const hasRequiredFor = (code: string, group: string): boolean => {
+      const def = (STANDARD_ASSESSMENTS as any)[code];
+      if (def) {
+        const all = [
+          ...(def.identification || []), ...(def.demographics || []),
+          ...(def.psychographics || []), ...(def.items || []), ...(def.closing || []),
+        ];
+        return all.some((q: any) => q?.required);
+      }
+      // Safeguarding, assessment and mental-health forms always carry required fields.
+      return ["Safeguarding Forms", "Assessment Forms", "Mental Health Forms"].includes(group);
+    };
     return ALL_STANDARD_FORMS
       .filter((f) => assignedStandardCodes.has(f.code))
       .map((f, i) => {
         const def = (STANDARD_ASSESSMENTS as any)[f.code];
+        // A form disabled at project level is "restricted" — assigned but locked.
+        const restricted = disabledStandardCodes.has(f.code as StandardFormCode);
         return {
           code: f.code,
           name: def?.shortName || f.name,
           desc: def?.description || f.group,
+          group: f.group,
           Icon: iconFor(f.code, f.group),
+          status: (restricted ? "restricted" : "assigned") as "assigned" | "restricted",
+          hasRequired: hasRequiredFor(f.code, f.group),
           ...palette[i % palette.length],
         };
       });
-  }, [assignedStandardCodes]);
+  }, [assignedStandardCodes, disabledStandardCodes]);
+
+  // Distinct categories present in the user's assigned forms (for filter chips).
+  const yourFormsGroups = useMemo(() => {
+    const s = new Set<string>();
+    assignedFormCards.forEach((c) => s.add(c.group));
+    return Array.from(s);
+  }, [assignedFormCards]);
+
+  // Apply search + category filter. Restricted forms stay visible (locked) so the
+  // user can see why a form can't be opened, but they can never be launched.
+  const filteredYourForms = useMemo(() => {
+    const q = yourFormsSearch.trim().toLowerCase();
+    return assignedFormCards.filter((c) => {
+      const matchGroup = yourFormsGroup === "all" || c.group === yourFormsGroup;
+      const matchSearch = !q || c.name.toLowerCase().includes(q) ||
+        c.code.toLowerCase().includes(q) || c.group.toLowerCase().includes(q);
+      return matchGroup && matchSearch;
+    });
+  }, [assignedFormCards, yourFormsSearch, yourFormsGroup]);
+
+  // Group the filtered cards by category for the folder-explorer view.
+  const filteredYourFormsByGroup = useMemo(() => {
+    const map = new Map<string, YourFormCard[]>();
+    filteredYourForms.forEach((c) => {
+      const arr = map.get(c.group) || [];
+      arr.push(c);
+      map.set(c.group, arr);
+    });
+    return Array.from(map.entries());
+  }, [filteredYourForms]);
+
+  // Single, consistent card renderer used by both the flat grid and folder views.
+  const renderYourFormCard = useCallback((c: YourFormCard) => {
+    const restricted = c.status === "restricted";
+    return (
+      <button
+        key={c.code}
+        onClick={() => launchStandardForm(c.code)}
+        disabled={restricted}
+        aria-disabled={restricted}
+        className={`group relative flex items-center gap-3.5 overflow-hidden rounded-2xl border bg-white p-4 text-left shadow-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+          restricted
+            ? "border-red-200 opacity-70 cursor-not-allowed"
+            : "border-border/60 hover:-translate-y-0.5 hover:shadow-md"
+        }`}
+        style={{ ['--tw-ring-color' as any]: c.ring }}
+      >
+        <span aria-hidden className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: restricted ? "#DC2626" : c.ring }} />
+        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${c.bg} transition-transform ${restricted ? "" : "group-hover:scale-105"}`}>
+          <c.Icon className={`h-6 w-6 ${c.fg}`} strokeWidth={2} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h4 className="truncate text-[15px] font-bold text-foreground">{c.name}</h4>
+          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{c.desc}</p>
+          {/* Status indicators — consistent, intuitive colouring across all cards. */}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {restricted ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600 ring-1 ring-inset ring-red-200">
+                <Lock className="h-3 w-3" /> Restricted
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 ring-1 ring-inset ring-emerald-200">
+                <CheckCircle className="h-3 w-3" /> Assigned
+              </span>
+            )}
+            {c.hasRequired && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-600 ring-1 ring-inset ring-amber-200">
+                <AlertTriangle className="h-3 w-3" /> Required fields
+              </span>
+            )}
+          </div>
+        </div>
+        {!restricted && (
+          <ChevronRight className="h-5 w-5 shrink-0 self-center text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:text-foreground" />
+        )}
+      </button>
+    );
+  }, [launchStandardForm]);
+
 
   const { canBulk } = useBulkDataAccess();
   const { isOnline, downloadForm, cacheFormsForOffline, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
@@ -1875,12 +1992,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               )}
             </div>
 
-            {/* Assigned Standard Forms — flat, folder-free beautiful grid.
+            {/* Assigned Standard Forms — flat, folder-free beautiful grid with
+                search, category filters and a grid/folder view toggle.
                 Shown to users who have specific standard forms assigned to them. */}
             {assignedFormCards.length > 0 && !standardRestricted && (
               <div className="overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-[#F7F9FE] to-white shadow-sm">
                 <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-border/50">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#2F6FE6] to-[#7C5CFF] shadow-sm">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#15803D] via-[#2F6FE6] to-[#7C5CFF] shadow-sm">
                     <Sparkles className="h-5 w-5 text-white" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -1891,32 +2009,112 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     {assignedFormCards.length}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 sm:p-4">
-                  {assignedFormCards.map(({ code, name, desc, Icon, bg, fg, ring }) => (
+
+                {/* Controls: search + view toggle */}
+                <div className="flex flex-col gap-3 p-3 sm:p-4 sm:flex-row sm:items-center">
+                  <div className="relative flex-1">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={yourFormsSearch}
+                      onChange={(e) => setYourFormsSearch(e.target.value)}
+                      placeholder="Search Safeguarding, Programme Activity, Microplanning…"
+                      className="pl-9 rounded-xl bg-white"
+                    />
+                  </div>
+                  <div className="inline-flex shrink-0 items-center rounded-xl border border-border/60 bg-white p-0.5">
                     <button
-                      key={code}
-                      onClick={() => launchStandardForm(code)}
-                      className="group relative flex items-center gap-3.5 overflow-hidden rounded-2xl border border-border/60 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                      style={{ ['--tw-ring-color' as any]: ring }}
+                      type="button"
+                      onClick={() => setYourFormsView("grid")}
+                      aria-pressed={yourFormsView === "grid"}
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        yourFormsView === "grid" ? "bg-[#2F6FE6] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      }`}
                     >
-                      <span
-                        aria-hidden
-                        className="absolute inset-y-0 left-0 w-1.5"
-                        style={{ backgroundColor: ring }}
-                      />
-                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${bg} transition-transform group-hover:scale-105`}>
-                        <Icon className={`h-6 w-6 ${fg}`} strokeWidth={2} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h4 className="truncate text-[15px] font-bold text-foreground">{name}</h4>
-                        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{desc}</p>
-                      </div>
-                      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:text-foreground" />
+                      <LayoutGrid className="h-4 w-4" /> Grid
                     </button>
-                  ))}
+                    <button
+                      type="button"
+                      onClick={() => setYourFormsView("folders")}
+                      aria-pressed={yourFormsView === "folders"}
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        yourFormsView === "folders" ? "bg-[#2F6FE6] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Rows3 className="h-4 w-4" /> Folders
+                    </button>
+                  </div>
                 </div>
+
+                {/* Category filter chips */}
+                {yourFormsGroups.length > 1 && (
+                  <div className="flex flex-wrap gap-2 px-3 pb-1 sm:px-4">
+                    <button
+                      type="button"
+                      onClick={() => setYourFormsGroup("all")}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                        yourFormsGroup === "all" ? "bg-[#2F6FE6] text-white" : "bg-[#EEF2F7] text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      All
+                    </button>
+                    {yourFormsGroups.map((g) => (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => setYourFormsGroup(g)}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                          yourFormsGroup === g ? "bg-[#2F6FE6] text-white" : "bg-[#EEF2F7] text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Body — grid or folder view */}
+                {filteredYourForms.length === 0 ? (
+                  <div className="flex h-32 flex-col items-center justify-center text-center px-4">
+                    <Search className="h-8 w-8 text-muted-foreground/40" />
+                    <p className="mt-2 text-sm text-muted-foreground">No forms match your search.</p>
+                  </div>
+                ) : yourFormsView === "grid" ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 p-3 sm:p-4">
+                    {filteredYourForms.map((c) => renderYourFormCard(c))}
+                  </div>
+                ) : (
+                  <div className="space-y-2 p-3 sm:p-4">
+                    {filteredYourFormsByGroup.map(([group, cards]) => {
+                      const open = openYourGroup === group || filteredYourFormsByGroup.length === 1;
+                      return (
+                        <div key={group} className="overflow-hidden rounded-2xl border border-border/60 bg-white">
+                          <button
+                            type="button"
+                            onClick={() => setOpenYourGroup((g) => (g === group ? null : group))}
+                            className="flex w-full items-center gap-3 p-3 text-left hover:bg-[#F4F6F8]/70 transition-colors"
+                          >
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#E3ECFB]">
+                              {open ? <FolderOpen className="h-5 w-5 text-[#2F6FE6]" /> : <Folder className="h-5 w-5 text-[#2F6FE6]" />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h4 className="truncate font-display text-sm font-bold text-foreground">{group}</h4>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-[#E3ECFB] px-2.5 py-0.5 text-xs font-semibold text-[#1656BA]">{cards.length}</span>
+                            <ChevronRight className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
+                          </button>
+                          {open && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-border/60 p-3">
+                              {cards.map((c) => renderYourFormCard(c))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
+
 
             {/* Folder 2 — Standard Forms (admins see the full folder explorer) */}
             {!isAdhoc && !standardRestricted && (
