@@ -320,7 +320,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           setActiveStandardAssessment(code as StandardFormCode);
         }
     }
-  }, []);
+  }, [isAdhoc, assignedStandardCodes, disabledStandardCodes]);
 
   // Flat, folder-free list of the standard forms assigned to this user, rendered
   // as a beautiful card grid instead of nested folders. Each card carries a
