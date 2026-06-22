@@ -846,6 +846,12 @@ const UsersView = () => {
               .insert({ user_id: u.user_id, restricted_by: currentUserProfile?.user_id });
             if (mErr && mErr.code !== "23505") throw mErr;
           }
+          auditRows.push({
+            target_user_id: u.user_id,
+            project_id: bulkProject || null,
+            action: "minimal_lock",
+            detail: "Locked to Forms, Project Chat & My Submissions",
+          });
           parts.push("minimal access");
         }
       } catch (err: any) {
