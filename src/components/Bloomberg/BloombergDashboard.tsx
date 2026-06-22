@@ -235,6 +235,45 @@ export default function BloombergDashboard({ onClose }: Props) {
       setCleaningDupes(false);
     }
   };
+  // Duplicate audit filters — quickly narrow the list by validator, by duplicate
+  // type (same-validator re-submission vs different-validator cross-validation),
+  // and by row status (superseded copies vs the retained survivor).
+  const [dupValidator, setDupValidator] = useState<string>("all");
+  const [dupType, setDupType] = useState<"all" | "same" | "cross">("all");
+  const [dupRowStatus, setDupRowStatus] = useState<"all" | "kept" | "superseded">("all");
+
+  // Distinct validators that appear anywhere in the duplicate groups.
+  const dupValidators = useMemo(() => {
+    const set = new Set<string>();
+    duplicates.groups.forEach((g) => g.copies.forEach((c) => set.add(c.validator)));
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [duplicates.groups]);
+
+  // Apply the three filters. A group survives if it matches the duplicate-type
+  // filter AND still has at least one copy after the validator/row-status
+  // filters are applied to its copies.
+  const filteredDupGroups = useMemo(() => {
+    return duplicates.groups
+      .filter((g) => {
+        if (dupType === "same") return !g.crossValidator;
+        if (dupType === "cross") return g.crossValidator;
+        return true;
+      })
+      .map((g) => {
+        const copies = g.copies.filter((c) => {
+          if (dupValidator !== "all" && c.validator !== dupValidator) return false;
+          if (dupRowStatus === "kept" && !c.kept) return false;
+          if (dupRowStatus === "superseded" && c.kept) return false;
+          return true;
+        });
+        return { ...g, copies };
+      })
+      .filter((g) => g.copies.length > 0);
+  }, [duplicates.groups, dupValidator, dupType, dupRowStatus]);
+
+  // Paginate by group so the DOM never mounts thousands of rows at once.
+  const dupPg = useTablePagination(filteredDupGroups, 40);
+
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [resetting, setResetting] = useState(false);
