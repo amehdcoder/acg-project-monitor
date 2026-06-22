@@ -532,6 +532,45 @@ export default function BloombergDashboard({ onClose }: Props) {
               This is why the entries table shows {fmt(validations.length)} records while only {fmt(stats.validatedSchools)} distinct schools are counted as validated.
               The most recent submission per school is kept; older copies are listed below with the validator and the date each was sent.
             </p>
+
+            {/* Deeper duplicate insight: who and how */}
+            <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="rounded-lg border border-amber-200 bg-white/70 p-2 dark:border-amber-900/50 dark:bg-amber-950/20">
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Affected schools</div>
+                <div className="text-lg font-bold text-foreground">{fmt(duplicates.schoolsWithDuplicates)}</div>
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-white/70 p-2 dark:border-amber-900/50 dark:bg-amber-950/20">
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Extra (superseded) entries</div>
+                <div className="text-lg font-bold text-foreground">{fmt(duplicates.extraEntries)}</div>
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-white/70 p-2 dark:border-amber-900/50 dark:bg-amber-950/20">
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Same validator re-submitted</div>
+                <div className="text-lg font-bold text-foreground">{fmt(duplicates.sameValidatorGroups)}</div>
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-white/70 p-2 dark:border-amber-900/50 dark:bg-amber-950/20">
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Different validators</div>
+                <div className="text-lg font-bold text-foreground">{fmt(duplicates.crossValidatorGroups)}</div>
+              </div>
+            </div>
+
+            {duplicates.validatorBreakdown.length > 0 && (
+              <div className="mb-3 rounded-lg border border-amber-200 bg-white/60 p-2 dark:border-amber-900/50 dark:bg-amber-950/20">
+                <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Superseded copies by validator
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {duplicates.validatorBreakdown.map((v) => (
+                    <span
+                      key={v.validator}
+                      className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/50 dark:text-amber-200"
+                    >
+                      {v.validator}
+                      <span className="rounded-full bg-amber-600 px-1.5 text-[10px] font-bold text-white">{fmt(v.extras)}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
             {canDelete && (
               <button
                 onClick={handleRemoveAllDuplicates}
