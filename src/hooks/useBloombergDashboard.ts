@@ -640,8 +640,9 @@ export const useBloombergDashboard = () => {
       const bt = b?.grand_total ?? 0;
       if (bt <= 0) return;
       const pct = (((v.grand_total ?? 0) - bt) / bt) * 100;
-      const st = (v.state || "Unknown").toString();
-      const lga = `${st}::${(v.lga || "Unknown").toString()}`;
+      const geo = resolveGeo(v);
+      const st = (geo.state || "__unspecified__").toString();
+      const lga = `${st}::${(geo.lga || "__unspecified__").toString()}`;
       (stateSamples.get(st) || stateSamples.set(st, []).get(st)!).push(pct);
       (lgaSamples.get(lga) || lgaSamples.set(lga, []).get(lga)!).push(pct);
     });
