@@ -1384,15 +1384,15 @@ const UsersView = () => {
                     <h3 className="font-display text-sm font-semibold text-foreground">{group.name}</h3>
                     <Badge variant="secondary" className="ml-auto">{group.users.length}</Badge>
                   </div>
-                  {group.users.map((user) => {
-                const roleInfo = getRoleInfo(user.role?.role);
-                const RoleIcon = roleInfo.icon;
-                const displayName = getUserDisplayName(user);
-                const displayEmail = safeText(user.email);
-                const userProjectIds = getUserProjectIds(user.user_id);
-                const userFormIds = getUserFormIds(user.user_id);
-
-                return (
+                  {group.users.map((user) => (
+                    <UserCard
+                      key={`${group.key}-${user.id}`}
+                      user={user}
+                      selected={selectedIds.has(user.user_id)}
+                      ctx={rowCtx}
+                      api={rowApiRef}
+                    />
+                  ))}
                   <div
                     key={`${group.key}-${user.id}`}
                     className={`group flex flex-col gap-4 rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft sm:flex-row sm:items-center sm:justify-between ${
