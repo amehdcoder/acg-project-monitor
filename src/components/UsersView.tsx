@@ -165,6 +165,13 @@ const UsersView = () => {
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [bulkProject, setBulkProject] = useState<string>("");
   const [bulkForms, setBulkForms] = useState<Set<string>>(new Set());
+  // Standard forms + restricted pages bulk assignment (scoped visibility control)
+  const [bulkStandardForms, setBulkStandardForms] = useState<Set<string>>(new Set());
+  const [bulkPages, setBulkPages] = useState<Set<string>>(new Set());
+  // When on, selected NON-admin users are restricted so they ONLY see the
+  // Standard forms you assign here (instead of every form their designation
+  // grants by default). Admins (Systems/Super) keep their full role access.
+  const [bulkRestrictStandard, setBulkRestrictStandard] = useState(true);
   const [showBulkRemove, setShowBulkRemove] = useState(false);
   // Per-user progress + outcome feedback for bulk operations
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
