@@ -148,6 +148,314 @@ const PROJECT_PALETTE = [
 ];
 const NO_ACCESS = { chip: "bg-muted text-muted-foreground border-border", bar: "bg-muted-foreground/40", soft: "bg-muted/30" };
 
+// Memoized row. Only re-renders when its own `selected` flag (or the rarely
+// changing shared `ctx`) changes — so toggling one checkbox in a list of
+// hundreds of users no longer re-renders every other row.
+const UserCard = memo(function UserCard({
+  user,
+  selected,
+  ctx,
+  api,
+}: {
+  user: any;
+  selected: boolean;
+  ctx: any;
+  api: { current: any };
+}) {
+  const {
+    isOwner,
+    isCoOwner,
+    isSuperAdmin,
+    isImpersonating,
+    impersonatingId,
+    projectNameById,
+    formNameById,
+    colorForProject,
+    getUserProjectIds,
+    getUserFormIds,
+    formById,
+    cascadeAssign,
+  } = ctx;
+  const a = api.current;
+  const roleInfo = getRoleInfo(user.role?.role);
+  const RoleIcon = roleInfo.icon;
+  const displayName = getUserDisplayName(user);
+  const displayEmail = safeText(user.email);
+  const userProjectIds = getUserProjectIds(user.user_id);
+  const userFormIds = getUserFormIds(user.user_id);
+
+  return (
+    <div
+      className={`group flex flex-col gap-4 rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft sm:flex-row sm:items-center sm:justify-between ${
+        !user.is_active ? "opacity-60" : ""
+      }`}
+    >
+      <div className="flex items-start gap-4">
+        {!user.is_owner && (
+          <Checkbox
+            className="mt-5"
+            checked={selected}
+            onCheckedChange={() => a.toggleSelect(user.user_id)}
+          />
+        )}
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+          <User className="h-7 w-7 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="font-medium text-foreground">{displayName}</h4>
+            {user.is_owner && (
+              <Badge variant="outline" className="border-acg-gold text-acg-gold">
+                Owner
+              </Badge>
+            )}
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${roleInfo.color}`}>
+              <RoleIcon className="h-3 w-3" />
+              {roleInfo.label}
+            </span>
+            {!user.is_active && <Badge variant="secondary">Inactive</Badge>}
+            {user.approval_status === "pending" && (
+              <Badge variant="outline" className="border-amber-500 bg-amber-50 text-amber-700">Pending Approval</Badge>
+            )}
+            {user.approval_status === "rejected" && <Badge variant="destructive">Rejected</Badge>}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Mail className="h-3 w-3" />
+              {displayEmail}
+            </span>
+            {user.phone_number && (
+              <span className="flex items-center gap-1">
+                <Phone className="h-3 w-3" />
+                {safeText(user.phone_number)}
+              </span>
+            )}
+            {user.state && (
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                {safeText(user.state)}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground capitalize">
+            {(user.designation || "").replace("_", " ") || "—"}
+            {user.other_designation && ` - ${user.other_designation}`}
+          </p>
+          {/* Access: projects & forms (blank when none) */}
+          <div className="mt-2.5 flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Projects</span>
+              {userProjectIds.length > 0 ? (
+                userProjectIds.map((pid: string) => {
+                  const c = colorForProject(pid);
+                  return (
+                    <span key={pid} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${c.chip}`}>
+                      <FolderOpen className="h-3 w-3" />
+                      {projectNameById(pid)}
+                    </span>
+                  );
+                })
+              ) : (
+                <span className="text-[11px] italic text-muted-foreground/50">—</span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Forms</span>
+              {userFormIds.length > 0 ? (
+                userFormIds.map((fid: string) => {
+                  const f = formById.get(fid);
+                  const parentColor = f?.project_id ? colorForProject(f.project_id) : NO_ACCESS;
+                  return (
+                    <span key={fid} className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium ${parentColor.chip}`}>
+                      <FileText className="h-3 w-3" />
+                      {formNameById(fid)}
+                    </span>
+                  );
+                })
+              ) : (
+                <span className="text-[11px] italic text-muted-foreground/50">—</span>
+              )}
+            </div>
+            {(cascadeAssign[user.user_id]?.length ?? 0) > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Cascade scope</span>
+                {(cascadeAssign[user.user_id] || []).map((c: any, ci: number) => (
+                  <span key={ci} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                    <MapPin className="h-3 w-3" />
+                    <span className="capitalize opacity-60">{c.field_key.replace("_", " ")}:</span>
+                    {c.value_label || c.value}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            a.setSelectedUser(user);
+            a.setShowAssignDialog(true);
+          }}
+        >
+          <FolderOpen className="h-4 w-4" />
+          Assign
+        </Button>
+        {(isOwner || isCoOwner) && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => a.setCascadeUser(user)}
+            title="Link this user to cascade options (e.g. a State)"
+          >
+            <MapPin className="h-4 w-4" />
+            Cascade
+          </Button>
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {isSuperAdmin && (
+              <>
+                <DropdownMenuItem
+                  onClick={() => {
+                    a.setSelectedUser(user);
+                    a.setEditProfileData({
+                      first_name: user.first_name || "",
+                      last_name: user.last_name || "",
+                      phone_number: user.phone_number,
+                      state: user.state,
+                      lga: user.lga,
+                      ward: user.ward,
+                      designation: user.designation || "adhoc_user",
+                      other_designation: user.other_designation,
+                    });
+                    a.setShowEditProfileDialog(true);
+                  }}
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    a.setSelectedUser(user);
+                    a.setNewRole(user.role?.role || "user");
+                    a.setShowRoleDialog(true);
+                  }}
+                  disabled={user.is_owner}
+                >
+                  <UserCog className="mr-2 h-4 w-4" />
+                  Change Role
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={async () => {
+                    a.setImpersonating(user.user_id);
+                    const success = await a.startImpersonation(user.user_id, displayName);
+                    if (success) {
+                      await a.logAction(
+                        "impersonate_user",
+                        `Started impersonating ${displayName} (${displayEmail})`,
+                        "user",
+                        user.user_id,
+                      );
+                    }
+                    a.setImpersonating(null);
+                  }}
+                  disabled={user.is_owner || isImpersonating || impersonatingId === user.user_id}
+                >
+                  {impersonatingId === user.user_id ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <LogIn className="mr-2 h-4 w-4" />
+                  )}
+                  Sign in as User
+                </DropdownMenuItem>
+              </>
+            )}
+            {isSuperAdmin && (
+              <DropdownMenuItem
+                onClick={() => {
+                  a.setSelectedUser(user);
+                  a.setShowDeviceDialog(true);
+                }}
+              >
+                <Monitor className="mr-2 h-4 w-4" />
+                View Devices
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={() => a.handleToggleActive(user)} disabled={user.is_owner}>
+              <User className="mr-2 h-4 w-4" />
+              {user.is_active ? "Deactivate" : "Activate"}
+            </DropdownMenuItem>
+            {user.approval_status === "pending" && (
+              <>
+                <DropdownMenuItem
+                  onClick={async () => {
+                    await supabase.from("profiles").update({ approval_status: "approved" }).eq("id", user.id);
+                    await supabase.from("notifications").insert({
+                      user_id: user.user_id,
+                      title: "✅ Account Approved",
+                      message: "Your account has been approved! You now have full access to Amehnities.",
+                      type: "success",
+                      category: "registration",
+                    });
+                    await a.logAction("approve_user", `Approved user ${displayName} (${displayEmail})`, "user", user.user_id);
+                    toast({ title: "User Approved", description: `${displayName} has been approved.` });
+                    a.fetchUsers();
+                  }}
+                  className="text-green-600"
+                >
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Approve
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={async () => {
+                    await supabase.from("profiles").update({ approval_status: "rejected" }).eq("id", user.id);
+                    await supabase.from("notifications").insert({
+                      user_id: user.user_id,
+                      title: "❌ Account Rejected",
+                      message: "Your registration has been reviewed and was not approved. Please contact an administrator.",
+                      type: "error",
+                      category: "registration",
+                    });
+                    await a.logAction("reject_user", `Rejected user ${displayName} (${displayEmail})`, "user", user.user_id);
+                    toast({ title: "User Rejected", description: `${displayName} has been rejected.` });
+                    a.fetchUsers();
+                  }}
+                  className="text-destructive"
+                >
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  Reject
+                </DropdownMenuItem>
+              </>
+            )}
+            {isOwner && !user.is_owner && (
+              <DropdownMenuItem
+                onClick={() => {
+                  a.setSelectedUser(user);
+                  a.setDeleteConfirmText("");
+                  a.setShowDeleteDialog(true);
+                }}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Permanently
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+});
+
+
 const UsersView = () => {
   const { role: currentUserRole, profile: currentUserProfile, isOwner, isCoOwner, isAdmin } = useAuth();
   const { startImpersonation, isImpersonating } = useImpersonation();
