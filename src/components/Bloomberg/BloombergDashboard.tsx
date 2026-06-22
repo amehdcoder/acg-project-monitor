@@ -501,8 +501,9 @@ export default function BloombergDashboard({ onClose }: Props) {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Kpi icon={School} label="Total Schools" value={fmt(stats.totalSchools)} tint={NAVY} />
           <Kpi icon={CheckCircle2} label="Schools Validated" value={fmt(stats.validatedSchools)} tint={toneColor(pctTone(stats.coveragePct, { good: 75, ok: 50, warn: 25 }))} sub={`${stats.coveragePct.toFixed(1)}% coverage`} />
-          <Kpi icon={FileText} label="Submissions" value={fmt(stats.submittedCount)} tint={BLUE} sub={`${fmt(stats.duplicateCount)} duplicate${stats.duplicateCount === 1 ? "" : "s"} · ${stats.draftCount} drafts`} />
-          <Kpi icon={History} label="Duplicate Submissions" value={fmt(stats.duplicateCount)} tint={toneColor(stats.duplicateCount > 0 ? "warn" : "good")} sub="submissions − schools validated" />
+          <Kpi icon={FileText} label="Submissions" value={fmt(stats.submittedCount)} tint={BLUE} sub={`${fmt(stats.uniqueValidations)} unique · ${fmt(stats.duplicateCount)} duplicate${stats.duplicateCount === 1 ? "" : "s"}`} />
+          <Kpi icon={History} label="Duplicate Submissions" value={fmt(stats.duplicateCount)} tint={toneColor(stats.duplicateCount > 0 ? "warn" : "good")} sub={`across ${fmt(stats.schoolsWithDuplicates)} school${stats.schoolsWithDuplicates === 1 ? "" : "s"}`} />
+
           <Kpi icon={Users} label="Pupils Validated" value={fmt(stats.validatedTotal)} tint={PINK} />
           <Kpi icon={Users} label="Baseline (LEA)" value={fmt(stats.baselineTotal)} tint="#64748b" sub="for validated schools" />
           <Kpi
