@@ -19,7 +19,6 @@
 // Idempotent: rows are upserted on their stable submissionId, and once a local
 // entry is marked "sent" it is no longer picked up.
 
-import { supabase } from "@/integrations/supabase/client";
 import {
   listSavedEntries,
   setSavedEntryStatus,
@@ -42,24 +41,6 @@ const collectionTime = (e: SavedFormEntry): number => {
 const finalizeTime = (e: SavedFormEntry): number => {
   const t = Date.parse(e.finalizedAt || "") || Date.parse(e.updatedAt || "") || collectionTime(e);
   return Number.isNaN(t) ? Date.now() : t;
-};
-
-const schoolKeyOf = (e: SavedFormEntry): string | null => {
-  const sd = (e.submissionData || {}) as Record<string, any>;
-  const r = (e.responses || {}) as Record<string, any>;
-  return (sd.school_key ?? r.school_key ?? r.schoolKey ?? null) || null;
-};
-
-const visitDateOf = (e: SavedFormEntry): string => {
-  const sd = (e.submissionData || {}) as Record<string, unknown>;
-  const r = (e.responses || {}) as Record<string, unknown>;
-  const verification = (sd.verification || r.verification || {}) as Record<string, unknown>;
-  return String(verification.date_of_visit || e.finalizedAt || e.updatedAt || e.createdAt || "").slice(0, 10);
-};
-
-const visitDedupKeyOf = (e: SavedFormEntry): string | null => {
-  const key = schoolKeyOf(e);
-  return key ? `${key}::${visitDateOf(e)}` : null;
 };
 
 export interface MigrationResult {
@@ -121,7 +102,6 @@ export async function migrateReadyToSendBloomberg(
   // recovery effectively instantaneous for any volume without batching delays
   // or freezing the dashboard/app.
   await runPool(targets, async (e) => {
-    const key = visitDedupKeyOf(e);
     const submissionId = e.submissionId || crypto.randomUUID();
     const createdIso = new Date(collectionTime(e) || finalizeTime(e)).toISOString();
     const submittedIso = new Date(finalizeTime(e)).toISOString();
