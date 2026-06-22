@@ -476,6 +476,10 @@ const UsersView = () => {
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [selectedForm, setSelectedForm] = useState<string>("");
   const [selectedStandardForm, setSelectedStandardForm] = useState<string>("");
+  // Search / filter controls for the assignment selectors
+  const [projectFilter, setProjectFilter] = useState("");
+  const [stdFormSearch, setStdFormSearch] = useState("");
+  const [stdFormGroup, setStdFormGroup] = useState<string>("all");
   const [showDeviceDialog, setShowDeviceDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
