@@ -36,6 +36,7 @@ interface SidebarProps {
   isOwner?: boolean;
   isAdhoc?: boolean;
   canAccessPage?: (pageId: string) => boolean;
+  minimalAccess?: boolean;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }
