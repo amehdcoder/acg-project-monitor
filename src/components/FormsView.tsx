@@ -1875,8 +1875,51 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               )}
             </div>
 
-            {/* Folder 2 — Standard Forms (hidden for adhoc users with no assigned standard form) */}
-            {(!isAdhoc || assignedStandardCodes.size > 0) && !standardRestricted && (
+            {/* Assigned Standard Forms — flat, folder-free beautiful grid.
+                Shown to users who have specific standard forms assigned to them. */}
+            {assignedFormCards.length > 0 && !standardRestricted && (
+              <div className="overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-[#F7F9FE] to-white shadow-sm">
+                <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-border/50">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#2F6FE6] to-[#7C5CFF] shadow-sm">
+                    <Sparkles className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-display text-base sm:text-lg font-bold text-foreground">Your Forms</h3>
+                    <p className="truncate text-xs sm:text-sm text-muted-foreground">Forms assigned to you — tap any to begin</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-[#E3ECFB] px-3 py-1 text-xs font-semibold text-[#1656BA]">
+                    {assignedFormCards.length}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 sm:p-4">
+                  {assignedFormCards.map(({ code, name, desc, Icon, bg, fg, ring }) => (
+                    <button
+                      key={code}
+                      onClick={() => launchStandardForm(code)}
+                      className="group relative flex items-center gap-3.5 overflow-hidden rounded-2xl border border-border/60 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                      style={{ ['--tw-ring-color' as any]: ring }}
+                    >
+                      <span
+                        aria-hidden
+                        className="absolute inset-y-0 left-0 w-1.5"
+                        style={{ backgroundColor: ring }}
+                      />
+                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${bg} transition-transform group-hover:scale-105`}>
+                        <Icon className={`h-6 w-6 ${fg}`} strokeWidth={2} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="truncate text-[15px] font-bold text-foreground">{name}</h4>
+                        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{desc}</p>
+                      </div>
+                      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:text-foreground" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Folder 2 — Standard Forms (admins see the full folder explorer) */}
+            {!isAdhoc && !standardRestricted && (
             <div className="overflow-hidden rounded-2xl border border-border/60 bg-white shadow-sm">
               <button
                 onClick={() => setOpenTopFolder((f) => (f === "standard" ? null : "standard"))}
