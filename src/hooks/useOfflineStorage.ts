@@ -185,60 +185,73 @@ export const useOfflineStorage = () => {
         return { synced: 0, failed: 0 };
       }
 
-      for (const submission of pending) {
-        try {
-          // Check for duplicates
-          const { data: existing } = await supabase
-            .from("form_submissions")
-            .select("id")
-            .eq("id", submission.id)
-            .maybeSingle();
+      // ---- Scalable batched drain ----
+      // Previously each row cost two network round-trips (a duplicate-check
+      // SELECT + an INSERT), processed strictly sequentially. On a device with
+      // thousands of queued field visits that drains far too slowly. We now
+      // upsert in chunks (one request per chunk, duplicates ignored server-side
+      // via the id primary key) and only fall back to per-row inserts when a
+      // chunk fails — so a single bad row never blocks the rest and nothing is
+      // ever lost.
+      const CHUNK = 200;
+      const toRow = (s: PendingSubmission) => ({
+        id: s.id,
+        form_id: s.form_id,
+        user_id: s.user_id,
+        data: s.data,
+        location: s.location,
+        within_geofence: s.within_geofence,
+        submission_type: s.submission_type || "regular",
+        status: "sent",
+        submitted_at: s.created_at,
+        synced_at: new Date().toISOString(),
+      });
+      const touchedFormIds = new Set<string>();
 
-          if (existing) {
-            await removeFromOfflineStorage(submission.id);
-            synced++;
-            continue;
-          }
+      for (let i = 0; i < pending.length; i += CHUNK) {
+        if (!navigator.onLine) break;
+        const slice = pending.slice(i, i + CHUNK);
+        const { error } = await supabase
+          .from("form_submissions")
+          .upsert(slice.map(toRow), { onConflict: "id", ignoreDuplicates: true });
 
-          const { error } = await supabase.from("form_submissions").insert({
-            id: submission.id,
-            form_id: submission.form_id,
-            user_id: submission.user_id,
-            data: submission.data,
-            location: submission.location,
-            within_geofence: submission.within_geofence,
-            submission_type: submission.submission_type || "regular",
-            status: "sent",
-            submitted_at: submission.created_at,
-            synced_at: new Date().toISOString(),
-          });
-
-
-          if (error) {
-            if (error.code === "23505") {
-              await removeFromOfflineStorage(submission.id);
-              synced++;
-            } else {
-              throw error;
-            }
-          } else {
-            await supabase
-              .from("forms")
-              .update({ last_used_at: new Date().toISOString() })
-              .eq("id", submission.form_id);
-            await removeFromOfflineStorage(submission.id);
-            synced++;
-          }
-        } catch (error: any) {
-          console.error("Error syncing submission:", submission.id, error);
-          const newRetryCount = submission.retryCount + 1;
-          // Never delete failed field submissions automatically. A persistent
-          // server/RLS/network problem must keep retrying until it succeeds or
-          // an admin intentionally repairs it; dropping after N attempts caused
-          // real field visits to disappear from dashboards.
-          await updateRetryCount(submission.id, newRetryCount);
-          failed++;
+        if (!error) {
+          // Whole chunk landed (or duplicates were ignored) — clear locally.
+          await Promise.all(slice.map((s) => removeFromOfflineStorage(s.id)));
+          slice.forEach((s) => touchedFormIds.add(s.form_id));
+          synced += slice.length;
+          continue;
         }
+
+        // Chunk failed — fall back to per-row so one offender can't block peers.
+        for (const submission of slice) {
+          if (!navigator.onLine) break;
+          try {
+            const { error: rowErr } = await supabase
+              .from("form_submissions")
+              .upsert(toRow(submission), { onConflict: "id", ignoreDuplicates: true });
+            if (rowErr && rowErr.code !== "23505") throw rowErr;
+            await removeFromOfflineStorage(submission.id);
+            touchedFormIds.add(submission.form_id);
+            synced++;
+          } catch (rowError: any) {
+            console.error("Error syncing submission:", submission.id, rowError);
+            // Never delete failed field submissions automatically. A persistent
+            // server/RLS/network problem must keep retrying until it succeeds or
+            // an admin intentionally repairs it; dropping after N attempts caused
+            // real field visits to disappear from dashboards.
+            await updateRetryCount(submission.id, submission.retryCount + 1);
+            failed++;
+          }
+        }
+      }
+
+      // Touch last_used_at once per distinct form instead of once per row.
+      if (touchedFormIds.size > 0) {
+        await supabase
+          .from("forms")
+          .update({ last_used_at: new Date().toISOString() })
+          .in("id", Array.from(touchedFormIds));
       }
 
       // Update pending count after sync

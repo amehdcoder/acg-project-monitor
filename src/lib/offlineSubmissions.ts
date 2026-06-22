@@ -203,8 +203,13 @@ export async function flushSubmissionQueue(): Promise<{ inserted: number; remain
       const last = Date.parse(rec.created_at || "") || 0;
       return rec.attempts === 0 || Date.now() - last >= delay;
     });
-    for (const rec of due) {
-      if (!isOnline()) break;
+
+    // Drain with bounded concurrency so a large backlog clears in seconds
+    // instead of strictly one-at-a-time, while still capping simultaneous
+    // requests so we never overwhelm the device or the backend.
+    const CONCURRENCY = 6;
+    const processOne = async (rec: PendingInsert) => {
+      if (!isOnline()) return;
       try {
         const { error } = await writeRecordToServer(rec.table, rec.row, rec.upsertOnId ?? false);
         if (error) throw error;
@@ -214,6 +219,10 @@ export async function flushSubmissionQueue(): Promise<{ inserted: number; remain
       } catch (e: any) {
         await putRecord({ ...rec, attempts: rec.attempts + 1, created_at: new Date().toISOString(), last_error: e?.message || "insert failed" });
       }
+    };
+    for (let i = 0; i < due.length; i += CONCURRENCY) {
+      if (!isOnline()) break;
+      await Promise.all(due.slice(i, i + CONCURRENCY).map(processOne));
     }
   } finally {
     flushing = false;
