@@ -453,6 +453,19 @@ export default function BloombergDashboard({ onClose }: Props) {
     { name: "Validated", value: stats.validatedTotal, color: TEAL },
   ];
 
+  if (drilldownValidator) {
+    return (
+      <BloombergValidatorDrilldown
+        validator={drilldownValidator}
+        groups={duplicates.groups}
+        onClose={() => setDrilldownValidator(null)}
+        canDelete={canDelete}
+        onDelete={handleDeleteRow}
+        deletingId={deleting}
+      />
+    );
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#f4f6fb]">
       {/* Navy header */}
