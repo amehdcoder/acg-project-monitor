@@ -276,9 +276,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     return () => { cancelled = true; };
   }, [user?.id, isAdmin]);
 
-  // Adhoc users may only see the standard form(s) explicitly assigned to them.
+  // Load the standard form(s) explicitly assigned to this user. This applies to
+  // ANY user (adhoc or regular non-admin) so that anyone granted access to only
+  // standard forms can see and open them from "Open your form".
   useEffect(() => {
-    if (!user?.id || !isAdhoc) return;
+    if (!user?.id) return;
     let cancelled = false;
     (async () => {
       const { data } = await (supabase as any)
@@ -288,7 +290,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       if (!cancelled) setAssignedStandardCodes(new Set((data || []).map((r: any) => r.form_code)));
     })();
     return () => { cancelled = true; };
-  }, [user?.id, isAdhoc]);
+  }, [user?.id]);
 
   // Launch the correct experience for an assigned standard-form code.
   const launchStandardForm = useCallback((code: string) => {
