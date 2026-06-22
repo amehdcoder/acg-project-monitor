@@ -771,28 +771,31 @@ const UsersView = () => {
     }
   };
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch = `${safeText(user.first_name, "")} ${safeText(user.last_name, "")} ${safeText(user.email, "")}`
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesDesignation = filterDesignation === "all" || user.designation === "adhoc_user";
-    return matchesSearch && matchesDesignation;
-  });
+  const filteredUsers = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return users.filter((user) => {
+      const matchesSearch = `${safeText(user.first_name, "")} ${safeText(user.last_name, "")} ${safeText(user.email, "")}`
+        .toLowerCase()
+        .includes(q);
+      const matchesDesignation = filterDesignation === "all" || user.designation === "adhoc_user";
+      return matchesSearch && matchesDesignation;
+    });
+  }, [users, searchQuery, filterDesignation]);
 
   // ---------------- Bulk actions (selected users) ----------------
-  const selectableUsers = filteredUsers.filter((u) => !u.is_owner);
+  const selectableUsers = useMemo(() => filteredUsers.filter((u) => !u.is_owner), [filteredUsers]);
 
   const allFilteredSelected =
     selectableUsers.length > 0 &&
     selectableUsers.every((u) => selectedIds.has(u.user_id));
 
-  const toggleSelect = (userId: string) => {
+  const toggleSelect = useCallback((userId: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       next.has(userId) ? next.delete(userId) : next.add(userId);
       return next;
     });
-  };
+  }, []);
 
   const toggleSelectAll = () => {
     setSelectedIds((prev) => {
