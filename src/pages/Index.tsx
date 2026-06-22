@@ -376,6 +376,7 @@ const Index = () => {
           isOwner={isOwner}
           isAdhoc={isAdhoc}
           canAccessPage={canAccessPage}
+          minimalAccess={minimalAccess}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(prev => !prev)}
         />
