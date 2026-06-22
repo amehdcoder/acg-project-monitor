@@ -620,7 +620,60 @@ export default function BloombergDashboard({ onClose }: Props) {
                 {cleaningDupes ? "Removing…" : `Remove all ${fmt(duplicates.extraEntries)} superseded duplicate${duplicates.extraEntries === 1 ? "" : "s"}`}
               </button>
             )}
-            <div className="max-h-[28rem] overflow-auto rounded-lg border border-amber-200 dark:border-amber-900">
+
+            {/* Filters: narrow the audit list by validator, duplicate type and row status. */}
+            <div className="mb-3 flex flex-wrap items-end gap-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Validator</span>
+                <select
+                  value={dupValidator}
+                  onChange={(e) => { setDupValidator(e.target.value); dupPg.resetPage(); }}
+                  className="h-8 rounded-md border border-amber-300 bg-white px-2 text-xs text-foreground dark:border-amber-900 dark:bg-amber-950/40"
+                >
+                  <option value="all">All validators</option>
+                  {dupValidators.map((v) => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Duplicate type</span>
+                <select
+                  value={dupType}
+                  onChange={(e) => { setDupType(e.target.value as typeof dupType); dupPg.resetPage(); }}
+                  className="h-8 rounded-md border border-amber-300 bg-white px-2 text-xs text-foreground dark:border-amber-900 dark:bg-amber-950/40"
+                >
+                  <option value="all">All types</option>
+                  <option value="same">Same validator</option>
+                  <option value="cross">Different validators</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Entry status</span>
+                <select
+                  value={dupRowStatus}
+                  onChange={(e) => { setDupRowStatus(e.target.value as typeof dupRowStatus); dupPg.resetPage(); }}
+                  className="h-8 rounded-md border border-amber-300 bg-white px-2 text-xs text-foreground dark:border-amber-900 dark:bg-amber-950/40"
+                >
+                  <option value="all">All entries</option>
+                  <option value="kept">Retained only</option>
+                  <option value="superseded">Superseded only</option>
+                </select>
+              </label>
+              {(dupValidator !== "all" || dupType !== "all" || dupRowStatus !== "all") && (
+                <button
+                  onClick={() => { setDupValidator("all"); setDupType("all"); setDupRowStatus("all"); dupPg.resetPage(); }}
+                  className="h-8 rounded-md border border-amber-300 px-2.5 text-xs font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-900 dark:text-amber-300 dark:hover:bg-amber-900/40"
+                >
+                  Clear filters
+                </button>
+              )}
+              <span className="ml-auto self-center text-[11px] text-muted-foreground">
+                {fmt(filteredDupGroups.length)} school{filteredDupGroups.length === 1 ? "" : "s"} match
+              </span>
+            </div>
+
+            <div className="max-h-[28rem] overflow-auto rounded-lg border border-amber-200 dark:border-amber-900" style={{ contentVisibility: "auto" }}>
               <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-amber-100/80 backdrop-blur dark:bg-amber-950/60">
                   <tr className="text-left text-muted-foreground">
@@ -633,56 +686,65 @@ export default function BloombergDashboard({ onClose }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {duplicates.groups.flatMap((g) =>
-                    g.copies.map((c, idx) => (
-                      <tr
-                        key={c.id}
-                        className={`border-b border-amber-100/60 last:border-0 dark:border-amber-900/40 ${idx === 0 ? "border-t-2 border-t-amber-300/70 dark:border-t-amber-800" : ""}`}
-                      >
-                        <td className="py-1.5 pl-3 pr-3 text-foreground">
-                          {idx === 0 ? (
-                            <span className="font-medium">
-                              {g.school} <span className="text-[10px] font-normal text-muted-foreground">({g.total} entries)</span>
-                              {g.crossValidator && (
-                                <span className="ml-1.5 rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-semibold text-rose-700 dark:bg-rose-950/50 dark:text-rose-300" title="Validated by more than one person">
-                                  multiple validators
-                                </span>
-                              )}
-                            </span>
-                          ) : (
-                            <span className="pl-3 text-muted-foreground">↳ {g.code}</span>
-                          )}
-                        </td>
-                        <td className="py-1.5 pr-3 text-muted-foreground">{idx === 0 ? `${g.state} / ${g.lga}` : ""}</td>
-                        <td className="py-1.5 pr-3 text-foreground">{c.validator}</td>
-                        <td className="py-1.5 pr-3 text-muted-foreground">{c.date ? new Date(c.date).toLocaleString() : "—"}</td>
-                        <td className="py-1.5 pr-3">
-                          {c.kept ? (
-                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">Kept</span>
-                          ) : (
-                            <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">Duplicate</span>
-                          )}
-                        </td>
-                        {canDelete && (
-                          <td className="py-1.5 pr-3 text-right">
-                            {!c.kept && (
-                              <button
-                                onClick={() => handleDeleteRow(c.id, `${g.school} (duplicate)`)}
-                                disabled={deleting === c.id}
-                                className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-amber-700 hover:bg-amber-200 disabled:opacity-50 dark:text-amber-300 dark:hover:bg-amber-900/50"
-                                title="Delete this duplicate entry"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                  {dupPg.paginatedData.length === 0 ? (
+                    <tr>
+                      <td colSpan={canDelete ? 6 : 5} className="py-6 text-center text-muted-foreground">
+                        No duplicate entries match the selected filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    dupPg.paginatedData.flatMap((g) =>
+                      g.copies.map((c, idx) => (
+                        <tr
+                          key={c.id}
+                          className={`border-b border-amber-100/60 last:border-0 dark:border-amber-900/40 ${idx === 0 ? "border-t-2 border-t-amber-300/70 dark:border-t-amber-800" : ""}`}
+                        >
+                          <td className="py-1.5 pl-3 pr-3 text-foreground">
+                            {idx === 0 ? (
+                              <span className="font-medium">
+                                {g.school} <span className="text-[10px] font-normal text-muted-foreground">({g.total} entries)</span>
+                                {g.crossValidator && (
+                                  <span className="ml-1.5 rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-semibold text-rose-700 dark:bg-rose-950/50 dark:text-rose-300" title="Validated by more than one person">
+                                    multiple validators
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="pl-3 text-muted-foreground">↳ {g.code}</span>
                             )}
                           </td>
-                        )}
-                      </tr>
-                    )),
+                          <td className="py-1.5 pr-3 text-muted-foreground">{idx === 0 ? `${g.state} / ${g.lga}` : ""}</td>
+                          <td className="py-1.5 pr-3 text-foreground">{c.validator}</td>
+                          <td className="py-1.5 pr-3 text-muted-foreground">{c.date ? new Date(c.date).toLocaleString() : "—"}</td>
+                          <td className="py-1.5 pr-3">
+                            {c.kept ? (
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">Kept</span>
+                            ) : (
+                              <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">Duplicate</span>
+                            )}
+                          </td>
+                          {canDelete && (
+                            <td className="py-1.5 pr-3 text-right">
+                              {!c.kept && (
+                                <button
+                                  onClick={() => handleDeleteRow(c.id, `${g.school} (duplicate)`)}
+                                  disabled={deleting === c.id}
+                                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-amber-700 hover:bg-amber-200 disabled:opacity-50 dark:text-amber-300 dark:hover:bg-amber-900/50"
+                                  title="Delete this duplicate entry"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      )),
+                    )
                   )}
                 </tbody>
               </table>
             </div>
+            <Pager page={dupPg.currentPage} totalPages={dupPg.totalPages} totalItems={dupPg.totalItems} startIndex={dupPg.startIndex} pageSize={dupPg.pageSize} onPrev={dupPg.prevPage} onNext={dupPg.nextPage} hasPrev={dupPg.hasPrev} hasNext={dupPg.hasNext} />
           </div>
         )}
 
