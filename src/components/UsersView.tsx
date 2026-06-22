@@ -1693,7 +1693,79 @@ const UsersView = () => {
                 </label>
               ))}
             </div>
-            <Button className="w-full" disabled={(!bulkProject && bulkForms.size === 0) || bulkBusy} onClick={handleBulkAssignProject}>
+
+            {/* Standard forms */}
+            <div className="flex items-center justify-between">
+              <Label>Standard forms (optional)</Label>
+              {bulkStandardForms.size > 0 && (
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setBulkStandardForms(new Set())}>
+                  Clear ({bulkStandardForms.size})
+                </Button>
+              )}
+            </div>
+            <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-2">
+              {Object.values(STANDARD_ASSESSMENTS).map((def: any) => (
+                <label key={def.code} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted/50">
+                  <Checkbox
+                    checked={bulkStandardForms.has(def.code)}
+                    onCheckedChange={() =>
+                      setBulkStandardForms((prev) => {
+                        const next = new Set(prev);
+                        next.has(def.code) ? next.delete(def.code) : next.add(def.code);
+                        return next;
+                      })
+                    }
+                  />
+                  <span className="truncate">{def.name}</span>
+                </label>
+              ))}
+            </div>
+            {bulkStandardForms.size > 0 && (
+              <label className="flex items-start gap-2 rounded-lg border bg-muted/30 p-2.5 text-sm">
+                <Switch checked={bulkRestrictStandard} onCheckedChange={setBulkRestrictStandard} className="mt-0.5" />
+                <span className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Restrict to only these standard forms.</span>{" "}
+                  Non-admin users will no longer see every standard form their designation grants — only the ones
+                  selected above. Systems &amp; Super Admins are never restricted.
+                </span>
+              </label>
+            )}
+
+            {/* Pages */}
+            <div className="flex items-center justify-between">
+              <Label>Pages (optional)</Label>
+              {bulkPages.size > 0 && (
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setBulkPages(new Set())}>
+                  Clear ({bulkPages.size})
+                </Button>
+              )}
+            </div>
+            <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-2">
+              {RESTRICTED_PAGES.map((pg) => (
+                <label key={pg.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted/50">
+                  <Checkbox
+                    checked={bulkPages.has(pg.id)}
+                    onCheckedChange={() =>
+                      setBulkPages((prev) => {
+                        const next = new Set(prev);
+                        next.has(pg.id) ? next.delete(pg.id) : next.add(pg.id);
+                        return next;
+                      })
+                    }
+                  />
+                  <span className="truncate">{pg.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <Button
+              className="w-full"
+              disabled={
+                (!bulkProject && bulkForms.size === 0 && bulkStandardForms.size === 0 && bulkPages.size === 0) ||
+                bulkBusy
+              }
+              onClick={handleBulkAssignProject}
+            >
               {bulkBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FolderOpen className="mr-2 h-4 w-4" />}
               Assign to {selectedIds.size} User(s)
             </Button>
