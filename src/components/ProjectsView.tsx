@@ -221,17 +221,25 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
           
           const formIds = formsData?.map(f => f.id) || [];
           
-          // Get unique members assigned to forms in this project
-          let uniqueMembersCount = 0;
+          // Count unique members from BOTH direct project assignments and
+          // form assignments (a user counts once even if both exist).
+          const memberIds = new Set<string>();
+
+          const { data: projectAssignments } = await supabase
+            .from("user_project_assignments")
+            .select("user_id")
+            .eq("project_id", project.id);
+          (projectAssignments || []).forEach((a: any) => memberIds.add(a.user_id));
+
           if (formIds.length > 0) {
             const { data: formAssignments } = await supabase
               .from("user_form_assignments")
               .select("user_id")
               .in("form_id", formIds);
-            
-            const uniqueUserIds = new Set(formAssignments?.map(a => a.user_id) || []);
-            uniqueMembersCount = uniqueUserIds.size;
+            (formAssignments || []).forEach((a: any) => memberIds.add(a.user_id));
           }
+
+          const uniqueMembersCount = memberIds.size;
 
           // Get submissions count and recent submissions
           let entriesCount = 0;

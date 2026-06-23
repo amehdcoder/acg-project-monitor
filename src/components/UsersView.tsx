@@ -177,6 +177,8 @@ const UserCard = memo(function UserCard({
     colorForProject,
     getUserProjectIds,
     getUserFormIds,
+    getUserStandardCodes,
+    stdFormNameByCodeFn,
     formById,
     cascadeAssign,
   } = ctx;
@@ -187,6 +189,7 @@ const UserCard = memo(function UserCard({
   const displayEmail = safeText(user.email);
   const userProjectIds = getUserProjectIds(user.user_id);
   const userFormIds = getUserFormIds(user.user_id);
+  const userStandardCodes = getUserStandardCodes(user.user_id);
 
   return (
     <div
@@ -276,6 +279,19 @@ const UserCard = memo(function UserCard({
                     </span>
                   );
                 })
+              ) : (
+                <span className="text-[11px] italic text-muted-foreground/50">—</span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Standard forms</span>
+              {userStandardCodes.length > 0 ? (
+                userStandardCodes.map((code: string) => (
+                  <span key={code} className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                    <FileText className="h-3 w-3" />
+                    {stdFormNameByCodeFn(code)}
+                  </span>
+                ))
               ) : (
                 <span className="text-[11px] italic text-muted-foreground/50">—</span>
               )}
@@ -513,6 +529,7 @@ const UsersView = () => {
   const [formAssign, setFormAssign] = useState<Record<string, string[]>>({});
   // Cascade scope assignments: user_id -> rows { form_id, field_key, value, value_label }
   const [cascadeAssign, setCascadeAssign] = useState<Record<string, { form_id: string; field_key: string; value: string; value_label: string | null }[]>>({});
+  const [stdFormAssign, setStdFormAssign] = useState<Record<string, string[]>>({});
   const [cascadeUser, setCascadeUser] = useState<UserProfile | null>(null);
 
   useEffect(() => {
@@ -523,10 +540,11 @@ const UsersView = () => {
   }, []);
 
   const fetchAssignments = async () => {
-    const [{ data: pa }, { data: fa }, { data: ca }] = await Promise.all([
+    const [{ data: pa }, { data: fa }, { data: ca }, { data: sa }] = await Promise.all([
       supabase.from("user_project_assignments").select("user_id, project_id"),
       supabase.from("user_form_assignments").select("user_id, form_id"),
       supabase.from("user_cascade_assignments").select("user_id, form_id, field_key, value, value_label"),
+      (supabase as any).from("user_standard_form_assignments").select("user_id, form_code"),
     ]);
     const pMap: Record<string, string[]> = {};
     (pa || []).forEach((r: any) => {
@@ -543,9 +561,15 @@ const UsersView = () => {
       if (!r.user_id) return;
       (cMap[r.user_id] ||= []).push({ form_id: r.form_id, field_key: r.field_key, value: r.value, value_label: r.value_label });
     });
+    const sMap: Record<string, string[]> = {};
+    (sa || []).forEach((r: any) => {
+      if (!r.user_id || !r.form_code) return;
+      (sMap[r.user_id] ||= []).push(r.form_code);
+    });
     setProjectAssign(pMap);
     setFormAssign(fMap);
     setCascadeAssign(cMap);
+    setStdFormAssign(sMap);
   };
 
   const fetchUsers = async () => {
@@ -1315,6 +1339,21 @@ const UsersView = () => {
     (uid: string) => Array.from(new Set(formAssign[uid] || [])).filter((id) => formById.has(id)),
     [formAssign, formById],
   );
+  const stdFormNameByCode = useMemo(() => {
+    const m = new Map<string, string>();
+    ALL_STANDARD_FORMS.forEach((f) => m.set(f.code, f.name));
+    return m;
+  }, []);
+  const getUserStandardCodes = useCallback(
+    (uid: string) => Array.from(new Set(stdFormAssign[uid] || [])),
+    [stdFormAssign],
+  );
+  const stdFormNameByCodeFn = useCallback(
+    (code: string) => stdFormNameByCode.get(code) || code,
+    [stdFormNameByCode],
+  );
+
+
 
   // Group filtered users by the projects they have access to. A user assigned to
   // multiple projects appears under each; users with none fall into "No Project Access".
@@ -1341,6 +1380,13 @@ const UsersView = () => {
 
   // Track which project folders are collapsed (by group key).
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  // Render cap per group so a group with thousands of users only mounts a
+  // bounded number of DOM rows at a time (keeps the page fast at any scale).
+  const GROUP_PAGE_SIZE = 50;
+  const [groupVisible, setGroupVisible] = useState<Record<string, number>>({});
+  const showMoreInGroup = useCallback((key: string, total: number) => {
+    setGroupVisible((prev) => ({ ...prev, [key]: Math.min((prev[key] || GROUP_PAGE_SIZE) + GROUP_PAGE_SIZE, total) }));
+  }, []);
   const toggleGroupCollapse = useCallback((key: string) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
@@ -1391,6 +1437,8 @@ const UsersView = () => {
       colorForProject,
       getUserProjectIds,
       getUserFormIds,
+      getUserStandardCodes,
+      stdFormNameByCodeFn,
       formById,
       cascadeAssign,
     }),
@@ -1405,6 +1453,8 @@ const UsersView = () => {
       colorForProject,
       getUserProjectIds,
       getUserFormIds,
+      getUserStandardCodes,
+      stdFormNameByCodeFn,
       formById,
       cascadeAssign,
     ],
@@ -1610,15 +1660,33 @@ const UsersView = () => {
                       <Badge variant="secondary" className="ml-auto">{group.users.length}</Badge>
                     </button>
                   </div>
-                  {!collapsed && group.users.map((user) => (
-                    <UserCard
-                      key={`${group.key}-${user.id}`}
-                      user={user}
-                      selected={selectedIds.has(user.user_id)}
-                      ctx={rowCtx}
-                      api={rowApiRef}
-                    />
-                  ))}
+                  {!collapsed && (() => {
+                    const visible = groupVisible[group.key] || GROUP_PAGE_SIZE;
+                    const shown = group.users.slice(0, visible);
+                    const remaining = group.users.length - shown.length;
+                    return (
+                      <>
+                        {shown.map((user) => (
+                          <UserCard
+                            key={`${group.key}-${user.id}`}
+                            user={user}
+                            selected={selectedIds.has(user.user_id)}
+                            ctx={rowCtx}
+                            api={rowApiRef}
+                          />
+                        ))}
+                        {remaining > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => showMoreInGroup(group.key, group.users.length)}
+                            className="w-full rounded-lg border border-dashed border-border py-2 text-sm font-medium text-muted-foreground hover:bg-muted/40"
+                          >
+                            Show {Math.min(GROUP_PAGE_SIZE, remaining)} more ({remaining} remaining)
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 );
               })}
