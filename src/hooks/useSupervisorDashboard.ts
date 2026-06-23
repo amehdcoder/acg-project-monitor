@@ -377,7 +377,7 @@ export function useSupervisorDashboard() {
 
       setDailySummary({
         date: new Date().toISOString().split("T")[0],
-        total_submissions: rangeSubmissions.length,
+        total_submissions: totalRangeSubmissions,
         active_users: activeUsersCount,
         active_enumerators: activeUsersCount, // backward compat
         geofence_compliance_avg: avgCompliance,
