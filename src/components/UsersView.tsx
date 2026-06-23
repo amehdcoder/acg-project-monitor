@@ -1660,15 +1660,33 @@ const UsersView = () => {
                       <Badge variant="secondary" className="ml-auto">{group.users.length}</Badge>
                     </button>
                   </div>
-                  {!collapsed && group.users.map((user) => (
-                    <UserCard
-                      key={`${group.key}-${user.id}`}
-                      user={user}
-                      selected={selectedIds.has(user.user_id)}
-                      ctx={rowCtx}
-                      api={rowApiRef}
-                    />
-                  ))}
+                  {!collapsed && (() => {
+                    const visible = groupVisible[group.key] || GROUP_PAGE_SIZE;
+                    const shown = group.users.slice(0, visible);
+                    const remaining = group.users.length - shown.length;
+                    return (
+                      <>
+                        {shown.map((user) => (
+                          <UserCard
+                            key={`${group.key}-${user.id}`}
+                            user={user}
+                            selected={selectedIds.has(user.user_id)}
+                            ctx={rowCtx}
+                            api={rowApiRef}
+                          />
+                        ))}
+                        {remaining > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => showMoreInGroup(group.key, group.users.length)}
+                            className="w-full rounded-lg border border-dashed border-border py-2 text-sm font-medium text-muted-foreground hover:bg-muted/40"
+                          >
+                            Show {Math.min(GROUP_PAGE_SIZE, remaining)} more ({remaining} remaining)
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 );
               })}
