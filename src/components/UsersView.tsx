@@ -189,6 +189,7 @@ const UserCard = memo(function UserCard({
   const displayEmail = safeText(user.email);
   const userProjectIds = getUserProjectIds(user.user_id);
   const userFormIds = getUserFormIds(user.user_id);
+  const userStandardCodes = getUserStandardCodes(user.user_id);
 
   return (
     <div
