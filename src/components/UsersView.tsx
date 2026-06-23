@@ -1323,6 +1323,21 @@ const UsersView = () => {
     (uid: string) => Array.from(new Set(formAssign[uid] || [])).filter((id) => formById.has(id)),
     [formAssign, formById],
   );
+  const stdFormNameByCode = useMemo(() => {
+    const m = new Map<string, string>();
+    ALL_STANDARD_FORMS.forEach((f) => m.set(f.code, f.name));
+    return m;
+  }, []);
+  const getUserStandardCodes = useCallback(
+    (uid: string) => Array.from(new Set(stdFormAssign[uid] || [])),
+    [stdFormAssign],
+  );
+  const stdFormNameByCodeFn = useCallback(
+    (code: string) => stdFormNameByCode.get(code) || code,
+    [stdFormNameByCode],
+  );
+
+
 
   // Group filtered users by the projects they have access to. A user assigned to
   // multiple projects appears under each; users with none fall into "No Project Access".
