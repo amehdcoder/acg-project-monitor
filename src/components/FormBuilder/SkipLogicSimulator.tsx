@@ -35,9 +35,8 @@ interface SkipLogicSimulatorProps {
 
 const INPUT_TYPES = new Set([
   "text",
-  "integer",
-  "decimal",
   "number",
+  "range",
   "select_one",
   "select_multiple",
   "date",
