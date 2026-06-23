@@ -177,6 +177,8 @@ const UserCard = memo(function UserCard({
     colorForProject,
     getUserProjectIds,
     getUserFormIds,
+    getUserStandardCodes,
+    stdFormNameByCodeFn,
     formById,
     cascadeAssign,
   } = ctx;
