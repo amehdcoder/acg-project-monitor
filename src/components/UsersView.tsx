@@ -524,10 +524,11 @@ const UsersView = () => {
   }, []);
 
   const fetchAssignments = async () => {
-    const [{ data: pa }, { data: fa }, { data: ca }] = await Promise.all([
+    const [{ data: pa }, { data: fa }, { data: ca }, { data: sa }] = await Promise.all([
       supabase.from("user_project_assignments").select("user_id, project_id"),
       supabase.from("user_form_assignments").select("user_id, form_id"),
       supabase.from("user_cascade_assignments").select("user_id, form_id, field_key, value, value_label"),
+      (supabase as any).from("user_standard_form_assignments").select("user_id, form_code"),
     ]);
     const pMap: Record<string, string[]> = {};
     (pa || []).forEach((r: any) => {
@@ -544,9 +545,15 @@ const UsersView = () => {
       if (!r.user_id) return;
       (cMap[r.user_id] ||= []).push({ form_id: r.form_id, field_key: r.field_key, value: r.value, value_label: r.value_label });
     });
+    const sMap: Record<string, string[]> = {};
+    (sa || []).forEach((r: any) => {
+      if (!r.user_id || !r.form_code) return;
+      (sMap[r.user_id] ||= []).push(r.form_code);
+    });
     setProjectAssign(pMap);
     setFormAssign(fMap);
     setCascadeAssign(cMap);
+    setStdFormAssign(sMap);
   };
 
   const fetchUsers = async () => {
