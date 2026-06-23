@@ -184,6 +184,9 @@ export function useSupervisorDashboard() {
       });
       const now = new Date();
       const allUserStatuses: UserStatus[] = (profiles || []).map((profile) => {
+        const m = metricsMap.get(profile.user_id);
+        const subsToday = m ? Number(m.subs_today) : 0;
+        const subsTotal = m ? Number(m.subs_total) : 0;
         const userActivity = fieldActivity.filter(a => a.user_id === profile.user_id);
         // Merge formal assignments with submission-derived assignments
         const formalForms = formAssignments.filter(a => a.user_id === profile.user_id).map(a => a.form_id);
