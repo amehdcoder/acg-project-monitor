@@ -66,7 +66,13 @@ const parseRelevantString = (relevant?: string): { conditions: LogicCondition[];
 };
 
 const parseSingleCondition = (conditionStr: string): LogicCondition | null => {
-  const match = conditionStr.match(/\$\{(.+?)\}\s*(=|!=|>|<|>=|<=)\s*['"]?(.+?)['"]?$/);
+  const str = conditionStr.trim().replace(/^\(/, "").replace(/\)$/, "").trim();
+  // selected(${name}, 'value')  → treat as equality for editing
+  const sel = str.match(/selected\s*\(\s*\$\{(.+?)\}\s*,\s*['"](.+?)['"]\s*\)/);
+  if (sel) {
+    return { questionId: sel[1], operator: "=", value: sel[2] };
+  }
+  const match = str.match(/\$\{(.+?)\}\s*(=|!=|>|<|>=|<=)\s*['"]?(.+?)['"]?$/);
   if (match) {
     return {
       questionId: match[1],
@@ -77,18 +83,34 @@ const parseSingleCondition = (conditionStr: string): LogicCondition | null => {
   return null;
 };
 
-const buildRelevantString = (conditions: LogicCondition[], matchType: ConditionOperator): string => {
+const buildRelevantString = (
+  conditions: LogicCondition[],
+  matchType: ConditionOperator,
+  allQuestions: Question[],
+): string => {
   if (conditions.length === 0) return "";
 
   const conditionStrings = conditions
     .filter((c) => c.questionId && c.value)
-    .map((c) => `\${${c.questionId}} ${c.operator} '${c.value}'`);
+    .map((c) => {
+      const ref = allQuestions.find((q) => q.id === c.questionId);
+      // For select_multiple parents, an equality check must use selected() so a
+      // single chosen option matches even when several options are selected.
+      if (ref?.type === "select_multiple" && c.operator === "=") {
+        return `selected(\${${c.questionId}}, '${c.value}')`;
+      }
+      if (ref?.type === "select_multiple" && c.operator === "!=") {
+        return `not(selected(\${${c.questionId}}, '${c.value}'))`;
+      }
+      return `\${${c.questionId}} ${c.operator} '${c.value}'`;
+    });
 
   if (conditionStrings.length === 0) return "";
   if (conditionStrings.length === 1) return conditionStrings[0];
 
   return conditionStrings.join(matchType === "and" ? " and " : " or ");
 };
+
 
 const SkipLogicEditor = ({
   open,
