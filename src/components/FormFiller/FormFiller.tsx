@@ -1461,47 +1461,51 @@ const FormFiller = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [responses, allFormQuestions, isMdaChecklist, useMicroplanCascade]);
 
-  const shouldShowQuestion = (question: Question): boolean => {
-    // Calculate questions are always "shown" (their value is computed silently)
-    // but we handle visibility separately
-    if (!question.relevant) return true;
+  // Evaluate a SINGLE relevance condition (no and/or) against current responses.
+  const evalSingleCondition = (expr: string): boolean => {
+    const trimmed = expr.trim().replace(/^\(/, "").replace(/\)$/, "").trim();
+    if (!trimmed) return true;
 
-    const relevantExpr = question.relevant;
-
-    // selected(${name}, 'value')
-    const selectedMatch = relevantExpr.match(/selected\s*\(\s*\$\{(.+?)\}\s*,\s*['"](.+?)['"]\s*\)/);
+    // selected(${name}, 'value') — works for both single and multi-select
+    const selectedMatch = trimmed.match(/selected\s*\(\s*\$\{(.+?)\}\s*,\s*['"](.+?)['"]\s*\)/);
     if (selectedMatch) {
       const [, refName, expectedValue] = selectedMatch;
       const qId = nameToIdMap[refName];
       if (qId) {
         const val = responses[qId];
-        if (Array.isArray(val)) return val.includes(expectedValue);
-        return String(val || "") === expectedValue;
+        if (Array.isArray(val)) return val.map(String).includes(expectedValue);
+        return String(val ?? "") === expectedValue;
       }
       return false;
     }
 
     // ${name} = 'value' or ${name} != 'value'
-    const eqMatch = relevantExpr.match(/\$\{(.+?)\}\s*(=|!=)\s*['"](.+?)['"]/);
+    const eqMatch = trimmed.match(/\$\{(.+?)\}\s*(=|!=)\s*['"](.+?)['"]/);
     if (eqMatch) {
       const [, refName, operator, expectedValue] = eqMatch;
       const qId = nameToIdMap[refName];
       if (qId) {
-        const val = String(responses[qId] || "");
-        if (operator === "=") return val === expectedValue;
-        if (operator === "!=") return val !== expectedValue;
+        const raw = responses[qId];
+        // Treat multi-select arrays as "contains" so a single selected option matches.
+        const matches = Array.isArray(raw)
+          ? raw.map(String).includes(expectedValue)
+          : String(raw ?? "") === expectedValue;
+        return operator === "=" ? matches : !matches;
       }
       return operator === "!=";
     }
 
-    // ${name} > value, etc.
-    const numMatch = relevantExpr.match(/\$\{(.+?)\}\s*(>=?|<=?)\s*(-?\d+(?:\.\d+)?)/);
+    // ${name} >|>=|<|<= number
+    const numMatch = trimmed.match(/\$\{(.+?)\}\s*(>=?|<=?)\s*(-?\d+(?:\.\d+)?)/);
     if (numMatch) {
       const [, refName, operator, numStr] = numMatch;
       const qId = nameToIdMap[refName];
       if (qId) {
-        const val = parseFloat(String(responses[qId] || "0"));
+        const raw = responses[qId];
+        if (raw === undefined || raw === null || raw === "") return false;
+        const val = parseFloat(String(raw));
         const num = parseFloat(numStr);
+        if (Number.isNaN(val)) return false;
         if (operator === ">") return val > num;
         if (operator === ">=") return val >= num;
         if (operator === "<") return val < num;
@@ -1511,11 +1515,12 @@ const FormFiller = ({
     }
 
     // ${name} (truthy check)
-    const truthyMatch = relevantExpr.match(/^\$\{(.+?)\}$/);
+    const truthyMatch = trimmed.match(/^\$\{(.+?)\}$/);
     if (truthyMatch) {
       const qId = nameToIdMap[truthyMatch[1]];
       if (qId) {
         const val = responses[qId];
+        if (Array.isArray(val)) return val.length > 0;
         return val !== undefined && val !== null && val !== "" && val !== false;
       }
       return false;
@@ -1523,6 +1528,33 @@ const FormFiller = ({
 
     return true;
   };
+
+  const shouldShowQuestion = (question: Question): boolean => {
+    // Calculate questions are always "shown" (their value is computed silently)
+    // but we handle visibility separately
+    if (!question.relevant) return true;
+
+    const relevantExpr = question.relevant.trim();
+
+    // Support compound expressions joined by " and " / " or ".
+    // Split on the top-level connective (parentheses around single conditions
+    // emitted by the Skip Logic editor are stripped per-condition).
+    if (/\s+or\s+/i.test(relevantExpr) && !/\s+and\s+/i.test(relevantExpr)) {
+      return relevantExpr.split(/\s+or\s+/i).some(part => evalSingleCondition(part));
+    }
+    if (/\s+and\s+/i.test(relevantExpr) && !/\s+or\s+/i.test(relevantExpr)) {
+      return relevantExpr.split(/\s+and\s+/i).every(part => evalSingleCondition(part));
+    }
+    // Mixed and/or: evaluate as OR of AND-groups (disjunctive form).
+    if (/\s+or\s+/i.test(relevantExpr) && /\s+and\s+/i.test(relevantExpr)) {
+      return relevantExpr.split(/\s+or\s+/i).some(orPart =>
+        orPart.split(/\s+and\s+/i).every(andPart => evalSingleCondition(andPart))
+      );
+    }
+
+    return evalSingleCondition(relevantExpr);
+  };
+
 
   // Check if any repeat groups are incomplete
   const getIncompleteRepeatGroups = useCallback(() => {
