@@ -149,13 +149,14 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
       setHouseholds([]);
       return;
     }
-    const data = await fetchAllRows<any>((from, to) =>
-      supabase
+    const data = await fetchAllRowsKeyset<any>((limit, afterId) => {
+      let q = supabase
         .from("ces_households" as any)
         .select("*")
-        .eq("session_id", activeSession.id)
-        .range(from, to)
-    );
+        .eq("session_id", activeSession.id);
+      if (afterId) q = q.gt("id", afterId);
+      return q.order("id", { ascending: true }).limit(limit);
+    });
     const mapped: Household3D[] = ((data as any) ?? []).map((h: any) => ({
       id: h.id,
       lat: h.latitude,
