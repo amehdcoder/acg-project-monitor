@@ -174,16 +174,15 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
           return [raw, canonical, `${canonical} State`, raw.toLowerCase(), raw.toUpperCase(), slug].filter(Boolean);
         }));
 
-        const buildQuery = (from: number, to: number) => {
-          let q = supabase
-            .from("microplan_entries")
-            .select("state, lga, ward, flhf_name, community_name, settlement_name");
-          if (scopeStates.length > 0) q = q.in("state", scopeStates);
-          return q.range(from, to).abortSignal(controller.signal);
-        };
-
-        const data = await fetchAllRows<GeoRow>(buildQuery);
-        if (!cancelled) setRows(data || []);
+        // Server-side DISTINCT aggregation: returns only the unique geography
+        // tuples needed to build the cascade dropdowns (a tiny fraction of the
+        // full microplan_entries volume). RLS still scopes per-user because the
+        // function runs SECURITY INVOKER.
+        const { data, error } = await (supabase.rpc as any)("microplan_distinct_geography", {
+          _states: scopeStates.length > 0 ? scopeStates : null,
+        }).abortSignal(controller.signal);
+        if (error) throw error;
+        if (!cancelled) setRows((data as GeoRow[]) || []);
       } catch {
         if (!cancelled) setRows([]);
       } finally {
