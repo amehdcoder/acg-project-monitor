@@ -624,6 +624,9 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
                 <DropdownMenuItem onClick={() => setShowPreview(true)}>
                   <Eye className="mr-2 h-4 w-4" /> Preview
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowSimulator(true)}>
+                  <GitBranch className="mr-2 h-4 w-4" /> Simulate Logic
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={openSaveTemplateDialog} disabled={savingTemplate}>
                   <BookTemplate className="mr-2 h-4 w-4" /> Save as Template
