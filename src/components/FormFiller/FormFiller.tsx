@@ -692,7 +692,7 @@ const FormFiller = ({
       const selM = expr.match(/selected\s*\(\s*\$\{(.+?)\}\s*,\s*['"](.+?)['"]\s*\)/);
       if (selM) { const qId = localNameToId[selM[1]]; if (qId) { const v = responses[qId]; return Array.isArray(v) ? v.includes(selM[2]) : String(v || "") === selM[2]; } return false; }
       const eqM = expr.match(/\$\{(.+?)\}\s*(=|!=)\s*['"](.+?)['"]/);
-      if (eqM) { const qId = localNameToId[eqM[1]]; if (qId) { const v = String(responses[qId] || ""); return eqM[2] === "=" ? v === eqM[3] : v !== eqM[3]; } return eqM[2] === "!="; }
+      if (eqM) { const qId = localNameToId[eqM[1]]; if (qId) { const raw = responses[qId]; const matches = Array.isArray(raw) ? raw.map(String).includes(eqM[3]) : String(raw ?? "") === eqM[3]; return eqM[2] === "=" ? matches : !matches; } return eqM[2] === "!="; }
       const numM = expr.match(/\$\{(.+?)\}\s*(>=?|<=?)\s*(-?\d+(?:\.\d+)?)/);
       if (numM) { const qId = localNameToId[numM[1]]; if (qId) { const v = parseFloat(String(responses[qId] || "0")); const n = parseFloat(numM[3]); if (numM[2] === ">") return v > n; if (numM[2] === ">=") return v >= n; if (numM[2] === "<") return v < n; return v <= n; } return false; }
       const tM = expr.match(/^\$\{(.+?)\}$/);
