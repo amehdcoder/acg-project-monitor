@@ -145,7 +145,7 @@ const SkipLogicEditor = ({
   };
 
   const handleSave = () => {
-    const relevantString = buildRelevantString(conditions, matchType);
+    const relevantString = buildRelevantString(conditions, matchType, allQuestions);
     onSave({ ...question, relevant: relevantString || undefined });
     onOpenChange(false);
   };
