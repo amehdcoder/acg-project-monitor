@@ -261,14 +261,13 @@ export async function generateTreatmentRollupWorkbook(opts: RollupOptions = {}):
   }
 
   // 2. Fetch all submissions for those forms.
-  const subs = await fetchAllRows<any>((from, to) => {
+  const subs = await fetchAllRowsKeyset<any>((limit, afterId) => {
     let q = supabase
       .from("form_submissions")
-      .select("data, submitted_at, status")
-      .in("form_id", formIds)
-      .order("submitted_at", { ascending: true })
-      .range(from, to);
-    return q as any;
+      .select("id, data, submitted_at, status")
+      .in("form_id", formIds);
+    if (afterId) q = q.gt("id", afterId);
+    return q.order("id", { ascending: true }).limit(limit) as any;
   });
 
   const records: NormalisedSubmission[] = (subs || [])
