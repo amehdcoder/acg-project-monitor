@@ -513,6 +513,7 @@ const UsersView = () => {
   const [formAssign, setFormAssign] = useState<Record<string, string[]>>({});
   // Cascade scope assignments: user_id -> rows { form_id, field_key, value, value_label }
   const [cascadeAssign, setCascadeAssign] = useState<Record<string, { form_id: string; field_key: string; value: string; value_label: string | null }[]>>({});
+  const [stdFormAssign, setStdFormAssign] = useState<Record<string, string[]>>({});
   const [cascadeUser, setCascadeUser] = useState<UserProfile | null>(null);
 
   useEffect(() => {
