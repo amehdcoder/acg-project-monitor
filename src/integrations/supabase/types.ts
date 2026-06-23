@@ -6905,6 +6905,17 @@ export type Database = {
         Args: { _user_id: string }
         Returns: boolean
       }
+      microplan_distinct_geography: {
+        Args: { _states?: string[] }
+        Returns: {
+          community_name: string
+          flhf_name: string
+          lga: string
+          settlement_name: string
+          state: string
+          ward: string
+        }[]
+      }
       office_form_approver_role: {
         Args: { _form_code: string }
         Returns: string

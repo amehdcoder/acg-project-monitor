@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { dbscanGeo, Cluster, GeoPoint } from "@/lib/ces/dbscan";
-import { fetchAllRows } from "@/lib/fetchAllRows";
+import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -106,14 +106,16 @@ export default function CESGapIntelligence() {
     setRefreshing(true);
     let data: any[];
     try {
-      // Page through ALL uncovered visits so DBSCAN never runs on a truncated set.
-      data = await fetchAllRows<any>((from, to) =>
-        supabase
+      // Keyset-paginate ALL uncovered visits so DBSCAN never runs on a
+      // truncated set, and so the global scan scales past the offset cap.
+      data = await fetchAllRowsKeyset<any>((limit, afterId) => {
+        let q = supabase
           .from("ces_household_visits" as any)
           .select("id, latitude, longitude, coverage_status, survey_id")
-          .in("coverage_status", ["not_treated", "absent", "refused"])
-          .range(from, to)
-      );
+          .in("coverage_status", ["not_treated", "absent", "refused"]);
+        if (afterId) q = q.gt("id", afterId);
+        return q.order("id", { ascending: true }).limit(limit);
+      });
     } catch (error: any) {
       toast({ title: "Error loading gaps", description: error.message, variant: "destructive" });
       setClusters([]);
