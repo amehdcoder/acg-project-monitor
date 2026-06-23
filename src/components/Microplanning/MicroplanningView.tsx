@@ -495,8 +495,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     if (!selectedProjectId) return;
     setLoading(true);
     try {
-      // Page through ALL rows so KPIs/coverage are never silently truncated at 1000.
-      const data = await fetchAllRows<any>((from, to) => {
+      // Keyset-paginate ALL rows so KPIs/coverage are never silently truncated
+      // and the scan scales past the offset cap on very large projects.
+      const data = await fetchAllRowsKeyset<any>((limit, afterId) => {
         let query = supabase
           .from("microplan_entries")
           .select("*")
@@ -504,7 +505,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         if (entryOnly && user?.id) {
           query = query.eq("created_by", user.id);
         }
-        return query.order("created_at", { ascending: false }).range(from, to);
+        if (afterId) query = query.gt("id", afterId);
+        return query.order("id", { ascending: true }).limit(limit);
       });
       setEntries(data || []);
     } catch (error: any) {
