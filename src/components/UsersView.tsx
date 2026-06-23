@@ -1380,6 +1380,13 @@ const UsersView = () => {
 
   // Track which project folders are collapsed (by group key).
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  // Render cap per group so a group with thousands of users only mounts a
+  // bounded number of DOM rows at a time (keeps the page fast at any scale).
+  const GROUP_PAGE_SIZE = 50;
+  const [groupVisible, setGroupVisible] = useState<Record<string, number>>({});
+  const showMoreInGroup = useCallback((key: string, total: number) => {
+    setGroupVisible((prev) => ({ ...prev, [key]: Math.min((prev[key] || GROUP_PAGE_SIZE) + GROUP_PAGE_SIZE, total) }));
+  }, []);
   const toggleGroupCollapse = useCallback((key: string) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
