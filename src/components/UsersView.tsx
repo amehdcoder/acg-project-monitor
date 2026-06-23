@@ -283,6 +283,19 @@ const UserCard = memo(function UserCard({
                 <span className="text-[11px] italic text-muted-foreground/50">—</span>
               )}
             </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Standard forms</span>
+              {userStandardCodes.length > 0 ? (
+                userStandardCodes.map((code: string) => (
+                  <span key={code} className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                    <FileText className="h-3 w-3" />
+                    {stdFormNameByCodeFn(code)}
+                  </span>
+                ))
+              ) : (
+                <span className="text-[11px] italic text-muted-foreground/50">—</span>
+              )}
+            </div>
             {(cascadeAssign[user.user_id]?.length ?? 0) > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Cascade scope</span>
