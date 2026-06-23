@@ -338,22 +338,20 @@ export function useSupervisorDashboard() {
       // Daily summary — driven by the SELECTED date range so the time filters
       // (Today / 7 Days / 30 Days / custom) reactively re-shape the whole page.
       const hourMap = new Map<number, number>();
-      rangeSubmissions.forEach(s => {
-        if (s.submitted_at) {
-          const hour = new Date(s.submitted_at).getHours();
-          hourMap.set(hour, (hourMap.get(hour) || 0) + 1);
-        }
+      hourlyRows.forEach((h: any) => {
+        hourMap.set(Number(h.hour), Number(h.cnt));
       });
       const submissionsByHour = Array.from({ length: 24 }, (_, i) => ({
         hour: i,
         count: hourMap.get(i) || 0,
       }));
 
-      const userCounts = new Map<string, number>();
-      rangeSubmissions.forEach(s => {
-        userCounts.set(s.user_id, (userCounts.get(s.user_id) || 0) + 1);
-      });
-      const sorted = Array.from(userCounts.entries()).sort((a, b) => b[1] - a[1]);
+      const totalRangeSubmissions = metricsRows.reduce((sum, r) => sum + Number(r.subs_total), 0);
+
+      const sorted = metricsRows
+        .map((r) => [r.user_id as string, Number(r.subs_total)] as [string, number])
+        .filter(([, c]) => c > 0)
+        .sort((a, b) => b[1] - a[1]);
       const topPerformers = sorted.slice(0, 5).map(([uid, count]) => {
         const w = allUserStatuses.find(w => w.user_id === uid);
         return { user_id: uid, name: w ? `${w.first_name} ${w.last_name}` : "Unknown", count };
