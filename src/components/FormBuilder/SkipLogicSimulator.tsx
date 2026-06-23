@@ -199,7 +199,7 @@ const SkipLogicSimulator = ({
                           );
                         })}
                       </div>
-                    ) : q.type === "integer" || q.type === "decimal" || q.type === "number" ? (
+                    ) : q.type === "number" || q.type === "range" ? (
                       <Input
                         type="number"
                         value={(responses[q.id] as string) ?? ""}
