@@ -34,6 +34,7 @@ import FormCanvas from "./FormCanvas";
 import GeofenceEditor from "./GeofenceEditor";
 import FormSettings from "./FormSettings";
 import FormPreview from "./FormPreview";
+import SkipLogicSimulator from "./SkipLogicSimulator";
 import SkipLogicEditor from "./SkipLogicEditor";
 import ValidationCriteriaEditor from "./ValidationCriteriaEditor";
 import GroupSkipLogicEditor from "./GroupSkipLogicEditor";
