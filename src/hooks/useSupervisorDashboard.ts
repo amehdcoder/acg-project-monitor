@@ -121,38 +121,21 @@ export function useSupervisorDashboard() {
       const todayStart = startOfDay(new Date()).toISOString();
       const todayEnd = endOfDay(new Date()).toISOString();
 
-      // Helper to paginate past the 1000-row Supabase default
-      const fetchAllRows = async (table: string, selectCols: string, filters: Array<{ col: string; op: string; val: any }>) => {
-        const PAGE = 1000;
-        let all: any[] = [];
-        let from = 0;
-        let hasMore = true;
-        while (hasMore) {
-          let q = (supabase as any).from(table).select(selectCols).range(from, from + PAGE - 1);
-          for (const f of filters) {
-            if (f.op === "eq") q = q.eq(f.col, f.val);
-            else if (f.op === "gte") q = q.gte(f.col, f.val);
-            else if (f.op === "lte") q = q.lte(f.col, f.val);
-          }
-          const { data } = await q;
-          if (!data || data.length < PAGE) hasMore = false;
-          all = all.concat(data || []);
-          from += PAGE;
-        }
-        return all;
-      };
-
-      const [todaySubmissions, rangeSubmissions, fieldActivityRes, formAssignmentsRes, projectsRes, projectAssignmentsRes, formsRes] = await Promise.all([
-        fetchAllRows("form_submissions", "id, user_id, submitted_at, created_at, within_geofence, location, form_id, data", [
-          { col: "status", op: "eq", val: "sent" },
-          { col: "submitted_at", op: "gte", val: todayStart },
-          { col: "submitted_at", op: "lte", val: todayEnd },
-        ]),
-        fetchAllRows("form_submissions", "id, user_id, submitted_at, within_geofence, form_id", [
-          { col: "status", op: "eq", val: "sent" },
-          { col: "submitted_at", op: "gte", val: currentDateRange.from.toISOString() },
-          { col: "submitted_at", op: "lte", val: currentDateRange.to.toISOString() },
-        ]),
+      // Submission metrics are now aggregated server-side (per-user counts,
+      // geofence compliance, first/last submission, most-recent location and
+      // submitted form ids) so the browser never downloads every submission
+      // row. This keeps the dashboard fast regardless of total submission volume.
+      const [userMetricsRes, hourlyRes, fieldActivityRes, formAssignmentsRes, projectsRes, projectAssignmentsRes, formsRes] = await Promise.all([
+        (supabase as any).rpc("supervisor_user_metrics", {
+          _today_start: todayStart,
+          _today_end: todayEnd,
+          _range_from: currentDateRange.from.toISOString(),
+          _range_to: currentDateRange.to.toISOString(),
+        }),
+        (supabase as any).rpc("supervisor_hourly_submissions", {
+          _range_from: currentDateRange.from.toISOString(),
+          _range_to: currentDateRange.to.toISOString(),
+        }),
         supabase
           .from("field_activity")
           .select("user_id, started_at, ended_at, location")
@@ -173,6 +156,10 @@ export function useSupervisorDashboard() {
           .select("id, project_id"),
       ]);
 
+      const metricsRows: any[] = userMetricsRes.data || [];
+      const metricsMap = new Map<string, any>(metricsRows.map((m) => [m.user_id, m]));
+      const hourlyRows: any[] = hourlyRes.data || [];
+
       const fieldActivity = fieldActivityRes.data || [];
       const formAssignments = formAssignmentsRes.data || [];
       const projects = projectsRes.data || [];
@@ -182,22 +169,24 @@ export function useSupervisorDashboard() {
       // Build a map of form_id -> project_id for deriving project assignments from submissions
       const formProjectMap = new Map((allForms || []).map((f: any) => [f.id, f.project_id]));
 
-      // Collect all user_ids that have submitted forms (to treat them as field workers even without formal assignments)
+      // Derive each user's submitted forms/projects from the aggregated form id set.
       const submitterFormIds = new Map<string, Set<string>>();
       const submitterProjectIds = new Map<string, Set<string>>();
-      [...todaySubmissions, ...rangeSubmissions].forEach((s: any) => {
-        if (!submitterFormIds.has(s.user_id)) submitterFormIds.set(s.user_id, new Set());
-        submitterFormIds.get(s.user_id)!.add(s.form_id);
-        const pid = formProjectMap.get(s.form_id);
-        if (pid) {
-          if (!submitterProjectIds.has(s.user_id)) submitterProjectIds.set(s.user_id, new Set());
-          submitterProjectIds.get(s.user_id)!.add(pid);
-        }
+      metricsRows.forEach((m) => {
+        const fset = new Set<string>(((m.form_ids as string[]) || []).filter(Boolean));
+        submitterFormIds.set(m.user_id, fset);
+        const pset = new Set<string>();
+        fset.forEach((fid) => {
+          const pid = formProjectMap.get(fid);
+          if (pid) pset.add(pid);
+        });
+        submitterProjectIds.set(m.user_id, pset);
       });
       const now = new Date();
       const allUserStatuses: UserStatus[] = (profiles || []).map((profile) => {
-        const userTodaySubs = todaySubmissions.filter(s => s.user_id === profile.user_id);
-        const userRangeSubs = rangeSubmissions.filter(s => s.user_id === profile.user_id);
+        const m = metricsMap.get(profile.user_id);
+        const subsToday = m ? Number(m.subs_today) : 0;
+        const subsTotal = m ? Number(m.subs_total) : 0;
         const userActivity = fieldActivity.filter(a => a.user_id === profile.user_id);
         // Merge formal assignments with submission-derived assignments
         const formalForms = formAssignments.filter(a => a.user_id === profile.user_id).map(a => a.form_id);
@@ -210,18 +199,13 @@ export function useSupervisorDashboard() {
 
         let status: "active" | "idle" | "offline" = "offline";
         const lastActivity = userActivity[0];
-        const lastSubmission = userTodaySubs.sort((a, b) =>
-          new Date(b.submitted_at || b.created_at).getTime() - new Date(a.submitted_at || a.created_at).getTime()
-        )[0];
 
         // Use last_seen_at (heartbeat) as primary indicator, fall back to activity/submissions
         const lastSeenAt = (profile as any).last_seen_at ? new Date((profile as any).last_seen_at) : null;
         const lastActivityTime = lastActivity
           ? new Date(lastActivity.ended_at || lastActivity.started_at)
           : null;
-        const lastSubmissionTime = lastSubmission
-          ? new Date(lastSubmission.submitted_at || lastSubmission.created_at)
-          : null;
+        const lastSubmissionTime = m?.last_submission_at ? new Date(m.last_submission_at) : null;
 
         // Pick the most recent signal
         const candidates = [lastSeenAt, lastActivityTime, lastSubmissionTime].filter(Boolean) as Date[];
@@ -235,41 +219,35 @@ export function useSupervisorDashboard() {
           else if (minutesAgo <= 30) status = "idle";
         }
 
-        const totalGeofenceSubs = userRangeSubs.filter(s => s.within_geofence !== null);
-        const withinGeofence = totalGeofenceSubs.filter(s => s.within_geofence === true);
-        const complianceRate = totalGeofenceSubs.length > 0
-          ? Math.round((withinGeofence.length / totalGeofenceSubs.length) * 100)
+        // Geofence compliance computed server-side over the selected range.
+        const geoTotal = m ? Number(m.geo_total) : 0;
+        const geoWithin = m ? Number(m.geo_within) : 0;
+        const complianceRate = geoTotal > 0
+          ? Math.round((geoWithin / geoTotal) * 100)
           : null; // null = no geofence configured
 
+        // Mean interval between today's submissions telescopes to (max-min)/(n-1).
         let avgTimeBetween: number | null = null;
-        if (userTodaySubs.length > 1) {
-          const sorted = userTodaySubs
-            .map(s => new Date(s.submitted_at || s.created_at).getTime())
-            .sort((a, b) => a - b);
-          const intervals = sorted.slice(1).map((t, i) => t - sorted[i]);
-          avgTimeBetween = Math.round(intervals.reduce((a, b) => a + b, 0) / intervals.length / 60000);
+        if (subsToday > 1 && m?.today_min && m?.today_max) {
+          avgTimeBetween = Math.round(
+            (new Date(m.today_max).getTime() - new Date(m.today_min).getTime()) / (subsToday - 1) / 60000,
+          );
         }
 
-        const lastLoc = lastSubmission?.location as any;
+        const lastLoc = m?.last_location as any;
         const lastLocation = lastLoc && lastLoc.lat && lastLoc.lng
           ? { lat: lastLoc.lat, lng: lastLoc.lng }
           : null;
 
-        // Derive state/lga from submission data (form metadata or GPS), fallback to profile
+        // Derive state/lga from the most recent submission's data/GPS (server-provided).
         let derivedState: string | null = null;
         let derivedLga: string | null = null;
-        // Check the most recent submission first for location info
-        const subsToCheck = [...userTodaySubs].sort((a, b) =>
-          new Date(b.submitted_at || b.created_at).getTime() - new Date(a.submitted_at || a.created_at).getTime()
-        );
-        for (const sub of subsToCheck) {
-          const formData = sub.data && typeof sub.data === "object" ? sub.data as Record<string, any> : null;
-          const gpsLoc = sub.location as any;
-          const locInfo = extractLocationInfo(formData, gpsLoc);
+        if (m?.last_data || m?.last_location) {
+          const formData = m.last_data && typeof m.last_data === "object" ? m.last_data as Record<string, any> : null;
+          const locInfo = extractLocationInfo(formData, m.last_location as any);
           if (locInfo.state) {
             derivedState = locInfo.state;
             derivedLga = locInfo.lga;
-            break;
           }
         }
         // Only use submission-derived location; do NOT fall back to profile state
@@ -290,11 +268,9 @@ export function useSupervisorDashboard() {
           is_active: profile.is_active,
           role: rolesMap.get(profile.user_id) || null,
           status,
-          last_submission_at: lastSubmission
-            ? (lastSubmission.submitted_at || lastSubmission.created_at)
-            : null,
-          submissions_today: userTodaySubs.length,
-          submissions_total: userRangeSubs.length,
+          last_submission_at: m?.last_submission_at || null,
+          submissions_today: subsToday,
+          submissions_total: subsTotal,
           geofence_compliance: complianceRate,
           avg_time_between_submissions: avgTimeBetween,
           last_location: lastLocation,
@@ -362,22 +338,20 @@ export function useSupervisorDashboard() {
       // Daily summary — driven by the SELECTED date range so the time filters
       // (Today / 7 Days / 30 Days / custom) reactively re-shape the whole page.
       const hourMap = new Map<number, number>();
-      rangeSubmissions.forEach(s => {
-        if (s.submitted_at) {
-          const hour = new Date(s.submitted_at).getHours();
-          hourMap.set(hour, (hourMap.get(hour) || 0) + 1);
-        }
+      hourlyRows.forEach((h: any) => {
+        hourMap.set(Number(h.hour), Number(h.cnt));
       });
       const submissionsByHour = Array.from({ length: 24 }, (_, i) => ({
         hour: i,
         count: hourMap.get(i) || 0,
       }));
 
-      const userCounts = new Map<string, number>();
-      rangeSubmissions.forEach(s => {
-        userCounts.set(s.user_id, (userCounts.get(s.user_id) || 0) + 1);
-      });
-      const sorted = Array.from(userCounts.entries()).sort((a, b) => b[1] - a[1]);
+      const totalRangeSubmissions = metricsRows.reduce((sum, r) => sum + Number(r.subs_total), 0);
+
+      const sorted = metricsRows
+        .map((r) => [r.user_id as string, Number(r.subs_total)] as [string, number])
+        .filter(([, c]) => c > 0)
+        .sort((a, b) => b[1] - a[1]);
       const topPerformers = sorted.slice(0, 5).map(([uid, count]) => {
         const w = allUserStatuses.find(w => w.user_id === uid);
         return { user_id: uid, name: w ? `${w.first_name} ${w.last_name}` : "Unknown", count };
@@ -403,7 +377,7 @@ export function useSupervisorDashboard() {
 
       setDailySummary({
         date: new Date().toISOString().split("T")[0],
-        total_submissions: rangeSubmissions.length,
+        total_submissions: totalRangeSubmissions,
         active_users: activeUsersCount,
         active_enumerators: activeUsersCount, // backward compat
         geofence_compliance_avg: avgCompliance,
