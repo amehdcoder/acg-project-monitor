@@ -804,6 +804,14 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
         />
       )}
 
+      {/* Skip Logic Simulator */}
+      <SkipLogicSimulator
+        open={showSimulator}
+        onOpenChange={setShowSimulator}
+        questions={questions}
+        groups={groups}
+      />
+
       {/* Validation Criteria Editor */}
       {selectedQuestion && (
         <ValidationCriteriaEditor
