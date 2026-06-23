@@ -34,6 +34,7 @@ import FormCanvas from "./FormCanvas";
 import GeofenceEditor from "./GeofenceEditor";
 import FormSettings from "./FormSettings";
 import FormPreview from "./FormPreview";
+import SkipLogicSimulator from "./SkipLogicSimulator";
 import SkipLogicEditor from "./SkipLogicEditor";
 import ValidationCriteriaEditor from "./ValidationCriteriaEditor";
 import GroupSkipLogicEditor from "./GroupSkipLogicEditor";
@@ -43,7 +44,7 @@ import XLSFormImportDialog from "./XLSFormImportDialog";
 import CaseManagementEditor, { CaseManagementSettings } from "./CaseManagementEditor";
 import ThemeEditor from "./ThemeEditor";
 import { normalizeFormTheme, FormTheme } from "@/lib/formTheme";
-import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate, MoreHorizontal, Plus, Palette } from "lucide-react";
+import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate, MoreHorizontal, Plus, Palette, GitBranch } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -86,6 +87,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
   });
   const [theme, setTheme] = useState<FormTheme>(() => normalizeFormTheme(editForm?.settings?.theme));
   const [showPreview, setShowPreview] = useState(false);
+  const [showSimulator, setShowSimulator] = useState(false);
   const [showSkipLogic, setShowSkipLogic] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
   const [showGroupSkipLogic, setShowGroupSkipLogic] = useState(false);
@@ -586,6 +588,10 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
               <Eye className="mr-2 h-4 w-4" />
               Preview
             </Button>
+            <Button variant="outline" onClick={() => setShowSimulator(true)} className="shrink-0">
+              <GitBranch className="mr-2 h-4 w-4" />
+              Simulate Logic
+            </Button>
             <Button variant="outline" onClick={openSaveTemplateDialog} disabled={savingTemplate} className="shrink-0">
               <BookTemplate className="mr-2 h-4 w-4" />
               Save as Template
@@ -617,6 +623,9 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setShowPreview(true)}>
                   <Eye className="mr-2 h-4 w-4" /> Preview
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowSimulator(true)}>
+                  <GitBranch className="mr-2 h-4 w-4" /> Simulate Logic
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={openSaveTemplateDialog} disabled={savingTemplate}>
@@ -794,6 +803,14 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
           onSave={handleSaveSkipLogic}
         />
       )}
+
+      {/* Skip Logic Simulator */}
+      <SkipLogicSimulator
+        open={showSimulator}
+        onOpenChange={setShowSimulator}
+        questions={questions}
+        groups={groups}
+      />
 
       {/* Validation Criteria Editor */}
       {selectedQuestion && (
