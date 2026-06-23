@@ -77,9 +77,11 @@ export default function CESQCWorkflow({ surveyId, onClose }: CESQCWorkflowProps)
     const { data: s } = await supabase.from("ces_surveys" as any).select("*").eq("id", surveyId).single();
     setSurvey(s);
 
-    const hh = await fetchAllRows<any>((from, to) =>
-      supabase.from("ces_household_visits" as any).select("*").eq("survey_id", surveyId).range(from, to)
-    );
+    const hh = await fetchAllRowsKeyset<any>((limit, afterId) => {
+      let q = supabase.from("ces_household_visits" as any).select("*").eq("survey_id", surveyId);
+      if (afterId) q = q.gt("id", afterId);
+      return q.order("id", { ascending: true }).limit(limit);
+    });
     setHouseholds(hh);
 
     // Existing validation by this user (if any)
