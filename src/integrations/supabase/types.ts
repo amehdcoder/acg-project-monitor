@@ -6954,6 +6954,34 @@ export type Database = {
         }
         Returns: Json
       }
+      supervisor_hourly_submissions: {
+        Args: { _range_from: string; _range_to: string }
+        Returns: {
+          cnt: number
+          hour: number
+        }[]
+      }
+      supervisor_user_metrics: {
+        Args: {
+          _range_from: string
+          _range_to: string
+          _today_end: string
+          _today_start: string
+        }
+        Returns: {
+          form_ids: string[]
+          geo_total: number
+          geo_within: number
+          last_data: Json
+          last_location: Json
+          last_submission_at: string
+          subs_today: number
+          subs_total: number
+          today_max: string
+          today_min: string
+          user_id: string
+        }[]
+      }
       user_can_access_chat_group: {
         Args: { _chat_group_id: string; _user_id: string }
         Returns: boolean
