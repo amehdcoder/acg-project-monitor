@@ -11,7 +11,7 @@
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAllRows } from "@/lib/fetchAllRows";
+import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
 import {
   buildCommunitySummaryForm,
   COMMUNITY_SUMMARY_FORM_NAME,
