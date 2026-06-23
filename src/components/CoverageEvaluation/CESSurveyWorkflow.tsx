@@ -269,12 +269,16 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     setLoading(true);
     try {
       const [mData, aData] = await Promise.all([
-        fetchAllRows<any>((from, to) =>
-          supabase.from("microplan_entries" as any)
-            .select("*").eq("project_id", projectId).order("community_name").range(from, to)),
-        fetchAllRows<any>((from, to) =>
-          supabase.from("microplan_medicine_allocations" as any)
-            .select("*").eq("project_id", projectId).range(from, to)),
+        fetchAllRowsKeyset<any>((limit, afterId) => {
+          let q = supabase.from("microplan_entries" as any).select("*").eq("project_id", projectId);
+          if (afterId) q = q.gt("id", afterId);
+          return q.order("id", { ascending: true }).limit(limit);
+        }),
+        fetchAllRowsKeyset<any>((limit, afterId) => {
+          let q = supabase.from("microplan_medicine_allocations" as any).select("*").eq("project_id", projectId);
+          if (afterId) q = q.gt("id", afterId);
+          return q.order("id", { ascending: true }).limit(limit);
+        }),
       ]);
       setMicroplans(mData);
       setMedicineAllocations(aData);
