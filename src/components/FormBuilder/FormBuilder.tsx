@@ -87,6 +87,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
   });
   const [theme, setTheme] = useState<FormTheme>(() => normalizeFormTheme(editForm?.settings?.theme));
   const [showPreview, setShowPreview] = useState(false);
+  const [showSimulator, setShowSimulator] = useState(false);
   const [showSkipLogic, setShowSkipLogic] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
   const [showGroupSkipLogic, setShowGroupSkipLogic] = useState(false);
