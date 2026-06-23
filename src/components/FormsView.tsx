@@ -1997,7 +1997,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             {/* Assigned Standard Forms — flat, folder-free beautiful grid with
                 search, category filters and a grid/folder view toggle.
                 Shown to users who have specific standard forms assigned to them. */}
-            {assignedFormCards.length > 0 && !standardRestricted && (
+            {assignedFormCards.length > 0 && (
               <div className="overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-[#F7F9FE] to-white shadow-sm">
                 <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-border/50">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#15803D] via-[#2F6FE6] to-[#7C5CFF] shadow-sm">
