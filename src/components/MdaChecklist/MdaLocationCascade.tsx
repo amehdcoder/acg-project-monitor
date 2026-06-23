@@ -25,7 +25,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAllRows } from "@/lib/fetchAllRows";
+// fetchAllRows replaced by server-side DISTINCT aggregation (microplan_distinct_geography RPC)
 import { fetchProjectScope, EMPTY_SCOPE } from "@/lib/projectScope";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useAuth } from "@/hooks/useAuth";
