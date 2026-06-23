@@ -184,8 +184,6 @@ export function useSupervisorDashboard() {
       });
       const now = new Date();
       const allUserStatuses: UserStatus[] = (profiles || []).map((profile) => {
-        const userTodaySubs = todaySubmissions.filter(s => s.user_id === profile.user_id);
-        const userRangeSubs = rangeSubmissions.filter(s => s.user_id === profile.user_id);
         const userActivity = fieldActivity.filter(a => a.user_id === profile.user_id);
         // Merge formal assignments with submission-derived assignments
         const formalForms = formAssignments.filter(a => a.user_id === profile.user_id).map(a => a.form_id);
@@ -198,18 +196,13 @@ export function useSupervisorDashboard() {
 
         let status: "active" | "idle" | "offline" = "offline";
         const lastActivity = userActivity[0];
-        const lastSubmission = userTodaySubs.sort((a, b) =>
-          new Date(b.submitted_at || b.created_at).getTime() - new Date(a.submitted_at || a.created_at).getTime()
-        )[0];
 
         // Use last_seen_at (heartbeat) as primary indicator, fall back to activity/submissions
         const lastSeenAt = (profile as any).last_seen_at ? new Date((profile as any).last_seen_at) : null;
         const lastActivityTime = lastActivity
           ? new Date(lastActivity.ended_at || lastActivity.started_at)
           : null;
-        const lastSubmissionTime = lastSubmission
-          ? new Date(lastSubmission.submitted_at || lastSubmission.created_at)
-          : null;
+        const lastSubmissionTime = m?.last_submission_at ? new Date(m.last_submission_at) : null;
 
         // Pick the most recent signal
         const candidates = [lastSeenAt, lastActivityTime, lastSubmissionTime].filter(Boolean) as Date[];
@@ -223,41 +216,35 @@ export function useSupervisorDashboard() {
           else if (minutesAgo <= 30) status = "idle";
         }
 
-        const totalGeofenceSubs = userRangeSubs.filter(s => s.within_geofence !== null);
-        const withinGeofence = totalGeofenceSubs.filter(s => s.within_geofence === true);
-        const complianceRate = totalGeofenceSubs.length > 0
-          ? Math.round((withinGeofence.length / totalGeofenceSubs.length) * 100)
+        // Geofence compliance computed server-side over the selected range.
+        const geoTotal = m ? Number(m.geo_total) : 0;
+        const geoWithin = m ? Number(m.geo_within) : 0;
+        const complianceRate = geoTotal > 0
+          ? Math.round((geoWithin / geoTotal) * 100)
           : null; // null = no geofence configured
 
+        // Mean interval between today's submissions telescopes to (max-min)/(n-1).
         let avgTimeBetween: number | null = null;
-        if (userTodaySubs.length > 1) {
-          const sorted = userTodaySubs
-            .map(s => new Date(s.submitted_at || s.created_at).getTime())
-            .sort((a, b) => a - b);
-          const intervals = sorted.slice(1).map((t, i) => t - sorted[i]);
-          avgTimeBetween = Math.round(intervals.reduce((a, b) => a + b, 0) / intervals.length / 60000);
+        if (subsToday > 1 && m?.today_min && m?.today_max) {
+          avgTimeBetween = Math.round(
+            (new Date(m.today_max).getTime() - new Date(m.today_min).getTime()) / (subsToday - 1) / 60000,
+          );
         }
 
-        const lastLoc = lastSubmission?.location as any;
+        const lastLoc = m?.last_location as any;
         const lastLocation = lastLoc && lastLoc.lat && lastLoc.lng
           ? { lat: lastLoc.lat, lng: lastLoc.lng }
           : null;
 
-        // Derive state/lga from submission data (form metadata or GPS), fallback to profile
+        // Derive state/lga from the most recent submission's data/GPS (server-provided).
         let derivedState: string | null = null;
         let derivedLga: string | null = null;
-        // Check the most recent submission first for location info
-        const subsToCheck = [...userTodaySubs].sort((a, b) =>
-          new Date(b.submitted_at || b.created_at).getTime() - new Date(a.submitted_at || a.created_at).getTime()
-        );
-        for (const sub of subsToCheck) {
-          const formData = sub.data && typeof sub.data === "object" ? sub.data as Record<string, any> : null;
-          const gpsLoc = sub.location as any;
-          const locInfo = extractLocationInfo(formData, gpsLoc);
+        if (m?.last_data || m?.last_location) {
+          const formData = m.last_data && typeof m.last_data === "object" ? m.last_data as Record<string, any> : null;
+          const locInfo = extractLocationInfo(formData, m.last_location as any);
           if (locInfo.state) {
             derivedState = locInfo.state;
             derivedLga = locInfo.lga;
-            break;
           }
         }
         // Only use submission-derived location; do NOT fall back to profile state
@@ -278,11 +265,9 @@ export function useSupervisorDashboard() {
           is_active: profile.is_active,
           role: rolesMap.get(profile.user_id) || null,
           status,
-          last_submission_at: lastSubmission
-            ? (lastSubmission.submitted_at || lastSubmission.created_at)
-            : null,
-          submissions_today: userTodaySubs.length,
-          submissions_total: userRangeSubs.length,
+          last_submission_at: m?.last_submission_at || null,
+          submissions_today: subsToday,
+          submissions_total: subsTotal,
           geofence_compliance: complianceRate,
           avg_time_between_submissions: avgTimeBetween,
           last_location: lastLocation,
