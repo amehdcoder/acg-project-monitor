@@ -588,6 +588,10 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
               <Eye className="mr-2 h-4 w-4" />
               Preview
             </Button>
+            <Button variant="outline" onClick={() => setShowSimulator(true)} className="shrink-0">
+              <GitBranch className="mr-2 h-4 w-4" />
+              Simulate Logic
+            </Button>
             <Button variant="outline" onClick={openSaveTemplateDialog} disabled={savingTemplate} className="shrink-0">
               <BookTemplate className="mr-2 h-4 w-4" />
               Save as Template
