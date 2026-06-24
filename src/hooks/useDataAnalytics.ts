@@ -28,6 +28,7 @@ export interface SubmissionRecord {
 export interface FormAnalytics {
   id: string;
   name: string;
+  project_id?: string;
   total_submissions: number;
   current_cycle_submissions: number;
   questions: any[];
