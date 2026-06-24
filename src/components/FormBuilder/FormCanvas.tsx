@@ -154,11 +154,29 @@ const SortableQuestion = ({
     });
   };
 
+  const slugifyValue = (s: string) => s.toLowerCase().trim().replace(/\s+/g, "_");
+
   const updateOption = (optionId: string, label: string) => {
     onUpdate({
       ...question,
+      options: question.options?.map((opt) => {
+        if (opt.id !== optionId) return opt;
+        // Auto-sync the XML value from the label ONLY while it hasn't been
+        // manually customised (i.e. it still matches the auto-derived slug).
+        const autoValue = slugifyValue(opt.label);
+        const valueIsAuto = !opt.value || opt.value === autoValue;
+        return { ...opt, label, value: valueIsAuto ? slugifyValue(label) : opt.value };
+      }),
+    });
+  };
+
+  const updateOptionValue = (optionId: string, value: string) => {
+    onUpdate({
+      ...question,
       options: question.options?.map((opt) =>
-        opt.id === optionId ? { ...opt, label, value: label.toLowerCase().replace(/\s+/g, "_") } : opt
+        opt.id === optionId
+          ? { ...opt, value: value.toLowerCase().replace(/\s+/g, "_") }
+          : opt
       ),
     });
   };
@@ -328,14 +346,24 @@ const SortableQuestion = ({
               question.type === "rank") && (
               <div className="space-y-2">
                 <Label>Options</Label>
+                <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-2 px-1">
+                  <span className="text-xs font-medium text-muted-foreground">Label (shown to user)</span>
+                  <span className="text-xs font-medium text-muted-foreground">XML value (used in skip logic)</span>
+                  <span />
+                </div>
                 <div className="space-y-2">
                   {question.options?.map((option) => (
-                    <div key={option.id} className="flex items-center gap-2">
+                    <div key={option.id} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
                       <Input
                         value={option.label}
                         onChange={(e) => updateOption(option.id, e.target.value)}
                         placeholder="Option label"
-                        className="flex-1"
+                      />
+                      <Input
+                        value={option.value}
+                        onChange={(e) => updateOptionValue(option.id, e.target.value)}
+                        placeholder="xml_value"
+                        className="font-mono text-sm"
                       />
                       <Button
                         variant="ghost"
@@ -356,6 +384,10 @@ const SortableQuestion = ({
                     Add Option
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  The XML value defaults from the label (lowercase, spaces become underscores) but can be overwritten. Skip-logic formulas reference this value, e.g. <code className="rounded bg-muted px-1">${"{"}name{"}"} = 'yes'</code>.
+                </p>
+
 
                 {/* Choice filter (raw ODK expression — legacy / XLSForm import) */}
                 <div className="space-y-2 pt-2">
