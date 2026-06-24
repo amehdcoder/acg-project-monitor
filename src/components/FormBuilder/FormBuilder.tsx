@@ -835,7 +835,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
           open={showGroupSkipLogic}
           onOpenChange={setShowGroupSkipLogic}
           group={selectedGroup}
-          allQuestions={questions}
+          allQuestions={allQuestionsFlat}
           onSave={handleSaveGroupSkipLogic}
         />
       )}
