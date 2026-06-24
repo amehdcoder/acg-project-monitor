@@ -54,10 +54,18 @@ export function usePresenceTracking(enabled: boolean) {
       return;
     }
 
-    const channel = supabase.channel(PRESENCE_CHANNEL, {
-      config: { presence: { key: user.id }, private: true },
-    });
-    channelRef.current = channel;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    authorizeRealtimeSubscription(PRESENCE_CHANNEL).then(({ allowed, reason }) => {
+      if (cancelled || !allowed) {
+        if (!allowed) console.warn(`[presence] subscription denied: ${reason}`);
+        return;
+      }
+      channel = supabase.channel(PRESENCE_CHANNEL, {
+        config: { presence: { key: user.id }, private: true },
+      });
+      channelRef.current = channel;
 
     const syncState = () => {
       const state = channel.presenceState<ActiveCollaborator>();
