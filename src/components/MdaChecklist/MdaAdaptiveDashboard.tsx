@@ -114,7 +114,7 @@ function KpiTile({ icon: Icon, label, value, sub, tint }: any) {
       <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full opacity-15" style={{ background: tint }} />
       <div className="flex items-center gap-2">
         <span className="flex h-9 w-9 items-center justify-center rounded-lg text-white shadow" style={{ background: tint }}>
-          <Icon className="h-4.5 w-4.5" />
+          <Icon className="h-4 w-4" />
         </span>
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
       </div>
@@ -388,7 +388,7 @@ export default function MdaAdaptiveDashboard({ submissions, questions, formName 
         <div className="flex flex-col gap-1">
           <CardTitle className="flex items-center gap-2 font-display text-lg">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 text-white shadow">
-              <Sparkles className="h-4.5 w-4.5" />
+              <Sparkles className="h-4 w-4" />
             </span>
             Adaptive Insights Dashboard
           </CardTitle>
