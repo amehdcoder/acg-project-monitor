@@ -154,11 +154,29 @@ const SortableQuestion = ({
     });
   };
 
+  const slugifyValue = (s: string) => s.toLowerCase().trim().replace(/\s+/g, "_");
+
   const updateOption = (optionId: string, label: string) => {
     onUpdate({
       ...question,
+      options: question.options?.map((opt) => {
+        if (opt.id !== optionId) return opt;
+        // Auto-sync the XML value from the label ONLY while it hasn't been
+        // manually customised (i.e. it still matches the auto-derived slug).
+        const autoValue = slugifyValue(opt.label);
+        const valueIsAuto = !opt.value || opt.value === autoValue;
+        return { ...opt, label, value: valueIsAuto ? slugifyValue(label) : opt.value };
+      }),
+    });
+  };
+
+  const updateOptionValue = (optionId: string, value: string) => {
+    onUpdate({
+      ...question,
       options: question.options?.map((opt) =>
-        opt.id === optionId ? { ...opt, label, value: label.toLowerCase().replace(/\s+/g, "_") } : opt
+        opt.id === optionId
+          ? { ...opt, value: value.toLowerCase().replace(/\s+/g, "_") }
+          : opt
       ),
     });
   };
