@@ -1647,7 +1647,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     },
     [projectId, formId, communityName, state, lga, ward, flhfName, settlementName, gps, perimeter,
      estHHAi, estHHUser, targetN, segments.length, selectedSegmentLabels, coverage, surveyId,
-     outsideMicroplan, outsideMicroplanReason, featureSummary],
+     outsideMicroplan, outsideMicroplanReason, featureSummary, locationLocked],
   );
 
   const openFeatureLabelDialog = useCallback((feature: FeatureLabelRequest) => {
