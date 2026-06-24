@@ -833,6 +833,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
       {/* Group Skip Logic Editor */}
       {selectedGroup && (
         <GroupSkipLogicEditor
+          key={`group-skip-${selectedGroup.id}`}
           open={showGroupSkipLogic}
           onOpenChange={setShowGroupSkipLogic}
           group={selectedGroup}
