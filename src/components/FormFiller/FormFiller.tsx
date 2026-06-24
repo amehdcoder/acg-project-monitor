@@ -135,6 +135,100 @@ const MDA_GEO_NAMES = new Set([
   "settlement", "settlement_name",
 ]);
 
+// ---------------------------------------------------------------------------
+// Skip-logic (XLSForm `relevant`) parse cache.
+//
+// Parsing a `relevant` expression with regexes is pure work that only depends
+// on the expression string, never on the live answers. On large forms the same
+// expressions are evaluated on every keystroke for every visible question, so
+// we parse each expression once and memoise the structured result (and the set
+// of question references it depends on). Evaluation then becomes a cheap value
+// comparison and visibility recomputes only when a *referenced* answer changes.
+// ---------------------------------------------------------------------------
+type ParsedCondition =
+  | { kind: "always" }
+  | { kind: "selected"; ref: string; value: string; negate: boolean }
+  | { kind: "eq"; ref: string; op: "=" | "!="; value: string }
+  | { kind: "num"; ref: string; op: ">" | ">=" | "<" | "<="; num: number }
+  | { kind: "truthy"; ref: string }
+  | { kind: "passthrough" };
+
+interface ParsedRelevant {
+  /** Disjunction of conjunctions: OR over AND-groups of single conditions. */
+  groups: ParsedCondition[][];
+  /** XLSForm `name`/id references this expression depends on. */
+  refs: string[];
+}
+
+const relevantParseCache = new Map<string, ParsedRelevant>();
+
+const parseSingleRelevantCondition = (expr: string): ParsedCondition => {
+  const trimmed = expr.trim().replace(/^\(/, "").replace(/\)$/, "").trim();
+  if (!trimmed) return { kind: "always" };
+
+  // not(selected(${name}, 'value')) — checked before selected() so the wrapping
+  // negation is honoured instead of matching the inner selected() substring.
+  const notSelectedMatch = trimmed.match(
+    /not\s*\(\s*selected\s*\(\s*\$\{(.+?)\}\s*,\s*['"](.+?)['"]\s*\)\s*\)/,
+  );
+  if (notSelectedMatch) {
+    return { kind: "selected", ref: notSelectedMatch[1], value: notSelectedMatch[2], negate: true };
+  }
+
+  const selectedMatch = trimmed.match(/selected\s*\(\s*\$\{(.+?)\}\s*,\s*['"](.+?)['"]\s*\)/);
+  if (selectedMatch) {
+    return { kind: "selected", ref: selectedMatch[1], value: selectedMatch[2], negate: false };
+  }
+
+  const eqMatch = trimmed.match(/\$\{(.+?)\}\s*(=|!=)\s*['"](.+?)['"]/);
+  if (eqMatch) {
+    return { kind: "eq", ref: eqMatch[1], op: eqMatch[2] as "=" | "!=", value: eqMatch[3] };
+  }
+
+  const numMatch = trimmed.match(/\$\{(.+?)\}\s*(>=?|<=?)\s*(-?\d+(?:\.\d+)?)/);
+  if (numMatch) {
+    return {
+      kind: "num",
+      ref: numMatch[1],
+      op: numMatch[2] as ">" | ">=" | "<" | "<=",
+      num: parseFloat(numMatch[3]),
+    };
+  }
+
+  const truthyMatch = trimmed.match(/^\$\{(.+?)\}$/);
+  if (truthyMatch) {
+    return { kind: "truthy", ref: truthyMatch[1] };
+  }
+
+  return { kind: "passthrough" };
+};
+
+const parseRelevant = (relevant: string): ParsedRelevant => {
+  const cached = relevantParseCache.get(relevant);
+  if (cached) return cached;
+
+  const expr = relevant.trim();
+  const refs = new Set<string>();
+  const collect = (c: ParsedCondition) => {
+    if ("ref" in c) refs.add(c.ref);
+  };
+
+  // OR over AND-groups (disjunctive normal form), mirroring shouldShowQuestion.
+  const groups: ParsedCondition[][] = expr
+    .split(/\s+or\s+/i)
+    .map((orPart) =>
+      orPart.split(/\s+and\s+/i).map((andPart) => {
+        const parsed = parseSingleRelevantCondition(andPart);
+        collect(parsed);
+        return parsed;
+      }),
+    );
+
+  const result: ParsedRelevant = { groups, refs: [...refs] };
+  relevantParseCache.set(relevant, result);
+  return result;
+};
+
 interface FormSettings {
   allowAnonymous?: boolean;
   requireLocation?: boolean;
@@ -1461,99 +1555,92 @@ const FormFiller = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [responses, allFormQuestions, isMdaChecklist, useMicroplanCascade]);
 
-  // Evaluate a SINGLE relevance condition (no and/or) against current responses.
-  const evalSingleCondition = (expr: string): boolean => {
-    const trimmed = expr.trim().replace(/^\(/, "").replace(/\)$/, "").trim();
-    if (!trimmed) return true;
-
-    // selected(${name}, 'value') — works for both single and multi-select
-    const selectedMatch = trimmed.match(/selected\s*\(\s*\$\{(.+?)\}\s*,\s*['"](.+?)['"]\s*\)/);
-    if (selectedMatch) {
-      const [, refName, expectedValue] = selectedMatch;
-      const qId = nameToIdMap[refName];
-      if (qId) {
-        const val = responses[qId];
-        if (Array.isArray(val)) return val.map(String).includes(expectedValue);
-        return String(val ?? "") === expectedValue;
+  // Evaluate one PARSED condition against the current answers. Pure value
+  // comparison — all regex parsing already happened (and was cached) upstream.
+  const evalParsedCondition = useCallback(
+    (c: ParsedCondition): boolean => {
+      switch (c.kind) {
+        case "always":
+          return true;
+        case "passthrough":
+          // Unrecognised expression — preserve legacy "show" behaviour.
+          return true;
+        case "selected": {
+          const qId = nameToIdMap[c.ref];
+          if (!qId) return c.negate; // missing ref: not(selected) → true, selected → false
+          const val = responses[qId];
+          const has = Array.isArray(val)
+            ? val.map(String).includes(c.value)
+            : String(val ?? "") === c.value;
+          return c.negate ? !has : has;
+        }
+        case "eq": {
+          const qId = nameToIdMap[c.ref];
+          if (!qId) return c.op === "!=";
+          const raw = responses[qId];
+          const matches = Array.isArray(raw)
+            ? raw.map(String).includes(c.value)
+            : String(raw ?? "") === c.value;
+          return c.op === "=" ? matches : !matches;
+        }
+        case "num": {
+          const qId = nameToIdMap[c.ref];
+          if (!qId) return false;
+          const raw = responses[qId];
+          if (raw === undefined || raw === null || raw === "") return false;
+          const val = parseFloat(String(raw));
+          if (Number.isNaN(val)) return false;
+          if (c.op === ">") return val > c.num;
+          if (c.op === ">=") return val >= c.num;
+          if (c.op === "<") return val < c.num;
+          return val <= c.num;
+        }
+        case "truthy": {
+          const qId = nameToIdMap[c.ref];
+          if (!qId) return false;
+          const val = responses[qId];
+          if (Array.isArray(val)) return val.length > 0;
+          return val !== undefined && val !== null && val !== "" && val !== false;
+        }
+        default:
+          return true;
       }
-      return false;
+    },
+    [nameToIdMap, responses],
+  );
+
+  // Evaluate a full (possibly compound) relevant expression using the cached parse.
+  const evalRelevantExpr = useCallback(
+    (relevant: string): boolean => {
+      const { groups: orGroups } = parseRelevant(relevant);
+      // OR over AND-groups: a question shows if any AND-group is fully satisfied.
+      return orGroups.some((andGroup) => andGroup.every(evalParsedCondition));
+    },
+    [evalParsedCondition],
+  );
+
+  // Precompute visibility for every question once per answer/structure change so
+  // the many `.filter(shouldShowQuestion)` passes are O(1) lookups instead of
+  // re-parsing each expression. Visibility only changes when a referenced answer
+  // changes, but recomputing the whole map per render is cheap and correct.
+  const visibilityMap = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    for (const q of allFormQuestions) {
+      map[q.id] = q.relevant ? evalRelevantExpr(q.relevant.trim()) : true;
     }
+    return map;
+  }, [allFormQuestions, evalRelevantExpr]);
 
-    // ${name} = 'value' or ${name} != 'value'
-    const eqMatch = trimmed.match(/\$\{(.+?)\}\s*(=|!=)\s*['"](.+?)['"]/);
-    if (eqMatch) {
-      const [, refName, operator, expectedValue] = eqMatch;
-      const qId = nameToIdMap[refName];
-      if (qId) {
-        const raw = responses[qId];
-        // Treat multi-select arrays as "contains" so a single selected option matches.
-        const matches = Array.isArray(raw)
-          ? raw.map(String).includes(expectedValue)
-          : String(raw ?? "") === expectedValue;
-        return operator === "=" ? matches : !matches;
-      }
-      return operator === "!=";
-    }
+  const shouldShowQuestion = useCallback(
+    (question: Question): boolean => {
+      if (!question.relevant) return true;
+      if (question.id in visibilityMap) return visibilityMap[question.id];
+      // Fallback for questions outside allFormQuestions (e.g. transient refs).
+      return evalRelevantExpr(question.relevant.trim());
+    },
+    [visibilityMap, evalRelevantExpr],
+  );
 
-    // ${name} >|>=|<|<= number
-    const numMatch = trimmed.match(/\$\{(.+?)\}\s*(>=?|<=?)\s*(-?\d+(?:\.\d+)?)/);
-    if (numMatch) {
-      const [, refName, operator, numStr] = numMatch;
-      const qId = nameToIdMap[refName];
-      if (qId) {
-        const raw = responses[qId];
-        if (raw === undefined || raw === null || raw === "") return false;
-        const val = parseFloat(String(raw));
-        const num = parseFloat(numStr);
-        if (Number.isNaN(val)) return false;
-        if (operator === ">") return val > num;
-        if (operator === ">=") return val >= num;
-        if (operator === "<") return val < num;
-        if (operator === "<=") return val <= num;
-      }
-      return false;
-    }
-
-    // ${name} (truthy check)
-    const truthyMatch = trimmed.match(/^\$\{(.+?)\}$/);
-    if (truthyMatch) {
-      const qId = nameToIdMap[truthyMatch[1]];
-      if (qId) {
-        const val = responses[qId];
-        if (Array.isArray(val)) return val.length > 0;
-        return val !== undefined && val !== null && val !== "" && val !== false;
-      }
-      return false;
-    }
-
-    return true;
-  };
-
-  const shouldShowQuestion = (question: Question): boolean => {
-    // Calculate questions are always "shown" (their value is computed silently)
-    // but we handle visibility separately
-    if (!question.relevant) return true;
-
-    const relevantExpr = question.relevant.trim();
-
-    // Support compound expressions joined by " and " / " or ".
-    // Split on the top-level connective (parentheses around single conditions
-    // emitted by the Skip Logic editor are stripped per-condition).
-    if (/\s+or\s+/i.test(relevantExpr) && !/\s+and\s+/i.test(relevantExpr)) {
-      return relevantExpr.split(/\s+or\s+/i).some(part => evalSingleCondition(part));
-    }
-    if (/\s+and\s+/i.test(relevantExpr) && !/\s+or\s+/i.test(relevantExpr)) {
-      return relevantExpr.split(/\s+and\s+/i).every(part => evalSingleCondition(part));
-    }
-    // Mixed and/or: evaluate as OR of AND-groups (disjunctive form).
-    if (/\s+or\s+/i.test(relevantExpr) && /\s+and\s+/i.test(relevantExpr)) {
-      return relevantExpr.split(/\s+or\s+/i).some(orPart =>
-        orPart.split(/\s+and\s+/i).every(andPart => evalSingleCondition(andPart))
-      );
-    }
-
-    return evalSingleCondition(relevantExpr);
-  };
 
 
   // Check if any repeat groups are incomplete
