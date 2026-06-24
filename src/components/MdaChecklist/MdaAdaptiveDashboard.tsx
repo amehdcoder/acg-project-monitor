@@ -337,10 +337,76 @@ function EmptyCard({ q, label, answered, total }: any) {
 }
 
 // ───────────────────────── Main component ─────────────────────────
-export default function MdaAdaptiveDashboard({ submissions, questions, formName }: Props) {
+export default function MdaAdaptiveDashboard({
+  submissions: allSubmissions,
+  questions,
+  formName,
+  formId,
+  projectId,
+  projects = [],
+}: Props) {
   const sections = useMemo(() => buildSections(questions), [questions]);
   const [activeSection, setActiveSection] = useState<string>("all");
   const [query, setQuery] = useState("");
+  const [exporting, setExporting] = useState(false);
+
+  // ── Project scope (persisted per form) ──
+  const storageKey = `mda-dashboard-project:${formId || formName || "default"}`;
+  // Projects that actually appear in this checklist's data (+ its own project).
+  const availableProjects = useMemo(() => {
+    const ids = new Set<string>();
+    for (const s of allSubmissions) if (s.projectId) ids.add(String(s.projectId));
+    if (projectId) ids.add(projectId);
+    const nameOf = (id: string) => projects.find((p) => p.id === id)?.name || "This project";
+    return [...ids].map((id) => ({ id, name: nameOf(id) }));
+  }, [allSubmissions, projectId, projects]);
+
+  const [activeProject, setActiveProject] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) return saved;
+    } catch { /* ignore */ }
+    return projectId || "all";
+  });
+
+  // Default to the checklist's own project once it is known.
+  useEffect(() => {
+    if (activeProject === "all" && projectId) {
+      let hasSaved = false;
+      try { hasSaved = !!localStorage.getItem(storageKey); } catch { /* ignore */ }
+      if (!hasSaved) setActiveProject(projectId);
+    }
+  }, [projectId, activeProject, storageKey]);
+
+  const setProjectScope = (id: string) => {
+    setActiveProject(id);
+    try { localStorage.setItem(storageKey, id); } catch { /* ignore */ }
+  };
+
+  // Submissions scoped to the selected project.
+  const submissions = useMemo(() => {
+    if (activeProject === "all") return allSubmissions;
+    return allSubmissions.filter((s) => !s.projectId || String(s.projectId) === activeProject);
+  }, [allSubmissions, activeProject]);
+
+  const activeProjectName =
+    activeProject === "all"
+      ? "All projects"
+      : availableProjects.find((p) => p.id === activeProject)?.name || "This project";
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await exportMdaDashboard(submissions, questions, formName || "MDA Supervisory Checklist", activeProjectName);
+      toast.success("Dashboard metrics exported to Excel");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to export dashboard metrics");
+    } finally {
+      setExporting(false);
+    }
+  };
+
 
   // Overview KPIs (always adaptive to whatever submissions exist)
   const kpis = useMemo(() => {
