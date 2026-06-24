@@ -9,6 +9,7 @@ import React, {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { authorizeRealtimeSubscription } from "@/lib/realtimeGuard";
 
 const PROXIMITY_RADIUS_KM = 10;
 const PRESENCE_PUSH_MS = 20000; // upsert own location at most every 20s
