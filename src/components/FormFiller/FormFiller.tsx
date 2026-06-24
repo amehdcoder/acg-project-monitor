@@ -3847,6 +3847,9 @@ const FormFiller = ({
                     ts: Date.now(),
                   };
                   sessionStorage.setItem("amehnities:cesLocationPrefill", JSON.stringify(prefill));
+                  // Intent flag: lets the Coverage Evaluation page show a clear
+                  // fallback error + manual reselection if the prefill is missing.
+                  sessionStorage.setItem("amehnities:cesFromChecklist", "1");
                 } catch { /* ignore storage errors */ }
                 window.dispatchEvent(new CustomEvent("amehnities:navigate-tab", { detail: { tab: "coverage-eval" } }));
                 navigate("/?tab=coverage-eval", { replace: true });
