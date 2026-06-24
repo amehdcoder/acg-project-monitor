@@ -129,7 +129,7 @@ const uniqueSorted = (values: string[]) =>
 
 
 export default function MdaLocationCascade({ projectId, responses, nameToId, onSet, stateScope }: Props) {
-  const { isOwner, isAdmin } = useAuth();
+  const { user, isOwner, isAdmin } = useAuth();
   const scope = useMicroplanScope(isOwner || isAdmin);
 
   const [rows, setRows] = useState<GeoRow[]>([]);
@@ -165,6 +165,26 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         const pStates = pScope.states || [];
         if (!cancelled) setProjectStates(pStates);
 
+        // Lock the microplan geography to ONLY the projects this user can
+        // access. Owners/admins see every project (null = no restriction);
+        // everyone else is limited to their assigned projects so the cascade
+        // never surfaces microplan locations from projects outside their reach.
+        let accessibleProjectIds: string[] | null = null;
+        if (!(isOwner || isAdmin) && user?.id) {
+          const { data: assignments } = await supabase
+            .from("user_project_assignments")
+            .select("project_id")
+            .eq("user_id", user.id);
+          accessibleProjectIds = Array.from(
+            new Set((assignments || []).map((a) => a.project_id).filter(Boolean)),
+          );
+          // No assigned projects → no microplan geography to show.
+          if (accessibleProjectIds.length === 0) {
+            if (!cancelled) { setRows([]); setLoading(false); }
+            return;
+          }
+        }
+
         // Admin form scope wins, otherwise the project's designed states.
         const rawScopeStates = (stateScope && stateScope.length > 0) ? stateScope : pStates;
         const scopeStates = uniqueSorted(rawScopeStates.flatMap((s) => {
@@ -180,6 +200,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         // function runs SECURITY INVOKER.
         const { data, error } = await (supabase.rpc as any)("microplan_distinct_geography", {
           _states: scopeStates.length > 0 ? scopeStates : null,
+          _project_ids: accessibleProjectIds && accessibleProjectIds.length > 0 ? accessibleProjectIds : null,
         }).abortSignal(controller.signal);
         if (error) throw error;
         if (!cancelled) setRows((data as GeoRow[]) || []);
