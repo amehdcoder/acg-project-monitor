@@ -192,6 +192,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
       const formsData = (data || []).map((f) => ({
         id: f.id,
         name: f.name,
+        project_id: f.project_id,
         total_submissions: 0,
         current_cycle_submissions: 0,
         questions: Array.isArray(f.questions) ? f.questions : [],
