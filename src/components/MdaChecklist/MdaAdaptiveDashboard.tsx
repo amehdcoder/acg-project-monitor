@@ -17,7 +17,7 @@
  *   • media (image/audio/video/file/geo)  → capture-rate card
  *   • text / note / barcode               → response-rate card
  */
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line,
@@ -26,12 +26,18 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   Activity, Users2, MapPin, CheckCircle2, ClipboardList, Search,
   CalendarDays, TrendingUp, Gauge, ListChecks, Hash, Image as ImageIcon,
-  Type as TypeIcon, Sparkles,
+  Type as TypeIcon, Sparkles, FileSpreadsheet, FolderLock,
 } from "lucide-react";
+import { toast } from "sonner";
+import { exportMdaDashboard } from "@/lib/mda/dashboardExport";
 
 // ───────────────────────── Types ─────────────────────────
 interface QOption { id?: string; label: string; value: string; }
@@ -45,6 +51,7 @@ interface FormQuestion {
 }
 interface MdaSubmission {
   id: string;
+  projectId?: string | null;
   state?: string | null;
   lga?: string | null;
   ward?: string | null;
@@ -53,10 +60,15 @@ interface MdaSubmission {
   status?: string | null;
   data?: Record<string, any>;
 }
+interface ProjectLite { id: string; name: string; }
 interface Props {
   submissions: MdaSubmission[];
   questions: FormQuestion[];
   formName?: string;
+  formId?: string;
+  /** The project this checklist instance belongs to. */
+  projectId?: string;
+  projects?: ProjectLite[];
 }
 
 // Vibrant, accessible categorical palette for data viz.
@@ -325,10 +337,76 @@ function EmptyCard({ q, label, answered, total }: any) {
 }
 
 // ───────────────────────── Main component ─────────────────────────
-export default function MdaAdaptiveDashboard({ submissions, questions, formName }: Props) {
+export default function MdaAdaptiveDashboard({
+  submissions: allSubmissions,
+  questions,
+  formName,
+  formId,
+  projectId,
+  projects = [],
+}: Props) {
   const sections = useMemo(() => buildSections(questions), [questions]);
   const [activeSection, setActiveSection] = useState<string>("all");
   const [query, setQuery] = useState("");
+  const [exporting, setExporting] = useState(false);
+
+  // ── Project scope (persisted per form) ──
+  const storageKey = `mda-dashboard-project:${formId || formName || "default"}`;
+  // Projects that actually appear in this checklist's data (+ its own project).
+  const availableProjects = useMemo(() => {
+    const ids = new Set<string>();
+    for (const s of allSubmissions) if (s.projectId) ids.add(String(s.projectId));
+    if (projectId) ids.add(projectId);
+    const nameOf = (id: string) => projects.find((p) => p.id === id)?.name || "This project";
+    return [...ids].map((id) => ({ id, name: nameOf(id) }));
+  }, [allSubmissions, projectId, projects]);
+
+  const [activeProject, setActiveProject] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) return saved;
+    } catch { /* ignore */ }
+    return projectId || "all";
+  });
+
+  // Default to the checklist's own project once it is known.
+  useEffect(() => {
+    if (activeProject === "all" && projectId) {
+      let hasSaved = false;
+      try { hasSaved = !!localStorage.getItem(storageKey); } catch { /* ignore */ }
+      if (!hasSaved) setActiveProject(projectId);
+    }
+  }, [projectId, activeProject, storageKey]);
+
+  const setProjectScope = (id: string) => {
+    setActiveProject(id);
+    try { localStorage.setItem(storageKey, id); } catch { /* ignore */ }
+  };
+
+  // Submissions scoped to the selected project.
+  const submissions = useMemo(() => {
+    if (activeProject === "all") return allSubmissions;
+    return allSubmissions.filter((s) => !s.projectId || String(s.projectId) === activeProject);
+  }, [allSubmissions, activeProject]);
+
+  const activeProjectName =
+    activeProject === "all"
+      ? "All projects"
+      : availableProjects.find((p) => p.id === activeProject)?.name || "This project";
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await exportMdaDashboard(submissions, questions, formName || "MDA Supervisory Checklist", activeProjectName);
+      toast.success("Dashboard metrics exported to Excel");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to export dashboard metrics");
+    } finally {
+      setExporting(false);
+    }
+  };
+
 
   // Overview KPIs (always adaptive to whatever submissions exist)
   const kpis = useMemo(() => {
@@ -385,19 +463,42 @@ export default function MdaAdaptiveDashboard({ submissions, questions, formName 
   return (
     <Card className="border-border/60 bg-gradient-to-br from-card to-muted/30">
       <CardHeader>
-        <div className="flex flex-col gap-1">
-          <CardTitle className="flex items-center gap-2 font-display text-lg">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 text-white shadow">
-              <Sparkles className="h-4 w-4" />
-            </span>
-            Adaptive Insights Dashboard
-          </CardTitle>
-          <CardDescription>
-            Live, auto-adapting analytics for <span className="font-medium text-foreground">{formName || "this checklist"}</span> —
-            {" "}{totalQuestions} fields across {sections.length} sections. Edits to the form are mirrored here automatically.
-          </CardDescription>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-1">
+            <CardTitle className="flex items-center gap-2 font-display text-lg">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 text-white shadow">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              Adaptive Insights Dashboard
+            </CardTitle>
+            <CardDescription>
+              Live, auto-adapting analytics for <span className="font-medium text-foreground">{formName || "this checklist"}</span> —
+              {" "}{totalQuestions} fields across {sections.length} sections. Edits to the form are mirrored here automatically.
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-2 py-1">
+              <FolderLock className="h-4 w-4 text-indigo-500" />
+              <Select value={activeProject} onValueChange={setProjectScope}>
+                <SelectTrigger className="h-8 w-[180px] border-0 bg-transparent px-1 text-xs shadow-none focus:ring-0">
+                  <SelectValue placeholder="Project scope" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableProjects.map((p) => (
+                    <SelectItem key={p.id} value={p.id} className="text-xs">{p.name}</SelectItem>
+                  ))}
+                  <SelectItem value="all" className="text-xs">All projects</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleExport} disabled={exporting || submissions.length === 0} className="gap-2 bg-gradient-to-r from-indigo-500 to-cyan-500 text-white hover:opacity-90">
+              <FileSpreadsheet className="h-4 w-4" />
+              {exporting ? "Exporting…" : "Export to Excel"}
+            </Button>
+          </div>
         </div>
       </CardHeader>
+
       <CardContent className="space-y-6">
         {/* Overview KPIs */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
