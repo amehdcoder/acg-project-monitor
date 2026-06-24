@@ -77,7 +77,7 @@ describe("choice control aspect ratio", () => {
     const radio = getByRole("radio");
     // No utilities that would let the parent resize it asymmetrically.
     expect(radio.className).not.toMatch(/\bflex-1\b/);
-    expect(radio.className).not.toMatch(/\bgrow\b/);
+    expect(radio.className).not.toMatch(/\bgrow(?!-0\b)\b/);
     expect(radio.className).not.toMatch(/\bw-full\b/);
     expect(radio.className).not.toMatch(/\bh-full\b/);
   });
