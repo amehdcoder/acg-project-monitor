@@ -334,13 +334,19 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [user?.id]);
 
   const subscribeToConversation = useCallback(
-    (conversationId: string) => {
+    async (conversationId: string) => {
       if (chatChannelRef.current) {
         supabase.removeChannel(chatChannelRef.current);
         chatChannelRef.current = null;
       }
+      const topic = `proximity-chat-${conversationId}`;
+      const { allowed, reason } = await authorizeRealtimeSubscription(topic);
+      if (!allowed) {
+        console.warn(`[proximity] chat subscription denied: ${reason}`);
+        return;
+      }
       const channel = supabase
-        .channel(`proximity-chat-${conversationId}`, { config: { private: true } })
+        .channel(topic, { config: { private: true } })
         .on(
           "postgres_changes",
           {
