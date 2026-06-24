@@ -257,6 +257,28 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [flhfName, setFlhfName] = useState("");
   const [communityName, setCommunityName] = useState("");
   const [settlementName, setSettlementName] = useState("");
+  // When the user arrives here from the Integrated MDA Supervisory Checklist,
+  // the checklist's location identification is prefilled here and LOCKED so it
+  // cannot be changed — guaranteeing the coverage survey matches the supervised
+  // community exactly.
+  const [locationLocked, setLocationLocked] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("amehnities:cesLocationPrefill");
+      if (!raw) return;
+      const p = JSON.parse(raw);
+      if (!p || (p.projectId && projectId && p.projectId !== projectId)) return;
+      if (p.state) setState(p.state);
+      if (p.lga) setLga(p.lga);
+      if (p.ward) setWard(p.ward);
+      if (p.flhf_name) setFlhfName(p.flhf_name);
+      if (p.community_name) setCommunityName(p.community_name);
+      if (p.settlement_name) setSettlementName(p.settlement_name);
+      if (p.state || p.lga || p.ward || p.community_name) setLocationLocked(true);
+      // One-shot: consume so a later manual visit isn't unexpectedly locked.
+      sessionStorage.removeItem("amehnities:cesLocationPrefill");
+    } catch { /* ignore */ }
+  }, [projectId]);
 
   // Microplanning Data
   const [loading, setLoading] = useState(false);
