@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          decision: string
+          id: string
+          metadata: Json
+          reason: string | null
+          resource_id: string | null
+          resource_type: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          decision: string
+          id?: string
+          metadata?: Json
+          reason?: string | null
+          resource_id?: string | null
+          resource_type: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          decision?: string
+          id?: string
+          metadata?: Json
+          reason?: string | null
+          resource_id?: string | null
+          resource_type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       account_audit_log: {
         Row: {
           actor_email: string | null
@@ -6779,6 +6815,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      authorize_realtime_subscription: {
+        Args: { _topic: string }
+        Returns: Json
+      }
       can_access_case: {
         Args: { _case_id: string; _user_id: string }
         Returns: boolean
@@ -6904,6 +6944,17 @@ export type Database = {
       is_standard_forms_restricted: {
         Args: { _user_id: string }
         Returns: boolean
+      }
+      log_access_attempt: {
+        Args: {
+          _action: string
+          _decision: string
+          _metadata?: Json
+          _reason?: string
+          _resource_id: string
+          _resource_type: string
+        }
+        Returns: undefined
       }
       microplan_distinct_geography:
         | {
