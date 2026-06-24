@@ -2668,6 +2668,25 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 Location identification carried over from the MDA Supervisory Checklist — locked to ensure the coverage survey matches the supervised community.
               </div>
             )}
+            {prefillMissing && (
+              <div className="flex items-start gap-2 text-[11px] text-destructive bg-destructive/5 border border-destructive/40 rounded-md px-2 py-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div className="space-y-1.5">
+                  <p className="font-medium">
+                    Checklist location could not be carried over.
+                  </p>
+                  <p className="text-muted-foreground">
+                    The location identification from the MDA Supervisory Checklist
+                    wasn't received (the link may have expired or been opened in a
+                    new session). To keep the survey accurate, please reselect the
+                    location below, or return to the checklist and proceed again.
+                  </p>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleReselectLocation}>
+                    Reselect location manually
+                  </Button>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
               <Field label="State *">
                 <Select value={state} onValueChange={(v) => { setState(v); setLga(""); setWard(""); }} disabled={locationLocked}>
