@@ -262,8 +262,18 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // ---- Incoming message popups (global) ----
   useEffect(() => {
     if (!user?.id) return;
-    const channel = supabase
-      .channel(`proximity-inbox-${user.id}`, { config: { private: true } })
+    const topic = `proximity-inbox-${user.id}`;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    authorizeRealtimeSubscription(topic).then(({ allowed, reason }) => {
+      if (cancelled) return;
+      if (!allowed) {
+        console.warn(`[proximity] inbox subscription denied: ${reason}`);
+        return;
+      }
+      channel = supabase
+        .channel(topic, { config: { private: true } })
       .on(
         "postgres_changes",
         {
