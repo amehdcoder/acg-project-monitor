@@ -26,12 +26,18 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   Activity, Users2, MapPin, CheckCircle2, ClipboardList, Search,
   CalendarDays, TrendingUp, Gauge, ListChecks, Hash, Image as ImageIcon,
-  Type as TypeIcon, Sparkles,
+  Type as TypeIcon, Sparkles, FileSpreadsheet, FolderLock,
 } from "lucide-react";
+import { toast } from "sonner";
+import { exportMdaDashboard } from "@/lib/mda/dashboardExport";
 
 // ───────────────────────── Types ─────────────────────────
 interface QOption { id?: string; label: string; value: string; }
@@ -45,6 +51,7 @@ interface FormQuestion {
 }
 interface MdaSubmission {
   id: string;
+  projectId?: string | null;
   state?: string | null;
   lga?: string | null;
   ward?: string | null;
@@ -53,10 +60,15 @@ interface MdaSubmission {
   status?: string | null;
   data?: Record<string, any>;
 }
+interface ProjectLite { id: string; name: string; }
 interface Props {
   submissions: MdaSubmission[];
   questions: FormQuestion[];
   formName?: string;
+  formId?: string;
+  /** The project this checklist instance belongs to. */
+  projectId?: string;
+  projects?: ProjectLite[];
 }
 
 // Vibrant, accessible categorical palette for data viz.
