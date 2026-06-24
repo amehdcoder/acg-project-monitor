@@ -148,6 +148,7 @@ const DataView = () => {
                       const ward = d.ward || d.Ward || d.ward_name || null;
                       return {
                         id: s.id,
+                        projectId: (selectedForm as any)?.project_id ?? selectedProjectId ?? null,
                         state: s.state,
                         lga,
                         ward,
@@ -159,6 +160,9 @@ const DataView = () => {
                     })}
                     questions={((selectedForm as any)?.questions ?? []) as any}
                     formName={selectedForm?.name}
+                    formId={selectedFormId}
+                    projectId={(selectedForm as any)?.project_id ?? selectedProjectId}
+                    projects={projects}
                   />
                   <SupervisoryGapAnalysisDashboard
                     submissions={submissions.map((s: any) => {
