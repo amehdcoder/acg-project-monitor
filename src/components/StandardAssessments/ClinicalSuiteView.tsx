@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { logReferralAccess } from "@/lib/realtimeGuard";
 import { supabase } from "@/integrations/supabase/client";
 import { getAllStates } from "@/lib/nigeriaAdminData";
 
