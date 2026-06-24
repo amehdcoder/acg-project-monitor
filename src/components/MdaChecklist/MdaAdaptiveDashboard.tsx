@@ -463,19 +463,42 @@ export default function MdaAdaptiveDashboard({
   return (
     <Card className="border-border/60 bg-gradient-to-br from-card to-muted/30">
       <CardHeader>
-        <div className="flex flex-col gap-1">
-          <CardTitle className="flex items-center gap-2 font-display text-lg">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 text-white shadow">
-              <Sparkles className="h-4 w-4" />
-            </span>
-            Adaptive Insights Dashboard
-          </CardTitle>
-          <CardDescription>
-            Live, auto-adapting analytics for <span className="font-medium text-foreground">{formName || "this checklist"}</span> —
-            {" "}{totalQuestions} fields across {sections.length} sections. Edits to the form are mirrored here automatically.
-          </CardDescription>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-1">
+            <CardTitle className="flex items-center gap-2 font-display text-lg">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 text-white shadow">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              Adaptive Insights Dashboard
+            </CardTitle>
+            <CardDescription>
+              Live, auto-adapting analytics for <span className="font-medium text-foreground">{formName || "this checklist"}</span> —
+              {" "}{totalQuestions} fields across {sections.length} sections. Edits to the form are mirrored here automatically.
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-2 py-1">
+              <FolderLock className="h-4 w-4 text-indigo-500" />
+              <Select value={activeProject} onValueChange={setProjectScope}>
+                <SelectTrigger className="h-8 w-[180px] border-0 bg-transparent px-1 text-xs shadow-none focus:ring-0">
+                  <SelectValue placeholder="Project scope" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableProjects.map((p) => (
+                    <SelectItem key={p.id} value={p.id} className="text-xs">{p.name}</SelectItem>
+                  ))}
+                  <SelectItem value="all" className="text-xs">All projects</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleExport} disabled={exporting || submissions.length === 0} className="gap-2 bg-gradient-to-r from-indigo-500 to-cyan-500 text-white hover:opacity-90">
+              <FileSpreadsheet className="h-4 w-4" />
+              {exporting ? "Exporting…" : "Export to Excel"}
+            </Button>
+          </div>
         </div>
       </CardHeader>
+
       <CardContent className="space-y-6">
         {/* Overview KPIs */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
