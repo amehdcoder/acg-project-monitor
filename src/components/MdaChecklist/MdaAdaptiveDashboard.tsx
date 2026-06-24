@@ -17,7 +17,7 @@
  *   • media (image/audio/video/file/geo)  → capture-rate card
  *   • text / note / barcode               → response-rate card
  */
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line,
