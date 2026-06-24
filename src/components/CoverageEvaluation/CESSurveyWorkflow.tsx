@@ -262,23 +262,75 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // cannot be changed — guaranteeing the coverage survey matches the supervised
   // community exactly.
   const [locationLocked, setLocationLocked] = useState(false);
+  // Immutable source of truth for locked location values. The submission payload
+  // is built from this ref (not the editable state), so the locked values cannot
+  // be overridden client-side even if component state were tampered with.
+  const lockedLocationRef = useRef<{
+    state: string; lga: string; ward: string;
+    flhf_name: string; community_name: string; settlement_name: string;
+  } | null>(null);
+  // True when the user explicitly proceeded from the checklist but the prefill
+  // was missing/unreadable — drives the fallback "reselect" error flow.
+  const [prefillMissing, setPrefillMissing] = useState(false);
   useEffect(() => {
+    let fromChecklist = false;
+    try {
+      fromChecklist = sessionStorage.getItem("amehnities:cesFromChecklist") === "1";
+    } catch { /* ignore */ }
+    let applied = false;
     try {
       const raw = sessionStorage.getItem("amehnities:cesLocationPrefill");
-      if (!raw) return;
-      const p = JSON.parse(raw);
-      if (!p || (p.projectId && projectId && p.projectId !== projectId)) return;
-      if (p.state) setState(p.state);
-      if (p.lga) setLga(p.lga);
-      if (p.ward) setWard(p.ward);
-      if (p.flhf_name) setFlhfName(p.flhf_name);
-      if (p.community_name) setCommunityName(p.community_name);
-      if (p.settlement_name) setSettlementName(p.settlement_name);
-      if (p.state || p.lga || p.ward || p.community_name) setLocationLocked(true);
-      // One-shot: consume so a later manual visit isn't unexpectedly locked.
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p && (!p.projectId || !projectId || p.projectId === projectId)) {
+          const loc = {
+            state: p.state || "",
+            lga: p.lga || "",
+            ward: p.ward || "",
+            flhf_name: p.flhf_name || "",
+            community_name: p.community_name || "",
+            settlement_name: p.settlement_name || "",
+          };
+          // A valid prefill must at least identify State + LGA + Ward + Community.
+          if (loc.state && loc.lga && loc.ward && loc.community_name) {
+            setState(loc.state);
+            setLga(loc.lga);
+            setWard(loc.ward);
+            setFlhfName(loc.flhf_name);
+            setCommunityName(loc.community_name);
+            setSettlementName(loc.settlement_name);
+            lockedLocationRef.current = loc;
+            setLocationLocked(true);
+            applied = true;
+          }
+        }
+      }
+    } catch { /* ignore */ }
+    // Fallback: user came from the checklist but no usable prefill was found.
+    if (!applied && fromChecklist) {
+      setPrefillMissing(true);
+    }
+    // One-shot: consume both signals so a later manual visit isn't affected.
+    try {
       sessionStorage.removeItem("amehnities:cesLocationPrefill");
+      sessionStorage.removeItem("amehnities:cesFromChecklist");
     } catch { /* ignore */ }
   }, [projectId]);
+
+  // Safe manual reselection from the fallback error: clears the locked state and
+  // lets the supervisor pick the location through the normal cascade.
+  const handleReselectLocation = useCallback(() => {
+    lockedLocationRef.current = null;
+    setLocationLocked(false);
+    setPrefillMissing(false);
+    setState("");
+    setLga("");
+    setWard("");
+    setFlhfName("");
+    setCommunityName("");
+    setSettlementName("");
+  }, []);
+
 
   // Microplanning Data
   const [loading, setLoading] = useState(false);
