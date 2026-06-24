@@ -806,7 +806,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
           open={showSkipLogic}
           onOpenChange={setShowSkipLogic}
           question={selectedQuestion}
-          allQuestions={questions}
+          allQuestions={allQuestionsFlat}
           onSave={handleSaveSkipLogic}
         />
       )}
