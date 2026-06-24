@@ -262,23 +262,75 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // cannot be changed — guaranteeing the coverage survey matches the supervised
   // community exactly.
   const [locationLocked, setLocationLocked] = useState(false);
+  // Immutable source of truth for locked location values. The submission payload
+  // is built from this ref (not the editable state), so the locked values cannot
+  // be overridden client-side even if component state were tampered with.
+  const lockedLocationRef = useRef<{
+    state: string; lga: string; ward: string;
+    flhf_name: string; community_name: string; settlement_name: string;
+  } | null>(null);
+  // True when the user explicitly proceeded from the checklist but the prefill
+  // was missing/unreadable — drives the fallback "reselect" error flow.
+  const [prefillMissing, setPrefillMissing] = useState(false);
   useEffect(() => {
+    let fromChecklist = false;
+    try {
+      fromChecklist = sessionStorage.getItem("amehnities:cesFromChecklist") === "1";
+    } catch { /* ignore */ }
+    let applied = false;
     try {
       const raw = sessionStorage.getItem("amehnities:cesLocationPrefill");
-      if (!raw) return;
-      const p = JSON.parse(raw);
-      if (!p || (p.projectId && projectId && p.projectId !== projectId)) return;
-      if (p.state) setState(p.state);
-      if (p.lga) setLga(p.lga);
-      if (p.ward) setWard(p.ward);
-      if (p.flhf_name) setFlhfName(p.flhf_name);
-      if (p.community_name) setCommunityName(p.community_name);
-      if (p.settlement_name) setSettlementName(p.settlement_name);
-      if (p.state || p.lga || p.ward || p.community_name) setLocationLocked(true);
-      // One-shot: consume so a later manual visit isn't unexpectedly locked.
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p && (!p.projectId || !projectId || p.projectId === projectId)) {
+          const loc = {
+            state: p.state || "",
+            lga: p.lga || "",
+            ward: p.ward || "",
+            flhf_name: p.flhf_name || "",
+            community_name: p.community_name || "",
+            settlement_name: p.settlement_name || "",
+          };
+          // A valid prefill must at least identify State + LGA + Ward + Community.
+          if (loc.state && loc.lga && loc.ward && loc.community_name) {
+            setState(loc.state);
+            setLga(loc.lga);
+            setWard(loc.ward);
+            setFlhfName(loc.flhf_name);
+            setCommunityName(loc.community_name);
+            setSettlementName(loc.settlement_name);
+            lockedLocationRef.current = loc;
+            setLocationLocked(true);
+            applied = true;
+          }
+        }
+      }
+    } catch { /* ignore */ }
+    // Fallback: user came from the checklist but no usable prefill was found.
+    if (!applied && fromChecklist) {
+      setPrefillMissing(true);
+    }
+    // One-shot: consume both signals so a later manual visit isn't affected.
+    try {
       sessionStorage.removeItem("amehnities:cesLocationPrefill");
+      sessionStorage.removeItem("amehnities:cesFromChecklist");
     } catch { /* ignore */ }
   }, [projectId]);
+
+  // Safe manual reselection from the fallback error: clears the locked state and
+  // lets the supervisor pick the location through the normal cascade.
+  const handleReselectLocation = useCallback(() => {
+    lockedLocationRef.current = null;
+    setLocationLocked(false);
+    setPrefillMissing(false);
+    setState("");
+    setLga("");
+    setWard("");
+    setFlhfName("");
+    setCommunityName("");
+    setSettlementName("");
+  }, []);
+
 
   // Microplanning Data
   const [loading, setLoading] = useState(false);
@@ -1525,13 +1577,21 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         toast({ title: "Sign in required", variant: "destructive" });
         return null;
       }
+      // When the location is locked (carried over from the MDA Supervisory
+      // Checklist), always source the geography from the immutable ref so the
+      // submitted values cannot be overridden by tampered component state.
+      const locked = locationLocked ? lockedLocationRef.current : null;
+      const geo = locked ?? {
+        state, lga, ward, flhf_name: flhfName,
+        community_name: communityName, settlement_name: settlementName,
+      };
       const payload: any = {
         project_id: projectId ?? null,
         form_id: formId ?? null,
-        name: `${communityName || "CES"} — ${new Date().toLocaleDateString()}`,
+        name: `${geo.community_name || "CES"} — ${new Date().toLocaleDateString()}`,
         survey_date: new Date().toISOString().slice(0, 10),
-        state, lga, ward, flhf_name: flhfName,
-        community_name: communityName, settlement_name: settlementName,
+        state: geo.state, lga: geo.lga, ward: geo.ward, flhf_name: geo.flhf_name,
+        community_name: geo.community_name, settlement_name: geo.settlement_name,
         center_lat: gps?.lat ?? null, center_lng: gps?.lng ?? null,
         perimeter_coords: perimeter,
         est_hh_ai: estHHAi, est_hh_user: estHHUser,
@@ -1587,7 +1647,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     },
     [projectId, formId, communityName, state, lga, ward, flhfName, settlementName, gps, perimeter,
      estHHAi, estHHUser, targetN, segments.length, selectedSegmentLabels, coverage, surveyId,
-     outsideMicroplan, outsideMicroplanReason, featureSummary],
+     outsideMicroplan, outsideMicroplanReason, featureSummary, locationLocked],
   );
 
   const openFeatureLabelDialog = useCallback((feature: FeatureLabelRequest) => {
@@ -2606,6 +2666,25 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <div className="flex items-center gap-1.5 text-[11px] text-primary bg-primary/5 border border-primary/30 rounded-md px-2 py-1">
                 <Lock className="h-3 w-3" />
                 Location identification carried over from the MDA Supervisory Checklist — locked to ensure the coverage survey matches the supervised community.
+              </div>
+            )}
+            {prefillMissing && (
+              <div className="flex items-start gap-2 text-[11px] text-destructive bg-destructive/5 border border-destructive/40 rounded-md px-2 py-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div className="space-y-1.5">
+                  <p className="font-medium">
+                    Checklist location could not be carried over.
+                  </p>
+                  <p className="text-muted-foreground">
+                    The location identification from the MDA Supervisory Checklist
+                    wasn't received (the link may have expired or been opened in a
+                    new session). To keep the survey accurate, please reselect the
+                    location below, or return to the checklist and proceed again.
+                  </p>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleReselectLocation}>
+                    Reselect location manually
+                  </Button>
+                </div>
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
