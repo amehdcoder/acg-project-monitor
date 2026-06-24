@@ -319,9 +319,11 @@ const ClinicalSuiteView = ({ projectId, onClose }: Props) => {
         resolved_at: status === "completed" || status === "declined" ? new Date().toISOString() : null,
       }).eq("id", id);
       if (error) throw error;
+      void logReferralAccess("update", "allowed", id, `status=${status}`);
       toast({ title: `Referral ${status}` });
       await load();
     } catch (e: any) {
+      void logReferralAccess("update", "denied", id, e?.message);
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     } finally { setBusy(false); }
   };
