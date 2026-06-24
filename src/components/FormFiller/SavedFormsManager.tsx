@@ -116,7 +116,16 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
     setLoading(true);
     try {
       let rows = await listSavedEntries(userId, cfg.status);
-      if (projectId) rows = rows.filter((r) => r.projectId === projectId || isSpecialBridgeEntry(r));
+      // Scope to the active project when one is selected, but NEVER hide an
+      // entry the field worker collected on this device: keep matches, special
+      // bridge mirrors, and any entry without a project tag (e.g. saved while
+      // offline before a project was resolved). This guarantees offline-
+      // finalized forms always surface in "Ready to send".
+      if (projectId) {
+        rows = rows.filter(
+          (r) => r.projectId === projectId || !r.projectId || isSpecialBridgeEntry(r),
+        );
+      }
       setEntries(rows);
       setSelected(new Set());
     } catch {
@@ -125,6 +134,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     load();
