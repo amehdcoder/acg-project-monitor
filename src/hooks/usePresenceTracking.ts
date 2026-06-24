@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { authorizeRealtimeSubscription } from "@/lib/realtimeGuard";
 
 export interface ActiveCollaborator {
   user_id: string;
@@ -54,43 +55,56 @@ export function usePresenceTracking(enabled: boolean) {
       return;
     }
 
-    const channel = supabase.channel(PRESENCE_CHANNEL, {
-      config: { presence: { key: user.id }, private: true },
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    authorizeRealtimeSubscription(PRESENCE_CHANNEL).then(({ allowed, reason }) => {
+      if (cancelled || !allowed) {
+        if (!allowed) console.warn(`[presence] subscription denied: ${reason}`);
+        return;
+      }
+      const ch = supabase.channel(PRESENCE_CHANNEL, {
+        config: { presence: { key: user.id }, private: true },
+      });
+      channel = ch;
+      channelRef.current = ch;
+
+      const syncState = () => {
+        const state = ch.presenceState<ActiveCollaborator>();
+        const flat: ActiveCollaborator[] = [];
+        const seen = new Set<string>();
+        Object.values(state).forEach((entries) => {
+          // Most recent entry per user wins (a user may have multiple tabs).
+          const latest = (entries as ActiveCollaborator[])
+            .slice()
+            .sort((a, b) => (a.online_at < b.online_at ? 1 : -1))[0];
+          if (latest && !seen.has(latest.user_id)) {
+            seen.add(latest.user_id);
+            flat.push(latest);
+          }
+        });
+        flat.sort((a, b) => a.name.localeCompare(b.name));
+        setCollaborators(flat);
+      };
+
+      ch
+        .on("presence", { event: "sync" }, syncState)
+        .on("presence", { event: "join" }, syncState)
+        .on("presence", { event: "leave" }, syncState)
+        .subscribe(async (status) => {
+          if (status === "SUBSCRIBED") {
+            const self = buildSelf();
+            if (self) await ch.track(self);
+          }
+        });
     });
-    channelRef.current = channel;
-
-    const syncState = () => {
-      const state = channel.presenceState<ActiveCollaborator>();
-      const flat: ActiveCollaborator[] = [];
-      const seen = new Set<string>();
-      Object.values(state).forEach((entries) => {
-        // Most recent entry per user wins (a user may have multiple tabs).
-        const latest = (entries as ActiveCollaborator[])
-          .slice()
-          .sort((a, b) => (a.online_at < b.online_at ? 1 : -1))[0];
-        if (latest && !seen.has(latest.user_id)) {
-          seen.add(latest.user_id);
-          flat.push(latest);
-        }
-      });
-      flat.sort((a, b) => a.name.localeCompare(b.name));
-      setCollaborators(flat);
-    };
-
-    channel
-      .on("presence", { event: "sync" }, syncState)
-      .on("presence", { event: "join" }, syncState)
-      .on("presence", { event: "leave" }, syncState)
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          const self = buildSelf();
-          if (self) await channel.track(self);
-        }
-      });
 
     return () => {
-      channel.untrack();
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) {
+        channel.untrack();
+        supabase.removeChannel(channel);
+      }
       channelRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

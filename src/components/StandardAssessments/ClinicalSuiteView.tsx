@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { logReferralAccess } from "@/lib/realtimeGuard";
 import { supabase } from "@/integrations/supabase/client";
 import { getAllStates } from "@/lib/nigeriaAdminData";
 
@@ -95,6 +96,12 @@ const ClinicalSuiteView = ({ projectId, onClose }: Props) => {
       setFacilities((f.data as Facility[]) || []);
       setStock((s.data as StockItem[]) || []);
       setReferrals((r.data as Referral[]) || []);
+      void logReferralAccess(
+        "list",
+        r.error ? "denied" : "allowed",
+        undefined,
+        r.error ? r.error.message : `count=${(r.data || []).length}`
+      );
     } catch (e: any) {
       toast({ title: "Could not load", description: e.message, variant: "destructive" });
     } finally {
@@ -312,9 +319,11 @@ const ClinicalSuiteView = ({ projectId, onClose }: Props) => {
         resolved_at: status === "completed" || status === "declined" ? new Date().toISOString() : null,
       }).eq("id", id);
       if (error) throw error;
+      void logReferralAccess("update", "allowed", id, `status=${status}`);
       toast({ title: `Referral ${status}` });
       await load();
     } catch (e: any) {
+      void logReferralAccess("update", "denied", id, e?.message);
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     } finally { setBusy(false); }
   };

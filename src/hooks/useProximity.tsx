@@ -9,6 +9,7 @@ import React, {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { authorizeRealtimeSubscription } from "@/lib/realtimeGuard";
 
 const PROXIMITY_RADIUS_KM = 10;
 const PRESENCE_PUSH_MS = 20000; // upsert own location at most every 20s
@@ -261,8 +262,18 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // ---- Incoming message popups (global) ----
   useEffect(() => {
     if (!user?.id) return;
-    const channel = supabase
-      .channel(`proximity-inbox-${user.id}`, { config: { private: true } })
+    const topic = `proximity-inbox-${user.id}`;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    authorizeRealtimeSubscription(topic).then(({ allowed, reason }) => {
+      if (cancelled) return;
+      if (!allowed) {
+        console.warn(`[proximity] inbox subscription denied: ${reason}`);
+        return;
+      }
+      channel = supabase
+        .channel(topic, { config: { private: true } })
       .on(
         "postgres_changes",
         {
@@ -311,22 +322,31 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             },
           });
         }
-      )
-      .subscribe();
+        )
+        .subscribe();
+    });
+
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   const subscribeToConversation = useCallback(
-    (conversationId: string) => {
+    async (conversationId: string) => {
       if (chatChannelRef.current) {
         supabase.removeChannel(chatChannelRef.current);
         chatChannelRef.current = null;
       }
+      const topic = `proximity-chat-${conversationId}`;
+      const { allowed, reason } = await authorizeRealtimeSubscription(topic);
+      if (!allowed) {
+        console.warn(`[proximity] chat subscription denied: ${reason}`);
+        return;
+      }
       const channel = supabase
-        .channel(`proximity-chat-${conversationId}`, { config: { private: true } })
+        .channel(topic, { config: { private: true } })
         .on(
           "postgres_changes",
           {
