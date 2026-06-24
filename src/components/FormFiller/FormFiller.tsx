@@ -229,7 +229,7 @@ const parseRelevant = (relevant: string): ParsedRelevant => {
   return result;
 };
 
-
+interface FormSettings {
   allowAnonymous?: boolean;
   requireLocation?: boolean;
   offlineEnabled?: boolean;
