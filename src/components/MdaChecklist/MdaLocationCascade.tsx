@@ -200,6 +200,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         // function runs SECURITY INVOKER.
         const { data, error } = await (supabase.rpc as any)("microplan_distinct_geography", {
           _states: scopeStates.length > 0 ? scopeStates : null,
+          _project_ids: accessibleProjectIds && accessibleProjectIds.length > 0 ? accessibleProjectIds : null,
         }).abortSignal(controller.signal);
         if (error) throw error;
         if (!cancelled) setRows((data as GeoRow[]) || []);
