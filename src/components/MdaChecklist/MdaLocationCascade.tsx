@@ -129,7 +129,7 @@ const uniqueSorted = (values: string[]) =>
 
 
 export default function MdaLocationCascade({ projectId, responses, nameToId, onSet, stateScope }: Props) {
-  const { isOwner, isAdmin } = useAuth();
+  const { user, isOwner, isAdmin } = useAuth();
   const scope = useMicroplanScope(isOwner || isAdmin);
 
   const [rows, setRows] = useState<GeoRow[]>([]);
