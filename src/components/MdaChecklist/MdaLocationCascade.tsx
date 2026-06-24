@@ -623,31 +623,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         </>
       )}
 
-      {/* Not-in-microplan provision (only relevant when a microplan exists) */}
-      {!microplanIsEmpty && (
-      <div className="flex flex-col gap-2 rounded-xl border border-dashed border-primary/40 bg-background/60 p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-2">
-          <PlusCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-          <div>
-            <p className="text-sm font-semibold text-foreground">
-              Community received medicine but is not in the microplan?
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Select State / LGA / Ward from the microplan, then type the FLHF,
-              community &amp; settlement. It will be flagged for reconciliation.
-            </p>
-          </div>
-        </div>
-        <Switch checked={notInMicroplan} onCheckedChange={toggleNotInMicroplan} />
-      </div>
-      )}
 
-      {notInMicroplan && (
-        <div className="flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-2 text-xs text-primary">
-          <Info className="h-3.5 w-3.5" />
-          This supervision will be tagged <strong>“received medicine — not microplanned”</strong>.
-        </div>
-      )}
 
       {/* Selection confirmation */}
       {sel.community_name && (
