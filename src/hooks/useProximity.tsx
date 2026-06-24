@@ -322,10 +322,13 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             },
           });
         }
-      )
-      .subscribe();
+        )
+        .subscribe();
+    });
+
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
