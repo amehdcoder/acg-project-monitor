@@ -3832,6 +3832,22 @@ const FormFiller = ({
             <AlertDialogAction
               onClick={() => {
                 setShowCoverageOptIn(false);
+                // Carry the supervisory checklist's location identification across
+                // to the Coverage Evaluation 3D page, where it will be prefilled
+                // and locked (not user-editable).
+                try {
+                  const prefill = {
+                    state: responses.state ?? "",
+                    lga: responses.lga ?? "",
+                    ward: responses.ward ?? "",
+                    flhf_name: responses.flhf_name ?? "",
+                    community_name: responses.community_name ?? responses.community ?? "",
+                    settlement_name: responses.settlement_name ?? "",
+                    projectId: projectId ?? "",
+                    ts: Date.now(),
+                  };
+                  sessionStorage.setItem("amehnities:cesLocationPrefill", JSON.stringify(prefill));
+                } catch { /* ignore storage errors */ }
                 window.dispatchEvent(new CustomEvent("amehnities:navigate-tab", { detail: { tab: "coverage-eval" } }));
                 navigate("/?tab=coverage-eval", { replace: true });
                 requestAnimationFrame(() => onClose());
