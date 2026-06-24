@@ -2602,29 +2602,36 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               </div>
             )}
 
+            {locationLocked && (
+              <div className="flex items-center gap-1.5 text-[11px] text-primary bg-primary/5 border border-primary/30 rounded-md px-2 py-1">
+                <Lock className="h-3 w-3" />
+                Location identification carried over from the MDA Supervisory Checklist — locked to ensure the coverage survey matches the supervised community.
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
               <Field label="State *">
-                <Select value={state} onValueChange={(v) => { setState(v); setLga(""); setWard(""); }}>
+                <Select value={state} onValueChange={(v) => { setState(v); setLga(""); setWard(""); }} disabled={locationLocked}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select state" /></SelectTrigger>
                   <SelectContent>{getAllStates().map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                 </Select>
               </Field>
               <Field label="LGA *">
-                <Select value={lga} onValueChange={(v) => { setLga(v); setWard(""); }} disabled={!state}>
+                <Select value={lga} onValueChange={(v) => { setLga(v); setWard(""); }} disabled={locationLocked || !state}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select LGA" /></SelectTrigger>
                   <SelectContent>{lgaOptions.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
                 </Select>
               </Field>
               <Field label="Ward *">
-                <Select value={ward} onValueChange={setWard} disabled={!lga}>
+                <Select value={ward} onValueChange={setWard} disabled={locationLocked || !lga}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select ward" /></SelectTrigger>
                   <SelectContent>{wardOptions.map((w) => <SelectItem key={w} value={w}>{w}</SelectItem>)}</SelectContent>
                 </Select>
               </Field>
-              <Field label="FLHF Name"><Input value={flhfName} onChange={(e) => setFlhfName(e.target.value)} className="h-8 text-xs" /></Field>
-              <Field label="Community *"><Input value={communityName} onChange={(e) => setCommunityName(e.target.value)} className="h-8 text-xs" /></Field>
-              <Field label="Settlement"><Input value={settlementName} onChange={(e) => setSettlementName(e.target.value)} className="h-8 text-xs" /></Field>
+              <Field label="FLHF Name"><Input value={flhfName} onChange={(e) => setFlhfName(e.target.value)} className="h-8 text-xs" readOnly={locationLocked} disabled={locationLocked} /></Field>
+              <Field label="Community *"><Input value={communityName} onChange={(e) => setCommunityName(e.target.value)} className="h-8 text-xs" readOnly={locationLocked} disabled={locationLocked} /></Field>
+              <Field label="Settlement"><Input value={settlementName} onChange={(e) => setSettlementName(e.target.value)} className="h-8 text-xs" readOnly={locationLocked} disabled={locationLocked} /></Field>
             </div>
+
 
             <div className="flex flex-wrap gap-2 items-center">
               <BasemapToggle value={basemap} onChange={setBasemap} />
