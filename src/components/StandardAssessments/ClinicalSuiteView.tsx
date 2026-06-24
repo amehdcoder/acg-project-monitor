@@ -96,6 +96,12 @@ const ClinicalSuiteView = ({ projectId, onClose }: Props) => {
       setFacilities((f.data as Facility[]) || []);
       setStock((s.data as StockItem[]) || []);
       setReferrals((r.data as Referral[]) || []);
+      void logReferralAccess(
+        "list",
+        r.error ? "denied" : "allowed",
+        undefined,
+        r.error ? r.error.message : `count=${(r.data || []).length}`
+      );
     } catch (e: any) {
       toast({ title: "Could not load", description: e.message, variant: "destructive" });
     } finally {
