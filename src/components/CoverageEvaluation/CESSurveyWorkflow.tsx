@@ -1577,13 +1577,21 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         toast({ title: "Sign in required", variant: "destructive" });
         return null;
       }
+      // When the location is locked (carried over from the MDA Supervisory
+      // Checklist), always source the geography from the immutable ref so the
+      // submitted values cannot be overridden by tampered component state.
+      const locked = locationLocked ? lockedLocationRef.current : null;
+      const geo = locked ?? {
+        state, lga, ward, flhf_name: flhfName,
+        community_name: communityName, settlement_name: settlementName,
+      };
       const payload: any = {
         project_id: projectId ?? null,
         form_id: formId ?? null,
-        name: `${communityName || "CES"} — ${new Date().toLocaleDateString()}`,
+        name: `${geo.community_name || "CES"} — ${new Date().toLocaleDateString()}`,
         survey_date: new Date().toISOString().slice(0, 10),
-        state, lga, ward, flhf_name: flhfName,
-        community_name: communityName, settlement_name: settlementName,
+        state: geo.state, lga: geo.lga, ward: geo.ward, flhf_name: geo.flhf_name,
+        community_name: geo.community_name, settlement_name: geo.settlement_name,
         center_lat: gps?.lat ?? null, center_lng: gps?.lng ?? null,
         perimeter_coords: perimeter,
         est_hh_ai: estHHAi, est_hh_user: estHHUser,
