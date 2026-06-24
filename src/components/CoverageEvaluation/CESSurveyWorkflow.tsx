@@ -2562,7 +2562,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
             <Field label="Select Microplanning Data (Optional)">
               <div className="flex items-center gap-2">
-                <Select value={selectedMicroplanId} onValueChange={handleMicroplanSelect}>
+                <Select value={selectedMicroplanId} onValueChange={handleMicroplanSelect} disabled={locationLocked}>
                   <SelectTrigger className="h-8 flex-1 text-xs"><SelectValue placeholder="Choose a community microplan to auto-fill" /></SelectTrigger>
                   <SelectContent>
                     {microplans.map((m) => (
