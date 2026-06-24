@@ -300,17 +300,35 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopedRows, sel.state, sel.lga, sel.ward, sel.flhf_name, sel.community_name]);
 
+  // Distinct states that actually have microplan data captured (independent of
+  // any downstream selection). Used to (a) decide whether the project has a
+  // locked-in microplan and (b) restrict the State picker so ONLY states the
+  // microplan was entered for can be supervised — even on the off-microplan path.
+  const microplanStates = useMemo(
+    () => Array.from(new Set((microplanOptionMap.state ?? []).map(canonicalStateName).filter(Boolean))),
+    [microplanOptionMap.state],
+  );
+  const hasMicroplanData = microplanStates.length > 0;
+
   // State → LGA → Ward options derived from the full Nigerian administrative
   // hierarchy, bounded by the project's designed state scope.
   const adminOptions = (level: keyof GeoRow): string[] => {
     if (level === "state") {
       const all = getAllStates();
-      return hasStateScope ? all.filter((s) => allowedStates.has(s)) : all;
+      let list = hasStateScope ? all.filter((s) => allowedStates.has(s)) : all;
+      // When the project has a locked-in microplan, ONLY states the microplan
+      // was entered for may be supervised — applies to the off-microplan path too.
+      if (hasMicroplanData) {
+        const mpSet = new Set(microplanStates);
+        list = list.filter((s) => mpSet.has(s));
+      }
+      return list;
     }
     if (level === "lga") return sel.state ? getLGAsForState(canonicalStateName(sel.state)) : [];
     if (level === "ward") return sel.state && sel.lga ? getWardsForLGA(canonicalStateName(sel.state), canonicalLgaName(sel.state, sel.lga)) : [];
     return [];
   };
+
 
   // True when a geo level resolves to the admin hierarchy (State/LGA/Ward only).
   const isGeoLevel = (level: keyof GeoRow) =>
@@ -474,6 +492,57 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         </div>
       ) : (
         <>
+          {/* Off-microplan provision — placed BEFORE the location fields so the
+              supervisor first decides whether the community is in the microplan,
+              then either picks from the microplan or proceeds to enter it. */}
+          {!microplanIsEmpty && (
+            <div
+              className={cn(
+                "overflow-hidden rounded-2xl border transition-colors",
+                notInMicroplan
+                  ? "border-amber-400/70 bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 dark:border-amber-500/40 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-rose-950/20"
+                  : "border-violet-300/70 bg-gradient-to-br from-violet-50 via-fuchsia-50 to-sky-50 dark:border-violet-500/40 dark:from-violet-950/40 dark:via-fuchsia-950/30 dark:to-sky-950/20",
+              )}
+            >
+              <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <span
+                    className={cn(
+                      "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm",
+                      notInMicroplan
+                        ? "bg-gradient-to-br from-amber-500 to-rose-500"
+                        : "bg-gradient-to-br from-violet-500 to-fuchsia-500",
+                    )}
+                  >
+                    <PlusCircle className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-foreground sm:text-base">
+                      Community received medicine but is not in the microplan?
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {notInMicroplan
+                        ? "On — pick the State / LGA / Ward, then type the FLHF, community & settlement that received medicine. It will be flagged for reconciliation."
+                        : "Leave off to pick a microplanned area below, or turn it on to record a community that received medicine without being in the microplan."}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-start sm:self-center">
+                  <span className={cn("text-xs font-semibold", notInMicroplan ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground")}>
+                    {notInMicroplan ? "Yes" : "No"}
+                  </span>
+                  <Switch checked={notInMicroplan} onCheckedChange={toggleNotInMicroplan} />
+                </div>
+              </div>
+              {notInMicroplan && (
+                <div className="flex items-center gap-2 border-t border-amber-400/40 bg-amber-100/40 px-4 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200">
+                  <Info className="h-3.5 w-3.5 shrink-0" />
+                  This supervision will be tagged <strong>“received medicine — not microplanned”</strong>.
+                </div>
+              )}
+            </div>
+          )}
+
           {microplanIsEmpty && (
             <div className="flex items-start gap-3 rounded-xl border border-sky-300 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
               <Info className="mt-0.5 h-4 w-4 shrink-0" />
@@ -484,6 +553,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
               </p>
             </div>
           )}
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {LEVELS.map(({ key, label, optional }) => {
             const isLeafGeo =
@@ -553,31 +623,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         </>
       )}
 
-      {/* Not-in-microplan provision (only relevant when a microplan exists) */}
-      {!microplanIsEmpty && (
-      <div className="flex flex-col gap-2 rounded-xl border border-dashed border-primary/40 bg-background/60 p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-2">
-          <PlusCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-          <div>
-            <p className="text-sm font-semibold text-foreground">
-              Community received medicine but is not in the microplan?
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Select State / LGA / Ward from the microplan, then type the FLHF,
-              community &amp; settlement. It will be flagged for reconciliation.
-            </p>
-          </div>
-        </div>
-        <Switch checked={notInMicroplan} onCheckedChange={toggleNotInMicroplan} />
-      </div>
-      )}
 
-      {notInMicroplan && (
-        <div className="flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-2 text-xs text-primary">
-          <Info className="h-3.5 w-3.5" />
-          This supervision will be tagged <strong>“received medicine — not microplanned”</strong>.
-        </div>
-      )}
 
       {/* Selection confirmation */}
       {sel.community_name && (
