@@ -114,12 +114,14 @@ const SkipLogicEditor = ({
     parseRelevantString(question.relevant),
   );
 
-  // Only questions that come before this one can be referenced.
-  const availableQuestions = allQuestions.filter((q) => {
-    const currentIndex = allQuestions.findIndex((aq) => aq.id === question.id);
-    const qIndex = allQuestions.findIndex((aq) => aq.id === q.id);
-    return qIndex < currentIndex;
-  });
+  // Only questions that come before this one can be referenced. If the current
+  // question can't be located in the list (e.g. ordering edge cases), fall back
+  // to every other question so the picker is never empty.
+  const currentIndex = allQuestions.findIndex((aq) => aq.id === question.id);
+  const availableQuestions =
+    currentIndex === -1
+      ? allQuestions.filter((q) => q.id !== question.id)
+      : allQuestions.filter((_, qIndex) => qIndex < currentIndex);
 
   const addCondition = () => {
     setConditions([

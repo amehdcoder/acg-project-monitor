@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -74,6 +74,13 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     return (editForm.questions as any[]).filter((q: any) => Array.isArray(q.questions));
   });
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Flat list of every question (grouped first in document order, then ungrouped)
+  // so skip-logic editors can reference any earlier question, including those
+  // that live inside groups.
+  const allQuestionsFlat = useMemo<Question[]>(
+    () => [...groups.flatMap((g) => g.questions), ...questions],
+    [groups, questions],
+  );
   const [formName, setFormName] = useState(editForm?.name || "");
   const [formDescription, setFormDescription] = useState(editForm?.description || "");
   const [geofence, setGeofence] = useState<GeofenceArea | undefined>(editForm?.geofence);
@@ -799,7 +806,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
           open={showSkipLogic}
           onOpenChange={setShowSkipLogic}
           question={selectedQuestion}
-          allQuestions={questions}
+          allQuestions={allQuestionsFlat}
           onSave={handleSaveSkipLogic}
         />
       )}
@@ -828,7 +835,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
           open={showGroupSkipLogic}
           onOpenChange={setShowGroupSkipLogic}
           group={selectedGroup}
-          allQuestions={questions}
+          allQuestions={allQuestionsFlat}
           onSave={handleSaveGroupSkipLogic}
         />
       )}
