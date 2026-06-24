@@ -55,7 +55,7 @@ export function usePresenceTracking(enabled: boolean) {
     }
 
     const channel = supabase.channel(PRESENCE_CHANNEL, {
-      config: { presence: { key: user.id } },
+      config: { presence: { key: user.id }, private: true },
     });
     channelRef.current = channel;
 
