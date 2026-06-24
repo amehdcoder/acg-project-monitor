@@ -135,7 +135,101 @@ const MDA_GEO_NAMES = new Set([
   "settlement", "settlement_name",
 ]);
 
-interface FormSettings {
+// ---------------------------------------------------------------------------
+// Skip-logic (XLSForm `relevant`) parse cache.
+//
+// Parsing a `relevant` expression with regexes is pure work that only depends
+// on the expression string, never on the live answers. On large forms the same
+// expressions are evaluated on every keystroke for every visible question, so
+// we parse each expression once and memoise the structured result (and the set
+// of question references it depends on). Evaluation then becomes a cheap value
+// comparison and visibility recomputes only when a *referenced* answer changes.
+// ---------------------------------------------------------------------------
+type ParsedCondition =
+  | { kind: "always" }
+  | { kind: "selected"; ref: string; value: string; negate: boolean }
+  | { kind: "eq"; ref: string; op: "=" | "!="; value: string }
+  | { kind: "num"; ref: string; op: ">" | ">=" | "<" | "<="; num: number }
+  | { kind: "truthy"; ref: string }
+  | { kind: "passthrough" };
+
+interface ParsedRelevant {
+  /** Disjunction of conjunctions: OR over AND-groups of single conditions. */
+  groups: ParsedCondition[][];
+  /** XLSForm `name`/id references this expression depends on. */
+  refs: string[];
+}
+
+const relevantParseCache = new Map<string, ParsedRelevant>();
+
+const parseSingleRelevantCondition = (expr: string): ParsedCondition => {
+  const trimmed = expr.trim().replace(/^\(/, "").replace(/\)$/, "").trim();
+  if (!trimmed) return { kind: "always" };
+
+  // not(selected(${name}, 'value')) — checked before selected() so the wrapping
+  // negation is honoured instead of matching the inner selected() substring.
+  const notSelectedMatch = trimmed.match(
+    /not\s*\(\s*selected\s*\(\s*\$\{(.+?)\}\s*,\s*['"](.+?)['"]\s*\)\s*\)/,
+  );
+  if (notSelectedMatch) {
+    return { kind: "selected", ref: notSelectedMatch[1], value: notSelectedMatch[2], negate: true };
+  }
+
+  const selectedMatch = trimmed.match(/selected\s*\(\s*\$\{(.+?)\}\s*,\s*['"](.+?)['"]\s*\)/);
+  if (selectedMatch) {
+    return { kind: "selected", ref: selectedMatch[1], value: selectedMatch[2], negate: false };
+  }
+
+  const eqMatch = trimmed.match(/\$\{(.+?)\}\s*(=|!=)\s*['"](.+?)['"]/);
+  if (eqMatch) {
+    return { kind: "eq", ref: eqMatch[1], op: eqMatch[2] as "=" | "!=", value: eqMatch[3] };
+  }
+
+  const numMatch = trimmed.match(/\$\{(.+?)\}\s*(>=?|<=?)\s*(-?\d+(?:\.\d+)?)/);
+  if (numMatch) {
+    return {
+      kind: "num",
+      ref: numMatch[1],
+      op: numMatch[2] as ">" | ">=" | "<" | "<=",
+      num: parseFloat(numMatch[3]),
+    };
+  }
+
+  const truthyMatch = trimmed.match(/^\$\{(.+?)\}$/);
+  if (truthyMatch) {
+    return { kind: "truthy", ref: truthyMatch[1] };
+  }
+
+  return { kind: "passthrough" };
+};
+
+const parseRelevant = (relevant: string): ParsedRelevant => {
+  const cached = relevantParseCache.get(relevant);
+  if (cached) return cached;
+
+  const expr = relevant.trim();
+  const refs = new Set<string>();
+  const collect = (c: ParsedCondition) => {
+    if ("ref" in c) refs.add(c.ref);
+  };
+
+  // OR over AND-groups (disjunctive normal form), mirroring shouldShowQuestion.
+  const groups: ParsedCondition[][] = expr
+    .split(/\s+or\s+/i)
+    .map((orPart) =>
+      orPart.split(/\s+and\s+/i).map((andPart) => {
+        const parsed = parseSingleRelevantCondition(andPart);
+        collect(parsed);
+        return parsed;
+      }),
+    );
+
+  const result: ParsedRelevant = { groups, refs: [...refs] };
+  relevantParseCache.set(relevant, result);
+  return result;
+};
+
+
   allowAnonymous?: boolean;
   requireLocation?: boolean;
   offlineEnabled?: boolean;
