@@ -326,7 +326,7 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         chatChannelRef.current = null;
       }
       const channel = supabase
-        .channel(`proximity-chat-${conversationId}`)
+        .channel(`proximity-chat-${conversationId}`, { config: { private: true } })
         .on(
           "postgres_changes",
           {
