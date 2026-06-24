@@ -803,6 +803,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
       {/* Skip Logic Editor */}
       {selectedQuestion && (
         <SkipLogicEditor
+          key={`skip-${selectedQuestion.id}`}
           open={showSkipLogic}
           onOpenChange={setShowSkipLogic}
           question={selectedQuestion}
