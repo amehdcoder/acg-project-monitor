@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { authorizeRealtimeSubscription } from "@/lib/realtimeGuard";
 
 export interface ActiveCollaborator {
   user_id: string;
