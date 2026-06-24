@@ -300,17 +300,35 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopedRows, sel.state, sel.lga, sel.ward, sel.flhf_name, sel.community_name]);
 
+  // Distinct states that actually have microplan data captured (independent of
+  // any downstream selection). Used to (a) decide whether the project has a
+  // locked-in microplan and (b) restrict the State picker so ONLY states the
+  // microplan was entered for can be supervised — even on the off-microplan path.
+  const microplanStates = useMemo(
+    () => Array.from(new Set((microplanOptionMap.state ?? []).map(canonicalStateName).filter(Boolean))),
+    [microplanOptionMap.state],
+  );
+  const hasMicroplanData = microplanStates.length > 0;
+
   // State → LGA → Ward options derived from the full Nigerian administrative
   // hierarchy, bounded by the project's designed state scope.
   const adminOptions = (level: keyof GeoRow): string[] => {
     if (level === "state") {
       const all = getAllStates();
-      return hasStateScope ? all.filter((s) => allowedStates.has(s)) : all;
+      let list = hasStateScope ? all.filter((s) => allowedStates.has(s)) : all;
+      // When the project has a locked-in microplan, ONLY states the microplan
+      // was entered for may be supervised — applies to the off-microplan path too.
+      if (hasMicroplanData) {
+        const mpSet = new Set(microplanStates);
+        list = list.filter((s) => mpSet.has(s));
+      }
+      return list;
     }
     if (level === "lga") return sel.state ? getLGAsForState(canonicalStateName(sel.state)) : [];
     if (level === "ward") return sel.state && sel.lga ? getWardsForLGA(canonicalStateName(sel.state), canonicalLgaName(sel.state, sel.lga)) : [];
     return [];
   };
+
 
   // True when a geo level resolves to the admin hierarchy (State/LGA/Ward only).
   const isGeoLevel = (level: keyof GeoRow) =>
