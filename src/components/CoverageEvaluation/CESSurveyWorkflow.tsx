@@ -257,6 +257,28 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [flhfName, setFlhfName] = useState("");
   const [communityName, setCommunityName] = useState("");
   const [settlementName, setSettlementName] = useState("");
+  // When the user arrives here from the Integrated MDA Supervisory Checklist,
+  // the checklist's location identification is prefilled here and LOCKED so it
+  // cannot be changed — guaranteeing the coverage survey matches the supervised
+  // community exactly.
+  const [locationLocked, setLocationLocked] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("amehnities:cesLocationPrefill");
+      if (!raw) return;
+      const p = JSON.parse(raw);
+      if (!p || (p.projectId && projectId && p.projectId !== projectId)) return;
+      if (p.state) setState(p.state);
+      if (p.lga) setLga(p.lga);
+      if (p.ward) setWard(p.ward);
+      if (p.flhf_name) setFlhfName(p.flhf_name);
+      if (p.community_name) setCommunityName(p.community_name);
+      if (p.settlement_name) setSettlementName(p.settlement_name);
+      if (p.state || p.lga || p.ward || p.community_name) setLocationLocked(true);
+      // One-shot: consume so a later manual visit isn't unexpectedly locked.
+      sessionStorage.removeItem("amehnities:cesLocationPrefill");
+    } catch { /* ignore */ }
+  }, [projectId]);
 
   // Microplanning Data
   const [loading, setLoading] = useState(false);
@@ -2540,7 +2562,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
             <Field label="Select Microplanning Data (Optional)">
               <div className="flex items-center gap-2">
-                <Select value={selectedMicroplanId} onValueChange={handleMicroplanSelect}>
+                <Select value={selectedMicroplanId} onValueChange={handleMicroplanSelect} disabled={locationLocked}>
                   <SelectTrigger className="h-8 flex-1 text-xs"><SelectValue placeholder="Choose a community microplan to auto-fill" /></SelectTrigger>
                   <SelectContent>
                     {microplans.map((m) => (
@@ -2580,29 +2602,36 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               </div>
             )}
 
+            {locationLocked && (
+              <div className="flex items-center gap-1.5 text-[11px] text-primary bg-primary/5 border border-primary/30 rounded-md px-2 py-1">
+                <Lock className="h-3 w-3" />
+                Location identification carried over from the MDA Supervisory Checklist — locked to ensure the coverage survey matches the supervised community.
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
               <Field label="State *">
-                <Select value={state} onValueChange={(v) => { setState(v); setLga(""); setWard(""); }}>
+                <Select value={state} onValueChange={(v) => { setState(v); setLga(""); setWard(""); }} disabled={locationLocked}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select state" /></SelectTrigger>
                   <SelectContent>{getAllStates().map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                 </Select>
               </Field>
               <Field label="LGA *">
-                <Select value={lga} onValueChange={(v) => { setLga(v); setWard(""); }} disabled={!state}>
+                <Select value={lga} onValueChange={(v) => { setLga(v); setWard(""); }} disabled={locationLocked || !state}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select LGA" /></SelectTrigger>
                   <SelectContent>{lgaOptions.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
                 </Select>
               </Field>
               <Field label="Ward *">
-                <Select value={ward} onValueChange={setWard} disabled={!lga}>
+                <Select value={ward} onValueChange={setWard} disabled={locationLocked || !lga}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select ward" /></SelectTrigger>
                   <SelectContent>{wardOptions.map((w) => <SelectItem key={w} value={w}>{w}</SelectItem>)}</SelectContent>
                 </Select>
               </Field>
-              <Field label="FLHF Name"><Input value={flhfName} onChange={(e) => setFlhfName(e.target.value)} className="h-8 text-xs" /></Field>
-              <Field label="Community *"><Input value={communityName} onChange={(e) => setCommunityName(e.target.value)} className="h-8 text-xs" /></Field>
-              <Field label="Settlement"><Input value={settlementName} onChange={(e) => setSettlementName(e.target.value)} className="h-8 text-xs" /></Field>
+              <Field label="FLHF Name"><Input value={flhfName} onChange={(e) => setFlhfName(e.target.value)} className="h-8 text-xs" readOnly={locationLocked} disabled={locationLocked} /></Field>
+              <Field label="Community *"><Input value={communityName} onChange={(e) => setCommunityName(e.target.value)} className="h-8 text-xs" readOnly={locationLocked} disabled={locationLocked} /></Field>
+              <Field label="Settlement"><Input value={settlementName} onChange={(e) => setSettlementName(e.target.value)} className="h-8 text-xs" readOnly={locationLocked} disabled={locationLocked} /></Field>
             </div>
+
 
             <div className="flex flex-wrap gap-2 items-center">
               <BasemapToggle value={basemap} onChange={setBasemap} />
