@@ -415,14 +415,15 @@ export default function MdaAdaptiveDashboard({
   };
 
 
-  // Overview KPIs (always adaptive to whatever submissions exist)
+  // Overview KPIs — computed ONLY from primary checklist visits (follow-up
+  // rows are merged in, never double-counted), so figures never mislead.
   const kpis = useMemo(() => {
     const supervisors = new Set<string>();
     const states = new Set<string>();
     const lgas = new Set<string>();
     const wards = new Set<string>();
     let finalized = 0;
-    for (const s of submissions) {
+    for (const s of visitRows) {
       if (s.submitter) supervisors.add(String(s.submitter));
       const st = s.state || s.data?.state; if (st) states.add(norm(st));
       const lg = s.lga || s.data?.lga; if (lg) lgas.add(norm(lg));
@@ -430,19 +431,20 @@ export default function MdaAdaptiveDashboard({
       if (norm(s.status) === "finalized" || norm(s.status) === "sent" || norm(s.status) === "submitted") finalized++;
     }
     return {
-      total: submissions.length,
+      total: visitRows.length,
+      communities: prepared.communityCount,
       supervisors: supervisors.size,
       states: states.size,
       lgas: lgas.size,
       wards: wards.size,
-      finalizedPct: submissions.length ? Math.round((finalized / submissions.length) * 100) : 0,
+      finalizedPct: visitRows.length ? Math.round((finalized / visitRows.length) * 100) : 0,
     };
-  }, [submissions]);
+  }, [visitRows, prepared.communityCount]);
 
-  // Visits over time (from submittedAt)
+  // Visits over time (from submittedAt) — primary visits only.
   const timeline = useMemo(() => {
     const byDay = new Map<string, number>();
-    for (const s of submissions) {
+    for (const s of visitRows) {
       if (!s.submittedAt) continue;
       const d = new Date(s.submittedAt);
       if (isNaN(d.getTime())) continue;
@@ -452,7 +454,7 @@ export default function MdaAdaptiveDashboard({
     return [...byDay.entries()]
       .sort((a, b) => (a[0] < b[0] ? -1 : 1))
       .map(([date, value]) => ({ date: date.slice(5), value }));
-  }, [submissions]);
+  }, [visitRows]);
 
   const visibleSections = useMemo(() => {
     let secs = activeSection === "all" ? sections : sections.filter((s) => s.name === activeSection);
