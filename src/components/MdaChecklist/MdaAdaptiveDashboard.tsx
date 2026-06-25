@@ -129,9 +129,16 @@ const optionLabel = (q: FormQuestion, val: string) =>
   stripTags(q.options?.find((o) => o.value === val || o.label === val)?.label) || val;
 
 // ───────────────────────── Small UI atoms ─────────────────────────
-function KpiTile({ icon: Icon, label, value, sub, tint }: any) {
+function KpiTile({ icon: Icon, label, value, sub, tint, onClick }: any) {
+  const clickable = typeof onClick === "function";
   return (
-    <div className="relative overflow-hidden rounded-xl border border-border/60 bg-card p-4 shadow-sm transition-all hover:shadow-md">
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!clickable}
+      className={`relative overflow-hidden rounded-xl border border-border/60 bg-card p-4 text-left shadow-sm transition-all hover:shadow-md ${clickable ? "cursor-pointer hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-1" : ""}`}
+      style={clickable ? ({ ["--tw-ring-color" as any]: tint }) : undefined}
+    >
       <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full opacity-15" style={{ background: tint }} />
       <div className="flex items-center gap-2">
         <span className="flex h-9 w-9 items-center justify-center rounded-lg text-white shadow" style={{ background: tint }}>
@@ -140,8 +147,9 @@ function KpiTile({ icon: Icon, label, value, sub, tint }: any) {
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
       </div>
       <div className="mt-3 font-display text-2xl font-bold text-foreground">{value}</div>
-      {sub && <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>}
-    </div>
+      {sub ? <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>
+        : clickable ? <div className="mt-0.5 text-[10px] font-medium" style={{ color: tint }}>Click to view submissions →</div> : null}
+    </button>
   );
 }
 
