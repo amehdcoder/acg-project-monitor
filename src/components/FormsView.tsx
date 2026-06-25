@@ -1228,24 +1228,33 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }
 
   if (fillingForm) {
+    const fillerCommon = {
+      formId: fillingForm.id,
+      formName: fillingForm.name,
+      formDescription: fillingForm.description || "",
+      questions: fillingForm.questions,
+      groups: fillingForm.groups,
+      geofence: fillingForm.geofence || undefined,
+      userId: user?.id || "",
+      projectId: fillingForm.project_id || currentProjectId || "",
+      requireLocation: fillingForm.settings?.requireLocation,
+      settings: fillingForm.settings,
+      onClose: () => setFillingForm(null),
+    };
+    // The Integrated MDA Supervisory Checklist opens to its 5-item landing page
+    // (Community Checklist + 4 follow-up modules) instead of the form directly.
+    if (fillingForm.settings?.isMdaChecklist) {
+      return <MdaChecklistLanding {...fillerCommon} />;
+    }
     return (
       <FormFiller
-        formId={fillingForm.id}
-        formName={fillingForm.name}
-        formDescription={fillingForm.description || ""}
-        questions={fillingForm.questions}
-        groups={fillingForm.groups}
-        geofence={fillingForm.geofence || undefined}
-        userId={user?.id || ""}
-        projectId={fillingForm.project_id || currentProjectId || ""}
-        requireLocation={fillingForm.settings?.requireLocation}
-        settings={fillingForm.settings}
+        {...fillerCommon}
         localWorkflow
-        onClose={() => setFillingForm(null)}
         onSavedLocally={() => setFillingForm(null)}
       />
     );
   }
+
 
   if (showFormBuilder) {
     const prePopulate = editingForm
