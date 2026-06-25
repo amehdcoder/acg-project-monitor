@@ -295,6 +295,12 @@ interface FormFillerProps {
    * fields permanently part of the same "Community Checklist" form schema.
    */
   focusGroupNames?: string[];
+  /**
+   * Seed values applied once on mount (e.g. locked location prefilled from a
+   * selected community on the MDA Checklist follow-up flows). User edits still
+   * override these afterwards.
+   */
+  initialResponses?: Record<string, any>;
 }
 
 const FormFiller = ({
@@ -316,6 +322,7 @@ const FormFiller = ({
   onSavedLocally,
   previewMode = false,
   focusGroupNames,
+  initialResponses,
 }: FormFillerProps) => {
   // Custom form theme (layout + light/dark colours) configured in the builder.
   const { resolvedTheme } = useTheme();
@@ -1299,6 +1306,18 @@ const FormFiller = ({
     setResponses(savedEntry.responses || {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedEntry?.id]);
+
+  // Seed prefilled (locked) values once on mount — e.g. location selected from a
+  // community list on the MDA Checklist follow-up flows.
+  const seededInitialRef = useRef(false);
+  useEffect(() => {
+    if (seededInitialRef.current) return;
+    if (savedEntry) return;
+    if (!initialResponses || Object.keys(initialResponses).length === 0) return;
+    seededInitialRef.current = true;
+    setResponses((prev) => ({ ...initialResponses, ...prev }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialResponses]);
 
   // On-mount: detect any saved draft and OFFER to resume (don't silently overwrite)
   useEffect(() => {
