@@ -33,6 +33,7 @@ import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdmi
 import {
   getGrid3FacilitiesWithCoords,
   getGrid3SettlementsWithCoords,
+  prefetchGrid3State,
   type FacilityWithCoords,
 } from "@/lib/grid3NigeriaData";
 import LocationCombobox from "@/components/MdaChecklist/LocationCombobox";
