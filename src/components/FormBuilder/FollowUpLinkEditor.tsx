@@ -28,7 +28,6 @@ import {
   ListChecks,
   AlertCircle,
   Sparkles,
-  GripVertical,
   CheckCircle2,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -286,27 +285,228 @@ export function FollowUpLinkEditor({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] p-0 overflow-hidden flex flex-col">
-        <DialogHeader className="px-6 pt-6">
-          <DialogTitle className="flex items-center gap-2">
-            <Link2 className="h-5 w-5 text-primary" />
-            Follow-up builder — {group.label}
+      <DialogContent className="flex max-h-[92vh] w-[calc(100vw-1.5rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 space-y-1.5 bg-gradient-to-br from-[#4338ca] via-[#7c3aed] to-[#db2777] px-5 py-4 text-white">
+          <DialogTitle className="flex items-center gap-2 text-white">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/20 ring-1 ring-white/25">
+              <Link2 className="h-4 w-4" />
+            </span>
+            <span className="truncate">Follow-up builder — {group.label}</span>
           </DialogTitle>
-          <DialogDescription>
-            Decide which visited communities appear in this follow-up list, build follow-up
-            questions, and link each to a response from the main Community Checklist.
+          <DialogDescription className="text-white/85">
+            Build the questions field workers answer during follow-up, link each to a Community
+            Checklist response, and choose which visited communities appear here.
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 px-6">
-          <div className="space-y-8 py-4">
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="space-y-6 px-5 py-5">
+            {/* ── Build & link follow-up questions (primary action) ── */}
+            <section className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <ListChecks className="h-4 w-4" />
+                  </span>
+                  <h3 className="text-sm font-bold">Follow-up questions</h3>
+                </div>
+                <Badge
+                  variant="secondary"
+                  className={`font-medium ${
+                    linkedCount > 0
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                      : ""
+                  }`}
+                >
+                  {linkedCount} linked
+                </Badge>
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Add the questions field workers answer during follow-up. Link a question to a
+                Community Checklist response so that response is carried in and accurately updated.
+              </p>
+
+              <div className="space-y-3">
+                {questions.map((q, idx) => {
+                  const sourceQuestion = sourceQuestionByName(q.linkedSourceField);
+                  const sourceOptions = sourceQuestion?.options || [];
+                  const sourceNeedsOption = sourceOptions.length > 0;
+                  const linked = isFullyLinked(q);
+                  return (
+                    <div
+                      key={q.id}
+                      className={`rounded-xl border p-3 transition-colors ${
+                        linked
+                          ? "border-emerald-300/70 bg-gradient-to-br from-emerald-50 to-teal-50 dark:border-emerald-800/60 dark:from-emerald-950/40 dark:to-teal-950/30"
+                          : "border-border bg-gradient-to-br from-muted/40 to-background"
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="mt-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[11px] font-semibold text-primary">
+                          {idx + 1}
+                        </div>
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <Input
+                            value={q.label}
+                            onChange={(e) => updateQuestion(q.id, { label: e.target.value })}
+                            placeholder="Question text (e.g. Was MDA completed?)"
+                            className="h-9 font-medium"
+                          />
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Select
+                              value={q.type}
+                              onValueChange={(v) => updateQuestionType(q.id, v as QuestionType)}
+                            >
+                              <SelectTrigger className="h-8 w-[9.5rem] text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {FOLLOWUP_TYPES.map((t) => (
+                                  <SelectItem key={t.type} value={t.type}>
+                                    {t.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            <div className="flex min-w-[10rem] flex-1 items-center gap-1.5">
+                              <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                              <Select
+                                value={q.linkedSourceField || NONE}
+                                onValueChange={(v) =>
+                                  updateQuestion(q.id, {
+                                    linkedSourceField: v === NONE ? undefined : v,
+                                    linkedSourceValue: undefined,
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="h-8 flex-1 text-xs">
+                                  <SelectValue placeholder="Link to checklist response" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value={NONE}>No link</SelectItem>
+                                  {linkableSourceQuestions.map((cq) => (
+                                    <SelectItem key={cq.id} value={cq.name || cq.id}>
+                                      {cq.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {sourceNeedsOption && (
+                              <div className="flex min-w-[10rem] flex-1 items-center gap-1.5">
+                                <span className="shrink-0 text-[11px] font-medium text-muted-foreground">option</span>
+                                <Select
+                                  value={q.linkedSourceValue || undefined}
+                                  onValueChange={(v) => updateQuestion(q.id, { linkedSourceValue: v })}
+                                >
+                                  <SelectTrigger className="h-8 flex-1 text-xs">
+                                    <SelectValue placeholder="Source option response" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {sourceOptions.map((o) => (
+                                      <SelectItem key={o.id} value={o.value}>
+                                        {o.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                            {linked && (
+                              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                            )}
+                          </div>
+                          {isChoiceType(q.type) && (
+                            <div className="rounded-lg border border-border/70 bg-background/80 p-2">
+                              <div className="mb-2 flex items-center justify-between gap-2">
+                                <span className="text-xs font-semibold text-muted-foreground">Follow-up answer options</span>
+                                <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => addQuestionOption(q.id)}>
+                                  <Plus className="h-3.5 w-3.5" /> Add option
+                                </Button>
+                              </div>
+                              <div className="space-y-2">
+                                {(q.options || []).map((option) => (
+                                  <div key={option.id} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
+                                    <Input
+                                      value={option.label}
+                                      onChange={(e) =>
+                                        updateQuestionOption(q.id, option.id, {
+                                          label: e.target.value,
+                                          value: option.value || optionValueFromLabel(e.target.value),
+                                        })
+                                      }
+                                      placeholder="Option label"
+                                      className="h-8 text-xs"
+                                    />
+                                    <Input
+                                      value={option.value}
+                                      onChange={(e) =>
+                                        updateQuestionOption(q.id, option.id, {
+                                          value: optionValueFromLabel(e.target.value),
+                                        })
+                                      }
+                                      placeholder="xml_value"
+                                      className="h-8 font-mono text-xs"
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      onClick={() => removeQuestionOption(q.id, option.id)}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeQuestion(q.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {questions.length === 0 && (
+                  <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed bg-muted/30 px-4 py-8 text-center">
+                    <Sparkles className="h-6 w-6 text-primary/60" />
+                    <p className="text-sm font-medium">No follow-up questions yet</p>
+                    <p className="max-w-xs text-xs text-muted-foreground">
+                      Add a question and link it to a Community Checklist response to start building
+                      this follow-up module.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <Button
+                onClick={addQuestion}
+                className="w-full gap-1.5 bg-gradient-to-r from-[#4338ca] to-[#7c3aed] text-white hover:opacity-90"
+              >
+                <Plus className="h-4 w-4" /> Add follow-up question
+              </Button>
+            </section>
+
+            <Separator />
+
             {/* ── Community appearance condition ── */}
             <section className="space-y-3">
               <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-semibold">Which communities appear here</h3>
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Filter className="h-4 w-4" />
+                </span>
+                <h3 className="text-sm font-bold">Which communities appear here</h3>
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs leading-relaxed text-muted-foreground">
                 A community appears in this follow-up list only when its Community Checklist
                 response matches{" "}
                 {rows.length > 1 ? (
@@ -410,207 +610,10 @@ export function FollowUpLinkEditor({
                 </p>
               )}
             </section>
-
-            <Separator />
-
-            {/* ── Build & link follow-up questions ── */}
-            <section className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <ListChecks className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold">Follow-up questions</h3>
-                </div>
-                <Badge
-                  variant="secondary"
-                  className={`font-normal ${
-                    linkedCount > 0
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                      : ""
-                  }`}
-                >
-                  {linkedCount} linked
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Add the questions field workers answer during follow-up. Link a question to a
-                Community Checklist response so that response is carried in and accurately updated.
-              </p>
-
-              <div className="space-y-3">
-                {questions.map((q, idx) => {
-                  const sourceQuestion = sourceQuestionByName(q.linkedSourceField);
-                  const sourceOptions = sourceQuestion?.options || [];
-                  const sourceNeedsOption = sourceOptions.length > 0;
-                  const linked = isFullyLinked(q);
-                  return (
-                    <div
-                      key={q.id}
-                      className={`rounded-xl border p-3 transition-colors ${
-                        linked
-                          ? "border-emerald-300/70 bg-gradient-to-br from-emerald-50 to-teal-50 dark:border-emerald-800/60 dark:from-emerald-950/40 dark:to-teal-950/30"
-                          : "border-border bg-gradient-to-br from-muted/40 to-background"
-                      }`}
-                    >
-                      <div className="flex items-start gap-2">
-                        <div className="mt-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[11px] font-semibold text-primary">
-                          {idx + 1}
-                        </div>
-                        <div className="min-w-0 flex-1 space-y-2">
-                          <Input
-                            value={q.label}
-                            onChange={(e) => updateQuestion(q.id, { label: e.target.value })}
-                            placeholder="Question text (e.g. Was MDA completed?)"
-                            className="h-9 font-medium"
-                          />
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Select
-                              value={q.type}
-                              onValueChange={(v) => updateQuestionType(q.id, v as QuestionType)}
-                            >
-                              <SelectTrigger className="h-8 w-[9.5rem] text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {FOLLOWUP_TYPES.map((t) => (
-                                  <SelectItem key={t.type} value={t.type}>
-                                    {t.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-
-                            <div className="flex flex-1 items-center gap-1.5">
-                              <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                              <Select
-                                value={q.linkedSourceField || NONE}
-                                onValueChange={(v) =>
-                                  updateQuestion(q.id, {
-                                    linkedSourceField: v === NONE ? undefined : v,
-                                    linkedSourceValue: undefined,
-                                  })
-                                }
-                              >
-                                <SelectTrigger className="h-8 flex-1 text-xs">
-                                  <SelectValue placeholder="Link to checklist response" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value={NONE}>No link</SelectItem>
-                                  {linkableSourceQuestions.map((cq) => (
-                                    <SelectItem key={cq.id} value={cq.name || cq.id}>
-                                      {cq.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            {sourceNeedsOption && (
-                              <div className="flex flex-1 items-center gap-1.5">
-                                <span className="shrink-0 text-[11px] font-medium text-muted-foreground">option</span>
-                                <Select
-                                  value={q.linkedSourceValue || undefined}
-                                  onValueChange={(v) => updateQuestion(q.id, { linkedSourceValue: v })}
-                                >
-                                  <SelectTrigger className="h-8 flex-1 text-xs">
-                                    <SelectValue placeholder="Source option response" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {sourceOptions.map((o) => (
-                                      <SelectItem key={o.id} value={o.value}>
-                                        {o.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-                            {linked && (
-                              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                            )}
-                          </div>
-                          {isChoiceType(q.type) && (
-                            <div className="rounded-lg border border-border/70 bg-background/80 p-2">
-                              <div className="mb-2 flex items-center justify-between gap-2">
-                                <span className="text-xs font-semibold text-muted-foreground">Follow-up answer options</span>
-                                <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => addQuestionOption(q.id)}>
-                                  <Plus className="h-3.5 w-3.5" /> Add option
-                                </Button>
-                              </div>
-                              <div className="space-y-2">
-                                {(q.options || []).map((option) => (
-                                  <div key={option.id} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
-                                    <Input
-                                      value={option.label}
-                                      onChange={(e) =>
-                                        updateQuestionOption(q.id, option.id, {
-                                          label: e.target.value,
-                                          value: option.value || optionValueFromLabel(e.target.value),
-                                        })
-                                      }
-                                      placeholder="Option label"
-                                      className="h-8 text-xs"
-                                    />
-                                    <Input
-                                      value={option.value}
-                                      onChange={(e) =>
-                                        updateQuestionOption(q.id, option.id, {
-                                          value: optionValueFromLabel(e.target.value),
-                                        })
-                                      }
-                                      placeholder="xml_value"
-                                      className="h-8 font-mono text-xs"
-                                    />
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                      onClick={() => removeQuestionOption(q.id, option.id)}
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                          onClick={() => removeQuestion(q.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {questions.length === 0 && (
-                  <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed bg-muted/30 px-4 py-8 text-center">
-                    <Sparkles className="h-6 w-6 text-primary/60" />
-                    <p className="text-sm font-medium">No follow-up questions yet</p>
-                    <p className="max-w-xs text-xs text-muted-foreground">
-                      Add a question and link it to a Community Checklist response to start building
-                      this follow-up module.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={addQuestion}
-                className="w-full gap-1.5 border-dashed"
-              >
-                <Plus className="h-4 w-4" /> Add follow-up question
-              </Button>
-            </section>
           </div>
         </ScrollArea>
 
-        <DialogFooter className="border-t px-6 py-4">
+        <DialogFooter className="shrink-0 items-center border-t px-5 py-3">
           {linkedCount === 0 ? (
             <span className="mr-auto flex items-center gap-1.5 text-xs text-destructive">
               <AlertCircle className="h-3.5 w-3.5" />
