@@ -564,56 +564,61 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         </div>
       ) : (
         <>
-          {/* Off-microplan provision — placed BEFORE the location fields so the
-              supervisor first decides whether the community is in the microplan,
-              then either picks from the microplan or proceeds to enter it. */}
-          {!microplanIsEmpty && (
-            <div
-              className={cn(
-                "overflow-hidden rounded-2xl border transition-colors",
-                notInMicroplan
-                  ? "border-amber-400/70 bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 dark:border-amber-500/40 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-rose-950/20"
-                  : "border-violet-300/70 bg-gradient-to-br from-violet-50 via-fuchsia-50 to-sky-50 dark:border-violet-500/40 dark:from-violet-950/40 dark:via-fuchsia-950/30 dark:to-sky-950/20",
-              )}
-            >
-              <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3">
-                  <span
-                    className={cn(
-                      "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm",
-                      notInMicroplan
-                        ? "bg-gradient-to-br from-amber-500 to-rose-500"
-                        : "bg-gradient-to-br from-violet-500 to-fuchsia-500",
-                    )}
-                  >
-                    <PlusCircle className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <p className="text-sm font-bold text-foreground sm:text-base">
-                      Community received medicine but is not in the microplan?
+          {/* GRID3 vs microplan switch — ENABLED BY DEFAULT (GRID3 national
+              cascade). Placed BEFORE the location fields so the supervisor first
+              decides the data source, then picks the area. Turn OFF to drive the
+              cascade from this project's locked-in microplan data. */}
+          <div
+            className={cn(
+              "overflow-hidden rounded-2xl border transition-colors",
+              notInMicroplan
+                ? "border-amber-400/70 bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 dark:border-amber-500/40 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-rose-950/20"
+                : "border-violet-300/70 bg-gradient-to-br from-violet-50 via-fuchsia-50 to-sky-50 dark:border-violet-500/40 dark:from-violet-950/40 dark:via-fuchsia-950/30 dark:to-sky-950/20",
+            )}
+          >
+            <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <span
+                  className={cn(
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm",
+                    notInMicroplan
+                      ? "bg-gradient-to-br from-amber-500 to-rose-500"
+                      : "bg-gradient-to-br from-violet-500 to-fuchsia-500",
+                  )}
+                >
+                  <PlusCircle className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-foreground sm:text-base">
+                    Community received medicine but is not in the microplan?
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {notInMicroplan
+                      ? "On (default) — the full GRID3 national cascade: pick State → LGA → Ward → FLHF → Community (settlement). You can also type any FLHF or community not in the list and add it. Settlement GPS is captured automatically."
+                      : "Off — driven by this project's microplan data. Pick the microplanned area below, or switch on to use the GRID3 national cascade."}
+                  </p>
+                  {!hasMicroplanData && !notInMicroplan && (
+                    <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                      This project has no microplan data — keep this on to use the GRID3 cascade.
                     </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {notInMicroplan
-                        ? "On — pick the State / LGA / Ward, then type the FLHF, community & settlement that received medicine. It will be flagged for reconciliation."
-                        : "Leave off to pick a microplanned area below, or turn it on to record a community that received medicine without being in the microplan."}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 self-start sm:self-center">
-                  <span className={cn("text-xs font-semibold", notInMicroplan ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground")}>
-                    {notInMicroplan ? "Yes" : "No"}
-                  </span>
-                  <Switch checked={notInMicroplan} onCheckedChange={toggleNotInMicroplan} />
+                  )}
                 </div>
               </div>
-              {notInMicroplan && (
-                <div className="flex items-center gap-2 border-t border-amber-400/40 bg-amber-100/40 px-4 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200">
-                  <Info className="h-3.5 w-3.5 shrink-0" />
-                  This supervision will be tagged <strong>“received medicine — not microplanned”</strong>.
-                </div>
-              )}
+              <div className="flex items-center gap-2 self-start sm:self-center">
+                <span className={cn("text-xs font-semibold", notInMicroplan ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground")}>
+                  {notInMicroplan ? "Yes" : "No"}
+                </span>
+                <Switch checked={notInMicroplan} onCheckedChange={toggleNotInMicroplan} />
+              </div>
             </div>
-          )}
+            {notInMicroplan && (
+              <div className="flex items-center gap-2 border-t border-amber-400/40 bg-amber-100/40 px-4 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200">
+                <Info className="h-3.5 w-3.5 shrink-0" />
+                Communities added outside the microplan are tagged <strong>“received medicine — not microplanned”</strong> for reconciliation.
+              </div>
+            )}
+          </div>
+
 
           {microplanIsEmpty && (
             <div className="flex items-start gap-3 rounded-xl border border-sky-300 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
