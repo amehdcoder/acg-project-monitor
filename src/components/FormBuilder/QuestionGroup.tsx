@@ -43,6 +43,9 @@ interface QuestionGroupProps {
   onUngroup?: (group: FormGroup) => void;
   onSkipLogic?: (group: FormGroup) => void;
   onValidation?: (group: FormGroup) => void;
+  onFollowUpLink?: (group: FormGroup) => void;
+  /** When true, show the MDA follow-up linking control for this group. */
+  isFollowUpGroup?: boolean;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   isFirst?: boolean;
