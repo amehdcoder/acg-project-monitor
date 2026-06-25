@@ -33,6 +33,7 @@ import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdmi
 import {
   getGrid3FacilitiesWithCoords,
   getGrid3SettlementsWithCoords,
+  prefetchGrid3State,
   type FacilityWithCoords,
 } from "@/lib/grid3NigeriaData";
 import LocationCombobox from "@/components/MdaChecklist/LocationCombobox";
@@ -41,8 +42,9 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
-  MapPinned, Lock, PlusCircle, Loader2, Info, CheckCircle2,
+  MapPinned, Lock, PlusCircle, Loader2, Info, CheckCircle2, DownloadCloud, WifiOff,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface GeoRow {
   state: string | null;
@@ -154,6 +156,21 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   // Guarantees the single-state auto-select runs at most once and can never
   // clobber a selection the supervisor has already made.
   const didAutoselectRef = useRef(false);
+
+  // Offline prefetch: pull and persist the GRID3 shards for the relevant
+  // states so the whole supervision cascade works instantly with no network.
+  const [prefetchState, setPrefetchState] = useState<"idle" | "running" | "done">("idle");
+  const [prefetchProgress, setPrefetchProgress] = useState({ done: 0, total: 0 });
+  const [savedStates, setSavedStates] = useState<Set<string>>(new Set());
+  const [isOffline, setIsOffline] = useState(typeof navigator !== "undefined" && !navigator.onLine);
+
+  useEffect(() => {
+    const on = () => setIsOffline(false);
+    const off = () => setIsOffline(true);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
 
   // Stable key for the (optional) admin-defined state scope so the loader effect
   // only re-runs when its contents actually change (not on every render).
@@ -530,8 +547,36 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     return true;
   };
 
+  // States that can be saved for offline use: the project's scoped states if
+  // any, otherwise whatever state the supervisor has currently selected.
+  const prefetchableStates = useMemo(() => {
+    const scoped = Array.from(allowedStates);
+    if (scoped.length > 0) return scoped;
+    return sel.state ? [canonicalStateName(sel.state)] : [];
+  }, [allowedStates, sel.state]);
+
+  const allSaved =
+    prefetchableStates.length > 0 && prefetchableStates.every((s) => savedStates.has(s));
+
+  const handlePrefetch = async () => {
+    if (prefetchableStates.length === 0 || prefetchState === "running") return;
+    setPrefetchState("running");
+    setPrefetchProgress({ done: 0, total: prefetchableStates.length });
+    const saved = new Set(savedStates);
+    for (let i = 0; i < prefetchableStates.length; i++) {
+      try {
+        await prefetchGrid3State(prefetchableStates[i]);
+        saved.add(prefetchableStates[i]);
+        setSavedStates(new Set(saved));
+      } catch { /* keep going; offline shards stay whatever is cached */ }
+      setPrefetchProgress({ done: i + 1, total: prefetchableStates.length });
+    }
+    setPrefetchState("done");
+  };
+
   return (
     <div className="space-y-4 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/[0.06] to-transparent p-4 sm:p-5">
+
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -620,6 +665,64 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
               </div>
             )}
           </div>
+
+          {/* Offline prefetch — save the GRID3 location data for the relevant
+              states so the cascade works instantly with no network. */}
+          {useAdminHierarchy && prefetchableStates.length > 0 && (
+            <div className="overflow-hidden rounded-2xl border border-sky-300/70 bg-gradient-to-br from-sky-50 via-cyan-50 to-emerald-50 dark:border-sky-500/40 dark:from-sky-950/40 dark:via-cyan-950/30 dark:to-emerald-950/20">
+              <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-emerald-500 text-white shadow-sm">
+                    {isOffline ? <WifiOff className="h-5 w-5" /> : <DownloadCloud className="h-5 w-5" />}
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-foreground sm:text-base">
+                      Save location data for offline use
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {allSaved
+                        ? `Saved for offline: ${prefetchableStates.join(", ")}. The cascade will load instantly with no network.`
+                        : `Download the full FLHF & community lists for ${prefetchableStates.join(", ")} so supervision works completely offline in the field.`}
+                    </p>
+                    {isOffline && !allSaved && (
+                      <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                        You are offline — only states already saved will load.
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-start sm:self-center">
+                  {allSaved ? (
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                      <CheckCircle2 className="h-4 w-4" /> Ready offline
+                    </span>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handlePrefetch}
+                      disabled={prefetchState === "running" || isOffline}
+                      className="gap-1.5 bg-gradient-to-br from-sky-600 to-emerald-600 text-white hover:from-sky-700 hover:to-emerald-700"
+                    >
+                      {prefetchState === "running" ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          {prefetchProgress.done}/{prefetchProgress.total}
+                        </>
+                      ) : (
+                        <>
+                          <DownloadCloud className="h-4 w-4" />
+                          Save for offline
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+
 
 
           {microplanIsEmpty && (
