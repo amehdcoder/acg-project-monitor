@@ -131,27 +131,70 @@ export const useGeolocation = (options?: PositionOptions) => {
     cleanupAcquisition();
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-    const acq: { watchId: number | null; timers: ReturnType<typeof setTimeout>[]; settled: boolean } = {
+    const acq: {
+      watchId: number | null;
+      timers: ReturnType<typeof setTimeout>[];
+      settled: boolean;
+      bestAccuracy: number;
+      firstFixAt: number | null;
+    } = {
       watchId: null,
       timers: [],
       settled: false,
+      bestAccuracy: Infinity,
+      firstFixAt: null,
     };
     acquisitionRef.current = acq;
 
+    // Commit a fix only if it improves on (or matches) the best accuracy seen so
+    // far. This keeps the displayed position sharpening rather than jittering.
+    const consider = (pos: globalThis.GeolocationPosition) => {
+      if (acq.settled) return;
+      const acc = pos.coords.accuracy ?? Infinity;
+      if (acc <= acq.bestAccuracy) {
+        acq.bestAccuracy = acc;
+        commitPosition(pos);
+      }
+      if (acq.firstFixAt === null) {
+        acq.firstFixAt = Date.now();
+        // Once we have *something*, give the GNSS a short window to sharpen,
+        // then stop to save battery.
+        const refineTimer = setTimeout(() => {
+          if (!acq.settled) settle({ ok: true, keep: true });
+        }, REFINE_WINDOW_MS);
+        acq.timers.push(refineTimer);
+      }
+      // Good enough — stop early.
+      if (acc <= GOOD_ACCURACY_M) {
+        settle({ ok: true, keep: true });
+      }
+    };
+
+    // 0) INSTANT: cached fix returns immediately with no hardware wait.
+    try {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => consider(pos),
+        () => {
+          /* no cached fix — refinement path will provide one */
+        },
+        { enableHighAccuracy: false, timeout: 1500, maximumAge: INSTANT_MAX_AGE_MS }
+      );
+    } catch {
+      /* noop */
+    }
+
+    // 1) REFINE: stream high-accuracy GNSS fixes and keep the best one.
     const highAccOptions: PositionOptions = {
       enableHighAccuracy: true,
       timeout: TOTAL_TIMEOUT_MS,
       maximumAge: 0,
       ...options,
     };
-
-    // 1) Watch for the FIRST fix to arrive — much faster than waiting for the
-    //    requested accuracy with getCurrentPosition.
     try {
       acq.watchId = navigator.geolocation.watchPosition(
-        (pos) => settle({ ok: true, pos }),
+        (pos) => consider(pos),
         () => {
-          /* swallow — fallback path will handle */
+          /* swallow — fallbacks below handle hard failures */
         },
         highAccOptions
       );
@@ -159,52 +202,40 @@ export const useGeolocation = (options?: PositionOptions) => {
       /* noop */
     }
 
-    // 2) Parallel one-shot in case the watch is slow to fire on this platform
-    try {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => settle({ ok: true, pos }),
-        () => {
-          /* fallback below handles */
-        },
-        highAccOptions
-      );
-    } catch {
-      /* noop */
-    }
-
-    // 3) After HIGH_ACC_WINDOW_MS without a fix, kick off a coarse/cached fallback
-    const fallbackTimer = setTimeout(() => {
-      if (acq.settled) return;
+    // 2) COARSE FALLBACK: if nothing at all arrived quickly, get a fast
+    //    network/WiFi fix so the user always sees something.
+    const coarseTimer = setTimeout(() => {
+      if (acq.settled || acq.firstFixAt !== null) return;
       try {
         navigator.geolocation.getCurrentPosition(
-          (pos) => settle({ ok: true, pos }),
+          (pos) => consider(pos),
           (err) => {
-            if (acq.settled) return;
+            if (acq.settled || acq.firstFixAt !== null) return;
             settle({ ok: false, error: errorMessage(err) });
           },
-          {
-            enableHighAccuracy: false,
-            timeout: FALLBACK_TIMEOUT_MS,
-            maximumAge: FALLBACK_MAX_AGE_MS,
-          }
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: INSTANT_MAX_AGE_MS }
         );
       } catch {
-        settle({ ok: false, error: "Unable to retrieve location." });
+        /* noop */
       }
-    }, HIGH_ACC_WINDOW_MS);
-    acq.timers.push(fallbackTimer);
+    }, COARSE_WINDOW_MS);
+    acq.timers.push(coarseTimer);
 
-    // 4) Hard ceiling
+    // 3) Hard ceiling — only errors if we still have nothing.
     const hardTimer = setTimeout(() => {
       if (acq.settled) return;
-      settle({
-        ok: false,
-        error:
-          "Could not get a GPS fix in time. If you're on desktop, your device may not have GPS hardware — try on a mobile device outdoors.",
-      });
+      if (acq.firstFixAt !== null) {
+        settle({ ok: true, keep: true });
+      } else {
+        settle({
+          ok: false,
+          error:
+            "Could not get a GPS fix in time. If you're on desktop, your device may not have GPS hardware — try on a mobile device outdoors.",
+        });
+      }
     }, TOTAL_TIMEOUT_MS);
     acq.timers.push(hardTimer);
-  }, [cleanupAcquisition, options, settle]);
+  }, [cleanupAcquisition, options, settle, commitPosition]);
 
   const startWatching = useCallback(() => {
     if (!navigator.geolocation) {
