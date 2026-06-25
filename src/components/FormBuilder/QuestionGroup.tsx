@@ -170,6 +170,12 @@ const QuestionGroupComponent = ({
                       Validation
                     </span>
                   )}
+                  {isFollowUpGroup && group.communityFilter && (
+                    <span className="flex items-center gap-1 text-fuchsia-600">
+                      <Link2 className="h-3 w-3" />
+                      Community filter
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
