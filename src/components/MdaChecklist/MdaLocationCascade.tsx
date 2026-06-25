@@ -664,11 +664,28 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
                     }
                     emptyLabel="No microplan match — type to add"
                     onChange={(v) => {
-                      const isNew = !!v && !microplanOptions(key).includes(v);
-                      if (isNew) {
+                      const inMicroplan = microplanOptions(key).includes(v);
+                      const inGrid3 =
+                        (key === "flhf_name" && grid3FacilityNames.includes(v)) ||
+                        (key === "community_name" && grid3SettlementNames.includes(v));
+                      // A value that is neither in the microplan nor the GRID3
+                      // dataset is a genuinely new (typed) entry → flag it.
+                      if (!!v && !inMicroplan && !inGrid3) {
                         onSet({ community_not_in_microplan: true, received_medicine_not_microplanned: true });
                       }
                       setLevel(key, v);
+                      // GRID3 settlements feed the Community field — carry their
+                      // GPS so the community location is recorded automatically.
+                      if (key === "community_name" && v) {
+                        const coords = grid3SettlementCoords.get(normGeo(v));
+                        if (coords) {
+                          onSet({
+                            community_latitude: coords.lat,
+                            community_longitude: coords.lng,
+                            community_gps: { lat: coords.lat, lng: coords.lng },
+                          });
+                        }
+                      }
                     }}
                   />
                 ) : (
