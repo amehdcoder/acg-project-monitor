@@ -346,9 +346,14 @@ const FormFiller = ({
   const focusedGroupsProp = useMemo(() => {
     if (!focusGroupNames || focusGroupNames.length === 0) return groupsProp;
     const wanted = new Set(focusGroupNames);
-    const filtered = groupsProp.filter((g) => wanted.has(g.name));
-    return filtered.length > 0 ? filtered : groupsProp;
+    // Match by group name slug OR label so renamed/saved schemas still resolve.
+    const filtered = groupsProp.filter((g) => wanted.has(g.name) || wanted.has(g.label));
+    // IMPORTANT: never fall back to the full Community Checklist. A focused
+    // sub-form must show ONLY its own group's fields (or nothing if the admin
+    // has not built any questions yet), not the checklist questions.
+    return filtered;
   }, [groupsProp, focusGroupNames]);
+
   const groups = isRegistrationForm ? [] : focusedGroupsProp;
 
   const [responses, setResponses] = useState<Record<string, any>>({});
