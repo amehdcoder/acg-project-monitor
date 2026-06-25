@@ -49,6 +49,33 @@ type StateShard = Record<string, Record<string, ShardEntry[]>>; // LGA > Ward > 
 const slugify = (s: string) =>
   String(s ?? "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 
+const normGeo = (s: string) =>
+  String(s ?? "")
+    .toLowerCase()
+    .trim()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\b(area council|municipal area council|local government area|lga|ward|central)\b/g, "")
+    .replace(/\b(i|ii|iii|iv|v|vi|vii|viii|ix|x|1|2|3|4|5|6|7|8|9|10)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const stateAliases: Record<string, string> = {
+  abuja: "Fct",
+  fct: "Fct",
+  fct_abuja: "Fct",
+  federal_capital_territory: "Fct",
+};
+
+const lgaAliases: Record<string, Record<string, string[]>> = {
+  fct: {
+    "Abuja Municipal": ["Abuja Municipal Area Council", "Municipal Area Council"],
+  },
+};
+
+const titleCase = (s: string) =>
+  s.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+
 // ---- Tiny IndexedDB key/value store (no dependency, offline-durable) -------
 const IDB_NAME = "grid3-shards";
 const IDB_STORE = "shards";
@@ -126,12 +153,14 @@ async function loadManifest(): Promise<Record<string, string>> {
 }
 
 function resolveSlug(manifest: Record<string, string>, state: string): string | null {
+  const alias = stateAliases[slugify(state)];
+  if (alias && manifest[alias]) return manifest[alias];
   if (manifest[state]) return manifest[state];
   const target = slugify(state);
   for (const [name, sg] of Object.entries(manifest)) {
-    if (slugify(name) === target || sg === target) return sg;
+    if (slugify(name) === target || sg === target || stateAliases[slugify(name)] === stateAliases[target]) return sg;
   }
-  return target || null; // last-resort: derive slug directly
+  return stateAliases[target] ? slugify(stateAliases[target]) : target || null; // last-resort: derive slug directly
 }
 
 // ---- Per-state shard loader (memory -> IndexedDB -> network) ---------------
@@ -192,14 +221,57 @@ async function revalidateShard(kind: "fac" | "set", slug: string, cacheKey: stri
   }
 }
 
-function collectFromShard(shard: StateShard, lga: string, ward?: string): FacilityWithCoords[] {
-  const lgaData = shard[lga];
+function resolveShardKey<T>(record: Record<string, T>, desired: string, aliases: string[] = []): string | null {
+  if (!desired) return null;
+  const candidates = [desired, ...aliases].filter(Boolean);
+  for (const c of candidates) if (record[c]) return c;
+  const wanted = candidates.map(normGeo).filter(Boolean);
+  return Object.keys(record).find((k) => wanted.some((w) => normGeo(k) === w || normGeo(k).includes(w) || w.includes(normGeo(k)))) || null;
+}
+
+function collectFromShard(shard: StateShard, state: string, lga: string, ward?: string): FacilityWithCoords[] {
+  const stateKey = slugify(stateAliases[slugify(state)] || state);
+  const lgaKey = resolveShardKey(shard, lga, lgaAliases[stateKey]?.[lga] ?? []);
+  const lgaData = lgaKey ? shard[lgaKey] : undefined;
   if (!lgaData) return [];
   const toObj = (e: ShardEntry): FacilityWithCoords => ({ name: e[0], latitude: e[1], longitude: e[2] });
-  if (ward && lgaData[ward]) return lgaData[ward].map(toObj);
+  const wardKey = ward ? resolveShardKey(lgaData, ward) : null;
+  if (ward && wardKey && lgaData[wardKey]) return lgaData[wardKey].map(toObj);
   const all: FacilityWithCoords[] = [];
   for (const entries of Object.values(lgaData)) for (const e of entries) all.push(toObj(e));
   return all;
+}
+
+function collectLgasFromShard(shard: StateShard): string[] {
+  return Object.keys(shard).map((lga) => {
+    if (lga === "Abuja Municipal Area Council" || lga === "Municipal Area Council") return "Abuja Municipal";
+    return lga;
+  }).sort((a, b) => a.localeCompare(b));
+}
+
+function collectWardsFromShard(shard: StateShard, state: string, lga: string): string[] {
+  const stateKey = slugify(stateAliases[slugify(state)] || state);
+  const lgaKey = resolveShardKey(shard, lga, lgaAliases[stateKey]?.[lga] ?? []);
+  return lgaKey ? Object.keys(shard[lgaKey] ?? {}).map(titleCase).sort((a, b) => a.localeCompare(b)) : [];
+}
+
+export async function getGrid3StateNames(): Promise<string[]> {
+  const manifest = await loadManifest();
+  return Object.keys(manifest).map((s) => (s === "Fct" ? "FCT" : s)).sort((a, b) => a.localeCompare(b));
+}
+
+export async function getGrid3LGAsForState(state: string): Promise<string[]> {
+  const [fac, set] = await Promise.all([loadStateShard("fac", state), loadStateShard("set", state)]);
+  const settlementLgas = collectLgasFromShard(set);
+  const facilityLgas = collectLgasFromShard(fac);
+  return Array.from(new Set(settlementLgas.length > 0 ? settlementLgas : facilityLgas)).sort((a, b) => a.localeCompare(b));
+}
+
+export async function getGrid3WardsForLGA(state: string, lga: string): Promise<string[]> {
+  const [fac, set] = await Promise.all([loadStateShard("fac", state), loadStateShard("set", state)]);
+  const settlementWards = collectWardsFromShard(set, state, lga);
+  const facilityWards = collectWardsFromShard(fac, state, lga);
+  return Array.from(new Set(settlementWards.length > 0 ? settlementWards : facilityWards)).sort((a, b) => a.localeCompare(b));
 }
 
 /**
@@ -208,7 +280,7 @@ function collectFromShard(shard: StateShard, lga: string, ward?: string): Facili
  */
 export async function getGrid3FacilitiesWithCoords(state: string, lga: string, ward?: string): Promise<FacilityWithCoords[]> {
   const shard = await loadStateShard("fac", state);
-  return collectFromShard(shard, lga, ward);
+  return collectFromShard(shard, state, lga, ward);
 }
 
 /**
@@ -216,7 +288,7 @@ export async function getGrid3FacilitiesWithCoords(state: string, lga: string, w
  */
 export async function getGrid3SettlementsWithCoords(state: string, lga: string, ward?: string): Promise<FacilityWithCoords[]> {
   const shard = await loadStateShard("set", state);
-  return collectFromShard(shard, lga, ward);
+  return collectFromShard(shard, state, lga, ward);
 }
 
 /**

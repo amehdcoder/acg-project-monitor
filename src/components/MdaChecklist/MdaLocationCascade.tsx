@@ -32,7 +32,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import {
   getGrid3FacilitiesWithCoords,
+  getGrid3LGAsForState,
+  getGrid3StateNames,
   getGrid3SettlementsWithCoords,
+  getGrid3WardsForLGA,
   prefetchGrid3State,
   type FacilityWithCoords,
 } from "@/lib/grid3NigeriaData";
@@ -107,9 +110,18 @@ const humanizeGeoToken = (value: string | null | undefined) => {
 const sameGeo = (a: string | null | undefined, b: string | null | undefined) =>
   normGeo(a) === normGeo(b);
 
+const STATE_ALIASES: Record<string, string> = {
+  abuja: "FCT",
+  fct: "FCT",
+  "fct abuja": "FCT",
+  "federal capital territory": "FCT",
+};
+
 const canonicalStateName = (value: string | null | undefined) => {
   const raw = humanizeGeoToken(value).replace(/\s+state$/i, "");
   if (!raw) return "";
+  const alias = STATE_ALIASES[normGeo(raw)];
+  if (alias) return alias;
   return getAllStates().find((s) => sameGeo(s, raw)) || raw;
 };
 
@@ -150,6 +162,9 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   // the current State/LGA/Ward — FLHF facilities and settlements with GPS.
   const [grid3Facilities, setGrid3Facilities] = useState<FacilityWithCoords[]>([]);
   const [grid3Settlements, setGrid3Settlements] = useState<FacilityWithCoords[]>([]);
+  const [grid3States, setGrid3States] = useState<string[]>([]);
+  const [grid3Lgas, setGrid3Lgas] = useState<string[]>([]);
+  const [grid3Wards, setGrid3Wards] = useState<string[]>([]);
   // States the project was designed for (from project scope) — used as the
   // cascade fallback when no microplan is linked to the project.
   const [projectStates, setProjectStates] = useState<string[]>([]);
@@ -195,24 +210,24 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         const pStates = pScope.states || [];
         if (!cancelled) setProjectStates(pStates);
 
-        // Lock the microplan geography to ONLY the projects this user can
-        // access. Owners/admins see every project (null = no restriction);
-        // everyone else is limited to their assigned projects so the cascade
-        // never surfaces microplan locations from projects outside their reach.
-        let accessibleProjectIds: string[] | null = null;
+        // Lock the microplan geography to the project this checklist belongs to.
+        // This prevents states from other projects' microplans leaking into the
+        // Supervision Location picker for admins/owners.
+        let accessibleProjectIds: string[] | null = projectId ? [projectId] : null;
         if (!(isOwner || isAdmin) && user?.id) {
           const { data: assignments } = await supabase
             .from("user_project_assignments")
             .select("project_id")
             .eq("user_id", user.id);
-          accessibleProjectIds = Array.from(
+          const assignedProjectIds = Array.from(
             new Set((assignments || []).map((a) => a.project_id).filter(Boolean)),
           );
           // No assigned projects → no microplan geography to show.
-          if (accessibleProjectIds.length === 0) {
+          if (assignedProjectIds.length === 0 || (projectId && !assignedProjectIds.includes(projectId))) {
             if (!cancelled) { setRows([]); setLoading(false); }
             return;
           }
+          accessibleProjectIds = projectId ? [projectId] : assignedProjectIds;
         }
 
         // Admin form scope wins, otherwise the project's designed states.
@@ -221,7 +236,10 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
           const raw = String(s || "").trim();
           const canonical = canonicalStateName(raw);
           const slug = canonical.toLowerCase().replace(/\s+/g, "_");
-          return [raw, canonical, `${canonical} State`, raw.toLowerCase(), raw.toUpperCase(), slug].filter(Boolean);
+          const fctAliases = canonical === "FCT"
+            ? ["FCT", "Fct", "fct", "Abuja", "FCT Abuja", "Federal Capital Territory"]
+            : [];
+          return [raw, canonical, `${canonical} State`, raw.toLowerCase(), raw.toUpperCase(), slug, ...fctAliases].filter(Boolean);
         }));
 
         // Server-side DISTINCT aggregation: returns only the unique geography
@@ -340,11 +358,52 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   );
   const hasMicroplanData = microplanStates.length > 0;
 
-  // State → LGA → Ward options derived from the full Nigerian administrative
-  // hierarchy, bounded by the project's designed state scope.
-  const adminOptions = (level: keyof GeoRow): string[] => {
+  const microplanIsEmpty = !loading && !scope.loading && scopedRows.length === 0;
+
+  // Use the consolidated GRID3 cascade when the supervisor explicitly flags an
+  // off-microplan community OR when the project has no linked microplan yet.
+  const useAdminHierarchy = notInMicroplan || microplanIsEmpty;
+
+  useEffect(() => {
+    let cancelled = false;
+    getGrid3StateNames()
+      .then((states) => { if (!cancelled) setGrid3States(states.map(canonicalStateName).filter(Boolean)); })
+      .catch(() => { if (!cancelled) setGrid3States(getAllStates().map(canonicalStateName)); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!useAdminHierarchy || !sel.state) {
+      setGrid3Lgas([]);
+      setGrid3Wards([]);
+      return;
+    }
+    let cancelled = false;
+    getGrid3LGAsForState(canonicalStateName(sel.state))
+      .then((lgas) => { if (!cancelled) setGrid3Lgas(lgas); })
+      .catch(() => { if (!cancelled) setGrid3Lgas(getLGAsForState(canonicalStateName(sel.state))); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useAdminHierarchy, sel.state]);
+
+  useEffect(() => {
+    if (!useAdminHierarchy || !sel.state || !sel.lga) {
+      setGrid3Wards([]);
+      return;
+    }
+    let cancelled = false;
+    getGrid3WardsForLGA(canonicalStateName(sel.state), canonicalLgaName(sel.state, sel.lga))
+      .then((wards) => { if (!cancelled) setGrid3Wards(wards); })
+      .catch(() => { if (!cancelled) setGrid3Wards(getWardsForLGA(canonicalStateName(sel.state), canonicalLgaName(sel.state, sel.lga))); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useAdminHierarchy, sel.state, sel.lga]);
+
+  // State → LGA → Ward options derived from the consolidated GRID3 shards,
+  // bounded by the project's designed state scope and by locked microplan data.
+  const grid3GeoOptions = (level: keyof GeoRow): string[] => {
     if (level === "state") {
-      const all = getAllStates();
+      const all = grid3States.length > 0 ? grid3States : getAllStates().map(canonicalStateName);
       let list = hasStateScope ? all.filter((s) => allowedStates.has(s)) : all;
       // When the project has a locked-in microplan, ONLY states the microplan
       // was entered for may be supervised — applies to the off-microplan path too.
@@ -352,10 +411,10 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         const mpSet = new Set(microplanStates);
         list = list.filter((s) => mpSet.has(s));
       }
-      return list;
+      return uniqueSorted(list);
     }
-    if (level === "lga") return sel.state ? getLGAsForState(canonicalStateName(sel.state)) : [];
-    if (level === "ward") return sel.state && sel.lga ? getWardsForLGA(canonicalStateName(sel.state), canonicalLgaName(sel.state, sel.lga)) : [];
+    if (level === "lga") return sel.state ? grid3Lgas : [];
+    if (level === "ward") return sel.state && sel.lga ? grid3Wards : [];
     return [];
   };
 
@@ -389,11 +448,11 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
 
   const options = (level: keyof GeoRow): string[] => {
     // GRID3 national cascade (default). State → LGA → Ward come from the full
-    // Nigerian administrative hierarchy; FLHF and Community (settlements) come
-    // from the GRID3 dataset. Type-and-add stays available for values not in
-    // the GRID3 list.
+    // consolidated GRID3 shards; FLHF and Community (settlements) come from
+    // the same GRID3 state shard. Type-and-add stays available for values not
+    // in the GRID3 list.
     if (useAdminHierarchy) {
-      if (isGeoLevel(level)) return adminOptions(level);
+      if (isGeoLevel(level)) return grid3GeoOptions(level);
       if (level === "flhf_name") return grid3FacilityNames;
       // The MDA "Community" field is populated from GRID3 settlements.
       if (level === "community_name") return grid3SettlementNames;
@@ -406,7 +465,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     // captured) — fall back to the full admin hierarchy for State/LGA/Ward.
     const mp = microplanOptions(level);
     if (mp.length > 0) return mp;
-    if (isGeoLevel(level)) return adminOptions(level);
+    if (isGeoLevel(level)) return grid3GeoOptions(level);
     return [];
   };
 
@@ -459,13 +518,6 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
       setFreeText("settlement_name", "");
     }
   };
-
-  const microplanIsEmpty = !loading && !scope.loading && scopedRows.length === 0;
-
-  // Use the full Nigerian administrative hierarchy cascade when the supervisor
-  // explicitly flags an off-microplan community OR when the project simply has
-  // no microplan linked yet. This guarantees the cascade always works.
-  const useAdminHierarchy = notInMicroplan || microplanIsEmpty;
 
   // Load GRID3 FLHF facilities + settlements (same source as Geo Microplanning)
   // for the chosen State/LGA(/Ward) whenever the GRID3 cascade is active. The
@@ -624,7 +676,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
             )}
           >
             <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-start gap-3">
+              <div className="flex min-w-0 items-start gap-3">
                 <span
                   className={cn(
                     "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm",
@@ -635,14 +687,9 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
                 >
                   <PlusCircle className="h-5 w-5" />
                 </span>
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-bold text-foreground sm:text-base">
                     Community received medicine but is not in the microplan?
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {notInMicroplan
-                      ? "On (default) — the full GRID3 national cascade: pick State → LGA → Ward → FLHF → Community (settlement). You can also type any FLHF or community not in the list and add it. Settlement GPS is captured automatically."
-                      : "Off — driven by this project's microplan data. Pick the microplanned area below, or switch on to use the GRID3 national cascade."}
                   </p>
                   {!hasMicroplanData && !notInMicroplan && (
                     <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">
@@ -651,19 +698,18 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2 self-start sm:self-center">
-                <span className={cn("text-xs font-semibold", notInMicroplan ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground")}>
+              <div className="flex shrink-0 items-center gap-3 self-start rounded-full border border-border/70 bg-background/80 px-3 py-2 shadow-sm sm:self-center">
+                <span className={cn("min-w-8 whitespace-nowrap text-center text-xs font-bold", notInMicroplan ? "text-primary" : "text-muted-foreground")}>
                   {notInMicroplan ? "Yes" : "No"}
                 </span>
-                <Switch checked={notInMicroplan} onCheckedChange={toggleNotInMicroplan} />
+                <Switch
+                  checked={notInMicroplan}
+                  onCheckedChange={toggleNotInMicroplan}
+                  aria-label="Community received medicine but is not in the microplan"
+                  className="h-7 w-12 data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted"
+                />
               </div>
             </div>
-            {notInMicroplan && (
-              <div className="flex items-center gap-2 border-t border-amber-400/40 bg-amber-100/40 px-4 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200">
-                <Info className="h-3.5 w-3.5 shrink-0" />
-                Communities added outside the microplan are tagged <strong>“received medicine — not microplanned”</strong> for reconciliation.
-              </div>
-            )}
           </div>
 
           {/* Offline prefetch — save the GRID3 location data for the relevant
