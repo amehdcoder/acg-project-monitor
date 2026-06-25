@@ -493,3 +493,5 @@ export function FollowUpLinkEditor({
     </Dialog>
   );
 }
+
+export default FollowUpLinkEditor;
