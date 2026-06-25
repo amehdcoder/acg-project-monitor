@@ -704,7 +704,7 @@ export function FollowUpLinkEditor({
               )}
             </section>
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="shrink-0 items-center border-t px-5 py-3">
           {linkedCount === 0 ? (
