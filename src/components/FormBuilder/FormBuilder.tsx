@@ -761,6 +761,45 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
         </div>
 
         <TabsContent value="questions" className="mt-0 flex-1 min-h-0 overflow-hidden">
+          {isMdaChecklistForm && canBuildMdaFollowUps && mdaFollowUpGroups.length > 0 && (
+            <div className="border-b bg-gradient-to-r from-fuchsia-600 via-primary to-cyan-600 px-3 py-3 text-white shadow-soft sm:px-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="bg-white/20 text-white hover:bg-white/25">Admin follow-up builder</Badge>
+                    <span className="text-sm font-semibold">Build questions, link source responses, and set community list rules</span>
+                  </div>
+                  <p className="mt-1 text-xs text-white/85">
+                    Visible only to Systems Admin, Super Admin, Owner, and Co-owner roles.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {mdaFollowUpGroups.map((group) => {
+                    const canonical = getMdaFollowUpGroupName(group);
+                    const shortLabel = canonical?.includes("completion")
+                      ? "Completion"
+                      : canonical?.includes("commodit")
+                        ? "Commodities"
+                        : "Adverse Reactions";
+                    const linked = group.questions.some((q) => !!q.linkedSourceField);
+                    return (
+                      <Button
+                        key={group.id}
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => handleOpenFollowUpLink(group)}
+                        className="gap-1.5 bg-white text-primary hover:bg-white/90"
+                      >
+                        <Link2 className="h-4 w-4" />
+                        Build {shortLabel}
+                        {linked && <span className="ml-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700">linked</span>}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
           <DndContext
             sensors={sensors}
             collisionDetection={pointerWithin}
@@ -799,6 +838,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
                   onOpenGroupValidation={handleOpenGroupValidation}
                   onOpenFollowUpLink={handleOpenFollowUpLink}
                   isMdaChecklist={isMdaChecklistForm}
+                  canBuildMdaFollowUps={canBuildMdaFollowUps}
                   caseManagementEnabled={caseManagementSettings.enabled}
                 />
               </div>
