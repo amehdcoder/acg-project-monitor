@@ -38,7 +38,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { exportMdaDashboard } from "@/lib/mda/dashboardExport";
-import { prepareMdaData } from "@/lib/mda/dashboardData";
+import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
+import { isMdaFollowUpGroup } from "@/lib/mdaFollowUp";
 import MdaDrillDownSheet, { type DrillData } from "./MdaDrillDownSheet";
 
 // ───────────────────────── Types ─────────────────────────
