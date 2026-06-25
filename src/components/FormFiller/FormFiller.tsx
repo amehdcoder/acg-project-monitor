@@ -322,6 +322,7 @@ const FormFiller = ({
   onSavedLocally,
   previewMode = false,
   focusGroupNames,
+  initialResponses,
 }: FormFillerProps) => {
   // Custom form theme (layout + light/dark colours) configured in the builder.
   const { resolvedTheme } = useTheme();
