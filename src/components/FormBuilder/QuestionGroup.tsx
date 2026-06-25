@@ -35,7 +35,6 @@ import {
   X,
 } from "lucide-react";
 import { getFollowUpIcon } from "@/components/FormFiller/followUpIcons";
-import { useAuth } from "@/hooks/useAuth";
 
 interface QuestionGroupProps {
   group: FormGroup;
@@ -48,6 +47,8 @@ interface QuestionGroupProps {
   onFollowUpLink?: (group: FormGroup) => void;
   /** When true, show the MDA follow-up linking control for this group. */
   isFollowUpGroup?: boolean;
+  /** Explicit role gate: Systems Admin, Super Admin, Owner, and Co-owner only. */
+  canBuildMdaFollowUps?: boolean;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   isFirst?: boolean;
@@ -67,6 +68,7 @@ const QuestionGroupComponent = ({
   onValidation,
   onFollowUpLink,
   isFollowUpGroup = false,
+  canBuildMdaFollowUps = false,
   onMoveUp,
   onMoveDown,
   isFirst = false,
@@ -74,7 +76,6 @@ const QuestionGroupComponent = ({
   followUpMode = false,
   children,
 }: QuestionGroupProps) => {
-  const { isAdmin } = useAuth();
   const [isOpen, setIsOpen] = useState(true);
   const [editingName, setEditingName] = useState(false);
   const [draftLabel, setDraftLabel] = useState(group.label);
@@ -233,7 +234,7 @@ const QuestionGroupComponent = ({
               >
                 <ShieldCheck className="h-4 w-4" />
               </Button>
-              {isFollowUpGroup && isAdmin && (
+              {isFollowUpGroup && canBuildMdaFollowUps && (
                 <Button
                   variant="default"
                   size="sm"
