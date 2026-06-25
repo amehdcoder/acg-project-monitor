@@ -32,9 +32,11 @@ const GPSCapture = ({
   const startedRef = useRef(false);
   const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Update parent when position changes
+  // Update parent when position changes. Adopt the first fix instantly, then
+  // keep adopting any MORE accurate fix the hook streams in while refining.
   useEffect(() => {
-    if (position && !value) {
+    if (!position) return;
+    if (!value || position.accuracy < value.accuracy) {
       onChange(position);
     }
   }, [position, value, onChange]);
