@@ -899,6 +899,18 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
         />
       )}
 
+      {/* Follow-up Linking & Community Filter Editor */}
+      {selectedGroup && (
+        <FollowUpLinkEditor
+          key={`followup-link-${selectedGroup.id}`}
+          open={showFollowUpLink}
+          onOpenChange={setShowFollowUpLink}
+          group={selectedGroup}
+          checklistQuestions={checklistQuestions}
+          onSave={handleSaveFollowUpLink}
+        />
+      )}
+
       {/* Create Group Dialog */}
       <CreateGroupDialog
         open={showGroupDialog}
