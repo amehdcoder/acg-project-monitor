@@ -24,6 +24,7 @@ import {
   GripVertical, 
   Repeat,
   GitBranch,
+  Link2,
   ShieldCheck,
   ArrowUp,
   ArrowDown,
