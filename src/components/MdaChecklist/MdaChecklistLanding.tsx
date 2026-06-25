@@ -381,22 +381,21 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
                 <button
                   onClick={() => (editingIcons ? triggerUpload(t.key) : setView(t.view))}
                   disabled={busy}
-                  className="group flex w-full flex-col items-center gap-3 rounded-2xl p-3 text-center transition-transform active:scale-95"
+                  className="group flex w-full flex-col items-center gap-3 rounded-2xl p-4 text-center transition-colors hover:bg-white/60"
                 >
-                  <span className="relative flex h-24 w-24 items-center justify-center rounded-3xl bg-white shadow-sm transition-transform group-hover:scale-105">
-
+                  <span className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-white transition-transform group-hover:scale-105 group-active:scale-95">
                     {busy ? (
-                      <Loader2 className="h-9 w-9 animate-spin text-slate-400" />
+                      <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
                     ) : (
                       <img
                         src={imgFor(t)}
                         alt={t.title}
                         loading="lazy"
-                        className="h-16 w-16 object-contain"
+                        className="h-14 w-14 object-contain"
                       />
                     )}
                     {editingIcons && !busy && (
-                      <span className="absolute -right-1.5 -top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#5b6fc4] shadow ring-1 ring-slate-200">
+                      <span className="absolute -right-1.5 -top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#5b6fc4]">
                         <Upload className="h-3.5 w-3.5" />
                       </span>
                     )}
