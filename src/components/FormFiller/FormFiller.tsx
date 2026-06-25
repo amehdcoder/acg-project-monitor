@@ -1307,6 +1307,18 @@ const FormFiller = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedEntry?.id]);
 
+  // Seed prefilled (locked) values once on mount — e.g. location selected from a
+  // community list on the MDA Checklist follow-up flows.
+  const seededInitialRef = useRef(false);
+  useEffect(() => {
+    if (seededInitialRef.current) return;
+    if (savedEntry) return;
+    if (!initialResponses || Object.keys(initialResponses).length === 0) return;
+    seededInitialRef.current = true;
+    setResponses((prev) => ({ ...initialResponses, ...prev }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialResponses]);
+
   // On-mount: detect any saved draft and OFFER to resume (don't silently overwrite)
   useEffect(() => {
     if (savedEntry) return; // editing a saved entry — no crash-resume prompt
