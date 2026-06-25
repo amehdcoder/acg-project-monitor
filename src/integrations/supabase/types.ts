@@ -6872,6 +6872,19 @@ export type Database = {
         Args: { _survey_id: string; _user_id: string }
         Returns: boolean
       }
+      can_read_microplan_entry: {
+        Args: {
+          _community: string
+          _flhf: string
+          _lga: string
+          _project_id: string
+          _settlement: string
+          _state: string
+          _user_id: string
+          _ward: string
+        }
+        Returns: boolean
+      }
       can_survey_households: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
@@ -6965,6 +6978,10 @@ export type Database = {
       }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_owner_or_co_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_project_member: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_proximity_message_participant: {
         Args: { _message_id: string }
         Returns: boolean

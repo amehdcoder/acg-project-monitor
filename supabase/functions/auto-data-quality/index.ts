@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { guardRequest } from "../_shared/authGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,6 +8,9 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const guard = await guardRequest(req, corsHeaders, { requireAdmin: true });
+  if (guard.response) return guard.response;
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;

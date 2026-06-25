@@ -123,6 +123,7 @@ import {
   hasMeaningfulFormResponses,
 } from "@/lib/formProgressPersistence";
 import { isMdaChecklistLike } from "@/lib/mdaFollowUp";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 
 // Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
 
@@ -2434,11 +2435,11 @@ const FormFiller = ({
               </span>
               <div className="flex-1">
                 <Label className="text-base font-medium">
-                  <span dangerouslySetInnerHTML={{ __html: question.label }} />
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.label) }} />
                   {question.required && <span className="ml-1 text-destructive">*</span>}
                 </Label>
                 {question.hint && (
-                  <p className="mt-1 text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: question.hint }} />
+                  <p className="mt-1 text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.hint) }} />
                 )}
                 {/* Status badge for current TTS question */}
                 {isCurrentTTSQuestion && (
@@ -3376,7 +3377,7 @@ const FormFiller = ({
                             </p>
                             <h2
                               className="mt-1 text-xl font-bold leading-tight text-inherit sm:text-2xl"
-                              dangerouslySetInnerHTML={{ __html: sectionTitle }}
+                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(sectionTitle) }}
                             />
                           </div>
                         </div>
@@ -3449,7 +3450,7 @@ const FormFiller = ({
                           <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-500 dark:text-indigo-400">Capturing supervision data</p>
                           <h3
                             className="truncate text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg"
-                            dangerouslySetInnerHTML={{ __html: sectionTitle }}
+                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(sectionTitle) }}
                           />
                         </div>
                       </div>
@@ -3557,7 +3558,7 @@ const FormFiller = ({
                             <Folder className="h-5 w-5 text-primary" />
                           </div>
                           <div>
-                            <h3 className="font-semibold text-foreground" dangerouslySetInnerHTML={{ __html: group.label }} />
+                            <h3 className="font-semibold text-foreground" dangerouslySetInnerHTML={{ __html: sanitizeHtml(group.label) }} />
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <span>{visibleNonCalcQuestions.length} question{visibleNonCalcQuestions.length !== 1 ? "s" : ""}</span>
                               {group.repeat && (

@@ -5,6 +5,7 @@
 // Designed to run on a schedule (cron) AND to be callable on-demand by an
 // Owner/Co-owner/admin from the UI.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { guardRequest } from "../_shared/authGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,6 +17,9 @@ const OWNER_EMAIL = "amehjoey1@gmail.com";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const guard = await guardRequest(req, corsHeaders, { requireAdmin: true });
+  if (guard.response) return guard.response;
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -111,8 +115,6 @@ Deno.serve(async (req) => {
         orphans: orphans.length,
         repaired: repaired.length,
         flagged: flagged.length,
-        repaired_emails: repaired,
-        flagged_emails: flagged,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

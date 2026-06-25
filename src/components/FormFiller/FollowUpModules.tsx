@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Repeat, Layers, ArrowUpRight } from "lucide-react";
 import { getFollowUpIcon } from "./followUpIcons";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 
 interface FollowUpModulesProps {
   groups: FormGroup[];
@@ -58,7 +59,7 @@ const FollowUpModules = ({ groups, caseTypeLabel }: FollowUpModulesProps) => {
                   <div className="flex items-center gap-2">
                     <h4
                       className="truncate font-medium text-foreground"
-                      dangerouslySetInnerHTML={{ __html: group.label || group.name || `Module ${idx + 1}` }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(group.label || group.name || `Module ${idx + 1}`) }}
                     />
                     <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                   </div>
