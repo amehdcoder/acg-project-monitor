@@ -63,6 +63,13 @@ export interface Question {
   };
   appearance?: string;
   relevant?: string;
+  /**
+   * MDA follow-up linking: the `name` of a question in the main Community
+   * Checklist whose submitted response should prefill / link to this follow-up
+   * question. When a community is chosen for follow-up, the linked checklist
+   * response is carried into this field so it is accurately updated.
+   */
+  linkedSourceField?: string;
   constraint?: string;
   constraintMessage?: string;
   defaultValue?: string;
