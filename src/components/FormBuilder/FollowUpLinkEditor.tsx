@@ -725,24 +725,24 @@ export function FollowUpLinkEditor({
         </div>
 
         <DialogFooter className="shrink-0 items-center border-t px-5 py-3">
-          {linkedCount === 0 ? (
-            <span className="mr-auto flex items-center gap-1.5 text-xs text-destructive">
-              <AlertCircle className="h-3.5 w-3.5" />
-              Link at least one follow-up question to save
-            </span>
-          ) : (
-            group.communityFilter && (
-              <Badge variant="secondary" className="mr-auto font-normal">
-                Filter active
-              </Badge>
-            )
-          )}
+          <span className="mr-auto flex items-center gap-1.5 text-xs text-muted-foreground">
+            {linkedCount > 0 ? (
+              <>
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                {linkedCount} question{linkedCount !== 1 ? "s" : ""} linked
+                {group.communityFilter ? " · filter active" : ""}
+              </>
+            ) : (
+              <>
+                <AlertCircle className="h-3.5 w-3.5" />
+                Linking is optional — link questions to carry checklist answers in
+              </>
+            )}
+          </span>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={linkedCount === 0}>
-            Save
-          </Button>
+          <Button onClick={handleSave}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
