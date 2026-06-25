@@ -45,7 +45,7 @@ import XLSFormImportDialog from "./XLSFormImportDialog";
 import CaseManagementEditor, { CaseManagementSettings } from "./CaseManagementEditor";
 import ThemeEditor from "./ThemeEditor";
 import { normalizeFormTheme, FormTheme } from "@/lib/formTheme";
-import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate, MoreHorizontal, Plus, Palette, GitBranch } from "lucide-react";
+import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate, MoreHorizontal, Plus, Palette, GitBranch, Link2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
