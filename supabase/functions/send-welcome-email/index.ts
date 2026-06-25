@@ -12,7 +12,7 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const guard = await guardRequest(req, corsHeaders, { requireAdmin: true });
+  const guard = await guardRequest(req, corsHeaders, { requireAdmin: false });
   if (guard.response) return guard.response;
   try {
     const { email, firstName, designationLabel, username, password } = await req.json();
@@ -24,6 +24,24 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Non-service callers may only send a welcome email to their own address
+    // (self-signup) unless they are an admin/owner.
+    if (!guard.viaService && guard.userId) {
+      const authz = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+      const [{ data: prof }, { data: roles }] = await Promise.all([
+        authz.from("profiles").select("email, is_owner, is_co_owner").eq("user_id", guard.userId).maybeSingle(),
+        authz.from("user_roles").select("role").eq("user_id", guard.userId),
+      ]);
+      const isAdmin = !!prof?.is_owner || !!prof?.is_co_owner ||
+        (roles ?? []).some((r: { role: string }) => r.role === "super_admin" || r.role === "systems_admin");
+      const sameEmail = (prof?.email ?? "").trim().toLowerCase() === String(email).trim().toLowerCase();
+      if (!isAdmin && !sameEmail) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     const name = (firstName ?? "").trim() || "there";
     const role = designationLabel ? ` as <b>${designationLabel}</b>` : "";
