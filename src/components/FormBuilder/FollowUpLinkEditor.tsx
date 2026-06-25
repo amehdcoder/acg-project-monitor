@@ -28,7 +28,6 @@ import {
   ListChecks,
   AlertCircle,
   Sparkles,
-  GripVertical,
   CheckCircle2,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
