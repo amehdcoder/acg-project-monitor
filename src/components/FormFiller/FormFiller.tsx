@@ -288,6 +288,13 @@ interface FormFillerProps {
    * enforcement, no tracking. Submitting validates and shows a preview toast.
    */
   previewMode?: boolean;
+  /**
+   * When provided, only the form groups whose `name` is included here are
+   * rendered. Used by the MDA Checklist landing page to open a single
+   * follow-up sub-form (e.g. "Follow-up on MDA Completion") while keeping the
+   * fields permanently part of the same "Community Checklist" form schema.
+   */
+  focusGroupNames?: string[];
 }
 
 const FormFiller = ({
@@ -308,6 +315,7 @@ const FormFiller = ({
   savedEntry = null,
   onSavedLocally,
   previewMode = false,
+  focusGroupNames,
 }: FormFillerProps) => {
   // Custom form theme (layout + light/dark colours) configured in the builder.
   const { resolvedTheme } = useTheme();
@@ -328,7 +336,13 @@ const FormFiller = ({
     !!settings.caseManagement?.enabled &&
     (settings.caseManagement.action === "update" || settings.caseManagement.action === "close");
   const followUpGroups = groupsProp;
-  const groups = isRegistrationForm ? [] : groupsProp;
+  const focusedGroupsProp = useMemo(() => {
+    if (!focusGroupNames || focusGroupNames.length === 0) return groupsProp;
+    const wanted = new Set(focusGroupNames);
+    const filtered = groupsProp.filter((g) => wanted.has(g.name));
+    return filtered.length > 0 ? filtered : groupsProp;
+  }, [groupsProp, focusGroupNames]);
+  const groups = isRegistrationForm ? [] : focusedGroupsProp;
 
   const [responses, setResponses] = useState<Record<string, any>>({});
   const [gpsPosition, setGpsPosition] = useState<GeolocationPosition | null>(null);

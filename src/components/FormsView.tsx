@@ -104,6 +104,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { FormBuilder } from "@/components/FormBuilder";
 import { FormFiller } from "@/components/FormFiller";
+import MdaChecklistLanding from "@/components/MdaChecklist/MdaChecklistLanding";
 import SavedFormsManager, { type SavedFormsMode } from "@/components/FormFiller/SavedFormsManager";
 import { FormGroup } from "@/components/FormBuilder/types";
 import SubmissionHistory from "@/components/SubmissionHistory";
@@ -139,6 +140,8 @@ interface FormSettings {
     closeCondition?: string;
     loadFromProperties: { propertyName: string; questionId: string }[];
   };
+  isMdaChecklist?: boolean;
+  coverageEvaluation?: boolean;
 }
 
 interface Form {
@@ -1228,24 +1231,33 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }
 
   if (fillingForm) {
+    const fillerCommon = {
+      formId: fillingForm.id,
+      formName: fillingForm.name,
+      formDescription: fillingForm.description || "",
+      questions: fillingForm.questions,
+      groups: fillingForm.groups,
+      geofence: fillingForm.geofence || undefined,
+      userId: user?.id || "",
+      projectId: fillingForm.project_id || currentProjectId || "",
+      requireLocation: fillingForm.settings?.requireLocation,
+      settings: fillingForm.settings,
+      onClose: () => setFillingForm(null),
+    };
+    // The Integrated MDA Supervisory Checklist opens to its 5-item landing page
+    // (Community Checklist + 4 follow-up modules) instead of the form directly.
+    if (fillingForm.settings?.isMdaChecklist) {
+      return <MdaChecklistLanding {...fillerCommon} />;
+    }
     return (
       <FormFiller
-        formId={fillingForm.id}
-        formName={fillingForm.name}
-        formDescription={fillingForm.description || ""}
-        questions={fillingForm.questions}
-        groups={fillingForm.groups}
-        geofence={fillingForm.geofence || undefined}
-        userId={user?.id || ""}
-        projectId={fillingForm.project_id || currentProjectId || ""}
-        requireLocation={fillingForm.settings?.requireLocation}
-        settings={fillingForm.settings}
+        {...fillerCommon}
         localWorkflow
-        onClose={() => setFillingForm(null)}
         onSavedLocally={() => setFillingForm(null)}
       />
     );
   }
+
 
   if (showFormBuilder) {
     const prePopulate = editingForm

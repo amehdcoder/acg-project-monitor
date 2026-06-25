@@ -95,6 +95,19 @@ const group = (label: string, questions: Question[]): FormGroup => ({
 });
 
 /**
+ * Mark a group (and all of its questions) as permanent so the Form Builder
+ * prevents deletion. These are the MDA follow-up sub-forms that must always
+ * remain part of the "Community Checklist" schema.
+ */
+const lockGroup = (g: FormGroup): FormGroup => {
+  (g as any).locked = true;
+  for (const qq of g.questions) {
+    if (!(qq as any).editable) (qq as any).locked = true;
+  }
+  return g;
+};
+
+/**
  * Build a fresh MDA Supervisory Checklist form payload.
  * Returns the `questions` array (groups) and the `settings` object ready to
  * insert into the `forms` table.
@@ -229,6 +242,43 @@ export function buildMdaSupervisoryChecklist(): {
       q({ type: "signature", name: "supervisor_signature", label: "Supervisor signature", signature: { requirePrintedName: true } }),
       q({ type: "acknowledge", name: "attestation", label: "Attestation", required: true, acknowledge: { statement: "I confirm the above observations are accurate and were made during this supervisory visit." } }),
     ]),
+
+    // 13 — Follow-up on MDA Completion (permanent · linked to dashboard "Status over time")
+    lockGroup(group("Follow-up on MDA Completion", [
+      q({
+        type: "select_one", name: "status_of_mda", label: "Status of MDA", required: true,
+        options: [opt("Not Started"), opt("Ongoing"), opt("Halted"), opt("Completed")],
+      }),
+      q({ type: "text", name: "followup_action_comment", label: "Comment on the action that was taken during follow-up", required: true, text: { multiline: true, rows: 3 } }),
+    ])),
+
+    // 14 — Follow-up on MDA Commodities (permanent · linked to dashboard commodity trends)
+    lockGroup(group("Follow-up on MDA Commodities", [
+      q({
+        type: "select_multiple", name: "commodity_inadequate", label: "What commodity was previously inadequate/unavailable", required: true,
+        // The first option (Praziquantel) is editable to any other drug; the
+        // remaining commodity options are permanent.
+        options: [
+          { ...opt("Praziquantel"), ...( { editable: true } as any) },
+          opt("Treatment Register"),
+          opt("Dose Pole/Tape"),
+        ],
+      }),
+    ])),
+
+    // 15 — Follow-up on Adverse Reactions (permanent · linked to dashboard AE trends)
+    lockGroup(group("Adverse Reaction Management", [
+      q({
+        type: "select_multiple", name: "adverse_reaction_type",
+        label: "What type of adverse reaction to praziquantel was observed in the household during administration", required: true,
+        options: [opt("Stomach pain"), opt("Headache"), opt("Diahorrea"), opt("Dizziness"), opt("Others")],
+      }),
+      q({ type: "select_one", name: "ae_been_managed", label: "Has it been managed", required: true, options: yesNo() }),
+      q({ type: "text", name: "ae_how_managed", label: "How was it managed", relevant: "${ae_been_managed} = 'yes'", text: { multiline: true, rows: 2 } }),
+      q({ type: "select_one", name: "ae_person_okay", label: "Is the person satisfactorily okay now", required: true, options: yesNo() }),
+      // Follow-up comments are NOT locked (admins can remove/customise these).
+      q({ type: "text", name: "ae_followup_comments", label: "Follow-up comments", text: { multiline: true, rows: 2 } }),
+    ])),
   ];
 
   const settings: Record<string, any> = {
