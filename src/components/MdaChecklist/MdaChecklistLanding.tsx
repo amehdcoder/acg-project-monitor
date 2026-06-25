@@ -78,16 +78,14 @@ interface TileDef {
   view: View;
   title: string;
   defaultImg: string;
-  gradient: string;
-  ring: string;
 }
 
 const TILES: TileDef[] = [
-  { key: "community", view: "community", title: "Community Checklist", defaultImg: imgCommunity, gradient: "from-rose-50 to-pink-100", ring: "ring-rose-200" },
-  { key: "hcs", view: "hcs-list", title: "Household Coverage Survey", defaultImg: imgHousehold, gradient: "from-fuchsia-50 to-purple-100", ring: "ring-fuchsia-200" },
-  { key: "completion", view: "completion-list", title: "Follow-up on MDA Completion", defaultImg: imgCompletion, gradient: "from-emerald-50 to-teal-100", ring: "ring-emerald-200" },
-  { key: "commodities", view: "commodities-list", title: "Follow-up on MDA Commodities", defaultImg: imgCommodities, gradient: "from-amber-50 to-orange-100", ring: "ring-amber-200" },
-  { key: "adverse", view: "adverse-list", title: "Follow-up on Adverse Reactions", defaultImg: imgAdverse, gradient: "from-sky-50 to-indigo-100", ring: "ring-sky-200" },
+  { key: "community", view: "community", title: "Community Checklist", defaultImg: imgCommunity },
+  { key: "hcs", view: "hcs-list", title: "Household Coverage Survey", defaultImg: imgHousehold },
+  { key: "completion", view: "completion-list", title: "Follow-up on MDA Completion", defaultImg: imgCompletion },
+  { key: "commodities", view: "commodities-list", title: "Follow-up on MDA Commodities", defaultImg: imgCommodities },
+  { key: "adverse", view: "adverse-list", title: "Follow-up on Adverse Reactions", defaultImg: imgAdverse },
 ];
 
 // Resize an uploaded image to a small square PNG data-URL (keeps the row light & offline-cacheable).
