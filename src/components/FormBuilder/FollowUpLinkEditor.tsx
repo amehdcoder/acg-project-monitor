@@ -104,13 +104,27 @@ function buildFilter(rows: ConditionRow[], joiner: "and" | "or"): string {
 const isChoiceType = (type: QuestionType) =>
   type === "select_one" || type === "select_multiple" || type === "rank";
 
+const uid = (prefix: string): string =>
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? `${prefix}-${crypto.randomUUID()}`
+    : `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
 const defaultOptions = (): QuestionOption[] => [
-  { id: `opt-${Date.now()}-1`, label: "Option 1", value: "option_1" },
-  { id: `opt-${Date.now()}-2`, label: "Option 2", value: "option_2" },
+  { id: uid("opt"), label: "Option 1", value: "option_1" },
+  { id: uid("opt"), label: "Option 2", value: "option_2" },
 ];
 
 const optionValueFromLabel = (label: string, fallback = "option") =>
   slugify(label, fallback).replace(/_{2,}/g, "_");
+
+/** Ensure a candidate option value is unique within the existing set. */
+const uniqueOptionValue = (candidate: string, existing: QuestionOption[]): string => {
+  const taken = new Set(existing.map((o) => o.value).filter(Boolean));
+  let value = candidate || "option";
+  let i = 2;
+  while (taken.has(value)) value = `${candidate}_${i++}`;
+  return value;
+};
 
 export function FollowUpLinkEditor({
   open,
