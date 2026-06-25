@@ -385,11 +385,15 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
       });
 
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving form:", error);
+      const msg = typeof error?.message === "string" ? error.message : "";
+      const isFollowUpBlock = msg.includes("Follow-up module");
       toast({
-        title: "Error",
-        description: "Failed to save form. Please try again.",
+        title: isFollowUpBlock ? "Follow-up not linked" : "Error",
+        description: isFollowUpBlock
+          ? msg
+          : "Failed to save form. Please try again.",
         variant: "destructive",
       });
     } finally {
