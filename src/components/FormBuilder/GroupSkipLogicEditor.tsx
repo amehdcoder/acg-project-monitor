@@ -108,6 +108,17 @@ const GroupSkipLogicEditor = ({
     parseRelevantString(group.relevant),
   );
 
+  // Re-hydrate from this group's own saved rule each time the dialog opens so
+  // the saved condition is preserved and never bleeds across groups.
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open && !wasOpen.current) {
+      setConditions(parseRelevantString(group.relevant));
+    }
+    wasOpen.current = open;
+  }, [open, group.id, group.relevant]);
+
+
   const addCondition = () => {
     setConditions([
       ...conditions,
