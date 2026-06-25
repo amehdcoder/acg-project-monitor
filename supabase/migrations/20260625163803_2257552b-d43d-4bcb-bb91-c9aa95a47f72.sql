@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.current_user_can_build_mda_followups() TO authenticated, anon;
