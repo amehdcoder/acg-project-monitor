@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import type { Question, FormGroup } from "@/components/FormBuilder/types";
+import { evaluateRelevant, type NameToIdMap } from "@/lib/skipLogic";
 
 // Default illustrated tile icons (match the supervisory checklist design).
 import imgCommunity from "@/assets/mda-tiles/community-checklist.png";
