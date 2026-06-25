@@ -114,6 +114,19 @@ const SkipLogicEditor = ({
     parseRelevantString(question.relevant),
   );
 
+  // Re-hydrate the editor from THIS question's own saved rule every time the
+  // dialog opens. This guarantees the previously-saved condition reappears
+  // (never disappears) and never bleeds in from another question, even when
+  // several questions reference the same source question.
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open && !wasOpen.current) {
+      setConditions(parseRelevantString(question.relevant));
+    }
+    wasOpen.current = open;
+  }, [open, question.id, question.relevant]);
+
+
   // Only questions that come before this one can be referenced. If the current
   // question can't be located in the list (e.g. ordering edge cases), fall back
   // to every other question so the picker is never empty.
