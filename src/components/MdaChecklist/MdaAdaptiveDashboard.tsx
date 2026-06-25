@@ -727,6 +727,13 @@ export default function MdaAdaptiveDashboard({
           ))
         )}
       </CardContent>
+
+      <MdaDrillDownSheet
+        data={drill}
+        questions={questions as any}
+        followUpFields={followUpFields}
+        onClose={() => setDrill(null)}
+      />
     </Card>
   );
 }
