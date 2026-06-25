@@ -19,7 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Link2, Plus, Trash2, Filter, ListChecks } from "lucide-react";
+import { Link2, Plus, Trash2, Filter, ListChecks, AlertCircle } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 interface ConditionRow {
   field: string; // checklist question name
