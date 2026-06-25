@@ -16,31 +16,29 @@ export interface GeolocationState {
 }
 
 /**
- * Geolocation hook with a tiered acquisition strategy designed for unreliable
- * environments (desktop browsers without GNSS, weak signal indoors, etc.).
+ * Geolocation hook tuned for INSTANT + ACCURATE acquisition in every
+ * environment (indoors, outdoors, online, offline, desktop or mobile).
  *
  * Strategy when getCurrentPosition() is called:
- *  1. Open a watchPosition with high-accuracy and accept the FIRST fix that
- *     arrives within HIGH_ACC_WINDOW_MS (12s). This is dramatically faster than
- *     getCurrentPosition + timeout because we resolve on the first event rather
- *     than waiting for the requested accuracy to be reached.
- *  2. In parallel fire a one-shot getCurrentPosition with high accuracy as a
- *     belt-and-suspenders backup.
- *  3. If nothing arrives within HIGH_ACC_WINDOW_MS, retry with
- *     enableHighAccuracy:false and a generous maximumAge — this lets the
- *     browser return a cached WiFi/IP fix instead of blocking forever.
- *  4. Hard ceiling at TOTAL_TIMEOUT_MS (45s). If still nothing, surface a
- *     friendly error AND the underlying browser code.
- *
- * This eliminates the "Location request timed out" loop users hit when the
- * preview is opened on a desktop without GPS hardware, or when high-accuracy
- * positioning is briefly unavailable on mobile.
+ *  1. INSTANT: immediately request a cached fix (maximumAge = ∞, timeout ~1s).
+ *     The browser returns the last known position with zero hardware wait, so
+ *     the UI shows coordinates instantly even offline / indoors.
+ *  2. REFINE: in parallel open a high-accuracy watchPosition that streams GNSS
+ *     fixes. Each fix that is MORE accurate than the current one is committed,
+ *     so the displayed position keeps sharpening toward the true location.
+ *  3. SETTLE: once we reach GOOD_ACCURACY_M (≤25m) or REFINE_WINDOW_MS elapses
+ *     after the first fix, we stop refining to save battery — keeping whatever
+ *     best fix we have. We never block waiting for perfect accuracy.
+ *  4. FALLBACK: if nothing at all arrives within COARSE_WINDOW_MS, fire a
+ *     coarse (network/WiFi) request so we always surface something fast.
+ *  5. Hard ceiling at TOTAL_TIMEOUT_MS. Only then do we surface an error.
  */
 
-const HIGH_ACC_WINDOW_MS = 12000;
-const FALLBACK_TIMEOUT_MS = 15000;
-const TOTAL_TIMEOUT_MS = 45000;
-const FALLBACK_MAX_AGE_MS = 5 * 60 * 1000; // accept fixes up to 5 min old on fallback
+const COARSE_WINDOW_MS = 2500; // if no fix yet, try coarse/network position
+const REFINE_WINDOW_MS = 8000; // keep sharpening up to 8s after first fix
+const TOTAL_TIMEOUT_MS = 30000;
+const GOOD_ACCURACY_M = 25; // stop refining once this good
+const INSTANT_MAX_AGE_MS = 10 * 60 * 1000; // accept cached fixes up to 10 min old
 
 export const useGeolocation = (options?: PositionOptions) => {
   const [state, setState] = useState<GeolocationState>({
