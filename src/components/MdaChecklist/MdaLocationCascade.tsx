@@ -157,6 +157,21 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   // clobber a selection the supervisor has already made.
   const didAutoselectRef = useRef(false);
 
+  // Offline prefetch: pull and persist the GRID3 shards for the relevant
+  // states so the whole supervision cascade works instantly with no network.
+  const [prefetchState, setPrefetchState] = useState<"idle" | "running" | "done">("idle");
+  const [prefetchProgress, setPrefetchProgress] = useState({ done: 0, total: 0 });
+  const [savedStates, setSavedStates] = useState<Set<string>>(new Set());
+  const [isOffline, setIsOffline] = useState(typeof navigator !== "undefined" && !navigator.onLine);
+
+  useEffect(() => {
+    const on = () => setIsOffline(false);
+    const off = () => setIsOffline(true);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
+
   // Stable key for the (optional) admin-defined state scope so the loader effect
   // only re-runs when its contents actually change (not on every render).
   const stateScopeKey = useMemo(() => (stateScope ?? []).join("|"), [stateScope]);
