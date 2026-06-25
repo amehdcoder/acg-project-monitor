@@ -78,6 +78,13 @@ const PALETTE = [
   "#8b5cf6", "#14b8a6", "#f97316", "#3b82f6", "#84cc16", "#e11d48",
 ];
 
+// Human labels for the canonical follow-up module keys.
+const FOLLOWUP_LABELS: Record<string, string> = {
+  follow_up_on_mda_completion: "MDA Completion follow-up",
+  follow_up_on_mda_commodities: "MDA Commodities follow-up",
+  adverse_reaction_management: "Adverse Reactions follow-up",
+};
+
 const stripTags = (s?: string) => String(s || "").replace(/<[^>]*>/g, "").trim();
 const norm = (v: any) => String(v ?? "").trim().toLowerCase();
 const POSITIVE = new Set(["yes", "true", "1", "available", "present", "good", "done", "complete", "compliant", "adequate", "trained", "passed"]);
