@@ -449,6 +449,30 @@ export default function MdaAdaptiveDashboard({
     return [...map.values()];
   }, [visitRows]);
 
+  // Map each follow-up module (canonical key) → its raw follow-up submissions.
+  const followUpRowsByModule = useMemo(() => {
+    const moduleQuestionNames: { canonical: string; names: string[] }[] = [];
+    for (const item of (questions as any[]) || []) {
+      const isGroup = Array.isArray(item.questions) && !item.type;
+      if (isGroup && isMdaFollowUpGroup(item)) {
+        moduleQuestionNames.push({
+          canonical: getMdaFollowUpGroupName(item) || "follow_up",
+          names: (item.questions || []).map((q: any) => q?.name).filter(Boolean),
+        });
+      }
+    }
+    const result: Record<string, MdaSubmission[]> = {};
+    for (const m of moduleQuestionNames) {
+      result[m.canonical] = prepared.followUps.filter((fu) =>
+        m.names.some((n) => {
+          const v = fu.data?.[n];
+          return v !== undefined && v !== null && String(v) !== "";
+        }),
+      );
+    }
+    return result;
+  }, [questions, prepared.followUps]);
+
   const openDrill = (d: DrillData) => setDrill(d);
 
   const activeProjectName =
