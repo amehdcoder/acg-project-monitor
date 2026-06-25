@@ -104,13 +104,27 @@ function buildFilter(rows: ConditionRow[], joiner: "and" | "or"): string {
 const isChoiceType = (type: QuestionType) =>
   type === "select_one" || type === "select_multiple" || type === "rank";
 
+const uid = (prefix: string): string =>
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? `${prefix}-${crypto.randomUUID()}`
+    : `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
 const defaultOptions = (): QuestionOption[] => [
-  { id: `opt-${Date.now()}-1`, label: "Option 1", value: "option_1" },
-  { id: `opt-${Date.now()}-2`, label: "Option 2", value: "option_2" },
+  { id: uid("opt"), label: "Option 1", value: "option_1" },
+  { id: uid("opt"), label: "Option 2", value: "option_2" },
 ];
 
 const optionValueFromLabel = (label: string, fallback = "option") =>
   slugify(label, fallback).replace(/_{2,}/g, "_");
+
+/** Ensure a candidate option value is unique within the existing set. */
+const uniqueOptionValue = (candidate: string, existing: QuestionOption[]): string => {
+  const taken = new Set(existing.map((o) => o.value).filter(Boolean));
+  let value = candidate || "option";
+  let i = 2;
+  while (taken.has(value)) value = `${candidate}_${i++}`;
+  return value;
+};
 
 export function FollowUpLinkEditor({
   open,
@@ -212,12 +226,17 @@ export function FollowUpLinkEditor({
     setQuestions((qs) =>
       qs.map((q) => {
         if (q.id !== id) return q;
-        const count = (q.options?.length ?? 0) + 1;
+        const existing = q.options || [];
+        const count = existing.length + 1;
         return {
           ...q,
           options: [
-            ...(q.options || []),
-            { id: `opt-${Date.now()}-${count}`, label: `Option ${count}`, value: `option_${count}` },
+            ...existing,
+            {
+              id: uid("opt"),
+              label: `Option ${count}`,
+              value: uniqueOptionValue(`option_${count}`, existing),
+            },
           ],
         };
       }),
@@ -283,15 +302,6 @@ export function FollowUpLinkEditor({
       });
       return;
     }
-    if (labelled.filter(isFullyLinked).length === 0) {
-      toast({
-        title: "Link at least one follow-up question",
-        description:
-          "You must link at least one follow-up question to a Community Checklist response option before saving.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     const communityFilter = buildFilter(rows, joiner);
 
@@ -301,11 +311,18 @@ export function FollowUpLinkEditor({
     const updatedQuestions: Question[] = labelled.map((dq) => {
       const base = existingById.get(dq.id);
       let name = (dq.name || slugify(dq.label, dq.id)).trim();
-      while (usedNames.has(name)) name = `${name}_1`;
+      if (usedNames.has(name)) {
+        let i = 2;
+        while (usedNames.has(`${name}_${i}`)) i++;
+        name = `${name}_${i}`;
+      }
       usedNames.add(name);
+      // Linking is OPTIONAL. Keep the link only when it is complete; otherwise
+      // save the question as a plain follow-up question (CommCare-style).
       const source = sourceQuestionByName(dq.linkedSourceField);
       const needsOption = (source?.options?.length ?? 0) > 0;
-      const src = isFullyLinked(dq) ? dq.linkedSourceField : undefined;
+      const linked = isFullyLinked(dq);
+      const src = linked ? dq.linkedSourceField : undefined;
       const srcValue = src && needsOption ? dq.linkedSourceValue : undefined;
       return {
         ...(base ?? { required: false }),
@@ -319,6 +336,7 @@ export function FollowUpLinkEditor({
         options: isChoiceType(dq.type) ? (dq.options || defaultOptions()) : undefined,
       } as Question;
     });
+
 
     onSave({ ...group, communityFilter: communityFilter || undefined, questions: updatedQuestions });
     onOpenChange(false);
@@ -707,24 +725,24 @@ export function FollowUpLinkEditor({
         </div>
 
         <DialogFooter className="shrink-0 items-center border-t px-5 py-3">
-          {linkedCount === 0 ? (
-            <span className="mr-auto flex items-center gap-1.5 text-xs text-destructive">
-              <AlertCircle className="h-3.5 w-3.5" />
-              Link at least one follow-up question to save
-            </span>
-          ) : (
-            group.communityFilter && (
-              <Badge variant="secondary" className="mr-auto font-normal">
-                Filter active
-              </Badge>
-            )
-          )}
+          <span className="mr-auto flex items-center gap-1.5 text-xs text-muted-foreground">
+            {linkedCount > 0 ? (
+              <>
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                {linkedCount} question{linkedCount !== 1 ? "s" : ""} linked
+                {group.communityFilter ? " · filter active" : ""}
+              </>
+            ) : (
+              <>
+                <AlertCircle className="h-3.5 w-3.5" />
+                Linking is optional — link questions to carry checklist answers in
+              </>
+            )}
+          </span>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={linkedCount === 0}>
-            Save
-          </Button>
+          <Button onClick={handleSave}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
