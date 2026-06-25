@@ -3821,6 +3821,33 @@ export type Database = {
         }
         Relationships: []
       }
+      mda_tile_icons: {
+        Row: {
+          form_id: string
+          icon_url: string
+          id: string
+          tile_key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          form_id: string
+          icon_url: string
+          id?: string
+          tile_key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          form_id?: string
+          icon_url?: string
+          id?: string
+          tile_key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       meeting_action_points: {
         Row: {
           action_point: string
