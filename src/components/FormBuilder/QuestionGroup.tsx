@@ -233,16 +233,17 @@ const QuestionGroupComponent = ({
               </Button>
               {isFollowUpGroup && (
                 <Button
-                  variant="ghost"
-                  size="icon"
+                  variant="default"
+                  size="sm"
                   onClick={(e) => {
                     e.stopPropagation();
                     onFollowUpLink?.(group);
                   }}
-                  className={`h-8 w-8 ${group.communityFilter ? "text-fuchsia-600" : "text-muted-foreground"}`}
-                  title="Follow-up linking & community filter"
+                  className="h-8 gap-1.5 bg-gradient-to-r from-fuchsia-600 to-primary text-white shadow-soft hover:opacity-90"
+                  title="Build & link follow-up questions"
                 >
                   <Link2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Build follow-up</span>
                 </Button>
               )}
               <Button
