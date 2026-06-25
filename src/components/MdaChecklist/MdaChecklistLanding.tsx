@@ -262,17 +262,52 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
     [groups],
   );
 
+  // Lookup helpers for follow-up linking & community filtering.
+  const groupByName = useMemo(() => {
+    const m = new Map<string, FormGroup>();
+    for (const g of groups) m.set(g.name, g);
+    return m;
+  }, [groups]);
+
+  // Identity name map for evaluating community filters against submission data
+  // (form_submissions.data is keyed by question `name`).
+  const checklistNameMap = useMemo<NameToIdMap>(() => {
+    const map: NameToIdMap = {};
+    for (const g of groups) {
+      if (FOLLOWUP_GROUPS.has(g.name)) continue;
+      for (const q of g.questions) if (q.name) map[q.name] = q.name;
+    }
+    return map;
+  }, [groups]);
+
+  // Carry linked Community Checklist responses into the follow-up form.
+  const linkedPrefill = (groupName: string, c: VisitedCommunity | null): Record<string, any> => {
+    const base = prefillFromCommunity(c);
+    const g = groupByName.get(groupName);
+    if (g && c) {
+      for (const q of g.questions) {
+        if (q.linkedSourceField && q.name) {
+          const v = c.data?.[q.linkedSourceField];
+          if (v !== undefined && v !== null && String(v) !== "") base[q.name] = v;
+        }
+      }
+    }
+    return base;
+  };
+
+  const filterFor = (groupName: string) => groupByName.get(groupName)?.communityFilter;
+
   if (view === "community") {
     return <FormFiller {...fillerProps(communityGroupNames)} />;
   }
   if (view === "completion") {
-    return <FormFiller {...fillerProps([GROUP_COMPLETION], prefillFromCommunity(selected))} />;
+    return <FormFiller {...fillerProps([GROUP_COMPLETION], linkedPrefill(GROUP_COMPLETION, selected))} />;
   }
   if (view === "commodities") {
-    return <FormFiller {...fillerProps([GROUP_COMMODITIES], prefillFromCommunity(selected))} />;
+    return <FormFiller {...fillerProps([GROUP_COMMODITIES], linkedPrefill(GROUP_COMMODITIES, selected))} />;
   }
   if (view === "adverse") {
-    return <FormFiller {...fillerProps([GROUP_ADVERSE], prefillFromCommunity(selected))} />;
+    return <FormFiller {...fillerProps([GROUP_ADVERSE], linkedPrefill(GROUP_ADVERSE, selected))} />;
   }
   if (view === "hcs-list") {
     return (
