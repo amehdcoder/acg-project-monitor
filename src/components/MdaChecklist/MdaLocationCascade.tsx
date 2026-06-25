@@ -139,7 +139,15 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
 
   const [rows, setRows] = useState<GeoRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [notInMicroplan, setNotInMicroplan] = useState(false);
+  // ENABLED BY DEFAULT for every project: the checklist starts on the GRID3
+  // national cascade (State→LGA→Ward→FLHF→Settlement, with settlements feeding
+  // the Community field). Supervisors can turn this OFF to drive the cascade
+  // from the project's own locked-in microplan data instead.
+  const [notInMicroplan, setNotInMicroplan] = useState(true);
+  // GRID3 cascade data (same source as the Geo Microplanning page) loaded for
+  // the current State/LGA/Ward — FLHF facilities and settlements with GPS.
+  const [grid3Facilities, setGrid3Facilities] = useState<FacilityWithCoords[]>([]);
+  const [grid3Settlements, setGrid3Settlements] = useState<FacilityWithCoords[]>([]);
   // States the project was designed for (from project scope) — used as the
   // cascade fallback when no microplan is linked to the project.
   const [projectStates, setProjectStates] = useState<string[]>([]);
