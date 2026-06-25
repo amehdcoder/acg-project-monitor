@@ -98,6 +98,25 @@ const TILES: TileDef[] = [
   { key: "adverse", view: "adverse-list", title: "Follow-up on Adverse Reactions", defaultImg: imgAdverse },
 ];
 
+const BUILDER_TARGETS = [GROUP_COMPLETION, GROUP_COMMODITIES, GROUP_ADVERSE] as const;
+
+const uid = (prefix: string) =>
+  `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+const defaultFollowUpLabel = (canonical: string): string =>
+  canonical === GROUP_COMPLETION
+    ? "Follow-up on MDA Completion"
+    : canonical === GROUP_COMMODITIES
+      ? "Follow-up on MDA Commodities / Communities"
+      : "Follow-up on Adverse Reactions";
+
+const makeFollowUpGroup = (canonical: string): FormGroup => ({
+  id: uid("mda_followup_group"),
+  name: canonical,
+  label: defaultFollowUpLabel(canonical),
+  questions: [],
+});
+
 // Resize an uploaded image to a small square PNG data-URL (keeps the row light & offline-cacheable).
 async function fileToIconDataUrl(file: File, size = 256): Promise<string> {
   const dataUrl: string = await new Promise((resolve, reject) => {
@@ -268,6 +287,18 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   );
 
   const followUpGroups = useMemo(() => groups.filter(isMdaFollowUpGroup), [groups]);
+  const groupFor = (name: string) => followUpGroups.find((g) => getMdaFollowUpGroupName(g) === name) || null;
+
+  const ensureFollowUpGroup = (canonical: string): FormGroup => {
+    const existing = groupFor(canonical);
+    if (existing) return existing;
+    const created = makeFollowUpGroup(canonical);
+    setLocalGroups((prev) => {
+      if (prev.some((g) => getMdaFollowUpGroupName(g) === canonical || g.id === created.id)) return prev;
+      return [...prev, created];
+    });
+    return created;
+  };
 
   const openBuilder = (group: FormGroup | null) => {
     if (!group) return;
@@ -285,7 +316,10 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
 
   const saveBuilderGroup = (updatedGroup: FormGroup) => {
     const previousGroups = groups;
-    const nextGroups = groups.map((g) => (g.id === updatedGroup.id ? updatedGroup : g));
+    const exists = groups.some((g) => g.id === updatedGroup.id);
+    const nextGroups = exists
+      ? groups.map((g) => (g.id === updatedGroup.id ? updatedGroup : g))
+      : [...groups, updatedGroup];
     setLocalGroups(nextGroups);
     setBuilderGroup(updatedGroup);
     supabase
@@ -305,8 +339,6 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
         toast({ title: "Follow-up builder saved", description: "Questions, source options, and community rules were saved." });
       });
   };
-
-  const groupFor = (name: string) => followUpGroups.find((g) => getMdaFollowUpGroupName(g) === name) || null;
 
   const builderLabelFor = (canonical: string | null) =>
     canonical === GROUP_COMPLETION
@@ -443,7 +475,7 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
           accent="completion"
           filterExpr={filterFor(GROUP_COMPLETION)}
           nameMap={checklistNameMap}
-          onConfigure={canBuildFollowUps ? () => openBuilder(groupFor(GROUP_COMPLETION)) : undefined}
+          onConfigure={canBuildFollowUps ? () => openBuilder(ensureFollowUpGroup(GROUP_COMPLETION)) : undefined}
           onBack={() => setView("home")}
           onSelect={(c) => { setSelected(c); setView("completion"); }}
         />
@@ -462,7 +494,7 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
           accent="commodities"
           filterExpr={filterFor(GROUP_COMMODITIES)}
           nameMap={checklistNameMap}
-          onConfigure={canBuildFollowUps ? () => openBuilder(groupFor(GROUP_COMMODITIES)) : undefined}
+          onConfigure={canBuildFollowUps ? () => openBuilder(ensureFollowUpGroup(GROUP_COMMODITIES)) : undefined}
           onBack={() => setView("home")}
           onSelect={(c) => { setSelected(c); setView("commodities"); }}
         />
@@ -481,7 +513,7 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
           accent="adverse"
           filterExpr={filterFor(GROUP_ADVERSE)}
           nameMap={checklistNameMap}
-          onConfigure={canBuildFollowUps ? () => openBuilder(groupFor(GROUP_ADVERSE)) : undefined}
+          onConfigure={canBuildFollowUps ? () => openBuilder(ensureFollowUpGroup(GROUP_ADVERSE)) : undefined}
           onBack={() => setView("home")}
           onSelect={(c) => { setSelected(c); setView("adverse"); }}
         />
@@ -522,7 +554,7 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
       )}
 
       <main className="mx-auto w-full max-w-2xl px-5 py-8">
-        {canBuildFollowUps && followUpGroups.length > 0 && (
+        {canBuildFollowUps && (
           <section className="mb-7 overflow-hidden rounded-3xl bg-gradient-to-br from-[#4338ca] via-[#7c3aed] to-[#db2777] p-4 text-white shadow-lg">
             <div className="flex items-start gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/18 ring-1 ring-white/25">
@@ -536,20 +568,20 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
               </div>
             </div>
             <div className="mt-4 grid gap-2 sm:grid-cols-3">
-              {followUpGroups.map((group) => {
-                const canonical = getMdaFollowUpGroupName(group);
-                const linked = group.questions.some((q) => q.linkedSourceField);
+              {BUILDER_TARGETS.map((canonical) => {
+                const group = groupFor(canonical);
+                const linked = !!group?.questions.some((q) => q.linkedSourceField && q.linkedSourceValue);
                 return (
                   <button
-                    key={group.id}
-                    onClick={() => openBuilder(group)}
+                    key={canonical}
+                    onClick={() => openBuilder(ensureFollowUpGroup(canonical))}
                     className="flex min-h-[4.25rem] flex-col items-start justify-between rounded-2xl bg-white/15 p-3 text-left ring-1 ring-white/20 transition hover:bg-white/22 active:scale-[0.99]"
                   >
                     <span className="flex items-center gap-1.5 text-sm font-semibold">
                       <Link2 className="h-4 w-4" /> Build {builderLabelFor(canonical)}
                     </span>
                     <span className={`mt-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${linked ? "bg-emerald-100 text-emerald-700" : "bg-white/20 text-white"}`}>
-                      {linked ? "linked" : "needs link"}
+                      {linked ? "linked" : group ? "needs link" : "add questions"}
                     </span>
                   </button>
                 );
