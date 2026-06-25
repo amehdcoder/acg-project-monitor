@@ -450,6 +450,39 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   // no microplan linked yet. This guarantees the cascade always works.
   const useAdminHierarchy = notInMicroplan || microplanIsEmpty;
 
+  // Load GRID3 FLHF facilities + settlements (same source as Geo Microplanning)
+  // for the chosen State/LGA(/Ward) whenever the GRID3 cascade is active. The
+  // lists power the FLHF and Community (settlement) pickers while keeping the
+  // type-and-add escape hatch for anything not in the GRID3 dataset.
+  useEffect(() => {
+    if (!useAdminHierarchy || !sel.state || !sel.lga) {
+      setGrid3Facilities([]);
+      setGrid3Settlements([]);
+      return;
+    }
+    let cancelled = false;
+    const st = canonicalStateName(sel.state);
+    const lg = canonicalLgaName(sel.state, sel.lga);
+    const wd = sel.ward ? canonicalWardName(sel.state, sel.lga, sel.ward) : undefined;
+    (async () => {
+      try {
+        const [fac, set] = await Promise.all([
+          getGrid3FacilitiesWithCoords(st, lg, wd),
+          getGrid3SettlementsWithCoords(st, lg, wd),
+        ]);
+        if (!cancelled) {
+          setGrid3Facilities(fac);
+          setGrid3Settlements(set);
+        }
+      } catch {
+        if (!cancelled) { setGrid3Facilities([]); setGrid3Settlements([]); }
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useAdminHierarchy, sel.state, sel.lga, sel.ward]);
+
+
   // When falling back to the admin hierarchy and the project was designed for a
   // single state, preselect it so the supervisor goes straight to LGA.
   // Runs at most once (didAutoselectRef) and only when nothing is selected yet,
