@@ -574,8 +574,9 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     setPrefetchState("done");
   };
 
-
+  return (
     <div className="space-y-4 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/[0.06] to-transparent p-4 sm:p-5">
+
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
