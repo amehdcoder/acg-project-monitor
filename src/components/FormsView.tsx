@@ -608,16 +608,31 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentProjectId, authLoading, user?.id, role, isSuperAdmin, isOwnerLevel]);
 
+  // Silent form restore: ONLY re-open a form after a genuine silent app update
+  // (the sessionStorage SILENT_UPDATE_RESTORE_KEY is written immediately before
+  // the auto-update reload). We intentionally do NOT restore from the persistent
+  // ACTIVE_FORM_FILL_KEY on ordinary mounts/logins, and we guard with a ref so
+  // this never re-fires when `fillingForm` is cleared (e.g. the Back button).
+  const silentRestoreHandledRef = useRef(false);
   useEffect(() => {
     if (authLoading || fillingForm) return;
+    if (silentRestoreHandledRef.current) return;
+    let restore: any = null;
     try {
-      const restore = JSON.parse(sessionStorage.getItem(SILENT_UPDATE_RESTORE_KEY) || "null");
+      restore = JSON.parse(sessionStorage.getItem(SILENT_UPDATE_RESTORE_KEY) || "null");
+    } catch {}
+    const formId = restore?.formId;
+    if (!formId) {
+      // Nothing to silently restore — mark handled so a later Back/login never
+      // accidentally re-opens a stale form.
+      silentRestoreHandledRef.current = true;
+      return;
+    }
+    try {
       const active = JSON.parse(localStorage.getItem(ACTIVE_FORM_FILL_KEY) || "null");
-      const formId = restore?.formId || active?.formId;
-      if (!formId) return;
       if (forms.length === 0 && offlineForms.length === 0 && active?.projectId && active.projectId !== currentProjectId) {
         setCurrentProjectId(active.projectId);
-        return;
+        return; // wait for the correct project's forms to load, then retry
       }
       const offlineMatches = offlineForms.map((of) => {
         const allItems = (of.questions as unknown as any[]) || [];
@@ -627,6 +642,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       });
       const form = forms.find((f) => f.id === formId) || offlineMatches.find((f) => f.id === formId);
       if (form) {
+        silentRestoreHandledRef.current = true;
+        sessionStorage.removeItem(SILENT_UPDATE_RESTORE_KEY);
         setFillingForm(form);
         if (form.project_id && form.project_id !== currentProjectId) setCurrentProjectId(form.project_id);
       } else if (active?.projectId && active.projectId !== currentProjectId) {
@@ -634,6 +651,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       }
     } catch {}
   }, [authLoading, currentProjectId, fillingForm, forms, offlineForms]);
+
 
   const fetchProjects = async () => {
     try {
