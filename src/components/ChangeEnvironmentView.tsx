@@ -36,6 +36,11 @@ const ChangeEnvironmentView = () => {
   const [configs, setConfigs] = useState<Record<string, EnvironmentConfig>>({});
   const autoMigrateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Owner-only: clear collected data for the selected form before going live
+  const [clearOpen, setClearOpen] = useState(false);
+  const [clearBusy, setClearBusy] = useState(false);
+  const [clearPhrase, setClearPhrase] = useState("");
+
   // Load projects
   useEffect(() => {
     (async () => {
