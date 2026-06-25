@@ -95,6 +95,19 @@ const group = (label: string, questions: Question[]): FormGroup => ({
 });
 
 /**
+ * Mark a group (and all of its questions) as permanent so the Form Builder
+ * prevents deletion. These are the MDA follow-up sub-forms that must always
+ * remain part of the "Community Checklist" schema.
+ */
+const lockGroup = (g: FormGroup): FormGroup => {
+  (g as any).locked = true;
+  for (const qq of g.questions) {
+    if (!(qq as any).editable) (qq as any).locked = true;
+  }
+  return g;
+};
+
+/**
  * Build a fresh MDA Supervisory Checklist form payload.
  * Returns the `questions` array (groups) and the `settings` object ready to
  * insert into the `forms` table.
