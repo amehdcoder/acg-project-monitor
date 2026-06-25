@@ -27,83 +27,205 @@ export interface FacilityWithCoords {
   longitude: number | null;
 }
 
-// Cache for loaded GRID3 JSON data
-let _grid3FacilitiesCache: Record<string, Record<string, Record<string, [string, number | null, number | null][]>>> | null = null;
-let _grid3SettlementsCache: Record<string, Record<string, Record<string, [string, number | null, number | null][]>>> | null = null;
-let _facilitiesLoading: Promise<void> | null = null;
-let _settlementsLoading: Promise<void> | null = null;
+// ────────────────────────────────────────────────────────────────────────
+// Sharded, offline-first GRID3 loader.
+//
+// The full GRID3 dataset (51K facilities + 292K settlements) is split into one
+// small JSON shard *per state* under /data/grid3/{fac,set}/<state-slug>.json.
+// A form only ever fetches the single state it needs (≤ ~1 MB) instead of the
+// 13 MB monolith, so the form never blocks, bloats memory, or crashes — and
+// the same approach scales to arbitrarily large datasets because each request
+// touches a bounded slice.
+//
+// Each shard is persisted in IndexedDB the first time it loads, so once a
+// supervisor has opened a state online it remains fully available offline even
+// if the service-worker cache is evicted. Lookups resolve from (1) in-memory
+// cache, then (2) IndexedDB, then (3) network — and write back up the chain.
+// ────────────────────────────────────────────────────────────────────────
 
-async function loadGrid3Facilities(): Promise<typeof _grid3FacilitiesCache> {
-  if (_grid3FacilitiesCache) return _grid3FacilitiesCache;
-  if (!_facilitiesLoading) {
-    _facilitiesLoading = fetch('/data/grid3_health_facilities.json')
-      .then(r => r.json())
-      .then(data => { _grid3FacilitiesCache = data; })
-      .catch(() => { _grid3FacilitiesCache = {}; });
-  }
-  await _facilitiesLoading;
-  return _grid3FacilitiesCache;
+type ShardEntry = [string, number | null, number | null];
+type StateShard = Record<string, Record<string, ShardEntry[]>>; // LGA > Ward > entries
+
+const slugify = (s: string) =>
+  String(s ?? "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+
+// ---- Tiny IndexedDB key/value store (no dependency, offline-durable) -------
+const IDB_NAME = "grid3-shards";
+const IDB_STORE = "shards";
+let _idb: Promise<IDBDatabase | null> | null = null;
+
+function openIdb(): Promise<IDBDatabase | null> {
+  if (_idb) return _idb;
+  _idb = new Promise((resolve) => {
+    try {
+      if (typeof indexedDB === "undefined") return resolve(null);
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+  return _idb;
 }
 
-async function loadGrid3Settlements(): Promise<typeof _grid3SettlementsCache> {
-  if (_grid3SettlementsCache) return _grid3SettlementsCache;
-  if (!_settlementsLoading) {
-    _settlementsLoading = fetch('/data/grid3_settlements.json')
-      .then(r => r.json())
-      .then(data => { _grid3SettlementsCache = data; })
-      .catch(() => { _grid3SettlementsCache = {}; });
+async function idbGet<T>(key: string): Promise<T | null> {
+  const db = await openIdb();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(IDB_STORE, "readonly");
+      const req = tx.objectStore(IDB_STORE).get(key);
+      req.onsuccess = () => resolve((req.result as T) ?? null);
+      req.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+async function idbSet(key: string, value: unknown): Promise<void> {
+  const db = await openIdb();
+  if (!db) return;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).put(value, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
+
+// ---- Manifest (state name -> slug) ----------------------------------------
+let _manifest: Record<string, string> | null = null;
+let _manifestLoading: Promise<Record<string, string>> | null = null;
+
+async function loadManifest(): Promise<Record<string, string>> {
+  if (_manifest) return _manifest;
+  if (!_manifestLoading) {
+    _manifestLoading = (async () => {
+      try {
+        const r = await fetch("/data/grid3/manifest.json", { cache: "force-cache" });
+        const data = await r.json();
+        _manifest = (data?.states ?? {}) as Record<string, string>;
+        await idbSet("manifest", _manifest);
+      } catch {
+        _manifest = (await idbGet<Record<string, string>>("manifest")) ?? {};
+      }
+      return _manifest;
+    })();
   }
-  await _settlementsLoading;
-  return _grid3SettlementsCache;
+  return _manifestLoading;
+}
+
+function resolveSlug(manifest: Record<string, string>, state: string): string | null {
+  if (manifest[state]) return manifest[state];
+  const target = slugify(state);
+  for (const [name, sg] of Object.entries(manifest)) {
+    if (slugify(name) === target || sg === target) return sg;
+  }
+  return target || null; // last-resort: derive slug directly
+}
+
+// ---- Per-state shard loader (memory -> IndexedDB -> network) ---------------
+const _shardMem = new Map<string, StateShard>();
+const _shardLoading = new Map<string, Promise<StateShard>>();
+
+async function loadStateShard(kind: "fac" | "set", state: string): Promise<StateShard> {
+  if (!state) return {};
+  const manifest = await loadManifest();
+  const slug = resolveSlug(manifest, state);
+  if (!slug) return {};
+  const cacheKey = `${kind}:${slug}`;
+
+  const mem = _shardMem.get(cacheKey);
+  if (mem) return mem;
+
+  let pending = _shardLoading.get(cacheKey);
+  if (!pending) {
+    pending = (async () => {
+      // 1) IndexedDB (instant + offline durable)
+      const stored = await idbGet<StateShard>(cacheKey);
+      if (stored) {
+        _shardMem.set(cacheKey, stored);
+        // Revalidate in the background without blocking the caller.
+        void revalidateShard(kind, slug, cacheKey);
+        return stored;
+      }
+      // 2) Network (also served from the SW cache when offline)
+      try {
+        const r = await fetch(`/data/grid3/${kind}/${slug}.json`, { cache: "force-cache" });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = (await r.json()) as StateShard;
+        _shardMem.set(cacheKey, data);
+        void idbSet(cacheKey, data);
+        return data;
+      } catch {
+        return {};
+      }
+    })();
+    _shardLoading.set(cacheKey, pending);
+  }
+  try {
+    return await pending;
+  } finally {
+    _shardLoading.delete(cacheKey);
+  }
+}
+
+async function revalidateShard(kind: "fac" | "set", slug: string, cacheKey: string): Promise<void> {
+  try {
+    const r = await fetch(`/data/grid3/${kind}/${slug}.json`, { cache: "no-cache" });
+    if (!r.ok) return;
+    const data = (await r.json()) as StateShard;
+    _shardMem.set(cacheKey, data);
+    await idbSet(cacheKey, data);
+  } catch {
+    /* offline — keep the cached copy */
+  }
+}
+
+function collectFromShard(shard: StateShard, lga: string, ward?: string): FacilityWithCoords[] {
+  const lgaData = shard[lga];
+  if (!lgaData) return [];
+  const toObj = (e: ShardEntry): FacilityWithCoords => ({ name: e[0], latitude: e[1], longitude: e[2] });
+  if (ward && lgaData[ward]) return lgaData[ward].map(toObj);
+  const all: FacilityWithCoords[] = [];
+  for (const entries of Object.values(lgaData)) for (const e of entries) all.push(toObj(e));
+  return all;
 }
 
 /**
- * Get GRID3 health facilities with coordinates for a given state, LGA, and optionally ward.
- * Returns array of { name, latitude, longitude }.
+ * Get GRID3 health facilities (FLHF) with coordinates for a State/LGA(/Ward).
+ * Loads only the relevant state shard — fast, memory-safe, and offline-ready.
  */
 export async function getGrid3FacilitiesWithCoords(state: string, lga: string, ward?: string): Promise<FacilityWithCoords[]> {
-  const data = await loadGrid3Facilities();
-  if (!data) return [];
-  // Try matching state name (GRID3 uses e.g. "Borno", app might use same)
-  const stateData = data[state];
-  if (!stateData) return [];
-  const lgaData = stateData[lga];
-  if (!lgaData) return [];
-  
-  if (ward && lgaData[ward]) {
-    return lgaData[ward].map(([name, lat, lng]) => ({ name, latitude: lat, longitude: lng }));
-  }
-  // If no ward match, return all facilities in the LGA
-  const all: FacilityWithCoords[] = [];
-  for (const entries of Object.values(lgaData)) {
-    for (const [name, lat, lng] of entries) {
-      all.push({ name, latitude: lat, longitude: lng });
-    }
-  }
-  return all;
+  const shard = await loadStateShard("fac", state);
+  return collectFromShard(shard, lga, ward);
 }
 
 /**
- * Get GRID3 settlements with coordinates for a given state, LGA, and optionally ward.
+ * Get GRID3 settlements (Community) with coordinates for a State/LGA(/Ward).
  */
 export async function getGrid3SettlementsWithCoords(state: string, lga: string, ward?: string): Promise<FacilityWithCoords[]> {
-  const data = await loadGrid3Settlements();
-  if (!data) return [];
-  const stateData = data[state];
-  if (!stateData) return [];
-  const lgaData = stateData[lga];
-  if (!lgaData) return [];
-  
-  if (ward && lgaData[ward]) {
-    return lgaData[ward].map(([name, lat, lng]) => ({ name, latitude: lat, longitude: lng }));
-  }
-  const all: FacilityWithCoords[] = [];
-  for (const entries of Object.values(lgaData)) {
-    for (const [name, lat, lng] of entries) {
-      all.push({ name, latitude: lat, longitude: lng });
-    }
-  }
-  return all;
+  const shard = await loadStateShard("set", state);
+  return collectFromShard(shard, lga, ward);
+}
+
+/**
+ * Warm the offline cache for a state ahead of going offline (optional).
+ * Fetches and persists both shards so the supervision cascade is fully usable
+ * without a network connection.
+ */
+export async function prefetchGrid3State(state: string): Promise<void> {
+  await Promise.all([loadStateShard("fac", state), loadStateShard("set", state)]);
 }
 
 // Structured by State > LGA for cascading lookup
