@@ -302,15 +302,6 @@ export function FollowUpLinkEditor({
       });
       return;
     }
-    if (labelled.filter(isFullyLinked).length === 0) {
-      toast({
-        title: "Link at least one follow-up question",
-        description:
-          "You must link at least one follow-up question to a Community Checklist response option before saving.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     const communityFilter = buildFilter(rows, joiner);
 
@@ -320,11 +311,18 @@ export function FollowUpLinkEditor({
     const updatedQuestions: Question[] = labelled.map((dq) => {
       const base = existingById.get(dq.id);
       let name = (dq.name || slugify(dq.label, dq.id)).trim();
-      while (usedNames.has(name)) name = `${name}_1`;
+      if (usedNames.has(name)) {
+        let i = 2;
+        while (usedNames.has(`${name}_${i}`)) i++;
+        name = `${name}_${i}`;
+      }
       usedNames.add(name);
+      // Linking is OPTIONAL. Keep the link only when it is complete; otherwise
+      // save the question as a plain follow-up question (CommCare-style).
       const source = sourceQuestionByName(dq.linkedSourceField);
       const needsOption = (source?.options?.length ?? 0) > 0;
-      const src = isFullyLinked(dq) ? dq.linkedSourceField : undefined;
+      const linked = isFullyLinked(dq);
+      const src = linked ? dq.linkedSourceField : undefined;
       const srcValue = src && needsOption ? dq.linkedSourceValue : undefined;
       return {
         ...(base ?? { required: false }),
@@ -338,6 +336,7 @@ export function FollowUpLinkEditor({
         options: isChoiceType(dq.type) ? (dq.options || defaultOptions()) : undefined,
       } as Question;
     });
+
 
     onSave({ ...group, communityFilter: communityFilter || undefined, questions: updatedQuestions });
     onOpenChange(false);
