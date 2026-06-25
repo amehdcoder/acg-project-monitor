@@ -179,6 +179,30 @@ const ChangeEnvironmentView = () => {
     updateConfig({ environment: next });
   };
 
+  const selectedFormName = forms.find(f => f.id === selectedForm)?.name || "this form";
+
+  const handleClearData = async () => {
+    if (!selectedForm) return;
+    setClearBusy(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("owner_clear_form_submissions", {
+        _form_id: selectedForm,
+      });
+      if (error) throw error;
+      const r = data as any;
+      toast({
+        title: "Checklist data cleared",
+        description: `${r?.submissions_deleted ?? 0} submission(s) and ${r?.versions_deleted ?? 0} version snapshot(s) permanently removed for "${selectedFormName}".`,
+      });
+      setClearOpen(false);
+      setClearPhrase("");
+    } catch (err: any) {
+      toast({ title: "Clear failed", description: err.message, variant: "destructive" });
+    } finally {
+      setClearBusy(false);
+    }
+  };
+
   const isLive = currentConfig.environment === "live";
 
   const timeUntilLive = useMemo(() => {
