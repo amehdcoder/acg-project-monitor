@@ -303,15 +303,24 @@ export default function FollowUpLinkEditor({
         </ScrollArea>
 
         <DialogFooter className="border-t px-6 py-4">
-          {group.communityFilter && (
-            <Badge variant="secondary" className="mr-auto font-normal">
-              Filter active
-            </Badge>
+          {linkedCount === 0 ? (
+            <span className="mr-auto flex items-center gap-1.5 text-xs text-destructive">
+              <AlertCircle className="h-3.5 w-3.5" />
+              Link at least one follow-up question to save
+            </span>
+          ) : (
+            group.communityFilter && (
+              <Badge variant="secondary" className="mr-auto font-normal">
+                Filter active
+              </Badge>
+            )
           )}
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave}>Save</Button>
+          <Button onClick={handleSave} disabled={linkedCount === 0}>
+            Save
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
