@@ -35,6 +35,7 @@ import {
   X,
 } from "lucide-react";
 import { getFollowUpIcon } from "@/components/FormFiller/followUpIcons";
+import { useAuth } from "@/hooks/useAuth";
 
 interface QuestionGroupProps {
   group: FormGroup;
@@ -73,6 +74,7 @@ const QuestionGroupComponent = ({
   followUpMode = false,
   children,
 }: QuestionGroupProps) => {
+  const { isAdmin } = useAuth();
   const [isOpen, setIsOpen] = useState(true);
   const [editingName, setEditingName] = useState(false);
   const [draftLabel, setDraftLabel] = useState(group.label);
@@ -231,7 +233,7 @@ const QuestionGroupComponent = ({
               >
                 <ShieldCheck className="h-4 w-4" />
               </Button>
-              {isFollowUpGroup && (
+              {isFollowUpGroup && isAdmin && (
                 <Button
                   variant="default"
                   size="sm"

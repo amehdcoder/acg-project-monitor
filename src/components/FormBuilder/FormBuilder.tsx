@@ -49,6 +49,7 @@ import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, F
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { isMdaChecklistLike, isMdaFollowUpGroup } from "@/lib/mdaFollowUp";
 
 interface FormBuilderProps {
   onClose: () => void;
@@ -65,7 +66,7 @@ interface FormBuilderProps {
 }
 
 const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderProps) => {
-  const { profile } = useAuth();
+  const { profile, isAdmin } = useAuth();
   const [questions, setQuestions] = useState<Question[]>(() => {
     if (!editForm?.questions) return [];
     return (editForm.questions as any[]).filter((q: any) => !q.questions);
@@ -347,6 +348,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
       // Merge case management settings into form settings
       const fullSettings = {
         ...settings,
+        ...(isMdaChecklistForm ? { isMdaChecklist: true, coverageEvaluation: (settings as any)?.coverageEvaluation ?? true } : {}),
         theme,
         caseManagement: caseManagementSettings.enabled ? caseManagementSettings : undefined,
       };
@@ -515,14 +517,9 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     );
   };
 
-  const MDA_FOLLOWUP_GROUP_NAMES = useMemo(
-    () =>
-      new Set([
-        "follow_up_on_mda_completion",
-        "follow_up_on_mda_commodities",
-        "adverse_reaction_management",
-      ]),
-    [],
+  const isMdaChecklistForm = useMemo(
+    () => isMdaChecklistLike({ settings, formName, groups }),
+    [settings, formName, groups],
   );
 
   // Questions belonging to the main Community Checklist (every group that is
@@ -530,12 +527,23 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
   const checklistQuestions = useMemo<Question[]>(
     () =>
       groups
-        .filter((g) => !MDA_FOLLOWUP_GROUP_NAMES.has(g.name))
+        .filter((g) => !isMdaFollowUpGroup(g))
         .flatMap((g) => g.questions),
-    [groups, MDA_FOLLOWUP_GROUP_NAMES],
+    [groups],
   );
 
   const handleOpenFollowUpLink = (group: FormGroup) => {
+    if (!isAdmin) {
+      toast({
+        title: "Admin access required",
+        description: "Only Systems Admin, Super Admin, Owner, and Co-owner can build MDA follow-up linkages.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!isMdaChecklistForm || !isMdaFollowUpGroup(group)) {
+      return;
+    }
     setSelectedGroup(group);
     setShowFollowUpLink(true);
   };
@@ -773,7 +781,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
                   onOpenGroupSkipLogic={handleOpenGroupSkipLogic}
                   onOpenGroupValidation={handleOpenGroupValidation}
                   onOpenFollowUpLink={handleOpenFollowUpLink}
-                  isMdaChecklist={!!(settings as any)?.n || !!(settings as any)?.isMdaChecklist}
+                  isMdaChecklist={isMdaChecklistForm}
                   caseManagementEnabled={caseManagementSettings.enabled}
                 />
               </div>
@@ -904,7 +912,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
       )}
 
       {/* Follow-up Linking & Community Filter Editor */}
-      {selectedGroup && (
+      {selectedGroup && isAdmin && isMdaChecklistForm && isMdaFollowUpGroup(selectedGroup) && (
         <FollowUpLinkEditor
           key={`followup-link-${selectedGroup.id}`}
           open={showFollowUpLink}

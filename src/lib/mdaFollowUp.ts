@@ -91,3 +91,10 @@ export function isMdaChecklistLike(args: {
     hasMdaFollowUpGroups(args.groups)
   );
 }
+
+export function canRoleBuildMdaFollowUps(args: {
+  role?: string | null;
+  isOwnerLevel?: boolean | null;
+}): boolean {
+  return args.role === "super_admin" || args.role === "systems_admin" || !!args.isOwnerLevel;
+}

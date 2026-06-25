@@ -121,6 +121,7 @@ import BulkDataDialog from "@/components/FormBulk/BulkDataDialog";
 import BulkUploadAccessManager from "@/components/OwnerTools/BulkUploadAccessManager";
 import { useBulkDataAccess } from "@/hooks/useBulkDataAccess";
 import { scrollToAppTop } from "@/lib/scrollToAppTop";
+import { isMdaChecklistLike } from "@/lib/mdaFollowUp";
 import { FileSpreadsheet, KeyRound, GanttChartSquare, NotebookPen } from "lucide-react";
 
 interface FormSettings {
@@ -1246,7 +1247,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     };
     // The Integrated MDA Supervisory Checklist opens to its 5-item landing page
     // (Community Checklist + 4 follow-up modules) instead of the form directly.
-    if (fillingForm.settings?.isMdaChecklist) {
+    if (isMdaChecklistLike({ settings: fillingForm.settings, formName: fillingForm.name, groups: fillingForm.groups })) {
       return <MdaChecklistLanding {...fillerCommon} />;
     }
     return (
