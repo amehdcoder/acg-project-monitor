@@ -631,11 +631,20 @@ interface FormCanvasProps {
   onGroupsChange?: (groups: import("./types").FormGroup[]) => void;
   onOpenGroupSkipLogic?: (group: import("./types").FormGroup) => void;
   onOpenGroupValidation?: (group: import("./types").FormGroup) => void;
+  onOpenFollowUpLink?: (group: import("./types").FormGroup) => void;
   /** When case management is enabled, groups represent beautiful follow-up modules */
   caseManagementEnabled?: boolean;
+  /** When true (MDA checklist), show the follow-up linking control on follow-up groups. */
+  isMdaChecklist?: boolean;
 }
 
-const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValidation, groups = [], onGroupsChange, onOpenGroupSkipLogic, onOpenGroupValidation, caseManagementEnabled = false }: FormCanvasProps) => {
+const MDA_FOLLOWUP_GROUPS = new Set([
+  "follow_up_on_mda_completion",
+  "follow_up_on_mda_commodities",
+  "adverse_reaction_management",
+]);
+
+const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValidation, groups = [], onGroupsChange, onOpenGroupSkipLogic, onOpenGroupValidation, onOpenFollowUpLink, caseManagementEnabled = false, isMdaChecklist = false }: FormCanvasProps) => {
   // Flat list of ALL questions (grouped + ungrouped) — fed to SortableQuestion
   // so the cascade parent-picker can see every select_one question in the form.
   const allQuestions: Question[] = [
@@ -844,6 +853,8 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
                 onUngroup={(g) => handleUngroupGroup(g.id)}
                 onSkipLogic={onOpenGroupSkipLogic}
                 onValidation={onOpenGroupValidation}
+                onFollowUpLink={onOpenFollowUpLink}
+                isFollowUpGroup={isMdaChecklist && MDA_FOLLOWUP_GROUPS.has(group.name)}
                 onMoveUp={() => {
                   if (onGroupsChange && groupIndex > 0) {
                     const newGroups = [...groups];

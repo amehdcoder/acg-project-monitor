@@ -39,6 +39,7 @@ import SkipLogicEditor from "./SkipLogicEditor";
 import ValidationCriteriaEditor from "./ValidationCriteriaEditor";
 import GroupSkipLogicEditor from "./GroupSkipLogicEditor";
 import GroupValidationEditor from "./GroupValidationEditor";
+import FollowUpLinkEditor from "./FollowUpLinkEditor";
 import { CreateGroupDialog } from "./QuestionGroup";
 import XLSFormImportDialog from "./XLSFormImportDialog";
 import CaseManagementEditor, { CaseManagementSettings } from "./CaseManagementEditor";
@@ -99,6 +100,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
   const [showValidation, setShowValidation] = useState(false);
   const [showGroupSkipLogic, setShowGroupSkipLogic] = useState(false);
   const [showGroupValidation, setShowGroupValidation] = useState(false);
+  const [showFollowUpLink, setShowFollowUpLink] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<FormGroup | null>(null);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
@@ -509,6 +511,41 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     );
   };
 
+  const MDA_FOLLOWUP_GROUP_NAMES = useMemo(
+    () =>
+      new Set([
+        "follow_up_on_mda_completion",
+        "follow_up_on_mda_commodities",
+        "adverse_reaction_management",
+      ]),
+    [],
+  );
+
+  // Questions belonging to the main Community Checklist (every group that is
+  // NOT one of the standalone follow-up modules), used as link/condition sources.
+  const checklistQuestions = useMemo<Question[]>(
+    () =>
+      groups
+        .filter((g) => !MDA_FOLLOWUP_GROUP_NAMES.has(g.name))
+        .flatMap((g) => g.questions),
+    [groups, MDA_FOLLOWUP_GROUP_NAMES],
+  );
+
+  const handleOpenFollowUpLink = (group: FormGroup) => {
+    setSelectedGroup(group);
+    setShowFollowUpLink(true);
+  };
+
+  const handleSaveFollowUpLink = (updatedGroup: FormGroup) => {
+    setGroups((prev) =>
+      prev.map((g) => (g.id === updatedGroup.id ? updatedGroup : g))
+    );
+    setSelectedGroup((cur) =>
+      cur && cur.id === updatedGroup.id ? updatedGroup : cur
+    );
+  };
+
+
   const handleCreateGroup = (group: FormGroup) => {
     setGroups((prev) => [...prev, group]);
     toast({
@@ -731,6 +768,8 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
                   onGroupsChange={setGroups}
                   onOpenGroupSkipLogic={handleOpenGroupSkipLogic}
                   onOpenGroupValidation={handleOpenGroupValidation}
+                  onOpenFollowUpLink={handleOpenFollowUpLink}
+                  isMdaChecklist={!!(settings as any)?.isMdaChecklist}
                   caseManagementEnabled={caseManagementSettings.enabled}
                 />
               </div>
@@ -857,6 +896,18 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
           onOpenChange={setShowGroupValidation}
           group={selectedGroup}
           onSave={handleSaveGroupValidation}
+        />
+      )}
+
+      {/* Follow-up Linking & Community Filter Editor */}
+      {selectedGroup && (
+        <FollowUpLinkEditor
+          key={`followup-link-${selectedGroup.id}`}
+          open={showFollowUpLink}
+          onOpenChange={setShowFollowUpLink}
+          group={selectedGroup}
+          checklistQuestions={checklistQuestions}
+          onSave={handleSaveFollowUpLink}
         />
       )}
 

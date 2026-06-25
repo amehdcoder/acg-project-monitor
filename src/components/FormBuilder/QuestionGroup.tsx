@@ -24,6 +24,7 @@ import {
   GripVertical, 
   Repeat,
   GitBranch,
+  Link2,
   ShieldCheck,
   ArrowUp,
   ArrowDown,
@@ -43,6 +44,9 @@ interface QuestionGroupProps {
   onUngroup?: (group: FormGroup) => void;
   onSkipLogic?: (group: FormGroup) => void;
   onValidation?: (group: FormGroup) => void;
+  onFollowUpLink?: (group: FormGroup) => void;
+  /** When true, show the MDA follow-up linking control for this group. */
+  isFollowUpGroup?: boolean;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   isFirst?: boolean;
@@ -60,6 +64,8 @@ const QuestionGroupComponent = ({
   onUngroup,
   onSkipLogic,
   onValidation,
+  onFollowUpLink,
+  isFollowUpGroup = false,
   onMoveUp,
   onMoveDown,
   isFirst = false,
@@ -164,6 +170,12 @@ const QuestionGroupComponent = ({
                       Validation
                     </span>
                   )}
+                  {isFollowUpGroup && group.communityFilter && (
+                    <span className="flex items-center gap-1 text-fuchsia-600">
+                      <Link2 className="h-3 w-3" />
+                      Community filter
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -219,6 +231,20 @@ const QuestionGroupComponent = ({
               >
                 <ShieldCheck className="h-4 w-4" />
               </Button>
+              {isFollowUpGroup && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onFollowUpLink?.(group);
+                  }}
+                  className={`h-8 w-8 ${group.communityFilter ? "text-fuchsia-600" : "text-muted-foreground"}`}
+                  title="Follow-up linking & community filter"
+                >
+                  <Link2 className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"

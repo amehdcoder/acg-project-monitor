@@ -63,6 +63,13 @@ export interface Question {
   };
   appearance?: string;
   relevant?: string;
+  /**
+   * MDA follow-up linking: the `name` of a question in the main Community
+   * Checklist whose submitted response should prefill / link to this follow-up
+   * question. When a community is chosen for follow-up, the linked checklist
+   * response is carried into this field so it is accurately updated.
+   */
+  linkedSourceField?: string;
   constraint?: string;
   constraintMessage?: string;
   defaultValue?: string;
@@ -274,6 +281,12 @@ export interface FormGroup {
   relevant?: string;
   constraint?: string;
   constraintMessage?: string;
+  /**
+   * MDA follow-up: condition (XLSForm `relevant`-style expression referencing
+   * Community Checklist question `name`s) that governs which visited communities
+   * appear in this follow-up module's community list table. Empty = show all.
+   */
+  communityFilter?: string;
 }
 
 export interface GeofenceArea {
