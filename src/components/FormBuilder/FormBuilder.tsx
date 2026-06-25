@@ -493,6 +493,9 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     setGroups((prev) =>
       prev.map((g) => (g.id === updatedGroup.id ? updatedGroup : g))
     );
+    setSelectedGroup((cur) =>
+      cur && cur.id === updatedGroup.id ? updatedGroup : cur
+    );
   };
 
   const handleOpenGroupValidation = (group: FormGroup) => {
