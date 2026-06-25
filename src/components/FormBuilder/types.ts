@@ -70,6 +70,12 @@ export interface Question {
    * response is carried into this field so it is accurately updated.
    */
   linkedSourceField?: string;
+  /**
+   * Optional source option value selected from `linkedSourceField`. This lets
+   * MDA follow-up modules bind a follow-up question to a specific response
+   * option from the main Community Checklist, not just the source question.
+   */
+  linkedSourceValue?: string;
   constraint?: string;
   constraintMessage?: string;
   defaultValue?: string;

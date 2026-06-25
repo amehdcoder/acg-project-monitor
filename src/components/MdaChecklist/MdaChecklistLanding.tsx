@@ -10,8 +10,11 @@ import {
   Check,
   Upload,
   RotateCcw,
+  Link2,
+  ShieldCheck,
 } from "lucide-react";
 import { FormFiller } from "@/components/FormFiller";
+import FollowUpLinkEditor from "@/components/FormBuilder/FollowUpLinkEditor";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -20,6 +23,7 @@ import { evaluateRelevant, type NameToIdMap } from "@/lib/skipLogic";
 import {
   getMdaFollowUpGroupName,
   isMdaFollowUpGroup,
+  canRoleBuildMdaFollowUps,
   MDA_FOLLOWUP_ADVERSE,
   MDA_FOLLOWUP_COMMODITIES,
   MDA_FOLLOWUP_COMPLETION,
@@ -90,7 +94,7 @@ const TILES: TileDef[] = [
   { key: "community", view: "community", title: "Community Checklist", defaultImg: imgCommunity },
   { key: "hcs", view: "hcs-list", title: "Household Coverage Survey", defaultImg: imgHousehold },
   { key: "completion", view: "completion-list", title: "Follow-up on MDA Completion", defaultImg: imgCompletion },
-  { key: "commodities", view: "commodities-list", title: "Follow-up on MDA Commodities", defaultImg: imgCommodities },
+  { key: "commodities", view: "commodities-list", title: "Follow-up on MDA Commodities / Communities", defaultImg: imgCommodities },
   { key: "adverse", view: "adverse-list", title: "Follow-up on Adverse Reactions", defaultImg: imgAdverse },
 ];
 
@@ -121,13 +125,22 @@ async function fileToIconDataUrl(file: File, size = 256): Promise<string> {
 }
 
 export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
-  const { formId, formName, projectId, onClose, groups = [] } = props;
+  const { formId, formName, projectId, onClose } = props;
   const navigate = useNavigate();
-  const { isOwner, isOwnerLevel, isAdmin } = useAuth();
+  const { isOwner, isOwnerLevel, role } = useAuth();
   const { toast } = useToast();
+  const [localGroups, setLocalGroups] = useState<FormGroup[]>(props.groups || []);
+  const groups = localGroups;
   const canEditIcons = !!(isOwner || isOwnerLevel);
+  const canBuildFollowUps = canRoleBuildMdaFollowUps({ role, isOwnerLevel });
   const [view, setView] = useState<View>("home");
   const [selected, setSelected] = useState<VisitedCommunity | null>(null);
+  const [builderGroup, setBuilderGroup] = useState<FormGroup | null>(null);
+  const [builderOpen, setBuilderOpen] = useState(false);
+
+  useEffect(() => {
+    setLocalGroups(props.groups || []);
+  }, [props.groups]);
 
   // ── Owner-uploaded tile icons (shared via DB, cached locally for offline) ──
   const cacheKey = `amehnities:mdaTileIconUrls:${formId}`;
@@ -231,7 +244,7 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
       formName: props.formName,
       formDescription: props.formDescription,
       questions: props.questions,
-      groups: props.groups,
+      groups,
       geofence: props.geofence,
       userId: props.userId,
       projectId: props.projectId,
@@ -243,8 +256,64 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
       onClose: () => setView("home"),
       onSavedLocally: () => setView("home"),
     }),
-    [props],
+    [props, groups],
   );
+
+  const checklistQuestions = useMemo<Question[]>(
+    () => [
+      ...groups.filter((g) => !isMdaFollowUpGroup(g)).flatMap((g) => g.questions),
+      ...(props.questions || []),
+    ],
+    [groups, props.questions],
+  );
+
+  const followUpGroups = useMemo(() => groups.filter(isMdaFollowUpGroup), [groups]);
+
+  const openBuilder = (group: FormGroup | null) => {
+    if (!group) return;
+    if (!canBuildFollowUps) {
+      toast({
+        title: "Admin access required",
+        description: "Only Systems Admin, Super Admin, Owner, and Co-owner can build MDA follow-up linkages.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setBuilderGroup(group);
+    setBuilderOpen(true);
+  };
+
+  const saveBuilderGroup = (updatedGroup: FormGroup) => {
+    const previousGroups = groups;
+    const nextGroups = groups.map((g) => (g.id === updatedGroup.id ? updatedGroup : g));
+    setLocalGroups(nextGroups);
+    setBuilderGroup(updatedGroup);
+    supabase
+      .from("forms")
+      .update({ questions: [...nextGroups, ...(props.questions || [])] as any })
+      .eq("id", formId)
+      .then(({ error }) => {
+        if (error) {
+          setLocalGroups(previousGroups);
+          toast({
+            title: "Could not save follow-up builder",
+            description: error.message || "Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        toast({ title: "Follow-up builder saved", description: "Questions, source options, and community rules were saved." });
+      });
+  };
+
+  const groupFor = (name: string) => followUpGroups.find((g) => getMdaFollowUpGroupName(g) === name) || null;
+
+  const builderLabelFor = (canonical: string | null) =>
+    canonical === GROUP_COMPLETION
+      ? "MDA Completion"
+      : canonical === GROUP_COMMODITIES
+        ? "MDA Commodities / Communities"
+        : "Adverse Reactions";
 
   // Location prefill derived from a chosen community (locks location into the sub-form).
   const prefillFromCommunity = (c: VisitedCommunity | null): Record<string, any> => {
@@ -297,6 +366,7 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
       for (const q of g.questions) {
         if (q.linkedSourceField && q.name) {
           const v = c.data?.[q.linkedSourceField];
+          if (q.linkedSourceValue && !responseHasOption(v, q.linkedSourceValue)) continue;
           if (v !== undefined && v !== null && String(v) !== "") base[q.name] = v;
         }
       }
@@ -305,6 +375,17 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   };
 
   const filterFor = (groupName: string) => groupByName.get(groupName)?.communityFilter;
+
+  const builderDialog = builderGroup && canBuildFollowUps ? (
+    <FollowUpLinkEditor
+      key={`mda-landing-builder-${builderGroup.id}`}
+      open={builderOpen}
+      onOpenChange={setBuilderOpen}
+      group={builderGroup}
+      checklistQuestions={checklistQuestions}
+      onSave={saveBuilderGroup}
+    />
+  ) : null;
 
   if (view === "community") {
     return <FormFiller {...fillerProps(communityGroupNames)} />;
@@ -320,77 +401,92 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   }
   if (view === "hcs-list") {
     return (
-      <CommunityListView
-        formId={formId}
-        projectId={projectId}
-        title="Household Coverage Survey"
-        subtitle="Select a community to run the linked Coverage Evaluation 3D survey."
-        onBack={() => setView("home")}
-        onSelect={(c) => {
-          // Prefill + lock the Coverage Evaluation 3D location from this visit.
-          try {
-            const prefill = {
-              state: pick(c.data, ["state"]),
-              lga: c.lga,
-              ward: c.ward,
-              flhf_name: c.flhf,
-              community_name: c.community,
-              settlement_name: pick(c.data, ["settlement", "settlement_name"]),
-              projectId: projectId ?? "",
-              ts: Date.now(),
-            };
-            sessionStorage.setItem("amehnities:cesLocationPrefill", JSON.stringify(prefill));
-            sessionStorage.setItem("amehnities:cesFromChecklist", "1");
-          } catch { /* ignore */ }
-          window.dispatchEvent(new CustomEvent("amehnities:navigate-tab", { detail: { tab: "coverage-eval" } }));
-          navigate("/?tab=coverage-eval", { replace: true });
-        }}
-      />
+      <>
+        <CommunityListView
+          formId={formId}
+          projectId={projectId}
+          title="Household Coverage Survey"
+          subtitle="Select a community to run the linked Coverage Evaluation 3D survey."
+          onBack={() => setView("home")}
+          onSelect={(c) => {
+            // Prefill + lock the Coverage Evaluation 3D location from this visit.
+            try {
+              const prefill = {
+                state: pick(c.data, ["state"]),
+                lga: c.lga,
+                ward: c.ward,
+                flhf_name: c.flhf,
+                community_name: c.community,
+                settlement_name: pick(c.data, ["settlement", "settlement_name"]),
+                projectId: projectId ?? "",
+                ts: Date.now(),
+              };
+              sessionStorage.setItem("amehnities:cesLocationPrefill", JSON.stringify(prefill));
+              sessionStorage.setItem("amehnities:cesFromChecklist", "1");
+            } catch { /* ignore */ }
+            window.dispatchEvent(new CustomEvent("amehnities:navigate-tab", { detail: { tab: "coverage-eval" } }));
+            navigate("/?tab=coverage-eval", { replace: true });
+          }}
+        />
+        {builderDialog}
+      </>
     );
   }
   if (view === "completion-list") {
     return (
-      <CommunityListView
-        formId={formId}
-        projectId={projectId}
-        title="Follow-up on MDA Completion"
-        subtitle="Select a community to record the MDA completion follow-up."
-        accent="completion"
-        filterExpr={filterFor(GROUP_COMPLETION)}
-        nameMap={checklistNameMap}
-        onBack={() => setView("home")}
-        onSelect={(c) => { setSelected(c); setView("completion"); }}
-      />
+      <>
+        <CommunityListView
+          formId={formId}
+          projectId={projectId}
+          title="Follow-up on MDA Completion"
+          subtitle="Select a community to record the MDA completion follow-up."
+          accent="completion"
+          filterExpr={filterFor(GROUP_COMPLETION)}
+          nameMap={checklistNameMap}
+          onConfigure={canBuildFollowUps ? () => openBuilder(groupFor(GROUP_COMPLETION)) : undefined}
+          onBack={() => setView("home")}
+          onSelect={(c) => { setSelected(c); setView("completion"); }}
+        />
+        {builderDialog}
+      </>
     );
   }
   if (view === "commodities-list") {
     return (
-      <CommunityListView
-        formId={formId}
-        projectId={projectId}
-        title="Follow-up on MDA Commodities"
-        subtitle="Select a community to record commodity follow-up."
-        accent="commodities"
-        filterExpr={filterFor(GROUP_COMMODITIES)}
-        nameMap={checklistNameMap}
-        onBack={() => setView("home")}
-        onSelect={(c) => { setSelected(c); setView("commodities"); }}
-      />
+      <>
+        <CommunityListView
+          formId={formId}
+          projectId={projectId}
+          title="Follow-up on MDA Commodities / Communities"
+          subtitle="Select a community to record commodity follow-up."
+          accent="commodities"
+          filterExpr={filterFor(GROUP_COMMODITIES)}
+          nameMap={checklistNameMap}
+          onConfigure={canBuildFollowUps ? () => openBuilder(groupFor(GROUP_COMMODITIES)) : undefined}
+          onBack={() => setView("home")}
+          onSelect={(c) => { setSelected(c); setView("commodities"); }}
+        />
+        {builderDialog}
+      </>
     );
   }
   if (view === "adverse-list") {
     return (
-      <CommunityListView
-        formId={formId}
-        projectId={projectId}
-        title="Follow-up on Adverse Reactions"
-        subtitle="Select a community to record adverse reaction follow-up."
-        accent="adverse"
-        filterExpr={filterFor(GROUP_ADVERSE)}
-        nameMap={checklistNameMap}
-        onBack={() => setView("home")}
-        onSelect={(c) => { setSelected(c); setView("adverse"); }}
-      />
+      <>
+        <CommunityListView
+          formId={formId}
+          projectId={projectId}
+          title="Follow-up on Adverse Reactions"
+          subtitle="Select a community to record adverse reaction follow-up."
+          accent="adverse"
+          filterExpr={filterFor(GROUP_ADVERSE)}
+          nameMap={checklistNameMap}
+          onConfigure={canBuildFollowUps ? () => openBuilder(groupFor(GROUP_ADVERSE)) : undefined}
+          onBack={() => setView("home")}
+          onSelect={(c) => { setSelected(c); setView("adverse"); }}
+        />
+        {builderDialog}
+      </>
     );
   }
 
@@ -426,6 +522,42 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
       )}
 
       <main className="mx-auto w-full max-w-2xl px-5 py-8">
+        {canBuildFollowUps && followUpGroups.length > 0 && (
+          <section className="mb-7 overflow-hidden rounded-3xl bg-gradient-to-br from-[#4338ca] via-[#7c3aed] to-[#db2777] p-4 text-white shadow-lg">
+            <div className="flex items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/18 ring-1 ring-white/25">
+                <ShieldCheck className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-bold leading-tight">Follow-up question & linkage builder</p>
+                <p className="mt-1 text-xs leading-relaxed text-white/85">
+                  Add follow-up questions, link them to Community Checklist response options, and set which visited communities appear in each follow-up list.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              {followUpGroups.map((group) => {
+                const canonical = getMdaFollowUpGroupName(group);
+                const linked = group.questions.some((q) => q.linkedSourceField);
+                return (
+                  <button
+                    key={group.id}
+                    onClick={() => openBuilder(group)}
+                    className="flex min-h-[4.25rem] flex-col items-start justify-between rounded-2xl bg-white/15 p-3 text-left ring-1 ring-white/20 transition hover:bg-white/22 active:scale-[0.99]"
+                  >
+                    <span className="flex items-center gap-1.5 text-sm font-semibold">
+                      <Link2 className="h-4 w-4" /> Build {builderLabelFor(canonical)}
+                    </span>
+                    <span className={`mt-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${linked ? "bg-emerald-100 text-emerald-700" : "bg-white/20 text-white"}`}>
+                      {linked ? "linked" : "needs link"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         <div className="grid grid-cols-2 gap-x-6 gap-y-8">
           {TILES.map((t) => {
             const busy = uploadingKey === t.key;
@@ -470,8 +602,18 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
         </div>
         <p className="mt-10 text-center text-xs text-slate-400">{formName}</p>
       </main>
+
+      {builderDialog}
     </div>
   );
+}
+
+function responseHasOption(response: any, optionValue: string): boolean {
+  if (Array.isArray(response)) return response.map(String).includes(optionValue);
+  return String(response ?? "")
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .includes(optionValue);
 }
 
 // ───────────────────────── Community list table ─────────────────────────
@@ -537,6 +679,7 @@ function CommunityListView({
   accent = "default",
   filterExpr,
   nameMap,
+  onConfigure,
   onBack,
   onSelect,
 }: {
@@ -547,6 +690,7 @@ function CommunityListView({
   accent?: AccentKey;
   filterExpr?: string;
   nameMap?: NameToIdMap;
+  onConfigure?: () => void;
   onBack: () => void;
   onSelect: (c: VisitedCommunity) => void;
 }) {
@@ -612,6 +756,14 @@ function CommunityListView({
           <ArrowLeft className="h-6 w-6" />
         </button>
         <h1 className="flex-1 truncate text-base font-semibold tracking-wide sm:text-lg">{title}</h1>
+        {onConfigure && (
+          <button
+            onClick={onConfigure}
+            className="flex shrink-0 items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-xs font-semibold transition hover:bg-white/30"
+          >
+            <Link2 className="h-3.5 w-3.5" /> Build
+          </button>
+        )}
         {!loading && (
           <span className="shrink-0 rounded-full bg-white/20 px-2.5 py-1 text-xs font-semibold">
             {filtered.length}
