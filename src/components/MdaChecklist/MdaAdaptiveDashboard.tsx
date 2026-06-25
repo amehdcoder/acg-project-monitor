@@ -578,13 +578,20 @@ export default function MdaAdaptiveDashboard({
 
         {/* Overview KPIs */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
-          <KpiTile icon={ClipboardList} label="Checklist Visits" value={kpis.total} tint="#6366f1" />
-          <KpiTile icon={MapPin} label="Communities" value={kpis.communities} tint="#0ea5e9" />
-          <KpiTile icon={Users2} label="Supervisors" value={kpis.supervisors} tint="#06b6d4" />
-          <KpiTile icon={MapPin} label="States" value={kpis.states} tint="#10b981" />
-          <KpiTile icon={MapPin} label="LGAs" value={kpis.lgas} tint="#f59e0b" />
-          <KpiTile icon={MapPin} label="Wards" value={kpis.wards} tint="#ec4899" />
-          <KpiTile icon={CheckCircle2} label="Finalized" value={`${kpis.finalizedPct}%`} tint="#8b5cf6" />
+          <KpiTile icon={ClipboardList} label="Checklist Visits" value={kpis.total} tint="#6366f1"
+            onClick={() => openDrill({ title: "Checklist Visits", tint: "#6366f1", subtitle: `${visitRows.length} supervisory visit(s)`, rows: visitRows })} />
+          <KpiTile icon={MapPin} label="Communities" value={kpis.communities} tint="#0ea5e9"
+            onClick={() => openDrill({ title: "Communities visited", tint: "#0ea5e9", subtitle: `${communityVisits.length} distinct communit${communityVisits.length === 1 ? "y" : "ies"}`, rows: communityVisits })} />
+          <KpiTile icon={Users2} label="Supervisors" value={kpis.supervisors} tint="#06b6d4"
+            onClick={() => openDrill({ title: "Supervisor submissions", tint: "#06b6d4", subtitle: `${kpis.supervisors} supervisor(s) across ${visitRows.length} visit(s)`, rows: visitRows })} />
+          <KpiTile icon={MapPin} label="States" value={kpis.states} tint="#10b981"
+            onClick={() => openDrill({ title: "Submissions by State", tint: "#10b981", subtitle: `${kpis.states} state(s)`, rows: visitRows })} />
+          <KpiTile icon={MapPin} label="LGAs" value={kpis.lgas} tint="#f59e0b"
+            onClick={() => openDrill({ title: "Submissions by LGA", tint: "#f59e0b", subtitle: `${kpis.lgas} LGA(s)`, rows: visitRows })} />
+          <KpiTile icon={MapPin} label="Wards" value={kpis.wards} tint="#ec4899"
+            onClick={() => openDrill({ title: "Submissions by Ward", tint: "#ec4899", subtitle: `${kpis.wards} ward(s)`, rows: visitRows })} />
+          <KpiTile icon={CheckCircle2} label="Finalized" value={`${kpis.finalizedPct}%`} tint="#8b5cf6"
+            onClick={() => openDrill({ title: "Finalized submissions", tint: "#8b5cf6", subtitle: "Visits marked finalized / sent / submitted", rows: visitRows.filter((s) => ["finalized", "sent", "submitted"].includes(norm(s.status))) })} />
         </div>
 
         {/* Follow-up coverage */}
