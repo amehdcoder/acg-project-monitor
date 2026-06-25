@@ -28,7 +28,7 @@ export const NIGERIA_ADMIN_DATA: NigeriaAdminHierarchy = {
     "Umuahia North": ["Afugiri", "Ibeku East I", "Ibeku East Ii", "Ibeku West", "Isingwu", "Ndume", "Nkwoachara", "Nkwoegwu", "Umuahia Urban I", "Umuahia Urban Ii", "Umuahia Urban Iii", "Umuhu"],
     "Umuahia South": ["Ahiaukwu I", "Ahiaukwu Ii", "Amakama", "Ezeleke Ogbodiukwu", "Nsirimo", "Ohiaocha", "Old Umuahia", "Omaegwu", "Ubakala A", "Ubakala B"]
   },
-  "Abuja": {
+  "FCT": {
     "Abaji": ["Abaji Central", "Abaji North East", "Abaji South East", "Agyana Pandagi", "Alu Mamagi", "Gawu", "Gurdi", "Nuku", "Rimba Ebagi", "Yaba"],
     "Abuja Municipal": ["City Centre", "Garki", "Gui", "Gwagwa", "Gwarinpa", "Jiwa", "Kabusa", "Karshi", "Karu", "Nyanya", "Orozo", "Wuse"],
     "Bwari": ["Bwari Central", "Byazhin", "Dutse Alhaji", "Igu", "Kawu", "Kubwa", "Kuduru", "Shere", "Ushafa", "Usuma"],
@@ -859,15 +859,21 @@ export const NIGERIA_ADMIN_DATA: NigeriaAdminHierarchy = {
   },
 };
 
+const normalizeStateKey = (state: string): string => {
+  const key = String(state || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (["abuja", "fct", "fct abuja", "federal capital territory"].includes(key)) return "FCT";
+  return Object.keys(NIGERIA_ADMIN_DATA).find((s) => s.toLowerCase() === key) || state;
+};
+
 export const getAllStates = (): string[] => Object.keys(NIGERIA_ADMIN_DATA).sort();
 
 export const getLGAsForState = (state: string): string[] => {
-  const stateData = NIGERIA_ADMIN_DATA[state];
+  const stateData = NIGERIA_ADMIN_DATA[normalizeStateKey(state)];
   return stateData ? Object.keys(stateData).sort() : [];
 };
 
 export const getWardsForLGA = (state: string, lga: string): string[] => {
-  const stateData = NIGERIA_ADMIN_DATA[state];
+  const stateData = NIGERIA_ADMIN_DATA[normalizeStateKey(state)];
   if (!stateData) return [];
   const lgaData = stateData[lga];
   return lgaData ? [...lgaData].sort() : [];
