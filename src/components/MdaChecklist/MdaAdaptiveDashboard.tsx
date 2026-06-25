@@ -629,7 +629,7 @@ export default function MdaAdaptiveDashboard({
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {section.questions.map((q, qi) => (
-                  <QuestionCard key={q.id || keyFor(q)} q={q} submissions={submissions} color={PALETTE[(si + qi) % PALETTE.length]} />
+                  <QuestionCard key={q.id || keyFor(q)} q={q} submissions={visitRows} color={PALETTE[(si + qi) % PALETTE.length]} />
                 ))}
               </div>
             </div>
