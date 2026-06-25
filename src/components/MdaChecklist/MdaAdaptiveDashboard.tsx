@@ -602,7 +602,18 @@ export default function MdaAdaptiveDashboard({
               const pct = kpis.communities ? Math.round((fc.communities / kpis.communities) * 100) : 0;
               const tint = PALETTE[i % PALETTE.length];
               return (
-                <div key={fc.canonical} className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+                <button
+                  type="button"
+                  key={fc.canonical}
+                  onClick={() => openDrill({
+                    title: label,
+                    tint,
+                    subtitle: `${fc.communities} communit${fc.communities === 1 ? "y" : "ies"} followed up`,
+                    rows: followUpRowsByModule[fc.canonical] || [],
+                  })}
+                  className="rounded-xl border border-border/60 bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-1"
+                  style={{ ["--tw-ring-color" as any]: tint }}
+                >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-muted-foreground">{label}</span>
                     <span className="text-xs font-semibold" style={{ color: tint }}>{pct}%</span>
@@ -613,7 +624,8 @@ export default function MdaAdaptiveDashboard({
                   <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
                     <div className="h-full rounded-full" style={{ width: `${pct}%`, background: tint }} />
                   </div>
-                </div>
+                  <div className="mt-2 text-[10px] font-medium" style={{ color: tint }}>Click to view follow-up answers →</div>
+                </button>
               );
             })}
           </div>
