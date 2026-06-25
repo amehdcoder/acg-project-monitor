@@ -30,6 +30,11 @@ import { fetchProjectScope, EMPTY_SCOPE } from "@/lib/projectScope";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useAuth } from "@/hooks/useAuth";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
+import {
+  getGrid3FacilitiesWithCoords,
+  getGrid3SettlementsWithCoords,
+  type FacilityWithCoords,
+} from "@/lib/grid3NigeriaData";
 import LocationCombobox from "@/components/MdaChecklist/LocationCombobox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
