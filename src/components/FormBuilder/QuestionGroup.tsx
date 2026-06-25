@@ -231,6 +231,20 @@ const QuestionGroupComponent = ({
               >
                 <ShieldCheck className="h-4 w-4" />
               </Button>
+              {isFollowUpGroup && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onFollowUpLink?.(group);
+                  }}
+                  className={`h-8 w-8 ${group.communityFilter ? "text-fuchsia-600" : "text-muted-foreground"}`}
+                  title="Follow-up linking & community filter"
+                >
+                  <Link2 className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
