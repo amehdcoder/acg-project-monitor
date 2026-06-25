@@ -385,9 +385,8 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
                   disabled={busy}
                   className="group flex w-full flex-col items-center gap-3 rounded-2xl p-3 text-center transition-transform active:scale-95"
                 >
-                  <span
-                    className={`relative flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br ${t.gradient} shadow-md ring-4 ${t.ring} transition-transform group-hover:scale-105`}
-                  >
+                  <span className="relative flex h-24 w-24 items-center justify-center rounded-3xl bg-white shadow-sm transition-transform group-hover:scale-105">
+
                     {busy ? (
                       <Loader2 className="h-9 w-9 animate-spin text-slate-400" />
                     ) : (
