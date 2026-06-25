@@ -100,6 +100,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
   const [showValidation, setShowValidation] = useState(false);
   const [showGroupSkipLogic, setShowGroupSkipLogic] = useState(false);
   const [showGroupValidation, setShowGroupValidation] = useState(false);
+  const [showFollowUpLink, setShowFollowUpLink] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<FormGroup | null>(null);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
