@@ -11,8 +11,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import {
   FlaskConical, Rocket, CalendarClock, ArrowRightLeft, CheckCircle2,
-  AlertTriangle, Clock, Shield, Users, Save, Loader2, Timer,
+  AlertTriangle, Clock, Shield, Users, Save, Loader2, Timer, Trash2, ShieldAlert,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
@@ -34,6 +35,11 @@ const ChangeEnvironmentView = () => {
   const [saving, setSaving] = useState(false);
   const [configs, setConfigs] = useState<Record<string, EnvironmentConfig>>({});
   const autoMigrateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Owner-only: clear collected data for the selected form before going live
+  const [clearOpen, setClearOpen] = useState(false);
+  const [clearBusy, setClearBusy] = useState(false);
+  const [clearPhrase, setClearPhrase] = useState("");
 
   // Load projects
   useEffect(() => {
@@ -171,6 +177,30 @@ const ChangeEnvironmentView = () => {
   const toggleEnvironment = () => {
     const next = currentConfig.environment === "training" ? "live" : "training";
     updateConfig({ environment: next });
+  };
+
+  const selectedFormName = forms.find(f => f.id === selectedForm)?.name || "this form";
+
+  const handleClearData = async () => {
+    if (!selectedForm) return;
+    setClearBusy(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("owner_clear_form_submissions", {
+        _form_id: selectedForm,
+      });
+      if (error) throw error;
+      const r = data as any;
+      toast({
+        title: "Checklist data cleared",
+        description: `${r?.submissions_deleted ?? 0} submission(s) and ${r?.versions_deleted ?? 0} version snapshot(s) permanently removed for "${selectedFormName}".`,
+      });
+      setClearOpen(false);
+      setClearPhrase("");
+    } catch (err: any) {
+      toast({ title: "Clear failed", description: err.message, variant: "destructive" });
+    } finally {
+      setClearBusy(false);
+    }
   };
 
   const isLive = currentConfig.environment === "live";
@@ -446,6 +476,30 @@ const ChangeEnvironmentView = () => {
             </CardContent>
           </Card>
 
+          {/* Owner-only: clear collected data before going live */}
+          {isOwner && (
+            <Card className="border-2 border-destructive/40 shadow-md">
+              <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
+                <CardTitle className="text-sm sm:text-lg flex items-center gap-2 text-destructive">
+                  <ShieldAlert className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Clear Collected Data (Owner only)
+                </CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  Permanently delete every submission collected for <strong>{selectedFormName}</strong> so live
+                  data collection starts from a clean slate. Use this when switching from Training to Live to
+                  remove practice data. This affects only this form — other forms and projects are untouched.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <Button variant="destructive" onClick={() => setClearOpen(true)} className="gap-2 h-9 sm:h-10 text-xs sm:text-sm">
+                  <Trash2 className="h-4 w-4" /> Clear this form's collected data
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+
+
           {/* Save Button */}
           <div className="flex justify-end gap-3">
             <Button variant="acg" onClick={handleSave} disabled={saving} className="gap-2 min-w-[140px] sm:min-w-[160px] h-9 sm:h-10 text-xs sm:text-sm">
@@ -455,6 +509,35 @@ const ChangeEnvironmentView = () => {
           </div>
         </>
       )}
+
+      {/* Confirm: clear collected data */}
+      <Dialog open={clearOpen} onOpenChange={(o) => { if (!clearBusy) { setClearOpen(o); if (!o) setClearPhrase(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" /> Permanently clear collected data
+            </DialogTitle>
+            <DialogDescription>
+              This deletes <strong>all</strong> submissions, version history, tracking events and anomaly flags
+              collected for <strong>{selectedFormName}</strong>. This cannot be undone. Type{" "}
+              <code className="px-1.5 py-0.5 bg-muted rounded font-mono">CLEAR</code> to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={clearPhrase}
+            onChange={(e) => setClearPhrase(e.target.value)}
+            placeholder="CLEAR"
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearOpen(false)} disabled={clearBusy}>Cancel</Button>
+            <Button variant="destructive" onClick={handleClearData} disabled={clearBusy || clearPhrase !== "CLEAR"}>
+              {clearBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Delete permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

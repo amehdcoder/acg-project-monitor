@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { exportMdaDashboard } from "@/lib/mda/dashboardExport";
+import { prepareMdaData } from "@/lib/mda/dashboardData";
 
 // ───────────────────────── Types ─────────────────────────
 interface QOption { id?: string; label: string; value: string; }
@@ -76,6 +77,13 @@ const PALETTE = [
   "#6366f1", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#ec4899",
   "#8b5cf6", "#14b8a6", "#f97316", "#3b82f6", "#84cc16", "#e11d48",
 ];
+
+// Human labels for the canonical follow-up module keys.
+const FOLLOWUP_LABELS: Record<string, string> = {
+  follow_up_on_mda_completion: "MDA Completion follow-up",
+  follow_up_on_mda_commodities: "MDA Commodities follow-up",
+  adverse_reaction_management: "Adverse Reactions follow-up",
+};
 
 const stripTags = (s?: string) => String(s || "").replace(/<[^>]*>/g, "").trim();
 const norm = (v: any) => String(v ?? "").trim().toLowerCase();
@@ -389,6 +397,12 @@ export default function MdaAdaptiveDashboard({
     return allSubmissions.filter((s) => !s.projectId || String(s.projectId) === activeProject);
   }, [allSubmissions, activeProject]);
 
+  // Separate primary checklist visits from follow-up rows, and merge follow-up
+  // answers back onto each community so charts reflect the latest responses.
+  const prepared = useMemo(() => prepareMdaData(submissions, questions as any), [submissions, questions]);
+  // The dataset every chart/KPI is computed from = accurate community visits.
+  const visitRows = prepared.checklist;
+
   const activeProjectName =
     activeProject === "all"
       ? "All projects"
@@ -397,7 +411,7 @@ export default function MdaAdaptiveDashboard({
   const handleExport = async () => {
     setExporting(true);
     try {
-      await exportMdaDashboard(submissions, questions, formName || "MDA Supervisory Checklist", activeProjectName);
+      await exportMdaDashboard(visitRows, questions, formName || "MDA Supervisory Checklist", activeProjectName);
       toast.success("Dashboard metrics exported to Excel");
     } catch (e) {
       console.error(e);
@@ -408,14 +422,15 @@ export default function MdaAdaptiveDashboard({
   };
 
 
-  // Overview KPIs (always adaptive to whatever submissions exist)
+  // Overview KPIs — computed ONLY from primary checklist visits (follow-up
+  // rows are merged in, never double-counted), so figures never mislead.
   const kpis = useMemo(() => {
     const supervisors = new Set<string>();
     const states = new Set<string>();
     const lgas = new Set<string>();
     const wards = new Set<string>();
     let finalized = 0;
-    for (const s of submissions) {
+    for (const s of visitRows) {
       if (s.submitter) supervisors.add(String(s.submitter));
       const st = s.state || s.data?.state; if (st) states.add(norm(st));
       const lg = s.lga || s.data?.lga; if (lg) lgas.add(norm(lg));
@@ -423,19 +438,20 @@ export default function MdaAdaptiveDashboard({
       if (norm(s.status) === "finalized" || norm(s.status) === "sent" || norm(s.status) === "submitted") finalized++;
     }
     return {
-      total: submissions.length,
+      total: visitRows.length,
+      communities: prepared.communityCount,
       supervisors: supervisors.size,
       states: states.size,
       lgas: lgas.size,
       wards: wards.size,
-      finalizedPct: submissions.length ? Math.round((finalized / submissions.length) * 100) : 0,
+      finalizedPct: visitRows.length ? Math.round((finalized / visitRows.length) * 100) : 0,
     };
-  }, [submissions]);
+  }, [visitRows, prepared.communityCount]);
 
-  // Visits over time (from submittedAt)
+  // Visits over time (from submittedAt) — primary visits only.
   const timeline = useMemo(() => {
     const byDay = new Map<string, number>();
-    for (const s of submissions) {
+    for (const s of visitRows) {
       if (!s.submittedAt) continue;
       const d = new Date(s.submittedAt);
       if (isNaN(d.getTime())) continue;
@@ -445,7 +461,7 @@ export default function MdaAdaptiveDashboard({
     return [...byDay.entries()]
       .sort((a, b) => (a[0] < b[0] ? -1 : 1))
       .map(([date, value]) => ({ date: date.slice(5), value }));
-  }, [submissions]);
+  }, [visitRows]);
 
   const visibleSections = useMemo(() => {
     let secs = activeSection === "all" ? sections : sections.filter((s) => s.name === activeSection);
@@ -491,7 +507,7 @@ export default function MdaAdaptiveDashboard({
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handleExport} disabled={exporting || submissions.length === 0} className="gap-2 bg-gradient-to-r from-indigo-500 to-cyan-500 text-white hover:opacity-90">
+            <Button onClick={handleExport} disabled={exporting || visitRows.length === 0} className="gap-2 bg-gradient-to-r from-indigo-500 to-cyan-500 text-white hover:opacity-90">
               <FileSpreadsheet className="h-4 w-4" />
               {exporting ? "Exporting…" : "Export to Excel"}
             </Button>
@@ -500,15 +516,53 @@ export default function MdaAdaptiveDashboard({
       </CardHeader>
 
       <CardContent className="space-y-6">
+        {/* Accuracy note: explain exactly what the figures represent */}
+        <div className="flex items-start gap-2 rounded-lg border border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-xs text-muted-foreground">
+          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
+          <span>
+            Figures below count <span className="font-semibold text-foreground">community checklist visits only</span>.
+            {prepared.hasFollowUpGroups && (
+              <> Follow-up submissions ({prepared.followUps.length}) are <span className="font-semibold text-foreground">merged</span> onto
+              their community — the latest follow-up answer updates the linked question — and are never double-counted as visits.</>
+            )}
+          </span>
+        </div>
+
         {/* Overview KPIs */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <KpiTile icon={ClipboardList} label="Total Visits" value={kpis.total} tint="#6366f1" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+          <KpiTile icon={ClipboardList} label="Checklist Visits" value={kpis.total} tint="#6366f1" />
+          <KpiTile icon={MapPin} label="Communities" value={kpis.communities} tint="#0ea5e9" />
           <KpiTile icon={Users2} label="Supervisors" value={kpis.supervisors} tint="#06b6d4" />
           <KpiTile icon={MapPin} label="States" value={kpis.states} tint="#10b981" />
           <KpiTile icon={MapPin} label="LGAs" value={kpis.lgas} tint="#f59e0b" />
           <KpiTile icon={MapPin} label="Wards" value={kpis.wards} tint="#ec4899" />
           <KpiTile icon={CheckCircle2} label="Finalized" value={`${kpis.finalizedPct}%`} tint="#8b5cf6" />
         </div>
+
+        {/* Follow-up coverage */}
+        {prepared.hasFollowUpGroups && (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {prepared.followUpCoverage.map((fc, i) => {
+              const label = FOLLOWUP_LABELS[fc.canonical] || "Follow-up";
+              const pct = kpis.communities ? Math.round((fc.communities / kpis.communities) * 100) : 0;
+              const tint = PALETTE[i % PALETTE.length];
+              return (
+                <div key={fc.canonical} className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                    <span className="text-xs font-semibold" style={{ color: tint }}>{pct}%</span>
+                  </div>
+                  <div className="mt-1 font-display text-xl font-bold text-foreground">
+                    {fc.communities}<span className="text-sm font-normal text-muted-foreground"> / {kpis.communities} communities</span>
+                  </div>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: tint }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Visits over time */}
         {timeline.length > 1 && (
@@ -557,7 +611,7 @@ export default function MdaAdaptiveDashboard({
         </div>
 
         {/* Adaptive per-section insights */}
-        {submissions.length === 0 ? (
+        {visitRows.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-12 text-center">
             <Activity className="h-10 w-10 text-muted-foreground/40" />
             <p className="mt-3 text-sm text-muted-foreground">No submissions yet. Insights appear here as data is collected.</p>
@@ -575,7 +629,7 @@ export default function MdaAdaptiveDashboard({
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {section.questions.map((q, qi) => (
-                  <QuestionCard key={q.id || keyFor(q)} q={q} submissions={submissions} color={PALETTE[(si + qi) % PALETTE.length]} />
+                  <QuestionCard key={q.id || keyFor(q)} q={q} submissions={visitRows} color={PALETTE[(si + qi) % PALETTE.length]} />
                 ))}
               </div>
             </div>

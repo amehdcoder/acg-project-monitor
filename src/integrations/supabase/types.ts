@@ -7011,6 +7011,10 @@ export type Database = {
         Args: { _form_code: string }
         Returns: string
       }
+      owner_clear_form_submissions: {
+        Args: { _form_id: string }
+        Returns: Json
+      }
       owner_clear_microplanning: {
         Args: {
           _lga?: string
