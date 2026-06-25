@@ -390,6 +390,12 @@ export default function MdaAdaptiveDashboard({
     return allSubmissions.filter((s) => !s.projectId || String(s.projectId) === activeProject);
   }, [allSubmissions, activeProject]);
 
+  // Separate primary checklist visits from follow-up rows, and merge follow-up
+  // answers back onto each community so charts reflect the latest responses.
+  const prepared = useMemo(() => prepareMdaData(submissions, questions as any), [submissions, questions]);
+  // The dataset every chart/KPI is computed from = accurate community visits.
+  const visitRows = prepared.checklist;
+
   const activeProjectName =
     activeProject === "all"
       ? "All projects"
