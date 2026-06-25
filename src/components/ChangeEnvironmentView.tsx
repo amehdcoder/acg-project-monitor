@@ -509,6 +509,35 @@ const ChangeEnvironmentView = () => {
           </div>
         </>
       )}
+
+      {/* Confirm: clear collected data */}
+      <Dialog open={clearOpen} onOpenChange={(o) => { if (!clearBusy) { setClearOpen(o); if (!o) setClearPhrase(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" /> Permanently clear collected data
+            </DialogTitle>
+            <DialogDescription>
+              This deletes <strong>all</strong> submissions, version history, tracking events and anomaly flags
+              collected for <strong>{selectedFormName}</strong>. This cannot be undone. Type{" "}
+              <code className="px-1.5 py-0.5 bg-muted rounded font-mono">CLEAR</code> to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={clearPhrase}
+            onChange={(e) => setClearPhrase(e.target.value)}
+            placeholder="CLEAR"
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearOpen(false)} disabled={clearBusy}>Cancel</Button>
+            <Button variant="destructive" onClick={handleClearData} disabled={clearBusy || clearPhrase !== "CLEAR"}>
+              {clearBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Delete permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
