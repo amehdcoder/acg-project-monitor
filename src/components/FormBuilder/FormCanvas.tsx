@@ -65,6 +65,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import { isMdaFollowUpGroup } from "@/lib/mdaFollowUp";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   text: Type,
@@ -636,15 +637,11 @@ interface FormCanvasProps {
   caseManagementEnabled?: boolean;
   /** When true (MDA checklist), show the follow-up linking control on follow-up groups. */
   isMdaChecklist?: boolean;
+  /** Explicit role gate for MDA follow-up builder buttons. */
+  canBuildMdaFollowUps?: boolean;
 }
 
-const MDA_FOLLOWUP_GROUPS = new Set([
-  "follow_up_on_mda_completion",
-  "follow_up_on_mda_commodities",
-  "adverse_reaction_management",
-]);
-
-const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValidation, groups = [], onGroupsChange, onOpenGroupSkipLogic, onOpenGroupValidation, onOpenFollowUpLink, caseManagementEnabled = false, isMdaChecklist = false }: FormCanvasProps) => {
+const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValidation, groups = [], onGroupsChange, onOpenGroupSkipLogic, onOpenGroupValidation, onOpenFollowUpLink, caseManagementEnabled = false, isMdaChecklist = false, canBuildMdaFollowUps = false }: FormCanvasProps) => {
   // Flat list of ALL questions (grouped + ungrouped) — fed to SortableQuestion
   // so the cascade parent-picker can see every select_one question in the form.
   const allQuestions: Question[] = [
@@ -854,7 +851,8 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
                 onSkipLogic={onOpenGroupSkipLogic}
                 onValidation={onOpenGroupValidation}
                 onFollowUpLink={onOpenFollowUpLink}
-                isFollowUpGroup={isMdaChecklist && MDA_FOLLOWUP_GROUPS.has(group.name)}
+                isFollowUpGroup={isMdaChecklist && isMdaFollowUpGroup(group)}
+                canBuildMdaFollowUps={canBuildMdaFollowUps}
                 onMoveUp={() => {
                   if (onGroupsChange && groupIndex > 0) {
                     const newGroups = [...groups];

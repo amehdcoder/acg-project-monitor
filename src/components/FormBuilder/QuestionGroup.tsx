@@ -47,6 +47,8 @@ interface QuestionGroupProps {
   onFollowUpLink?: (group: FormGroup) => void;
   /** When true, show the MDA follow-up linking control for this group. */
   isFollowUpGroup?: boolean;
+  /** Explicit role gate: Systems Admin, Super Admin, Owner, and Co-owner only. */
+  canBuildMdaFollowUps?: boolean;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   isFirst?: boolean;
@@ -66,6 +68,7 @@ const QuestionGroupComponent = ({
   onValidation,
   onFollowUpLink,
   isFollowUpGroup = false,
+  canBuildMdaFollowUps = false,
   onMoveUp,
   onMoveDown,
   isFirst = false,
@@ -231,7 +234,7 @@ const QuestionGroupComponent = ({
               >
                 <ShieldCheck className="h-4 w-4" />
               </Button>
-              {isFollowUpGroup && (
+              {isFollowUpGroup && canBuildMdaFollowUps && (
                 <Button
                   variant="default"
                   size="sm"

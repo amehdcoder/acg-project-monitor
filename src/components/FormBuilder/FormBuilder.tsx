@@ -45,10 +45,16 @@ import XLSFormImportDialog from "./XLSFormImportDialog";
 import CaseManagementEditor, { CaseManagementSettings } from "./CaseManagementEditor";
 import ThemeEditor from "./ThemeEditor";
 import { normalizeFormTheme, FormTheme } from "@/lib/formTheme";
-import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate, MoreHorizontal, Plus, Palette, GitBranch } from "lucide-react";
+import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate, MoreHorizontal, Plus, Palette, GitBranch, Link2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  canRoleBuildMdaFollowUps,
+  getMdaFollowUpGroupName,
+  isMdaChecklistLike,
+  isMdaFollowUpGroup,
+} from "@/lib/mdaFollowUp";
 
 interface FormBuilderProps {
   onClose: () => void;
@@ -65,7 +71,7 @@ interface FormBuilderProps {
 }
 
 const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderProps) => {
-  const { profile } = useAuth();
+  const { profile, role, isOwnerLevel } = useAuth();
   const [questions, setQuestions] = useState<Question[]>(() => {
     if (!editForm?.questions) return [];
     return (editForm.questions as any[]).filter((q: any) => !q.questions);
@@ -347,6 +353,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
       // Merge case management settings into form settings
       const fullSettings = {
         ...settings,
+        ...(isMdaChecklistForm ? { isMdaChecklist: true, coverageEvaluation: (settings as any)?.coverageEvaluation ?? true } : {}),
         theme,
         caseManagement: caseManagementSettings.enabled ? caseManagementSettings : undefined,
       };
@@ -388,9 +395,9 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     } catch (error: any) {
       console.error("Error saving form:", error);
       const msg = typeof error?.message === "string" ? error.message : "";
-      const isFollowUpBlock = msg.includes("Follow-up module");
+      const isFollowUpBlock = msg.includes("Follow-up module") || msg.includes("Only Systems Admin");
       toast({
-        title: isFollowUpBlock ? "Follow-up not linked" : "Error",
+        title: isFollowUpBlock ? "Follow-up builder blocked" : "Error",
         description: isFollowUpBlock
           ? msg
           : "Failed to save form. Please try again.",
@@ -515,27 +522,45 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     );
   };
 
-  const MDA_FOLLOWUP_GROUP_NAMES = useMemo(
-    () =>
-      new Set([
-        "follow_up_on_mda_completion",
-        "follow_up_on_mda_commodities",
-        "adverse_reaction_management",
-      ]),
-    [],
+  const isMdaChecklistForm = useMemo(
+    () => isMdaChecklistLike({ settings, formName, groups }),
+    [settings, formName, groups],
+  );
+
+  const canBuildMdaFollowUps = useMemo(
+    () => canRoleBuildMdaFollowUps({ role, isOwnerLevel }),
+    [role, isOwnerLevel],
+  );
+
+  const mdaFollowUpGroups = useMemo(
+    () => groups.filter(isMdaFollowUpGroup),
+    [groups],
   );
 
   // Questions belonging to the main Community Checklist (every group that is
   // NOT one of the standalone follow-up modules), used as link/condition sources.
   const checklistQuestions = useMemo<Question[]>(
-    () =>
-      groups
-        .filter((g) => !MDA_FOLLOWUP_GROUP_NAMES.has(g.name))
+    () => [
+      ...groups
+        .filter((g) => !isMdaFollowUpGroup(g))
         .flatMap((g) => g.questions),
-    [groups, MDA_FOLLOWUP_GROUP_NAMES],
+      ...questions,
+    ],
+    [groups, questions],
   );
 
   const handleOpenFollowUpLink = (group: FormGroup) => {
+    if (!canBuildMdaFollowUps) {
+      toast({
+        title: "Admin access required",
+        description: "Only Systems Admin, Super Admin, Owner, and Co-owner can build MDA follow-up linkages.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!isMdaChecklistForm || !isMdaFollowUpGroup(group)) {
+      return;
+    }
     setSelectedGroup(group);
     setShowFollowUpLink(true);
   };
@@ -736,6 +761,45 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
         </div>
 
         <TabsContent value="questions" className="mt-0 flex-1 min-h-0 overflow-hidden">
+          {isMdaChecklistForm && canBuildMdaFollowUps && mdaFollowUpGroups.length > 0 && (
+            <div className="border-b bg-gradient-to-r from-fuchsia-600 via-primary to-cyan-600 px-3 py-3 text-white shadow-soft sm:px-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="bg-white/20 text-white hover:bg-white/25">Admin follow-up builder</Badge>
+                    <span className="text-sm font-semibold">Build questions, link source responses, and set community list rules</span>
+                  </div>
+                  <p className="mt-1 text-xs text-white/85">
+                    Visible only to Systems Admin, Super Admin, Owner, and Co-owner roles.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {mdaFollowUpGroups.map((group) => {
+                    const canonical = getMdaFollowUpGroupName(group);
+                    const shortLabel = canonical?.includes("completion")
+                      ? "Completion"
+                      : canonical?.includes("commodit")
+                        ? "Commodities"
+                        : "Adverse Reactions";
+                    const linked = group.questions.some((q) => !!q.linkedSourceField);
+                    return (
+                      <Button
+                        key={group.id}
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => handleOpenFollowUpLink(group)}
+                        className="gap-1.5 bg-white text-primary hover:bg-white/90"
+                      >
+                        <Link2 className="h-4 w-4" />
+                        Build {shortLabel}
+                        {linked && <span className="ml-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700">linked</span>}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
           <DndContext
             sensors={sensors}
             collisionDetection={pointerWithin}
@@ -773,7 +837,8 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
                   onOpenGroupSkipLogic={handleOpenGroupSkipLogic}
                   onOpenGroupValidation={handleOpenGroupValidation}
                   onOpenFollowUpLink={handleOpenFollowUpLink}
-                  isMdaChecklist={!!(settings as any)?.n || !!(settings as any)?.isMdaChecklist}
+                  isMdaChecklist={isMdaChecklistForm}
+                  canBuildMdaFollowUps={canBuildMdaFollowUps}
                   caseManagementEnabled={caseManagementSettings.enabled}
                 />
               </div>
@@ -904,7 +969,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
       )}
 
       {/* Follow-up Linking & Community Filter Editor */}
-      {selectedGroup && (
+      {selectedGroup && canBuildMdaFollowUps && isMdaChecklistForm && isMdaFollowUpGroup(selectedGroup) && (
         <FollowUpLinkEditor
           key={`followup-link-${selectedGroup.id}`}
           open={showFollowUpLink}

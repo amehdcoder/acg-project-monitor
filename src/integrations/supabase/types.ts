@@ -6877,6 +6877,7 @@ export type Database = {
         Returns: boolean
       }
       can_view_all_locations: { Args: { _user_id: string }; Returns: boolean }
+      current_user_can_build_mda_followups: { Args: never; Returns: boolean }
       ensure_hands_staff_group: {
         Args: { _project_id: string }
         Returns: string

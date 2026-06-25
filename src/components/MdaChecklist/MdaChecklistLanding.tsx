@@ -17,6 +17,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import type { Question, FormGroup } from "@/components/FormBuilder/types";
 import { evaluateRelevant, type NameToIdMap } from "@/lib/skipLogic";
+import {
+  getMdaFollowUpGroupName,
+  isMdaFollowUpGroup,
+  MDA_FOLLOWUP_ADVERSE,
+  MDA_FOLLOWUP_COMMODITIES,
+  MDA_FOLLOWUP_COMPLETION,
+} from "@/lib/mdaFollowUp";
 
 // Default illustrated tile icons (match the supervisory checklist design).
 import imgCommunity from "@/assets/mda-tiles/community-checklist.png";
@@ -25,12 +32,10 @@ import imgCompletion from "@/assets/mda-tiles/mda-completion.png";
 import imgCommodities from "@/assets/mda-tiles/mda-commodities.png";
 import imgAdverse from "@/assets/mda-tiles/adverse-reactions.png";
 
-/** Group name slugs (mirror mdaSupervisoryChecklist.ts). */
-const GROUP_COMPLETION = "follow_up_on_mda_completion";
-const GROUP_COMMODITIES = "follow_up_on_mda_commodities";
-const GROUP_ADVERSE = "adverse_reaction_management";
-// The "Community Checklist" = every group EXCEPT the standalone follow-up subforms.
-const FOLLOWUP_GROUPS = new Set([GROUP_COMPLETION, GROUP_COMMODITIES, GROUP_ADVERSE]);
+/** Canonical MDA follow-up group names. */
+const GROUP_COMPLETION = MDA_FOLLOWUP_COMPLETION;
+const GROUP_COMMODITIES = MDA_FOLLOWUP_COMMODITIES;
+const GROUP_ADVERSE = MDA_FOLLOWUP_ADVERSE;
 
 interface VisitedCommunity {
   id: string;
@@ -258,14 +263,18 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
 
   // "Community Checklist" = all groups except the standalone follow-up subforms.
   const communityGroupNames = useMemo(
-    () => groups.filter((g) => !FOLLOWUP_GROUPS.has(g.name)).map((g) => g.name),
+    () => groups.filter((g) => !isMdaFollowUpGroup(g)).map((g) => g.name),
     [groups],
   );
 
   // Lookup helpers for follow-up linking & community filtering.
   const groupByName = useMemo(() => {
     const m = new Map<string, FormGroup>();
-    for (const g of groups) m.set(g.name, g);
+    for (const g of groups) {
+      m.set(g.name, g);
+      const canonical = getMdaFollowUpGroupName(g);
+      if (canonical) m.set(canonical, g);
+    }
     return m;
   }, [groups]);
 
@@ -274,7 +283,7 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   const checklistNameMap = useMemo<NameToIdMap>(() => {
     const map: NameToIdMap = {};
     for (const g of groups) {
-      if (FOLLOWUP_GROUPS.has(g.name)) continue;
+      if (isMdaFollowUpGroup(g)) continue;
       for (const q of g.questions) if (q.name) map[q.name] = q.name;
     }
     return map;

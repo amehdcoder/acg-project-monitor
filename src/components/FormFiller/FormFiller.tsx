@@ -122,6 +122,7 @@ import {
   getFormDraftKey,
   hasMeaningfulFormResponses,
 } from "@/lib/formProgressPersistence";
+import { isMdaChecklistLike } from "@/lib/mdaFollowUp";
 
 // Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
 
@@ -486,10 +487,7 @@ const FormFiller = ({
   // Also detect by name so older/offline saved copies that missed the settings
   // flag still use the MDA chrome and never render the generic duplicate header.
   const normalizedFormName = (formName || "").toLowerCase();
-  const isMdaChecklist =
-    !!settings.isMdaChecklist ||
-    normalizedFormName.includes("integrated mda supervisory checklist") ||
-    normalizedFormName.includes("mda supervisory checklist");
+  const isMdaChecklist = isMdaChecklistLike({ settings, formName, groups: groupsProp });
   const offerCoverageEvaluation = isMdaChecklist && !!settings.coverageEvaluation && !previewMode;
   // Treatment Data Reporting Tools drive their geography from the microplan via
   // <MdaLocationCascade> (with the off-microplan provision), without the full
