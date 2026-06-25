@@ -527,18 +527,30 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     [settings, formName, groups],
   );
 
-  // Questions belonging to the main Community Checklist (every group that is
-  // NOT one of the standalone follow-up modules), used as link/condition sources.
-  const checklistQuestions = useMemo<Question[]>(
-    () =>
-      groups
-        .filter((g) => !isMdaFollowUpGroup(g))
-        .flatMap((g) => g.questions),
+  const canBuildMdaFollowUps = useMemo(
+    () => canRoleBuildMdaFollowUps({ role, isOwnerLevel }),
+    [role, isOwnerLevel],
+  );
+
+  const mdaFollowUpGroups = useMemo(
+    () => groups.filter(isMdaFollowUpGroup),
     [groups],
   );
 
+  // Questions belonging to the main Community Checklist (every group that is
+  // NOT one of the standalone follow-up modules), used as link/condition sources.
+  const checklistQuestions = useMemo<Question[]>(
+    () => [
+      ...groups
+        .filter((g) => !isMdaFollowUpGroup(g))
+        .flatMap((g) => g.questions),
+      ...questions,
+    ],
+    [groups, questions],
+  );
+
   const handleOpenFollowUpLink = (group: FormGroup) => {
-    if (!isAdmin) {
+    if (!canBuildMdaFollowUps) {
       toast({
         title: "Admin access required",
         description: "Only Systems Admin, Super Admin, Owner, and Co-owner can build MDA follow-up linkages.",
