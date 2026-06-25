@@ -277,7 +277,7 @@ const NearbyPanel: React.FC = () => {
               ))}
             </div>
           )}
-        </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );
