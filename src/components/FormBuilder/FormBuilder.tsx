@@ -395,9 +395,9 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     } catch (error: any) {
       console.error("Error saving form:", error);
       const msg = typeof error?.message === "string" ? error.message : "";
-      const isFollowUpBlock = msg.includes("Follow-up module");
+      const isFollowUpBlock = msg.includes("Follow-up module") || msg.includes("Only Systems Admin");
       toast({
-        title: isFollowUpBlock ? "Follow-up not linked" : "Error",
+        title: isFollowUpBlock ? "Follow-up builder blocked" : "Error",
         description: isFollowUpBlock
           ? msg
           : "Failed to save form. Please try again.",
