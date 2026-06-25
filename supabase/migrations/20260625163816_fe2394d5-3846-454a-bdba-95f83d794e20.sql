@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.current_user_can_build_mda_followups() FROM anon;
