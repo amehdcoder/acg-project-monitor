@@ -53,6 +53,8 @@ export const useGeolocation = (options?: PositionOptions) => {
     watchId: number | null;
     timers: ReturnType<typeof setTimeout>[];
     settled: boolean;
+    bestAccuracy: number;
+    firstFixAt: number | null;
   } | null>(null);
 
   const commitPosition = useCallback((p: globalThis.GeolocationPosition) => {
