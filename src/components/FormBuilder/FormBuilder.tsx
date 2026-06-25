@@ -39,6 +39,7 @@ import SkipLogicEditor from "./SkipLogicEditor";
 import ValidationCriteriaEditor from "./ValidationCriteriaEditor";
 import GroupSkipLogicEditor from "./GroupSkipLogicEditor";
 import GroupValidationEditor from "./GroupValidationEditor";
+import FollowUpLinkEditor from "./FollowUpLinkEditor";
 import { CreateGroupDialog } from "./QuestionGroup";
 import XLSFormImportDialog from "./XLSFormImportDialog";
 import CaseManagementEditor, { CaseManagementSettings } from "./CaseManagementEditor";
