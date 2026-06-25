@@ -45,6 +45,8 @@ interface DraftQuestion {
   name: string;
   type: QuestionType;
   linkedSourceField?: string;
+  linkedSourceValue?: string;
+  options?: QuestionOption[];
 }
 
 interface FollowUpLinkEditorProps {
@@ -100,6 +102,17 @@ function buildFilter(rows: ConditionRow[], joiner: "and" | "or"): string {
   return valid.map((r) => `selected(\${${r.field}}, '${r.value}')`).join(` ${joiner} `);
 }
 
+const isChoiceType = (type: QuestionType) =>
+  type === "select_one" || type === "select_multiple" || type === "rank";
+
+const defaultOptions = (): QuestionOption[] => [
+  { id: `opt-${Date.now()}-1`, label: "Option 1", value: "option_1" },
+  { id: `opt-${Date.now()}-2`, label: "Option 2", value: "option_2" },
+];
+
+const optionValueFromLabel = (label: string, fallback = "option") =>
+  slugify(label, fallback).replace(/_{2,}/g, "_");
+
 export function FollowUpLinkEditor({
   open,
   onOpenChange,
@@ -116,6 +129,7 @@ export function FollowUpLinkEditor({
     () => checklistQuestions.filter((q) => q.type === "select_one" || q.type === "select_multiple"),
     [checklistQuestions],
   );
+  const linkableSourceQuestions = choiceQuestions;
 
   useEffect(() => {
     if (!open || !group) return;
@@ -129,18 +143,27 @@ export function FollowUpLinkEditor({
         name: q.name || q.id,
         type: q.type,
         linkedSourceField: q.linkedSourceField,
+        linkedSourceValue: q.linkedSourceValue,
+        options: q.options,
       })),
     );
   }, [open, group]);
 
-  if (!group) return null;
-
-  const qByName = (name: string) => choiceQuestions.find((q) => q.name === name);
+  const qByName = (name: string) => choiceQuestions.find((q) => (q.name || q.id) === name);
+  const sourceQuestionByName = (name?: string) =>
+    checklistQuestions.find((q) => (q.name || q.id) === name);
+  const isFullyLinked = (q: DraftQuestion) => {
+    if (!q.linkedSourceField || q.linkedSourceField === NONE) return false;
+    const source = sourceQuestionByName(q.linkedSourceField);
+    return !!source && (source.options?.length ?? 0) > 0 && !!q.linkedSourceValue;
+  };
 
   const linkedCount = useMemo(
-    () => questions.filter((q) => q.linkedSourceField && q.linkedSourceField !== NONE).length,
-    [questions],
+    () => questions.filter(isFullyLinked).length,
+    [questions, checklistQuestions],
   );
+
+  if (!group) return null;
 
   const addRow = () => setRows((r) => [...r, { field: "", value: "" }]);
   const removeRow = (i: number) => setRows((r) => r.filter((_, idx) => idx !== i));
@@ -159,12 +182,56 @@ export function FollowUpLinkEditor({
         name: "",
         type: "text",
         linkedSourceField: undefined,
+        linkedSourceValue: undefined,
+        options: undefined,
       },
     ]);
   const removeQuestion = (id: string) =>
     setQuestions((qs) => qs.filter((q) => q.id !== id));
   const updateQuestion = (id: string, patch: Partial<DraftQuestion>) =>
     setQuestions((qs) => qs.map((q) => (q.id === id ? { ...q, ...patch } : q)));
+  const updateQuestionType = (id: string, type: QuestionType) =>
+    setQuestions((qs) =>
+      qs.map((q) => {
+        if (q.id !== id) return q;
+        const next: DraftQuestion = { ...q, type };
+        if (isChoiceType(type) && (!next.options || next.options.length === 0)) {
+          next.options = defaultOptions();
+        }
+        if (!isChoiceType(type)) next.options = undefined;
+        return next;
+      }),
+    );
+  const addQuestionOption = (id: string) =>
+    setQuestions((qs) =>
+      qs.map((q) => {
+        if (q.id !== id) return q;
+        const count = (q.options?.length ?? 0) + 1;
+        return {
+          ...q,
+          options: [
+            ...(q.options || []),
+            { id: `opt-${Date.now()}-${count}`, label: `Option ${count}`, value: `option_${count}` },
+          ],
+        };
+      }),
+    );
+  const updateQuestionOption = (questionId: string, optionId: string, patch: Partial<QuestionOption>) =>
+    setQuestions((qs) =>
+      qs.map((q) => {
+        if (q.id !== questionId) return q;
+        return {
+          ...q,
+          options: q.options?.map((o) => (o.id === optionId ? { ...o, ...patch } : o)),
+        };
+      }),
+    );
+  const removeQuestionOption = (questionId: string, optionId: string) =>
+    setQuestions((qs) =>
+      qs.map((q) =>
+        q.id === questionId ? { ...q, options: q.options?.filter((o) => o.id !== optionId) } : q,
+      ),
+    );
 
   const handleSave = () => {
     const labelled = questions.filter((q) => q.label.trim());
@@ -176,11 +243,11 @@ export function FollowUpLinkEditor({
       });
       return;
     }
-    if (labelled.filter((q) => q.linkedSourceField && q.linkedSourceField !== NONE).length === 0) {
+    if (labelled.filter(isFullyLinked).length === 0) {
       toast({
         title: "Link at least one follow-up question",
         description:
-          "You must link at least one follow-up question to a Community Checklist response before saving.",
+          "You must link at least one follow-up question to a Community Checklist response option before saving.",
         variant: "destructive",
       });
       return;
@@ -196,7 +263,10 @@ export function FollowUpLinkEditor({
       let name = (dq.name || slugify(dq.label, dq.id)).trim();
       while (usedNames.has(name)) name = `${name}_1`;
       usedNames.add(name);
-      const src = dq.linkedSourceField && dq.linkedSourceField !== NONE ? dq.linkedSourceField : undefined;
+      const source = sourceQuestionByName(dq.linkedSourceField);
+      const needsOption = (source?.options?.length ?? 0) > 0;
+      const src = isFullyLinked(dq) ? dq.linkedSourceField : undefined;
+      const srcValue = src && needsOption ? dq.linkedSourceValue : undefined;
       return {
         ...(base ?? { required: false }),
         id: dq.id,
@@ -205,6 +275,8 @@ export function FollowUpLinkEditor({
         type: dq.type,
         required: base?.required ?? false,
         linkedSourceField: src,
+        linkedSourceValue: srcValue,
+        options: isChoiceType(dq.type) ? (dq.options || defaultOptions()) : undefined,
       } as Question;
     });
 
@@ -366,7 +438,10 @@ export function FollowUpLinkEditor({
 
               <div className="space-y-3">
                 {questions.map((q, idx) => {
-                  const linked = !!q.linkedSourceField && q.linkedSourceField !== NONE;
+                  const sourceQuestion = sourceQuestionByName(q.linkedSourceField);
+                  const sourceOptions = sourceQuestion?.options || [];
+                  const sourceNeedsOption = sourceOptions.length > 0;
+                  const linked = isFullyLinked(q);
                   return (
                     <div
                       key={q.id}
@@ -390,7 +465,7 @@ export function FollowUpLinkEditor({
                           <div className="flex flex-wrap items-center gap-2">
                             <Select
                               value={q.type}
-                              onValueChange={(v) => updateQuestion(q.id, { type: v as QuestionType })}
+                              onValueChange={(v) => updateQuestionType(q.id, v as QuestionType)}
                             >
                               <SelectTrigger className="h-8 w-[9.5rem] text-xs">
                                 <SelectValue />
@@ -411,6 +486,7 @@ export function FollowUpLinkEditor({
                                 onValueChange={(v) =>
                                   updateQuestion(q.id, {
                                     linkedSourceField: v === NONE ? undefined : v,
+                                    linkedSourceValue: undefined,
                                   })
                                 }
                               >
@@ -419,7 +495,7 @@ export function FollowUpLinkEditor({
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value={NONE}>No link</SelectItem>
-                                  {checklistQuestions.map((cq) => (
+                                  {linkableSourceQuestions.map((cq) => (
                                     <SelectItem key={cq.id} value={cq.name || cq.id}>
                                       {cq.label}
                                     </SelectItem>
@@ -427,10 +503,75 @@ export function FollowUpLinkEditor({
                                 </SelectContent>
                               </Select>
                             </div>
+                            {sourceNeedsOption && (
+                              <div className="flex flex-1 items-center gap-1.5">
+                                <span className="shrink-0 text-[11px] font-medium text-muted-foreground">option</span>
+                                <Select
+                                  value={q.linkedSourceValue || undefined}
+                                  onValueChange={(v) => updateQuestion(q.id, { linkedSourceValue: v })}
+                                >
+                                  <SelectTrigger className="h-8 flex-1 text-xs">
+                                    <SelectValue placeholder="Source option response" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {sourceOptions.map((o) => (
+                                      <SelectItem key={o.id} value={o.value}>
+                                        {o.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
                             {linked && (
                               <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
                             )}
                           </div>
+                          {isChoiceType(q.type) && (
+                            <div className="rounded-lg border border-border/70 bg-background/80 p-2">
+                              <div className="mb-2 flex items-center justify-between gap-2">
+                                <span className="text-xs font-semibold text-muted-foreground">Follow-up answer options</span>
+                                <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => addQuestionOption(q.id)}>
+                                  <Plus className="h-3.5 w-3.5" /> Add option
+                                </Button>
+                              </div>
+                              <div className="space-y-2">
+                                {(q.options || []).map((option) => (
+                                  <div key={option.id} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
+                                    <Input
+                                      value={option.label}
+                                      onChange={(e) =>
+                                        updateQuestionOption(q.id, option.id, {
+                                          label: e.target.value,
+                                          value: option.value || optionValueFromLabel(e.target.value),
+                                        })
+                                      }
+                                      placeholder="Option label"
+                                      className="h-8 text-xs"
+                                    />
+                                    <Input
+                                      value={option.value}
+                                      onChange={(e) =>
+                                        updateQuestionOption(q.id, option.id, {
+                                          value: optionValueFromLabel(e.target.value),
+                                        })
+                                      }
+                                      placeholder="xml_value"
+                                      className="h-8 font-mono text-xs"
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      onClick={() => removeQuestionOption(q.id, option.id)}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                         <Button
                           variant="ghost"
