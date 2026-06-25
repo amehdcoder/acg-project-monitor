@@ -666,6 +666,64 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
             )}
           </div>
 
+          {/* Offline prefetch — save the GRID3 location data for the relevant
+              states so the cascade works instantly with no network. */}
+          {useAdminHierarchy && prefetchableStates.length > 0 && (
+            <div className="overflow-hidden rounded-2xl border border-sky-300/70 bg-gradient-to-br from-sky-50 via-cyan-50 to-emerald-50 dark:border-sky-500/40 dark:from-sky-950/40 dark:via-cyan-950/30 dark:to-emerald-950/20">
+              <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-emerald-500 text-white shadow-sm">
+                    {isOffline ? <WifiOff className="h-5 w-5" /> : <DownloadCloud className="h-5 w-5" />}
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-foreground sm:text-base">
+                      Save location data for offline use
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {allSaved
+                        ? `Saved for offline: ${prefetchableStates.join(", ")}. The cascade will load instantly with no network.`
+                        : `Download the full FLHF & community lists for ${prefetchableStates.join(", ")} so supervision works completely offline in the field.`}
+                    </p>
+                    {isOffline && !allSaved && (
+                      <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                        You are offline — only states already saved will load.
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-start sm:self-center">
+                  {allSaved ? (
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                      <CheckCircle2 className="h-4 w-4" /> Ready offline
+                    </span>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handlePrefetch}
+                      disabled={prefetchState === "running" || isOffline}
+                      className="gap-1.5 bg-gradient-to-br from-sky-600 to-emerald-600 text-white hover:from-sky-700 hover:to-emerald-700"
+                    >
+                      {prefetchState === "running" ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          {prefetchProgress.done}/{prefetchProgress.total}
+                        </>
+                      ) : (
+                        <>
+                          <DownloadCloud className="h-4 w-4" />
+                          Save for offline
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+
+
 
           {microplanIsEmpty && (
             <div className="flex items-start gap-3 rounded-xl border border-sky-300 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
