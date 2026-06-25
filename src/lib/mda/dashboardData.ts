@@ -22,6 +22,11 @@
  */
 import { isMdaFollowUpGroup, getMdaFollowUpGroupName } from "@/lib/mdaFollowUp";
 
+export interface RawOption {
+  value?: string;
+  label?: string;
+  linkedSourceValues?: string[];
+}
 export interface RawQuestion {
   id?: string;
   name?: string;
@@ -29,6 +34,7 @@ export interface RawQuestion {
   type?: string;
   questions?: RawQuestion[]; // present when this is a group
   linkedSourceField?: string;
+  options?: RawOption[];
 }
 
 export interface RawSubmission {
@@ -73,6 +79,8 @@ interface GroupInfo {
   questionNames: string[];
   /** map of follow-up question name -> linked source question name */
   linkMap: Record<string, string>;
+  /** map of follow-up question name -> { follow-up option value -> source value(s) } */
+  optionLinkMap: Record<string, Record<string, string[]>>;
 }
 
 function collectGroups(questions: RawQuestion[]): { followUp: GroupInfo[]; checklistKeys: Set<string> } {
@@ -82,13 +90,27 @@ function collectGroups(questions: RawQuestion[]): { followUp: GroupInfo[]; check
     const isGroup = Array.isArray(item.questions) && !item.type;
     if (isGroup && isMdaFollowUpGroup(item as any)) {
       const linkMap: Record<string, string> = {};
+      const optionLinkMap: Record<string, Record<string, string[]>> = {};
       const names: string[] = [];
       for (const q of item.questions || []) {
         if (!q?.name) continue;
         names.push(q.name);
         if (q.linkedSourceField) linkMap[q.name] = q.linkedSourceField;
+        // Capture option-level links for choice follow-up questions.
+        const optMap: Record<string, string[]> = {};
+        for (const o of q.options || []) {
+          if (o?.value && Array.isArray(o.linkedSourceValues) && o.linkedSourceValues.length) {
+            optMap[o.value] = o.linkedSourceValues;
+          }
+        }
+        if (Object.keys(optMap).length) optionLinkMap[q.name] = optMap;
       }
-      followUp.push({ canonical: getMdaFollowUpGroupName(item as any), questionNames: names, linkMap });
+      followUp.push({
+        canonical: getMdaFollowUpGroupName(item as any),
+        questionNames: names,
+        linkMap,
+        optionLinkMap,
+      });
     } else if (isGroup) {
       for (const q of item.questions || []) if (q?.name) checklistKeys.add(q.name);
     } else if (item.type && item.name) {
@@ -121,9 +143,11 @@ export function prepareMdaData<T extends RawSubmission>(
   const { followUp, checklistKeys } = collectGroups(questions);
   const followUpOnly = new Set<string>();
   const followUpLinkMap: Record<string, string> = {};
+  const followUpOptionLinkMap: Record<string, Record<string, string[]>> = {};
   for (const g of followUp) {
     for (const n of g.questionNames) if (!checklistKeys.has(n)) followUpOnly.add(n);
     Object.assign(followUpLinkMap, g.linkMap);
+    Object.assign(followUpOptionLinkMap, g.optionLinkMap);
   }
 
   const hasFollowUpGroups = followUp.length > 0;
@@ -170,8 +194,21 @@ export function prepareMdaData<T extends RawSubmission>(
     for (const [followUpName, sourceField] of Object.entries(followUpLinkMap)) {
       const v = fd[followUpName];
       if (v !== undefined && v !== null && String(v) !== "") {
-        // Update the determinant (linked) checklist field with the follow-up value.
-        (target.data as any)[sourceField] = v;
+        // Translate the follow-up answer to the linked source option value(s)
+        // when option-level links are defined, so the determinant matches the
+        // original Community Checklist option vocabulary.
+        const optMap = followUpOptionLinkMap[followUpName];
+        let sourceValue: any = v;
+        if (optMap) {
+          const tokens = Array.isArray(v) ? v.map(String) : String(v).split(/\s+/);
+          const mapped: string[] = [];
+          for (const tk of tokens) {
+            for (const sv of optMap[tk] || []) if (!mapped.includes(sv)) mapped.push(sv);
+          }
+          if (mapped.length) sourceValue = mapped.join(" ");
+        }
+        // Update the determinant (linked) checklist field with the mapped value.
+        (target.data as any)[sourceField] = sourceValue;
         (target.data as any)[followUpName] = v;
       }
     }

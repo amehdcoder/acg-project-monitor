@@ -33,6 +33,13 @@ export interface QuestionOption {
    * equals this string.
    */
   parentValue?: string;
+  /**
+   * MDA follow-up option-level linking. The source option value(s) of the
+   * linked Community Checklist question that THIS follow-up answer option maps
+   * to. One follow-up option can be linked to one, several, or all source
+   * options (e.g. follow-up "Ongoing" → Community Checklist "Ongoing").
+   */
+  linkedSourceValues?: string[];
 }
 
 export interface Question {
