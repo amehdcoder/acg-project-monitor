@@ -1,43 +1,28 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
-  MapPin,
-  Radar,
-  ClipboardList,
-  Pill,
-  HeartPulse,
   ChevronRight,
   Loader2,
   Search,
   Inbox,
   Pencil,
   Check,
-  X,
-  // Icon library for admin customization
-  Activity,
-  AlertTriangle,
-  BarChart3,
-  Boxes,
-  CalendarCheck,
-  CheckCircle2,
-  ClipboardCheck,
-  FileText,
-  FlaskConical,
-  Home,
-  ListChecks,
-  Microscope,
-  Package,
-  ShieldCheck,
-  Stethoscope,
-  Syringe,
-  Truck,
-  Users,
+  Upload,
+  RotateCcw,
 } from "lucide-react";
 import { FormFiller } from "@/components/FormFiller";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import type { Question, FormGroup } from "@/components/FormBuilder/types";
+
+// Default illustrated tile icons (match the supervisory checklist design).
+import imgCommunity from "@/assets/mda-tiles/community-checklist.png";
+import imgHousehold from "@/assets/mda-tiles/household-coverage.png";
+import imgCompletion from "@/assets/mda-tiles/mda-completion.png";
+import imgCommodities from "@/assets/mda-tiles/mda-commodities.png";
+import imgAdverse from "@/assets/mda-tiles/adverse-reactions.png";
 
 /** Group name slugs (mirror mdaSupervisoryChecklist.ts). */
 const GROUP_COMPLETION = "follow_up_on_mda_completion";
@@ -88,63 +73,152 @@ const pick = (d: Record<string, any>, keys: string[]): string => {
   return "";
 };
 
-// Library of icons admins can assign to a tile.
-const ICON_LIBRARY = {
-  MapPin, Radar, ClipboardList, Pill, HeartPulse, Activity, AlertTriangle,
-  BarChart3, Boxes, CalendarCheck, CheckCircle2, ClipboardCheck, FileText,
-  FlaskConical, Home, ListChecks, Microscope, Package, ShieldCheck,
-  Stethoscope, Syringe, Truck, Users,
-} as const;
-type IconName = keyof typeof ICON_LIBRARY;
-
 interface TileDef {
   key: string;
   view: View;
   title: string;
-  defaultIcon: IconName;
+  defaultImg: string;
   gradient: string;
   ring: string;
 }
 
 const TILES: TileDef[] = [
-  { key: "community", view: "community", title: "Community Checklist", defaultIcon: "MapPin", gradient: "from-rose-500 to-pink-600", ring: "ring-rose-200" },
-  { key: "hcs", view: "hcs-list", title: "Household Coverage Survey", defaultIcon: "Radar", gradient: "from-fuchsia-500 to-purple-600", ring: "ring-fuchsia-200" },
-  { key: "completion", view: "completion-list", title: "Follow-up on MDA Completion", defaultIcon: "ClipboardList", gradient: "from-emerald-500 to-teal-600", ring: "ring-emerald-200" },
-  { key: "commodities", view: "commodities-list", title: "Follow-up on MDA Commodities", defaultIcon: "Pill", gradient: "from-amber-500 to-orange-600", ring: "ring-amber-200" },
-  { key: "adverse", view: "adverse-list", title: "Follow-up on Adverse Reactions", defaultIcon: "HeartPulse", gradient: "from-sky-500 to-indigo-600", ring: "ring-sky-200" },
+  { key: "community", view: "community", title: "Community Checklist", defaultImg: imgCommunity, gradient: "from-rose-50 to-pink-100", ring: "ring-rose-200" },
+  { key: "hcs", view: "hcs-list", title: "Household Coverage Survey", defaultImg: imgHousehold, gradient: "from-fuchsia-50 to-purple-100", ring: "ring-fuchsia-200" },
+  { key: "completion", view: "completion-list", title: "Follow-up on MDA Completion", defaultImg: imgCompletion, gradient: "from-emerald-50 to-teal-100", ring: "ring-emerald-200" },
+  { key: "commodities", view: "commodities-list", title: "Follow-up on MDA Commodities", defaultImg: imgCommodities, gradient: "from-amber-50 to-orange-100", ring: "ring-amber-200" },
+  { key: "adverse", view: "adverse-list", title: "Follow-up on Adverse Reactions", defaultImg: imgAdverse, gradient: "from-sky-50 to-indigo-100", ring: "ring-sky-200" },
 ];
+
+// Resize an uploaded image to a small square PNG data-URL (keeps the row light & offline-cacheable).
+async function fileToIconDataUrl(file: File, size = 256): Promise<string> {
+  const dataUrl: string = await new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result));
+    fr.onerror = reject;
+    fr.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = reject;
+    i.src = dataUrl;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  // Contain the image centered on a transparent square.
+  const scale = Math.min(size / img.width, size / img.height);
+  const w = img.width * scale;
+  const h = img.height * scale;
+  ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+  return canvas.toDataURL("image/png");
+}
 
 export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   const { formId, formName, projectId, onClose, groups = [] } = props;
   const navigate = useNavigate();
-  const { isAdmin, isOwner } = useAuth();
-  const canEditIcons = !!(isAdmin || isOwner);
+  const { isOwner, isOwnerLevel, isAdmin } = useAuth();
+  const { toast } = useToast();
+  const canEditIcons = !!(isOwner || isOwnerLevel);
   const [view, setView] = useState<View>("home");
   const [selected, setSelected] = useState<VisitedCommunity | null>(null);
 
-  // ── Admin-customizable tile icons (persisted per form) ──
-  const iconStorageKey = `amehnities:mdaTileIcons:${formId}`;
-  const [iconOverrides, setIconOverrides] = useState<Record<string, IconName>>({});
-  const [editingIcons, setEditingIcons] = useState(false);
-  const [pickingTile, setPickingTile] = useState<string | null>(null);
-
-  useEffect(() => {
+  // ── Owner-uploaded tile icons (shared via DB, cached locally for offline) ──
+  const cacheKey = `amehnities:mdaTileIconUrls:${formId}`;
+  const [iconUrls, setIconUrls] = useState<Record<string, string>>(() => {
     try {
-      const raw = localStorage.getItem(iconStorageKey);
-      if (raw) setIconOverrides(JSON.parse(raw));
-    } catch { /* ignore */ }
-  }, [iconStorageKey]);
+      const raw = localStorage.getItem(cacheKey);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [editingIcons, setEditingIcons] = useState(false);
+  const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingTileRef = useRef<string | null>(null);
 
-  const setTileIcon = (tileKey: string, icon: IconName) => {
-    setIconOverrides((prev) => {
-      const next = { ...prev, [tileKey]: icon };
-      try { localStorage.setItem(iconStorageKey, JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
-    setPickingTile(null);
+  // Load shared overrides from the database.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("mda_tile_icons")
+          .select("tile_key, icon_url")
+          .eq("form_id", formId);
+        if (error) throw error;
+        if (!active) return;
+        const map: Record<string, string> = {};
+        for (const r of data || []) map[r.tile_key] = r.icon_url;
+        setIconUrls(map);
+        try { localStorage.setItem(cacheKey, JSON.stringify(map)); } catch { /* ignore */ }
+      } catch {
+        /* offline / not yet available — keep cached values */
+      }
+    })();
+    return () => { active = false; };
+  }, [formId, cacheKey]);
+
+  const imgFor = (t: TileDef): string => iconUrls[t.key] || t.defaultImg;
+
+  const triggerUpload = (tileKey: string) => {
+    pendingTileRef.current = tileKey;
+    fileInputRef.current?.click();
   };
 
-  const iconFor = (t: TileDef): IconName => iconOverrides[t.key] || t.defaultIcon;
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const tileKey = pendingTileRef.current;
+    e.target.value = "";
+    if (!file || !tileKey) return;
+    setUploadingKey(tileKey);
+    try {
+      const iconUrl = await fileToIconDataUrl(file);
+      const { error } = await supabase
+        .from("mda_tile_icons")
+        .upsert(
+          { form_id: formId, tile_key: tileKey, icon_url: iconUrl, updated_at: new Date().toISOString(), updated_by: props.userId },
+          { onConflict: "form_id,tile_key" },
+        );
+      if (error) throw error;
+      setIconUrls((prev) => {
+        const next = { ...prev, [tileKey]: iconUrl };
+        try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch { /* ignore */ }
+        return next;
+      });
+      toast({ title: "Icon updated", description: "The tile icon has been saved for everyone." });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err?.message || "Could not save the icon.", variant: "destructive" });
+    } finally {
+      setUploadingKey(null);
+    }
+  };
+
+  const resetIcon = async (tileKey: string) => {
+    setUploadingKey(tileKey);
+    try {
+      const { error } = await supabase
+        .from("mda_tile_icons")
+        .delete()
+        .eq("form_id", formId)
+        .eq("tile_key", tileKey);
+      if (error) throw error;
+      setIconUrls((prev) => {
+        const next = { ...prev };
+        delete next[tileKey];
+        try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch { /* ignore */ }
+        return next;
+      });
+      toast({ title: "Icon reset", description: "Reverted to the default icon." });
+    } catch (err: any) {
+      toast({ title: "Reset failed", description: err?.message || "Could not reset the icon.", variant: "destructive" });
+    } finally {
+      setUploadingKey(null);
+    }
+  };
 
   // Build the FormFiller props for a focused sub-form / community checklist.
   const fillerProps = useCallback(
@@ -271,6 +345,13 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   // ── Landing grid ──
   return (
     <div className="min-h-screen bg-[#eef0f3]">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+        className="hidden"
+        onChange={handleFileSelected}
+      />
       <header className="sticky top-0 z-20 flex items-center gap-3 bg-[#5b6fc4] px-4 py-4 text-white shadow-md">
         <button onClick={onClose} className="rounded-full p-1 transition-colors hover:bg-white/15" aria-label="Back">
           <ArrowLeft className="h-6 w-6" />
@@ -278,7 +359,7 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
         <h1 className="flex-1 truncate text-lg font-semibold tracking-wide">MDA Supervisory Checklist</h1>
         {canEditIcons && (
           <button
-            onClick={() => { setEditingIcons((v) => !v); setPickingTile(null); }}
+            onClick={() => setEditingIcons((v) => !v)}
             className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-white/25"
           >
             {editingIcons ? <><Check className="h-4 w-4" /> Done</> : <><Pencil className="h-4 w-4" /> Edit icons</>}
@@ -286,72 +367,59 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
         )}
       </header>
 
+      {editingIcons && (
+        <p className="mx-auto mt-3 max-w-2xl px-5 text-center text-xs text-slate-500">
+          Tap a tile to upload a custom icon image. Changes are saved for everyone.
+        </p>
+      )}
+
       <main className="mx-auto w-full max-w-2xl px-5 py-8">
         <div className="grid grid-cols-2 gap-x-6 gap-y-8">
           {TILES.map((t) => {
-            const Icon = ICON_LIBRARY[iconFor(t)];
+            const busy = uploadingKey === t.key;
+            const hasCustom = !!iconUrls[t.key];
             return (
               <div key={t.key} className="relative flex flex-col items-center">
                 <button
-                  onClick={() => (editingIcons ? setPickingTile(t.key) : setView(t.view))}
+                  onClick={() => (editingIcons ? triggerUpload(t.key) : setView(t.view))}
+                  disabled={busy}
                   className="group flex w-full flex-col items-center gap-3 rounded-2xl p-3 text-center transition-transform active:scale-95"
                 >
                   <span
-                    className={`relative flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br ${t.gradient} text-white shadow-lg ring-4 ${t.ring} transition-transform group-hover:scale-105`}
+                    className={`relative flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br ${t.gradient} shadow-md ring-4 ${t.ring} transition-transform group-hover:scale-105`}
                   >
-                    <Icon className="h-12 w-12" strokeWidth={1.6} />
-                    {editingIcons && (
+                    {busy ? (
+                      <Loader2 className="h-9 w-9 animate-spin text-slate-400" />
+                    ) : (
+                      <img
+                        src={imgFor(t)}
+                        alt={t.title}
+                        loading="lazy"
+                        className="h-16 w-16 object-contain"
+                      />
+                    )}
+                    {editingIcons && !busy && (
                       <span className="absolute -right-1.5 -top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#5b6fc4] shadow ring-1 ring-slate-200">
-                        <Pencil className="h-3.5 w-3.5" />
+                        <Upload className="h-3.5 w-3.5" />
                       </span>
                     )}
                   </span>
                   <span className="text-[15px] font-medium leading-tight text-slate-800">{t.title}</span>
                 </button>
+                {editingIcons && hasCustom && !busy && (
+                  <button
+                    onClick={() => resetIcon(t.key)}
+                    className="mt-1 flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-rose-600"
+                  >
+                    <RotateCcw className="h-3 w-3" /> Reset
+                  </button>
+                )}
               </div>
             );
           })}
         </div>
         <p className="mt-10 text-center text-xs text-slate-400">{formName}</p>
       </main>
-
-      {/* Icon picker dialog (admin only) */}
-      {pickingTile && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setPickingTile(null)}>
-          <div
-            className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-slate-800">
-                Choose an icon for “{TILES.find((t) => t.key === pickingTile)?.title}”
-              </h3>
-              <button onClick={() => setPickingTile(null)} className="rounded-full p-1 text-slate-400 hover:bg-slate-100">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="grid max-h-[55vh] grid-cols-5 gap-3 overflow-y-auto sm:grid-cols-6">
-              {(Object.keys(ICON_LIBRARY) as IconName[]).map((name) => {
-                const I = ICON_LIBRARY[name];
-                const active = iconOverrides[pickingTile]
-                  ? iconOverrides[pickingTile] === name
-                  : TILES.find((t) => t.key === pickingTile)?.defaultIcon === name;
-                return (
-                  <button
-                    key={name}
-                    onClick={() => setTileIcon(pickingTile, name)}
-                    className={`flex aspect-square items-center justify-center rounded-xl border transition-colors ${
-                      active ? "border-[#5b6fc4] bg-[#eef1fc] text-[#5b6fc4]" : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    <I className="h-6 w-6" strokeWidth={1.7} />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
