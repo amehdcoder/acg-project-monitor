@@ -475,9 +475,25 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     setShowSkipLogic(true);
   };
 
-  const handleSaveSkipLogic = (updatedQuestion: Question) => {
+  // Persist an edited question whether it lives ungrouped OR inside a group.
+  // The skip-logic / validation editors reference the flattened question list,
+  // so a saved rule can target a grouped question. Updating only `questions`
+  // silently dropped those edits, making the rule "disappear" on reopen.
+  const persistQuestionUpdate = (updatedQuestion: Question) => {
     setQuestions((prev) =>
       prev.map((q) => (q.id === updatedQuestion.id ? updatedQuestion : q))
+    );
+    setGroups((prev) =>
+      prev.map((g) =>
+        Array.isArray(g.questions) && g.questions.some((q) => q.id === updatedQuestion.id)
+          ? {
+              ...g,
+              questions: g.questions.map((q) =>
+                q.id === updatedQuestion.id ? updatedQuestion : q
+              ),
+            }
+          : g
+      )
     );
     // Keep the live selection in sync so reopening the editor reflects the
     // freshly-saved rule instead of a stale snapshot.
@@ -486,15 +502,17 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     );
   };
 
+  const handleSaveSkipLogic = (updatedQuestion: Question) => {
+    persistQuestionUpdate(updatedQuestion);
+  };
+
   const handleOpenValidation = (question: Question) => {
     setSelectedQuestion(question);
     setShowValidation(true);
   };
 
   const handleSaveValidation = (updatedQuestion: Question) => {
-    setQuestions((prev) =>
-      prev.map((q) => (q.id === updatedQuestion.id ? updatedQuestion : q))
-    );
+    persistQuestionUpdate(updatedQuestion);
   };
 
   const handleOpenGroupSkipLogic = (group: FormGroup) => {
