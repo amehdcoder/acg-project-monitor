@@ -500,7 +500,7 @@ export default function MdaAdaptiveDashboard({
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handleExport} disabled={exporting || submissions.length === 0} className="gap-2 bg-gradient-to-r from-indigo-500 to-cyan-500 text-white hover:opacity-90">
+            <Button onClick={handleExport} disabled={exporting || visitRows.length === 0} className="gap-2 bg-gradient-to-r from-indigo-500 to-cyan-500 text-white hover:opacity-90">
               <FileSpreadsheet className="h-4 w-4" />
               {exporting ? "Exporting…" : "Export to Excel"}
             </Button>
@@ -509,15 +509,53 @@ export default function MdaAdaptiveDashboard({
       </CardHeader>
 
       <CardContent className="space-y-6">
+        {/* Accuracy note: explain exactly what the figures represent */}
+        <div className="flex items-start gap-2 rounded-lg border border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-xs text-muted-foreground">
+          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
+          <span>
+            Figures below count <span className="font-semibold text-foreground">community checklist visits only</span>.
+            {prepared.hasFollowUpGroups && (
+              <> Follow-up submissions ({prepared.followUps.length}) are <span className="font-semibold text-foreground">merged</span> onto
+              their community — the latest follow-up answer updates the linked question — and are never double-counted as visits.</>
+            )}
+          </span>
+        </div>
+
         {/* Overview KPIs */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <KpiTile icon={ClipboardList} label="Total Visits" value={kpis.total} tint="#6366f1" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+          <KpiTile icon={ClipboardList} label="Checklist Visits" value={kpis.total} tint="#6366f1" />
+          <KpiTile icon={MapPin} label="Communities" value={kpis.communities} tint="#0ea5e9" />
           <KpiTile icon={Users2} label="Supervisors" value={kpis.supervisors} tint="#06b6d4" />
           <KpiTile icon={MapPin} label="States" value={kpis.states} tint="#10b981" />
           <KpiTile icon={MapPin} label="LGAs" value={kpis.lgas} tint="#f59e0b" />
           <KpiTile icon={MapPin} label="Wards" value={kpis.wards} tint="#ec4899" />
           <KpiTile icon={CheckCircle2} label="Finalized" value={`${kpis.finalizedPct}%`} tint="#8b5cf6" />
         </div>
+
+        {/* Follow-up coverage */}
+        {prepared.hasFollowUpGroups && (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {prepared.followUpCoverage.map((fc, i) => {
+              const label = FOLLOWUP_LABELS[fc.canonical] || "Follow-up";
+              const pct = kpis.communities ? Math.round((fc.communities / kpis.communities) * 100) : 0;
+              const tint = PALETTE[i % PALETTE.length];
+              return (
+                <div key={fc.canonical} className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                    <span className="text-xs font-semibold" style={{ color: tint }}>{pct}%</span>
+                  </div>
+                  <div className="mt-1 font-display text-xl font-bold text-foreground">
+                    {fc.communities}<span className="text-sm font-normal text-muted-foreground"> / {kpis.communities} communities</span>
+                  </div>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: tint }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Visits over time */}
         {timeline.length > 1 && (
