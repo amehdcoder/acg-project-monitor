@@ -929,7 +929,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
       )}
 
       {/* Follow-up Linking & Community Filter Editor */}
-      {selectedGroup && isAdmin && isMdaChecklistForm && isMdaFollowUpGroup(selectedGroup) && (
+      {selectedGroup && canBuildMdaFollowUps && isMdaChecklistForm && isMdaFollowUpGroup(selectedGroup) && (
         <FollowUpLinkEditor
           key={`followup-link-${selectedGroup.id}`}
           open={showFollowUpLink}
