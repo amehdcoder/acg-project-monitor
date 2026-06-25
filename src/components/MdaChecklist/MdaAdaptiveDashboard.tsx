@@ -38,7 +38,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { exportMdaDashboard } from "@/lib/mda/dashboardExport";
-import { prepareMdaData } from "@/lib/mda/dashboardData";
+import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
+import { isMdaFollowUpGroup, getMdaFollowUpGroupName } from "@/lib/mdaFollowUp";
+import MdaDrillDownSheet, { type DrillData } from "./MdaDrillDownSheet";
 
 // ───────────────────────── Types ─────────────────────────
 interface QOption { id?: string; label: string; value: string; }
@@ -128,9 +130,16 @@ const optionLabel = (q: FormQuestion, val: string) =>
   stripTags(q.options?.find((o) => o.value === val || o.label === val)?.label) || val;
 
 // ───────────────────────── Small UI atoms ─────────────────────────
-function KpiTile({ icon: Icon, label, value, sub, tint }: any) {
+function KpiTile({ icon: Icon, label, value, sub, tint, onClick }: any) {
+  const clickable = typeof onClick === "function";
   return (
-    <div className="relative overflow-hidden rounded-xl border border-border/60 bg-card p-4 shadow-sm transition-all hover:shadow-md">
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!clickable}
+      className={`relative overflow-hidden rounded-xl border border-border/60 bg-card p-4 text-left shadow-sm transition-all hover:shadow-md ${clickable ? "cursor-pointer hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-1" : ""}`}
+      style={clickable ? ({ ["--tw-ring-color" as any]: tint }) : undefined}
+    >
       <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full opacity-15" style={{ background: tint }} />
       <div className="flex items-center gap-2">
         <span className="flex h-9 w-9 items-center justify-center rounded-lg text-white shadow" style={{ background: tint }}>
@@ -139,8 +148,9 @@ function KpiTile({ icon: Icon, label, value, sub, tint }: any) {
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
       </div>
       <div className="mt-3 font-display text-2xl font-bold text-foreground">{value}</div>
-      {sub && <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>}
-    </div>
+      {sub ? <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>
+        : clickable ? <div className="mt-0.5 text-[10px] font-medium" style={{ color: tint }}>Click to view submissions →</div> : null}
+    </button>
   );
 }
 
@@ -403,6 +413,68 @@ export default function MdaAdaptiveDashboard({
   // The dataset every chart/KPI is computed from = accurate community visits.
   const visitRows = prepared.checklist;
 
+  // ── Drill-down state ──
+  const [drill, setDrill] = useState<DrillData | null>(null);
+
+  // Names of follow-up questions + their linked source fields, so the drill-down
+  // can flag answers that were updated during a follow-up.
+  const followUpFields = useMemo(() => {
+    const set = new Set<string>();
+    const walk = (qs: any[]) => {
+      for (const item of qs || []) {
+        const isGroup = Array.isArray(item.questions) && !item.type;
+        if (isGroup) {
+          for (const q of item.questions || []) {
+            if (q?.name && (q.linkedSourceField || item.followUpModule || isMdaFollowUpGroup?.(item))) {
+              set.add(q.name);
+              if (q.linkedSourceField) set.add(q.linkedSourceField);
+            }
+          }
+          walk(item.questions || []);
+        }
+      }
+    };
+    walk(questions as any);
+    return set;
+  }, [questions]);
+
+  // De-duplicate community visits (latest per community) for the drill-down.
+  const communityVisits = useMemo(() => {
+    const map = new Map<string, MdaSubmission>();
+    for (const s of visitRows) {
+      const k = communityKey(s as any);
+      const prev = map.get(k);
+      if (!prev || new Date(s.submittedAt || 0) > new Date(prev.submittedAt || 0)) map.set(k, s);
+    }
+    return [...map.values()];
+  }, [visitRows]);
+
+  // Map each follow-up module (canonical key) → its raw follow-up submissions.
+  const followUpRowsByModule = useMemo(() => {
+    const moduleQuestionNames: { canonical: string; names: string[] }[] = [];
+    for (const item of (questions as any[]) || []) {
+      const isGroup = Array.isArray(item.questions) && !item.type;
+      if (isGroup && isMdaFollowUpGroup(item)) {
+        moduleQuestionNames.push({
+          canonical: getMdaFollowUpGroupName(item) || "follow_up",
+          names: (item.questions || []).map((q: any) => q?.name).filter(Boolean),
+        });
+      }
+    }
+    const result: Record<string, MdaSubmission[]> = {};
+    for (const m of moduleQuestionNames) {
+      result[m.canonical] = prepared.followUps.filter((fu) =>
+        m.names.some((n) => {
+          const v = fu.data?.[n];
+          return v !== undefined && v !== null && String(v) !== "";
+        }),
+      );
+    }
+    return result;
+  }, [questions, prepared.followUps]);
+
+  const openDrill = (d: DrillData) => setDrill(d);
+
   const activeProjectName =
     activeProject === "all"
       ? "All projects"
@@ -530,13 +602,20 @@ export default function MdaAdaptiveDashboard({
 
         {/* Overview KPIs */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
-          <KpiTile icon={ClipboardList} label="Checklist Visits" value={kpis.total} tint="#6366f1" />
-          <KpiTile icon={MapPin} label="Communities" value={kpis.communities} tint="#0ea5e9" />
-          <KpiTile icon={Users2} label="Supervisors" value={kpis.supervisors} tint="#06b6d4" />
-          <KpiTile icon={MapPin} label="States" value={kpis.states} tint="#10b981" />
-          <KpiTile icon={MapPin} label="LGAs" value={kpis.lgas} tint="#f59e0b" />
-          <KpiTile icon={MapPin} label="Wards" value={kpis.wards} tint="#ec4899" />
-          <KpiTile icon={CheckCircle2} label="Finalized" value={`${kpis.finalizedPct}%`} tint="#8b5cf6" />
+          <KpiTile icon={ClipboardList} label="Checklist Visits" value={kpis.total} tint="#6366f1"
+            onClick={() => openDrill({ title: "Checklist Visits", tint: "#6366f1", subtitle: `${visitRows.length} supervisory visit(s)`, rows: visitRows })} />
+          <KpiTile icon={MapPin} label="Communities" value={kpis.communities} tint="#0ea5e9"
+            onClick={() => openDrill({ title: "Communities visited", tint: "#0ea5e9", subtitle: `${communityVisits.length} distinct communit${communityVisits.length === 1 ? "y" : "ies"}`, rows: communityVisits })} />
+          <KpiTile icon={Users2} label="Supervisors" value={kpis.supervisors} tint="#06b6d4"
+            onClick={() => openDrill({ title: "Supervisor submissions", tint: "#06b6d4", subtitle: `${kpis.supervisors} supervisor(s) across ${visitRows.length} visit(s)`, rows: visitRows })} />
+          <KpiTile icon={MapPin} label="States" value={kpis.states} tint="#10b981"
+            onClick={() => openDrill({ title: "Submissions by State", tint: "#10b981", subtitle: `${kpis.states} state(s)`, rows: visitRows })} />
+          <KpiTile icon={MapPin} label="LGAs" value={kpis.lgas} tint="#f59e0b"
+            onClick={() => openDrill({ title: "Submissions by LGA", tint: "#f59e0b", subtitle: `${kpis.lgas} LGA(s)`, rows: visitRows })} />
+          <KpiTile icon={MapPin} label="Wards" value={kpis.wards} tint="#ec4899"
+            onClick={() => openDrill({ title: "Submissions by Ward", tint: "#ec4899", subtitle: `${kpis.wards} ward(s)`, rows: visitRows })} />
+          <KpiTile icon={CheckCircle2} label="Finalized" value={`${kpis.finalizedPct}%`} tint="#8b5cf6"
+            onClick={() => openDrill({ title: "Finalized submissions", tint: "#8b5cf6", subtitle: "Visits marked finalized / sent / submitted", rows: visitRows.filter((s) => ["finalized", "sent", "submitted"].includes(norm(s.status))) })} />
         </div>
 
         {/* Follow-up coverage */}
@@ -547,7 +626,18 @@ export default function MdaAdaptiveDashboard({
               const pct = kpis.communities ? Math.round((fc.communities / kpis.communities) * 100) : 0;
               const tint = PALETTE[i % PALETTE.length];
               return (
-                <div key={fc.canonical} className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+                <button
+                  type="button"
+                  key={fc.canonical}
+                  onClick={() => openDrill({
+                    title: label,
+                    tint,
+                    subtitle: `${fc.communities} communit${fc.communities === 1 ? "y" : "ies"} followed up`,
+                    rows: followUpRowsByModule[fc.canonical] || [],
+                  })}
+                  className="rounded-xl border border-border/60 bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-1"
+                  style={{ ["--tw-ring-color" as any]: tint }}
+                >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-muted-foreground">{label}</span>
                     <span className="text-xs font-semibold" style={{ color: tint }}>{pct}%</span>
@@ -558,7 +648,8 @@ export default function MdaAdaptiveDashboard({
                   <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
                     <div className="h-full rounded-full" style={{ width: `${pct}%`, background: tint }} />
                   </div>
-                </div>
+                  <div className="mt-2 text-[10px] font-medium" style={{ color: tint }}>Click to view follow-up answers →</div>
+                </button>
               );
             })}
           </div>
@@ -636,6 +727,13 @@ export default function MdaAdaptiveDashboard({
           ))
         )}
       </CardContent>
+
+      <MdaDrillDownSheet
+        data={drill}
+        questions={questions as any}
+        followUpFields={followUpFields}
+        onClose={() => setDrill(null)}
+      />
     </Card>
   );
 }
