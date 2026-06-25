@@ -1,5 +1,6 @@
 // Sends transactional emails from info@amehnities.org via Hostinger SMTP.
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { guardRequest } from "../_shared/authGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,6 +31,9 @@ function getClient(): SMTPClient {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const guard = await guardRequest(req, corsHeaders, { requireAdmin: true });
+  if (guard.response) return guard.response;
   try {
     const body = await req.json();
     const { to, subject, html, text } = body ?? {};
