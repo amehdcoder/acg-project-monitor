@@ -226,12 +226,17 @@ export function FollowUpLinkEditor({
     setQuestions((qs) =>
       qs.map((q) => {
         if (q.id !== id) return q;
-        const count = (q.options?.length ?? 0) + 1;
+        const existing = q.options || [];
+        const count = existing.length + 1;
         return {
           ...q,
           options: [
-            ...(q.options || []),
-            { id: `opt-${Date.now()}-${count}`, label: `Option ${count}`, value: `option_${count}` },
+            ...existing,
+            {
+              id: uid("opt"),
+              label: `Option ${count}`,
+              value: uniqueOptionValue(`option_${count}`, existing),
+            },
           ],
         };
       }),
