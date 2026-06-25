@@ -10,6 +10,13 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertTriangle,
   RefreshCw,
   ShieldCheck,
@@ -17,6 +24,10 @@ import {
   Mail,
   Loader2,
   Search,
+  Trash2,
+  Archive,
+  FolderPlus,
+  X,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,6 +57,11 @@ interface Attempt {
   created_at: string;
 }
 
+interface ProjectLite {
+  id: string;
+  name: string;
+}
+
 const reasonLabel = (r: string) => {
   switch (r) {
     case "account_deactivated":
@@ -71,9 +87,12 @@ const safeDate = (value: unknown) => {
 };
 
 const InactiveUsersPanel = () => {
-  const { isAdmin, isOwner } = useAuth();
+  const { isAdmin, isOwner, profile: currentProfile } = useAuth();
   const [profiles, setProfiles] = useState<InactiveProfile[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
+  const [projects, setProjects] = useState<ProjectLite[]>([]);
+  const [assignments, setAssignments] = useState<Record<string, string[]>>({}); // user_id -> project_ids
+  const [pickProject, setPickProject] = useState<Record<string, string>>({}); // user_id -> selected project to add
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -83,7 +102,7 @@ const InactiveUsersPanel = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [{ data: profs }, { data: atts }] = await Promise.all([
+      const [{ data: profs }, { data: atts }, { data: projs }, { data: asgs }] = await Promise.all([
         supabase
           .from("profiles")
           .select("id,user_id,email,first_name,last_name,is_active,approval_status,created_at")
@@ -94,9 +113,17 @@ const InactiveUsersPanel = () => {
           .select("*")
           .order("created_at", { ascending: false })
           .limit(500),
+        supabase.from("projects").select("id,name").order("name"),
+        supabase.from("user_project_assignments").select("user_id,project_id"),
       ]);
       setProfiles((profs as InactiveProfile[]) || []);
       setAttempts((atts as Attempt[]) || []);
+      setProjects((projs as ProjectLite[]) || []);
+      const map: Record<string, string[]> = {};
+      ((asgs as { user_id: string; project_id: string }[]) || []).forEach((a) => {
+        (map[a.user_id] ||= []).push(a.project_id);
+      });
+      setAssignments(map);
     } catch (e) {
       console.error(e);
       toast({ title: "Error", description: "Failed to load inactive users", variant: "destructive" });
@@ -108,6 +135,12 @@ const InactiveUsersPanel = () => {
   useEffect(() => {
     if (isAdmin || isOwner) load();
   }, [isAdmin, isOwner, load]);
+
+  const projectById = useMemo(() => {
+    const m = new Map<string, string>();
+    projects.forEach((p) => m.set(p.id, p.name));
+    return m;
+  }, [projects]);
 
   const attemptsByEmail = useMemo(() => {
     const map: Record<string, Attempt[]> = {};
@@ -133,6 +166,27 @@ const InactiveUsersPanel = () => {
     const known = new Set(profiles.map((p) => safeText(p.email, "").toLowerCase()));
     return attempts.filter((a) => !known.has((a.email || "").toLowerCase())).slice(0, 50);
   }, [attempts, profiles]);
+
+  // ----- Dismiss (delete) blocked sign-in attempt logs -----
+  const dismissAttempts = async (ids: string[], label: string) => {
+    if (ids.length === 0) return;
+    try {
+      const { error } = await supabase.from("inactive_login_attempts").delete().in("id", ids);
+      if (error) throw error;
+      const idSet = new Set(ids);
+      setAttempts((prev) => prev.filter((a) => !idSet.has(a.id)));
+      toast({ title: "Dismissed", description: `${label} removed from the audit log.` });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message || "Failed to dismiss log", variant: "destructive" });
+    }
+  };
+
+  const dismissAllAttempts = async () => {
+    await dismissAttempts(
+      attempts.map((a) => a.id),
+      `${attempts.length} blocked attempt log${attempts.length === 1 ? "" : "s"}`,
+    );
+  };
 
   const notifyByEmail = async (
     p: InactiveProfile,
@@ -165,6 +219,49 @@ const InactiveUsersPanel = () => {
       });
     } catch (e) {
       console.error("Email notification failed:", e);
+    }
+  };
+
+  // ----- Assign a (re)activated user to a project -----
+  const assignToProject = async (p: InactiveProfile, projectId: string) => {
+    if (!projectId) return;
+    try {
+      const { error } = await supabase
+        .from("user_project_assignments")
+        .upsert(
+          { user_id: p.user_id, project_id: projectId, assigned_by: currentProfile?.user_id },
+          { onConflict: "user_id,project_id", ignoreDuplicates: true },
+        );
+      if (error) throw error;
+      setAssignments((prev) => {
+        const next = { ...prev };
+        const list = new Set(next[p.user_id] || []);
+        list.add(projectId);
+        next[p.user_id] = Array.from(list);
+        return next;
+      });
+      setPickProject((prev) => ({ ...prev, [p.user_id]: "" }));
+      toast({ title: "Project assigned", description: `${p.email} → ${projectById.get(projectId) || "project"}.` });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message || "Failed to assign project", variant: "destructive" });
+    }
+  };
+
+  const unassignFromProject = async (p: InactiveProfile, projectId: string) => {
+    try {
+      const { error } = await supabase
+        .from("user_project_assignments")
+        .delete()
+        .eq("user_id", p.user_id)
+        .eq("project_id", projectId);
+      if (error) throw error;
+      setAssignments((prev) => {
+        const next = { ...prev };
+        next[p.user_id] = (next[p.user_id] || []).filter((id) => id !== projectId);
+        return next;
+      });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message || "Failed to remove project", variant: "destructive" });
     }
   };
 
@@ -242,11 +339,11 @@ const InactiveUsersPanel = () => {
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-            Inactive / Pending Users & Blocked Sign-in Attempts
+            <Archive className="h-4 w-4 text-destructive" />
+            Deactivated / Pending Accounts & Sign-in Audit Log
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            {profiles.length} inactive/pending · {attempts.length} blocked attempts logged
+            {profiles.length} archived account{profiles.length === 1 ? "" : "s"} · {attempts.length} blocked attempt log{attempts.length === 1 ? "" : "s"}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={load} disabled={loading}>
@@ -270,7 +367,7 @@ const InactiveUsersPanel = () => {
           </div>
         ) : filtered.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
-            No inactive or pending users.
+            No deactivated or pending accounts in the archive.
           </p>
         ) : (
           <Accordion type="multiple" className="w-full">
@@ -278,6 +375,7 @@ const InactiveUsersPanel = () => {
               const userAttempts = attemptsByEmail[safeText(p.email, "").toLowerCase()] || [];
               const lastAttempt = userAttempts[0];
               const lastAttemptDate = safeDate(lastAttempt?.created_at);
+              const userProjects = assignments[p.user_id] || [];
               return (
                 <AccordionItem key={p.id} value={p.id}>
                   <AccordionTrigger className="hover:no-underline">
@@ -346,9 +444,79 @@ const InactiveUsersPanel = () => {
                         )}
                       </div>
 
+                      {/* Project assignment — reactivate into same or new projects */}
+                      <div className="rounded border bg-muted/30 p-3 space-y-2">
+                        <div className="text-xs font-medium flex items-center gap-1.5">
+                          <FolderPlus className="h-3.5 w-3.5" />
+                          Project access
+                        </div>
+                        {userProjects.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {userProjects.map((pid) => (
+                              <Badge key={pid} variant="secondary" className="text-[10px] gap-1 pr-1">
+                                {projectById.get(pid) || "Project"}
+                                <button
+                                  type="button"
+                                  onClick={() => unassignFromProject(p, pid)}
+                                  className="rounded-full hover:bg-background/60 p-0.5"
+                                  aria-label="Remove project"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground">Not assigned to any project yet.</p>
+                        )}
+                        <div className="flex gap-2">
+                          <Select
+                            value={pickProject[p.user_id] || ""}
+                            onValueChange={(v) => setPickProject((prev) => ({ ...prev, [p.user_id]: v }))}
+                          >
+                            <SelectTrigger className="h-8 text-xs flex-1">
+                              <SelectValue placeholder="Assign to a project…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {projects
+                                .filter((pr) => !userProjects.includes(pr.id))
+                                .map((pr) => (
+                                  <SelectItem key={pr.id} value={pr.id} className="text-xs">
+                                    {pr.name}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!pickProject[p.user_id]}
+                            onClick={() => assignToProject(p, pickProject[p.user_id])}
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+
                       <div className="rounded border bg-muted/30">
-                        <div className="px-3 py-1.5 text-xs font-medium border-b">
-                          Blocked sign-in attempts
+                        <div className="px-3 py-1.5 text-xs font-medium border-b flex items-center justify-between">
+                          <span>Blocked sign-in attempts</span>
+                          {userAttempts.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-2 text-[11px]"
+                              onClick={() =>
+                                dismissAttempts(
+                                  userAttempts.map((a) => a.id),
+                                  `${userAttempts.length} log${userAttempts.length === 1 ? "" : "s"} for ${p.email}`,
+                                )
+                              }
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Dismiss all
+                            </Button>
+                          )}
                         </div>
                         {userAttempts.length === 0 ? (
                           <div className="px-3 py-2 text-xs text-muted-foreground">None recorded.</div>
@@ -356,11 +524,21 @@ const InactiveUsersPanel = () => {
                           <ul className="divide-y text-xs max-h-56 overflow-auto">
                             {userAttempts.map((a) => (
                               <li key={a.id} className="px-3 py-2 flex flex-col gap-0.5">
-                                <div className="flex justify-between gap-2">
+                                <div className="flex justify-between gap-2 items-start">
                                   <span className="font-medium">{reasonLabel(a.reason)}</span>
-                                  <span className="text-muted-foreground">
-                                    {safeDate(a.created_at) ? format(safeDate(a.created_at)!, "yyyy-MM-dd HH:mm:ss") : "Unknown time"}
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground">
+                                      {safeDate(a.created_at) ? format(safeDate(a.created_at)!, "yyyy-MM-dd HH:mm:ss") : "Unknown time"}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => dismissAttempts([a.id], "Log entry")}
+                                      className="text-muted-foreground hover:text-destructive"
+                                      aria-label="Dismiss log entry"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </div>
                                 </div>
                                 <div className="text-muted-foreground">
                                   mode: {a.mode}
@@ -399,20 +577,53 @@ const InactiveUsersPanel = () => {
           </div>
         )}
 
+        {attempts.length > 0 && (
+          <div className="flex justify-end">
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={dismissAllAttempts}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              Dismiss all sign-in logs
+            </Button>
+          </div>
+        )}
+
         {orphanAttempts.length > 0 && (
           <div className="rounded border border-dashed bg-muted/20">
-            <div className="px-3 py-1.5 text-xs font-medium border-b">
-              Attempts from unknown emails ({orphanAttempts.length})
+            <div className="px-3 py-1.5 text-xs font-medium border-b flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                Attempts from unknown emails ({orphanAttempts.length})
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[11px]"
+                onClick={() =>
+                  dismissAttempts(orphanAttempts.map((a) => a.id), `${orphanAttempts.length} unknown-email log(s)`)
+                }
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Dismiss all
+              </Button>
             </div>
             <ul className="divide-y text-xs max-h-48 overflow-auto">
               {orphanAttempts.map((a) => (
-                <li key={a.id} className="px-3 py-2 flex justify-between gap-2">
+                <li key={a.id} className="px-3 py-2 flex justify-between gap-2 items-center">
                   <span>
                     <span className="font-medium">{safeText(a.email)}</span> — {reasonLabel(a.reason)}
                   </span>
-                  <span className="text-muted-foreground">
-                    {safeDate(a.created_at) ? format(safeDate(a.created_at)!, "yyyy-MM-dd HH:mm") : "Unknown time"}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">
+                      {safeDate(a.created_at) ? format(safeDate(a.created_at)!, "yyyy-MM-dd HH:mm") : "Unknown time"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => dismissAttempts([a.id], "Log entry")}
+                      className="text-muted-foreground hover:text-destructive"
+                      aria-label="Dismiss log entry"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
