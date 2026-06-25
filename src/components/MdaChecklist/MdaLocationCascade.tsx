@@ -350,12 +350,37 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   // Microplan-only options for a level given current upstream selections.
   const microplanOptions = (level: keyof GeoRow): string[] => microplanOptionMap[level] ?? [];
 
+  // GRID3 option name lists for the current selection (FLHF & settlements).
+  const grid3FacilityNames = useMemo(
+    () => uniqueSorted(grid3Facilities.map((f) => f.name)),
+    [grid3Facilities],
+  );
+  const grid3SettlementNames = useMemo(
+    () => uniqueSorted(grid3Settlements.map((s) => s.name)),
+    [grid3Settlements],
+  );
+  // name → coordinates lookup so a chosen settlement (= Community) can carry its GPS.
+  const grid3SettlementCoords = useMemo(() => {
+    const m = new Map<string, { lat: number; lng: number }>();
+    for (const s of grid3Settlements) {
+      if (s.latitude != null && s.longitude != null) {
+        m.set(normGeo(s.name), { lat: s.latitude, lng: s.longitude });
+      }
+    }
+    return m;
+  }, [grid3Settlements]);
+
   const options = (level: keyof GeoRow): string[] => {
-    // Off-microplan / no-microplan path: State → LGA → Ward come from the full
-    // Nigerian administrative hierarchy.
+    // GRID3 national cascade (default). State → LGA → Ward come from the full
+    // Nigerian administrative hierarchy; FLHF and Community (settlements) come
+    // from the GRID3 dataset. Type-and-add stays available for values not in
+    // the GRID3 list.
     if (useAdminHierarchy) {
       if (isGeoLevel(level)) return adminOptions(level);
-      // FLHF / community / settlement are entered as free text below.
+      if (level === "flhf_name") return grid3FacilityNames;
+      // The MDA "Community" field is populated from GRID3 settlements.
+      if (level === "community_name") return grid3SettlementNames;
+      // Settlement detail level remains free-text (type-and-add).
       return [];
     }
     // Microplan-driven path. If the microplan captured values for this level,
@@ -367,6 +392,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     if (isGeoLevel(level)) return adminOptions(level);
     return [];
   };
+
 
   // ── Write a level + clear downstream selections ───────────────────────
   const setLevel = (level: keyof GeoRow, value: string) => {
