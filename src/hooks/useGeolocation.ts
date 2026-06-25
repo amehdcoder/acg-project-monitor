@@ -89,13 +89,19 @@ export const useGeolocation = (options?: PositionOptions) => {
   const settle = useCallback(
     (result:
       | { ok: true; pos: globalThis.GeolocationPosition }
+      | { ok: true; keep: true }
       | { ok: false; error: string }) => {
       const a = acquisitionRef.current;
       if (!a || a.settled) return;
       a.settled = true;
       cleanupAcquisition();
       if (result.ok === true) {
-        commitPosition(result.pos);
+        if ("pos" in result) {
+          commitPosition(result.pos);
+        } else {
+          // keep whatever best fix is already committed; just stop loading.
+          setState((prev) => ({ ...prev, isLoading: false }));
+        }
       } else {
         const msg = result.error;
         setState((prev) => ({ ...prev, error: msg, isLoading: false }));
