@@ -222,14 +222,14 @@ function CommunityListView({
     (async () => {
       setLoading(true);
       try {
-        let q = supabase
+        // form_submissions has no project_id column; the MDA checklist form
+        // instance is itself project-scoped, so filtering by form_id is enough.
+        const { data, error } = await supabase
           .from("form_submissions")
-          .select("id, data, project_id, submitted_at")
+          .select("id, data, submitted_at")
           .eq("form_id", formId)
           .order("submitted_at", { ascending: false })
           .limit(2000);
-        if (projectId) q = q.eq("project_id", projectId);
-        const { data, error } = await q;
         if (error) throw error;
         const seen = new Set<string>();
         const out: VisitedCommunity[] = [];
