@@ -232,7 +232,7 @@ const NearbyPanel: React.FC = () => {
           <Switch checked={enabled} onCheckedChange={setEnabled} />
         </div>
 
-        <ScrollArea className="max-h-72">
+        <div className="max-h-72 overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [scrollbar-width:thin]">
           {!enabled ? (
             <p className="text-center text-xs text-muted-foreground py-8 px-4">
               Turn on proximity discovery to see who is nearby and start chatting.
@@ -277,7 +277,7 @@ const NearbyPanel: React.FC = () => {
               ))}
             </div>
           )}
-        </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );

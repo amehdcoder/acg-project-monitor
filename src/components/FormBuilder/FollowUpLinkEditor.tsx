@@ -340,7 +340,7 @@ export function FollowUpLinkEditor({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="min-h-0 flex-1">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [scrollbar-width:thin]">
           <div className="space-y-6 px-5 py-5">
             {/* ── Build & link follow-up questions (primary action) ── */}
             <section className="space-y-3">
@@ -704,7 +704,7 @@ export function FollowUpLinkEditor({
               )}
             </section>
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="shrink-0 items-center border-t px-5 py-3">
           {linkedCount === 0 ? (
