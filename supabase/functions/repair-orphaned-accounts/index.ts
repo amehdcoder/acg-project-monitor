@@ -115,8 +115,6 @@ Deno.serve(async (req) => {
         orphans: orphans.length,
         repaired: repaired.length,
         flagged: flagged.length,
-        repaired_emails: repaired,
-        flagged_emails: flagged,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import webpush from "npm:web-push@3.6.7";
+import { guardRequest } from "../_shared/authGuard.ts";
 
 const VAPID_PUBLIC_KEY =
   "BKYN8xNQ6kIcm1Jg_7J9j7TFBFf4A7um_Yegz2ZkVPllgZCD1XrCBaHACeaeBgg3yFm3TuYVQkimGR2hVXd7Cao";
@@ -63,6 +64,9 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  const guard = await guardRequest(req, corsHeaders, { requireAdmin: false });
+  if (guard.response) return guard.response;
+
   try {
     const { type, message_id } = await req.json();
     if (!message_id || !["group", "direct"].includes(type)) {
@@ -79,6 +83,12 @@ Deno.serve(async (req) => {
         .eq("id", message_id)
         .single();
       if (!msg) return ok();
+      if (!guard.viaService && guard.userId && msg.sender_id !== guard.userId) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       const { data: group } = await admin
         .from("chat_groups")
@@ -127,6 +137,12 @@ Deno.serve(async (req) => {
       .eq("id", message_id)
       .single();
     if (!msg || !msg.recipient_id) return ok();
+    if (!guard.viaService && guard.userId && msg.sender_id !== guard.userId) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { data: sender } = await admin
       .from("profiles")
