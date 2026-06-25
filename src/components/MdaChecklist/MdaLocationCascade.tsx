@@ -547,7 +547,34 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     return true;
   };
 
-  return (
+  // States that can be saved for offline use: the project's scoped states if
+  // any, otherwise whatever state the supervisor has currently selected.
+  const prefetchableStates = useMemo(() => {
+    const scoped = Array.from(allowedStates);
+    if (scoped.length > 0) return scoped;
+    return sel.state ? [canonicalStateName(sel.state)] : [];
+  }, [allowedStates, sel.state]);
+
+  const allSaved =
+    prefetchableStates.length > 0 && prefetchableStates.every((s) => savedStates.has(s));
+
+  const handlePrefetch = async () => {
+    if (prefetchableStates.length === 0 || prefetchState === "running") return;
+    setPrefetchState("running");
+    setPrefetchProgress({ done: 0, total: prefetchableStates.length });
+    const saved = new Set(savedStates);
+    for (let i = 0; i < prefetchableStates.length; i++) {
+      try {
+        await prefetchGrid3State(prefetchableStates[i]);
+        saved.add(prefetchableStates[i]);
+        setSavedStates(new Set(saved));
+      } catch { /* keep going; offline shards stay whatever is cached */ }
+      setPrefetchProgress({ done: i + 1, total: prefetchableStates.length });
+    }
+    setPrefetchState("done");
+  };
+
+
     <div className="space-y-4 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/[0.06] to-transparent p-4 sm:p-5">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
