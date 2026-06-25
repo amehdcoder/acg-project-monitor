@@ -2554,12 +2554,16 @@ const FormFiller = ({
         // Apply cascading choice_filter
         const filteredOptions = getFilteredOptions(question);
         return (
-          <RadioGroup value={value || ""} onValueChange={(val) => update(val)}>
+          <RadioGroup value={value || ""} onValueChange={(val) => update(val)} className="odk-choice-list">
             {filteredOptions?.map((option) => (
-              <div key={option.id} className="flex items-center space-x-2">
-                <RadioGroupItem value={option.value} id={`${qKey}-${option.id}`} />
-                <Label htmlFor={`${qKey}-${option.id}`}>{option.label}</Label>
-              </div>
+              <Label
+                key={option.id}
+                htmlFor={`${qKey}-${option.id}`}
+                className="odk-choice-row"
+              >
+                <RadioGroupItem value={option.value} id={`${qKey}-${option.id}`} className="odk-choice-control" />
+                <span className="odk-choice-label">{option.label}</span>
+              </Label>
             ))}
             {filteredOptions?.length === 0 && (
               <p className="text-sm text-muted-foreground italic">No options available based on your previous selections.</p>
@@ -2570,19 +2574,24 @@ const FormFiller = ({
       case "select_multiple": {
         const filteredOptions = getFilteredOptions(question);
         return (
-          <div className="space-y-2">
+          <div className="odk-choice-list">
             {filteredOptions?.map((option) => (
-              <div key={option.id} className="flex items-center space-x-2">
+              <Label
+                key={option.id}
+                htmlFor={`${qKey}-${option.id}`}
+                className="odk-choice-row"
+              >
                 <Checkbox
                   id={`${qKey}-${option.id}`}
+                  className="odk-choice-control"
                   checked={(value || []).includes(option.value)}
                   onCheckedChange={(checked) => {
                     const current = value || [];
                     update(checked ? [...current, option.value] : current.filter((v: string) => v !== option.value));
                   }}
                 />
-                <Label htmlFor={`${qKey}-${option.id}`}>{option.label}</Label>
-              </div>
+                <span className="odk-choice-label">{option.label}</span>
+              </Label>
             ))}
             {filteredOptions?.length === 0 && (
               <p className="text-sm text-muted-foreground italic">No options available based on your previous selections.</p>
@@ -2590,6 +2599,7 @@ const FormFiller = ({
           </div>
         );
       }
+
       case "date":
         return (
           <DateInput
@@ -2698,12 +2708,16 @@ const FormFiller = ({
       case "select_one": {
         const filteredOptions = getFilteredOptions(question);
         return (
-          <RadioGroup value={value || ""} onValueChange={(val) => updateResponse(question.id, val)}>
+          <RadioGroup value={value || ""} onValueChange={(val) => updateResponse(question.id, val)} className="odk-choice-list">
             {filteredOptions?.map((option) => (
-              <div key={option.id} className="flex items-center space-x-2">
-                <RadioGroupItem value={option.value} id={`${question.id}-${option.id}`} />
-                <Label htmlFor={`${question.id}-${option.id}`}>{option.label}</Label>
-              </div>
+              <Label
+                key={option.id}
+                htmlFor={`${question.id}-${option.id}`}
+                className="odk-choice-row"
+              >
+                <RadioGroupItem value={option.value} id={`${question.id}-${option.id}`} className="odk-choice-control" />
+                <span className="odk-choice-label">{option.label}</span>
+              </Label>
             ))}
             {filteredOptions?.length === 0 && (
               <p className="text-sm text-muted-foreground italic">No options available based on your previous selections.</p>
@@ -2715,11 +2729,16 @@ const FormFiller = ({
       case "select_multiple": {
         const filteredOptions = getFilteredOptions(question);
         return (
-          <div className="space-y-2">
+          <div className="odk-choice-list">
             {filteredOptions?.map((option) => (
-              <div key={option.id} className="flex items-center space-x-2">
+              <Label
+                key={option.id}
+                htmlFor={`${question.id}-${option.id}`}
+                className="odk-choice-row"
+              >
                 <Checkbox
                   id={`${question.id}-${option.id}`}
+                  className="odk-choice-control"
                   checked={(value || []).includes(option.value)}
                   onCheckedChange={(checked) => {
                     const current = value || [];
@@ -2730,8 +2749,8 @@ const FormFiller = ({
                     }
                   }}
                 />
-                <Label htmlFor={`${question.id}-${option.id}`}>{option.label}</Label>
-              </div>
+                <span className="odk-choice-label">{option.label}</span>
+              </Label>
             ))}
             {filteredOptions?.length === 0 && (
               <p className="text-sm text-muted-foreground italic">No options available based on your previous selections.</p>
@@ -2739,6 +2758,7 @@ const FormFiller = ({
           </div>
         );
       }
+
 
       case "date":
         return (

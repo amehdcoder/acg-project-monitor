@@ -529,6 +529,53 @@ button.animate-bounce:active,
   box-shadow: var(--shadow-card);
 }
 
+/* ── ODK / KoboCollect-style choice lists ──
+   Full-width tappable rows with thin dividers, generous touch targets and
+   readable labels so select_one / select_multiple questions feel native on
+   Android data-collection apps. */
+.odk-choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 0.25rem;
+}
+.odk-choice-row {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  min-height: 52px;
+  padding: 0.75rem 0.25rem;
+  border-bottom: 1px solid hsl(var(--border) / 0.7);
+  cursor: pointer;
+  font-weight: 400;
+  line-height: 1.45;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s ease;
+}
+.odk-choice-row:last-child {
+  border-bottom: 0;
+}
+.odk-choice-row:active {
+  background-color: hsl(var(--primary) / 0.06);
+}
+@media (hover: hover) {
+  .odk-choice-row:hover {
+    background-color: hsl(var(--muted) / 0.5);
+  }
+}
+.odk-choice-control {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+}
+.odk-choice-label {
+  flex: 1;
+  font-size: 1rem;
+  color: hsl(var(--foreground));
+  word-break: break-word;
+}
+
+
 /* ── Modern "paper-feel" surface for the FormFiller ──
    Inspired by elegant stationery: warm cream canvas, soft rounded cards,
    tasteful floral corner flourishes, no ruled lines, no dashed inputs.
