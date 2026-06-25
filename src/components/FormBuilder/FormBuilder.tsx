@@ -49,7 +49,12 @@ import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, F
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { isMdaChecklistLike, isMdaFollowUpGroup } from "@/lib/mdaFollowUp";
+import {
+  canRoleBuildMdaFollowUps,
+  getMdaFollowUpGroupName,
+  isMdaChecklistLike,
+  isMdaFollowUpGroup,
+} from "@/lib/mdaFollowUp";
 
 interface FormBuilderProps {
   onClose: () => void;
@@ -66,7 +71,7 @@ interface FormBuilderProps {
 }
 
 const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderProps) => {
-  const { profile, isAdmin } = useAuth();
+  const { profile, role, isOwnerLevel } = useAuth();
   const [questions, setQuestions] = useState<Question[]>(() => {
     if (!editForm?.questions) return [];
     return (editForm.questions as any[]).filter((q: any) => !q.questions);
