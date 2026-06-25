@@ -295,6 +295,12 @@ interface FormFillerProps {
    * fields permanently part of the same "Community Checklist" form schema.
    */
   focusGroupNames?: string[];
+  /**
+   * Seed values applied once on mount (e.g. locked location prefilled from a
+   * selected community on the MDA Checklist follow-up flows). User edits still
+   * override these afterwards.
+   */
+  initialResponses?: Record<string, any>;
 }
 
 const FormFiller = ({
