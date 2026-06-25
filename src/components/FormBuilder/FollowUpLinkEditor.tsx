@@ -491,7 +491,7 @@ export function FollowUpLinkEditor({
                                   responses. The linked checklist response is updated when this option is chosen.
                                 </p>
                               )}
-                              <ScrollArea className="max-h-60 pr-2">
+                              <div className="max-h-60 overflow-y-auto overscroll-contain pr-2 [scrollbar-gutter:stable] [scrollbar-width:thin]">
                                 <div className="space-y-2">
                                   {(q.options || []).map((option) => {
                                     const allValues = sourceOptions.map((o) => o.value);
@@ -570,7 +570,7 @@ export function FollowUpLinkEditor({
                                     );
                                   })}
                                 </div>
-                              </ScrollArea>
+                              </div>
                             </div>
                           )}
                         </div>
