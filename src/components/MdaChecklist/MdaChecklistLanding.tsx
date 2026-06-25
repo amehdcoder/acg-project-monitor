@@ -381,7 +381,7 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
                 <button
                   onClick={() => (editingIcons ? triggerUpload(t.key) : setView(t.view))}
                   disabled={busy}
-                  className="group flex w-full flex-col items-center gap-3 rounded-2xl p-4 text-center transition-colors hover:bg-white/60 active:scale-95"
+                  className="group flex w-full flex-col items-center gap-3 rounded-2xl p-4 text-center transition-colors hover:bg-white/60"
                 >
                   <span className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-white transition-transform group-hover:scale-105 group-active:scale-95">
                     {busy ? (
