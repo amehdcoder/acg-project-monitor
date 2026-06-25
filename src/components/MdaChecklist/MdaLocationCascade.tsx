@@ -516,10 +516,12 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     const idx = LEVEL_ORDER.indexOf(key);
     if (idx <= 0) return true;
     if (useAdminHierarchy) {
-      // Admin-hierarchy: State→LGA→Ward is a strict chain;
-      // FLHF/Community/Settlement are free text gated only by Ward.
-      const parent = LEVEL_ORDER[idx - 1];
-      return !!sel[parent];
+      // Admin / GRID3 cascade: State→LGA→Ward is a strict chain. FLHF, Community
+      // and Settlement are pick-or-type fields gated only by Ward, so an empty
+      // FLHF list can never dead-end Community/Settlement beneath it.
+      if (key === "lga") return !!sel.state;
+      if (key === "ward") return !!sel.lga;
+      return !!sel.ward;
     }
     for (let i = 0; i < idx; i++) {
       const anc = LEVEL_ORDER[i];
