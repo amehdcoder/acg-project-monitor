@@ -22,6 +22,11 @@
  */
 import { isMdaFollowUpGroup, getMdaFollowUpGroupName } from "@/lib/mdaFollowUp";
 
+export interface RawOption {
+  value?: string;
+  label?: string;
+  linkedSourceValues?: string[];
+}
 export interface RawQuestion {
   id?: string;
   name?: string;
@@ -29,6 +34,7 @@ export interface RawQuestion {
   type?: string;
   questions?: RawQuestion[]; // present when this is a group
   linkedSourceField?: string;
+  options?: RawOption[];
 }
 
 export interface RawSubmission {

@@ -154,7 +154,14 @@ export function FollowUpLinkEditor({
   const isFullyLinked = (q: DraftQuestion) => {
     if (!q.linkedSourceField || q.linkedSourceField === NONE) return false;
     const source = sourceQuestionByName(q.linkedSourceField);
-    return !!source && (source.options?.length ?? 0) > 0 && !!q.linkedSourceValue;
+    if (!source) return false;
+    const sourceHasOptions = (source.options?.length ?? 0) > 0;
+    if (!sourceHasOptions) return true;
+    // Choice follow-up questions link at the OPTION level.
+    if (isChoiceType(q.type)) {
+      return (q.options || []).some((o) => (o.linkedSourceValues?.length ?? 0) > 0);
+    }
+    return !!q.linkedSourceValue;
   };
 
   const linkedCount = useMemo(
@@ -230,6 +237,40 @@ export function FollowUpLinkEditor({
       qs.map((q) =>
         q.id === questionId ? { ...q, options: q.options?.filter((o) => o.id !== optionId) } : q,
       ),
+    );
+  // Toggle a single source-option link on a follow-up answer option.
+  const toggleOptionLink = (questionId: string, optionId: string, sourceValue: string) =>
+    setQuestions((qs) =>
+      qs.map((q) => {
+        if (q.id !== questionId) return q;
+        return {
+          ...q,
+          options: q.options?.map((o) => {
+            if (o.id !== optionId) return o;
+            const cur = o.linkedSourceValues || [];
+            const next = cur.includes(sourceValue)
+              ? cur.filter((v) => v !== sourceValue)
+              : [...cur, sourceValue];
+            return { ...o, linkedSourceValues: next };
+          }),
+        };
+      }),
+    );
+  // Link a follow-up option to ALL source options (or clear them).
+  const toggleOptionLinkAll = (questionId: string, optionId: string, allValues: string[]) =>
+    setQuestions((qs) =>
+      qs.map((q) => {
+        if (q.id !== questionId) return q;
+        return {
+          ...q,
+          options: q.options?.map((o) => {
+            if (o.id !== optionId) return o;
+            const cur = o.linkedSourceValues || [];
+            const hasAll = allValues.length > 0 && allValues.every((v) => cur.includes(v));
+            return { ...o, linkedSourceValues: hasAll ? [] : [...allValues] };
+          }),
+        };
+      }),
     );
 
   const handleSave = () => {
@@ -393,7 +434,7 @@ export function FollowUpLinkEditor({
                                 </SelectContent>
                               </Select>
                             </div>
-                            {sourceNeedsOption && (
+                            {sourceNeedsOption && !isChoiceType(q.type) && (
                               <div className="flex min-w-[10rem] flex-1 items-center gap-1.5">
                                 <span className="shrink-0 text-[11px] font-medium text-muted-foreground">option</span>
                                 <Select
@@ -425,41 +466,93 @@ export function FollowUpLinkEditor({
                                   <Plus className="h-3.5 w-3.5" /> Add option
                                 </Button>
                               </div>
-                              <div className="space-y-2">
-                                {(q.options || []).map((option) => (
-                                  <div key={option.id} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
-                                    <Input
-                                      value={option.label}
-                                      onChange={(e) =>
-                                        updateQuestionOption(q.id, option.id, {
-                                          label: e.target.value,
-                                          value: option.value || optionValueFromLabel(e.target.value),
-                                        })
-                                      }
-                                      placeholder="Option label"
-                                      className="h-8 text-xs"
-                                    />
-                                    <Input
-                                      value={option.value}
-                                      onChange={(e) =>
-                                        updateQuestionOption(q.id, option.id, {
-                                          value: optionValueFromLabel(e.target.value),
-                                        })
-                                      }
-                                      placeholder="xml_value"
-                                      className="h-8 font-mono text-xs"
-                                    />
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                      onClick={() => removeQuestionOption(q.id, option.id)}
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
-                                ))}
-                              </div>
+                              {sourceNeedsOption && (
+                                <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
+                                  Link each answer option to one, several, or all{" "}
+                                  <span className="font-medium text-foreground">{sourceQuestion?.label}</span>{" "}
+                                  responses. The linked checklist response is updated when this option is chosen.
+                                </p>
+                              )}
+                              <ScrollArea className="max-h-60 pr-2">
+                                <div className="space-y-2">
+                                  {(q.options || []).map((option) => {
+                                    const allValues = sourceOptions.map((o) => o.value);
+                                    const linkedSet = new Set(option.linkedSourceValues || []);
+                                    const hasAll =
+                                      allValues.length > 0 && allValues.every((v) => linkedSet.has(v));
+                                    return (
+                                      <div key={option.id} className="rounded-md border border-border/60 bg-muted/20 p-2">
+                                        <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
+                                          <Input
+                                            value={option.label}
+                                            onChange={(e) =>
+                                              updateQuestionOption(q.id, option.id, {
+                                                label: e.target.value,
+                                                value: option.value || optionValueFromLabel(e.target.value),
+                                              })
+                                            }
+                                            placeholder="Option label"
+                                            className="h-8 text-xs"
+                                          />
+                                          <Input
+                                            value={option.value}
+                                            onChange={(e) =>
+                                              updateQuestionOption(q.id, option.id, {
+                                                value: optionValueFromLabel(e.target.value),
+                                              })
+                                            }
+                                            placeholder="xml_value"
+                                            className="h-8 font-mono text-xs"
+                                          />
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                            onClick={() => removeQuestionOption(q.id, option.id)}
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </div>
+                                        {sourceNeedsOption && (
+                                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                            <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                                              <Link2 className="h-3 w-3" /> links to:
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={() => toggleOptionLinkAll(q.id, option.id, allValues)}
+                                              className={`rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                                                hasAll
+                                                  ? "border-primary bg-primary text-primary-foreground"
+                                                  : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                                              }`}
+                                            >
+                                              All
+                                            </button>
+                                            {sourceOptions.map((so) => {
+                                              const active = linkedSet.has(so.value);
+                                              return (
+                                                <button
+                                                  type="button"
+                                                  key={so.id}
+                                                  onClick={() => toggleOptionLink(q.id, option.id, so.value)}
+                                                  className={`rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                                                    active
+                                                      ? "border-emerald-500 bg-emerald-500 text-white"
+                                                      : "border-border bg-background text-muted-foreground hover:border-emerald-400/60"
+                                                  }`}
+                                                >
+                                                  {option.label && active ? "✓ " : ""}{so.label}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </ScrollArea>
                             </div>
                           )}
                         </div>
