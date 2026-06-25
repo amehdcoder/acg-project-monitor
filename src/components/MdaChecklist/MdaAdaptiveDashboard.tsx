@@ -404,7 +404,7 @@ export default function MdaAdaptiveDashboard({
   const handleExport = async () => {
     setExporting(true);
     try {
-      await exportMdaDashboard(submissions, questions, formName || "MDA Supervisory Checklist", activeProjectName);
+      await exportMdaDashboard(visitRows, questions, formName || "MDA Supervisory Checklist", activeProjectName);
       toast.success("Dashboard metrics exported to Excel");
     } catch (e) {
       console.error(e);
