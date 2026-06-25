@@ -42,8 +42,9 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
-  MapPinned, Lock, PlusCircle, Loader2, Info, CheckCircle2,
+  MapPinned, Lock, PlusCircle, Loader2, Info, CheckCircle2, DownloadCloud, WifiOff,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface GeoRow {
   state: string | null;
