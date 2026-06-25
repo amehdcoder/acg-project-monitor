@@ -768,6 +768,8 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
                   onGroupsChange={setGroups}
                   onOpenGroupSkipLogic={handleOpenGroupSkipLogic}
                   onOpenGroupValidation={handleOpenGroupValidation}
+                  onOpenFollowUpLink={handleOpenFollowUpLink}
+                  isMdaChecklist={!!(settings as any)?.isMdaChecklist}
                   caseManagementEnabled={caseManagementSettings.enabled}
                 />
               </div>
