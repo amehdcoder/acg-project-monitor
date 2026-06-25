@@ -281,6 +281,12 @@ export interface FormGroup {
   relevant?: string;
   constraint?: string;
   constraintMessage?: string;
+  /**
+   * MDA follow-up: condition (XLSForm `relevant`-style expression referencing
+   * Community Checklist question `name`s) that governs which visited communities
+   * appear in this follow-up module's community list table. Empty = show all.
+   */
+  communityFilter?: string;
 }
 
 export interface GeofenceArea {
