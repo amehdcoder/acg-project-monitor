@@ -346,6 +346,9 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
         projectId={projectId}
         title="Follow-up on MDA Completion"
         subtitle="Select a community to record the MDA completion follow-up."
+        accent="completion"
+        filterExpr={filterFor(GROUP_COMPLETION)}
+        nameMap={checklistNameMap}
         onBack={() => setView("home")}
         onSelect={(c) => { setSelected(c); setView("completion"); }}
       />
@@ -358,6 +361,9 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
         projectId={projectId}
         title="Follow-up on MDA Commodities"
         subtitle="Select a community to record commodity follow-up."
+        accent="commodities"
+        filterExpr={filterFor(GROUP_COMMODITIES)}
+        nameMap={checklistNameMap}
         onBack={() => setView("home")}
         onSelect={(c) => { setSelected(c); setView("commodities"); }}
       />
@@ -370,6 +376,9 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
         projectId={projectId}
         title="Follow-up on Adverse Reactions"
         subtitle="Select a community to record adverse reaction follow-up."
+        accent="adverse"
+        filterExpr={filterFor(GROUP_ADVERSE)}
+        nameMap={checklistNameMap}
         onBack={() => setView("home")}
         onSelect={(c) => { setSelected(c); setView("adverse"); }}
       />
