@@ -476,6 +476,30 @@ const ChangeEnvironmentView = () => {
             </CardContent>
           </Card>
 
+          {/* Owner-only: clear collected data before going live */}
+          {isOwner && (
+            <Card className="border-2 border-destructive/40 shadow-md">
+              <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
+                <CardTitle className="text-sm sm:text-lg flex items-center gap-2 text-destructive">
+                  <ShieldAlert className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Clear Collected Data (Owner only)
+                </CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  Permanently delete every submission collected for <strong>{selectedFormName}</strong> so live
+                  data collection starts from a clean slate. Use this when switching from Training to Live to
+                  remove practice data. This affects only this form — other forms and projects are untouched.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <Button variant="destructive" onClick={() => setClearOpen(true)} className="gap-2 h-9 sm:h-10 text-xs sm:text-sm">
+                  <Trash2 className="h-4 w-4" /> Clear this form's collected data
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+
+
           {/* Save Button */}
           <div className="flex justify-end gap-3">
             <Button variant="acg" onClick={handleSave} disabled={saving} className="gap-2 min-w-[140px] sm:min-w-[160px] h-9 sm:h-10 text-xs sm:text-sm">
