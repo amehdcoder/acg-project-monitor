@@ -30,6 +30,11 @@ import { fetchProjectScope, EMPTY_SCOPE } from "@/lib/projectScope";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useAuth } from "@/hooks/useAuth";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
+import {
+  getGrid3FacilitiesWithCoords,
+  getGrid3SettlementsWithCoords,
+  type FacilityWithCoords,
+} from "@/lib/grid3NigeriaData";
 import LocationCombobox from "@/components/MdaChecklist/LocationCombobox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -134,7 +139,15 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
 
   const [rows, setRows] = useState<GeoRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [notInMicroplan, setNotInMicroplan] = useState(false);
+  // ENABLED BY DEFAULT for every project: the checklist starts on the GRID3
+  // national cascade (State→LGA→Ward→FLHF→Settlement, with settlements feeding
+  // the Community field). Supervisors can turn this OFF to drive the cascade
+  // from the project's own locked-in microplan data instead.
+  const [notInMicroplan, setNotInMicroplan] = useState(true);
+  // GRID3 cascade data (same source as the Geo Microplanning page) loaded for
+  // the current State/LGA/Ward — FLHF facilities and settlements with GPS.
+  const [grid3Facilities, setGrid3Facilities] = useState<FacilityWithCoords[]>([]);
+  const [grid3Settlements, setGrid3Settlements] = useState<FacilityWithCoords[]>([]);
   // States the project was designed for (from project scope) — used as the
   // cascade fallback when no microplan is linked to the project.
   const [projectStates, setProjectStates] = useState<string[]>([]);
@@ -337,12 +350,37 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   // Microplan-only options for a level given current upstream selections.
   const microplanOptions = (level: keyof GeoRow): string[] => microplanOptionMap[level] ?? [];
 
+  // GRID3 option name lists for the current selection (FLHF & settlements).
+  const grid3FacilityNames = useMemo(
+    () => uniqueSorted(grid3Facilities.map((f) => f.name)),
+    [grid3Facilities],
+  );
+  const grid3SettlementNames = useMemo(
+    () => uniqueSorted(grid3Settlements.map((s) => s.name)),
+    [grid3Settlements],
+  );
+  // name → coordinates lookup so a chosen settlement (= Community) can carry its GPS.
+  const grid3SettlementCoords = useMemo(() => {
+    const m = new Map<string, { lat: number; lng: number }>();
+    for (const s of grid3Settlements) {
+      if (s.latitude != null && s.longitude != null) {
+        m.set(normGeo(s.name), { lat: s.latitude, lng: s.longitude });
+      }
+    }
+    return m;
+  }, [grid3Settlements]);
+
   const options = (level: keyof GeoRow): string[] => {
-    // Off-microplan / no-microplan path: State → LGA → Ward come from the full
-    // Nigerian administrative hierarchy.
+    // GRID3 national cascade (default). State → LGA → Ward come from the full
+    // Nigerian administrative hierarchy; FLHF and Community (settlements) come
+    // from the GRID3 dataset. Type-and-add stays available for values not in
+    // the GRID3 list.
     if (useAdminHierarchy) {
       if (isGeoLevel(level)) return adminOptions(level);
-      // FLHF / community / settlement are entered as free text below.
+      if (level === "flhf_name") return grid3FacilityNames;
+      // The MDA "Community" field is populated from GRID3 settlements.
+      if (level === "community_name") return grid3SettlementNames;
+      // Settlement detail level remains free-text (type-and-add).
       return [];
     }
     // Microplan-driven path. If the microplan captured values for this level,
@@ -354,6 +392,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     if (isGeoLevel(level)) return adminOptions(level);
     return [];
   };
+
 
   // ── Write a level + clear downstream selections ───────────────────────
   const setLevel = (level: keyof GeoRow, value: string) => {
@@ -411,6 +450,39 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   // no microplan linked yet. This guarantees the cascade always works.
   const useAdminHierarchy = notInMicroplan || microplanIsEmpty;
 
+  // Load GRID3 FLHF facilities + settlements (same source as Geo Microplanning)
+  // for the chosen State/LGA(/Ward) whenever the GRID3 cascade is active. The
+  // lists power the FLHF and Community (settlement) pickers while keeping the
+  // type-and-add escape hatch for anything not in the GRID3 dataset.
+  useEffect(() => {
+    if (!useAdminHierarchy || !sel.state || !sel.lga) {
+      setGrid3Facilities([]);
+      setGrid3Settlements([]);
+      return;
+    }
+    let cancelled = false;
+    const st = canonicalStateName(sel.state);
+    const lg = canonicalLgaName(sel.state, sel.lga);
+    const wd = sel.ward ? canonicalWardName(sel.state, sel.lga, sel.ward) : undefined;
+    (async () => {
+      try {
+        const [fac, set] = await Promise.all([
+          getGrid3FacilitiesWithCoords(st, lg, wd),
+          getGrid3SettlementsWithCoords(st, lg, wd),
+        ]);
+        if (!cancelled) {
+          setGrid3Facilities(fac);
+          setGrid3Settlements(set);
+        }
+      } catch {
+        if (!cancelled) { setGrid3Facilities([]); setGrid3Settlements([]); }
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useAdminHierarchy, sel.state, sel.lga, sel.ward]);
+
+
   // When falling back to the admin hierarchy and the project was designed for a
   // single state, preselect it so the supervisor goes straight to LGA.
   // Runs at most once (didAutoselectRef) and only when nothing is selected yet,
@@ -444,10 +516,12 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     const idx = LEVEL_ORDER.indexOf(key);
     if (idx <= 0) return true;
     if (useAdminHierarchy) {
-      // Admin-hierarchy: State→LGA→Ward is a strict chain;
-      // FLHF/Community/Settlement are free text gated only by Ward.
-      const parent = LEVEL_ORDER[idx - 1];
-      return !!sel[parent];
+      // Admin / GRID3 cascade: State→LGA→Ward is a strict chain. FLHF, Community
+      // and Settlement are pick-or-type fields gated only by Ward, so an empty
+      // FLHF list can never dead-end Community/Settlement beneath it.
+      if (key === "lga") return !!sel.state;
+      if (key === "ward") return !!sel.lga;
+      return !!sel.ward;
     }
     for (let i = 0; i < idx; i++) {
       const anc = LEVEL_ORDER[i];
@@ -492,56 +566,61 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         </div>
       ) : (
         <>
-          {/* Off-microplan provision — placed BEFORE the location fields so the
-              supervisor first decides whether the community is in the microplan,
-              then either picks from the microplan or proceeds to enter it. */}
-          {!microplanIsEmpty && (
-            <div
-              className={cn(
-                "overflow-hidden rounded-2xl border transition-colors",
-                notInMicroplan
-                  ? "border-amber-400/70 bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 dark:border-amber-500/40 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-rose-950/20"
-                  : "border-violet-300/70 bg-gradient-to-br from-violet-50 via-fuchsia-50 to-sky-50 dark:border-violet-500/40 dark:from-violet-950/40 dark:via-fuchsia-950/30 dark:to-sky-950/20",
-              )}
-            >
-              <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3">
-                  <span
-                    className={cn(
-                      "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm",
-                      notInMicroplan
-                        ? "bg-gradient-to-br from-amber-500 to-rose-500"
-                        : "bg-gradient-to-br from-violet-500 to-fuchsia-500",
-                    )}
-                  >
-                    <PlusCircle className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <p className="text-sm font-bold text-foreground sm:text-base">
-                      Community received medicine but is not in the microplan?
+          {/* GRID3 vs microplan switch — ENABLED BY DEFAULT (GRID3 national
+              cascade). Placed BEFORE the location fields so the supervisor first
+              decides the data source, then picks the area. Turn OFF to drive the
+              cascade from this project's locked-in microplan data. */}
+          <div
+            className={cn(
+              "overflow-hidden rounded-2xl border transition-colors",
+              notInMicroplan
+                ? "border-amber-400/70 bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 dark:border-amber-500/40 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-rose-950/20"
+                : "border-violet-300/70 bg-gradient-to-br from-violet-50 via-fuchsia-50 to-sky-50 dark:border-violet-500/40 dark:from-violet-950/40 dark:via-fuchsia-950/30 dark:to-sky-950/20",
+            )}
+          >
+            <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <span
+                  className={cn(
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm",
+                    notInMicroplan
+                      ? "bg-gradient-to-br from-amber-500 to-rose-500"
+                      : "bg-gradient-to-br from-violet-500 to-fuchsia-500",
+                  )}
+                >
+                  <PlusCircle className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-foreground sm:text-base">
+                    Community received medicine but is not in the microplan?
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {notInMicroplan
+                      ? "On (default) — the full GRID3 national cascade: pick State → LGA → Ward → FLHF → Community (settlement). You can also type any FLHF or community not in the list and add it. Settlement GPS is captured automatically."
+                      : "Off — driven by this project's microplan data. Pick the microplanned area below, or switch on to use the GRID3 national cascade."}
+                  </p>
+                  {!hasMicroplanData && !notInMicroplan && (
+                    <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                      This project has no microplan data — keep this on to use the GRID3 cascade.
                     </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {notInMicroplan
-                        ? "On — pick the State / LGA / Ward, then type the FLHF, community & settlement that received medicine. It will be flagged for reconciliation."
-                        : "Leave off to pick a microplanned area below, or turn it on to record a community that received medicine without being in the microplan."}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 self-start sm:self-center">
-                  <span className={cn("text-xs font-semibold", notInMicroplan ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground")}>
-                    {notInMicroplan ? "Yes" : "No"}
-                  </span>
-                  <Switch checked={notInMicroplan} onCheckedChange={toggleNotInMicroplan} />
+                  )}
                 </div>
               </div>
-              {notInMicroplan && (
-                <div className="flex items-center gap-2 border-t border-amber-400/40 bg-amber-100/40 px-4 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200">
-                  <Info className="h-3.5 w-3.5 shrink-0" />
-                  This supervision will be tagged <strong>“received medicine — not microplanned”</strong>.
-                </div>
-              )}
+              <div className="flex items-center gap-2 self-start sm:self-center">
+                <span className={cn("text-xs font-semibold", notInMicroplan ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground")}>
+                  {notInMicroplan ? "Yes" : "No"}
+                </span>
+                <Switch checked={notInMicroplan} onCheckedChange={toggleNotInMicroplan} />
+              </div>
             </div>
-          )}
+            {notInMicroplan && (
+              <div className="flex items-center gap-2 border-t border-amber-400/40 bg-amber-100/40 px-4 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200">
+                <Info className="h-3.5 w-3.5 shrink-0" />
+                Communities added outside the microplan are tagged <strong>“received medicine — not microplanned”</strong> for reconciliation.
+              </div>
+            )}
+          </div>
+
 
           {microplanIsEmpty && (
             <div className="flex items-start gap-3 rounded-xl border border-sky-300 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
@@ -592,11 +671,28 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
                     }
                     emptyLabel="No microplan match — type to add"
                     onChange={(v) => {
-                      const isNew = !!v && !microplanOptions(key).includes(v);
-                      if (isNew) {
+                      const inMicroplan = microplanOptions(key).includes(v);
+                      const inGrid3 =
+                        (key === "flhf_name" && grid3FacilityNames.includes(v)) ||
+                        (key === "community_name" && grid3SettlementNames.includes(v));
+                      // A value that is neither in the microplan nor the GRID3
+                      // dataset is a genuinely new (typed) entry → flag it.
+                      if (!!v && !inMicroplan && !inGrid3) {
                         onSet({ community_not_in_microplan: true, received_medicine_not_microplanned: true });
                       }
                       setLevel(key, v);
+                      // GRID3 settlements feed the Community field — carry their
+                      // GPS so the community location is recorded automatically.
+                      if (key === "community_name" && v) {
+                        const coords = grid3SettlementCoords.get(normGeo(v));
+                        if (coords) {
+                          onSet({
+                            community_latitude: coords.lat,
+                            community_longitude: coords.lng,
+                            community_gps: { lat: coords.lat, lng: coords.lng },
+                          });
+                        }
+                      }
                     }}
                   />
                 ) : (

@@ -466,6 +466,11 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     setQuestions((prev) =>
       prev.map((q) => (q.id === updatedQuestion.id ? updatedQuestion : q))
     );
+    // Keep the live selection in sync so reopening the editor reflects the
+    // freshly-saved rule instead of a stale snapshot.
+    setSelectedQuestion((cur) =>
+      cur && cur.id === updatedQuestion.id ? updatedQuestion : cur
+    );
   };
 
   const handleOpenValidation = (question: Question) => {
@@ -487,6 +492,9 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
   const handleSaveGroupSkipLogic = (updatedGroup: FormGroup) => {
     setGroups((prev) =>
       prev.map((g) => (g.id === updatedGroup.id ? updatedGroup : g))
+    );
+    setSelectedGroup((cur) =>
+      cur && cur.id === updatedGroup.id ? updatedGroup : cur
     );
   };
 

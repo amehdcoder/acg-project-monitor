@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FormGroup, Question } from "./types";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -107,6 +107,17 @@ const GroupSkipLogicEditor = ({
   const [conditions, setConditions] = useState<LogicCondition[]>(
     parseRelevantString(group.relevant),
   );
+
+  // Re-hydrate from this group's own saved rule each time the dialog opens so
+  // the saved condition is preserved and never bleeds across groups.
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open && !wasOpen.current) {
+      setConditions(parseRelevantString(group.relevant));
+    }
+    wasOpen.current = open;
+  }, [open, group.id, group.relevant]);
+
 
   const addCondition = () => {
     setConditions([
