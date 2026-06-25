@@ -611,7 +611,7 @@ export default function MdaAdaptiveDashboard({
         </div>
 
         {/* Adaptive per-section insights */}
-        {submissions.length === 0 ? (
+        {visitRows.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-12 text-center">
             <Activity className="h-10 w-10 text-muted-foreground/40" />
             <p className="mt-3 text-sm text-muted-foreground">No submissions yet. Insights appear here as data is collected.</p>
