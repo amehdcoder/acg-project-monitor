@@ -751,7 +751,15 @@ function CommunityListView({
           const d = (s.data as Record<string, any>) || {};
           // Admin-defined appearance condition: only include communities whose
           // Community Checklist response satisfies the configured filter.
-          if (filterExpr && !evaluateRelevant(filterExpr, d, nameMap || {})) continue;
+          // Submission data is keyed by question `name`, and the filter expression
+          // references those same `name`s — build an identity map over the actual
+          // submission keys so conditions evaluate exactly as defined regardless
+          // of which questions are registered in nameMap.
+          if (filterExpr) {
+            const identityMap: NameToIdMap = { ...(nameMap || {}) };
+            for (const k of Object.keys(d)) identityMap[k] = k;
+            if (!evaluateRelevant(filterExpr, d, identityMap)) continue;
+          }
           const community = pick(d, ["community", "community_name", "settlement", "settlement_name"]);
           const lga = pick(d, ["lga"]);
           const ward = pick(d, ["ward"]);
