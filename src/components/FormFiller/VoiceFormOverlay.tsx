@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { VoiceFormState, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
 import { ConfidenceResult, ConfirmationPolicy } from "@/hooks/useVoiceConfidence";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 
 interface VoiceFormOverlayProps {
   isActive: boolean;
@@ -200,7 +201,7 @@ export const VoiceFormOverlay = ({
               <div className="flex-1 min-w-0">
                 <p
                   className="text-sm font-medium leading-snug"
-                  dangerouslySetInnerHTML={{ __html: currentQuestion.label }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(currentQuestion.label) }}
                 />
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <Badge variant="outline" className="text-[10px]">{currentQuestion.type}</Badge>
