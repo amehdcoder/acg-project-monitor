@@ -63,6 +63,8 @@ const QuestionGroupComponent = ({
   onUngroup,
   onSkipLogic,
   onValidation,
+  onFollowUpLink,
+  isFollowUpGroup = false,
   onMoveUp,
   onMoveDown,
   isFirst = false,
