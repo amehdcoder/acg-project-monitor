@@ -104,6 +104,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { FormBuilder } from "@/components/FormBuilder";
 import { FormFiller } from "@/components/FormFiller";
+import MdaChecklistLanding from "@/components/MdaChecklist/MdaChecklistLanding";
 import SavedFormsManager, { type SavedFormsMode } from "@/components/FormFiller/SavedFormsManager";
 import { FormGroup } from "@/components/FormBuilder/types";
 import SubmissionHistory from "@/components/SubmissionHistory";
@@ -139,6 +140,8 @@ interface FormSettings {
     closeCondition?: string;
     loadFromProperties: { propertyName: string; questionId: string }[];
   };
+  isMdaChecklist?: boolean;
+  coverageEvaluation?: boolean;
 }
 
 interface Form {
