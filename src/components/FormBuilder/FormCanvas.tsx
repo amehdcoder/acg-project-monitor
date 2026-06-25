@@ -853,6 +853,8 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
                 onUngroup={(g) => handleUngroupGroup(g.id)}
                 onSkipLogic={onOpenGroupSkipLogic}
                 onValidation={onOpenGroupValidation}
+                onFollowUpLink={onOpenFollowUpLink}
+                isFollowUpGroup={isMdaChecklist && MDA_FOLLOWUP_GROUPS.has(group.name)}
                 onMoveUp={() => {
                   if (onGroupsChange && groupIndex > 0) {
                     const newGroups = [...groups];
