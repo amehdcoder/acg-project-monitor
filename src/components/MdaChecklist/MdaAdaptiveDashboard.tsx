@@ -412,6 +412,44 @@ export default function MdaAdaptiveDashboard({
   // The dataset every chart/KPI is computed from = accurate community visits.
   const visitRows = prepared.checklist;
 
+  // ── Drill-down state ──
+  const [drill, setDrill] = useState<DrillData | null>(null);
+
+  // Names of follow-up questions + their linked source fields, so the drill-down
+  // can flag answers that were updated during a follow-up.
+  const followUpFields = useMemo(() => {
+    const set = new Set<string>();
+    const walk = (qs: any[]) => {
+      for (const item of qs || []) {
+        const isGroup = Array.isArray(item.questions) && !item.type;
+        if (isGroup) {
+          for (const q of item.questions || []) {
+            if (q?.name && (q.linkedSourceField || item.followUpModule || isMdaFollowUpGroup?.(item))) {
+              set.add(q.name);
+              if (q.linkedSourceField) set.add(q.linkedSourceField);
+            }
+          }
+          walk(item.questions || []);
+        }
+      }
+    };
+    walk(questions as any);
+    return set;
+  }, [questions]);
+
+  // De-duplicate community visits (latest per community) for the drill-down.
+  const communityVisits = useMemo(() => {
+    const map = new Map<string, MdaSubmission>();
+    for (const s of visitRows) {
+      const k = communityKey(s as any);
+      const prev = map.get(k);
+      if (!prev || new Date(s.submittedAt || 0) > new Date(prev.submittedAt || 0)) map.set(k, s);
+    }
+    return [...map.values()];
+  }, [visitRows]);
+
+  const openDrill = (d: DrillData) => setDrill(d);
+
   const activeProjectName =
     activeProject === "all"
       ? "All projects"
