@@ -39,6 +39,7 @@ import {
 import { toast } from "sonner";
 import { exportMdaDashboard } from "@/lib/mda/dashboardExport";
 import { prepareMdaData } from "@/lib/mda/dashboardData";
+import MdaDrillDownSheet, { type DrillData } from "./MdaDrillDownSheet";
 
 // ───────────────────────── Types ─────────────────────────
 interface QOption { id?: string; label: string; value: string; }
