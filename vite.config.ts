@@ -115,6 +115,18 @@ export default defineConfig(({ mode }) => {
         navigateFallback: "index.html",
         runtimeCaching: [
           {
+            // GRID3 supervision location shards (per-state FLHF & settlements).
+            // CacheFirst so the cascade keeps working fully offline once a state
+            // has been opened, without ever re-downloading the slice.
+            urlPattern: ({ url }: any) => url.pathname.startsWith("/data/grid3/"),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "grid3-location-cache",
+              expiration: { maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 * 180 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             // Always fetch fresh HTML so new builds (e.g. without the old
             // green background) display immediately on next navigation.
             urlPattern: ({ request }: any) => request.mode === "navigate",
