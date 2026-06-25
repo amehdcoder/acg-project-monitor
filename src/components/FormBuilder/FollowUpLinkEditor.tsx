@@ -19,7 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Link2, Plus, Trash2, Filter, ListChecks } from "lucide-react";
+import { Link2, Plus, Trash2, Filter, ListChecks, AlertCircle } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 interface ConditionRow {
   field: string; // checklist question name
@@ -89,12 +90,26 @@ export default function FollowUpLinkEditor({
 
   const qByName = (name: string) => choiceQuestions.find((q) => q.name === name);
 
+  const linkedCount = useMemo(
+    () => Object.values(links).filter((src) => src && src !== NONE).length,
+    [links],
+  );
+
   const addRow = () => setRows((r) => [...r, { field: "", value: "" }]);
   const removeRow = (i: number) => setRows((r) => r.filter((_, idx) => idx !== i));
   const updateRow = (i: number, patch: Partial<ConditionRow>) =>
     setRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
 
   const handleSave = () => {
+    if (linkedCount === 0) {
+      toast({
+        title: "Link at least one follow-up question",
+        description:
+          "You must link at least one follow-up question to a Community Checklist response before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
     const communityFilter = buildFilter(rows, joiner);
     const updatedQuestions = group.questions.map((q) => {
       const src = links[q.id];
@@ -288,15 +303,24 @@ export default function FollowUpLinkEditor({
         </ScrollArea>
 
         <DialogFooter className="border-t px-6 py-4">
-          {group.communityFilter && (
-            <Badge variant="secondary" className="mr-auto font-normal">
-              Filter active
-            </Badge>
+          {linkedCount === 0 ? (
+            <span className="mr-auto flex items-center gap-1.5 text-xs text-destructive">
+              <AlertCircle className="h-3.5 w-3.5" />
+              Link at least one follow-up question to save
+            </span>
+          ) : (
+            group.communityFilter && (
+              <Badge variant="secondary" className="mr-auto font-normal">
+                Filter active
+              </Badge>
+            )
           )}
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave}>Save</Button>
+          <Button onClick={handleSave} disabled={linkedCount === 0}>
+            Save
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
