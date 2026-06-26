@@ -210,6 +210,8 @@ export function FollowUpLinkEditor({
         label: "",
         name: "",
         type: "text",
+        required: false,
+        relevant: undefined,
         linkedSourceField: undefined,
         linkedSourceValue: undefined,
         options: undefined,
