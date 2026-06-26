@@ -1011,3 +1011,28 @@ select option {
   animation: gapClusterPulse 1.6s ease-in-out infinite;
   filter: drop-shadow(0 0 6px hsl(0 85% 55% / 0.7));
 }
+
+/* ── Household Coverage Survey Map — outcome pins + animated visit replay ── */
+.hcs-pin { background: transparent; border: none; }
+.hcs-pin-wrap {
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45));
+  transition: transform 0.15s ease;
+}
+.hcs-pin-wrap:hover { transform: scale(1.12); }
+.hcs-pin-live { animation: hcsPinBounce 1.1s ease-in-out infinite; }
+@keyframes hcsPinBounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+.hcs-live { background: transparent; border: none; }
+.hcs-live-ring {
+  width: 26px; height: 26px; border-radius: 9999px;
+  background: radial-gradient(circle, rgba(34, 197, 94, 0.55) 0%, rgba(34, 197, 94, 0) 70%);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.6);
+  animation: hcsLivePulse 1.1s ease-out infinite;
+}
+@keyframes hcsLivePulse {
+  0%   { transform: scale(0.5); opacity: 0.95; }
+  70%  { transform: scale(2.4); opacity: 0.15; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
