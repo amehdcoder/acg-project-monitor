@@ -272,6 +272,7 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
             questions={questions}
             formName={form.name}
             projectName={projectName}
+            projectId={form.project_id || null}
           />
         )}
       </main>
