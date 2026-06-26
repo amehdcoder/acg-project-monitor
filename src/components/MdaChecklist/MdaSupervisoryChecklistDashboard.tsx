@@ -529,7 +529,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
             <Badge variant="outline" className="gap-1.5 bg-sky-500/10 text-sky-700 border-sky-500/40"><Accessibility className="h-3 w-3" />Inclusive</Badge>
             <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/70 py-1 pl-1 pr-3">
               <div className="relative h-11 w-11">
-                <Donut data={[{ name: "Done", value: completionPct, color: "#10b981" }, { name: "Rest", value: 100 - completionPct, color: "#e5e7eb" }]} />
+                <Donut height={44} inner={15} outer={21} data={[{ name: "Done", value: completionPct, color: "#10b981" }, { name: "Rest", value: 100 - completionPct, color: "#e5e7eb" }]} />
                 <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[11px] font-bold text-foreground">{completionPct}%</span>
               </div>
               <div className="leading-tight">
