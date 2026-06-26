@@ -6899,6 +6899,35 @@ export type Database = {
         Args: { _project_id: string }
         Returns: string
       }
+      get_direct_unread_by_user: {
+        Args: never
+        Returns: {
+          sender_id: string
+          unread_count: number
+        }[]
+      }
+      get_my_chat_groups: {
+        Args: { _project_id: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          description: string | null
+          form_id: string | null
+          icon_url: string | null
+          id: string
+          is_default: boolean
+          is_protected: boolean
+          name: string
+          project_id: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "chat_groups"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_project_chat_members: {
         Args: { _project_id: string }
         Returns: {
