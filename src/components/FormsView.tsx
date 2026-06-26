@@ -1091,6 +1091,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     form.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const mdaChecklistForms = mergedForms.filter((form) =>
+    isMdaChecklistLike({ settings: form.settings, formName: form.name, groups: form.groups })
+  );
+  const primaryMdaDashboardForm =
+    (currentProjectId ? mdaChecklistForms.find((form) => form.project_id === currentProjectId) : null) ||
+    mdaChecklistForms[0] ||
+    null;
+
   const currentProject = projects.find(p => p.id === currentProjectId);
 
   if (showMentalHealth) {
