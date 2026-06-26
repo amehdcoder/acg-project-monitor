@@ -14,6 +14,7 @@ import {
   type OfflineAuthCredential,
 } from "@/lib/offlineAuthCache";
 import { logOfflineAuditEvent, flushOfflineAuditQueue } from "@/lib/offlineAuditLog";
+import { checkOfflineLock, registerOfflineFailure, clearOfflineFailures } from "@/lib/offlineAuthThrottle";
 
 
 type AppRole = "super_admin" | "systems_admin" | "user";
