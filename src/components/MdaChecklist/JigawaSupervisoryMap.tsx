@@ -74,6 +74,8 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
   const geoRef = useRef<any[] | null>(null);
+  const sweepTimer = useRef<number | null>(null);
+  const liveRef = useRef<L.Marker | null>(null);
 
   const points = useMemo(
     () =>
