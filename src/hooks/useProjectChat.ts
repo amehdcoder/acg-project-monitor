@@ -219,6 +219,13 @@ export function useProjectChat(projectId: string | null) {
       setChatGroups(prev => prev.map(g => 
         g.id === selectedGroup.id ? { ...g, unread_count: 0 } : g
       ));
+
+      // Reset the global chat badge (FAB) immediately too.
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("amehnities:chat-read", { detail: { groupId: selectedGroup.id } })
+        );
+      }
     } catch (error) {
       console.error("Error marking messages as read:", error);
     }

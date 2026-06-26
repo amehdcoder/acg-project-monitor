@@ -102,8 +102,13 @@ export function useDirectUnread({ withToast = false }: UseDirectUnreadOptions = 
         () => refetch(),
       )
       .subscribe();
+    // Refetch the moment a thread is opened/read so the global badge clears
+    // instantly without waiting for the realtime UPDATE round-trip.
+    const onRead = () => refetch();
+    window.addEventListener("amehnities:direct-read", onRead as EventListener);
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener("amehnities:direct-read", onRead as EventListener);
     };
   }, [user?.id, withToast, refetch, resolveName]);
 

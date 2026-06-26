@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import {
   Plus,
@@ -96,8 +96,34 @@ export function ChatGroupList({
   const matchedDirect = directChats.filter((c) =>
     (c.other_name || "").toLowerCase().includes(q)
   );
-  const visibleDirect = matchedDirect.filter((c) => (showArchived ? c.archived : !c.archived));
+  const allVisibleDirect = matchedDirect.filter((c) => (showArchived ? c.archived : !c.archived));
   const archivedCount = matchedDirect.filter((c) => c.archived).length;
+
+  // ── Infinite scroll pagination ──
+  // Render a growing window of conversations so very large contact lists stay
+  // smooth. The window grows as the user nears the bottom of the scroll area.
+  const PAGE = 20;
+  const [visibleCount, setVisibleCount] = useState(PAGE);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Reset the window whenever the result set changes (search / archive toggle).
+  useEffect(() => {
+    setVisibleCount(PAGE);
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [searchQuery, showArchived]);
+
+  const visibleDirect = useMemo(
+    () => allVisibleDirect.slice(0, visibleCount),
+    [allVisibleDirect, visibleCount]
+  );
+  const hasMoreDirect = allVisibleDirect.length > visibleDirect.length;
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 240 && hasMoreDirect) {
+      setVisibleCount((c) => c + PAGE);
+    }
+  };
 
   const handleCreate = async () => {
     if (!newGroup.name.trim()) return;
@@ -130,7 +156,7 @@ export function ChatGroupList({
               }}
             >
               <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" title="New chat">
+                <Button variant="ghost" size="icon" className="h-10 w-10" title="New chat" aria-label="Start a new direct chat">
                   <MessageSquarePlus className="h-5 w-5" />
                 </Button>
               </DialogTrigger>
@@ -143,13 +169,15 @@ export function ChatGroupList({
                 </DialogHeader>
                 <div className="space-y-3 py-2">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     <Input
                       autoFocus
+                      type="search"
+                      aria-label="Search people to start a chat"
                       placeholder="Search people..."
                       value={memberQuery}
                       onChange={(e) => setMemberQuery(e.target.value)}
-                      className="pl-9"
+                      className="pl-9 h-11"
                     />
                   </div>
                   <div className="max-h-72 overflow-y-auto -mx-2">
@@ -189,7 +217,7 @@ export function ChatGroupList({
             {isAdmin && (
             <Dialog open={showCreate} onOpenChange={setShowCreate}>
               <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" title="New group">
+                <Button variant="ghost" size="icon" className="h-10 w-10" title="New group" aria-label="Create a new chat group">
                   <Plus className="h-5 w-5" />
                 </Button>
               </DialogTrigger>
@@ -262,19 +290,21 @@ export function ChatGroupList({
           </div>
         </div>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <Input
+            type="search"
+            aria-label="Search chats and direct conversations by name"
             placeholder="Search chats..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-9 bg-muted/50 border-0"
+            className="pl-9 h-11 bg-muted/50 border border-border/60 text-foreground placeholder:text-muted-foreground"
           />
         </div>
       </div>
 
       {/* Chats List */}
-      <div className="flex-1 overflow-y-auto">
-        {filteredGroups.length === 0 && visibleDirect.length === 0 && archivedCount === 0 ? (
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
+        {filteredGroups.length === 0 && allVisibleDirect.length === 0 && archivedCount === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-center p-4">
             <MessageSquare className="h-10 w-10 text-muted-foreground/50 mb-2" />
             <p className="text-sm text-muted-foreground">No chats found</p>
@@ -307,7 +337,11 @@ export function ChatGroupList({
                     </AvatarFallback>
                   </Avatar>
                   {(group.unread_count || 0) > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-medium">
+                    <span
+                      role="status"
+                      aria-label={`${group.unread_count} unread ${group.unread_count === 1 ? "message" : "messages"} in ${group.name}`}
+                      className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-semibold ring-2 ring-background"
+                    >
                       {group.unread_count > 99 ? "99+" : group.unread_count}
                     </span>
                   )}
@@ -346,7 +380,7 @@ export function ChatGroupList({
                 )}
               </div>
             )}
-            {visibleDirect.length === 0 && (matchedDirect.length > 0 || archivedCount > 0) && (
+            {allVisibleDirect.length === 0 && (matchedDirect.length > 0 || archivedCount > 0) && (
               <p className="px-4 py-3 text-xs text-muted-foreground">
                 {showArchived ? "No archived chats." : "No direct chats yet."}
               </p>
@@ -368,7 +402,11 @@ export function ChatGroupList({
                     </AvatarFallback>
                   </Avatar>
                   {chat.unread_count > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-medium">
+                    <span
+                      role="status"
+                      aria-label={`${chat.unread_count} unread ${chat.unread_count === 1 ? "message" : "messages"} from ${chat.other_name}`}
+                      className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-semibold ring-2 ring-background"
+                    >
                       {chat.unread_count > 99 ? "99+" : chat.unread_count}
                     </span>
                   )}
@@ -393,7 +431,8 @@ export function ChatGroupList({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 flex-shrink-0 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100"
+                      aria-label={`Chat options for ${chat.other_name}`}
+                      className="h-10 w-10 flex-shrink-0 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 data-[state=open]:opacity-100 focus-visible:opacity-100"
                     >
                       <MoreVertical className="h-4 w-4" />
                     </Button>
@@ -420,6 +459,15 @@ export function ChatGroupList({
                 </DropdownMenu>
               </div>
             ))}
+            {hasMoreDirect && (
+              <button
+                type="button"
+                onClick={() => setVisibleCount((c) => c + PAGE)}
+                className="w-full min-h-11 py-3 text-xs font-medium text-primary hover:bg-muted/50 transition-colors"
+              >
+                Load more conversations ({allVisibleDirect.length - visibleDirect.length})
+              </button>
+            )}
           </>
         )}
       </div>

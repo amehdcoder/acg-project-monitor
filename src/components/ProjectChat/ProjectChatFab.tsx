@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, MessagesSquare } from "lucide-react";
+import { Check, MessagesSquare, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { ProjectChatDialog } from "@/components/ProjectChat/ProjectChatDialog";
 import { useDirectUnread } from "@/hooks/useDirectUnread";
+import { useHandsStaffUnread } from "@/hooks/useHandsStaffUnread";
 import {
   Popover,
   PopoverContent,
@@ -73,6 +74,11 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
 
   // Direct-message unread + real-time toast notifications (fires once globally).
   const { total: directUnread } = useDirectUnread({ withToast: true });
+  // Cross-project HANDS Staff - Official unread, surfaced separately so it stays
+  // visible regardless of which project the user is browsing.
+  const { unread: handsStaffUnread } = useHandsStaffUnread(
+    currentProjectId ?? projects[0]?.id ?? null,
+  );
   const totalUnread = unread + directUnread;
 
 
@@ -195,9 +201,13 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
     };
     load();
     const t = setInterval(load, 30_000);
+    // Re-load the moment a group is read so the FAB badge clears instantly.
+    const onChatRead = () => load();
+    window.addEventListener("amehnities:chat-read", onChatRead as EventListener);
     return () => {
       cancelled = true;
       clearInterval(t);
+      window.removeEventListener("amehnities:chat-read", onChatRead as EventListener);
     };
   }, [user, projects, open]);
 
@@ -223,7 +233,11 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
             <button
               type="button"
               onClick={launch}
-              aria-label="Open project chat"
+              aria-label={
+                totalUnread + handsStaffUnread > 0
+                  ? `Open project chat, ${totalUnread + handsStaffUnread} unread ${totalUnread + handsStaffUnread === 1 ? "message" : "messages"}`
+                  : "Open project chat"
+              }
               className="group relative flex h-14 w-14 items-center justify-center rounded-full text-white shadow-2xl transition-all duration-300 hover:scale-110 hover:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.35)] active:scale-95"
               style={{
                 background: "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--chart-accent)) 100%)",
@@ -241,10 +255,25 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
 
               {/* Unread badge — red with white ring */}
               {totalUnread > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-[hsl(var(--destructive))] px-1.5 text-[11px] font-bold text-white ring-[2.5px] ring-[hsl(var(--background))] animate-badge-bounce">
+                <span
+                  role="status"
+                  aria-label={`${totalUnread} unread chat ${totalUnread === 1 ? "message" : "messages"}`}
+                  className="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-[hsl(var(--destructive))] px-1.5 text-[11px] font-bold text-white ring-[2.5px] ring-[hsl(var(--background))] animate-badge-bounce"
+                >
                   {totalUnread > 99 ? "99+" : totalUnread}
                 </span>
+              )}
 
+              {/* HANDS Staff - Official unread — distinct badge, always visible */}
+              {handsStaffUnread > 0 && (
+                <span
+                  role="status"
+                  aria-label={`${handsStaffUnread} unread HANDS Staff Official ${handsStaffUnread === 1 ? "message" : "messages"}`}
+                  className="absolute -left-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center gap-0.5 rounded-full bg-sky-600 px-1 text-[10px] font-bold text-white ring-[2.5px] ring-[hsl(var(--background))]"
+                >
+                  <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+                  {handsStaffUnread > 99 ? "99+" : handsStaffUnread}
+                </span>
               )}
 
               {/* Online / active indicator dot */}
