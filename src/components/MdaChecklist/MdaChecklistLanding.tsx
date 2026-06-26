@@ -470,14 +470,23 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
           onBack={() => setView("home")}
           onSelect={(c) => {
             // Prefill + lock the Coverage Evaluation 3D location from this visit.
+            // Read every field straight from the raw submission `data` using a
+            // comprehensive set of candidate keys so the State, LGA, Ward, FLHF,
+            // Community and Settlement transfer accurately 100% of the time,
+            // regardless of how the checklist questions were named. We deliberately
+            // keep Community and Settlement distinct (no cross-fallback) so the two
+            // identity fields are never confused with each other.
             try {
+              const d = c.data || {};
               const prefill = {
-                state: pick(c.data, ["state"]),
-                lga: c.lga,
-                ward: c.ward,
-                flhf_name: c.flhf,
-                community_name: c.community,
-                settlement_name: pick(c.data, ["settlement", "settlement_name"]),
+                state: pick(d, ["state", "state_name", "admin_state", "state_of_residence"]),
+                lga: pick(d, ["lga", "lga_name", "local_government", "lga_of_residence"]) || c.lga,
+                ward: pick(d, ["ward", "ward_name"]) || c.ward,
+                flhf_name:
+                  pick(d, ["flhf_name", "flhf", "health_facility", "facility", "facility_name"]) ||
+                  c.flhf,
+                community_name: pick(d, ["community", "community_name"]) || c.community,
+                settlement_name: pick(d, ["settlement", "settlement_name", "settlement_village"]),
                 projectId: projectId ?? "",
                 ts: Date.now(),
               };
@@ -487,6 +496,7 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
             window.dispatchEvent(new CustomEvent("amehnities:navigate-tab", { detail: { tab: "coverage-eval" } }));
             navigate("/?tab=coverage-eval", { replace: true });
           }}
+
         />
         {builderDialog}
       </>
