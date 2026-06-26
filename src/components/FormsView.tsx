@@ -105,6 +105,7 @@ import { toast } from "@/hooks/use-toast";
 import { FormBuilder } from "@/components/FormBuilder";
 import { FormFiller } from "@/components/FormFiller";
 import MdaChecklistLanding from "@/components/MdaChecklist/MdaChecklistLanding";
+import MdaDashboardView from "@/components/MdaChecklist/MdaDashboardView";
 import SavedFormsManager, { type SavedFormsMode } from "@/components/FormFiller/SavedFormsManager";
 import { FormGroup } from "@/components/FormBuilder/types";
 import SubmissionHistory from "@/components/SubmissionHistory";
@@ -226,6 +227,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [selectingFormFor, setSelectingFormFor] = useState<string | null>(null);
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
   const [dashboardForm, setDashboardForm] = useState<Form | null>(null);
+  const [mdaDashboardForm, setMdaDashboardForm] = useState<Form | null>(null);
   const [templateForm, setTemplateForm] = useState<{ templateId: string; name: string; description: string; questions: Question[]; settings: any; geofence?: GeofenceArea } | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
@@ -503,6 +505,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       showSeeClearDash ||
       microplanFillingActive ||
       dashboardForm ||
+      mdaDashboardForm ||
       geofenceManagerForm ||
       templateForm ||
       qrCodeForm ||
@@ -536,6 +539,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     showSeeClearDash,
     microplanFillingActive,
     dashboardForm,
+    mdaDashboardForm,
     geofenceManagerForm,
     templateForm,
     qrCodeForm,
@@ -1230,6 +1234,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
+  if (mdaDashboardForm) {
+    return (
+      <MdaDashboardView
+        form={mdaDashboardForm}
+        projects={projects}
+        onClose={() => setMdaDashboardForm(null)}
+      />
+    );
+  }
+
   if (geofenceManagerForm) {
     return (
       <UserGeofenceManager
@@ -1844,10 +1858,40 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   // palette used by the Project dropdown above, so the trigger
                   // border/text + form name + row left-border are all in sync.
                   const accent = getProjectAccent(form.project_id, projects, idx);
+                  const isMdaChecklistForm = isMdaChecklistLike({ settings: form.settings, formName: form.name, groups: form.groups });
 
                   return (
+                    <div key={form.id} className="contents">
+                      {isMdaChecklistForm && (
+                        <div
+                          className="group flex items-center gap-3 border-l-4 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
+                          style={{ borderLeftColor: "#0d9488" }}
+                        >
+                          <button
+                            onClick={() => setMdaDashboardForm(form)}
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#DCF3F0]"
+                            aria-label={`Open ${form.name} dashboard`}
+                          >
+                            <BarChart3 className="h-5 w-5 text-[#0d9488]" strokeWidth={2} />
+                          </button>
+                          <button
+                            onClick={() => setMdaDashboardForm(form)}
+                            className="min-w-0 flex-1 text-left"
+                          >
+                            <h4 className="truncate text-[15px] font-bold text-[#0f766e]">Integrated MDA Supervisory Dashboard</h4>
+                            <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">
+                              Realtime checklist, follow-up, GPS map and field-worker insights
+                            </p>
+                          </button>
+                          <span className="shrink-0 rounded-full bg-[#DCF3F0] px-3 py-1 text-xs font-semibold text-[#0f766e]">
+                            Dashboard
+                          </span>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-[#0f766e]" onClick={() => setMdaDashboardForm(form)}>
+                            <ChevronRight className="h-5 w-5" />
+                          </Button>
+                        </div>
+                      )}
                     <div
-                      key={form.id}
                       className="group flex items-center gap-3 border-l-4 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
                       style={{ borderLeftColor: accent }}
                     >
@@ -1958,6 +2002,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 <LayoutDashboard className="mr-2 h-4 w-4" />
                                 Custom Dashboards
                               </DropdownMenuItem>
+                              {isMdaChecklistForm && (
+                                <DropdownMenuItem onClick={() => setMdaDashboardForm(form)}>
+                                  <BarChart3 className="mr-2 h-4 w-4 text-emerald-600" />
+                                  MDA Supervisory Dashboard
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => setQrCodeForm(form)}>
                                 <QrCode className="mr-2 h-4 w-4" />
                                 Generate QR Code
@@ -2018,6 +2068,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
+                    </div>
                     </div>
                   );
                 })}
