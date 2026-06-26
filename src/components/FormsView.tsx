@@ -2062,6 +2062,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 <MapPin className="mr-2 h-4 w-4" />
                                 User Geofences
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setAccessManagerForm(form)}>
+                                <ShieldCheck className="mr-2 h-4 w-4 text-primary" />
+                                Manage Access
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => setDashboardForm(form)}>
                                 <LayoutDashboard className="mr-2 h-4 w-4" />
                                 Custom Dashboards
