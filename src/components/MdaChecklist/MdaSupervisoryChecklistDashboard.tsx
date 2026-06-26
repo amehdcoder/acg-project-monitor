@@ -28,6 +28,7 @@ import {
   Users2, CheckCircle2, Pill, ClipboardList, AlertTriangle, Flag,
   ShieldCheck, HeartHandshake, MapPin, CalendarClock, ListChecks,
   TrendingUp, Activity, Ambulance, ArrowRight,
+  Clock, Wifi, Accessibility, Layers, Building2, Map as MapIcon,
 } from "lucide-react";
 import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
 import MdaSupervisoryMap from "./MdaSupervisoryMap";
@@ -91,36 +92,38 @@ function Kpi({ icon: Icon, label, value, sub, tint, bar }: {
   icon: any; label: string; value: string | number; sub?: string; tint: string; bar?: number;
 }) {
   return (
-    <div className="rounded-xl border border-border/60 bg-card p-3 shadow-sm">
-      <div className="flex items-start gap-2">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white shadow" style={{ background: tint }}>
-          <Icon className="h-4 w-4" />
+    <div className="group relative overflow-hidden rounded-2xl border border-border/60 bg-card p-3.5 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
+      <span className="absolute inset-x-0 top-0 h-1" style={{ background: tint }} aria-hidden />
+      <div className="flex items-start gap-2.5">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: tint }}>
+          <Icon className="h-5 w-5" />
         </span>
-        <span className="text-[11px] font-semibold leading-tight text-muted-foreground">{label}</span>
+        <span className="pt-0.5 text-[11px] font-semibold leading-tight text-muted-foreground">{label}</span>
       </div>
-      <div className="mt-2 font-display text-2xl font-bold text-foreground">{value}</div>
-      {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
+      <div className="mt-2.5 font-display text-[26px] font-extrabold leading-none tracking-tight text-foreground">{value}</div>
+      {sub && <div className="mt-1 text-[11px] text-muted-foreground">{sub}</div>}
       {typeof bar === "number" && (
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-2.5 flex items-center gap-2">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full" style={{ width: `${Math.min(100, bar)}%`, background: tint }} />
+            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, bar)}%`, background: tint }} />
           </div>
-          <span className="text-[10px] font-semibold text-muted-foreground">{bar}%</span>
+          <span className="text-[10px] font-bold" style={{ color: tint }}>{bar}%</span>
         </div>
       )}
     </div>
   );
 }
 
-function Donut({ data, centerLabel, centerValue }: {
+function Donut({ data, centerLabel, centerValue, height = 170, inner = 52, outer = 75 }: {
   data: { name: string; value: number; color: string }[]; centerLabel?: string; centerValue?: string;
+  height?: number; inner?: number; outer?: number;
 }) {
   const total = data.reduce((a, b) => a + b.value, 0);
   return (
-    <div className="relative">
-      <ResponsiveContainer width="100%" height={170}>
+    <div className="relative h-full">
+      <ResponsiveContainer width="100%" height={height}>
         <PieChart>
-          <Pie data={total ? data : [{ name: "—", value: 1, color: "#e5e7eb" }]} dataKey="value" innerRadius={52} outerRadius={75} paddingAngle={total ? 2 : 0} stroke="none">
+          <Pie data={total ? data : [{ name: "—", value: 1, color: "#e5e7eb" }]} dataKey="value" innerRadius={inner} outerRadius={outer} paddingAngle={total ? 2 : 0} stroke="none">
             {(total ? data : [{ color: "#e5e7eb" }]).map((d, i) => <Cell key={i} fill={d.color} />)}
           </Pie>
           {total > 0 && <RTooltip />}
@@ -477,6 +480,25 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     return { completed, notCompleted, adverse };
   }, [checklist, followUps]);
 
+  // ── Context / scope strip (read-only data summary, never misleading) ──
+  const scope = useMemo(() => {
+    const uniq = (vals: (string | null | undefined)[]) =>
+      new Set(vals.map((v) => stripTags(String(v || "")).toLowerCase()).filter(Boolean)).size;
+    const all = checklist.concat(followUps);
+    const states = uniq(all.map((s) => s.data?.state || s.state));
+    const lgas = uniq(all.map((s) => s.data?.lga || s.lga));
+    const wards = uniq(all.map((s) => s.data?.ward || s.ward));
+    const times = all.map((s) => (s.submittedAt ? new Date(s.submittedAt).getTime() : 0)).filter(Boolean);
+    const fmt = (t: number) => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    const range = times.length
+      ? `${fmt(Math.min(...times))} – ${fmt(Math.max(...times))}`
+      : "—";
+    const last = times.length
+      ? new Date(Math.max(...times)).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+      : "—";
+    return { states, lgas, wards, communities: prepared.communityCount, range, last };
+  }, [checklist, followUps, prepared.communityCount]);
+
   if (total === 0 && followUps.length === 0) {
     return (
       <Card>
@@ -490,16 +512,52 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-card p-4">
-        <div>
-          <h2 className="font-display text-lg font-bold text-foreground sm:text-xl">Integrated MDA Supervisory Checklist Dashboard</h2>
-          <p className="text-xs text-muted-foreground">Real-time monitoring & supervision intelligence for integrated MDA activities</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" />Live</Badge>
-          <div className="flex flex-col items-center">
-            <Donut data={[{ name: "Done", value: completionPct, color: "#10b981" }, { name: "Rest", value: 100 - completionPct, color: "#e5e7eb" }]} />
+      <div className="overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-r from-card via-card to-primary/5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5">
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <ShieldCheck className="h-6 w-6" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="font-display text-lg font-bold tracking-tight text-foreground sm:text-xl">Integrated MDA Supervisory Checklist Dashboard</h2>
+              <p className="text-xs text-muted-foreground">Real-time monitoring &amp; supervision intelligence for integrated MDA activities</p>
+            </div>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="gap-1.5 bg-background/60"><Clock className="h-3 w-3 text-muted-foreground" />Updated {scope.last}</Badge>
+            <Badge variant="outline" className="gap-1.5 bg-emerald-500/10 text-emerald-700 border-emerald-500/40"><Wifi className="h-3 w-3" />Online</Badge>
+            <Badge variant="outline" className="gap-1.5 bg-sky-500/10 text-sky-700 border-sky-500/40"><Accessibility className="h-3 w-3" />Inclusive</Badge>
+            <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/70 py-1 pl-1 pr-3">
+              <div className="relative h-11 w-11">
+                <Donut height={44} inner={15} outer={21} data={[{ name: "Done", value: completionPct, color: "#10b981" }, { name: "Rest", value: 100 - completionPct, color: "#e5e7eb" }]} />
+                <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[11px] font-bold text-foreground">{completionPct}%</span>
+              </div>
+              <div className="leading-tight">
+                <div className="text-[11px] font-semibold text-foreground">Checklist</div>
+                <div className="text-[11px] text-muted-foreground">Completion</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Context / scope strip */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border/60 bg-muted/40 px-4 py-2.5 text-[11px] sm:px-5">
+          {[
+            { icon: MapIcon, label: "States", value: scope.states },
+            { icon: Building2, label: "LGAs", value: scope.lgas },
+            { icon: Layers, label: "Wards", value: scope.wards },
+            { icon: MapPin, label: "Communities", value: scope.communities },
+            { icon: ClipboardList, label: "Total visits", value: total },
+          ].map((c) => (
+            <span key={c.label} className="flex items-center gap-1.5 text-muted-foreground">
+              <c.icon className="h-3.5 w-3.5 text-primary" />
+              <span className="font-semibold text-foreground">{c.value}</span> {c.label}
+            </span>
+          ))}
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <CalendarClock className="h-3.5 w-3.5 text-primary" />
+            <span className="font-semibold text-foreground">{scope.range}</span>
+          </span>
         </div>
       </div>
 
