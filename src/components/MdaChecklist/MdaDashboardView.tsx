@@ -16,9 +16,24 @@ interface MdaDashboardForm {
   name: string;
   description?: string | null;
   project_id?: string | null;
-  questions?: any[];
-  groups?: any[];
-  settings?: Record<string, any> | null;
+  questions?: DashboardQuestion[];
+  groups?: DashboardQuestion[];
+  settings?: Record<string, unknown> | null;
+}
+
+interface DashboardOption {
+  label?: string;
+  value?: string;
+}
+
+interface DashboardQuestion {
+  id: string;
+  name?: string;
+  label?: string;
+  type?: string;
+  options?: DashboardOption[];
+  questions?: DashboardQuestion[];
+  [key: string]: unknown;
 }
 
 interface ProjectLite {
@@ -36,7 +51,7 @@ const SIM_DEFAULTS = { count: 250, seed: 1337 };
 
 const norm = (v: unknown) => String(v ?? "").trim();
 
-function pick(data: Record<string, any> | undefined, keys: string[]): string | null {
+function pick(data: Record<string, unknown> | undefined, keys: string[]): string | null {
   if (!data) return null;
   const entries = Object.entries(data);
   for (const wanted of keys) {
@@ -50,12 +65,13 @@ function pick(data: Record<string, any> | undefined, keys: string[]): string | n
   return null;
 }
 
-function readGps(data: Record<string, any> | undefined): { latitude: number; longitude: number } | null {
+function readGps(data: Record<string, unknown> | undefined): { latitude: number; longitude: number } | null {
   if (!data) return null;
   for (const value of Object.values(data)) {
     if (value && typeof value === "object") {
-      const lat = Number((value as any).latitude ?? (value as any).lat);
-      const lng = Number((value as any).longitude ?? (value as any).lng ?? (value as any).lon);
+      const point = value as Record<string, unknown>;
+      const lat = Number(point.latitude ?? point.lat);
+      const lng = Number(point.longitude ?? point.lng ?? point.lon);
       if (Number.isFinite(lat) && Number.isFinite(lng)) return { latitude: lat, longitude: lng };
     }
     if (typeof value === "string") {
@@ -70,8 +86,8 @@ function readGps(data: Record<string, any> | undefined): { latitude: number; lon
   return null;
 }
 
-function flattenQuestions(items: any[]): any[] {
-  const out: any[] = [];
+function flattenQuestions(items: DashboardQuestion[]): DashboardQuestion[] {
+  const out: DashboardQuestion[] = [];
   for (const item of items || []) {
     if (Array.isArray(item?.questions)) out.push(...flattenQuestions(item.questions));
     else if (item) out.push(item);
@@ -79,7 +95,7 @@ function flattenQuestions(items: any[]): any[] {
   return out;
 }
 
-function singleStateRestriction(questions: any[]): string | null {
+function singleStateRestriction(questions: DashboardQuestion[]): string | null {
   const stateQuestion = flattenQuestions(questions).find((q) => String(q?.name || q?.id || "").toLowerCase() === "state");
   const options = stateQuestion?.options || [];
   if (options.length === 1) return String(options[0].value || options[0].label || "") || null;
