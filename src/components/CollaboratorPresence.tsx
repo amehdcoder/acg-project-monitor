@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { usePresenceTracking, type ActiveCollaborator } from "@/hooks/usePresenceTracking";
+import { useDirectUnread } from "@/hooks/useDirectUnread";
 import { cn } from "@/lib/utils";
 
 const ANIMALS = [
