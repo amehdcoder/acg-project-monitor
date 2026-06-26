@@ -39,6 +39,7 @@ import {
 import { exportMdaDashboard } from "@/lib/mda/dashboardExport";
 import MdaSupervisoryMap from "./MdaSupervisoryMap";
 import JigawaSupervisoryMap from "./JigawaSupervisoryMap";
+import FctSupervisoryMap from "./FctSupervisoryMap";
 import HouseholdCoverageSurveyMap from "./HouseholdCoverageSurveyMap";
 
 // ───────────────────────── Types ─────────────────────────
