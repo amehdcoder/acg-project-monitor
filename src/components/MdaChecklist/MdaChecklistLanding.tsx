@@ -669,6 +669,32 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   );
 }
 
+// Clear access-denied overlay for unauthorized attempts to open the follow-up
+// builder (e.g. UI bypass / direct access). The DB guard also blocks any write.
+function BuilderAccessDenied({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="alertdialog" aria-modal="true">
+      <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-rose-100">
+          <ShieldAlert className="h-7 w-7 text-rose-600" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-900">Access denied</h2>
+        <p className="mt-2 text-sm leading-relaxed text-slate-600">
+          The Follow-up question &amp; linkage builder is restricted to Systems Admins,
+          Super Admins, Owners, and Co-owners who are assigned to this project.
+        </p>
+        <button
+          onClick={onClose}
+          className="mt-5 w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 active:scale-[0.99]"
+        >
+          Got it
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
 function responseHasOption(response: any, optionValue: string): boolean {
   if (Array.isArray(response)) return response.map(String).includes(optionValue);
   return String(response ?? "")
