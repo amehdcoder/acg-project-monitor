@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, Database, Loader2, RotateCcw, Settings2, Sparkles } from "lucide-react";
+import { ArrowLeft, BarChart3, ChevronUp, Database, Loader2, RotateCcw, Settings2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -46,6 +46,8 @@ interface Props {
   form: MdaDashboardForm;
   projects?: ProjectLite[];
   onClose: () => void;
+  /** When true, render inline (no full-screen wrapper / sticky header). */
+  embedded?: boolean;
 }
 
 const SIM_DEFAULTS = { count: 250, seed: 1337 };
@@ -150,7 +152,7 @@ function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm) {
   };
 }
 
-export default function MdaDashboardView({ form, projects = [], onClose }: Props) {
+export default function MdaDashboardView({ form, projects = [], onClose, embedded = false }: Props) {
   const { isOwner } = useAuth();
   const { submissions, loading } = useDataAnalytics({ formId: form.id });
   const [simulate, setSimulate] = useState(false);
@@ -190,12 +192,15 @@ export default function MdaDashboardView({ form, projects = [], onClose }: Props
   const projectName = projects.find((p) => p.id === form.project_id)?.name;
 
   return (
-    <div className="min-h-screen bg-background" data-mda-scroll>
-      <div className="sticky top-0 z-20 border-b bg-card/95 backdrop-blur">
-        <div className="container mx-auto flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div
+      className={embedded ? "overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm" : "min-h-screen bg-background"}
+      data-mda-scroll
+    >
+      <div className={embedded ? "border-b bg-card/95" : "sticky top-0 z-20 border-b bg-card/95 backdrop-blur"}>
+        <div className={`flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${embedded ? "" : "container mx-auto"}`}>
           <div className="flex min-w-0 items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Back to Forms">
-              <ArrowLeft className="h-5 w-5" />
+            <Button variant="ghost" size="icon" onClick={onClose} aria-label={embedded ? "Collapse dashboard" : "Back to Forms"}>
+              {embedded ? <ChevronUp className="h-5 w-5" /> : <ArrowLeft className="h-5 w-5" />}
             </Button>
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
               <BarChart3 className="h-5 w-5 text-primary" />
@@ -248,7 +253,7 @@ export default function MdaDashboardView({ form, projects = [], onClose }: Props
         </div>
       </div>
 
-      <main className="container mx-auto space-y-6 px-4 py-6">
+      <main className={`space-y-6 px-4 py-6 ${embedded ? "" : "container mx-auto"}`}>
         {simulate && (
           <div className="flex items-center gap-2 rounded-lg border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm text-violet-800">
             <Sparkles className="h-4 w-4 shrink-0" />
