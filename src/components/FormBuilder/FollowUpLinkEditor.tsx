@@ -355,7 +355,23 @@ export function FollowUpLinkEditor({
     onOpenChange(false);
   };
 
+  const draftToQuestion = (dq: DraftQuestion): Question => ({
+    id: dq.id,
+    label: dq.label || "Untitled",
+    name: dq.name || dq.id,
+    type: dq.type,
+    required: !!dq.required,
+    relevant: dq.relevant,
+    options: dq.options,
+  });
+  const activeSkipQuestion = questions.find((q) => q.id === skipLogicFor) || null;
+  const skipLogicAllQuestions: Question[] = [
+    ...checklistQuestions,
+    ...questions.filter((q) => q.id !== skipLogicFor && q.label.trim()).map(draftToQuestion),
+  ];
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[92vh] w-[calc(100vw-1.5rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="shrink-0 space-y-1.5 bg-gradient-to-br from-[#4338ca] via-[#7c3aed] to-[#db2777] px-5 py-4 text-white">
