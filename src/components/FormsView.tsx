@@ -1557,7 +1557,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         )}
 
         {/* Inline MDA Supervisory Dashboard — expands in place within the forms list */}
-        {mdaDashboardForm && (
+        {mdaDashboardForm && canSeeMdaDashboard && (
           <section className="mx-auto w-full max-w-6xl">
             <MdaDashboardView
               form={mdaDashboardForm}
