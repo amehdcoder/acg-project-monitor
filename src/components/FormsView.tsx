@@ -3460,6 +3460,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         hideTrigger
       />
 
+      {/* Per-form access: Owner/Co-owner grant + remove; all admins remove */}
+      <FormAccessManager
+        form={accessManagerForm}
+        open={!!accessManagerForm}
+        onOpenChange={(o) => { if (!o) setAccessManagerForm(null); }}
+        canGrant={isOwnerLevel}
+        canRemove={isAdmin}
+        currentUserId={user?.id}
+      />
+
       {/* WhatsApp-style floating project chat launcher */}
       <ProjectChatFab projects={projects} currentProjectId={currentProjectId} />
     </div>
