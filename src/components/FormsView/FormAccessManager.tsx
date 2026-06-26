@@ -180,7 +180,7 @@ export default function FormAccessManager({
       // changes (DB triggers fan this out to current & future members and
       // revoke it when a member leaves the project).
       const { error: grantErr } = await supabase
-        .from("form_project_grants")
+        .from("form_project_grants" as any)
         .upsert(
           {
             form_id: formId,
