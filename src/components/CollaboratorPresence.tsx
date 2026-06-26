@@ -193,6 +193,16 @@ const CollaboratorPresence = () => {
                     <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                       {routeLabel(c.route)}
                     </span>
+                    {c.user_id !== user?.id && (
+                      <button
+                        type="button"
+                        onClick={() => startDirectChat(c)}
+                        aria-label={`Chat with ${c.name}`}
+                        className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </button>
+                    )}
                   </li>
                 );
               })}
