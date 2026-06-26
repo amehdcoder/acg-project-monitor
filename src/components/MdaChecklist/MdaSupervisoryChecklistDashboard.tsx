@@ -813,6 +813,13 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         </Card>
       )}
 
+      {/* ── Household coverage survey map (Coverage Evaluation 3D outcomes) ── */}
+      <HouseholdCoverageSurveyMap
+        projectId={projectId}
+        formName={formName}
+        stateFilter={fState === ALL ? null : fState}
+      />
+
       {/* ── Field worker accountability ── */}
       <Card>
         <CardHeader className="pb-2"><CardTitle className="flex items-center gap-1.5 text-sm"><Users2 className="h-4 w-4 text-primary" />Field Worker Submissions</CardTitle></CardHeader>
