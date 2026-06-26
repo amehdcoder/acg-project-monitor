@@ -599,27 +599,28 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
                 <button
                   onClick={() => (editingIcons ? triggerUpload(t.key) : setView(t.view))}
                   disabled={busy}
-                  className="group flex w-full flex-col items-center gap-3 rounded-2xl p-4 text-center transition-colors hover:bg-white/60"
+                  className="group flex w-full flex-col items-center gap-3 rounded-3xl p-4 text-center transition-colors hover:bg-white/40"
                 >
-                  <span className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-white transition-transform group-hover:scale-105 group-active:scale-95">
+                  <span className="relative flex aspect-square w-full max-w-[9rem] items-center justify-center rounded-3xl transition-transform group-hover:scale-105 group-active:scale-95">
                     {busy ? (
-                      <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                      <Loader2 className="h-10 w-10 animate-spin text-slate-400" />
                     ) : (
                       <img
                         src={imgFor(t)}
                         alt={t.title}
                         loading="lazy"
-                        className="h-14 w-14 object-contain"
+                        className="h-full w-full object-contain drop-shadow-sm"
                       />
                     )}
                     {editingIcons && !busy && (
-                      <span className="absolute -right-1.5 -top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#5b6fc4]">
-                        <Upload className="h-3.5 w-3.5" />
+                      <span className="absolute -right-1 -top-1 flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#5b6fc4] shadow-md">
+                        <Upload className="h-4 w-4" />
                       </span>
                     )}
                   </span>
                   <span className="text-[15px] font-medium leading-tight text-slate-800">{t.title}</span>
                 </button>
+
                 {editingIcons && hasCustom && !busy && (
                   <button
                     onClick={() => resetIcon(t.key)}
