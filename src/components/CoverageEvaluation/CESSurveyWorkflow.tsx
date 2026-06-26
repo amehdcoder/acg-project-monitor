@@ -272,11 +272,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // True when the user explicitly proceeded from the checklist but the prefill
   // was missing/unreadable — drives the fallback "reselect" error flow.
   const [prefillMissing, setPrefillMissing] = useState(false);
-  useEffect(() => {
+  const applyChecklistPrefill = useCallback(() => {
     let fromChecklist = false;
     try {
       fromChecklist = sessionStorage.getItem("amehnities:cesFromChecklist") === "1";
     } catch { /* ignore */ }
+    // Nothing was stashed by the checklist on this navigation — leave any prior
+    // manual selection untouched and don't trigger the fallback flow.
+    if (!fromChecklist) return;
     let applied = false;
     try {
       const raw = sessionStorage.getItem("amehnities:cesLocationPrefill");
@@ -301,13 +304,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             setSettlementName(loc.settlement_name);
             lockedLocationRef.current = loc;
             setLocationLocked(true);
+            setPrefillMissing(false);
             applied = true;
           }
         }
       }
     } catch { /* ignore */ }
     // Fallback: user came from the checklist but no usable prefill was found.
-    if (!applied && fromChecklist) {
+    if (!applied) {
       setPrefillMissing(true);
     }
     // One-shot: consume both signals so a later manual visit isn't affected.
@@ -316,6 +320,16 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       sessionStorage.removeItem("amehnities:cesFromChecklist");
     } catch { /* ignore */ }
   }, [projectId]);
+
+  // Apply on mount, and again whenever the user re-enters this tab from the
+  // checklist while the component is already mounted (tab switch, no remount).
+  useEffect(() => {
+    applyChecklistPrefill();
+    const onNav = () => applyChecklistPrefill();
+    window.addEventListener("amehnities:navigate-tab", onNav);
+    return () => window.removeEventListener("amehnities:navigate-tab", onNav);
+  }, [applyChecklistPrefill]);
+
 
   // Safe manual reselection from the fallback error: clears the locked state and
   // lets the supervisor pick the location through the normal cascade.
