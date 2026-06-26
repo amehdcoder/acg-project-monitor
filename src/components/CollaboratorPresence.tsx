@@ -7,7 +7,7 @@
  * pseudonymous yet visually distinct.
  */
 import { useMemo } from "react";
-import { Users } from "lucide-react";
+import { Users, MessageCircle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Popover,
