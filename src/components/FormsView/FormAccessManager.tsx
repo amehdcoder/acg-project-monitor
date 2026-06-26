@@ -173,20 +173,39 @@ export default function FormAccessManager({
   };
 
   const grantToProjectMembers = async () => {
-    if (!projectId || !canGrant) return;
+    if (!projectId || !canGrant || !formId) return;
     setSaving(true);
     try {
+      // Record a project-wide grant so access stays in sync as membership
+      // changes (DB triggers fan this out to current & future members and
+      // revoke it when a member leaves the project).
+      const { error: grantErr } = await supabase
+        .from("form_project_grants")
+        .upsert(
+          {
+            form_id: formId,
+            project_id: projectId,
+            granted_by: currentUserId ?? null,
+            starts_at: fromLocalInput(starts),
+            expires_at: fromLocalInput(expires),
+          },
+          { onConflict: "form_id,project_id" },
+        );
+      if (grantErr) throw grantErr;
+
       const { data, error } = await supabase
         .from("user_project_assignments")
         .select("user_id")
         .eq("project_id", projectId);
       if (error) throw error;
       const ids = [...new Set(((data ?? []) as any[]).map((r) => r.user_id))];
-      if (ids.length === 0) {
-        toast({ title: "No members", description: "This project has no assigned members." });
-        return;
-      }
-      await grant(ids);
+      await refreshAssigned();
+      toast({
+        title: "Access granted to project",
+        description: ids.length
+          ? `${ids.length} current member${ids.length === 1 ? "" : "s"} granted. New members will be synced automatically.`
+          : "No members yet — access will be granted automatically as members join.",
+      });
     } catch (e: any) {
       toast({ title: "Grant failed", description: e?.message ?? "Could not grant access.", variant: "destructive" });
     } finally {
