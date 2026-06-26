@@ -59,6 +59,7 @@ interface Props {
   questions: FormQuestion[];
   formName?: string;
   projectName?: string;
+  projectId?: string | null;
 }
 
 // ───────────────────────── Palette ─────────────────────────
