@@ -3220,6 +3220,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           </>
           )}
         </section>
+        )}
       </div>
 
 
