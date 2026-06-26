@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Users2, CheckCircle2, Pill, ClipboardList, AlertTriangle, Flag,
   ShieldCheck, HeartHandshake, MapPin, CalendarClock, ListChecks,
+  TrendingUp, Activity, Ambulance, ArrowRight,
 } from "lucide-react";
 import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
 import MdaSupervisoryMap from "./MdaSupervisoryMap";
