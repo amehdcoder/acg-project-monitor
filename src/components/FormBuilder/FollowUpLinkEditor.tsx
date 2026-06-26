@@ -162,6 +162,8 @@ export function FollowUpLinkEditor({
         label: q.label,
         name: q.name || q.id,
         type: q.type,
+        required: q.required ?? false,
+        relevant: q.relevant,
         linkedSourceField: q.linkedSourceField,
         linkedSourceValue: q.linkedSourceValue,
         options: q.options,
