@@ -143,6 +143,7 @@ export function FollowUpLinkEditor({
   const [rows, setRows] = useState<ConditionRow[]>([]);
   const [joiner, setJoiner] = useState<"and" | "or">("and");
   const [questions, setQuestions] = useState<DraftQuestion[]>([]);
+  const [skipLogicFor, setSkipLogicFor] = useState<string | null>(null);
 
   // Choice-type checklist questions (usable for conditions).
   const choiceQuestions = useMemo(
