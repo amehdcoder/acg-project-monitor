@@ -50,6 +50,12 @@ let flushTimer: number | null = null;
 
 const RETRY_DELAYS_MS = [1_000, 5_000, 15_000, 30_000, 60_000];
 
+// After this many failed attempts a record is "quarantined": it is no longer
+// retried automatically (so a permanently-failing poison row can't loop every
+// interval forever and mask real activity), but it is NEVER deleted — the data
+// is preserved and retried on a forced drain (app open / manual resync).
+const MAX_AUTO_ATTEMPTS = 12;
+
 function scheduleFlush(delay = 1_000) {
   if (typeof window === "undefined" || !isOnline()) return;
   if (flushTimer !== null) window.clearTimeout(flushTimer);
