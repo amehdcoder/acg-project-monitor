@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 import acgLogo from "@/assets/acg-logo.png";
 import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
+import FormAccessManager from "@/components/FormsView/FormAccessManager";
 import { MicroplanningView } from "@/components/Microplanning";
 import { StandardAssessmentView, MentalHealthAssessment } from "@/components/StandardAssessments";
 import { DigitalAttendanceView } from "@/components/DigitalAttendance";
