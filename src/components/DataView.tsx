@@ -1,5 +1,6 @@
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useDataAnalytics, type AnalyticsFilters } from "@/hooks/useDataAnalytics";
 import { buildLabelMap } from "@/lib/formLabelUtils";
