@@ -248,6 +248,14 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     [checklist],
   );
 
+  // Detect a Jigawa-scoped checklist so we can show the LGA-level Jigawa map.
+  const isJigawa = useMemo(() => {
+    const norm2 = (v: any) => String(v ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (/jigawa/i.test(formName || "")) return true;
+    const jig = checklist.filter((s) => norm2(s.state) === "jigawa").length;
+    return jig > 0 && jig >= checklist.length * 0.6;
+  }, [checklist, formName]);
+
   // Follow-up: MDA Completion status distribution ----------
   const mdaStatusDist = useMemo(() => {
     const order = ["Not Started", "Ongoing", "Halted", "Completed"];
