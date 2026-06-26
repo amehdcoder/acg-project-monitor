@@ -87,6 +87,9 @@ const CollaboratorPresence = () => {
   const canView = isOwner || isSuperAdmin;
   // Track presence for every user; the roster is only rendered for admins.
   const { collaborators } = usePresenceTracking(true);
+  // Per-peer unread direct-message counts (badge-only; no toast here).
+  const { byUser: unreadByUser } = useDirectUnread();
+
 
   const startDirectChat = (c: ActiveCollaborator) => {
     window.dispatchEvent(
