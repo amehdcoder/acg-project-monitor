@@ -828,16 +828,49 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           formsData = [];
         }
       } else {
-        // Regular users get only assigned forms
+        // Regular users get their explicitly-assigned forms PLUS automatic access
+        // to the Integrated MDA Supervisory Checklist for every project they are a
+        // member of (the checklist is auto-granted to all project members; the
+        // dashboard is gated separately and not opened here).
         const { data: assignments, error: assignError } = await supabase
           .from("user_form_assignments")
           .select("form_id")
           .eq("user_id", user?.id);
-        
+
         if (assignError) throw assignError;
-        
-        if (assignments && assignments.length > 0) {
-          const formIds = assignments.map(a => a.form_id);
+
+        const assignedFormIds = (assignments || []).map(a => a.form_id);
+
+        // Pull all forms from the user's assigned projects so we can surface the
+        // MDA checklist automatically even when it was never explicitly assigned.
+        const { data: projectAssignments } = await supabase
+          .from("user_project_assignments")
+          .select("project_id")
+          .eq("user_id", user?.id);
+        const memberProjectIds = (projectAssignments || []).map(a => a.project_id);
+
+        let autoMdaFormIds: string[] = [];
+        if (memberProjectIds.length > 0) {
+          const { data: projectForms } = await supabase
+            .from("forms")
+            .select("id, name, settings, questions")
+            .in("project_id", memberProjectIds);
+          autoMdaFormIds = (projectForms || [])
+            .filter((f: any) => {
+              const allItems = (f.questions as unknown as any[]) || [];
+              const groups = allItems.filter((q: any) => Array.isArray(q.questions));
+              return isMdaChecklistLike({
+                settings: (f.settings as unknown as FormSettings) || {},
+                formName: f.name,
+                groups: groups as FormGroup[],
+              });
+            })
+            .map((f: any) => f.id);
+        }
+
+        const formIds = [...new Set([...assignedFormIds, ...autoMdaFormIds])];
+
+        if (formIds.length > 0) {
           const { data, error } = await supabase
             .from("forms")
             .select("*")
