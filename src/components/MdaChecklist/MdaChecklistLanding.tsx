@@ -146,12 +146,35 @@ async function fileToIconDataUrl(file: File, size = 256): Promise<string> {
 export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   const { formId, formName, projectId, onClose } = props;
   const navigate = useNavigate();
-  const { isOwner, isOwnerLevel, role } = useAuth();
+  const { user, isOwner, isOwnerLevel, role } = useAuth();
   const { toast } = useToast();
   const [localGroups, setLocalGroups] = useState<FormGroup[]>(props.groups || []);
   const groups = localGroups;
   const canEditIcons = !!(isOwner || isOwnerLevel);
-  const canBuildFollowUps = canRoleBuildMdaFollowUps({ role, isOwnerLevel });
+
+  // Admins (super/systems) must additionally be assigned to THIS project before the
+  // follow-up linkage builder is exposed. Owner-level (Owner/Co-owner) always bypass.
+  // Regular users never qualify regardless of assignment.
+  const hasBuilderRole = canRoleBuildMdaFollowUps({ role, isOwnerLevel });
+  const [assignedToProject, setAssignedToProject] = useState<boolean>(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!hasBuilderRole) { setAssignedToProject(false); return; }
+      if (isOwnerLevel) { setAssignedToProject(true); return; }
+      if (!user?.id || !projectId) { setAssignedToProject(false); return; }
+      const { data } = await supabase
+        .from("user_project_assignments")
+        .select("project_id")
+        .eq("user_id", user.id)
+        .eq("project_id", projectId)
+        .maybeSingle();
+      if (!cancelled) setAssignedToProject(!!data);
+    })();
+    return () => { cancelled = true; };
+  }, [hasBuilderRole, isOwnerLevel, user?.id, projectId]);
+  const canBuildFollowUps = hasBuilderRole && assignedToProject;
+
   const [view, setView] = useState<View>("home");
   const [selected, setSelected] = useState<VisitedCommunity | null>(null);
   const [builderGroup, setBuilderGroup] = useState<FormGroup | null>(null);
@@ -599,27 +622,28 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
                 <button
                   onClick={() => (editingIcons ? triggerUpload(t.key) : setView(t.view))}
                   disabled={busy}
-                  className="group flex w-full flex-col items-center gap-3 rounded-2xl p-4 text-center transition-colors hover:bg-white/60"
+                  className="group flex w-full flex-col items-center gap-3 rounded-3xl p-4 text-center transition-colors hover:bg-white/40"
                 >
-                  <span className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-white transition-transform group-hover:scale-105 group-active:scale-95">
+                  <span className="relative flex aspect-square w-full max-w-[9rem] items-center justify-center rounded-3xl transition-transform group-hover:scale-105 group-active:scale-95">
                     {busy ? (
-                      <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                      <Loader2 className="h-10 w-10 animate-spin text-slate-400" />
                     ) : (
                       <img
                         src={imgFor(t)}
                         alt={t.title}
                         loading="lazy"
-                        className="h-14 w-14 object-contain"
+                        className="h-full w-full object-contain drop-shadow-sm"
                       />
                     )}
                     {editingIcons && !busy && (
-                      <span className="absolute -right-1.5 -top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#5b6fc4]">
-                        <Upload className="h-3.5 w-3.5" />
+                      <span className="absolute -right-1 -top-1 flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#5b6fc4] shadow-md">
+                        <Upload className="h-4 w-4" />
                       </span>
                     )}
                   </span>
                   <span className="text-[15px] font-medium leading-tight text-slate-800">{t.title}</span>
                 </button>
+
                 {editingIcons && hasCustom && !busy && (
                   <button
                     onClick={() => resetIcon(t.key)}
