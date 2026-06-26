@@ -511,16 +511,52 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-card p-4">
-        <div>
-          <h2 className="font-display text-lg font-bold text-foreground sm:text-xl">Integrated MDA Supervisory Checklist Dashboard</h2>
-          <p className="text-xs text-muted-foreground">Real-time monitoring & supervision intelligence for integrated MDA activities</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" />Live</Badge>
-          <div className="flex flex-col items-center">
-            <Donut data={[{ name: "Done", value: completionPct, color: "#10b981" }, { name: "Rest", value: 100 - completionPct, color: "#e5e7eb" }]} />
+      <div className="overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-r from-card via-card to-primary/5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5">
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <ShieldCheck className="h-6 w-6" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="font-display text-lg font-bold tracking-tight text-foreground sm:text-xl">Integrated MDA Supervisory Checklist Dashboard</h2>
+              <p className="text-xs text-muted-foreground">Real-time monitoring &amp; supervision intelligence for integrated MDA activities</p>
+            </div>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="gap-1.5 bg-background/60"><Clock className="h-3 w-3 text-muted-foreground" />Updated {scope.last}</Badge>
+            <Badge variant="outline" className="gap-1.5 bg-emerald-500/10 text-emerald-700 border-emerald-500/40"><Wifi className="h-3 w-3" />Online</Badge>
+            <Badge variant="outline" className="gap-1.5 bg-sky-500/10 text-sky-700 border-sky-500/40"><Accessibility className="h-3 w-3" />Inclusive</Badge>
+            <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/70 py-1 pl-1 pr-3">
+              <div className="relative h-11 w-11">
+                <Donut data={[{ name: "Done", value: completionPct, color: "#10b981" }, { name: "Rest", value: 100 - completionPct, color: "#e5e7eb" }]} />
+                <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[11px] font-bold text-foreground">{completionPct}%</span>
+              </div>
+              <div className="leading-tight">
+                <div className="text-[11px] font-semibold text-foreground">Checklist</div>
+                <div className="text-[11px] text-muted-foreground">Completion</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Context / scope strip */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border/60 bg-muted/40 px-4 py-2.5 text-[11px] sm:px-5">
+          {[
+            { icon: MapIcon, label: "States", value: scope.states },
+            { icon: Building2, label: "LGAs", value: scope.lgas },
+            { icon: Layers, label: "Wards", value: scope.wards },
+            { icon: MapPin, label: "Communities", value: scope.communities },
+            { icon: ClipboardList, label: "Total visits", value: total },
+          ].map((c) => (
+            <span key={c.label} className="flex items-center gap-1.5 text-muted-foreground">
+              <c.icon className="h-3.5 w-3.5 text-primary" />
+              <span className="font-semibold text-foreground">{c.value}</span> {c.label}
+            </span>
+          ))}
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <CalendarClock className="h-3.5 w-3.5 text-primary" />
+            <span className="font-semibold text-foreground">{scope.range}</span>
+          </span>
         </div>
       </div>
 
