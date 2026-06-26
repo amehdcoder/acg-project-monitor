@@ -805,6 +805,19 @@ export function FollowUpLinkEditor({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {activeSkipQuestion && (
+      <SkipLogicEditor
+        open={!!skipLogicFor}
+        onOpenChange={(o) => { if (!o) setSkipLogicFor(null); }}
+        question={draftToQuestion(activeSkipQuestion)}
+        allQuestions={skipLogicAllQuestions}
+        onSave={(updated) => {
+          updateQuestion(activeSkipQuestion.id, { relevant: updated.relevant });
+          setSkipLogicFor(null);
+        }}
+      />
+    )}
+    </>
   );
 }
 
