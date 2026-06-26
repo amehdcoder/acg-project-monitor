@@ -308,9 +308,15 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
           projectId={activeProject.id}
           projectName={activeProject.name}
           open={open}
-          onOpenChange={setOpen}
+          onOpenChange={(next) => {
+            setOpen(next);
+            if (!next) setDirectTarget(null);
+          }}
           initialGroupId={initialGroupId}
+          initialDirectUserId={directTarget?.id ?? null}
+          initialDirectUserName={directTarget?.name ?? null}
         />
+
       )}
     </>
   );
