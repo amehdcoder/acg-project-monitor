@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
 import MdaSupervisoryMap from "./MdaSupervisoryMap";
+import JigawaSupervisoryMap from "./JigawaSupervisoryMap";
 
 // ───────────────────────── Types ─────────────────────────
 interface QOption { id?: string; label: string; value: string; }
