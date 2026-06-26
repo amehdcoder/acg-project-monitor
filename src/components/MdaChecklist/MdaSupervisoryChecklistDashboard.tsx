@@ -818,7 +818,10 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         projectId={projectId}
         formName={formName}
         stateFilter={fState === ALL ? null : fState}
+        dateFrom={fFrom ? fFrom + "T00:00:00" : null}
+        dateTo={fTo ? fTo + "T23:59:59" : null}
       />
+
 
       {/* ── Field worker accountability ── */}
       <Card>
