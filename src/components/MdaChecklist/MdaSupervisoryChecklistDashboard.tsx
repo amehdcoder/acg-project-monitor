@@ -492,6 +492,13 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     const jig = checklist.filter((s) => n2(pickGeo(s, "state")) === "jigawa").length;
     return jig > 0 && jig >= checklist.length * 0.6;
   }, [checklist, formName]);
+  const isFct = useMemo(() => {
+    const n2 = (v: any) => String(v ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (/endfund|\bfct\b|abuja|federalcapital/i.test(`${projectName || ""} ${formName || ""}`)) return true;
+    const fctStates = new Set(["fct", "abuja", "federalcapitalterritory", "fctabuja"]);
+    const fct = checklist.filter((s) => fctStates.has(n2(pickGeo(s, "state")))).length;
+    return fct > 0 && fct >= checklist.length * 0.6;
+  }, [checklist, formName, projectName]);
 
   // ── Export ────────────────────────────────────────────────────
   const handleExport = async () => {
