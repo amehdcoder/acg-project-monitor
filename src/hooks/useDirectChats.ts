@@ -44,7 +44,20 @@ export function useDirectChats(enabled: boolean) {
     setLoading(true);
     const { data, error } = await supabase.rpc("get_proximity_conversations");
     if (!error && data) {
-      setChats(data as DirectChat[]);
+      // Deduplicate so each person appears only once across all chats. The RPC
+      // already returns rows newest-first, so the first row per `other_id` is the
+      // most recent conversation; we keep that and fold any unread counts from
+      // older duplicate threads into it so nothing is silently lost.
+      const seen = new Map<string, DirectChat>();
+      for (const row of data as DirectChat[]) {
+        const existing = seen.get(row.other_id);
+        if (existing) {
+          existing.unread_count += row.unread_count || 0;
+        } else {
+          seen.set(row.other_id, { ...row });
+        }
+      }
+      setChats(Array.from(seen.values()));
     }
     setLoading(false);
   }, [user?.id, enabled]);
@@ -53,6 +66,28 @@ export function useDirectChats(enabled: boolean) {
     if (!enabled) return;
     fetchChats();
   }, [enabled, fetchChats]);
+
+  // Immediately zero a conversation's unread badge when its thread is opened
+  // (before the realtime read-receipt round-trip completes), so badges reset
+  // the instant the user views a chat.
+  const markRead = useCallback((conversationId: string) => {
+    setChats((prev) =>
+      prev.map((c) =>
+        c.conversation_id === conversationId ? { ...c, unread_count: 0 } : c
+      )
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!enabled || typeof window === "undefined") return;
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent).detail?.conversationId as string | undefined;
+      if (id) markRead(id);
+    };
+    window.addEventListener("amehnities:direct-read", handler as EventListener);
+    return () =>
+      window.removeEventListener("amehnities:direct-read", handler as EventListener);
+  }, [enabled, markRead]);
 
   // Refresh the list whenever a relevant message arrives/changes.
   useEffect(() => {
@@ -102,7 +137,7 @@ export function useDirectChats(enabled: boolean) {
     []
   );
 
-  return { chats, loading, fetchChats, setFlag };
+  return { chats, loading, fetchChats, setFlag, markRead };
 }
 
 /**
@@ -138,7 +173,8 @@ export function useDirectThread(conversation: DirectChat | null) {
       setMessages((data as DirectMessage[]) ?? []);
       setLoading(false);
 
-      // Mark incoming messages delivered + read.
+      // Mark incoming messages delivered + read, then immediately reset this
+      // conversation's unread badges everywhere (list + global counter).
       const nowIso = new Date().toISOString();
       supabase
         .from("proximity_messages")
@@ -146,6 +182,11 @@ export function useDirectThread(conversation: DirectChat | null) {
         .eq("conversation_id", convId)
         .eq("recipient_id", user.id)
         .is("read_at", null);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("amehnities:direct-read", { detail: { conversationId: convId } })
+        );
+      }
     })();
 
     const channel = supabase
@@ -162,6 +203,12 @@ export function useDirectThread(conversation: DirectChat | null) {
               .from("proximity_messages")
               .update({ delivered_at: new Date().toISOString(), read_at: new Date().toISOString() })
               .eq("id", msg.id);
+            // The thread is open, so this arrives already-read — keep badges at 0.
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("amehnities:direct-read", { detail: { conversationId: convId } })
+              );
+            }
           }
         }
       )

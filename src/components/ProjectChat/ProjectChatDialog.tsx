@@ -72,7 +72,7 @@ export function ProjectChatDialog({
     isAdmin,
   } = useProjectChat(open ? projectId : null);
 
-  const { chats: directChats, fetchChats: fetchDirectChats, setFlag: setDirectFlag } =
+  const { chats: directChats, fetchChats: fetchDirectChats, setFlag: setDirectFlag, markRead: markDirectRead } =
     useDirectChats(open);
   const [selectedDirect, setSelectedDirect] = useState<DirectChat | null>(null);
   const [projectMembers, setProjectMembers] = useState<
@@ -218,6 +218,13 @@ export function ProjectChatDialog({
     setShowSearch(false);
     setReplyTo(null);
     setSelectedDirect(chat);
+    // Reset this conversation's unread badge immediately on open.
+    markDirectRead(chat.conversation_id);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("amehnities:direct-read", { detail: { conversationId: chat.conversation_id } })
+      );
+    }
   };
 
   const handleArchiveDirect = async (chat: DirectChat) => {
