@@ -218,7 +218,11 @@ const CESSurveyMap = ({
           maxNativeZoom: 19,
           detectRetina: true,
           crossOrigin: true,
+          keepBuffer: 8,
+          updateWhenIdle: false,
+          updateWhenZooming: false,
         } as L.TileLayerOptions).addTo(map);
+
         // Keep a reference so it gets cleaned up on next basemap change
         tileRef.current = fb;
         try { map.removeLayer(primary); } catch {}
