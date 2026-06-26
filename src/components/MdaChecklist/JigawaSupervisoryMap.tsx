@@ -118,7 +118,10 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
     mapRef.current = map;
     setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 50);
     redraw();
-    return () => { try { map.remove(); } catch { /* noop */ } mapRef.current = null; };
+    return () => {
+      if (sweepTimer.current) { clearInterval(sweepTimer.current); sweepTimer.current = null; }
+      try { map.remove(); } catch { /* noop */ } mapRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
