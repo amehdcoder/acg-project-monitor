@@ -29,8 +29,13 @@ import {
   AlertCircle,
   Sparkles,
   CheckCircle2,
+  GitBranch,
+  Asterisk,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import SkipLogicEditor from "./SkipLogicEditor";
 import { toast } from "@/hooks/use-toast";
+
 
 interface ConditionRow {
   field: string; // checklist question name
@@ -43,6 +48,8 @@ interface DraftQuestion {
   label: string;
   name: string;
   type: QuestionType;
+  required?: boolean;
+  relevant?: string;
   linkedSourceField?: string;
   linkedSourceValue?: string;
   options?: QuestionOption[];
@@ -136,6 +143,7 @@ export function FollowUpLinkEditor({
   const [rows, setRows] = useState<ConditionRow[]>([]);
   const [joiner, setJoiner] = useState<"and" | "or">("and");
   const [questions, setQuestions] = useState<DraftQuestion[]>([]);
+  const [skipLogicFor, setSkipLogicFor] = useState<string | null>(null);
 
   // Choice-type checklist questions (usable for conditions).
   const choiceQuestions = useMemo(
@@ -155,6 +163,8 @@ export function FollowUpLinkEditor({
         label: q.label,
         name: q.name || q.id,
         type: q.type,
+        required: q.required ?? false,
+        relevant: q.relevant,
         linkedSourceField: q.linkedSourceField,
         linkedSourceValue: q.linkedSourceValue,
         options: q.options,
@@ -201,6 +211,8 @@ export function FollowUpLinkEditor({
         label: "",
         name: "",
         type: "text",
+        required: false,
+        relevant: undefined,
         linkedSourceField: undefined,
         linkedSourceValue: undefined,
         options: undefined,
@@ -330,7 +342,8 @@ export function FollowUpLinkEditor({
         label: dq.label.trim(),
         name,
         type: dq.type,
-        required: base?.required ?? false,
+        required: dq.required ?? false,
+        relevant: dq.relevant || undefined,
         linkedSourceField: src,
         linkedSourceValue: srcValue,
         options: isChoiceType(dq.type) ? (dq.options || defaultOptions()) : undefined,
@@ -342,7 +355,23 @@ export function FollowUpLinkEditor({
     onOpenChange(false);
   };
 
+  const draftToQuestion = (dq: DraftQuestion): Question => ({
+    id: dq.id,
+    label: dq.label || "Untitled",
+    name: dq.name || dq.id,
+    type: dq.type,
+    required: !!dq.required,
+    relevant: dq.relevant,
+    options: dq.options,
+  });
+  const activeSkipQuestion = questions.find((q) => q.id === skipLogicFor) || null;
+  const skipLogicAllQuestions: Question[] = [
+    ...checklistQuestions,
+    ...questions.filter((q) => q.id !== skipLogicFor && q.label.trim()).map(draftToQuestion),
+  ];
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[92vh] w-[calc(100vw-1.5rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="shrink-0 space-y-1.5 bg-gradient-to-br from-[#4338ca] via-[#7c3aed] to-[#db2777] px-5 py-4 text-white">
@@ -474,6 +503,36 @@ export function FollowUpLinkEditor({
                             )}
                             {linked && (
                               <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-background/60 px-2.5 py-1.5">
+                            <label className="flex items-center gap-2 text-xs font-medium text-foreground">
+                              <Switch
+                                checked={!!q.required}
+                                onCheckedChange={(v) => updateQuestion(q.id, { required: v })}
+                              />
+                              <span className="flex items-center gap-1">
+                                <Asterisk className="h-3 w-3 text-rose-500" /> Mandatory
+                              </span>
+                            </label>
+                            <Button
+                              type="button"
+                              variant={q.relevant ? "default" : "outline"}
+                              size="sm"
+                              className={`h-7 gap-1.5 text-xs ${q.relevant ? "bg-indigo-600 hover:bg-indigo-700" : ""}`}
+                              onClick={() => setSkipLogicFor(q.id)}
+                            >
+                              <GitBranch className="h-3.5 w-3.5" />
+                              {q.relevant ? "Skip logic set" : "Skip logic"}
+                            </Button>
+                            {q.relevant && (
+                              <button
+                                type="button"
+                                onClick={() => updateQuestion(q.id, { relevant: undefined })}
+                                className="text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-destructive hover:underline"
+                              >
+                                Clear
+                              </button>
                             )}
                           </div>
                           {isChoiceType(q.type) && (
@@ -746,6 +805,19 @@ export function FollowUpLinkEditor({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {activeSkipQuestion && (
+      <SkipLogicEditor
+        open={!!skipLogicFor}
+        onOpenChange={(o) => { if (!o) setSkipLogicFor(null); }}
+        question={draftToQuestion(activeSkipQuestion)}
+        allQuestions={skipLogicAllQuestions}
+        onSave={(updated) => {
+          updateQuestion(activeSkipQuestion.id, { relevant: updated.relevant });
+          setSkipLogicFor(null);
+        }}
+      />
+    )}
+    </>
   );
 }
 

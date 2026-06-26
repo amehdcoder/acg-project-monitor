@@ -650,11 +650,21 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       if (form) {
         silentRestoreHandledRef.current = true;
         sessionStorage.removeItem(SILENT_UPDATE_RESTORE_KEY);
+        // The Integrated MDA Supervisory Checklist opens to a navigation hub
+        // (the 5-item landing), not a single form. Silently re-opening it after
+        // an update/refresh would dump the user on that landing page even when
+        // they had navigated away — and their actual sub-module progress is
+        // already preserved as a draft. So never auto-restore into it; leave the
+        // user on the Forms home and let them resume from Drafts.
+        if (isMdaChecklistLike({ settings: form.settings, formName: form.name, groups: form.groups })) {
+          return;
+        }
         setFillingForm(form);
         if (form.project_id && form.project_id !== currentProjectId) setCurrentProjectId(form.project_id);
       } else if (active?.projectId && active.projectId !== currentProjectId) {
         setCurrentProjectId(active.projectId);
       }
+
     } catch {}
   }, [authLoading, currentProjectId, fillingForm, forms, offlineForms]);
 
@@ -1558,39 +1568,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
         {/* KoboCollect-style action menu */}
         <section className="mx-auto w-full max-w-md space-y-3">
-          <button
-            onClick={() => {
-              if (primaryMdaDashboardForm) {
-                setMdaDashboardForm(primaryMdaDashboardForm);
-                return;
-              }
-              setShowFormsExplorer(true);
-              setOpenTopFolder("standard");
-              setOpenFolder("mda_supervisory_folder");
-              toast({
-                title: "MDA dashboard needs a checklist",
-                description: currentProjectId
-                  ? "Add or copy the Integrated MDA Supervisory Checklist to this project first."
-                  : "Select a project with an Integrated MDA Supervisory Checklist first.",
-                variant: "destructive",
-              });
-            }}
-            className="group flex w-full items-center gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-          >
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#DCF3F0] shadow-inner">
-              <BarChart3 className="h-6 w-6 text-[#0f766e]" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="truncate font-display text-base font-bold text-[#0f766e]">Integrated MDA Supervisory Dashboard</h3>
-              <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                Standalone realtime dashboard for checklist, follow-up, GPS map and field-worker insights.
-              </p>
-            </div>
-            <span className="hidden shrink-0 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-[#0f766e] sm:inline-flex">
-              {primaryMdaDashboardForm ? "Open" : "Setup"}
-            </span>
-            <ChevronRight className="h-5 w-5 shrink-0 text-[#0f766e] transition group-hover:translate-x-0.5" />
-          </button>
+
 
           {/* "Open your form" — primary entry */}
           <div className="flex items-stretch gap-3">
