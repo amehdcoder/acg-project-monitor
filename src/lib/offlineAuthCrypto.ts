@@ -11,7 +11,10 @@
 // back to that scheme when no salt is present, so existing users are not
 // locked out until their next online login re-caches with the stronger hash.
 
-const PBKDF2_ITERATIONS = 150_000;
+// OWASP-recommended floor for PBKDF2-SHA256. Stored per-record, so raising it
+// only affects newly-cached credentials; older caches keep verifying with their
+// own saved iteration count until the next online login re-hashes them.
+const PBKDF2_ITERATIONS = 310_000;
 
 const bytesToHex = (bytes: Uint8Array): string =>
   Array.from(bytes)

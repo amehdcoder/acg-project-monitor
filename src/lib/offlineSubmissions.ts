@@ -50,6 +50,12 @@ let flushTimer: number | null = null;
 
 const RETRY_DELAYS_MS = [1_000, 5_000, 15_000, 30_000, 60_000];
 
+// After this many failed attempts a record is "quarantined": it is no longer
+// retried automatically (so a permanently-failing poison row can't loop every
+// interval forever and mask real activity), but it is NEVER deleted — the data
+// is preserved and retried on a forced drain (app open / manual resync).
+const MAX_AUTO_ATTEMPTS = 12;
+
 function scheduleFlush(delay = 1_000) {
   if (typeof window === "undefined" || !isOnline()) return;
   if (flushTimer !== null) window.clearTimeout(flushTimer);
@@ -190,6 +196,15 @@ export async function getPendingInsertCount(): Promise<number> {
   }
 }
 
+/** Count records that have exhausted automatic retries and need a forced resync. */
+export async function getQuarantinedInsertCount(): Promise<number> {
+  try {
+    return (await getAllRecords()).filter((r) => (r.attempts ?? 0) >= MAX_AUTO_ATTEMPTS).length;
+  } catch {
+    return 0;
+  }
+}
+
 export async function flushSubmissionQueue(
   options: { force?: boolean } = {},
 ): Promise<{ inserted: number; remaining: number }> {
@@ -207,6 +222,9 @@ export async function flushSubmissionQueue(
     const due = options.force
       ? records
       : records.filter((rec) => {
+          // Quarantined poison rows are skipped by the automatic loop but kept
+          // for a forced drain so the data is never silently abandoned.
+          if ((rec.attempts ?? 0) >= MAX_AUTO_ATTEMPTS) return false;
           const delay = RETRY_DELAYS_MS[Math.min(rec.attempts, RETRY_DELAYS_MS.length - 1)];
           const last = Date.parse(rec.created_at || "") || 0;
           return rec.attempts === 0 || Date.now() - last >= delay;

@@ -14,6 +14,7 @@ import {
   type OfflineAuthCredential,
 } from "@/lib/offlineAuthCache";
 import { logOfflineAuditEvent, flushOfflineAuditQueue } from "@/lib/offlineAuditLog";
+import { checkOfflineLock, registerOfflineFailure, clearOfflineFailures } from "@/lib/offlineAuthThrottle";
 
 
 type AppRole = "super_admin" | "systems_admin" | "user";
@@ -442,6 +443,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     const tryOfflineSignIn = async (reason: string) => {
       void logOfflineAuditEvent("offline_login_attempt", { email, details: { reason } });
+      // Device-side brute-force guard: block while locked out.
+      const lock = await checkOfflineLock(email);
+      if (lock.locked) {
+        logOfflineEvent("login_blocked", { mode: "offline", email, reason: "throttled" });
+        void logOfflineAuditEvent("offline_login_failure", { email, success: false, details: { reason: "throttled", remainingMs: lock.remainingMs } });
+        return { error: new Error(lock.message || "Too many failed offline attempts. Please wait before trying again.") };
+      }
       const cache = await getOfflineCredential(email);
       if (!cache) {
         void logOfflineAuditEvent("offline_login_failure", { email, success: false, details: { reason: "no_credentials" } });
@@ -449,12 +457,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       const passwordOk = await verifyOfflineCredentialPassword(password, cache);
       if (!passwordOk) {
+        const status = await registerOfflineFailure(email);
         logOfflineEvent("login_failed", { mode: "offline", email, reason: "invalid_password" });
-        void logOfflineAuditEvent("offline_login_failure", { email: cache.email, userId: cache.user_id, success: false, details: { reason: "invalid_password" } });
-        return { error: new Error("Invalid password (Offline).") };
+        void logOfflineAuditEvent("offline_login_failure", { email: cache.email, userId: cache.user_id, success: false, details: { reason: "invalid_password", locked: status.locked } });
+        return { error: new Error(status.message || "Invalid password (Offline).") };
       }
       const result = await hydrateOfflineCredential(cache, reason);
       if (!result.error) {
+        await clearOfflineFailures(email);
         void logOfflineAuditEvent("offline_login_success", { email: cache.email, userId: cache.user_id, success: true, details: { reason } });
         toast({ title: "Offline Login Successful", description: "You are logged in using this device's encrypted offline profile." });
       }
@@ -535,6 +545,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           variant: "destructive",
         });
       }
+      // A verified online login clears any offline brute-force lockout.
+      void clearOfflineFailures(email);
       logOfflineEvent("login", { mode: "online", email });
 
       // Warm-cache this user's accessible forms so they can collect data offline
