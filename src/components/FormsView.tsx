@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 import acgLogo from "@/assets/acg-logo.png";
 import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
+import FormAccessManager from "@/components/FormsView/FormAccessManager";
 import { MicroplanningView } from "@/components/Microplanning";
 import { StandardAssessmentView, MentalHealthAssessment } from "@/components/StandardAssessments";
 import { DigitalAttendanceView } from "@/components/DigitalAttendance";
@@ -234,6 +235,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [showCopyMda, setShowCopyMda] = useState(false);
   const [geofenceManagerForm, setGeofenceManagerForm] = useState<Form | null>(null);
+  const [accessManagerForm, setAccessManagerForm] = useState<Form | null>(null);
   const [qrCodeForm, setQrCodeForm] = useState<Form | null>(null);
   const [dailyTargetForm, setDailyTargetForm] = useState<Form | null>(null);
   const [showQRScanner, setShowQRScanner] = useState(false);
@@ -2060,6 +2062,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 <MapPin className="mr-2 h-4 w-4" />
                                 User Geofences
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setAccessManagerForm(form)}>
+                                <ShieldCheck className="mr-2 h-4 w-4 text-primary" />
+                                Manage Access
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => setDashboardForm(form)}>
                                 <LayoutDashboard className="mr-2 h-4 w-4" />
                                 Custom Dashboards
@@ -3452,6 +3458,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         open={showBulkAccess}
         onOpenChange={setShowBulkAccess}
         hideTrigger
+      />
+
+      {/* Per-form access: Owner/Co-owner grant + remove; all admins remove */}
+      <FormAccessManager
+        form={accessManagerForm}
+        open={!!accessManagerForm}
+        onOpenChange={(o) => { if (!o) setAccessManagerForm(null); }}
+        canGrant={isOwnerLevel}
+        canRemove={isAdmin}
+        currentUserId={user?.id}
       />
 
       {/* WhatsApp-style floating project chat launcher */}

@@ -183,11 +183,20 @@ const CESSurveyMap = ({
   const labelsRef = useRef<L.TileLayer | null>(null);
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
   const tapHandlerRef = useRef<((lat: number, lng: number) => void) | null>(null);
+  // Active tile config (url + native zoom + subdomains) used by the offline
+  // prefetcher to download the exact same imagery the map is currently showing.
+  const activeTileRef = useRef<{ url: string; maxNativeZoom: number; subdomains: string }>({
+    url: TILE_LAYERS.satellite.url,
+    maxNativeZoom: 19,
+    subdomains: "abc",
+  });
 
   const applyBasemap = (map: L.Map, mode: typeof basemap) => {
     if (tileRef.current) { map.removeLayer(tileRef.current); tileRef.current = null; }
     if (labelsRef.current) { map.removeLayer(labelsRef.current); labelsRef.current = null; }
     const tl = TILE_LAYERS[mode] ?? TILE_LAYERS.satellite;
+    const nativeZoom = mode === "google" || mode === "google-sat" ? 21 : 19;
+    activeTileRef.current = { url: tl.url, maxNativeZoom: nativeZoom, subdomains: tl.subdomains ?? "abc" };
     const primary = L.tileLayer(tl.url, {
       attribution: tl.attribution,
       maxZoom: 23,
@@ -261,12 +270,102 @@ const CESSurveyMap = ({
       if (h) h(e.latlng.lat, e.latlng.lng);
     });
 
+    // Offline-map download control. Pre-fetches every tile covering the current
+    // view across all zoom levels up to street-level detail so the satellite map
+    // renders FULLY with no network later. Tiles land in the Workbox
+    // "map-tiles-cache" (CacheFirst), so a downloaded area works 100% offline.
+    const DownloadControl = L.Control.extend({
+      options: { position: "topleft" as L.ControlPosition },
+      onAdd: () => {
+        const btn = L.DomUtil.create("a", "leaflet-bar leaflet-control ces-offline-dl");
+        btn.href = "#";
+        btn.title = "Download this area for offline use";
+        btn.setAttribute("role", "button");
+        btn.setAttribute("aria-label", "Download this area for offline use");
+        btn.innerHTML = "⬇";
+        btn.style.cssText =
+          "width:34px;height:34px;line-height:34px;text-align:center;font-size:18px;font-weight:700;background:#fff;color:#1656BA;cursor:pointer;";
+        L.DomEvent.disableClickPropagation(btn);
+        L.DomEvent.on(btn, "click", (ev) => {
+          L.DomEvent.preventDefault(ev);
+          void prefetchOfflineTiles(btn);
+        });
+        return btn;
+      },
+    });
+    map.addControl(new DownloadControl());
+
     return () => {
       map.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line
   }, []);
+
+  // Pre-fetch all tiles covering the current map view across zoom levels so the
+  // imagery is fully available offline. Caps total tile count to protect the
+  // device and the runtime cache (4,000-tile budget).
+  const prefetchOfflineTiles = async (btn?: HTMLElement) => {
+    const map = mapRef.current;
+    if (!map) return;
+    const { url, maxNativeZoom, subdomains } = activeTileRef.current;
+    const bounds = map.getBounds();
+    const startZoom = Math.max(Math.floor(map.getZoom()), 12);
+    const endZoom = Math.min(maxNativeZoom, startZoom + 4);
+
+    const lat2tileY = (lat: number, z: number) => {
+      const rad = (lat * Math.PI) / 180;
+      return Math.floor(
+        ((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) * Math.pow(2, z),
+      );
+    };
+    const lng2tileX = (lng: number, z: number) =>
+      Math.floor(((lng + 180) / 360) * Math.pow(2, z));
+
+    const urls: string[] = [];
+    const MAX_TILES = 1500;
+    for (let z = startZoom; z <= endZoom && urls.length < MAX_TILES; z++) {
+      const xMin = lng2tileX(bounds.getWest(), z);
+      const xMax = lng2tileX(bounds.getEast(), z);
+      const yMin = lat2tileY(bounds.getNorth(), z);
+      const yMax = lat2tileY(bounds.getSouth(), z);
+      for (let x = xMin; x <= xMax && urls.length < MAX_TILES; x++) {
+        for (let y = yMin; y <= yMax && urls.length < MAX_TILES; y++) {
+          const sub = subdomains[(x + y) % subdomains.length] ?? subdomains[0];
+          urls.push(
+            url
+              .replace("{s}", sub)
+              .replace("{z}", String(z))
+              .replace("{x}", String(x))
+              .replace("{y}", String(y)),
+          );
+        }
+      }
+    }
+
+    if (btn) { btn.innerHTML = "…"; btn.style.pointerEvents = "none"; }
+    let done = 0;
+    const CONCURRENCY = 6;
+    let idx = 0;
+    const worker = async () => {
+      while (idx < urls.length) {
+        const i = idx++;
+        try {
+          await fetch(urls[i], { mode: "no-cors", cache: "force-cache" });
+        } catch { /* offline / blocked tiles are skipped */ }
+        done++;
+        if (btn) btn.title = `Caching offline map… ${done}/${urls.length}`;
+      }
+    };
+    await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+    if (btn) {
+      btn.innerHTML = "✓";
+      btn.title = `Saved ${done} tiles for offline use`;
+      btn.style.color = "#16a34a";
+      btn.style.pointerEvents = "";
+      window.setTimeout(() => { btn.innerHTML = "⬇"; btn.style.color = "#1656BA"; }, 4000);
+    }
+  };
 
   // basemap switch
   useEffect(() => {
