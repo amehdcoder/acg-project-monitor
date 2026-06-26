@@ -2843,6 +2843,46 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                               </button>
                             );
                           }
+                          if (it.kind === "mda_dashboard") {
+                            const Icon = it.icon;
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  if (primaryMdaDashboardForm) {
+                                    setMdaDashboardForm(primaryMdaDashboardForm);
+                                    return;
+                                  }
+                                  toast({
+                                    title: "Dashboard not ready",
+                                    description: currentProjectId
+                                      ? "Add or copy the Integrated MDA Supervisory Checklist to this project first."
+                                      : "Select a project that has an Integrated MDA Supervisory Checklist first.",
+                                    variant: "destructive",
+                                  });
+                                }}
+                                className="flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 text-left hover:bg-white/60 transition-colors border-t border-border/30 first:border-t-0"
+                              >
+                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${it.bg}`}>
+                                  <Icon className={`h-4 w-4 ${it.fg}`} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h5 className="truncate text-sm font-semibold">{it.label}</h5>
+                                  <p className="text-xs text-muted-foreground">{it.desc}</p>
+                                </div>
+                                {primaryMdaDashboardForm ? (
+                                  <span className="hidden shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 sm:inline-flex">
+                                    Live
+                                  </span>
+                                ) : (
+                                  <span className="hidden shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700 sm:inline-flex">
+                                    Setup needed
+                                  </span>
+                                )}
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </button>
+                            );
+                          }
                           if (it.kind === "action_tracker") {
                             const Icon = it.icon;
                             return (
