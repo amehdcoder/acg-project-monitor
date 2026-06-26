@@ -28,7 +28,7 @@ import {
   Users2, CheckCircle2, Pill, ClipboardList, AlertTriangle, Flag,
   ShieldCheck, HeartHandshake, MapPin, CalendarClock, ListChecks,
 } from "lucide-react";
-import { prepareMdaData } from "@/lib/mda/dashboardData";
+import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
 import MdaSupervisoryMap from "./MdaSupervisoryMap";
 
 // ───────────────────────── Types ─────────────────────────
