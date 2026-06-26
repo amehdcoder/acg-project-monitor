@@ -76,14 +76,29 @@ export function useProjectChat(projectId: string | null) {
         await (supabase as any).rpc("ensure_hands_staff_group", { _project_id: projectId });
       } catch { /* non-fatal */ }
 
-      const { data, error } = await supabase
-        .from("chat_groups")
-        .select("*")
-        .eq("project_id", projectId)
-        .order("is_default", { ascending: false })
-        .order("created_at", { ascending: true });
-
+      // Include this project's groups PLUS any protected (HANDS Staff) group
+      // the user belongs to, even if it lives under another project — so staff
+      // share one official channel across all projects.
+      const { data: rpcData, error: rpcError } = await (supabase as any).rpc(
+        "get_my_chat_groups",
+        { _project_id: projectId },
+      );
+      let data = rpcData as any[] | null;
+      let error = rpcError;
+      if (error) {
+        // Fallback to the project-scoped query if the RPC is unavailable.
+        const res = await supabase
+          .from("chat_groups")
+          .select("*")
+          .eq("project_id", projectId);
+        data = res.data;
+        error = res.error;
+      }
       if (error) throw error;
+      data = (data || []).sort((a, b) => {
+        if (a.is_default !== b.is_default) return a.is_default ? -1 : 1;
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
       
       // Fetch unread counts for each group
       const groupsWithUnread = await Promise.all(

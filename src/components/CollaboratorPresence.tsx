@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { usePresenceTracking, type ActiveCollaborator } from "@/hooks/usePresenceTracking";
+import { useDirectUnread } from "@/hooks/useDirectUnread";
 import { cn } from "@/lib/utils";
 
 const ANIMALS = [
@@ -86,6 +87,9 @@ const CollaboratorPresence = () => {
   const canView = isOwner || isSuperAdmin;
   // Track presence for every user; the roster is only rendered for admins.
   const { collaborators } = usePresenceTracking(true);
+  // Per-peer unread direct-message counts (badge-only; no toast here).
+  const { byUser: unreadByUser } = useDirectUnread();
+
 
   const startDirectChat = (c: ActiveCollaborator) => {
     window.dispatchEvent(
@@ -197,12 +201,22 @@ const CollaboratorPresence = () => {
                       <button
                         type="button"
                         onClick={() => startDirectChat(c)}
-                        aria-label={`Chat with ${c.name}`}
-                        className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        aria-label={
+                          unreadByUser[c.user_id]
+                            ? `Chat with ${c.name}, ${unreadByUser[c.user_id]} unread`
+                            : `Chat with ${c.name}`
+                        }
+                        className="relative shrink-0 flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       >
                         <MessageCircle className="h-4 w-4" />
+                        {unreadByUser[c.user_id] > 0 && (
+                          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground ring-2 ring-card">
+                            {unreadByUser[c.user_id] > 99 ? "99+" : unreadByUser[c.user_id]}
+                          </span>
+                        )}
                       </button>
                     )}
+
                   </li>
                 );
               })}

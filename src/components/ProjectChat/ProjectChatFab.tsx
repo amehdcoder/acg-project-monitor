@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { ProjectChatDialog } from "@/components/ProjectChat/ProjectChatDialog";
+import { useDirectUnread } from "@/hooks/useDirectUnread";
 import {
   Popover,
   PopoverContent,
@@ -69,6 +70,11 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
   const [initialGroupId, setInitialGroupId] = useState<string | null>(null);
   const [directTarget, setDirectTarget] = useState<{ id: string; name: string } | null>(null);
   const [unread, setUnread] = useState(() => readCachedUnread(user?.id));
+
+  // Direct-message unread + real-time toast notifications (fires once globally).
+  const { total: directUnread } = useDirectUnread({ withToast: true });
+  const totalUnread = unread + directUnread;
+
 
   // Listen for "chat with this person" requests from the active-users roster.
   useEffect(() => {
@@ -234,10 +240,11 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
               <MessagesSquare className="h-7 w-7 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3" strokeWidth={2.2} />
 
               {/* Unread badge — red with white ring */}
-              {unread > 0 && (
+              {totalUnread > 0 && (
                 <span className="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-[hsl(var(--destructive))] px-1.5 text-[11px] font-bold text-white ring-[2.5px] ring-[hsl(var(--background))] animate-badge-bounce">
-                  {unread > 99 ? "99+" : unread}
+                  {totalUnread > 99 ? "99+" : totalUnread}
                 </span>
+
               )}
 
               {/* Online / active indicator dot */}
