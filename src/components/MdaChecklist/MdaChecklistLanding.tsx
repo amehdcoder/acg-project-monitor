@@ -12,6 +12,8 @@ import {
   RotateCcw,
   Link2,
   ShieldCheck,
+  ShieldAlert,
+
 } from "lucide-react";
 import { FormFiller } from "@/components/FormFiller";
 import FollowUpLinkEditor from "@/components/FormBuilder/FollowUpLinkEditor";
@@ -326,16 +328,16 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   const openBuilder = (group: FormGroup | null) => {
     if (!group) return;
     if (!canBuildFollowUps) {
-      toast({
-        title: "Admin access required",
-        description: "Only Systems Admin, Super Admin, Owner, and Co-owner can build MDA follow-up linkages.",
-        variant: "destructive",
-      });
+      // Surface an explicit access-denied state instead of silently bailing,
+      // so unauthorized direct/bypass attempts get a clear message.
+      setBuilderGroup(null);
+      setBuilderOpen(true);
       return;
     }
     setBuilderGroup(group);
     setBuilderOpen(true);
   };
+
 
   const saveBuilderGroup = (updatedGroup: FormGroup) => {
     const previousGroups = groups;
@@ -440,7 +442,10 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
       checklistQuestions={checklistQuestions}
       onSave={saveBuilderGroup}
     />
+  ) : builderOpen && !canBuildFollowUps ? (
+    <BuilderAccessDenied onClose={() => { setBuilderOpen(false); setBuilderGroup(null); }} />
   ) : null;
+
 
   if (view === "community") {
     return <FormFiller {...fillerProps(communityGroupNames)} />;
@@ -663,6 +668,32 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
     </div>
   );
 }
+
+// Clear access-denied overlay for unauthorized attempts to open the follow-up
+// builder (e.g. UI bypass / direct access). The DB guard also blocks any write.
+function BuilderAccessDenied({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="alertdialog" aria-modal="true">
+      <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-rose-100">
+          <ShieldAlert className="h-7 w-7 text-rose-600" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-900">Access denied</h2>
+        <p className="mt-2 text-sm leading-relaxed text-slate-600">
+          The Follow-up question &amp; linkage builder is restricted to Systems Admins,
+          Super Admins, Owners, and Co-owners who are assigned to this project.
+        </p>
+        <button
+          onClick={onClose}
+          className="mt-5 w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 active:scale-[0.99]"
+        >
+          Got it
+        </button>
+      </div>
+    </div>
+  );
+}
+
 
 function responseHasOption(response: any, optionValue: string): boolean {
   if (Array.isArray(response)) return response.map(String).includes(optionValue);

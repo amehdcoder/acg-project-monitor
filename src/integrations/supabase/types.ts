@@ -6891,6 +6891,10 @@ export type Database = {
       }
       can_view_all_locations: { Args: { _user_id: string }; Returns: boolean }
       current_user_can_build_mda_followups: { Args: never; Returns: boolean }
+      current_user_can_build_mda_followups_for_project: {
+        Args: { p_project_id: string }
+        Returns: boolean
+      }
       ensure_hands_staff_group: {
         Args: { _project_id: string }
         Returns: string
