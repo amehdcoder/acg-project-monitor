@@ -105,6 +105,7 @@ import { toast } from "@/hooks/use-toast";
 import { FormBuilder } from "@/components/FormBuilder";
 import { FormFiller } from "@/components/FormFiller";
 import MdaChecklistLanding from "@/components/MdaChecklist/MdaChecklistLanding";
+import MdaDashboardView from "@/components/MdaChecklist/MdaDashboardView";
 import SavedFormsManager, { type SavedFormsMode } from "@/components/FormFiller/SavedFormsManager";
 import { FormGroup } from "@/components/FormBuilder/types";
 import SubmissionHistory from "@/components/SubmissionHistory";
@@ -226,6 +227,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [selectingFormFor, setSelectingFormFor] = useState<string | null>(null);
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
   const [dashboardForm, setDashboardForm] = useState<Form | null>(null);
+  const [mdaDashboardForm, setMdaDashboardForm] = useState<Form | null>(null);
   const [templateForm, setTemplateForm] = useState<{ templateId: string; name: string; description: string; questions: Question[]; settings: any; geofence?: GeofenceArea } | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
@@ -503,6 +505,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       showSeeClearDash ||
       microplanFillingActive ||
       dashboardForm ||
+      mdaDashboardForm ||
       geofenceManagerForm ||
       templateForm ||
       qrCodeForm ||
@@ -536,6 +539,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     showSeeClearDash,
     microplanFillingActive,
     dashboardForm,
+    mdaDashboardForm,
     geofenceManagerForm,
     templateForm,
     qrCodeForm,
@@ -1087,6 +1091,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     form.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const mdaChecklistForms = mergedForms.filter((form) =>
+    isMdaChecklistLike({ settings: form.settings, formName: form.name, groups: form.groups })
+  );
+  const primaryMdaDashboardForm = currentProjectId
+    ? mdaChecklistForms.find((form) => form.project_id === currentProjectId) || null
+    : mdaChecklistForms[0] || null;
+
   const currentProject = projects.find(p => p.id === currentProjectId);
 
   if (showMentalHealth) {
@@ -1226,6 +1237,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         formName={dashboardForm.name}
         isAdmin={isAdmin}
         onBack={() => setDashboardForm(null)}
+      />
+    );
+  }
+
+  if (mdaDashboardForm) {
+    return (
+      <MdaDashboardView
+        form={mdaDashboardForm}
+        projects={projects}
+        onClose={() => setMdaDashboardForm(null)}
       />
     );
   }
@@ -1531,6 +1552,40 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
         {/* KoboCollect-style action menu */}
         <section className="mx-auto w-full max-w-md space-y-3">
+          <button
+            onClick={() => {
+              if (primaryMdaDashboardForm) {
+                setMdaDashboardForm(primaryMdaDashboardForm);
+                return;
+              }
+              setShowFormsExplorer(true);
+              setOpenTopFolder("standard");
+              setOpenFolder("mda_supervisory_folder");
+              toast({
+                title: "MDA dashboard needs a checklist",
+                description: currentProjectId
+                  ? "Add or copy the Integrated MDA Supervisory Checklist to this project first."
+                  : "Select a project with an Integrated MDA Supervisory Checklist first.",
+                variant: "destructive",
+              });
+            }}
+            className="group flex w-full items-center gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+          >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#DCF3F0] shadow-inner">
+              <BarChart3 className="h-6 w-6 text-[#0f766e]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate font-display text-base font-bold text-[#0f766e]">Integrated MDA Supervisory Dashboard</h3>
+              <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                Standalone realtime dashboard for checklist, follow-up, GPS map and field-worker insights.
+              </p>
+            </div>
+            <span className="hidden shrink-0 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-[#0f766e] sm:inline-flex">
+              {primaryMdaDashboardForm ? "Open" : "Setup"}
+            </span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-[#0f766e] transition group-hover:translate-x-0.5" />
+          </button>
+
           {/* "Open your form" — primary entry */}
           <div className="flex items-stretch gap-3">
             <button
@@ -1844,10 +1899,40 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   // palette used by the Project dropdown above, so the trigger
                   // border/text + form name + row left-border are all in sync.
                   const accent = getProjectAccent(form.project_id, projects, idx);
+                  const isMdaChecklistForm = isMdaChecklistLike({ settings: form.settings, formName: form.name, groups: form.groups });
 
                   return (
+                    <div key={form.id} className="contents">
+                      {isMdaChecklistForm && (
+                        <div
+                          className="group flex items-center gap-3 border-l-4 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
+                          style={{ borderLeftColor: "#0d9488" }}
+                        >
+                          <button
+                            onClick={() => setMdaDashboardForm(form)}
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#DCF3F0]"
+                            aria-label={`Open ${form.name} dashboard`}
+                          >
+                            <BarChart3 className="h-5 w-5 text-[#0d9488]" strokeWidth={2} />
+                          </button>
+                          <button
+                            onClick={() => setMdaDashboardForm(form)}
+                            className="min-w-0 flex-1 text-left"
+                          >
+                            <h4 className="truncate text-[15px] font-bold text-[#0f766e]">Integrated MDA Supervisory Dashboard</h4>
+                            <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">
+                              Realtime checklist, follow-up, GPS map and field-worker insights
+                            </p>
+                          </button>
+                          <span className="shrink-0 rounded-full bg-[#DCF3F0] px-3 py-1 text-xs font-semibold text-[#0f766e]">
+                            Dashboard
+                          </span>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-[#0f766e]" onClick={() => setMdaDashboardForm(form)}>
+                            <ChevronRight className="h-5 w-5" />
+                          </Button>
+                        </div>
+                      )}
                     <div
-                      key={form.id}
                       className="group flex items-center gap-3 border-l-4 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
                       style={{ borderLeftColor: accent }}
                     >
@@ -1958,6 +2043,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 <LayoutDashboard className="mr-2 h-4 w-4" />
                                 Custom Dashboards
                               </DropdownMenuItem>
+                              {isMdaChecklistForm && (
+                                <DropdownMenuItem onClick={() => setMdaDashboardForm(form)}>
+                                  <BarChart3 className="mr-2 h-4 w-4 text-emerald-600" />
+                                  MDA Supervisory Dashboard
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => setQrCodeForm(form)}>
                                 <QrCode className="mr-2 h-4 w-4" />
                                 Generate QR Code
@@ -2018,6 +2109,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
+                    </div>
                     </div>
                   );
                 })}
@@ -2604,6 +2696,24 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     { kind: "bloomberg_dash" as const, icon: BarChart3, bg: "bg-[#DCF3F0]", fg: "text-[#14b8a6]", label: "Validation Dashboard", desc: "Baseline vs validated analytics, discrepancies & map (Owner only)." },
                   ],
                 }] : []),
+                {
+                  id: "mda_supervisory_folder",
+                  title: "Integrated MDA Supervisory Checklist",
+                  subtitle: "Community supervision checklist, follow-ups & realtime decision dashboard",
+                  bg: "bg-[#DCF3F0]", fg: "text-[#0f766e]", chipBg: "bg-[#DCF3F0]", chipFg: "text-[#0f766e]",
+                  items: [
+                    {
+                      kind: "mda_dashboard" as const,
+                      icon: BarChart3,
+                      bg: "bg-[#DCF3F0]",
+                      fg: "text-[#0f766e]",
+                      label: "MDA Supervisory Dashboard",
+                      desc: primaryMdaDashboardForm
+                        ? "Open the standalone Bloomberg-style dashboard for checklist, follow-up, GPS and field-worker insights."
+                        : "Create or copy an Integrated MDA Supervisory Checklist in this project to activate the dashboard.",
+                    },
+                  ],
+                },
                 ...(isOwner ? [{
                   id: "seeclear_folder",
                   title: "See Clear — Plateau Eye Health Project",
@@ -2762,6 +2872,46 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                   <h5 className="truncate text-sm font-semibold">{it.label}</h5>
                                   <p className="text-xs text-muted-foreground">{it.desc}</p>
                                 </div>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </button>
+                            );
+                          }
+                          if (it.kind === "mda_dashboard") {
+                            const Icon = it.icon;
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  if (primaryMdaDashboardForm) {
+                                    setMdaDashboardForm(primaryMdaDashboardForm);
+                                    return;
+                                  }
+                                  toast({
+                                    title: "Dashboard not ready",
+                                    description: currentProjectId
+                                      ? "Add or copy the Integrated MDA Supervisory Checklist to this project first."
+                                      : "Select a project that has an Integrated MDA Supervisory Checklist first.",
+                                    variant: "destructive",
+                                  });
+                                }}
+                                className="flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 text-left hover:bg-white/60 transition-colors border-t border-border/30 first:border-t-0"
+                              >
+                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${it.bg}`}>
+                                  <Icon className={`h-4 w-4 ${it.fg}`} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h5 className="truncate text-sm font-semibold">{it.label}</h5>
+                                  <p className="text-xs text-muted-foreground">{it.desc}</p>
+                                </div>
+                                {primaryMdaDashboardForm ? (
+                                  <span className="hidden shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 sm:inline-flex">
+                                    Live
+                                  </span>
+                                ) : (
+                                  <span className="hidden shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700 sm:inline-flex">
+                                    Setup needed
+                                  </span>
+                                )}
                                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
                               </button>
                             );
