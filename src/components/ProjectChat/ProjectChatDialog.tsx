@@ -34,6 +34,10 @@ interface ProjectChatDialogProps {
   /** When opened from a push notification, auto-select this group so its
       messages are shown and immediately marked as read. */
   initialGroupId?: string | null;
+  /** When opened to chat with a specific person (e.g. from the active-users
+      roster), auto-create/select a direct conversation with this user. */
+  initialDirectUserId?: string | null;
+  initialDirectUserName?: string | null;
 }
 
 export function ProjectChatDialog({
@@ -43,6 +47,8 @@ export function ProjectChatDialog({
   open,
   onOpenChange,
   initialGroupId,
+  initialDirectUserId,
+  initialDirectUserName,
 }: ProjectChatDialogProps) {
   const { user } = useAuth();
   const {
@@ -111,6 +117,51 @@ export function ProjectChatDialog({
       setSelectedGroup(target);
     }
   }, [open, initialGroupId, chatGroups, setSelectedGroup]);
+
+  // Deep-link: when opened to chat with a specific person (active-users roster),
+  // create/select a 1:1 conversation with them so the thread is ready instantly.
+  const appliedInitialDirect = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open) {
+      appliedInitialDirect.current = null;
+      return;
+    }
+    if (!initialDirectUserId || appliedInitialDirect.current === initialDirectUserId)
+      return;
+    appliedInitialDirect.current = initialDirectUserId;
+    let active = true;
+    (async () => {
+      const { data: convId, error } = await supabase.rpc("start_proximity_conversation", {
+        _other: initialDirectUserId,
+      });
+      if (!active || error || !convId) {
+        if (error) toast.error("Could not start the chat. Please try again.");
+        return;
+      }
+      setSelectedGroup(null);
+      setShowMembers(false);
+      setShowSearch(false);
+      setReplyTo(null);
+      setSelectedDirect({
+        conversation_id: convId as unknown as string,
+        other_id: initialDirectUserId,
+        other_name: initialDirectUserName || "User",
+        status: "active",
+        archived: false,
+        last_message: null,
+        last_message_at: null,
+        last_sender_id: null,
+        unread_count: 0,
+        updated_at: new Date().toISOString(),
+      });
+      await fetchDirectChats();
+    })();
+    return () => {
+      active = false;
+    };
+  }, [open, initialDirectUserId, initialDirectUserName, setSelectedGroup, fetchDirectChats]);
+
+
 
 
 

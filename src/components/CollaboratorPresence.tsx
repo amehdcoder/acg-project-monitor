@@ -7,7 +7,7 @@
  * pseudonymous yet visually distinct.
  */
 import { useMemo } from "react";
-import { Users } from "lucide-react";
+import { Users, MessageCircle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Popover,
@@ -82,10 +82,19 @@ function CollaboratorAvatar({
 }
 
 const CollaboratorPresence = () => {
-  const { isOwner, isSuperAdmin } = useAuth();
+  const { user, isOwner, isSuperAdmin } = useAuth();
   const canView = isOwner || isSuperAdmin;
   // Track presence for every user; the roster is only rendered for admins.
   const { collaborators } = usePresenceTracking(true);
+
+  const startDirectChat = (c: ActiveCollaborator) => {
+    window.dispatchEvent(
+      new CustomEvent("amehnities:open-direct-chat", {
+        detail: { userId: c.user_id, userName: c.name },
+      }),
+    );
+  };
+
 
   const others = useMemo(
     () => collaborators,
@@ -184,6 +193,16 @@ const CollaboratorPresence = () => {
                     <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                       {routeLabel(c.route)}
                     </span>
+                    {c.user_id !== user?.id && (
+                      <button
+                        type="button"
+                        onClick={() => startDirectChat(c)}
+                        aria-label={`Chat with ${c.name}`}
+                        className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </button>
+                    )}
                   </li>
                 );
               })}
