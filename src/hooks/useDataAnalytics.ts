@@ -197,6 +197,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
         total_submissions: 0,
         current_cycle_submissions: 0,
         questions: Array.isArray(f.questions) ? f.questions : [],
+        settings: (f as any).settings ?? {},
       }));
 
       setForms(formsData);
