@@ -146,12 +146,35 @@ async function fileToIconDataUrl(file: File, size = 256): Promise<string> {
 export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   const { formId, formName, projectId, onClose } = props;
   const navigate = useNavigate();
-  const { isOwner, isOwnerLevel, role } = useAuth();
+  const { user, isOwner, isOwnerLevel, role } = useAuth();
   const { toast } = useToast();
   const [localGroups, setLocalGroups] = useState<FormGroup[]>(props.groups || []);
   const groups = localGroups;
   const canEditIcons = !!(isOwner || isOwnerLevel);
-  const canBuildFollowUps = canRoleBuildMdaFollowUps({ role, isOwnerLevel });
+
+  // Admins (super/systems) must additionally be assigned to THIS project before the
+  // follow-up linkage builder is exposed. Owner-level (Owner/Co-owner) always bypass.
+  // Regular users never qualify regardless of assignment.
+  const hasBuilderRole = canRoleBuildMdaFollowUps({ role, isOwnerLevel });
+  const [assignedToProject, setAssignedToProject] = useState<boolean>(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!hasBuilderRole) { setAssignedToProject(false); return; }
+      if (isOwnerLevel) { setAssignedToProject(true); return; }
+      if (!user?.id || !projectId) { setAssignedToProject(false); return; }
+      const { data } = await supabase
+        .from("user_project_assignments")
+        .select("project_id")
+        .eq("user_id", user.id)
+        .eq("project_id", projectId)
+        .maybeSingle();
+      if (!cancelled) setAssignedToProject(!!data);
+    })();
+    return () => { cancelled = true; };
+  }, [hasBuilderRole, isOwnerLevel, user?.id, projectId]);
+  const canBuildFollowUps = hasBuilderRole && assignedToProject;
+
   const [view, setView] = useState<View>("home");
   const [selected, setSelected] = useState<VisitedCommunity | null>(null);
   const [builderGroup, setBuilderGroup] = useState<FormGroup | null>(null);
