@@ -33,10 +33,9 @@ function restrictQuestionToState(q: Question, stateValue: string): Question {
     return {
       ...q,
       options: filtered.length ? filtered : opts,
-      // Preselect & lock the destination state so users "just" pick the
-      // location cascade beneath it.
+      // Preselect the destination state (single option) so users "just" pick
+      // the location cascade beneath it.
       defaultValue: stateValue,
-      readOnly: true,
     } as Question;
   }
   if (q.name === "lga") {
