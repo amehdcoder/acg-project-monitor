@@ -34,6 +34,10 @@ interface ProjectChatDialogProps {
   /** When opened from a push notification, auto-select this group so its
       messages are shown and immediately marked as read. */
   initialGroupId?: string | null;
+  /** When opened to chat with a specific person (e.g. from the active-users
+      roster), auto-create/select a direct conversation with this user. */
+  initialDirectUserId?: string | null;
+  initialDirectUserName?: string | null;
 }
 
 export function ProjectChatDialog({
@@ -43,6 +47,8 @@ export function ProjectChatDialog({
   open,
   onOpenChange,
   initialGroupId,
+  initialDirectUserId,
+  initialDirectUserName,
 }: ProjectChatDialogProps) {
   const { user } = useAuth();
   const {
