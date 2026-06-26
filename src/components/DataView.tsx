@@ -51,6 +51,22 @@ const DataView = () => {
 
   const selectedForm = formAnalytics.find((f) => f.id === selectedFormId) || null;
 
+  // Live updates: refresh analytics whenever submissions change for the open form.
+  useEffect(() => {
+    if (!selectedFormId) return;
+    const channel = supabase
+      .channel(`dataview-submissions-${selectedFormId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "form_submissions", filter: `form_id=eq.${selectedFormId}` },
+        () => { void refresh(); },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [selectedFormId, refresh]);
+
+
+
   const handleBack = () => {
     if (selectedFormId) {
       setSelectedFormId(undefined);
