@@ -46,6 +46,8 @@ interface Props {
   form: MdaDashboardForm;
   projects?: ProjectLite[];
   onClose: () => void;
+  /** When true, render inline (no full-screen wrapper / sticky header). */
+  embedded?: boolean;
 }
 
 const SIM_DEFAULTS = { count: 250, seed: 1337 };
