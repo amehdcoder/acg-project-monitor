@@ -111,6 +111,15 @@ export default function FormAccessManager({
       `${displayName(u)} ${safeText(u.email, "")}`.toLowerCase().includes(q));
   }, [users, search]);
 
+  // Reset to first page whenever the search/result set changes.
+  useEffect(() => { setPage(0); }, [search, formId, open]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const paged = useMemo(
+    () => filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE),
+    [filtered, safePage],
+  );
+
   const assignedCount = assigned.size;
 
   const refreshAssigned = async () => {
