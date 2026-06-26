@@ -545,6 +545,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           variant: "destructive",
         });
       }
+      // A verified online login clears any offline brute-force lockout.
+      void clearOfflineFailures(email);
       logOfflineEvent("login", { mode: "online", email });
 
       // Warm-cache this user's accessible forms so they can collect data offline
