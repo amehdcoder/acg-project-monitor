@@ -127,6 +127,24 @@ export default defineConfig(({ mode }) => {
             },
           },
           {
+            // Satellite / street / terrain map tiles (Esri, Google, OSM, OpenTopo).
+            // CacheFirst so a tile that has been seen once renders INSTANTLY on
+            // every revisit and remains available with NO network (offline mode).
+            // A large cap keeps a whole survey area's imagery resident on-device.
+            urlPattern: ({ url }: any) =>
+              /(^|\.)arcgisonline\.com$/.test(url.hostname) ||
+              /(^|\.)google\.com$/.test(url.hostname) ||
+              /(^|\.)tile\.openstreetmap\.org$/.test(url.hostname) ||
+              /(^|\.)tile\.opentopomap\.org$/.test(url.hostname),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "map-tiles-cache",
+              expiration: { maxEntries: 4000, maxAgeSeconds: 60 * 60 * 24 * 180 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+
+          {
             // Always fetch fresh HTML so new builds (e.g. without the old
             // green background) display immediately on next navigation.
             urlPattern: ({ request }: any) => request.mode === "navigate",

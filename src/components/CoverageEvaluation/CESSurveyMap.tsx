@@ -194,8 +194,15 @@ const CESSurveyMap = ({
       maxNativeZoom: mode === "google" || mode === "google-sat" ? 21 : 19,
       detectRetina: true,
       crossOrigin: true,
+      // Instant + smooth rendering: keep a generous off-screen tile buffer so
+      // panning shows imagery immediately, and paint tiles as they stream in
+      // (no waiting for the whole viewport) so cached tiles appear with no delay.
+      keepBuffer: 8,
+      updateWhenIdle: false,
+      updateWhenZooming: false,
       ...(tl.subdomains ? { subdomains: tl.subdomains } : {}),
     } as L.TileLayerOptions).addTo(map);
+
     tileRef.current = primary;
     // Resilience: if Google tiles fail (region block, throttling, offline cache miss),
     // automatically swap in Esri World Imagery so satellite imagery NEVER disappears.
@@ -211,7 +218,11 @@ const CESSurveyMap = ({
           maxNativeZoom: 19,
           detectRetina: true,
           crossOrigin: true,
+          keepBuffer: 8,
+          updateWhenIdle: false,
+          updateWhenZooming: false,
         } as L.TileLayerOptions).addTo(map);
+
         // Keep a reference so it gets cleaned up on next basemap change
         tileRef.current = fb;
         try { map.removeLayer(primary); } catch {}
