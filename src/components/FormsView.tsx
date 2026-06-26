@@ -2030,7 +2030,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 <LayoutDashboard className="mr-2 h-4 w-4" />
                                 Custom Dashboards
                               </DropdownMenuItem>
-                              {isMdaChecklistForm && (
+                              {isMdaChecklistForm && canSeeMdaDashboard && (
                                 <DropdownMenuItem onClick={() => setMdaDashboardForm(form)}>
                                   <BarChart3 className="mr-2 h-4 w-4 text-emerald-600" />
                                   MDA Supervisory Dashboard
