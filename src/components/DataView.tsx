@@ -25,6 +25,10 @@ import PullToRefresh from "@/components/PullToRefresh";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MdaSupervisoryMap, SupervisoryGapAnalysisDashboard, MdaAdaptiveDashboard, MdaSupervisoryChecklistDashboard } from "@/components/MdaChecklist";
 import FormDataKnowledgeGraph from "@/components/KnowledgeGraph/FormDataKnowledgeGraph";
+import { useAuth } from "@/hooks/useAuth";
+import { generateMdaSimulation } from "@/lib/mda/simulation";
+import { Switch } from "@/components/ui/switch";
+import { FlaskConical, AlertTriangle } from "lucide-react";
 
 const DataView = () => {
   const browserRef = useRef<ProjectSubmissionsBrowserHandle>(null);
