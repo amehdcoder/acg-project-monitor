@@ -650,11 +650,21 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       if (form) {
         silentRestoreHandledRef.current = true;
         sessionStorage.removeItem(SILENT_UPDATE_RESTORE_KEY);
+        // The Integrated MDA Supervisory Checklist opens to a navigation hub
+        // (the 5-item landing), not a single form. Silently re-opening it after
+        // an update/refresh would dump the user on that landing page even when
+        // they had navigated away — and their actual sub-module progress is
+        // already preserved as a draft. So never auto-restore into it; leave the
+        // user on the Forms home and let them resume from Drafts.
+        if (isMdaChecklistLike({ settings: form.settings, formName: form.name, groups: form.groups })) {
+          return;
+        }
         setFillingForm(form);
         if (form.project_id && form.project_id !== currentProjectId) setCurrentProjectId(form.project_id);
       } else if (active?.projectId && active.projectId !== currentProjectId) {
         setCurrentProjectId(active.projectId);
       }
+
     } catch {}
   }, [authLoading, currentProjectId, fillingForm, forms, offlineForms]);
 
