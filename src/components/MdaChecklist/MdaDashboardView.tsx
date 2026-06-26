@@ -192,12 +192,15 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
   const projectName = projects.find((p) => p.id === form.project_id)?.name;
 
   return (
-    <div className="min-h-screen bg-background" data-mda-scroll>
-      <div className="sticky top-0 z-20 border-b bg-card/95 backdrop-blur">
-        <div className="container mx-auto flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div
+      className={embedded ? "overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm" : "min-h-screen bg-background"}
+      data-mda-scroll
+    >
+      <div className={embedded ? "border-b bg-card/95" : "sticky top-0 z-20 border-b bg-card/95 backdrop-blur"}>
+        <div className={`flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${embedded ? "" : "container mx-auto"}`}>
           <div className="flex min-w-0 items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Back to Forms">
-              <ArrowLeft className="h-5 w-5" />
+            <Button variant="ghost" size="icon" onClick={onClose} aria-label={embedded ? "Collapse dashboard" : "Back to Forms"}>
+              {embedded ? <ChevronUp className="h-5 w-5" /> : <ArrowLeft className="h-5 w-5" />}
             </Button>
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
               <BarChart3 className="h-5 w-5 text-primary" />
