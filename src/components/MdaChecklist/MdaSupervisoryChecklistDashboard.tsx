@@ -363,7 +363,111 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       .sort((a, b) => b.subs - a.subs);
   }, [checklist, followUps]);
 
-  // ───────────────────────── Render ─────────────────────────
+  // ── Community-level status & adverse-reaction tables ──────────────
+  const communityTables = useMemo(() => {
+    const STATUS: Record<string, string> = {
+      "not started": "Not Started", ongoing: "Ongoing", halted: "Halted", completed: "Completed",
+    };
+    const statusLabel = (v: any) => (v ? STATUS[norm(v)] || stripTags(String(v)) : "");
+    const comLabel = (s?: MdaSubmission) => {
+      const d = s?.data || {};
+      const community = stripTags(d.community || d.community_name || d.settlement_name || d.settlement) || "Unspecified";
+      const ward = stripTags(d.ward || d.ward_name) || (s?.ward ?? "") || "—";
+      const lga = stripTags(d.lga || d.LGA || d.local_government) || (s?.lga ?? "") || "—";
+      const state = stripTags(d.state) || (s?.state ?? "") || "—";
+      const flhf = stripTags(d.flhf_name || d.flhf) || "";
+      const supervisor = stripTags(s?.submitter || d.supervisor_name) || "—";
+      return { community, ward, lga, state, flhf, supervisor };
+    };
+
+    // latest primary checklist visit per community
+    const primaryByCom = new Map<string, MdaSubmission>();
+    for (const s of checklist) {
+      const k = communityKey(s as any);
+      const prev = primaryByCom.get(k);
+      if (!prev || new Date(s.submittedAt || 0) > new Date(prev.submittedAt || 0)) primaryByCom.set(k, s);
+    }
+    // follow-ups per community, oldest → newest
+    const fuByCom = new Map<string, MdaSubmission[]>();
+    for (const s of followUps) {
+      const k = communityKey(s as any);
+      if (!fuByCom.has(k)) fuByCom.set(k, []);
+      fuByCom.get(k)!.push(s);
+    }
+    for (const arr of fuByCom.values()) {
+      arr.sort((a, b) => new Date(a.submittedAt || 0).getTime() - new Date(b.submittedAt || 0).getTime());
+    }
+
+    const completed: any[] = [];
+    const notCompleted: any[] = [];
+    const adverse: any[] = [];
+
+    for (const k of new Set([...primaryByCom.keys(), ...fuByCom.keys()])) {
+      const primary = primaryByCom.get(k);
+      const fus = fuByCom.get(k) || [];
+      const loc = comLabel(primary || fus[fus.length - 1]);
+
+      // ---- MDA status history (driven by follow-up submissions) ----
+      const statusFus = fus.filter((f) => f.data?.status_of_mda);
+      const firstStatus = statusFus.length ? statusLabel(statusFus[0].data!.status_of_mda) : "";
+      const latestStatus = statusFus.length
+        ? statusLabel(statusFus[statusFus.length - 1].data!.status_of_mda)
+        : statusLabel(primary?.data?.status_of_mda);
+      const hadFollowup = statusFus.length > 0;
+      const statusChanged = !!firstStatus && !!latestStatus && firstStatus !== latestStatus;
+      const lastFu = statusFus.length ? statusFus[statusFus.length - 1].submittedAt : null;
+
+      if (latestStatus === "Completed") {
+        completed.push({
+          key: k, ...loc,
+          afterFollowup: hadFollowup && statusChanged && firstStatus !== "Completed",
+          fromStatus: firstStatus, hadFollowup,
+          followups: statusFus.length, lastFu,
+        });
+      } else if (latestStatus === "Not Started" || latestStatus === "Ongoing" || latestStatus === "Halted") {
+        notCompleted.push({
+          key: k, ...loc, status: latestStatus,
+          changed: statusChanged, fromStatus: firstStatus, hadFollowup,
+          followups: statusFus.length, lastFu,
+        });
+      }
+
+      // ---- Adverse reactions ----
+      const aesReported = toNum(primary?.data?.aes_reported) || 0;
+      const seriousAes = toNum(primary?.data?.serious_aes) || 0;
+      const reactionTypes = new Set<string>();
+      for (const f of fus) {
+        const v = f.data?.adverse_reaction_type;
+        if (!v) continue;
+        const arr = Array.isArray(v) ? v : String(v).split(/\s+/);
+        for (const it of arr) { const lbl = stripTags(String(it)).replace(/_/g, " "); if (lbl) reactionTypes.add(lbl); }
+      }
+      const hasReaction = aesReported > 0 || seriousAes > 0 || reactionTypes.size > 0;
+      if (hasReaction) {
+        const referralRaw = primary?.data?.referral_done;
+        const referral = referralRaw ? stripTags(String(referralRaw)) : "";
+        const aeFus = fus.filter((f) => f.data?.adverse_reaction_type || f.data?.ae_been_managed);
+        const followedUp = aeFus.length > 0;
+        const lastAeFu = followedUp ? aeFus[aeFus.length - 1] : null;
+        const managed = lastAeFu ? POSITIVE.has(norm(lastAeFu.data?.ae_been_managed)) : false;
+        const okayNow = lastAeFu ? POSITIVE.has(norm(lastAeFu.data?.ae_person_okay)) : false;
+        adverse.push({
+          key: k, ...loc,
+          aes: aesReported, serious: seriousAes,
+          types: [...reactionTypes],
+          referral, referred: norm(referral) === "yes",
+          followedUp, managed, okayNow,
+          lastAeFu: lastAeFu?.submittedAt || null,
+        });
+      }
+    }
+
+    completed.sort((a, b) => (b.lastFu ? new Date(b.lastFu).getTime() : 0) - (a.lastFu ? new Date(a.lastFu).getTime() : 0));
+    notCompleted.sort((a, b) => (a.status === "Halted" ? -1 : 0) - (b.status === "Halted" ? -1 : 0));
+    adverse.sort((a, b) => (b.serious + b.aes) - (a.serious + a.aes));
+    return { completed, notCompleted, adverse };
+  }, [checklist, followUps]);
+
   if (total === 0 && followUps.length === 0) {
     return (
       <Card>
