@@ -814,6 +814,8 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       {/* ── Coverage map ── */}
       {isJigawa ? (
         <JigawaSupervisoryMap submissions={mapSubs} formName={formName} />
+      ) : isFct ? (
+        <FctSupervisoryMap submissions={mapSubs} formName={formName} />
       ) : (
         <Card>
           <CardHeader className="pb-2"><CardTitle className="flex items-center gap-1.5 text-sm"><MapPin className="h-4 w-4 text-primary" />Supervision Coverage Map</CardTitle></CardHeader>
