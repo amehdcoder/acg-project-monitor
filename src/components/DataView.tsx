@@ -25,13 +25,19 @@ import PullToRefresh from "@/components/PullToRefresh";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MdaSupervisoryMap, SupervisoryGapAnalysisDashboard, MdaAdaptiveDashboard, MdaSupervisoryChecklistDashboard } from "@/components/MdaChecklist";
 import FormDataKnowledgeGraph from "@/components/KnowledgeGraph/FormDataKnowledgeGraph";
+import { useAuth } from "@/hooks/useAuth";
+import { generateMdaSimulation } from "@/lib/mda/simulation";
+import { Switch } from "@/components/ui/switch";
+import { FlaskConical, AlertTriangle } from "lucide-react";
 
 const DataView = () => {
   const browserRef = useRef<ProjectSubmissionsBrowserHandle>(null);
+  const { isOwner } = useAuth();
   const [filters, setFilters] = useState<AnalyticsFilters>({});
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>();
   const [selectedFormId, setSelectedFormId] = useState<string | undefined>();
   const [activeTab, setActiveTab] = useState("submissions");
+  const [mdaSimulate, setMdaSimulate] = useState(false);
 
   const handlePullRefresh = useCallback(async () => {
     await browserRef.current?.refresh();
@@ -50,6 +56,50 @@ const DataView = () => {
   } = useDataAnalytics({ ...filters, projectId: selectedProjectId, formId: selectedFormId });
 
   const selectedForm = formAnalytics.find((f) => f.id === selectedFormId) || null;
+  const isMdaChecklist = Boolean((selectedForm as any)?.settings?.isMdaChecklist);
+
+  // Reset simulation whenever the form changes so it never lingers.
+  useEffect(() => { setMdaSimulate(false); }, [selectedFormId]);
+
+  // Real submissions mapped to the MDA dashboard shape. NEVER mutated.
+  const realMdaSubs = useMemo(
+    () =>
+      submissions.map((s: any) => {
+        let lat: number | undefined;
+        let lng: number | undefined;
+        const m = typeof s.location === "string" ? s.location.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/) : null;
+        if (m) { lat = parseFloat(m[1]); lng = parseFloat(m[2]); }
+        const d = s.data || {};
+        const lga = d.lga || d.LGA || d.local_government || d.local_government_area || null;
+        const ward = d.ward || d.Ward || d.ward_name || null;
+        return {
+          id: s.id,
+          projectId: (selectedForm as any)?.project_id ?? selectedProjectId ?? null,
+          state: s.state,
+          lga,
+          ward,
+          submitter: s.submitter_name,
+          submittedAt: s.submitted_at,
+          status: s.status,
+          location: lat != null && lng != null ? { latitude: lat, longitude: lng } : null,
+          data: d,
+        };
+      }),
+    [submissions, selectedForm, selectedProjectId],
+  );
+
+  // Owner-only synthetic submissions — generated purely in memory, never saved.
+  const simulatedMdaSubs = useMemo(() => {
+    if (!mdaSimulate || !isMdaChecklist) return [];
+    const restrictState = /jigawa/i.test(selectedForm?.name || "") ? "Jigawa" : null;
+    return generateMdaSimulation(((selectedForm as any)?.questions ?? []) as any, {
+      projectId: (selectedForm as any)?.project_id ?? selectedProjectId ?? null,
+      restrictState,
+    });
+  }, [mdaSimulate, isMdaChecklist, selectedForm, selectedProjectId]);
+
+  // What the dashboards render: simulation when toggled, otherwise real data.
+  const mdaSubs = mdaSimulate ? (simulatedMdaSubs as any[]) : realMdaSubs;
 
   // Live updates: refresh analytics whenever submissions change for the open form.
   useEffect(() => {
@@ -152,54 +202,38 @@ const DataView = () => {
               </div>
 
               <AnalyticsKPICards kpis={kpis} loading={loading} />
-              {(selectedForm as any)?.settings?.isMdaChecklist && (
+              {isMdaChecklist && (
                 <>
+                  {isOwner && (
+                    <div className="flex flex-col gap-2 rounded-xl border border-amber-300/60 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-950/30 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-start gap-2">
+                        <FlaskConical className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                        <div>
+                          <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Owner simulation mode</p>
+                          <p className="text-xs text-amber-700/80 dark:text-amber-300/80">
+                            Preview the dashboards with synthetic submissions. This data is generated in your browser only — it is never saved and never touches real submissions.
+                          </p>
+                        </div>
+                      </div>
+                      <label className="flex items-center gap-2 text-xs font-medium text-amber-800 dark:text-amber-200">
+                        {mdaSimulate ? "Simulating" : "Live data"}
+                        <Switch checked={mdaSimulate} onCheckedChange={setMdaSimulate} aria-label="Toggle simulation mode" />
+                      </label>
+                    </div>
+                  )}
+                  {mdaSimulate && (
+                    <div className="flex items-center gap-2 rounded-lg border border-amber-400 bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900 dark:border-amber-500/40 dark:bg-amber-900/40 dark:text-amber-100">
+                      <AlertTriangle className="h-4 w-4" />
+                      SIMULATION MODE — dashboards below show synthetic data ({simulatedMdaSubs.length} records). Nothing is saved.
+                    </div>
+                  )}
                   <MdaSupervisoryChecklistDashboard
-                    submissions={submissions.map((s: any) => {
-                      let lat: number | undefined;
-                      let lng: number | undefined;
-                      const m = typeof s.location === "string" ? s.location.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/) : null;
-                      if (m) { lat = parseFloat(m[1]); lng = parseFloat(m[2]); }
-                      const d = s.data || {};
-                      const lga = d.lga || d.LGA || d.local_government || d.local_government_area || null;
-                      const ward = d.ward || d.Ward || d.ward_name || null;
-                      return {
-                        id: s.id,
-                        projectId: (selectedForm as any)?.project_id ?? selectedProjectId ?? null,
-                        state: s.state,
-                        lga,
-                        ward,
-                        submitter: s.submitter_name,
-                        submittedAt: s.submitted_at,
-                        status: s.status,
-                        location: lat != null && lng != null ? { latitude: lat, longitude: lng } : null,
-                        data: d,
-                      };
-                    })}
+                    submissions={mdaSubs as any}
                     questions={((selectedForm as any)?.questions ?? []) as any}
                     formName={selectedForm?.name}
                   />
                   <MdaAdaptiveDashboard
-                    submissions={submissions.map((s: any) => {
-                      let lat: number | undefined;
-                      let lng: number | undefined;
-                      const m = typeof s.location === "string" ? s.location.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/) : null;
-                      if (m) { lat = parseFloat(m[1]); lng = parseFloat(m[2]); }
-                      const d = s.data || {};
-                      const lga = d.lga || d.LGA || d.local_government || d.local_government_area || null;
-                      const ward = d.ward || d.Ward || d.ward_name || null;
-                      return {
-                        id: s.id,
-                        projectId: (selectedForm as any)?.project_id ?? selectedProjectId ?? null,
-                        state: s.state,
-                        lga,
-                        ward,
-                        submitter: s.submitter_name,
-                        submittedAt: s.submitted_at,
-                        status: s.status,
-                        data: d,
-                      };
-                    })}
+                    submissions={mdaSubs as any}
                     questions={((selectedForm as any)?.questions ?? []) as any}
                     formName={selectedForm?.name}
                     formId={selectedFormId}
@@ -207,47 +241,12 @@ const DataView = () => {
                     projects={projects}
                   />
                   <SupervisoryGapAnalysisDashboard
-                    submissions={submissions.map((s: any) => {
-                      let lat: number | undefined;
-                      let lng: number | undefined;
-                      const m = typeof s.location === "string" ? s.location.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/) : null;
-                      if (m) { lat = parseFloat(m[1]); lng = parseFloat(m[2]); }
-                      const d = s.data || {};
-                      const lga = d.lga || d.LGA || d.local_government || d.local_government_area || null;
-                      const ward = d.ward || d.Ward || d.ward_name || null;
-                      return {
-                        id: s.id,
-                        state: s.state,
-                        lga,
-                        ward,
-                        submitter: s.submitter_name,
-                        submittedAt: s.submitted_at,
-                        status: s.status,
-                        location: lat && lng ? { latitude: lat, longitude: lng } : null,
-                        data: d,
-                      };
-                    })}
+                    submissions={mdaSubs as any}
                     questions={((selectedForm as any)?.questions ?? []) as any}
                     formName={selectedForm?.name}
                   />
                   <MdaSupervisoryMap
-                    submissions={submissions.map((s: any) => {
-                      let lat: number | undefined;
-                      let lng: number | undefined;
-                      const m = typeof s.location === "string" ? s.location.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/) : null;
-                      if (m) { lat = parseFloat(m[1]); lng = parseFloat(m[2]); }
-                      const d = s.data || {};
-                      const lga = d.lga || d.LGA || d.local_government || d.local_government_area || null;
-                      return {
-                        id: s.id,
-                        state: s.state,
-                        lga,
-                        submitter: s.submitter_name,
-                        submittedAt: s.submitted_at,
-                        status: s.status,
-                        location: lat && lng ? { latitude: lat, longitude: lng } : null,
-                      };
-                    })}
+                    submissions={mdaSubs as any}
                     formName={selectedForm?.name}
                   />
                 </>

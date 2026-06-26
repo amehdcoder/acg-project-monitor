@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
 import MdaSupervisoryMap from "./MdaSupervisoryMap";
+import JigawaSupervisoryMap from "./JigawaSupervisoryMap";
 
 // ───────────────────────── Types ─────────────────────────
 interface QOption { id?: string; label: string; value: string; }
@@ -246,6 +247,14 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     })),
     [checklist],
   );
+
+  // Detect a Jigawa-scoped checklist so we can show the LGA-level Jigawa map.
+  const isJigawa = useMemo(() => {
+    const norm2 = (v: any) => String(v ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (/jigawa/i.test(formName || "")) return true;
+    const jig = checklist.filter((s) => norm2(s.state) === "jigawa").length;
+    return jig > 0 && jig >= checklist.length * 0.6;
+  }, [checklist, formName]);
 
   // Follow-up: MDA Completion status distribution ----------
   const mdaStatusDist = useMemo(() => {
@@ -557,12 +566,16 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       </div>
 
       {/* Coverage map */}
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1"><MapPin className="h-4 w-4" />Supervision Coverage Map</CardTitle></CardHeader>
-        <CardContent>
-          <MdaSupervisoryMap submissions={mapSubs} formName={formName} />
-        </CardContent>
-      </Card>
+      {isJigawa ? (
+        <JigawaSupervisoryMap submissions={mapSubs} formName={formName} />
+      ) : (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1"><MapPin className="h-4 w-4" />Supervision Coverage Map</CardTitle></CardHeader>
+          <CardContent>
+            <MdaSupervisoryMap submissions={mapSubs} formName={formName} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Follow-up insights */}
       <div className="grid gap-4 lg:grid-cols-3">
