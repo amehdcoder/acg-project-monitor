@@ -479,7 +479,26 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     return { completed, notCompleted, adverse };
   }, [checklist, followUps]);
 
-  if (total === 0 && followUps.length === 0) {
+  // ── Context / scope strip (read-only data summary, never misleading) ──
+  const scope = useMemo(() => {
+    const uniq = (vals: (string | null | undefined)[]) =>
+      new Set(vals.map((v) => stripTags(String(v || "")).toLowerCase()).filter(Boolean)).size;
+    const all = checklist.concat(followUps);
+    const states = uniq(all.map((s) => s.data?.state || s.state));
+    const lgas = uniq(all.map((s) => s.data?.lga || s.lga));
+    const wards = uniq(all.map((s) => s.data?.ward || s.ward));
+    const times = all.map((s) => (s.submittedAt ? new Date(s.submittedAt).getTime() : 0)).filter(Boolean);
+    const fmt = (t: number) => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    const range = times.length
+      ? `${fmt(Math.min(...times))} – ${fmt(Math.max(...times))}`
+      : "—";
+    const last = times.length
+      ? new Date(Math.max(...times)).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+      : "—";
+    return { states, lgas, wards, communities: prepared.communityCount, range, last };
+  }, [checklist, followUps, prepared.communityCount]);
+
+
     return (
       <Card>
         <CardContent className="py-12 text-center text-sm text-muted-foreground">
