@@ -183,11 +183,20 @@ const CESSurveyMap = ({
   const labelsRef = useRef<L.TileLayer | null>(null);
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
   const tapHandlerRef = useRef<((lat: number, lng: number) => void) | null>(null);
+  // Active tile config (url + native zoom + subdomains) used by the offline
+  // prefetcher to download the exact same imagery the map is currently showing.
+  const activeTileRef = useRef<{ url: string; maxNativeZoom: number; subdomains: string }>({
+    url: TILE_LAYERS.satellite.url,
+    maxNativeZoom: 19,
+    subdomains: "abc",
+  });
 
   const applyBasemap = (map: L.Map, mode: typeof basemap) => {
     if (tileRef.current) { map.removeLayer(tileRef.current); tileRef.current = null; }
     if (labelsRef.current) { map.removeLayer(labelsRef.current); labelsRef.current = null; }
     const tl = TILE_LAYERS[mode] ?? TILE_LAYERS.satellite;
+    const nativeZoom = mode === "google" || mode === "google-sat" ? 21 : 19;
+    activeTileRef.current = { url: tl.url, maxNativeZoom: nativeZoom, subdomains: tl.subdomains ?? "abc" };
     const primary = L.tileLayer(tl.url, {
       attribution: tl.attribution,
       maxZoom: 23,
