@@ -8,7 +8,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAuth } from "@/hooks/useAuth";
 import { useDataAnalytics, type SubmissionRecord } from "@/hooks/useDataAnalytics";
 import { generateMdaSimulation } from "@/lib/mda/simulation";
-import MdaAdaptiveDashboard from "./MdaAdaptiveDashboard";
 import MdaSupervisoryChecklistDashboard from "./MdaSupervisoryChecklistDashboard";
 
 interface MdaDashboardForm {
@@ -268,17 +267,12 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
             </CardContent>
           </Card>
         ) : (
-          <>
-            <MdaSupervisoryChecklistDashboard submissions={dashboardRows} questions={questions} formName={form.name} />
-            <MdaAdaptiveDashboard
-              submissions={dashboardRows}
-              questions={questions}
-              formName={form.name}
-              formId={form.id}
-              projectId={form.project_id || undefined}
-              projects={projects}
-            />
-          </>
+          <MdaSupervisoryChecklistDashboard
+            submissions={dashboardRows}
+            questions={questions}
+            formName={form.name}
+            projectName={projectName}
+          />
         )}
       </main>
     </div>

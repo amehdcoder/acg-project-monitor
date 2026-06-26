@@ -1,36 +1,42 @@
 /**
- * Integrated MDA Supervisory Checklist Dashboard
+ * Integrated MDA Supervisory Checklist Dashboard — v2 (Bloomberg-class)
  * ────────────────────────────────────────────────────────────────────────
- * A faithful, decision-support dashboard matching the approved layout.
- * Every metric is computed strictly from the REAL fields captured by the
- * Integrated MDA Supervisory Checklist + its linked follow-up modules, so as
- * submissions arrive the dashboard updates accurately and insightfully.
+ * A professional, decision-support dashboard built around the COMMUNITY
+ * CHECKLIST module as the spine, with longitudinal linkage to the three
+ * follow-up modules captured later against the same community:
+ *   • Follow-up on MDA Completion
+ *   • Follow-up on MDA Commodities / Communities
+ *   • Follow-up on Adverse Reactions
  *
- * Items the current checklist cannot compute are intentionally omitted (and
- * the user has been informed) so the dashboard never misinforms:
- *   • "of N planned" denominators (no planned-target field is captured)
- *   • "Top Halt Reasons" (only a free-text follow-up comment exists)
- *   • Commodities Yes/No tri-rows (replaced with the real "commodity
- *     previously inadequate" distribution)
- *   • Corrective-action Status/Priority (replaced with the visit Risk Category)
- *
- * The dashboard ADDS: follow-up insights and a Field Worker Submissions panel
- * (submissions per user + the distinct days they worked).
+ * Every metric is computed strictly from REAL captured fields. The dashboard
+ * adopts the visual language of the Bloomberg School Enrolment Validation
+ * Dashboard: a navy report header, tinted KPI tiles, a longitudinal funnel,
+ * follow-up outcome panels, a per-community linkage register and a coverage
+ * map — all driven by a comprehensive, professional filter bar.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  Users2, CheckCircle2, Pill, ClipboardList, AlertTriangle, Flag,
-  ShieldCheck, HeartHandshake, MapPin, CalendarClock, ListChecks,
-  TrendingUp, Activity, Ambulance, ArrowRight,
-  Clock, Wifi, Accessibility, Layers, Building2, Map as MapIcon,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  ClipboardList, CheckCircle2, Pill, AlertTriangle, Flag, Activity,
+  MapPin, CalendarClock, Users2, Search, RotateCcw, Download, Filter,
+  ArrowRight, ShieldCheck, Map as MapIcon, Building2, Layers, Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
+import {
+  getMdaFollowUpGroupName, isMdaFollowUpGroup,
+  MDA_FOLLOWUP_COMPLETION, MDA_FOLLOWUP_COMMODITIES, MDA_FOLLOWUP_ADVERSE,
+} from "@/lib/mdaFollowUp";
+import { exportMdaDashboard } from "@/lib/mda/dashboardExport";
 import MdaSupervisoryMap from "./MdaSupervisoryMap";
 import JigawaSupervisoryMap from "./JigawaSupervisoryMap";
 
@@ -51,31 +57,38 @@ interface Props {
   submissions: MdaSubmission[];
   questions: FormQuestion[];
   formName?: string;
+  projectName?: string;
 }
+
+// ───────────────────────── Palette ─────────────────────────
+const NAVY = "#0c2340";
+const BLUE = "#2563eb";
+const TEAL = "#14b8a6";
+const EMERALD = "#10b981";
+const AMBER = "#f59e0b";
+const RED = "#ef4444";
+const PINK = "#ec4899";
+const VIOLET = "#8b5cf6";
+const SLATE = "#64748b";
 
 // ───────────────────────── Helpers ─────────────────────────
 const stripTags = (s?: string) => String(s || "").replace(/<[^>]*>/g, "").trim();
 const norm = (v: any) => String(v ?? "").trim().toLowerCase();
 const POSITIVE = new Set(["yes", "true", "1", "available", "present", "good", "done", "complete", "completed", "compliant", "adequate", "trained", "passed", "okay"]);
-const toNum = (v: any): number | null => {
-  if (v === null || v === undefined || v === "") return null;
-  const n = parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
-  return Number.isFinite(n) ? n : null;
-};
 const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
+const fmt = (n: number) => n.toLocaleString();
 
-const PALETTE = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
-
-const isYesNoQuestion = (q: FormQuestion) => {
-  if (q.type !== "select_one") return false;
-  const vals = (q.options || []).map((o) => norm(o.value || o.label));
-  return vals.includes("yes") && vals.includes("no");
+const FU_LABELS: Record<string, string> = {
+  [MDA_FOLLOWUP_COMPLETION]: "Follow-up on MDA Completion",
+  [MDA_FOLLOWUP_COMMODITIES]: "Follow-up on MDA Commodities/Communities",
+  [MDA_FOLLOWUP_ADVERSE]: "Follow-up on Adverse Reactions",
+};
+const FU_TINTS: Record<string, string> = {
+  [MDA_FOLLOWUP_COMPLETION]: EMERALD,
+  [MDA_FOLLOWUP_COMMODITIES]: TEAL,
+  [MDA_FOLLOWUP_ADVERSE]: AMBER,
 };
 
-const isFollowUpGroup = (g: FormQuestion) =>
-  /follow-?up|adverse reaction management/i.test(stripTags(g.label));
-
-// Count yes/no answers for one field across submissions → {yes,total}
 function yesStat(subs: MdaSubmission[], field: string) {
   let yes = 0, total = 0;
   for (const s of subs) {
@@ -87,40 +100,48 @@ function yesStat(subs: MdaSubmission[], field: string) {
   return { yes, total, pct: pct(yes, total) };
 }
 
+function pickGeo(s: MdaSubmission, kind: "state" | "lga" | "ward" | "community"): string {
+  const d = s.data || {};
+  if (kind === "state") return stripTags(s.state || d.state || d.state_name) || "";
+  if (kind === "lga") return stripTags(s.lga || d.lga || d.LGA || d.local_government || d.local_government_area) || "";
+  if (kind === "ward") return stripTags(s.ward || d.ward || d.ward_name) || "";
+  return stripTags(d.community || d.community_name || d.settlement_name || d.settlement) || "";
+}
+
 // ───────────────────────── Small UI atoms ─────────────────────────
 function Kpi({ icon: Icon, label, value, sub, tint, bar }: {
   icon: any; label: string; value: string | number; sub?: string; tint: string; bar?: number;
 }) {
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-border/60 bg-card p-3.5 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
-      <span className="absolute inset-x-0 top-0 h-1" style={{ background: tint }} aria-hidden />
-      <div className="flex items-start gap-2.5">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: tint }}>
-          <Icon className="h-5 w-5" />
-        </span>
-        <span className="pt-0.5 text-[11px] font-semibold leading-tight text-muted-foreground">{label}</span>
+    <div
+      className="relative overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+      style={{ background: `linear-gradient(135deg, ${tint}0d, transparent 70%)` }}
+    >
+      <span className="absolute inset-y-0 left-0 w-1" style={{ background: tint }} aria-hidden />
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-medium leading-tight text-muted-foreground">{label}</span>
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: `${tint}1a`, color: tint }}>
+          <Icon className="h-4 w-4" />
+        </div>
       </div>
-      <div className="mt-2.5 font-display text-[26px] font-extrabold leading-none tracking-tight text-foreground">{value}</div>
-      {sub && <div className="mt-1 text-[11px] text-muted-foreground">{sub}</div>}
+      <p className="mt-2 font-display text-2xl font-bold tracking-tight" style={{ color: tint }}>{value}</p>
+      {sub && <p className="mt-0.5 text-[11px] text-muted-foreground">{sub}</p>}
       {typeof bar === "number" && (
-        <div className="mt-2.5 flex items-center gap-2">
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, bar)}%`, background: tint }} />
-          </div>
-          <span className="text-[10px] font-bold" style={{ color: tint }}>{bar}%</span>
+        <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, bar)}%`, background: tint }} />
         </div>
       )}
     </div>
   );
 }
 
-function Donut({ data, centerLabel, centerValue, height = 170, inner = 52, outer = 75 }: {
+function Donut({ data, centerLabel, centerValue, height = 180, inner = 56, outer = 80 }: {
   data: { name: string; value: number; color: string }[]; centerLabel?: string; centerValue?: string;
   height?: number; inner?: number; outer?: number;
 }) {
   const total = data.reduce((a, b) => a + b.value, 0);
   return (
-    <div className="relative h-full">
+    <div className="relative">
       <ResponsiveContainer width="100%" height={height}>
         <PieChart>
           <Pie data={total ? data : [{ name: "—", value: 1, color: "#e5e7eb" }]} dataKey="value" innerRadius={inner} outerRadius={outer} paddingAngle={total ? 2 : 0} stroke="none">
@@ -130,7 +151,7 @@ function Donut({ data, centerLabel, centerValue, height = 170, inner = 52, outer
         </PieChart>
       </ResponsiveContainer>
       {centerValue && (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center" style={{ height }}>
           <span className="font-display text-2xl font-bold text-foreground">{centerValue}</span>
           {centerLabel && <span className="text-[10px] text-muted-foreground">{centerLabel}</span>}
         </div>
@@ -142,99 +163,311 @@ function Donut({ data, centerLabel, centerValue, height = 170, inner = 52, outer
 function BarRow({ label, value, pctVal, color }: { label: string; value: number; pctVal: number; color: string }) {
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span className="w-40 shrink-0 truncate text-muted-foreground">{label}</span>
+      <span className="w-40 shrink-0 truncate text-muted-foreground" title={label}>{label}</span>
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
         <div className="h-full rounded-full" style={{ width: `${pctVal}%`, background: color }} />
       </div>
-      <span className="w-14 shrink-0 text-right font-semibold text-foreground">{value} ({pctVal}%)</span>
+      <span className="w-16 shrink-0 text-right font-semibold text-foreground">{value} ({pctVal}%)</span>
     </div>
   );
 }
 
+function Tag({ text, tint }: { text: string; tint: string }) {
+  return (
+    <span className="inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${tint}1a`, color: tint }}>
+      {text}
+    </span>
+  );
+}
+
+const ALL = "__all__";
+
 // ───────────────────────── Main ─────────────────────────
-export default function MdaSupervisoryChecklistDashboard({ submissions, questions, formName }: Props) {
-  const prepared = useMemo(() => prepareMdaData(submissions, questions as any), [submissions, questions]);
+export default function MdaSupervisoryChecklistDashboard({ submissions, questions, formName, projectName }: Props) {
+  // ── Filter state ──────────────────────────────────────────────
+  const [fState, setFState] = useState(ALL);
+  const [fLga, setFLga] = useState(ALL);
+  const [fWard, setFWard] = useState(ALL);
+  const [fStatus, setFStatus] = useState(ALL);
+  const [fModule, setFModule] = useState(ALL);
+  const [fFrom, setFFrom] = useState("");
+  const [fTo, setFTo] = useState("");
+  const [search, setSearch] = useState("");
+  const [exporting, setExporting] = useState(false);
+
+  // Module → question-name set (for classifying follow-up submissions).
+  const moduleQuestions = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    for (const item of questions || []) {
+      const isGroup = Array.isArray(item.questions) && !item.type;
+      if (!isGroup || !isMdaFollowUpGroup(item as any)) continue;
+      const canonical = getMdaFollowUpGroupName(item as any);
+      if (!canonical) continue;
+      const set = map[canonical] || (map[canonical] = new Set());
+      for (const q of item.questions || []) if (q?.name) set.add(q.name);
+    }
+    return map;
+  }, [questions]);
+
+  const classifyFollowUp = useMemo(() => {
+    const entries = Object.entries(moduleQuestions);
+    return (s: MdaSubmission): string | null => {
+      const keys = Object.keys(s.data || {});
+      let best: string | null = null;
+      let bestHits = 0;
+      for (const [canonical, names] of entries) {
+        const hits = keys.filter((k) => names.has(k)).length;
+        if (hits > bestHits) { bestHits = hits; best = canonical; }
+      }
+      return best;
+    };
+  }, [moduleQuestions]);
+
+  // ── Filter option lists (from full dataset, geography is cascading) ──
+  const states = useMemo(
+    () => Array.from(new Set(submissions.map((s) => pickGeo(s, "state")).filter(Boolean))).sort(),
+    [submissions],
+  );
+  const lgas = useMemo(() => {
+    const pool = fState === ALL ? submissions : submissions.filter((s) => pickGeo(s, "state") === fState);
+    return Array.from(new Set(pool.map((s) => pickGeo(s, "lga")).filter(Boolean))).sort();
+  }, [submissions, fState]);
+  const wards = useMemo(() => {
+    const pool = submissions.filter(
+      (s) => (fState === ALL || pickGeo(s, "state") === fState) && (fLga === ALL || pickGeo(s, "lga") === fLga),
+    );
+    return Array.from(new Set(pool.map((s) => pickGeo(s, "ward")).filter(Boolean))).sort();
+  }, [submissions, fState, fLga]);
+
+  // ── Apply geography / status / date / search filters to raw rows ──
+  const filtered = useMemo(() => {
+    const q = norm(search);
+    const fromTs = fFrom ? new Date(fFrom + "T00:00:00").getTime() : null;
+    const toTs = fTo ? new Date(fTo + "T23:59:59").getTime() : null;
+    return submissions.filter((s) => {
+      if (fState !== ALL && pickGeo(s, "state") !== fState) return false;
+      if (fLga !== ALL && pickGeo(s, "lga") !== fLga) return false;
+      if (fWard !== ALL && pickGeo(s, "ward") !== fWard) return false;
+      if (fStatus !== ALL && norm(s.status) !== fStatus) return false;
+      if (fromTs || toTs) {
+        const t = s.submittedAt ? new Date(s.submittedAt).getTime() : null;
+        if (t === null) return false;
+        if (fromTs && t < fromTs) return false;
+        if (toTs && t > toTs) return false;
+      }
+      if (q) {
+        const hay = [
+          pickGeo(s, "community"), pickGeo(s, "ward"), pickGeo(s, "lga"), pickGeo(s, "state"),
+          stripTags(s.submitter || s.data?.supervisor_name),
+        ].join(" ").toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [submissions, fState, fLga, fWard, fStatus, fFrom, fTo, search]);
+
+  const prepared = useMemo(() => prepareMdaData(filtered, questions as any), [filtered, questions]);
   const checklist = prepared.checklist;
   const followUps = prepared.followUps;
   const total = checklist.length;
 
-  // Sections (non follow-up groups with yes/no questions) → average compliance
-  const sectionPerf = useMemo(() => {
-    const rows: { label: string; pct: number }[] = [];
-    for (const item of questions || []) {
-      const isGroup = Array.isArray(item.questions) && !item.type;
-      if (!isGroup || isFollowUpGroup(item)) continue;
-      const yn = (item.questions || []).filter(isYesNoQuestion);
-      if (!yn.length) continue;
-      let yes = 0, tot = 0;
-      for (const q of yn) {
-        const st = yesStat(checklist, q.name || q.id);
-        yes += st.yes; tot += st.total;
-      }
-      if (tot > 0) rows.push({ label: stripTags(item.label), pct: pct(yes, tot) });
+  const filtersActive =
+    fState !== ALL || fLga !== ALL || fWard !== ALL || fStatus !== ALL || fModule !== ALL || !!fFrom || !!fTo || !!search;
+  const resetFilters = () => {
+    setFState(ALL); setFLga(ALL); setFWard(ALL); setFStatus(ALL); setFModule(ALL);
+    setFFrom(""); setFTo(""); setSearch("");
+  };
+
+  // ── Follow-ups grouped by community + module ──────────────────
+  const fuByCommunity = useMemo(() => {
+    const map = new Map<string, Map<string, MdaSubmission[]>>();
+    for (const fu of followUps) {
+      const canonical = classifyFollowUp(fu) || "other";
+      const ck = communityKey(fu as any);
+      const inner = map.get(ck) || new Map<string, MdaSubmission[]>();
+      const arr = inner.get(canonical) || [];
+      arr.push(fu);
+      inner.set(canonical, arr);
+      map.set(ck, inner);
     }
-    return rows;
-  }, [questions, checklist]);
+    // newest first within each module
+    for (const inner of map.values())
+      for (const arr of inner.values())
+        arr.sort((a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime());
+    return map;
+  }, [followUps, classifyFollowUp]);
 
-  const avgSectionCompliance = sectionPerf.length
-    ? Math.round(sectionPerf.reduce((a, b) => a + b.pct, 0) / sectionPerf.length) : 0;
+  // ── Distinct communities supervised + funnel ──────────────────
+  const primaryByCom = useMemo(() => {
+    const m = new Map<string, MdaSubmission>();
+    for (const s of checklist) {
+      const k = communityKey(s as any);
+      const prev = m.get(k);
+      if (!prev || new Date(s.submittedAt || 0) > new Date(prev.submittedAt || 0)) m.set(k, s);
+    }
+    return m;
+  }, [checklist]);
 
-  // KPIs ----------------------------------------------------
-  const registers = useMemo(() => yesStat(checklist, "registers_available"), [checklist]);
-  const medicine = useMemo(() => yesStat(checklist, "commodities_available"), [checklist]);
-  const inclusion = useMemo(() => yesStat(checklist, "gender_inclusion"), [checklist]);
+  const moduleCoverage = (canonical: string) => {
+    let n = 0;
+    for (const k of primaryByCom.keys()) if (fuByCommunity.get(k)?.has(canonical)) n++;
+    return n;
+  };
+  const communitiesSupervised = primaryByCom.size;
+  const covCompletion = useMemo(() => moduleCoverage(MDA_FOLLOWUP_COMPLETION), [primaryByCom, fuByCommunity]);
+  const covCommodities = useMemo(() => moduleCoverage(MDA_FOLLOWUP_COMMODITIES), [primaryByCom, fuByCommunity]);
+  const covAdverse = useMemo(() => moduleCoverage(MDA_FOLLOWUP_ADVERSE), [primaryByCom, fuByCommunity]);
+
+  const funnel = [
+    { label: "Community Checklist", icon: ClipboardList, value: communitiesSupervised, base: communitiesSupervised, tint: BLUE },
+    { label: "MDA Completion follow-up", icon: CheckCircle2, value: covCompletion, base: communitiesSupervised, tint: EMERALD },
+    { label: "Commodities follow-up", icon: Pill, value: covCommodities, base: communitiesSupervised, tint: TEAL },
+    { label: "Adverse Reaction follow-up", icon: AlertTriangle, value: covAdverse, base: communitiesSupervised, tint: AMBER },
+  ];
+
+  // ── KPIs ──────────────────────────────────────────────────────
   const mdaCompleted = useMemo(() => {
     let done = 0, tot = 0;
     for (const s of checklist) {
       const v = s.data?.status_of_mda;
       if (v === undefined || v === null || v === "") continue;
-      tot++;
-      if (norm(v) === "completed") done++;
+      tot++; if (norm(v) === "completed") done++;
     }
     return { done, tot, pct: pct(done, tot) };
   }, [checklist]);
-  const redFlags = useMemo(
-    () => checklist.filter((s) => norm(s.data?.risk_category) === "high").length,
-    [checklist],
-  );
-  const aeFollowedUp = useMemo(() => {
-    const managed = followUps.filter((s) => POSITIVE.has(norm(s.data?.ae_been_managed))).length;
-    const withAe = followUps.filter((s) => s.data?.adverse_reaction_type).length;
-    return { managed, withAe, pct: pct(managed, withAe) };
-  }, [followUps]);
+  const medicine = useMemo(() => yesStat(checklist, "commodities_available"), [checklist]);
+  const redFlags = useMemo(() => checklist.filter((s) => norm(s.data?.risk_category) === "high").length, [checklist]);
+  const aeManaged = useMemo(() => yesStat(followUps, "ae_been_managed"), [followUps]);
 
-  // Checklist completion (by submission status) -------------
-  const completion = useMemo(() => {
-    let completed = 0, inProgress = 0, notStarted = 0;
-    for (const s of checklist) {
-      const st = norm(s.status);
-      if (st === "finalized" || st === "sent") completed++;
-      else if (st === "draft") inProgress++;
-      else notStarted++;
+  // ── Follow-up outcome distributions ───────────────────────────
+  const completionFus = followUps.filter((s) => classifyFollowUp(s) === MDA_FOLLOWUP_COMPLETION);
+  const commoditiesFus = followUps.filter((s) => classifyFollowUp(s) === MDA_FOLLOWUP_COMMODITIES);
+  const adverseFus = followUps.filter((s) => classifyFollowUp(s) === MDA_FOLLOWUP_ADVERSE);
+
+  const mdaStatusDist = useMemo(() => {
+    const order = ["Not Started", "Ongoing", "Halted", "Completed"];
+    const colors: Record<string, string> = { "Not Started": SLATE, Ongoing: BLUE, Halted: RED, Completed: EMERALD };
+    const counts = new Map<string, number>();
+    for (const s of completionFus) {
+      const v = s.data?.status_of_mda;
+      if (!v) continue;
+      const lbl = order.find((o) => norm(o) === norm(v)) || stripTags(String(v));
+      counts.set(lbl, (counts.get(lbl) || 0) + 1);
     }
-    return { completed, inProgress, notStarted };
-  }, [checklist]);
-  const completionPct = pct(completion.completed, total);
+    return order.filter((o) => counts.has(o)).map((o) => ({ name: o, value: counts.get(o) || 0, color: colors[o] || SLATE }));
+  }, [completionFus]);
+  const mdaStatusTotal = mdaStatusDist.reduce((a, b) => a + b.value, 0);
+  const mdaCompletedFu = mdaStatusDist.find((d) => d.name === "Completed")?.value || 0;
 
-  // Supervision status trend (last 7 days) -----------------
+  const commodityDist = useMemo(() => {
+    const counts = new Map<string, number>();
+    let tot = 0;
+    for (const s of commoditiesFus) {
+      const v = s.data?.commodity_inadequate;
+      if (!v) continue;
+      const arr = Array.isArray(v) ? v : String(v).split(/\s+/);
+      for (const item of arr) {
+        const lbl = stripTags(String(item)).replace(/_/g, " ");
+        if (!lbl) continue;
+        counts.set(lbl, (counts.get(lbl) || 0) + 1); tot++;
+      }
+    }
+    return [...counts.entries()].map(([name, value], i) => ({ name, value, pct: pct(value, tot), color: [TEAL, BLUE, AMBER, RED, VIOLET, PINK][i % 6] })).sort((a, b) => b.value - a.value);
+  }, [commoditiesFus]);
+
+  const aeTypes = useMemo(() => {
+    const counts = new Map<string, number>();
+    let tot = 0;
+    for (const s of adverseFus) {
+      const v = s.data?.adverse_reaction_type;
+      if (!v) continue;
+      const arr = Array.isArray(v) ? v : String(v).split(/\s+/);
+      for (const item of arr) {
+        const lbl = stripTags(String(item)).replace(/_/g, " ");
+        if (!lbl) continue;
+        counts.set(lbl, (counts.get(lbl) || 0) + 1); tot++;
+      }
+    }
+    return [...counts.entries()].map(([name, value], i) => ({ name, value, pct: pct(value, tot), color: [AMBER, RED, VIOLET, PINK, BLUE, TEAL][i % 6] })).sort((a, b) => b.value - a.value);
+  }, [adverseFus]);
+  const aeOkay = useMemo(() => yesStat(adverseFus, "ae_person_okay"), [adverseFus]);
+
+  // ── Trend (last 14 days) ──────────────────────────────────────
   const trend = useMemo(() => {
-    const days: { date: string; key: string; completed: number; inProgress: number }[] = [];
-    for (let i = 6; i >= 0; i--) {
+    const days: { date: string; key: string; checklist: number; followups: number }[] = [];
+    for (let i = 13; i >= 0; i--) {
       const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
-      days.push({ date: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }), key: d.toISOString().slice(0, 10), completed: 0, inProgress: 0 });
+      days.push({ date: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }), key: d.toISOString().slice(0, 10), checklist: 0, followups: 0 });
     }
     const idx = new Map(days.map((d) => [d.key, d]));
     for (const s of checklist) {
-      if (!s.submittedAt) continue;
-      const k = new Date(s.submittedAt).toISOString().slice(0, 10);
-      const row = idx.get(k);
-      if (!row) continue;
-      if (norm(s.status) === "draft") row.inProgress++; else row.completed++;
+      const k = s.submittedAt ? new Date(s.submittedAt).toISOString().slice(0, 10) : null;
+      const row = k && idx.get(k); if (row) row.checklist++;
+    }
+    for (const s of followUps) {
+      const k = s.submittedAt ? new Date(s.submittedAt).toISOString().slice(0, 10) : null;
+      const row = k && idx.get(k); if (row) row.followups++;
     }
     return days;
-  }, [checklist]);
+  }, [checklist, followUps]);
 
-  // Map submissions ----------------------------------------
+  // ── Longitudinal linkage register ─────────────────────────────
+  const linkage = useMemo(() => {
+    const statusLabel = (v: any) => {
+      const map: Record<string, string> = { "not started": "Not Started", ongoing: "Ongoing", halted: "Halted", completed: "Completed" };
+      return v ? map[norm(v)] || stripTags(String(v)) : "";
+    };
+    const rows = [...primaryByCom.entries()].map(([ck, s]) => {
+      const inner = fuByCommunity.get(ck);
+      const completionSub = inner?.get(MDA_FOLLOWUP_COMPLETION)?.[0];
+      const commoditySub = inner?.get(MDA_FOLLOWUP_COMMODITIES)?.[0];
+      const adverseSub = inner?.get(MDA_FOLLOWUP_ADVERSE)?.[0];
+      const mdaStatus = statusLabel(completionSub?.data?.status_of_mda ?? s.data?.status_of_mda);
+      return {
+        id: s.id,
+        community: pickGeo(s, "community") || "Unspecified",
+        ward: pickGeo(s, "ward") || "—",
+        lga: pickGeo(s, "lga") || "—",
+        state: pickGeo(s, "state") || "—",
+        supervisor: stripTags(s.submitter || s.data?.supervisor_name) || "—",
+        visitDate: s.submittedAt ? new Date(s.submittedAt).toLocaleDateString() : "—",
+        visitTs: s.submittedAt ? new Date(s.submittedAt).getTime() : 0,
+        risk: stripTags(s.data?.risk_category) || "",
+        mdaStatus,
+        hasCompletion: !!completionSub,
+        hasCommodities: !!commoditySub,
+        hasAdverse: !!adverseSub,
+        commodityIssue: commoditySub ? !POSITIVE.has(norm(commoditySub.data?.commodities_available ?? "yes")) || !!commoditySub.data?.commodity_inadequate : false,
+        adverseManaged: adverseSub ? POSITIVE.has(norm(adverseSub.data?.ae_been_managed)) : null,
+      };
+    });
+    rows.sort((a, b) => b.visitTs - a.visitTs);
+    // Apply module filter to the register.
+    if (fModule === MDA_FOLLOWUP_COMPLETION) return rows.filter((r) => r.hasCompletion);
+    if (fModule === MDA_FOLLOWUP_COMMODITIES) return rows.filter((r) => r.hasCommodities);
+    if (fModule === MDA_FOLLOWUP_ADVERSE) return rows.filter((r) => r.hasAdverse);
+    return rows;
+  }, [primaryByCom, fuByCommunity, fModule]);
+
+  // ── Field worker accountability ───────────────────────────────
+  const workers = useMemo(() => {
+    const map = new Map<string, { name: string; subs: number; days: Set<string>; last: number }>();
+    for (const s of checklist.concat(followUps)) {
+      const name = stripTags(s.submitter || s.data?.supervisor_name) || "Unknown";
+      const rec = map.get(name) || { name, subs: 0, days: new Set<string>(), last: 0 };
+      rec.subs++;
+      if (s.submittedAt) {
+        rec.days.add(new Date(s.submittedAt).toISOString().slice(0, 10));
+        rec.last = Math.max(rec.last, new Date(s.submittedAt).getTime());
+      }
+      map.set(name, rec);
+    }
+    return [...map.values()]
+      .map((r) => ({ name: r.name, subs: r.subs, days: r.days.size, last: r.last ? new Date(r.last).toLocaleDateString() : "—" }))
+      .sort((a, b) => b.subs - a.subs).slice(0, 12);
+  }, [checklist, followUps]);
+
+  // ── Map ───────────────────────────────────────────────────────
   const mapSubs = useMemo(
     () => checklist.map((s) => ({
       id: s.id, state: s.state, lga: s.lga, submitter: s.submitter,
@@ -250,256 +483,28 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     })),
     [checklist],
   );
-
-  // Detect a Jigawa-scoped checklist so we can show the LGA-level Jigawa map.
   const isJigawa = useMemo(() => {
-    const norm2 = (v: any) => String(v ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const n2 = (v: any) => String(v ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
     if (/jigawa/i.test(formName || "")) return true;
-    const jig = checklist.filter((s) => norm2(s.state) === "jigawa").length;
+    const jig = checklist.filter((s) => n2(pickGeo(s, "state")) === "jigawa").length;
     return jig > 0 && jig >= checklist.length * 0.6;
   }, [checklist, formName]);
 
-  // Follow-up: MDA Completion status distribution ----------
-  const mdaStatusDist = useMemo(() => {
-    const order = ["Not Started", "Ongoing", "Halted", "Completed"];
-    const colors: Record<string, string> = { "Not Started": "#94a3b8", Ongoing: "#3b82f6", Halted: "#ef4444", Completed: "#10b981" };
-    const counts = new Map<string, number>();
-    for (const s of followUps) {
-      const v = s.data?.status_of_mda;
-      if (!v) continue;
-      const lbl = order.find((o) => norm(o) === norm(v)) || String(v);
-      counts.set(lbl, (counts.get(lbl) || 0) + 1);
+  // ── Export ────────────────────────────────────────────────────
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await exportMdaDashboard(filtered as any, questions as any, formName || "Integrated MDA Supervisory Checklist", projectName);
+      toast.success("Dashboard exported to Excel");
+    } catch (e: any) {
+      toast.error(e?.message || "Could not export dashboard");
+    } finally {
+      setExporting(false);
     }
-    return order.filter((o) => counts.has(o)).map((o) => ({ name: o, value: counts.get(o) || 0, color: colors[o] || "#64748b" }));
-  }, [followUps]);
-  const mdaStatusTotal = mdaStatusDist.reduce((a, b) => a + b.value, 0);
-  const mdaCompletedFu = mdaStatusDist.find((d) => d.name === "Completed")?.value || 0;
+  };
 
-  // Follow-up: Commodity previously inadequate -------------
-  const commodityDist = useMemo(() => {
-    const counts = new Map<string, number>();
-    let tot = 0;
-    for (const s of followUps) {
-      const v = s.data?.commodity_inadequate;
-      if (!v) continue;
-      const arr = Array.isArray(v) ? v : String(v).split(/\s+/);
-      for (const item of arr) {
-        const lbl = stripTags(String(item)).replace(/_/g, " ");
-        counts.set(lbl, (counts.get(lbl) || 0) + 1);
-        tot++;
-      }
-    }
-    return [...counts.entries()].map(([name, value]) => ({ name, value, pct: pct(value, tot) })).sort((a, b) => b.value - a.value);
-  }, [followUps]);
-
-  // Follow-up: Adverse reaction types / management ---------
-  const aeTypes = useMemo(() => {
-    const counts = new Map<string, number>();
-    let tot = 0;
-    for (const s of followUps) {
-      const v = s.data?.adverse_reaction_type;
-      if (!v) continue;
-      const arr = Array.isArray(v) ? v : String(v).split(/\s+/);
-      for (const item of arr) {
-        const lbl = stripTags(String(item)).replace(/_/g, " ");
-        counts.set(lbl, (counts.get(lbl) || 0) + 1);
-        tot++;
-      }
-    }
-    return [...counts.entries()].map(([name, value], i) => ({ name, value, pct: pct(value, tot), color: PALETTE[i % PALETTE.length] })).sort((a, b) => b.value - a.value);
-  }, [followUps]);
-  const aeManaged = useMemo(() => yesStat(followUps, "ae_been_managed"), [followUps]);
-  const aeOkay = useMemo(() => yesStat(followUps, "ae_person_okay"), [followUps]);
-
-  // Community engagement (available fields only) -----------
-  const engagement = useMemo(() => [
-    { label: "Town announcer / crier used", ...yesStat(checklist, "town_announcer_used") },
-    { label: "Community leaders involved", ...yesStat(checklist, "community_leaders_involved") },
-    { label: "Both sexes equitably reached", ...yesStat(checklist, "gender_inclusion") },
-  ].filter((r) => r.total > 0), [checklist]);
-  const engagementScore = engagement.length ? Math.round(engagement.reduce((a, b) => a + b.pct, 0) / engagement.length) : 0;
-
-  // Cross-cutting checks (available fields only) -----------
-  const crossCutting = useMemo(() => [
-    { label: "Both sexes equitably reached", ...yesStat(checklist, "gender_inclusion") },
-    { label: "PWD / elderly considered", ...yesStat(checklist, "pwd_considered") },
-    { label: "Proper waste disposal", ...yesStat(checklist, "waste_disposal_proper") },
-  ].filter((r) => r.total > 0), [checklist]);
-  const crossScore = crossCutting.length ? Math.round(crossCutting.reduce((a, b) => a + b.pct, 0) / crossCutting.length) : 0;
-
-  // Data quality (completeness of required-ish fields) -----
-  const dataQuality = useMemo(() => {
-    const requiredFields = ["supervisor_name", "state", "lga", "ward", "community", "geolocation", "registers_available", "implementation_score", "risk_category"];
-    let filled = 0, slots = 0;
-    for (const s of checklist) {
-      for (const f of requiredFields) {
-        slots++;
-        const v = s.data?.[f] ?? (s as any)[f];
-        if (v !== undefined && v !== null && String(v).trim() !== "") filled++;
-      }
-    }
-    return pct(filled, slots);
-  }, [checklist]);
-
-  // Corrective actions tracker -----------------------------
-  const corrective = useMemo(() =>
-    checklist
-      .filter((s) => stripTags(s.data?.issues_identified) || stripTags(s.data?.corrective_actions))
-      .map((s) => ({
-        id: s.id,
-        issue: stripTags(s.data?.issues_identified) || stripTags(s.data?.corrective_actions),
-        person: stripTags(s.data?.responsible_person) || "—",
-        deadline: s.data?.action_deadline ? new Date(s.data.action_deadline).toLocaleDateString() : "—",
-        risk: stripTags(s.data?.risk_category) || "—",
-        community: stripTags(s.data?.community) || s.lga || "—",
-      }))
-      .slice(0, 12),
-    [checklist],
-  );
-
-  // Field worker submissions & days worked -----------------
-  const workers = useMemo(() => {
-    const map = new Map<string, { name: string; subs: number; days: Set<string>; last: number }>();
-    for (const s of checklist.concat(followUps)) {
-      const name = stripTags(s.submitter || s.data?.supervisor_name) || "Unknown";
-      const rec = map.get(name) || { name, subs: 0, days: new Set<string>(), last: 0 };
-      rec.subs++;
-      if (s.submittedAt) {
-        rec.days.add(new Date(s.submittedAt).toISOString().slice(0, 10));
-        rec.last = Math.max(rec.last, new Date(s.submittedAt).getTime());
-      }
-      map.set(name, rec);
-    }
-    return [...map.values()]
-      .map((r) => ({ name: r.name, subs: r.subs, days: r.days.size, last: r.last ? new Date(r.last).toLocaleDateString() : "—" }))
-      .sort((a, b) => b.subs - a.subs);
-  }, [checklist, followUps]);
-
-  // ── Community-level status & adverse-reaction tables ──────────────
-  const communityTables = useMemo(() => {
-    const STATUS: Record<string, string> = {
-      "not started": "Not Started", ongoing: "Ongoing", halted: "Halted", completed: "Completed",
-    };
-    const statusLabel = (v: any) => (v ? STATUS[norm(v)] || stripTags(String(v)) : "");
-    const comLabel = (s?: MdaSubmission) => {
-      const d = s?.data || {};
-      const community = stripTags(d.community || d.community_name || d.settlement_name || d.settlement) || "Unspecified";
-      const ward = stripTags(d.ward || d.ward_name) || (s?.ward ?? "") || "—";
-      const lga = stripTags(d.lga || d.LGA || d.local_government) || (s?.lga ?? "") || "—";
-      const state = stripTags(d.state) || (s?.state ?? "") || "—";
-      const flhf = stripTags(d.flhf_name || d.flhf) || "";
-      const supervisor = stripTags(s?.submitter || d.supervisor_name) || "—";
-      return { community, ward, lga, state, flhf, supervisor };
-    };
-
-    // latest primary checklist visit per community
-    const primaryByCom = new Map<string, MdaSubmission>();
-    for (const s of checklist) {
-      const k = communityKey(s as any);
-      const prev = primaryByCom.get(k);
-      if (!prev || new Date(s.submittedAt || 0) > new Date(prev.submittedAt || 0)) primaryByCom.set(k, s);
-    }
-    // follow-ups per community, oldest → newest
-    const fuByCom = new Map<string, MdaSubmission[]>();
-    for (const s of followUps) {
-      const k = communityKey(s as any);
-      if (!fuByCom.has(k)) fuByCom.set(k, []);
-      fuByCom.get(k)!.push(s);
-    }
-    for (const arr of fuByCom.values()) {
-      arr.sort((a, b) => new Date(a.submittedAt || 0).getTime() - new Date(b.submittedAt || 0).getTime());
-    }
-
-    const completed: any[] = [];
-    const notCompleted: any[] = [];
-    const adverse: any[] = [];
-
-    for (const k of new Set([...primaryByCom.keys(), ...fuByCom.keys()])) {
-      const primary = primaryByCom.get(k);
-      const fus = fuByCom.get(k) || [];
-      const loc = comLabel(primary || fus[fus.length - 1]);
-
-      // ---- MDA status history (driven by follow-up submissions) ----
-      const statusFus = fus.filter((f) => f.data?.status_of_mda);
-      const firstStatus = statusFus.length ? statusLabel(statusFus[0].data!.status_of_mda) : "";
-      const latestStatus = statusFus.length
-        ? statusLabel(statusFus[statusFus.length - 1].data!.status_of_mda)
-        : statusLabel(primary?.data?.status_of_mda);
-      const hadFollowup = statusFus.length > 0;
-      const statusChanged = !!firstStatus && !!latestStatus && firstStatus !== latestStatus;
-      const lastFu = statusFus.length ? statusFus[statusFus.length - 1].submittedAt : null;
-
-      if (latestStatus === "Completed") {
-        completed.push({
-          key: k, ...loc,
-          afterFollowup: hadFollowup && statusChanged && firstStatus !== "Completed",
-          fromStatus: firstStatus, hadFollowup,
-          followups: statusFus.length, lastFu,
-        });
-      } else if (latestStatus === "Not Started" || latestStatus === "Ongoing" || latestStatus === "Halted") {
-        notCompleted.push({
-          key: k, ...loc, status: latestStatus,
-          changed: statusChanged, fromStatus: firstStatus, hadFollowup,
-          followups: statusFus.length, lastFu,
-        });
-      }
-
-      // ---- Adverse reactions ----
-      const aesReported = toNum(primary?.data?.aes_reported) || 0;
-      const seriousAes = toNum(primary?.data?.serious_aes) || 0;
-      const reactionTypes = new Set<string>();
-      for (const f of fus) {
-        const v = f.data?.adverse_reaction_type;
-        if (!v) continue;
-        const arr = Array.isArray(v) ? v : String(v).split(/\s+/);
-        for (const it of arr) { const lbl = stripTags(String(it)).replace(/_/g, " "); if (lbl) reactionTypes.add(lbl); }
-      }
-      const hasReaction = aesReported > 0 || seriousAes > 0 || reactionTypes.size > 0;
-      if (hasReaction) {
-        const referralRaw = primary?.data?.referral_done;
-        const referral = referralRaw ? stripTags(String(referralRaw)) : "";
-        const aeFus = fus.filter((f) => f.data?.adverse_reaction_type || f.data?.ae_been_managed);
-        const followedUp = aeFus.length > 0;
-        const lastAeFu = followedUp ? aeFus[aeFus.length - 1] : null;
-        const managed = lastAeFu ? POSITIVE.has(norm(lastAeFu.data?.ae_been_managed)) : false;
-        const okayNow = lastAeFu ? POSITIVE.has(norm(lastAeFu.data?.ae_person_okay)) : false;
-        adverse.push({
-          key: k, ...loc,
-          aes: aesReported, serious: seriousAes,
-          types: [...reactionTypes],
-          referral, referred: norm(referral) === "yes",
-          followedUp, managed, okayNow,
-          lastAeFu: lastAeFu?.submittedAt || null,
-        });
-      }
-    }
-
-    completed.sort((a, b) => (b.lastFu ? new Date(b.lastFu).getTime() : 0) - (a.lastFu ? new Date(a.lastFu).getTime() : 0));
-    notCompleted.sort((a, b) => (a.status === "Halted" ? -1 : 0) - (b.status === "Halted" ? -1 : 0));
-    adverse.sort((a, b) => (b.serious + b.aes) - (a.serious + a.aes));
-    return { completed, notCompleted, adverse };
-  }, [checklist, followUps]);
-
-  // ── Context / scope strip (read-only data summary, never misleading) ──
-  const scope = useMemo(() => {
-    const uniq = (vals: (string | null | undefined)[]) =>
-      new Set(vals.map((v) => stripTags(String(v || "")).toLowerCase()).filter(Boolean)).size;
-    const all = checklist.concat(followUps);
-    const states = uniq(all.map((s) => s.data?.state || s.state));
-    const lgas = uniq(all.map((s) => s.data?.lga || s.lga));
-    const wards = uniq(all.map((s) => s.data?.ward || s.ward));
-    const times = all.map((s) => (s.submittedAt ? new Date(s.submittedAt).getTime() : 0)).filter(Boolean);
-    const fmt = (t: number) => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-    const range = times.length
-      ? `${fmt(Math.min(...times))} – ${fmt(Math.max(...times))}`
-      : "—";
-    const last = times.length
-      ? new Date(Math.max(...times)).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
-      : "—";
-    return { states, lgas, wards, communities: prepared.communityCount, range, last };
-  }, [checklist, followUps, prepared.communityCount]);
-
-  if (total === 0 && followUps.length === 0) {
+  // ── Empty state ───────────────────────────────────────────────
+  if (submissions.length === 0) {
     return (
       <Card>
         <CardContent className="py-12 text-center text-sm text-muted-foreground">
@@ -509,136 +514,160 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     );
   }
 
+  const completionCovPct = pct(covCompletion, communitiesSupervised);
+
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-r from-card via-card to-primary/5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5">
+      {/* ── Navy report header ── */}
+      <div className="overflow-hidden rounded-2xl text-white shadow-sm" style={{ background: `linear-gradient(160deg, ${NAVY}, #163a63)` }}>
+        <div className="flex flex-wrap items-start justify-between gap-4 p-5">
           <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <ShieldCheck className="h-6 w-6" />
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10">
+              <ShieldCheck className="h-7 w-7" />
             </span>
             <div className="min-w-0">
-              <h2 className="font-display text-lg font-bold tracking-tight text-foreground sm:text-xl">Integrated MDA Supervisory Checklist Dashboard</h2>
-              <p className="text-xs text-muted-foreground">Real-time monitoring &amp; supervision intelligence for integrated MDA activities</p>
+              <h2 className="font-display text-xl font-bold tracking-tight">Integrated MDA Supervisory Dashboard</h2>
+              <p className="text-sm text-white/70">Community Checklist with longitudinal follow-up linkage · {formName || "MDA Supervisory Checklist"}</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="gap-1.5 bg-background/60"><Clock className="h-3 w-3 text-muted-foreground" />Updated {scope.last}</Badge>
-            <Badge variant="outline" className="gap-1.5 bg-emerald-500/10 text-emerald-700 border-emerald-500/40"><Wifi className="h-3 w-3" />Online</Badge>
-            <Badge variant="outline" className="gap-1.5 bg-sky-500/10 text-sky-700 border-sky-500/40"><Accessibility className="h-3 w-3" />Inclusive</Badge>
-            <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/70 py-1 pl-1 pr-3">
-              <div className="relative h-11 w-11">
-                <Donut height={44} inner={15} outer={21} data={[{ name: "Done", value: completionPct, color: "#10b981" }, { name: "Rest", value: 100 - completionPct, color: "#e5e7eb" }]} />
-                <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[11px] font-bold text-foreground">{completionPct}%</span>
-              </div>
-              <div className="leading-tight">
-                <div className="text-[11px] font-semibold text-foreground">Checklist</div>
-                <div className="text-[11px] text-muted-foreground">Completion</div>
-              </div>
-            </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={handleExport} disabled={exporting} className="h-9 border-0 bg-white/15 text-white hover:bg-white/25">
+              {exporting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}
+              Export Excel
+            </Button>
           </div>
         </div>
-
-        {/* Context / scope strip */}
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border/60 bg-muted/40 px-4 py-2.5 text-[11px] sm:px-5">
+        {/* Scope strip */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/10 bg-black/10 px-5 py-2.5 text-[11px] text-white/80">
           {[
-            { icon: MapIcon, label: "States", value: scope.states },
-            { icon: Building2, label: "LGAs", value: scope.lgas },
-            { icon: Layers, label: "Wards", value: scope.wards },
-            { icon: MapPin, label: "Communities", value: scope.communities },
-            { icon: ClipboardList, label: "Total visits", value: total },
+            { icon: MapIcon, label: "States", value: states.length },
+            { icon: Building2, label: "LGAs", value: lgas.length },
+            { icon: Layers, label: "Wards", value: wards.length },
+            { icon: MapPin, label: "Communities", value: communitiesSupervised },
+            { icon: ClipboardList, label: "Checklist visits", value: total },
+            { icon: Activity, label: "Follow-ups", value: followUps.length },
           ].map((c) => (
-            <span key={c.label} className="flex items-center gap-1.5 text-muted-foreground">
-              <c.icon className="h-3.5 w-3.5 text-primary" />
-              <span className="font-semibold text-foreground">{c.value}</span> {c.label}
+            <span key={c.label} className="flex items-center gap-1.5">
+              <c.icon className="h-3.5 w-3.5 text-white/60" />
+              <span className="font-semibold text-white">{fmt(c.value)}</span> {c.label}
             </span>
           ))}
-          <span className="flex items-center gap-1.5 text-muted-foreground">
-            <CalendarClock className="h-3.5 w-3.5 text-primary" />
-            <span className="font-semibold text-foreground">{scope.range}</span>
+          <span className="ml-auto flex items-center gap-1.5">
+            <CalendarClock className="h-3.5 w-3.5 text-white/60" /> Generated {new Date().toLocaleString()}
           </span>
         </div>
       </div>
 
-      {/* Top KPI row */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
-        <Kpi icon={ClipboardList} label="Supervision Visits Completed" value={total} sub={`${prepared.communityCount} communities`} tint="#3b82f6" />
-        <Kpi icon={CheckCircle2} label="Sites with MDA Completed" value={mdaCompleted.done} sub={`of ${mdaCompleted.tot} reported`} tint="#10b981" bar={mdaCompleted.pct} />
-        <Kpi icon={Pill} label="Sites with Sufficient Medicine" value={medicine.yes} sub={`of ${medicine.total} answered`} tint="#06b6d4" bar={medicine.pct} />
-        <Kpi icon={ListChecks} label="Sites with Registers Available" value={registers.yes} sub={`of ${registers.total} answered`} tint="#8b5cf6" bar={registers.pct} />
-        <Kpi icon={AlertTriangle} label="Adverse Reaction Cases Followed up" value={aeFollowedUp.managed} sub={`of ${aeFollowedUp.withAe} cases`} tint="#f59e0b" bar={aeFollowedUp.pct} />
-        <Kpi icon={Flag} label="Red-flag Sites" value={redFlags} sub="high-risk visits" tint="#ef4444" />
-        <Kpi icon={ShieldCheck} label="Section Compliance (avg.)" value={`${avgSectionCompliance}%`} sub="across sections" tint="#3b82f6" bar={avgSectionCompliance} />
-      </div>
-
-      {/* Section perf + completion + trend */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Section Performance <span className="font-normal text-muted-foreground">(avg compliance %)</span></CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {sectionPerf.length ? sectionPerf.map((r, i) => (
-              <div key={i} className="flex items-center gap-2 text-xs">
-                <span className="w-44 shrink-0 truncate text-muted-foreground">{r.label}</span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full rounded-full" style={{ width: `${r.pct}%`, background: r.pct >= 80 ? "#10b981" : r.pct >= 60 ? "#f59e0b" : "#ef4444" }} />
-                </div>
-                <span className="w-10 shrink-0 text-right font-semibold text-foreground">{r.pct}%</span>
-              </div>
-            )) : <p className="py-6 text-center text-xs text-muted-foreground">No yes/no section questions answered yet.</p>}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Checklist Completion Score</CardTitle></CardHeader>
-          <CardContent>
-            <Donut centerValue={`${completionPct}%`} centerLabel="Completed" data={[
-              { name: "Completed", value: completion.completed, color: "#10b981" },
-              { name: "In Progress", value: completion.inProgress, color: "#3b82f6" },
-              { name: "Not Started", value: completion.notStarted, color: "#ef4444" },
-            ]} />
-            <div className="mt-2 space-y-1 text-xs">
-              <div className="flex items-center justify-between"><span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" />Completed</span><span className="font-semibold">{completion.completed}</span></div>
-              <div className="flex items-center justify-between"><span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500" />In Progress</span><span className="font-semibold">{completion.inProgress}</span></div>
-              <div className="flex items-center justify-between"><span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" />Not Started</span><span className="font-semibold">{completion.notStarted}</span></div>
+      {/* ── Filter bar ── */}
+      <Card>
+        <CardContent className="p-3">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-foreground">
+            <Filter className="h-3.5 w-3.5 text-primary" /> Filters
+            {filtersActive && (
+              <Button variant="ghost" size="sm" className="ml-auto h-7 px-2 text-xs" onClick={resetFilters}>
+                <RotateCcw className="mr-1 h-3 w-3" /> Clear
+              </Button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
+            <Select value={fState} onValueChange={(v) => { setFState(v); setFLga(ALL); setFWard(ALL); }}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="State" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All states</SelectItem>
+                {states.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={fLga} onValueChange={(v) => { setFLga(v); setFWard(ALL); }}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="LGA" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All LGAs</SelectItem>
+                {lgas.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={fWard} onValueChange={setFWard}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Ward" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All wards</SelectItem>
+                {wards.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={fStatus} onValueChange={setFStatus}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>Any status</SelectItem>
+                <SelectItem value="sent">Submitted</SelectItem>
+                <SelectItem value="finalized">Finalized</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={fModule} onValueChange={setFModule}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Follow-up module" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All modules</SelectItem>
+                <SelectItem value={MDA_FOLLOWUP_COMPLETION}>MDA Completion</SelectItem>
+                <SelectItem value={MDA_FOLLOWUP_COMMODITIES}>MDA Commodities</SelectItem>
+                <SelectItem value={MDA_FOLLOWUP_ADVERSE}>Adverse Reactions</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} className="h-9 text-xs" aria-label="From date" />
+            <Input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} className="h-9 text-xs" aria-label="To date" />
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search community…" className="h-9 pl-8 text-xs" />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Supervision Status Trend <span className="font-normal text-muted-foreground">(last 7 days)</span></CardTitle></CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={trend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-                <RTooltip />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="completed" name="Completed" stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} />
-                <Line type="monotone" dataKey="inProgress" name="In Progress" stroke="#3b82f6" strokeWidth={2} dot={{ r: 2 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      {/* ── KPI tiles ── */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <Kpi icon={MapPin} label="Communities Supervised" value={fmt(communitiesSupervised)} sub={`${fmt(total)} checklist visits`} tint={BLUE} />
+        <Kpi icon={CheckCircle2} label="MDA Completed" value={`${mdaCompleted.pct}%`} sub={`${fmt(mdaCompleted.done)} of ${fmt(mdaCompleted.tot)} reported`} tint={EMERALD} bar={mdaCompleted.pct} />
+        <Kpi icon={Pill} label="Sufficient Medicine" value={`${medicine.pct}%`} sub={`${fmt(medicine.yes)} of ${fmt(medicine.total)}`} tint={TEAL} bar={medicine.pct} />
+        <Kpi icon={Activity} label="Follow-up Coverage" value={`${completionCovPct}%`} sub={`${fmt(covCompletion)} communities followed up`} tint={VIOLET} bar={completionCovPct} />
+        <Kpi icon={AlertTriangle} label="Adverse Cases Managed" value={aeManaged.total ? `${aeManaged.pct}%` : "—"} sub={`${fmt(aeManaged.yes)} of ${fmt(aeManaged.total)} cases`} tint={AMBER} bar={aeManaged.total ? aeManaged.pct : undefined} />
+        <Kpi icon={Flag} label="Red-flag Sites" value={fmt(redFlags)} sub="high-risk visits" tint={RED} />
       </div>
 
-      {/* Coverage map */}
-      {isJigawa ? (
-        <JigawaSupervisoryMap submissions={mapSubs} formName={formName} />
-      ) : (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1"><MapPin className="h-4 w-4" />Supervision Coverage Map</CardTitle></CardHeader>
-          <CardContent>
-            <MdaSupervisoryMap submissions={mapSubs} formName={formName} />
-          </CardContent>
-        </Card>
-      )}
+      {/* ── Longitudinal funnel ── */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-1.5 text-sm">
+            <ArrowRight className="h-4 w-4 text-primary" /> Longitudinal Linkage Funnel
+            <span className="font-normal text-muted-foreground">— Community Checklist → follow-up outcomes</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {funnel.map((f, i) => {
+              const p = pct(f.value, f.base);
+              return (
+                <div key={f.label} className="relative rounded-xl border border-border bg-card p-3" style={{ background: `linear-gradient(135deg, ${f.tint}0d, transparent 70%)` }}>
+                  <div className="flex items-center justify-between">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${f.tint}1a`, color: f.tint }}><f.icon className="h-4 w-4" /></span>
+                    {i > 0 && <span className="text-[11px] font-bold" style={{ color: f.tint }}>{p}%</span>}
+                  </div>
+                  <p className="mt-2 font-display text-2xl font-bold" style={{ color: f.tint }}>{fmt(f.value)}</p>
+                  <p className="text-[11px] text-muted-foreground">{f.label}</p>
+                  {i > 0 && (
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full" style={{ width: `${p}%`, background: f.tint }} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Follow-up insights */}
+      {/* ── Follow-up outcome panels ── */}
       <div className="grid gap-4 lg:grid-cols-3">
+        {/* MDA Completion */}
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Follow-up on MDA Completion</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-1.5 text-sm"><CheckCircle2 className="h-4 w-4" style={{ color: EMERALD }} />MDA Completion Outcomes</CardTitle>
+          </CardHeader>
           <CardContent>
             {mdaStatusTotal ? (
               <>
@@ -652,270 +681,164 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
                   ))}
                 </div>
               </>
-            ) : <p className="py-8 text-center text-xs text-muted-foreground">No MDA completion follow-ups yet.</p>}
+            ) : <p className="py-10 text-center text-xs text-muted-foreground">No MDA Completion follow-ups yet.</p>}
           </CardContent>
         </Card>
 
+        {/* Commodities */}
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Follow-up: Commodity Previously Inadequate</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {commodityDist.length ? commodityDist.map((d, i) => (
-              <BarRow key={d.name} label={d.name} value={d.value} pctVal={d.pct} color={PALETTE[i % PALETTE.length]} />
-            )) : <p className="py-8 text-center text-xs text-muted-foreground">No commodity follow-ups yet.</p>}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Follow-up on Adverse Reactions</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-1.5 text-sm"><Pill className="h-4 w-4" style={{ color: TEAL }} />Commodities Follow-up</CardTitle>
+          </CardHeader>
           <CardContent>
-            {aeTypes.length ? (
-              <>
-                <Donut data={aeTypes.map((d) => ({ name: d.name, value: d.value, color: d.color }))} />
-                <div className="mt-2 space-y-1 text-xs">
-                  {aeTypes.map((d) => (
-                    <div key={d.name} className="flex items-center justify-between">
-                      <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: d.color }} />{d.name}</span>
-                      <span className="font-semibold">{d.value} ({d.pct}%)</span>
-                    </div>
-                  ))}
+            {commodityDist.length ? (
+              <div className="space-y-2 py-1">
+                <p className="text-[11px] text-muted-foreground">Commodities reported inadequate ({fmt(commoditiesFus.length)} follow-ups)</p>
+                {commodityDist.slice(0, 7).map((d) => (
+                  <BarRow key={d.name} label={d.name} value={d.value} pctVal={d.pct} color={d.color} />
+                ))}
+              </div>
+            ) : <p className="py-10 text-center text-xs text-muted-foreground">No commodity issues reported in follow-ups.</p>}
+          </CardContent>
+        </Card>
+
+        {/* Adverse */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-1.5 text-sm"><AlertTriangle className="h-4 w-4" style={{ color: AMBER }} />Adverse Reactions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {aeTypes.length || aeManaged.total ? (
+              <div className="space-y-2 py-1">
+                <div className="flex items-center justify-between rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs">
+                  <span className="text-muted-foreground">Cases managed</span>
+                  <Tag text={`${aeManaged.yes}/${aeManaged.total} (${aeManaged.pct}%)`} tint={EMERALD} />
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-lg bg-emerald-500/10 p-2"><div className="text-muted-foreground">Managed</div><div className="font-display text-lg font-bold text-emerald-600">{aeManaged.pct}%</div><div className="text-[10px] text-muted-foreground">{aeManaged.yes}/{aeManaged.total}</div></div>
-                  <div className="rounded-lg bg-blue-500/10 p-2"><div className="text-muted-foreground">Satisfied/OK now</div><div className="font-display text-lg font-bold text-blue-600">{aeOkay.pct}%</div><div className="text-[10px] text-muted-foreground">{aeOkay.yes}/{aeOkay.total}</div></div>
+                <div className="flex items-center justify-between rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs">
+                  <span className="text-muted-foreground">Person reported okay</span>
+                  <Tag text={`${aeOkay.yes}/${aeOkay.total} (${aeOkay.pct}%)`} tint={BLUE} />
                 </div>
-              </>
-            ) : <p className="py-8 text-center text-xs text-muted-foreground">No adverse-reaction follow-ups yet.</p>}
+                {aeTypes.length > 0 && <p className="pt-1 text-[11px] text-muted-foreground">Reaction types reported</p>}
+                {aeTypes.slice(0, 5).map((d) => <BarRow key={d.name} label={d.name} value={d.value} pctVal={d.pct} color={d.color} />)}
+              </div>
+            ) : <p className="py-10 text-center text-xs text-muted-foreground">No adverse reactions reported.</p>}
           </CardContent>
         </Card>
       </div>
 
-      {/* Community status tables — Completed vs Not completed */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Communities where MDA was completed */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-1">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              Communities — MDA Completed
-              <Badge variant="secondary" className="ml-auto">{communityTables.completed.length}</Badge>
-            </CardTitle>
-            <p className="text-[11px] text-muted-foreground">Green “after follow-up” means completion was achieved only after a follow-up visit.</p>
-          </CardHeader>
-          <CardContent className="max-h-[340px] overflow-auto">
-            {communityTables.completed.length ? (
-              <table className="w-full text-xs">
-                <thead><tr className="border-b text-left text-muted-foreground">
-                  <th className="py-1.5 pr-2 font-medium">Community</th>
-                  <th className="py-1.5 pr-2 font-medium">Ward / LGA</th>
-                  <th className="py-1.5 font-medium">Completion</th>
-                </tr></thead>
-                <tbody>
-                  {communityTables.completed.map((c) => (
-                    <tr key={c.key} className="border-b border-border/40 align-top">
-                      <td className="py-1.5 pr-2"><div className="font-medium text-foreground">{c.community}</div><div className="text-[10px] text-muted-foreground">{c.supervisor}</div></td>
-                      <td className="py-1.5 pr-2"><div className="max-w-[120px] truncate">{c.ward}</div><div className="text-[10px] text-muted-foreground">{c.lga}, {c.state}</div></td>
-                      <td className="py-1.5">
-                        {c.afterFollowup ? (
-                          <Badge className="gap-1 border-emerald-500 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10">
-                            <TrendingUp className="h-3 w-3" />
-                            {c.fromStatus || "Incomplete"} <ArrowRight className="h-3 w-3" /> Completed
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="border-emerald-500 text-emerald-600 gap-1">
-                            <CheckCircle2 className="h-3 w-3" />Completed{c.hadFollowup ? " (verified)" : ""}
-                          </Badge>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : <p className="py-8 text-center text-xs text-muted-foreground">No communities reported MDA as completed yet.</p>}
-          </CardContent>
-        </Card>
+      {/* ── Activity trend ── */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Supervision Activity Trend <span className="font-normal text-muted-foreground">(last 14 days)</span></CardTitle></CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={trend} margin={{ top: 5, right: 10, left: -18, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+              <RTooltip />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Line type="monotone" dataKey="checklist" name="Checklist visits" stroke={BLUE} strokeWidth={2} dot={{ r: 2 }} />
+              <Line type="monotone" dataKey="followups" name="Follow-ups" stroke={EMERALD} strokeWidth={2} dot={{ r: 2 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
-        {/* Communities where MDA is NOT completed */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-1">
-              <Activity className="h-4 w-4 text-amber-600" />
-              Communities — MDA Not Completed
-              <Badge variant="secondary" className="ml-auto">{communityTables.notCompleted.length}</Badge>
-            </CardTitle>
-            <p className="text-[11px] text-muted-foreground">Not Started, Ongoing or Halted. Arrows show any status change driven by follow-up.</p>
-          </CardHeader>
-          <CardContent className="max-h-[340px] overflow-auto">
-            {communityTables.notCompleted.length ? (
-              <table className="w-full text-xs">
-                <thead><tr className="border-b text-left text-muted-foreground">
-                  <th className="py-1.5 pr-2 font-medium">Community</th>
-                  <th className="py-1.5 pr-2 font-medium">Ward / LGA</th>
-                  <th className="py-1.5 font-medium">Current Status</th>
-                </tr></thead>
-                <tbody>
-                  {communityTables.notCompleted.map((c) => {
-                    const tint = c.status === "Halted" ? "border-red-500 text-red-600" : c.status === "Ongoing" ? "border-blue-500 text-blue-600" : "border-slate-400 text-slate-500";
-                    return (
-                      <tr key={c.key} className="border-b border-border/40 align-top">
-                        <td className="py-1.5 pr-2"><div className="font-medium text-foreground">{c.community}</div><div className="text-[10px] text-muted-foreground">{c.supervisor}</div></td>
-                        <td className="py-1.5 pr-2"><div className="max-w-[120px] truncate">{c.ward}</div><div className="text-[10px] text-muted-foreground">{c.lga}, {c.state}</div></td>
-                        <td className="py-1.5">
-                          <Badge variant="outline" className={`gap-1 ${tint}`}>{c.status}</Badge>
-                          {c.changed && (
-                            <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
-                              <TrendingUp className="h-3 w-3" />{c.fromStatus} <ArrowRight className="h-3 w-3" /> {c.status} <span className="text-emerald-600">(follow-up)</span>
-                            </div>
-                          )}
-                          {!c.changed && c.hadFollowup && (
-                            <div className="mt-1 text-[10px] text-muted-foreground">No change after follow-up</div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            ) : <p className="py-8 text-center text-xs text-muted-foreground">No incomplete communities reported.</p>}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Communities with reported adverse reactions */}
+      {/* ── Longitudinal linkage register ── */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm flex items-center gap-1">
-            <Ambulance className="h-4 w-4 text-rose-600" />
-            Communities with Reported Adverse Reactions
-            <Badge variant="secondary" className="ml-auto">{communityTables.adverse.length}</Badge>
+          <CardTitle className="flex items-center gap-1.5 text-sm">
+            <ClipboardList className="h-4 w-4 text-primary" /> Community Longitudinal Register
+            <span className="ml-auto text-xs font-normal text-muted-foreground">{fmt(linkage.length)} communit{linkage.length === 1 ? "y" : "ies"}</span>
           </CardTitle>
-          <p className="text-[11px] text-muted-foreground">Referral status from the supervisory visit, and whether the reaction was followed up.</p>
         </CardHeader>
-        <CardContent className="max-h-[400px] overflow-auto">
-          {communityTables.adverse.length ? (
+        <CardContent className="p-0">
+          <div className="max-h-[460px] overflow-auto">
             <table className="w-full text-xs">
-              <thead><tr className="border-b text-left text-muted-foreground">
-                <th className="py-1.5 pr-2 font-medium">Community</th>
-                <th className="py-1.5 pr-2 font-medium">Ward / LGA</th>
-                <th className="py-1.5 pr-2 font-medium">AEs / SAEs</th>
-                <th className="py-1.5 pr-2 font-medium">Reaction type(s)</th>
-                <th className="py-1.5 pr-2 font-medium">Referred</th>
-                <th className="py-1.5 font-medium">Follow-up</th>
-              </tr></thead>
+              <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
+                <tr className="text-left text-[11px] text-muted-foreground">
+                  <th className="px-3 py-2 font-semibold">Community</th>
+                  <th className="px-3 py-2 font-semibold">Ward · LGA</th>
+                  <th className="px-3 py-2 font-semibold">Visit</th>
+                  <th className="px-3 py-2 font-semibold">MDA Completion</th>
+                  <th className="px-3 py-2 font-semibold">Commodities</th>
+                  <th className="px-3 py-2 font-semibold">Adverse</th>
+                  <th className="px-3 py-2 font-semibold">Supervisor</th>
+                </tr>
+              </thead>
               <tbody>
-                {communityTables.adverse.map((c) => (
-                  <tr key={c.key} className="border-b border-border/40 align-top">
-                    <td className="py-1.5 pr-2"><div className="font-medium text-foreground">{c.community}</div><div className="text-[10px] text-muted-foreground">{c.supervisor}</div></td>
-                    <td className="py-1.5 pr-2"><div className="max-w-[110px] truncate">{c.ward}</div><div className="text-[10px] text-muted-foreground">{c.lga}, {c.state}</div></td>
-                    <td className="py-1.5 pr-2"><span className="font-semibold text-foreground">{c.aes}</span>{c.serious > 0 && <span className="ml-1 text-rose-600">({c.serious} SAE)</span>}</td>
-                    <td className="py-1.5 pr-2"><div className="flex max-w-[160px] flex-wrap gap-1">{c.types.length ? c.types.map((t: string) => <Badge key={t} variant="secondary" className="px-1 py-0 text-[10px]">{t}</Badge>) : <span className="text-muted-foreground">—</span>}</div></td>
-                    <td className="py-1.5 pr-2">
-                      {norm(c.referral) === "yes" ? (
-                        <Badge variant="outline" className="border-emerald-500 text-emerald-600">Referred</Badge>
-                      ) : norm(c.referral) === "no" ? (
-                        <Badge variant="outline" className="border-red-500 text-red-600">Not referred</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">{c.referral || "—"}</span>
-                      )}
+                {linkage.length === 0 ? (
+                  <tr><td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">No communities match the current filters.</td></tr>
+                ) : linkage.map((r) => (
+                  <tr key={r.id} className="border-t border-border/60 hover:bg-muted/40">
+                    <td className="px-3 py-2">
+                      <div className="font-semibold text-foreground">{r.community}</div>
+                      {r.risk && <span className="text-[10px]" style={{ color: norm(r.risk) === "high" ? RED : SLATE }}>{r.risk} risk</span>}
                     </td>
-                    <td className="py-1.5">
-                      {c.followedUp ? (
-                        <div className="flex flex-col gap-0.5">
-                          <Badge className="w-fit gap-1 border-emerald-500 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10"><CheckCircle2 className="h-3 w-3" />Followed up</Badge>
-                          <span className="text-[10px] text-muted-foreground">{c.managed ? "Managed" : "Not managed"}{c.okayNow ? " · OK now" : ""}</span>
-                        </div>
-                      ) : (
-                        <Badge variant="outline" className="border-amber-500 text-amber-600">Pending follow-up</Badge>
-                      )}
+                    <td className="px-3 py-2 text-muted-foreground">{r.ward} · {r.lga}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{r.visitDate}</td>
+                    <td className="px-3 py-2">
+                      {r.hasCompletion
+                        ? <Tag text={r.mdaStatus || "Done"} tint={norm(r.mdaStatus) === "completed" ? EMERALD : norm(r.mdaStatus) === "halted" ? RED : BLUE} />
+                        : <span className="text-muted-foreground">—</span>}
                     </td>
+                    <td className="px-3 py-2">
+                      {r.hasCommodities
+                        ? <Tag text={r.commodityIssue ? "Issue" : "OK"} tint={r.commodityIssue ? AMBER : EMERALD} />
+                        : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-3 py-2">
+                      {r.hasAdverse
+                        ? <Tag text={r.adverseManaged ? "Managed" : "Reported"} tint={r.adverseManaged ? EMERALD : RED} />
+                        : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">{r.supervisor}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          ) : <p className="py-8 text-center text-xs text-muted-foreground">No adverse reactions reported.</p>}
+          </div>
         </CardContent>
       </Card>
 
+      {/* ── Coverage map ── */}
+      {isJigawa ? (
+        <JigawaSupervisoryMap submissions={mapSubs} formName={formName} />
+      ) : (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="flex items-center gap-1.5 text-sm"><MapPin className="h-4 w-4 text-primary" />Supervision Coverage Map</CardTitle></CardHeader>
+          <CardContent><MdaSupervisoryMap submissions={mapSubs} formName={formName} /></CardContent>
+        </Card>
+      )}
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1"><HeartHandshake className="h-4 w-4" />Community Engagement Score <Badge variant="secondary" className="ml-auto">{engagementScore}%</Badge></CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {engagement.length ? engagement.map((r) => <BarRow key={r.label} label={r.label} value={r.yes} pctVal={r.pct} color="#10b981" />) : <p className="py-6 text-center text-xs text-muted-foreground">No data yet.</p>}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1"><ListChecks className="h-4 w-4" />Cross-cutting Checks <Badge variant="secondary" className="ml-auto">{crossScore}%</Badge></CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {crossCutting.length ? crossCutting.map((r) => <BarRow key={r.label} label={r.label} value={r.yes} pctVal={r.pct} color="#3b82f6" />) : <p className="py-6 text-center text-xs text-muted-foreground">No data yet.</p>}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1"><ShieldCheck className="h-4 w-4" />Data Quality Score</CardTitle></CardHeader>
-          <CardContent>
-            <Donut centerValue={`${dataQuality}%`} centerLabel="Completeness" data={[{ name: "Complete", value: dataQuality, color: dataQuality >= 80 ? "#10b981" : dataQuality >= 60 ? "#f59e0b" : "#ef4444" }, { name: "Missing", value: 100 - dataQuality, color: "#e5e7eb" }]} />
-            <p className="mt-1 text-center text-[11px] text-muted-foreground">Completeness of key supervisory fields across all visits</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Corrective actions + field workers */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Corrective Actions Tracker</CardTitle></CardHeader>
-          <CardContent className="overflow-x-auto">
-            {corrective.length ? (
-              <table className="w-full text-xs">
-                <thead><tr className="border-b text-left text-muted-foreground">
-                  <th className="py-1.5 pr-2 font-medium">Issue / Action</th>
-                  <th className="py-1.5 pr-2 font-medium">Responsible</th>
-                  <th className="py-1.5 pr-2 font-medium">Deadline</th>
-                  <th className="py-1.5 font-medium">Risk</th>
-                </tr></thead>
-                <tbody>
-                  {corrective.map((c) => (
-                    <tr key={c.id} className="border-b border-border/40">
-                      <td className="py-1.5 pr-2"><div className="max-w-[200px] truncate">{c.issue}</div><div className="text-[10px] text-muted-foreground">{c.community}</div></td>
-                      <td className="py-1.5 pr-2">{c.person}</td>
-                      <td className="py-1.5 pr-2">{c.deadline}</td>
-                      <td className="py-1.5"><Badge variant="outline" className={norm(c.risk) === "high" ? "border-red-500 text-red-600" : norm(c.risk) === "medium" ? "border-amber-500 text-amber-600" : "border-emerald-500 text-emerald-600"}>{c.risk}</Badge></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : <p className="py-8 text-center text-xs text-muted-foreground">No corrective actions recorded.</p>}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1"><Users2 className="h-4 w-4" />Field Worker Submissions & Days Worked</CardTitle></CardHeader>
-          <CardContent className="overflow-x-auto">
-            {workers.length ? (
-              <table className="w-full text-xs">
-                <thead><tr className="border-b text-left text-muted-foreground">
-                  <th className="py-1.5 pr-2 font-medium">Supervisor</th>
-                  <th className="py-1.5 pr-2 font-medium text-right">Submissions</th>
-                  <th className="py-1.5 pr-2 font-medium text-right">Days Worked</th>
-                  <th className="py-1.5 font-medium text-right">Last Active</th>
-                </tr></thead>
-                <tbody>
-                  {workers.map((w) => (
-                    <tr key={w.name} className="border-b border-border/40">
-                      <td className="py-1.5 pr-2 font-medium text-foreground">{w.name}</td>
-                      <td className="py-1.5 pr-2 text-right">{w.subs}</td>
-                      <td className="py-1.5 pr-2 text-right"><span className="inline-flex items-center gap-1"><CalendarClock className="h-3 w-3 text-muted-foreground" />{w.days}</span></td>
-                      <td className="py-1.5 text-right text-muted-foreground">{w.last}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : <p className="py-8 text-center text-xs text-muted-foreground">No submissions yet.</p>}
-          </CardContent>
-        </Card>
-      </div>
-
-      <p className="px-1 text-[10px] text-muted-foreground">
-        All figures are computed live from submitted Integrated MDA Supervisory Checklist data and its follow-up modules.
-      </p>
+      {/* ── Field worker accountability ── */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="flex items-center gap-1.5 text-sm"><Users2 className="h-4 w-4 text-primary" />Field Worker Submissions</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          <div className="max-h-[320px] overflow-auto">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
+                <tr className="text-left text-[11px] text-muted-foreground">
+                  <th className="px-3 py-2 font-semibold">Field worker</th>
+                  <th className="px-3 py-2 text-right font-semibold">Submissions</th>
+                  <th className="px-3 py-2 text-right font-semibold">Days worked</th>
+                  <th className="px-3 py-2 text-right font-semibold">Last active</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workers.map((w) => (
+                  <tr key={w.name} className="border-t border-border/60 hover:bg-muted/40">
+                    <td className="px-3 py-2 font-medium text-foreground">{w.name}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmt(w.subs)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmt(w.days)}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap text-muted-foreground">{w.last}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
