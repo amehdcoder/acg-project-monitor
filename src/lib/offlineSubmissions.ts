@@ -213,6 +213,9 @@ export async function flushSubmissionQueue(
     const due = options.force
       ? records
       : records.filter((rec) => {
+          // Quarantined poison rows are skipped by the automatic loop but kept
+          // for a forced drain so the data is never silently abandoned.
+          if ((rec.attempts ?? 0) >= MAX_AUTO_ATTEMPTS) return false;
           const delay = RETRY_DELAYS_MS[Math.min(rec.attempts, RETRY_DELAYS_MS.length - 1)];
           const last = Date.parse(rec.created_at || "") || 0;
           return rec.attempts === 0 || Date.now() - last >= delay;
