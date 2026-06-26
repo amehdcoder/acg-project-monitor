@@ -566,12 +566,16 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       </div>
 
       {/* Coverage map */}
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1"><MapPin className="h-4 w-4" />Supervision Coverage Map</CardTitle></CardHeader>
-        <CardContent>
-          <MdaSupervisoryMap submissions={mapSubs} formName={formName} />
-        </CardContent>
-      </Card>
+      {isJigawa ? (
+        <JigawaSupervisoryMap submissions={mapSubs} formName={formName} />
+      ) : (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1"><MapPin className="h-4 w-4" />Supervision Coverage Map</CardTitle></CardHeader>
+          <CardContent>
+            <MdaSupervisoryMap submissions={mapSubs} formName={formName} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Follow-up insights */}
       <div className="grid gap-4 lg:grid-cols-3">
