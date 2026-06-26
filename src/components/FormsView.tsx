@@ -2182,7 +2182,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                       <p className="text-xs text-muted-foreground">12-section NTD supervision tool · cascade selects · auto-scoring · linked Coverage Evaluation 3D. Fully editable in the Form Builder.</p>
                     </div>
                   </div>
-                   <div class-placeholder className="flex flex-col gap-1.5 shrink-0">
+                   <div className="flex flex-col gap-1.5 shrink-0">
                    <Button
                      size="sm"
                      className="shrink-0"
