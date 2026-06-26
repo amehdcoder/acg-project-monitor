@@ -27,8 +27,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   Users2, CheckCircle2, Pill, ClipboardList, AlertTriangle, Flag,
   ShieldCheck, HeartHandshake, MapPin, CalendarClock, ListChecks,
+  TrendingUp, Activity, Ambulance, ArrowRight,
 } from "lucide-react";
-import { prepareMdaData } from "@/lib/mda/dashboardData";
+import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
 import MdaSupervisoryMap from "./MdaSupervisoryMap";
 
 // ───────────────────────── Types ─────────────────────────
@@ -362,7 +363,111 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       .sort((a, b) => b.subs - a.subs);
   }, [checklist, followUps]);
 
-  // ───────────────────────── Render ─────────────────────────
+  // ── Community-level status & adverse-reaction tables ──────────────
+  const communityTables = useMemo(() => {
+    const STATUS: Record<string, string> = {
+      "not started": "Not Started", ongoing: "Ongoing", halted: "Halted", completed: "Completed",
+    };
+    const statusLabel = (v: any) => (v ? STATUS[norm(v)] || stripTags(String(v)) : "");
+    const comLabel = (s?: MdaSubmission) => {
+      const d = s?.data || {};
+      const community = stripTags(d.community || d.community_name || d.settlement_name || d.settlement) || "Unspecified";
+      const ward = stripTags(d.ward || d.ward_name) || (s?.ward ?? "") || "—";
+      const lga = stripTags(d.lga || d.LGA || d.local_government) || (s?.lga ?? "") || "—";
+      const state = stripTags(d.state) || (s?.state ?? "") || "—";
+      const flhf = stripTags(d.flhf_name || d.flhf) || "";
+      const supervisor = stripTags(s?.submitter || d.supervisor_name) || "—";
+      return { community, ward, lga, state, flhf, supervisor };
+    };
+
+    // latest primary checklist visit per community
+    const primaryByCom = new Map<string, MdaSubmission>();
+    for (const s of checklist) {
+      const k = communityKey(s as any);
+      const prev = primaryByCom.get(k);
+      if (!prev || new Date(s.submittedAt || 0) > new Date(prev.submittedAt || 0)) primaryByCom.set(k, s);
+    }
+    // follow-ups per community, oldest → newest
+    const fuByCom = new Map<string, MdaSubmission[]>();
+    for (const s of followUps) {
+      const k = communityKey(s as any);
+      if (!fuByCom.has(k)) fuByCom.set(k, []);
+      fuByCom.get(k)!.push(s);
+    }
+    for (const arr of fuByCom.values()) {
+      arr.sort((a, b) => new Date(a.submittedAt || 0).getTime() - new Date(b.submittedAt || 0).getTime());
+    }
+
+    const completed: any[] = [];
+    const notCompleted: any[] = [];
+    const adverse: any[] = [];
+
+    for (const k of new Set([...primaryByCom.keys(), ...fuByCom.keys()])) {
+      const primary = primaryByCom.get(k);
+      const fus = fuByCom.get(k) || [];
+      const loc = comLabel(primary || fus[fus.length - 1]);
+
+      // ---- MDA status history (driven by follow-up submissions) ----
+      const statusFus = fus.filter((f) => f.data?.status_of_mda);
+      const firstStatus = statusFus.length ? statusLabel(statusFus[0].data!.status_of_mda) : "";
+      const latestStatus = statusFus.length
+        ? statusLabel(statusFus[statusFus.length - 1].data!.status_of_mda)
+        : statusLabel(primary?.data?.status_of_mda);
+      const hadFollowup = statusFus.length > 0;
+      const statusChanged = !!firstStatus && !!latestStatus && firstStatus !== latestStatus;
+      const lastFu = statusFus.length ? statusFus[statusFus.length - 1].submittedAt : null;
+
+      if (latestStatus === "Completed") {
+        completed.push({
+          key: k, ...loc,
+          afterFollowup: hadFollowup && statusChanged && firstStatus !== "Completed",
+          fromStatus: firstStatus, hadFollowup,
+          followups: statusFus.length, lastFu,
+        });
+      } else if (latestStatus === "Not Started" || latestStatus === "Ongoing" || latestStatus === "Halted") {
+        notCompleted.push({
+          key: k, ...loc, status: latestStatus,
+          changed: statusChanged, fromStatus: firstStatus, hadFollowup,
+          followups: statusFus.length, lastFu,
+        });
+      }
+
+      // ---- Adverse reactions ----
+      const aesReported = toNum(primary?.data?.aes_reported) || 0;
+      const seriousAes = toNum(primary?.data?.serious_aes) || 0;
+      const reactionTypes = new Set<string>();
+      for (const f of fus) {
+        const v = f.data?.adverse_reaction_type;
+        if (!v) continue;
+        const arr = Array.isArray(v) ? v : String(v).split(/\s+/);
+        for (const it of arr) { const lbl = stripTags(String(it)).replace(/_/g, " "); if (lbl) reactionTypes.add(lbl); }
+      }
+      const hasReaction = aesReported > 0 || seriousAes > 0 || reactionTypes.size > 0;
+      if (hasReaction) {
+        const referralRaw = primary?.data?.referral_done;
+        const referral = referralRaw ? stripTags(String(referralRaw)) : "";
+        const aeFus = fus.filter((f) => f.data?.adverse_reaction_type || f.data?.ae_been_managed);
+        const followedUp = aeFus.length > 0;
+        const lastAeFu = followedUp ? aeFus[aeFus.length - 1] : null;
+        const managed = lastAeFu ? POSITIVE.has(norm(lastAeFu.data?.ae_been_managed)) : false;
+        const okayNow = lastAeFu ? POSITIVE.has(norm(lastAeFu.data?.ae_person_okay)) : false;
+        adverse.push({
+          key: k, ...loc,
+          aes: aesReported, serious: seriousAes,
+          types: [...reactionTypes],
+          referral, referred: norm(referral) === "yes",
+          followedUp, managed, okayNow,
+          lastAeFu: lastAeFu?.submittedAt || null,
+        });
+      }
+    }
+
+    completed.sort((a, b) => (b.lastFu ? new Date(b.lastFu).getTime() : 0) - (a.lastFu ? new Date(a.lastFu).getTime() : 0));
+    notCompleted.sort((a, b) => (a.status === "Halted" ? -1 : 0) - (b.status === "Halted" ? -1 : 0));
+    adverse.sort((a, b) => (b.serious + b.aes) - (a.serious + a.aes));
+    return { completed, notCompleted, adverse };
+  }, [checklist, followUps]);
+
   if (total === 0 && followUps.length === 0) {
     return (
       <Card>
@@ -513,7 +618,153 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         </Card>
       </div>
 
-      {/* Engagement / cross-cutting / data quality */}
+      {/* Community status tables — Completed vs Not completed */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Communities where MDA was completed */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-1">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              Communities — MDA Completed
+              <Badge variant="secondary" className="ml-auto">{communityTables.completed.length}</Badge>
+            </CardTitle>
+            <p className="text-[11px] text-muted-foreground">Green “after follow-up” means completion was achieved only after a follow-up visit.</p>
+          </CardHeader>
+          <CardContent className="max-h-[340px] overflow-auto">
+            {communityTables.completed.length ? (
+              <table className="w-full text-xs">
+                <thead><tr className="border-b text-left text-muted-foreground">
+                  <th className="py-1.5 pr-2 font-medium">Community</th>
+                  <th className="py-1.5 pr-2 font-medium">Ward / LGA</th>
+                  <th className="py-1.5 font-medium">Completion</th>
+                </tr></thead>
+                <tbody>
+                  {communityTables.completed.map((c) => (
+                    <tr key={c.key} className="border-b border-border/40 align-top">
+                      <td className="py-1.5 pr-2"><div className="font-medium text-foreground">{c.community}</div><div className="text-[10px] text-muted-foreground">{c.supervisor}</div></td>
+                      <td className="py-1.5 pr-2"><div className="max-w-[120px] truncate">{c.ward}</div><div className="text-[10px] text-muted-foreground">{c.lga}, {c.state}</div></td>
+                      <td className="py-1.5">
+                        {c.afterFollowup ? (
+                          <Badge className="gap-1 border-emerald-500 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10">
+                            <TrendingUp className="h-3 w-3" />
+                            {c.fromStatus || "Incomplete"} <ArrowRight className="h-3 w-3" /> Completed
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-emerald-500 text-emerald-600 gap-1">
+                            <CheckCircle2 className="h-3 w-3" />Completed{c.hadFollowup ? " (verified)" : ""}
+                          </Badge>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : <p className="py-8 text-center text-xs text-muted-foreground">No communities reported MDA as completed yet.</p>}
+          </CardContent>
+        </Card>
+
+        {/* Communities where MDA is NOT completed */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-1">
+              <Activity className="h-4 w-4 text-amber-600" />
+              Communities — MDA Not Completed
+              <Badge variant="secondary" className="ml-auto">{communityTables.notCompleted.length}</Badge>
+            </CardTitle>
+            <p className="text-[11px] text-muted-foreground">Not Started, Ongoing or Halted. Arrows show any status change driven by follow-up.</p>
+          </CardHeader>
+          <CardContent className="max-h-[340px] overflow-auto">
+            {communityTables.notCompleted.length ? (
+              <table className="w-full text-xs">
+                <thead><tr className="border-b text-left text-muted-foreground">
+                  <th className="py-1.5 pr-2 font-medium">Community</th>
+                  <th className="py-1.5 pr-2 font-medium">Ward / LGA</th>
+                  <th className="py-1.5 font-medium">Current Status</th>
+                </tr></thead>
+                <tbody>
+                  {communityTables.notCompleted.map((c) => {
+                    const tint = c.status === "Halted" ? "border-red-500 text-red-600" : c.status === "Ongoing" ? "border-blue-500 text-blue-600" : "border-slate-400 text-slate-500";
+                    return (
+                      <tr key={c.key} className="border-b border-border/40 align-top">
+                        <td className="py-1.5 pr-2"><div className="font-medium text-foreground">{c.community}</div><div className="text-[10px] text-muted-foreground">{c.supervisor}</div></td>
+                        <td className="py-1.5 pr-2"><div className="max-w-[120px] truncate">{c.ward}</div><div className="text-[10px] text-muted-foreground">{c.lga}, {c.state}</div></td>
+                        <td className="py-1.5">
+                          <Badge variant="outline" className={`gap-1 ${tint}`}>{c.status}</Badge>
+                          {c.changed && (
+                            <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                              <TrendingUp className="h-3 w-3" />{c.fromStatus} <ArrowRight className="h-3 w-3" /> {c.status} <span className="text-emerald-600">(follow-up)</span>
+                            </div>
+                          )}
+                          {!c.changed && c.hadFollowup && (
+                            <div className="mt-1 text-[10px] text-muted-foreground">No change after follow-up</div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : <p className="py-8 text-center text-xs text-muted-foreground">No incomplete communities reported.</p>}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Communities with reported adverse reactions */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-1">
+            <Ambulance className="h-4 w-4 text-rose-600" />
+            Communities with Reported Adverse Reactions
+            <Badge variant="secondary" className="ml-auto">{communityTables.adverse.length}</Badge>
+          </CardTitle>
+          <p className="text-[11px] text-muted-foreground">Referral status from the supervisory visit, and whether the reaction was followed up.</p>
+        </CardHeader>
+        <CardContent className="max-h-[400px] overflow-auto">
+          {communityTables.adverse.length ? (
+            <table className="w-full text-xs">
+              <thead><tr className="border-b text-left text-muted-foreground">
+                <th className="py-1.5 pr-2 font-medium">Community</th>
+                <th className="py-1.5 pr-2 font-medium">Ward / LGA</th>
+                <th className="py-1.5 pr-2 font-medium">AEs / SAEs</th>
+                <th className="py-1.5 pr-2 font-medium">Reaction type(s)</th>
+                <th className="py-1.5 pr-2 font-medium">Referred</th>
+                <th className="py-1.5 font-medium">Follow-up</th>
+              </tr></thead>
+              <tbody>
+                {communityTables.adverse.map((c) => (
+                  <tr key={c.key} className="border-b border-border/40 align-top">
+                    <td className="py-1.5 pr-2"><div className="font-medium text-foreground">{c.community}</div><div className="text-[10px] text-muted-foreground">{c.supervisor}</div></td>
+                    <td className="py-1.5 pr-2"><div className="max-w-[110px] truncate">{c.ward}</div><div className="text-[10px] text-muted-foreground">{c.lga}, {c.state}</div></td>
+                    <td className="py-1.5 pr-2"><span className="font-semibold text-foreground">{c.aes}</span>{c.serious > 0 && <span className="ml-1 text-rose-600">({c.serious} SAE)</span>}</td>
+                    <td className="py-1.5 pr-2"><div className="flex max-w-[160px] flex-wrap gap-1">{c.types.length ? c.types.map((t: string) => <Badge key={t} variant="secondary" className="px-1 py-0 text-[10px]">{t}</Badge>) : <span className="text-muted-foreground">—</span>}</div></td>
+                    <td className="py-1.5 pr-2">
+                      {norm(c.referral) === "yes" ? (
+                        <Badge variant="outline" className="border-emerald-500 text-emerald-600">Referred</Badge>
+                      ) : norm(c.referral) === "no" ? (
+                        <Badge variant="outline" className="border-red-500 text-red-600">Not referred</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">{c.referral || "—"}</span>
+                      )}
+                    </td>
+                    <td className="py-1.5">
+                      {c.followedUp ? (
+                        <div className="flex flex-col gap-0.5">
+                          <Badge className="w-fit gap-1 border-emerald-500 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10"><CheckCircle2 className="h-3 w-3" />Followed up</Badge>
+                          <span className="text-[10px] text-muted-foreground">{c.managed ? "Managed" : "Not managed"}{c.okayNow ? " · OK now" : ""}</span>
+                        </div>
+                      ) : (
+                        <Badge variant="outline" className="border-amber-500 text-amber-600">Pending follow-up</Badge>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : <p className="py-8 text-center text-xs text-muted-foreground">No adverse reactions reported.</p>}
+        </CardContent>
+      </Card>
+
+
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1"><HeartHandshake className="h-4 w-4" />Community Engagement Score <Badge variant="secondary" className="ml-auto">{engagementScore}%</Badge></CardTitle></CardHeader>
