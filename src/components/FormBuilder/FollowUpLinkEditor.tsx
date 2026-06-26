@@ -33,7 +33,7 @@ import {
   Asterisk,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { SkipLogicEditor } from "./SkipLogicEditor";
+import SkipLogicEditor from "./SkipLogicEditor";
 import { toast } from "@/hooks/use-toast";
 
 
