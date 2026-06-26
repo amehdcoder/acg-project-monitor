@@ -82,10 +82,19 @@ function CollaboratorAvatar({
 }
 
 const CollaboratorPresence = () => {
-  const { isOwner, isSuperAdmin } = useAuth();
+  const { user, isOwner, isSuperAdmin } = useAuth();
   const canView = isOwner || isSuperAdmin;
   // Track presence for every user; the roster is only rendered for admins.
   const { collaborators } = usePresenceTracking(true);
+
+  const startDirectChat = (c: ActiveCollaborator) => {
+    window.dispatchEvent(
+      new CustomEvent("amehnities:open-direct-chat", {
+        detail: { userId: c.user_id, userName: c.name },
+      }),
+    );
+  };
+
 
   const others = useMemo(
     () => collaborators,
