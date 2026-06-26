@@ -1036,3 +1036,18 @@ select option {
   70%  { transform: scale(2.4); opacity: 0.15; }
   100% { transform: scale(2.6); opacity: 0; }
 }
+.hcs-cluster-wrap { background: transparent; border: none; }
+.hcs-cluster {
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 9999px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease;
+}
+.hcs-cluster:hover { transform: scale(1.08); }
+.hcs-cluster-core {
+  display: flex; align-items: center; justify-content: center;
+  width: 64%; height: 64%; border-radius: 9999px;
+  background: hsl(var(--card)); color: hsl(var(--foreground));
+  font-weight: 700; font-size: 12px;
+}
+
