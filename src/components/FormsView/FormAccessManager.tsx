@@ -306,7 +306,7 @@ export default function FormAccessManager({
           ) : (
             <ScrollArea className="h-[40vh]">
               <div className="p-1">
-                {filtered.map((u) => {
+                {paged.map((u) => {
                   const hasAccess = assigned.has(u.user_id);
                   return (
                     <div
@@ -354,6 +354,31 @@ export default function FormAccessManager({
             </ScrollArea>
           )}
         </div>
+
+        {!loading && filtered.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <span className="text-xs text-muted-foreground">
+              {safePage * PAGE_SIZE + 1}–{Math.min(filtered.length, (safePage + 1) * PAGE_SIZE)} of {filtered.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm" variant="outline" className="h-8"
+                disabled={safePage === 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+              >
+                Previous
+              </Button>
+              <span className="text-xs text-muted-foreground">Page {safePage + 1} / {pageCount}</span>
+              <Button
+                size="sm" variant="outline" className="h-8"
+                disabled={safePage >= pageCount - 1}
+                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
