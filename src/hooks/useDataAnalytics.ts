@@ -32,6 +32,7 @@ export interface FormAnalytics {
   total_submissions: number;
   current_cycle_submissions: number;
   questions: any[];
+  settings?: any;
 }
 
 export interface LocationAnalytics {
