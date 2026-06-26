@@ -39,6 +39,7 @@ import {
 import { exportMdaDashboard } from "@/lib/mda/dashboardExport";
 import MdaSupervisoryMap from "./MdaSupervisoryMap";
 import JigawaSupervisoryMap from "./JigawaSupervisoryMap";
+import FctSupervisoryMap from "./FctSupervisoryMap";
 import HouseholdCoverageSurveyMap from "./HouseholdCoverageSurveyMap";
 
 // ───────────────────────── Types ─────────────────────────
@@ -491,6 +492,13 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     const jig = checklist.filter((s) => n2(pickGeo(s, "state")) === "jigawa").length;
     return jig > 0 && jig >= checklist.length * 0.6;
   }, [checklist, formName]);
+  const isFct = useMemo(() => {
+    const n2 = (v: any) => String(v ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (/endfund|\bfct\b|abuja|federalcapital/i.test(`${projectName || ""} ${formName || ""}`)) return true;
+    const fctStates = new Set(["fct", "abuja", "federalcapitalterritory", "fctabuja"]);
+    const fct = checklist.filter((s) => fctStates.has(n2(pickGeo(s, "state")))).length;
+    return fct > 0 && fct >= checklist.length * 0.6;
+  }, [checklist, formName, projectName]);
 
   // ── Export ────────────────────────────────────────────────────
   const handleExport = async () => {
@@ -806,6 +814,8 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       {/* ── Coverage map ── */}
       {isJigawa ? (
         <JigawaSupervisoryMap submissions={mapSubs} formName={formName} />
+      ) : isFct ? (
+        <FctSupervisoryMap submissions={mapSubs} formName={formName} />
       ) : (
         <Card>
           <CardHeader className="pb-2"><CardTitle className="flex items-center gap-1.5 text-sm"><MapPin className="h-4 w-4 text-primary" />Supervision Coverage Map</CardTitle></CardHeader>

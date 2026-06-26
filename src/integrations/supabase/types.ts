@@ -3346,6 +3346,44 @@ export type Database = {
           },
         ]
       }
+      form_project_grants: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          form_id: string
+          granted_by: string | null
+          id: string
+          project_id: string
+          starts_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          form_id: string
+          granted_by?: string | null
+          id?: string
+          project_id: string
+          starts_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          form_id?: string
+          granted_by?: string | null
+          id?: string
+          project_id?: string
+          starts_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_project_grants_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       form_submissions: {
         Row: {
           created_at: string

@@ -76,6 +76,8 @@ export default function FormAccessManager({
   const [expires, setExpires] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 25;
 
   const formId = form?.id ?? null;
 
@@ -108,6 +110,15 @@ export default function FormAccessManager({
     return users.filter((u) =>
       `${displayName(u)} ${safeText(u.email, "")}`.toLowerCase().includes(q));
   }, [users, search]);
+
+  // Reset to first page whenever the search/result set changes.
+  useEffect(() => { setPage(0); }, [search, formId, open]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const paged = useMemo(
+    () => filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE),
+    [filtered, safePage],
+  );
 
   const assignedCount = assigned.size;
 
@@ -162,20 +173,39 @@ export default function FormAccessManager({
   };
 
   const grantToProjectMembers = async () => {
-    if (!projectId || !canGrant) return;
+    if (!projectId || !canGrant || !formId) return;
     setSaving(true);
     try {
+      // Record a project-wide grant so access stays in sync as membership
+      // changes (DB triggers fan this out to current & future members and
+      // revoke it when a member leaves the project).
+      const { error: grantErr } = await supabase
+        .from("form_project_grants" as any)
+        .upsert(
+          {
+            form_id: formId,
+            project_id: projectId,
+            granted_by: currentUserId ?? null,
+            starts_at: fromLocalInput(starts),
+            expires_at: fromLocalInput(expires),
+          },
+          { onConflict: "form_id,project_id" },
+        );
+      if (grantErr) throw grantErr;
+
       const { data, error } = await supabase
         .from("user_project_assignments")
         .select("user_id")
         .eq("project_id", projectId);
       if (error) throw error;
       const ids = [...new Set(((data ?? []) as any[]).map((r) => r.user_id))];
-      if (ids.length === 0) {
-        toast({ title: "No members", description: "This project has no assigned members." });
-        return;
-      }
-      await grant(ids);
+      await refreshAssigned();
+      toast({
+        title: "Access granted to project",
+        description: ids.length
+          ? `${ids.length} current member${ids.length === 1 ? "" : "s"} granted. New members will be synced automatically.`
+          : "No members yet — access will be granted automatically as members join.",
+      });
     } catch (e: any) {
       toast({ title: "Grant failed", description: e?.message ?? "Could not grant access.", variant: "destructive" });
     } finally {
@@ -295,7 +325,7 @@ export default function FormAccessManager({
           ) : (
             <ScrollArea className="h-[40vh]">
               <div className="p-1">
-                {filtered.map((u) => {
+                {paged.map((u) => {
                   const hasAccess = assigned.has(u.user_id);
                   return (
                     <div
@@ -343,6 +373,31 @@ export default function FormAccessManager({
             </ScrollArea>
           )}
         </div>
+
+        {!loading && filtered.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <span className="text-xs text-muted-foreground">
+              {safePage * PAGE_SIZE + 1}–{Math.min(filtered.length, (safePage + 1) * PAGE_SIZE)} of {filtered.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm" variant="outline" className="h-8"
+                disabled={safePage === 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+              >
+                Previous
+              </Button>
+              <span className="text-xs text-muted-foreground">Page {safePage + 1} / {pageCount}</span>
+              <Button
+                size="sm" variant="outline" className="h-8"
+                disabled={safePage >= pageCount - 1}
+                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
