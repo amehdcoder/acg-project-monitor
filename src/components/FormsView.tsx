@@ -122,7 +122,8 @@ import BulkUploadAccessManager from "@/components/OwnerTools/BulkUploadAccessMan
 import { useBulkDataAccess } from "@/hooks/useBulkDataAccess";
 import { scrollToAppTop } from "@/lib/scrollToAppTop";
 import { isMdaChecklistLike } from "@/lib/mdaFollowUp";
-import { FileSpreadsheet, KeyRound, GanttChartSquare, NotebookPen } from "lucide-react";
+import { FileSpreadsheet, KeyRound, GanttChartSquare, NotebookPen, Copy } from "lucide-react";
+import CopyMdaChecklistDialog from "@/components/MdaChecklist/CopyMdaChecklistDialog";
 
 interface FormSettings {
   requireLocation?: boolean;
