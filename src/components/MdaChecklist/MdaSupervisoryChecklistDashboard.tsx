@@ -498,7 +498,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     return { states, lgas, wards, communities: prepared.communityCount, range, last };
   }, [checklist, followUps, prepared.communityCount]);
 
-
+  if (total === 0 && followUps.length === 0) {
     return (
       <Card>
         <CardContent className="py-12 text-center text-sm text-muted-foreground">
