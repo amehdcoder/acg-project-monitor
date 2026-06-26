@@ -29,8 +29,13 @@ import {
   AlertCircle,
   Sparkles,
   CheckCircle2,
+  GitBranch,
+  Asterisk,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { SkipLogicEditor } from "./SkipLogicEditor";
 import { toast } from "@/hooks/use-toast";
+
 
 interface ConditionRow {
   field: string; // checklist question name
