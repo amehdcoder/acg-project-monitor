@@ -67,7 +67,23 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
     currentProjectId ?? projects[0]?.id ?? null,
   );
   const [initialGroupId, setInitialGroupId] = useState<string | null>(null);
+  const [directTarget, setDirectTarget] = useState<{ id: string; name: string } | null>(null);
   const [unread, setUnread] = useState(() => readCachedUnread(user?.id));
+
+  // Listen for "chat with this person" requests from the active-users roster.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { userId?: string; userName?: string } | undefined;
+      if (!detail?.userId) return;
+      setInitialGroupId(null);
+      setDirectTarget({ id: detail.userId, name: detail.userName || "User" });
+      setPickerOpen(false);
+      setOpen(true);
+    };
+    window.addEventListener("amehnities:open-direct-chat", handler as EventListener);
+    return () => window.removeEventListener("amehnities:open-direct-chat", handler as EventListener);
+  }, []);
 
   useEffect(() => {
     if (currentProjectId) setActiveProjectId(currentProjectId);
