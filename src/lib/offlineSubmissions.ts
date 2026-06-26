@@ -196,6 +196,15 @@ export async function getPendingInsertCount(): Promise<number> {
   }
 }
 
+/** Count records that have exhausted automatic retries and need a forced resync. */
+export async function getQuarantinedInsertCount(): Promise<number> {
+  try {
+    return (await getAllRecords()).filter((r) => (r.attempts ?? 0) >= MAX_AUTO_ATTEMPTS).length;
+  } catch {
+    return 0;
+  }
+}
+
 export async function flushSubmissionQueue(
   options: { force?: boolean } = {},
 ): Promise<{ inserted: number; remaining: number }> {
