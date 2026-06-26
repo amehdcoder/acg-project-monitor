@@ -3080,6 +3080,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Copy MDA Supervisory Checklist from another project */}
+      <CopyMdaChecklistDialog
+        open={showCopyMda}
+        onOpenChange={setShowCopyMda}
+        currentProjectId={currentProjectId}
+        projects={projects}
+        destinationHasChecklist={forms.some((f) => f.name === MDA_CHECKLIST_NAME)}
+        userId={user?.id}
+        onCopied={() => currentProjectId && fetchForms(currentProjectId)}
+      />
+
       {/* Template Picker Dialog */}
       {showTemplatePicker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowTemplatePicker(false)}>
