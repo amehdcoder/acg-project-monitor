@@ -32,10 +32,12 @@ import { FlaskConical, AlertTriangle } from "lucide-react";
 
 const DataView = () => {
   const browserRef = useRef<ProjectSubmissionsBrowserHandle>(null);
+  const { isOwner } = useAuth();
   const [filters, setFilters] = useState<AnalyticsFilters>({});
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>();
   const [selectedFormId, setSelectedFormId] = useState<string | undefined>();
   const [activeTab, setActiveTab] = useState("submissions");
+  const [mdaSimulate, setMdaSimulate] = useState(false);
 
   const handlePullRefresh = useCallback(async () => {
     await browserRef.current?.refresh();
