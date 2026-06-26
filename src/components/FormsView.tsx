@@ -1602,7 +1602,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         )}
 
 
-        {/* KoboCollect-style action menu */}
+        {/* KoboCollect-style action menu — hidden while the inline MDA dashboard is open */}
+        {!(mdaDashboardForm && canSeeMdaDashboard) && (
         <section className="mx-auto w-full max-w-md space-y-3">
 
 
