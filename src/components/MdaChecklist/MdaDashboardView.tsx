@@ -18,7 +18,7 @@ interface MdaDashboardForm {
   project_id?: string | null;
   questions?: unknown[];
   groups?: unknown[];
-  settings?: Record<string, unknown> | null;
+  settings?: unknown;
 }
 
 interface DashboardOption {
