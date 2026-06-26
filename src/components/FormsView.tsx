@@ -229,6 +229,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [showCopyMda, setShowCopyMda] = useState(false);
   const [geofenceManagerForm, setGeofenceManagerForm] = useState<Form | null>(null);
   const [qrCodeForm, setQrCodeForm] = useState<Form | null>(null);
   const [dailyTargetForm, setDailyTargetForm] = useState<Form | null>(null);
