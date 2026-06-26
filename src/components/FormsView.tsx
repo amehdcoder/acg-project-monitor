@@ -234,6 +234,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [showCopyMda, setShowCopyMda] = useState(false);
   const [geofenceManagerForm, setGeofenceManagerForm] = useState<Form | null>(null);
+  const [accessManagerForm, setAccessManagerForm] = useState<Form | null>(null);
   const [qrCodeForm, setQrCodeForm] = useState<Form | null>(null);
   const [dailyTargetForm, setDailyTargetForm] = useState<Form | null>(null);
   const [showQRScanner, setShowQRScanner] = useState(false);
