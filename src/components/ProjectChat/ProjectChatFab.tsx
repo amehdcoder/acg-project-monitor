@@ -240,10 +240,11 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
               <MessagesSquare className="h-7 w-7 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3" strokeWidth={2.2} />
 
               {/* Unread badge — red with white ring */}
-              {unread > 0 && (
+              {totalUnread > 0 && (
                 <span className="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-[hsl(var(--destructive))] px-1.5 text-[11px] font-bold text-white ring-[2.5px] ring-[hsl(var(--background))] animate-badge-bounce">
-                  {unread > 99 ? "99+" : unread}
+                  {totalUnread > 99 ? "99+" : totalUnread}
                 </span>
+
               )}
 
               {/* Online / active indicator dot */}
