@@ -56,6 +56,50 @@ const DataView = () => {
   } = useDataAnalytics({ ...filters, projectId: selectedProjectId, formId: selectedFormId });
 
   const selectedForm = formAnalytics.find((f) => f.id === selectedFormId) || null;
+  const isMdaChecklist = Boolean((selectedForm as any)?.settings?.isMdaChecklist);
+
+  // Reset simulation whenever the form changes so it never lingers.
+  useEffect(() => { setMdaSimulate(false); }, [selectedFormId]);
+
+  // Real submissions mapped to the MDA dashboard shape. NEVER mutated.
+  const realMdaSubs = useMemo(
+    () =>
+      submissions.map((s: any) => {
+        let lat: number | undefined;
+        let lng: number | undefined;
+        const m = typeof s.location === "string" ? s.location.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/) : null;
+        if (m) { lat = parseFloat(m[1]); lng = parseFloat(m[2]); }
+        const d = s.data || {};
+        const lga = d.lga || d.LGA || d.local_government || d.local_government_area || null;
+        const ward = d.ward || d.Ward || d.ward_name || null;
+        return {
+          id: s.id,
+          projectId: (selectedForm as any)?.project_id ?? selectedProjectId ?? null,
+          state: s.state,
+          lga,
+          ward,
+          submitter: s.submitter_name,
+          submittedAt: s.submitted_at,
+          status: s.status,
+          location: lat != null && lng != null ? { latitude: lat, longitude: lng } : null,
+          data: d,
+        };
+      }),
+    [submissions, selectedForm, selectedProjectId],
+  );
+
+  // Owner-only synthetic submissions — generated purely in memory, never saved.
+  const simulatedMdaSubs = useMemo(() => {
+    if (!mdaSimulate || !isMdaChecklist) return [];
+    const restrictState = /jigawa/i.test(selectedForm?.name || "") ? "Jigawa" : null;
+    return generateMdaSimulation(((selectedForm as any)?.questions ?? []) as any, {
+      projectId: (selectedForm as any)?.project_id ?? selectedProjectId ?? null,
+      restrictState,
+    });
+  }, [mdaSimulate, isMdaChecklist, selectedForm, selectedProjectId]);
+
+  // What the dashboards render: simulation when toggled, otherwise real data.
+  const mdaSubs = mdaSimulate ? (simulatedMdaSubs as any[]) : realMdaSubs;
 
   // Live updates: refresh analytics whenever submissions change for the open form.
   useEffect(() => {
