@@ -2663,6 +2663,24 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     { kind: "bloomberg_dash" as const, icon: BarChart3, bg: "bg-[#DCF3F0]", fg: "text-[#14b8a6]", label: "Validation Dashboard", desc: "Baseline vs validated analytics, discrepancies & map (Owner only)." },
                   ],
                 }] : []),
+                {
+                  id: "mda_supervisory_folder",
+                  title: "Integrated MDA Supervisory Checklist",
+                  subtitle: "Community supervision checklist, follow-ups & realtime decision dashboard",
+                  bg: "bg-[#DCF3F0]", fg: "text-[#0f766e]", chipBg: "bg-[#DCF3F0]", chipFg: "text-[#0f766e]",
+                  items: [
+                    {
+                      kind: "mda_dashboard" as const,
+                      icon: BarChart3,
+                      bg: "bg-[#DCF3F0]",
+                      fg: "text-[#0f766e]",
+                      label: "MDA Supervisory Dashboard",
+                      desc: primaryMdaDashboardForm
+                        ? "Open the standalone Bloomberg-style dashboard for checklist, follow-up, GPS and field-worker insights."
+                        : "Create or copy an Integrated MDA Supervisory Checklist in this project to activate the dashboard.",
+                    },
+                  ],
+                },
                 ...(isOwner ? [{
                   id: "seeclear_folder",
                   title: "See Clear — Plateau Eye Health Project",
