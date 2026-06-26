@@ -828,16 +828,49 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           formsData = [];
         }
       } else {
-        // Regular users get only assigned forms
+        // Regular users get their explicitly-assigned forms PLUS automatic access
+        // to the Integrated MDA Supervisory Checklist for every project they are a
+        // member of (the checklist is auto-granted to all project members; the
+        // dashboard is gated separately and not opened here).
         const { data: assignments, error: assignError } = await supabase
           .from("user_form_assignments")
           .select("form_id")
           .eq("user_id", user?.id);
-        
+
         if (assignError) throw assignError;
-        
-        if (assignments && assignments.length > 0) {
-          const formIds = assignments.map(a => a.form_id);
+
+        const assignedFormIds = (assignments || []).map(a => a.form_id);
+
+        // Pull all forms from the user's assigned projects so we can surface the
+        // MDA checklist automatically even when it was never explicitly assigned.
+        const { data: projectAssignments } = await supabase
+          .from("user_project_assignments")
+          .select("project_id")
+          .eq("user_id", user?.id);
+        const memberProjectIds = (projectAssignments || []).map(a => a.project_id);
+
+        let autoMdaFormIds: string[] = [];
+        if (memberProjectIds.length > 0) {
+          const { data: projectForms } = await supabase
+            .from("forms")
+            .select("id, name, settings, questions")
+            .in("project_id", memberProjectIds);
+          autoMdaFormIds = (projectForms || [])
+            .filter((f: any) => {
+              const allItems = (f.questions as unknown as any[]) || [];
+              const groups = allItems.filter((q: any) => Array.isArray(q.questions));
+              return isMdaChecklistLike({
+                settings: (f.settings as unknown as FormSettings) || {},
+                formName: f.name,
+                groups: groups as FormGroup[],
+              });
+            })
+            .map((f: any) => f.id);
+        }
+
+        const formIds = [...new Set([...assignedFormIds, ...autoMdaFormIds])];
+
+        if (formIds.length > 0) {
           const { data, error } = await supabase
             .from("forms")
             .select("*")
@@ -1104,6 +1137,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const mdaChecklistForms = mergedForms.filter((form) =>
     isMdaChecklistLike({ settings: form.settings, formName: form.name, groups: form.groups })
   );
+  // The MDA Supervisory Dashboard is NOT auto-granted with the checklist.
+  // Only Systems Admins, Super Admins, Owner and Co-owner may open it.
+  const canSeeMdaDashboard = isAdmin || isOwnerLevel;
   const primaryMdaDashboardForm = currentProjectId
     ? mdaChecklistForms.find((form) => form.project_id === currentProjectId) || null
     : mdaChecklistForms[0] || null;
@@ -1554,7 +1590,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         )}
 
         {/* Inline MDA Supervisory Dashboard — expands in place within the forms list */}
-        {mdaDashboardForm && (
+        {mdaDashboardForm && canSeeMdaDashboard && (
           <section className="mx-auto w-full max-w-6xl">
             <MdaDashboardView
               form={mdaDashboardForm}
@@ -1887,7 +1923,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
                   return (
                     <div key={form.id} className="contents">
-                      {isMdaChecklistForm && (
+                      {isMdaChecklistForm && canSeeMdaDashboard && (
                         <div
                           className="group flex items-center gap-3 border-l-4 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
                           style={{ borderLeftColor: "#0d9488" }}
@@ -2027,7 +2063,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 <LayoutDashboard className="mr-2 h-4 w-4" />
                                 Custom Dashboards
                               </DropdownMenuItem>
-                              {isMdaChecklistForm && (
+                              {isMdaChecklistForm && canSeeMdaDashboard && (
                                 <DropdownMenuItem onClick={() => setMdaDashboardForm(form)}>
                                   <BarChart3 className="mr-2 h-4 w-4 text-emerald-600" />
                                   MDA Supervisory Dashboard
@@ -2680,7 +2716,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     { kind: "bloomberg_dash" as const, icon: BarChart3, bg: "bg-[#DCF3F0]", fg: "text-[#14b8a6]", label: "Validation Dashboard", desc: "Baseline vs validated analytics, discrepancies & map (Owner only)." },
                   ],
                 }] : []),
-                {
+                ...(canSeeMdaDashboard ? [{
                   id: "mda_supervisory_folder",
                   title: "Integrated MDA Supervisory Checklist",
                   subtitle: "Community supervision checklist, follow-ups & realtime decision dashboard",
@@ -2697,7 +2733,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         : "Create or copy an Integrated MDA Supervisory Checklist in this project to activate the dashboard.",
                     },
                   ],
-                },
+                }] : []),
                 ...(isOwner ? [{
                   id: "seeclear_folder",
                   title: "See Clear — Plateau Eye Health Project",
