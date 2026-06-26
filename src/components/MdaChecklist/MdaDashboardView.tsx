@@ -152,7 +152,7 @@ function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm) {
   };
 }
 
-export default function MdaDashboardView({ form, projects = [], onClose }: Props) {
+export default function MdaDashboardView({ form, projects = [], onClose, embedded = false }: Props) {
   const { isOwner } = useAuth();
   const { submissions, loading } = useDataAnalytics({ formId: form.id });
   const [simulate, setSimulate] = useState(false);
