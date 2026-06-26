@@ -1890,7 +1890,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
                   return (
                     <div key={form.id} className="contents">
-                      {isMdaChecklistForm && (
+                      {isMdaChecklistForm && canSeeMdaDashboard && (
                         <div
                           className="group flex items-center gap-3 border-l-4 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
                           style={{ borderLeftColor: "#0d9488" }}
