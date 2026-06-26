@@ -253,7 +253,7 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
         </div>
       </div>
 
-      <main className="container mx-auto space-y-6 px-4 py-6">
+      <main className={`space-y-6 px-4 py-6 ${embedded ? "" : "container mx-auto"}`}>
         {simulate && (
           <div className="flex items-center gap-2 rounded-lg border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm text-violet-800">
             <Sparkles className="h-4 w-4 shrink-0" />
