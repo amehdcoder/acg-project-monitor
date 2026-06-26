@@ -71,6 +71,11 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
   const [directTarget, setDirectTarget] = useState<{ id: string; name: string } | null>(null);
   const [unread, setUnread] = useState(() => readCachedUnread(user?.id));
 
+  // Direct-message unread + real-time toast notifications (fires once globally).
+  const { total: directUnread } = useDirectUnread({ withToast: true });
+  const totalUnread = unread + directUnread;
+
+
   // Listen for "chat with this person" requests from the active-users roster.
   useEffect(() => {
     if (typeof window === "undefined") return;
