@@ -489,6 +489,36 @@ export function FollowUpLinkEditor({
                               <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
                             )}
                           </div>
+                          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-background/60 px-2.5 py-1.5">
+                            <label className="flex items-center gap-2 text-xs font-medium text-foreground">
+                              <Switch
+                                checked={!!q.required}
+                                onCheckedChange={(v) => updateQuestion(q.id, { required: v })}
+                              />
+                              <span className="flex items-center gap-1">
+                                <Asterisk className="h-3 w-3 text-rose-500" /> Mandatory
+                              </span>
+                            </label>
+                            <Button
+                              type="button"
+                              variant={q.relevant ? "default" : "outline"}
+                              size="sm"
+                              className={`h-7 gap-1.5 text-xs ${q.relevant ? "bg-indigo-600 hover:bg-indigo-700" : ""}`}
+                              onClick={() => setSkipLogicFor(q.id)}
+                            >
+                              <GitBranch className="h-3.5 w-3.5" />
+                              {q.relevant ? "Skip logic set" : "Skip logic"}
+                            </Button>
+                            {q.relevant && (
+                              <button
+                                type="button"
+                                onClick={() => updateQuestion(q.id, { relevant: undefined })}
+                                className="text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-destructive hover:underline"
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
                           {isChoiceType(q.type) && (
                             <div className="rounded-lg border border-border/70 bg-background/80 p-2">
                               <div className="mb-2 flex items-center justify-between gap-2">
