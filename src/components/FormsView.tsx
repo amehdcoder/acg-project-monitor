@@ -1241,15 +1241,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
-  if (mdaDashboardForm) {
-    return (
-      <MdaDashboardView
-        form={mdaDashboardForm}
-        projects={projects}
-        onClose={() => setMdaDashboardForm(null)}
-      />
-    );
-  }
+
+
 
   if (geofenceManagerForm) {
     return (
