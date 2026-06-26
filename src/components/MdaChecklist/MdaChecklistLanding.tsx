@@ -328,16 +328,16 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   const openBuilder = (group: FormGroup | null) => {
     if (!group) return;
     if (!canBuildFollowUps) {
-      toast({
-        title: "Admin access required",
-        description: "Only Systems Admin, Super Admin, Owner, and Co-owner can build MDA follow-up linkages.",
-        variant: "destructive",
-      });
+      // Surface an explicit access-denied state instead of silently bailing,
+      // so unauthorized direct/bypass attempts get a clear message.
+      setBuilderGroup(null);
+      setBuilderOpen(true);
       return;
     }
     setBuilderGroup(group);
     setBuilderOpen(true);
   };
+
 
   const saveBuilderGroup = (updatedGroup: FormGroup) => {
     const previousGroups = groups;
