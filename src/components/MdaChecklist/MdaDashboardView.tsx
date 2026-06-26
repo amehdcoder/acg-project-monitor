@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, Database, Loader2, RotateCcw, Settings2, Sparkles } from "lucide-react";
+import { ArrowLeft, BarChart3, ChevronUp, Database, Loader2, RotateCcw, Settings2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
