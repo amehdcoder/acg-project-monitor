@@ -442,7 +442,10 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
       checklistQuestions={checklistQuestions}
       onSave={saveBuilderGroup}
     />
+  ) : builderOpen && !canBuildFollowUps ? (
+    <BuilderAccessDenied onClose={() => { setBuilderOpen(false); setBuilderGroup(null); }} />
   ) : null;
+
 
   if (view === "community") {
     return <FormFiller {...fillerProps(communityGroupNames)} />;
