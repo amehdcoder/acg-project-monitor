@@ -618,7 +618,153 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         </Card>
       </div>
 
-      {/* Engagement / cross-cutting / data quality */}
+      {/* Community status tables — Completed vs Not completed */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Communities where MDA was completed */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-1">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              Communities — MDA Completed
+              <Badge variant="secondary" className="ml-auto">{communityTables.completed.length}</Badge>
+            </CardTitle>
+            <p className="text-[11px] text-muted-foreground">Green “after follow-up” means completion was achieved only after a follow-up visit.</p>
+          </CardHeader>
+          <CardContent className="max-h-[340px] overflow-auto">
+            {communityTables.completed.length ? (
+              <table className="w-full text-xs">
+                <thead><tr className="border-b text-left text-muted-foreground">
+                  <th className="py-1.5 pr-2 font-medium">Community</th>
+                  <th className="py-1.5 pr-2 font-medium">Ward / LGA</th>
+                  <th className="py-1.5 font-medium">Completion</th>
+                </tr></thead>
+                <tbody>
+                  {communityTables.completed.map((c) => (
+                    <tr key={c.key} className="border-b border-border/40 align-top">
+                      <td className="py-1.5 pr-2"><div className="font-medium text-foreground">{c.community}</div><div className="text-[10px] text-muted-foreground">{c.supervisor}</div></td>
+                      <td className="py-1.5 pr-2"><div className="max-w-[120px] truncate">{c.ward}</div><div className="text-[10px] text-muted-foreground">{c.lga}, {c.state}</div></td>
+                      <td className="py-1.5">
+                        {c.afterFollowup ? (
+                          <Badge className="gap-1 border-emerald-500 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10">
+                            <TrendingUp className="h-3 w-3" />
+                            {c.fromStatus || "Incomplete"} <ArrowRight className="h-3 w-3" /> Completed
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-emerald-500 text-emerald-600 gap-1">
+                            <CheckCircle2 className="h-3 w-3" />Completed{c.hadFollowup ? " (verified)" : ""}
+                          </Badge>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : <p className="py-8 text-center text-xs text-muted-foreground">No communities reported MDA as completed yet.</p>}
+          </CardContent>
+        </Card>
+
+        {/* Communities where MDA is NOT completed */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-1">
+              <Activity className="h-4 w-4 text-amber-600" />
+              Communities — MDA Not Completed
+              <Badge variant="secondary" className="ml-auto">{communityTables.notCompleted.length}</Badge>
+            </CardTitle>
+            <p className="text-[11px] text-muted-foreground">Not Started, Ongoing or Halted. Arrows show any status change driven by follow-up.</p>
+          </CardHeader>
+          <CardContent className="max-h-[340px] overflow-auto">
+            {communityTables.notCompleted.length ? (
+              <table className="w-full text-xs">
+                <thead><tr className="border-b text-left text-muted-foreground">
+                  <th className="py-1.5 pr-2 font-medium">Community</th>
+                  <th className="py-1.5 pr-2 font-medium">Ward / LGA</th>
+                  <th className="py-1.5 font-medium">Current Status</th>
+                </tr></thead>
+                <tbody>
+                  {communityTables.notCompleted.map((c) => {
+                    const tint = c.status === "Halted" ? "border-red-500 text-red-600" : c.status === "Ongoing" ? "border-blue-500 text-blue-600" : "border-slate-400 text-slate-500";
+                    return (
+                      <tr key={c.key} className="border-b border-border/40 align-top">
+                        <td className="py-1.5 pr-2"><div className="font-medium text-foreground">{c.community}</div><div className="text-[10px] text-muted-foreground">{c.supervisor}</div></td>
+                        <td className="py-1.5 pr-2"><div className="max-w-[120px] truncate">{c.ward}</div><div className="text-[10px] text-muted-foreground">{c.lga}, {c.state}</div></td>
+                        <td className="py-1.5">
+                          <Badge variant="outline" className={`gap-1 ${tint}`}>{c.status}</Badge>
+                          {c.changed && (
+                            <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                              <TrendingUp className="h-3 w-3" />{c.fromStatus} <ArrowRight className="h-3 w-3" /> {c.status} <span className="text-emerald-600">(follow-up)</span>
+                            </div>
+                          )}
+                          {!c.changed && c.hadFollowup && (
+                            <div className="mt-1 text-[10px] text-muted-foreground">No change after follow-up</div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : <p className="py-8 text-center text-xs text-muted-foreground">No incomplete communities reported.</p>}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Communities with reported adverse reactions */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-1">
+            <Ambulance className="h-4 w-4 text-rose-600" />
+            Communities with Reported Adverse Reactions
+            <Badge variant="secondary" className="ml-auto">{communityTables.adverse.length}</Badge>
+          </CardTitle>
+          <p className="text-[11px] text-muted-foreground">Referral status from the supervisory visit, and whether the reaction was followed up.</p>
+        </CardHeader>
+        <CardContent className="max-h-[400px] overflow-auto">
+          {communityTables.adverse.length ? (
+            <table className="w-full text-xs">
+              <thead><tr className="border-b text-left text-muted-foreground">
+                <th className="py-1.5 pr-2 font-medium">Community</th>
+                <th className="py-1.5 pr-2 font-medium">Ward / LGA</th>
+                <th className="py-1.5 pr-2 font-medium">AEs / SAEs</th>
+                <th className="py-1.5 pr-2 font-medium">Reaction type(s)</th>
+                <th className="py-1.5 pr-2 font-medium">Referred</th>
+                <th className="py-1.5 font-medium">Follow-up</th>
+              </tr></thead>
+              <tbody>
+                {communityTables.adverse.map((c) => (
+                  <tr key={c.key} className="border-b border-border/40 align-top">
+                    <td className="py-1.5 pr-2"><div className="font-medium text-foreground">{c.community}</div><div className="text-[10px] text-muted-foreground">{c.supervisor}</div></td>
+                    <td className="py-1.5 pr-2"><div className="max-w-[110px] truncate">{c.ward}</div><div className="text-[10px] text-muted-foreground">{c.lga}, {c.state}</div></td>
+                    <td className="py-1.5 pr-2"><span className="font-semibold text-foreground">{c.aes}</span>{c.serious > 0 && <span className="ml-1 text-rose-600">({c.serious} SAE)</span>}</td>
+                    <td className="py-1.5 pr-2"><div className="flex max-w-[160px] flex-wrap gap-1">{c.types.length ? c.types.map((t: string) => <Badge key={t} variant="secondary" className="px-1 py-0 text-[10px]">{t}</Badge>) : <span className="text-muted-foreground">—</span>}</div></td>
+                    <td className="py-1.5 pr-2">
+                      {norm(c.referral) === "yes" ? (
+                        <Badge variant="outline" className="border-emerald-500 text-emerald-600">Referred</Badge>
+                      ) : norm(c.referral) === "no" ? (
+                        <Badge variant="outline" className="border-red-500 text-red-600">Not referred</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">{c.referral || "—"}</span>
+                      )}
+                    </td>
+                    <td className="py-1.5">
+                      {c.followedUp ? (
+                        <div className="flex flex-col gap-0.5">
+                          <Badge className="w-fit gap-1 border-emerald-500 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10"><CheckCircle2 className="h-3 w-3" />Followed up</Badge>
+                          <span className="text-[10px] text-muted-foreground">{c.managed ? "Managed" : "Not managed"}{c.okayNow ? " · OK now" : ""}</span>
+                        </div>
+                      ) : (
+                        <Badge variant="outline" className="border-amber-500 text-amber-600">Pending follow-up</Badge>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : <p className="py-8 text-center text-xs text-muted-foreground">No adverse reactions reported.</p>}
+        </CardContent>
+      </Card>
+
+
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1"><HeartHandshake className="h-4 w-4" />Community Engagement Score <Badge variant="secondary" className="ml-auto">{engagementScore}%</Badge></CardTitle></CardHeader>
