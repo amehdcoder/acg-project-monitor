@@ -16,14 +16,15 @@ interface MdaDashboardForm {
   name: string;
   description?: string | null;
   project_id?: string | null;
-  questions?: DashboardQuestion[];
-  groups?: DashboardQuestion[];
+  questions?: unknown[];
+  groups?: unknown[];
   settings?: Record<string, unknown> | null;
 }
 
 interface DashboardOption {
-  label?: string;
-  value?: string;
+  id?: string;
+  label: string;
+  value: string;
 }
 
 interface DashboardQuestion {
@@ -95,6 +96,37 @@ function flattenQuestions(items: DashboardQuestion[]): DashboardQuestion[] {
   return out;
 }
 
+function normalizeQuestions(items: unknown[]): DashboardQuestion[] {
+  return (items || [])
+    .map((item, idx) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Record<string, unknown>;
+      const id = String(row.id || row.name || `question_${idx}`);
+      const nested = Array.isArray(row.questions) ? normalizeQuestions(row.questions) : undefined;
+      const options = Array.isArray(row.options)
+        ? row.options
+            .map((opt, optIdx) => {
+              if (!opt || typeof opt !== "object") return null;
+              const option = opt as Record<string, unknown>;
+              const label = String(option.label || option.value || `Option ${optIdx + 1}`);
+              const value = String(option.value || option.label || label);
+              return { ...option, id: option.id ? String(option.id) : undefined, label, value } as DashboardOption;
+            })
+            .filter((opt): opt is DashboardOption => !!opt)
+        : undefined;
+      return {
+        ...row,
+        id,
+        name: row.name ? String(row.name) : undefined,
+        label: row.label ? String(row.label) : undefined,
+        type: row.type ? String(row.type) : undefined,
+        questions: nested,
+        options,
+      } as DashboardQuestion;
+    })
+    .filter((item): item is DashboardQuestion => !!item);
+}
+
 function singleStateRestriction(questions: DashboardQuestion[]): string | null {
   const stateQuestion = flattenQuestions(questions).find((q) => String(q?.name || q?.id || "").toLowerCase() === "state");
   const options = stateQuestion?.options || [];
@@ -125,7 +157,10 @@ export default function MdaDashboardView({ form, projects = [], onClose }: Props
   const [simCount, setSimCount] = useState(SIM_DEFAULTS.count);
   const [simSeed, setSimSeed] = useState(SIM_DEFAULTS.seed);
 
-  const questions = useMemo(() => [...(form.groups || []), ...(form.questions || [])], [form.groups, form.questions]);
+  const questions = useMemo(
+    () => normalizeQuestions([...(form.groups || []), ...(form.questions || [])]),
+    [form.groups, form.questions],
+  );
 
   const realRows = useMemo(
     () => submissions.map((s) => toMdaSubmission(s, form)),
