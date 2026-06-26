@@ -1,5 +1,6 @@
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useDataAnalytics, type AnalyticsFilters } from "@/hooks/useDataAnalytics";
 import { buildLabelMap } from "@/lib/formLabelUtils";
@@ -22,7 +23,7 @@ import ProjectSubmissionsBrowser, {
 } from "@/components/DataAnalytics/ProjectSubmissionsBrowser";
 import PullToRefresh from "@/components/PullToRefresh";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MdaSupervisoryMap, SupervisoryGapAnalysisDashboard, MdaAdaptiveDashboard } from "@/components/MdaChecklist";
+import { MdaSupervisoryMap, SupervisoryGapAnalysisDashboard, MdaAdaptiveDashboard, MdaSupervisoryChecklistDashboard } from "@/components/MdaChecklist";
 import FormDataKnowledgeGraph from "@/components/KnowledgeGraph/FormDataKnowledgeGraph";
 
 const DataView = () => {
@@ -49,6 +50,22 @@ const DataView = () => {
   } = useDataAnalytics({ ...filters, projectId: selectedProjectId, formId: selectedFormId });
 
   const selectedForm = formAnalytics.find((f) => f.id === selectedFormId) || null;
+
+  // Live updates: refresh analytics whenever submissions change for the open form.
+  useEffect(() => {
+    if (!selectedFormId) return;
+    const channel = supabase
+      .channel(`dataview-submissions-${selectedFormId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "form_submissions", filter: `form_id=eq.${selectedFormId}` },
+        () => { void refresh(); },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [selectedFormId, refresh]);
+
+
 
   const handleBack = () => {
     if (selectedFormId) {
@@ -137,6 +154,31 @@ const DataView = () => {
               <AnalyticsKPICards kpis={kpis} loading={loading} />
               {(selectedForm as any)?.settings?.isMdaChecklist && (
                 <>
+                  <MdaSupervisoryChecklistDashboard
+                    submissions={submissions.map((s: any) => {
+                      let lat: number | undefined;
+                      let lng: number | undefined;
+                      const m = typeof s.location === "string" ? s.location.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/) : null;
+                      if (m) { lat = parseFloat(m[1]); lng = parseFloat(m[2]); }
+                      const d = s.data || {};
+                      const lga = d.lga || d.LGA || d.local_government || d.local_government_area || null;
+                      const ward = d.ward || d.Ward || d.ward_name || null;
+                      return {
+                        id: s.id,
+                        projectId: (selectedForm as any)?.project_id ?? selectedProjectId ?? null,
+                        state: s.state,
+                        lga,
+                        ward,
+                        submitter: s.submitter_name,
+                        submittedAt: s.submitted_at,
+                        status: s.status,
+                        location: lat != null && lng != null ? { latitude: lat, longitude: lng } : null,
+                        data: d,
+                      };
+                    })}
+                    questions={((selectedForm as any)?.questions ?? []) as any}
+                    formName={selectedForm?.name}
+                  />
                   <MdaAdaptiveDashboard
                     submissions={submissions.map((s: any) => {
                       let lat: number | undefined;
