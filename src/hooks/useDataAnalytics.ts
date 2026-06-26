@@ -178,7 +178,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
     if (!isAdmin && !filters.formId) return;
 
     try {
-      let query = supabase.from("forms").select("id, name, questions, project_id");
+      let query = supabase.from("forms").select("id, name, questions, project_id, settings");
 
       // If a specific formId is provided, only fetch that form
       if (filters.formId) {
