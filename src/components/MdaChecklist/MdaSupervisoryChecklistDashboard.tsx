@@ -755,6 +755,9 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         </CardContent>
       </Card>
 
+      {/* ── Insightful, conditionally-formatted analyses ── */}
+      <MdaAdvancedAnalyses submissions={filtered as any} questions={questions as any} />
+
       {/* ── Longitudinal linkage register ── */}
       <Card>
         <CardHeader className="pb-2">
