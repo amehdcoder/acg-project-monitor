@@ -76,6 +76,8 @@ export default function FormAccessManager({
   const [expires, setExpires] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 25;
 
   const formId = form?.id ?? null;
 
