@@ -48,6 +48,8 @@ interface DraftQuestion {
   label: string;
   name: string;
   type: QuestionType;
+  required?: boolean;
+  relevant?: string;
   linkedSourceField?: string;
   linkedSourceValue?: string;
   options?: QuestionOption[];
