@@ -114,15 +114,16 @@ function Kpi({ icon: Icon, label, value, sub, tint, bar }: {
   );
 }
 
-function Donut({ data, centerLabel, centerValue }: {
+function Donut({ data, centerLabel, centerValue, height = 170, inner = 52, outer = 75 }: {
   data: { name: string; value: number; color: string }[]; centerLabel?: string; centerValue?: string;
+  height?: number; inner?: number; outer?: number;
 }) {
   const total = data.reduce((a, b) => a + b.value, 0);
   return (
-    <div className="relative">
-      <ResponsiveContainer width="100%" height={170}>
+    <div className="relative h-full">
+      <ResponsiveContainer width="100%" height={height}>
         <PieChart>
-          <Pie data={total ? data : [{ name: "—", value: 1, color: "#e5e7eb" }]} dataKey="value" innerRadius={52} outerRadius={75} paddingAngle={total ? 2 : 0} stroke="none">
+          <Pie data={total ? data : [{ name: "—", value: 1, color: "#e5e7eb" }]} dataKey="value" innerRadius={inner} outerRadius={outer} paddingAngle={total ? 2 : 0} stroke="none">
             {(total ? data : [{ color: "#e5e7eb" }]).map((d, i) => <Cell key={i} fill={d.color} />)}
           </Pie>
           {total > 0 && <RTooltip />}
