@@ -97,7 +97,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions }: Props) {
   const communities = useMemo(() => aggregateByCommunity(submissions), [submissions]);
 
   // Resolve the questions that drive each analysis (by label).
-  const qStatus = useMemo(() => idx.find([/current.*status of mda/i, /status of mda/i, /treatment commenced/i]), [idx]);
+  const qStatus = useMemo(() => idx.find([/current.*status of mda/i, /status of mda/i]), [idx]);
   const qCdd = useMemo(() => idx.find([/are there cdds/i, /cdds in the community/i]), [idx]);
   const qNumCdd = useMemo(() => idx.find([/how many cdds/i, /number of cdds/i, /no\.? of cdds/i]), [idx]);
   const qSae = useMemo(() => idx.find([/complain.*side effect/i, /side effects during mda/i, /complain of side/i]), [idx]);
