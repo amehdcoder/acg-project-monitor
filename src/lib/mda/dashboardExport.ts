@@ -177,6 +177,141 @@ function bandRow(ws: ExcelJS.Worksheet, row: number, span: number, text: string,
   ws.getRow(row).height = size + 12;
 }
 
+// ───── Bloomberg-style "Collected Data" sheet ─────
+// One row per submission, every checklist field as a column, grouped by section
+// with coloured group bands, frozen panes, zebra striping and auto-filter.
+const GROUP_TONES = [
+  "FF2563EB", "FF0E7490", "FF6D28D9", "FF14B8A6", "FFB45309",
+  "FFDB2777", "FF0891B2", "FF7C3AED", "FF059669", "FFC2410C",
+];
+
+function cellValue(q: FormQuestion, raw: any): string | number {
+  const type = (q.type || "").toLowerCase();
+  if (raw === undefined || raw === null || raw === "") return "";
+  if (MEDIA.has(type)) {
+    if (type === "geopoint" || type === "geotrace" || type === "geoshape") return String(raw);
+    return "Captured";
+  }
+  if (NUMERIC.has(type)) {
+    const n = toNum(raw);
+    return n === null ? String(raw) : n;
+  }
+  if (CHOICE.has(type)) {
+    const arr = Array.isArray(raw) ? raw : String(raw).split(/[\s,;]+/).filter(Boolean);
+    if (arr.length > 1 || type === "select_multiple") return arr.map((v) => optLabel(q, String(v))).join("; ");
+    return optLabel(q, String(raw));
+  }
+  return stripTags(String(raw)) || String(raw);
+}
+
+function buildCollectedDataSheet(
+  wb: ExcelJS.Workbook, submissions: DashSubmission[], questions: FormQuestion[], formName: string, projectName?: string,
+) {
+  const sections = buildSections(questions);
+  type Col = { header: string; width: number; group: string; q?: FormQuestion };
+  const cols: Col[] = [
+    { header: "#", width: 5, group: "Record" },
+    { header: "Status", width: 13, group: "Record" },
+    { header: "Supervisor", width: 22, group: "Record" },
+    { header: "Date Submitted", width: 18, group: "Record" },
+    { header: "State", width: 16, group: "Location" },
+    { header: "LGA", width: 16, group: "Location" },
+    { header: "Ward", width: 18, group: "Location" },
+  ];
+  sections.forEach((sec) => {
+    sec.questions.forEach((q) => {
+      const label = stripTags(q.label) || keyFor(q);
+      cols.push({ header: label, width: Math.min(40, Math.max(14, label.length + 2)), group: sec.label, q });
+    });
+  });
+
+  const groupColor: Record<string, string> = { Record: NAVY, Location: INDIGO };
+  sections.forEach((s, i) => { groupColor[s.label] = GROUP_TONES[i % GROUP_TONES.length]; });
+
+  const ws = wb.addWorksheet("Collected Data", {
+    views: [{ state: "frozen", xSplit: 4, ySplit: 3, showGridLines: false }],
+    properties: { defaultRowHeight: 16 },
+  });
+  const totalCols = cols.length;
+
+  // Row 1: Title banner
+  ws.mergeCells(1, 1, 1, totalCols);
+  const title = ws.getCell(1, 1);
+  title.value = `${formName}${projectName ? `  •  ${projectName}` : ""}   •   ${submissions.length.toLocaleString()} submissions   •   Generated ${new Date().toLocaleString()}`;
+  title.font = { bold: true, size: 13, color: { argb: WHITE }, name: "Arial" };
+  title.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+  title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
+  ws.getRow(1).height = 28;
+
+  // Row 2: Group band
+  let ci = 1;
+  while (ci <= totalCols) {
+    const g = cols[ci - 1].group;
+    let span = 1;
+    while (ci + span <= totalCols && cols[ci - 1 + span].group === g) span++;
+    if (span > 1) ws.mergeCells(2, ci, 2, ci + span - 1);
+    const cell = ws.getCell(2, ci);
+    cell.value = g;
+    cell.font = { bold: true, size: 10, color: { argb: WHITE }, name: "Arial" };
+    cell.alignment = { vertical: "middle", horizontal: "center" };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: groupColor[g] || NAVY } };
+    cell.border = { right: { style: "thin", color: { argb: WHITE } } };
+    ci += span;
+  }
+  ws.getRow(2).height = 20;
+
+  // Row 3: Column headers
+  const headerRow = ws.getRow(3);
+  cols.forEach((c, i) => {
+    const cell = headerRow.getCell(i + 1);
+    cell.value = c.header;
+    cell.font = { bold: true, size: 9, color: { argb: NAVY }, name: "Arial" };
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEEF2FB" } };
+    cell.border = {
+      bottom: { style: "medium", color: { argb: groupColor[c.group] || NAVY } },
+      right: { style: "hair", color: { argb: "FFCBD5E1" } },
+    };
+    ws.getColumn(i + 1).width = c.width;
+  });
+  headerRow.height = 30;
+
+  const STATUS_FILL: Record<string, string> = { finalized: "FFDCFCE7", sent: "FFDCFCE7", submitted: "FFDCFCE7", draft: "FFFEF9C3" };
+  const STATUS_FG: Record<string, string> = { finalized: "FF15803D", sent: "FF15803D", submitted: "FF15803D", draft: "FF854D0E" };
+
+  submissions.forEach((s, idx) => {
+    const row: any[] = [
+      idx + 1,
+      s.status ? s.status[0].toUpperCase() + s.status.slice(1) : "—",
+      s.submitter || "—",
+      s.submittedAt ? new Date(s.submittedAt).toLocaleString() : "—",
+      s.state || s.data?.state || "—",
+      s.lga || s.data?.lga || "—",
+      s.ward || s.data?.ward || "—",
+    ];
+    sections.forEach((sec) => sec.questions.forEach((q) => row.push(cellValue(q, s.data?.[keyFor(q)]))));
+    const r = ws.addRow(row);
+    r.height = 16;
+    const zebra = idx % 2 === 0 ? "FFFFFFFF" : "FFF7F9FC";
+    r.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      const isNum = typeof cell.value === "number";
+      cell.font = { size: 9, color: { argb: "FF1F2937" }, name: "Arial" };
+      cell.alignment = { vertical: "middle", horizontal: colNumber <= 3 ? "left" : isNum ? "center" : "left", wrapText: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: zebra } };
+      cell.border = { right: { style: "hair", color: { argb: "FFE2E8F0" } }, bottom: { style: "hair", color: { argb: "FFE2E8F0" } } };
+      if (isNum) cell.numFmt = "#,##0.###";
+    });
+    const stKey = norm(s.status);
+    const statusCell = r.getCell(2);
+    if (STATUS_FILL[stKey]) {
+      statusCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: STATUS_FILL[stKey] } };
+      statusCell.font = { size: 9, bold: true, color: { argb: STATUS_FG[stKey] }, name: "Arial" };
+    }
+  });
+
+  ws.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: totalCols } };
+}
+
 export async function exportMdaDashboard(
   submissions: DashSubmission[],
   questions: FormQuestion[],
@@ -187,6 +322,10 @@ export async function exportMdaDashboard(
   const wb = new ExcelJS.Workbook();
   wb.creator = "Amehnities";
   wb.created = new Date();
+
+  // ───── Collected Data sheet (Bloomberg-style full table — first sheet) ─────
+  buildCollectedDataSheet(wb, submissions, questions, formName || "Integrated MDA Supervisory Checklist", projectName);
+
 
   // ───── Overview sheet ─────
   const ov = wb.addWorksheet("Overview", { views: [{ showGridLines: false }] });
