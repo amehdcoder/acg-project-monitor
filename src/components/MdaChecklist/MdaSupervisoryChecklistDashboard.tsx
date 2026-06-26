@@ -39,6 +39,7 @@ import {
 import { exportMdaDashboard } from "@/lib/mda/dashboardExport";
 import MdaSupervisoryMap from "./MdaSupervisoryMap";
 import JigawaSupervisoryMap from "./JigawaSupervisoryMap";
+import HouseholdCoverageSurveyMap from "./HouseholdCoverageSurveyMap";
 
 // ───────────────────────── Types ─────────────────────────
 interface QOption { id?: string; label: string; value: string; }
