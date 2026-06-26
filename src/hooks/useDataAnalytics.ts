@@ -32,6 +32,7 @@ export interface FormAnalytics {
   total_submissions: number;
   current_cycle_submissions: number;
   questions: any[];
+  settings?: any;
 }
 
 export interface LocationAnalytics {
@@ -177,7 +178,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
     if (!isAdmin && !filters.formId) return;
 
     try {
-      let query = supabase.from("forms").select("id, name, questions, project_id");
+      let query = supabase.from("forms").select("id, name, questions, project_id, settings");
 
       // If a specific formId is provided, only fetch that form
       if (filters.formId) {
@@ -196,6 +197,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
         total_submissions: 0,
         current_cycle_submissions: 0,
         questions: Array.isArray(f.questions) ? f.questions : [],
+        settings: (f as any).settings ?? {},
       }));
 
       setForms(formsData);
