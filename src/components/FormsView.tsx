@@ -1543,6 +1543,19 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         </section>
         )}
 
+        {/* Inline MDA Supervisory Dashboard — expands in place within the forms list */}
+        {mdaDashboardForm && (
+          <section className="mx-auto w-full max-w-6xl">
+            <MdaDashboardView
+              form={mdaDashboardForm}
+              projects={projects}
+              onClose={() => setMdaDashboardForm(null)}
+              embedded
+            />
+          </section>
+        )}
+
+
         {/* KoboCollect-style action menu */}
         <section className="mx-auto w-full max-w-md space-y-3">
           <button
