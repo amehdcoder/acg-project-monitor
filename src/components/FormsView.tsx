@@ -122,7 +122,8 @@ import BulkUploadAccessManager from "@/components/OwnerTools/BulkUploadAccessMan
 import { useBulkDataAccess } from "@/hooks/useBulkDataAccess";
 import { scrollToAppTop } from "@/lib/scrollToAppTop";
 import { isMdaChecklistLike } from "@/lib/mdaFollowUp";
-import { FileSpreadsheet, KeyRound, GanttChartSquare, NotebookPen } from "lucide-react";
+import { FileSpreadsheet, KeyRound, GanttChartSquare, NotebookPen, Copy } from "lucide-react";
+import CopyMdaChecklistDialog from "@/components/MdaChecklist/CopyMdaChecklistDialog";
 
 interface FormSettings {
   requireLocation?: boolean;
@@ -229,6 +230,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [showCopyMda, setShowCopyMda] = useState(false);
   const [geofenceManagerForm, setGeofenceManagerForm] = useState<Form | null>(null);
   const [qrCodeForm, setQrCodeForm] = useState<Form | null>(null);
   const [dailyTargetForm, setDailyTargetForm] = useState<Form | null>(null);
@@ -2182,41 +2184,58 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                       <p className="text-xs text-muted-foreground">12-section NTD supervision tool · cascade selects · auto-scoring · linked Coverage Evaluation 3D. Fully editable in the Form Builder.</p>
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    className="shrink-0"
-                    onClick={async () => {
-                      if (!currentProjectId) {
-                        toast({ title: "Select a project", description: "Choose a project before creating the checklist.", variant: "destructive" });
-                        return;
-                      }
-                      const existing = forms.find((f) => f.name === MDA_CHECKLIST_NAME);
-                      if (existing) {
-                        toast({ title: "Already added", description: "This checklist already exists in this project. Open it from the list above to edit." });
-                        return;
-                      }
-                      try {
-                        const built = buildMdaSupervisoryChecklist();
-                        const { error } = await supabase.from("forms").insert({
-                          name: built.name,
-                          description: built.description,
-                          questions: built.questions as any,
-                          settings: built.settings as any,
-                          project_id: currentProjectId,
-                          created_by: user?.id,
-                          status: "draft",
-                        } as any);
-                        if (error) throw error;
-                        toast({ title: "Checklist created", description: "Open it from your forms list to fill, share, or edit in the Form Builder." });
-                        fetchForms(currentProjectId);
-                      } catch (e: any) {
-                        console.error("MDA checklist create error", e);
-                        toast({ title: "Could not create", description: e?.message || "Please try again.", variant: "destructive" });
-                      }
-                    }}
-                  >
-                    <Sparkles className="h-4 w-4 mr-1.5" /> Add to project
-                  </Button>
+                   <div className="flex flex-col gap-1.5 shrink-0">
+                   <Button
+                     size="sm"
+                     className="shrink-0"
+                     onClick={async () => {
+                       if (!currentProjectId) {
+                         toast({ title: "Select a project", description: "Choose a project before creating the checklist.", variant: "destructive" });
+                         return;
+                       }
+                       const existing = forms.find((f) => f.name === MDA_CHECKLIST_NAME);
+                       if (existing) {
+                         toast({ title: "Already added", description: "This checklist already exists in this project. Open it from the list above to edit." });
+                         return;
+                       }
+                       try {
+                         const built = buildMdaSupervisoryChecklist();
+                         const { error } = await supabase.from("forms").insert({
+                           name: built.name,
+                           description: built.description,
+                           questions: built.questions as any,
+                           settings: built.settings as any,
+                           project_id: currentProjectId,
+                           created_by: user?.id,
+                           status: "draft",
+                         } as any);
+                         if (error) throw error;
+                         toast({ title: "Checklist created", description: "Open it from your forms list to fill, share, or edit in the Form Builder." });
+                         fetchForms(currentProjectId);
+                       } catch (e: any) {
+                         console.error("MDA checklist create error", e);
+                         toast({ title: "Could not create", description: e?.message || "Please try again.", variant: "destructive" });
+                       }
+                     }}
+                   >
+                     <Sparkles className="h-4 w-4 mr-1.5" /> Add to project
+                   </Button>
+                   <Button
+                     size="sm"
+                     variant="outline"
+                     className="shrink-0"
+                     onClick={() => {
+                       if (!currentProjectId) {
+                         toast({ title: "Select a project", description: "Choose a destination project first.", variant: "destructive" });
+                         return;
+                       }
+                       setShowCopyMda(true);
+                     }}
+                   >
+                     <Copy className="h-4 w-4 mr-1.5" /> Copy from project
+                   </Button>
+                   </div>
+
                 </div>
               </div>
 
@@ -3060,6 +3079,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Copy MDA Supervisory Checklist from another project */}
+      <CopyMdaChecklistDialog
+        open={showCopyMda}
+        onOpenChange={setShowCopyMda}
+        currentProjectId={currentProjectId}
+        projects={projects}
+        destinationHasChecklist={forms.some((f) => f.name === MDA_CHECKLIST_NAME)}
+        userId={user?.id}
+        onCopied={() => currentProjectId && fetchForms(currentProjectId)}
+      />
 
       {/* Template Picker Dialog */}
       {showTemplatePicker && (
