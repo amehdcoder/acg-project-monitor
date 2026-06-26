@@ -74,6 +74,8 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
   const geoRef = useRef<any[] | null>(null);
+  const sweepTimer = useRef<number | null>(null);
+  const liveRef = useRef<L.Marker | null>(null);
 
   const points = useMemo(
     () =>
@@ -116,7 +118,10 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
     mapRef.current = map;
     setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 50);
     redraw();
-    return () => { try { map.remove(); } catch { /* noop */ } mapRef.current = null; };
+    return () => {
+      if (sweepTimer.current) { clearInterval(sweepTimer.current); sweepTimer.current = null; }
+      try { map.remove(); } catch { /* noop */ } mapRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -152,17 +157,26 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
     const group = L.layerGroup();
     const bounds = L.latLngBounds([]);
 
+    // Bold glow underlay so the Jigawa boundary reads strongly over the basemap.
+    const glow = L.geoJSON(
+      { type: "FeatureCollection", features: feats } as any,
+      { style: () => ({ color: "#0d9488", weight: 6, opacity: 0.22, fill: false }) },
+    );
+    group.addLayer(glow);
+
     const gj = L.geoJSON(
       { type: "FeatureCollection", features: feats } as any,
       {
         style: (feature: any) => {
           const v = visits.get(norm(feature?.properties?.lga)) || 0;
-          return { color: "#ffffff", weight: 1, fillColor: fillFor(v, max), fillOpacity: v > 0 ? 0.85 : 0.45 };
+          return { color: "#0f766e", weight: 1.8, fillColor: fillFor(v, max), fillOpacity: v > 0 ? 0.82 : 0.4 };
         },
         onEachFeature: (feature: any, lyr: L.Layer) => {
           const label = prettyLga(feature?.properties?.lga || "");
           const v = visits.get(norm(feature?.properties?.lga)) || 0;
           lyr.bindTooltip(`<strong>${label}</strong><br/>${v} supervisory visit${v === 1 ? "" : "s"}`, { sticky: true });
+          (lyr as L.Path).on("mouseover", () => (lyr as L.Path).setStyle({ weight: 3.2, color: "#134e4a" }));
+          (lyr as L.Path).on("mouseout", () => (lyr as L.Path).setStyle({ weight: 1.8, color: "#0f766e" }));
           try { bounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
         },
       },
@@ -184,6 +198,23 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
     group.addTo(map);
     layerRef.current = group;
     try { if (bounds.isValid()) map.fitBounds(bounds, { padding: [16, 16] }); } catch { /* noop */ }
+
+    // Dengue-style animated sweep that replays the supervisory visits.
+    if (sweepTimer.current) { clearInterval(sweepTimer.current); sweepTimer.current = null; }
+    if (liveRef.current) { try { map.removeLayer(liveRef.current); } catch { /* noop */ } liveRef.current = null; }
+    if (points.length) {
+      const seq = [...points].sort((a, b) => new Date(a.at || 0).getTime() - new Date(b.at || 0).getTime());
+      let i = 0;
+      const pulse = L.marker([seq[0].lat, seq[0].lng], {
+        icon: L.divIcon({ className: "hcs-live", html: '<div class="hcs-live-ring"></div>', iconSize: [26, 26], iconAnchor: [13, 13] }),
+        interactive: false, zIndexOffset: -50,
+      }).addTo(map);
+      liveRef.current = pulse;
+      sweepTimer.current = window.setInterval(() => {
+        i = (i + 1) % seq.length;
+        pulse.setLatLng([seq[i].lat, seq[i].lng]);
+      }, 1100);
+    }
   }
 
   const totalGps = points.length;

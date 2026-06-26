@@ -39,6 +39,7 @@ import {
 import { exportMdaDashboard } from "@/lib/mda/dashboardExport";
 import MdaSupervisoryMap from "./MdaSupervisoryMap";
 import JigawaSupervisoryMap from "./JigawaSupervisoryMap";
+import HouseholdCoverageSurveyMap from "./HouseholdCoverageSurveyMap";
 
 // ───────────────────────── Types ─────────────────────────
 interface QOption { id?: string; label: string; value: string; }
@@ -58,6 +59,7 @@ interface Props {
   questions: FormQuestion[];
   formName?: string;
   projectName?: string;
+  projectId?: string | null;
 }
 
 // ───────────────────────── Palette ─────────────────────────
@@ -183,7 +185,7 @@ function Tag({ text, tint }: { text: string; tint: string }) {
 const ALL = "__all__";
 
 // ───────────────────────── Main ─────────────────────────
-export default function MdaSupervisoryChecklistDashboard({ submissions, questions, formName, projectName }: Props) {
+export default function MdaSupervisoryChecklistDashboard({ submissions, questions, formName, projectName, projectId }: Props) {
   // ── Filter state ──────────────────────────────────────────────
   const [fState, setFState] = useState(ALL);
   const [fLga, setFLga] = useState(ALL);
@@ -810,6 +812,13 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
           <CardContent><MdaSupervisoryMap submissions={mapSubs} formName={formName} /></CardContent>
         </Card>
       )}
+
+      {/* ── Household coverage survey map (Coverage Evaluation 3D outcomes) ── */}
+      <HouseholdCoverageSurveyMap
+        projectId={projectId}
+        formName={formName}
+        stateFilter={fState === ALL ? null : fState}
+      />
 
       {/* ── Field worker accountability ── */}
       <Card>
