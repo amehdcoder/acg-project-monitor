@@ -137,7 +137,8 @@ export default function MdaAdvancedAnalyses({ submissions, questions }: Props) {
     const byLga = new Map<string, number[]>();
     for (const r of statusRows) {
       const k = r.c.lga || "Unspecified";
-      (byLga.get(k) || byLga.set(k, []).get(k)!).push(norm(r.status).includes("complet") ? 100 : 0);
+      if (!byLga.has(k)) byLga.set(k, []);
+      byLga.get(k)!.push(norm(r.status).includes("complet") ? 100 : 0);
     }
     const groups = [...byLga.values()].filter((g) => g.length >= 2);
     const anova = groups.length >= 2 ? oneWayAnova(groups) : null;
