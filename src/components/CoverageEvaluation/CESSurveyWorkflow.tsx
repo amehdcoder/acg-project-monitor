@@ -38,7 +38,7 @@ import { logCESAction } from "@/lib/ces/auditLog";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import {
   saveHouseholdOffline, syncCESOfflineQueue, getPendingCount, getPendingHouseholds,
-  registerCESSyncOnReconnect, getDeviceId, generateUUID, saveSurveyOffline, type OfflineHousehold,
+  registerCESSyncOnReconnect, getDeviceId, generateUUID, saveSurveyOffline, getOfflineSurvey, type OfflineHousehold,
 } from "@/lib/ces/offlineHouseholds";
 import StreetViewPanel from "./StreetViewPanel";
 import {
@@ -1392,11 +1392,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const featureSummary = useMemo(() => {
     const fg = deferredResidentialMask?.featureGeometry;
     if (!fg) return { buildings: 0, roads: 0, waterways: 0, uncertain: 0, namedRoads: 0, labeled: 0, avgConfidence: 0 };
-    const inPerimeter = deferredPerimeter.length >= 3
+    const perimeterIndex = deferredPerimeter.length >= 3 ? pointInPolygonIndex(deferredPerimeter) : null;
+    const contains = (p: LatLng) => perimeterIndex ? perimeterIndex.contains(p) : true;
+    const inPerimeter = perimeterIndex
       ? {
-          buildings: fg.buildings.filter((b) => pointInPolygonGeo(b.center, deferredPerimeter)),
-          roads: fg.roads.filter((r) => r.points.some((p) => pointInPolygonGeo(p, deferredPerimeter))),
-          waterways: fg.waterways.filter((w) => w.points.some((p) => pointInPolygonGeo(p, deferredPerimeter))),
+          buildings: fg.buildings.filter((b) => contains(b.center)),
+          roads: fg.roads.filter((r) => r.points.some(contains)),
+          waterways: fg.waterways.filter((w) => w.points.some(contains)),
         }
       : { buildings: fg.buildings, roads: fg.roads, waterways: fg.waterways };
     const all = [...inPerimeter.buildings, ...inPerimeter.roads, ...inPerimeter.waterways];
@@ -2055,15 +2057,19 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       treated_persons: parseInt(hhForm.treatedPersons) || 0,
     };
 
-    // ─── Offline-First: try Supabase, fall back to IndexedDB ───
+    const parentSurveyQueued = await getOfflineSurvey(id);
+
+    // ─── Offline-First: try backend only when the parent survey exists online ───
     let savedId: string | null = null;
-    if (!navigator.onLine) {
+    if (!navigator.onLine || parentSurveyQueued) {
       // Save to local IndexedDB immediately
       await saveHouseholdOffline(offlineRow);
       setOfflinePending(p => p + 1);
       toast({
-        title: "Saved Offline ☁️",
-        description: `${hhNumber} stored locally. Will sync when online.`,
+        title: parentSurveyQueued ? "Saved to ordered offline queue" : "Saved Offline ☁️",
+        description: parentSurveyQueued
+          ? `${hhNumber} is queued behind its survey draft and will sync after the survey reaches the server.`
+          : `${hhNumber} stored locally. Will sync when online.`,
         className: "bg-amber-600 text-white",
       });
       savedId = offlineRow.local_id;

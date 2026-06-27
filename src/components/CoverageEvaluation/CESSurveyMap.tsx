@@ -4,6 +4,14 @@ import "leaflet/dist/leaflet.css";
 import type { Segment, LatLng } from "@/lib/ces/kmeansSegments";
 import type { FeatureGeometry } from "./utils/residentialMask";
 import { polygonAreaM2, pointInPolygon } from "./utils/residentialMask";
+import {
+  CES_MAP_TILE_CACHE,
+  buildCesTileRequests,
+  putCesTileInCache,
+  validateCesTileCache,
+  waitForCesTileFrame,
+  type CesTileSource,
+} from "@/lib/ces/tileCacheValidation";
 
 export type FeatureLabelRequest = {
   id: string;
@@ -107,16 +115,6 @@ const STATUS_SYMBOL: Record<string, string> = {
   refused: "⛔",
   ineligible: "▲",
   unassessed: "?",
-};
-
-const MAP_TILE_CACHE = "map-tiles-cache";
-
-type TileSource = {
-  url: string;
-  maxNativeZoom: number;
-  subdomains: string;
-  requestMode: RequestMode;
-  label: string;
 };
 
 const TILE_LAYERS: Record<CesBasemap, { url: string; attribution: string; subdomains?: string }> = {
@@ -225,7 +223,7 @@ const CESSurveyMap = ({
   const sampleRenderKeyRef = useRef<string>("");
   // Active tile config (url + native zoom + subdomains) used by the offline
   // prefetcher to download the exact same imagery the map is currently showing.
-  const activeTileRef = useRef<{ mode: CesBasemap; sources: TileSource[] }>({
+  const activeTileRef = useRef<{ mode: CesBasemap; sources: CesTileSource[] }>({
     mode: "satellite",
     sources: [{ url: TILE_LAYERS.satellite.url, maxNativeZoom: 19, subdomains: "abc", requestMode: "cors", label: "Esri satellite" }],
   });
@@ -256,7 +254,7 @@ const CESSurveyMap = ({
     const tl = TILE_LAYERS[mode] ?? TILE_LAYERS.satellite;
     const isGoogle = mode === "google" || mode === "google-sat";
     const nativeZoom = mode === "google" || mode === "google-sat" ? 21 : 19;
-    const sources: TileSource[] = [{
+    const sources: CesTileSource[] = [{
       url: tl.url,
       maxNativeZoom: nativeZoom,
       subdomains: tl.subdomains ?? "abc",
@@ -447,7 +445,7 @@ const CESSurveyMap = ({
   // Pre-fetch all tiles covering the current map view across zoom levels so the
     // imagery is fully available offline. Caps total tile count to protect the
     // device while matching the enlarged Workbox tile cache budget.
-  const prefetchOfflineTiles = async (
+    const prefetchOfflineTiles = async (
     btn?: HTMLElement,
     opts: { maxTiles?: number; zoomAhead?: number; zoomBack?: number; padRatio?: number; quiet?: boolean; concurrency?: number } = {},
   ) => {
@@ -456,79 +454,48 @@ const CESSurveyMap = ({
     const { sources } = activeTileRef.current;
     const bounds = map.getBounds().pad(opts.padRatio ?? 0.3);
     const currentZoom = Math.max(1, Math.round(map.getZoom()));
-    const maxNativeZoom = Math.max(...sources.map((s) => s.maxNativeZoom));
-    const startZoom = Math.max(Math.min(currentZoom - (opts.zoomBack ?? 1), maxNativeZoom), 12);
-    // Reach street-level detail offline without requesting an unbounded village.
-    const endZoom = Math.min(maxNativeZoom, currentZoom + (opts.zoomAhead ?? 4));
-
-    const lat2tileY = (lat: number, z: number) => {
-      const rad = (lat * Math.PI) / 180;
-      return Math.floor(
-        ((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) * Math.pow(2, z),
-      );
-    };
-    const lng2tileX = (lng: number, z: number) =>
-      Math.floor(((lng + 180) / 360) * Math.pow(2, z));
-
-    const requests: Array<{ url: string; mode: RequestMode }> = [];
-    const MAX_TILES = opts.maxTiles ?? 12000;
-    for (let z = startZoom; z <= endZoom && requests.length < MAX_TILES; z++) {
-      const xMin = lng2tileX(bounds.getWest(), z);
-      const xMax = lng2tileX(bounds.getEast(), z);
-      const yMin = lat2tileY(bounds.getNorth(), z);
-      const yMax = lat2tileY(bounds.getSouth(), z);
-      for (let x = xMin; x <= xMax && requests.length < MAX_TILES; x++) {
-        for (let y = yMin; y <= yMax && requests.length < MAX_TILES; y++) {
-          // Interleave imagery + label sources per tile coordinate. This keeps
-          // an offline hybrid map visually identical instead of filling the
-          // entire cache budget with imagery before labels get a chance to save.
-          for (const source of sources) {
-            if (requests.length >= MAX_TILES) break;
-            const sub = source.subdomains[(x + y) % source.subdomains.length] ?? source.subdomains[0];
-            requests.push({
-              mode: source.requestMode,
-              url: source.url
-                .replace("{s}", sub)
-                .replace("{z}", String(z))
-                .replace("{x}", String(x))
-                .replace("{y}", String(y)),
-            });
-          }
-        }
-      }
-    }
+    // Deterministic z/x/y URL generation is shared with validation so the
+    // offline cache is checked against exactly what Leaflet will request later.
+    const requests = buildCesTileRequests(
+      { west: bounds.getWest(), east: bounds.getEast(), north: bounds.getNorth(), south: bounds.getSouth() },
+      sources,
+      {
+        currentZoom,
+        zoomBack: opts.zoomBack ?? 1,
+        zoomAhead: opts.zoomAhead ?? 4,
+        maxTiles: opts.maxTiles ?? 12000,
+      },
+    );
 
     if (btn) { btn.innerHTML = "…"; btn.style.pointerEvents = "none"; }
     let done = 0;
     let saved = 0;
     const CONCURRENCY = opts.concurrency ?? 8;
     let idx = 0;
-    const cache = "caches" in window ? await caches.open(MAP_TILE_CACHE).catch(() => null) : null;
+    const cache = "caches" in window ? await caches.open(CES_MAP_TILE_CACHE).catch(() => null) : null;
     const worker = async () => {
       while (idx < requests.length) {
         const i = idx++;
         try {
-          const req = new Request(requests[i].url, { mode: requests[i].mode });
-          const cached = cache ? await cache.match(req) : null;
-          if (cached) {
-            saved++;
-          } else {
-            const res = await fetch(req, { cache: "no-store" });
-            if (cache && (res.ok || res.type === "opaque")) {
-              await cache.put(req, res.clone()).catch(() => undefined);
-              saved++;
-            }
-          }
+          if (await putCesTileInCache(cache, requests[i])) saved++;
         } catch { /* offline / blocked tiles are skipped */ }
         done++;
         if (btn) btn.title = `Caching offline map… ${done}/${requests.length}`;
+        // Yield regularly so large offline downloads never lock scrolling/taps.
+        if (done % 24 === 0) await waitForCesTileFrame();
       }
     };
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+    const validation = cache
+      ? await validateCesTileCache(requests, { sampleLimit: opts.quiet ? 96 : undefined }).catch(() => null)
+      : null;
     if (btn) {
-      btn.innerHTML = "✓";
-      btn.title = `Saved ${saved}/${requests.length} map tiles for offline use`;
-      btn.style.color = "#16a34a";
+      const ok = validation?.complete ?? saved === requests.length;
+      btn.innerHTML = ok ? "✓" : "!";
+      btn.title = validation
+        ? `Offline map validation: ${validation.present}/${validation.checked} checked (${validation.coveragePct.toFixed(1)}%). ${validation.complete ? "Ready" : "Missing tiles will be retried when online."}`
+        : `Saved ${saved}/${requests.length} map tiles for offline use`;
+      btn.style.color = ok ? "#16a34a" : "#d97706";
       btn.style.pointerEvents = "";
       window.setTimeout(() => { btn.innerHTML = "⬇"; btn.style.color = "#1656BA"; }, 4000);
     }
