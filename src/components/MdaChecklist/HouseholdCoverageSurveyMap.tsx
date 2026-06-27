@@ -490,7 +490,10 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(redraw, [windowed, statesPresent, selectedLga, clustered]);
+  // Boundary polygons rebuild only on state/LGA change; markers redraw on every
+  // filter/sweep change without touching the (memoized) boundary layers (#10).
+  useEffect(() => { drawBoundary(); drawMarkers(); }, [statesPresent, selectedLga]);
+  useEffect(() => { drawMarkers(); }, [windowed, clustered]);
 
   // ── Basemap switching (light ↔ satellite) with URL persistence (#8) ──
   useEffect(() => {
