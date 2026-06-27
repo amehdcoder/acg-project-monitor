@@ -653,98 +653,11 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     { label: "Adverse Reaction follow-up", icon: AlertTriangle, value: kpis.funnel.adverse.value, base: kpis.funnel.adverse.base, pctOverride: kpis.funnel.adverse.pct, tint: AMBER },
   ];
 
-  // ── KPIs (every checklist-bound metric resolved by question LABEL, never a
-  //    hard-coded field name, so each KPI stays wired to the right question per
-  //    project — Jigawa Schisto, ENDFUND/FCT, etc.) ──────────────────────────
-  const qIndex = useMemo(() => new MdaQuestionIndex(questions as any), [questions]);
-  const kpiKeys = useMemo(() => {
-    const find = (patterns: (string | RegExp)[], fallback: string) =>
-      qIndex.find(patterns)?.key || fallback;
-    return {
-      // "Status of MDA" determinant for the completion KPI.
-      mdaStatus: find([/status\s*of\s*mda/i, /mda\s*status/i, /status.*mass\s*drug/i], "status_of_mda"),
-      // Commodity / medicine availability question.
-      medicine: find(
-        [/commodit.*(availab|sufficient|adequate|enough)/i, /medicine.*(availab|sufficient|adequate|enough)/i, /(availab|sufficient|adequate).*(commodit|medicine|drug)/i, /drugs?\s*availab/i],
-        "commodities_available",
-      ),
-      // Risk categorisation question used to flag high-risk sites.
-      risk: find([/risk\s*categor/i, /risk\s*level/i, /risk\s*rating/i, /\brisk\b/i], "risk_category"),
-      // Whether the adverse event was managed (lives on the follow-up module).
-      aeManaged: find([/(adverse|ae|reaction).*manage/i, /manage.*(adverse|ae|reaction)/i, /(ae|adverse).*(addressed|handled|resolved)/i], "ae_been_managed"),
-    };
-  }, [qIndex]);
-
-  const mdaCompleted = useMemo(() => {
-    let done = 0, tot = 0;
-    for (const s of checklist) {
-      const raw = s.data?.[kpiKeys.mdaStatus];
-      if (raw === undefined || raw === null || raw === "") continue;
-      tot++;
-      const lbl = qIndex.label(qIndex.find([/status\s*of\s*mda/i, /mda\s*status/i]) || null, raw) || String(raw);
-      if (norm(lbl) === "completed" || norm(raw) === "completed") done++;
-    }
-    return { done, tot, pct: pct(done, tot) };
-  }, [checklist, kpiKeys.mdaStatus, qIndex]);
-  const medicine = useMemo(() => yesStat(checklist, kpiKeys.medicine), [checklist, kpiKeys.medicine]);
-  const redFlags = useMemo(
-    () => checklist.filter((s) => norm(s.data?.[kpiKeys.risk]) === "high").length,
-    [checklist, kpiKeys.risk],
-  );
-  const aeManaged = useMemo(() => yesStat(followUps, kpiKeys.aeManaged), [followUps, kpiKeys.aeManaged]);
-
-  // ── Follow-up outcome distributions ───────────────────────────
-  const completionFus = followUps.filter((s) => classifyFollowUp(s) === MDA_FOLLOWUP_COMPLETION);
-  const commoditiesFus = followUps.filter((s) => classifyFollowUp(s) === MDA_FOLLOWUP_COMMODITIES);
-  const adverseFus = followUps.filter((s) => classifyFollowUp(s) === MDA_FOLLOWUP_ADVERSE);
-
-  const mdaStatusDist = useMemo(() => {
-    const order = ["Not Started", "Ongoing", "Halted", "Completed"];
-    const colors: Record<string, string> = { "Not Started": SLATE, Ongoing: BLUE, Halted: RED, Completed: EMERALD };
-    const counts = new Map<string, number>();
-    for (const s of completionFus) {
-      const v = s.data?.status_of_mda;
-      if (!v) continue;
-      const lbl = order.find((o) => norm(o) === norm(v)) || stripTags(String(v));
-      counts.set(lbl, (counts.get(lbl) || 0) + 1);
-    }
-    return order.filter((o) => counts.has(o)).map((o) => ({ name: o, value: counts.get(o) || 0, color: colors[o] || SLATE }));
-  }, [completionFus]);
-  const mdaStatusTotal = mdaStatusDist.reduce((a, b) => a + b.value, 0);
-  const mdaCompletedFu = mdaStatusDist.find((d) => d.name === "Completed")?.value || 0;
-
-  const commodityDist = useMemo(() => {
-    const counts = new Map<string, number>();
-    let tot = 0;
-    for (const s of commoditiesFus) {
-      const v = s.data?.commodity_inadequate;
-      if (!v) continue;
-      const arr = Array.isArray(v) ? v : String(v).split(/\s+/);
-      for (const item of arr) {
-        const lbl = stripTags(String(item)).replace(/_/g, " ");
-        if (!lbl) continue;
-        counts.set(lbl, (counts.get(lbl) || 0) + 1); tot++;
-      }
-    }
-    return [...counts.entries()].map(([name, value], i) => ({ name, value, pct: pct(value, tot), color: [TEAL, BLUE, AMBER, RED, VIOLET, PINK][i % 6] })).sort((a, b) => b.value - a.value);
-  }, [commoditiesFus]);
-
-  const aeTypes = useMemo(() => {
-    const counts = new Map<string, number>();
-    let tot = 0;
-    for (const s of adverseFus) {
-      const v = s.data?.adverse_reaction_type;
-      if (!v) continue;
-      const arr = Array.isArray(v) ? v : String(v).split(/\s+/);
-      for (const item of arr) {
-        const lbl = stripTags(String(item)).replace(/_/g, " ");
-        if (!lbl) continue;
-        counts.set(lbl, (counts.get(lbl) || 0) + 1); tot++;
-      }
-    }
-    return [...counts.entries()].map(([name, value], i) => ({ name, value, pct: pct(value, tot), color: [AMBER, RED, VIOLET, PINK, BLUE, TEAL][i % 6] })).sort((a, b) => b.value - a.value);
-  }, [adverseFus]);
-  const aeOkay = useMemo(() => yesStat(adverseFus, "ae_person_okay"), [adverseFus]);
+  // NOTE: Headline KPIs are computed exclusively by the authoritative
+  // `computeMdaKpis` engine (see `kpis` above), which resolves every
+  // determinant by question LABEL per the Owner's published definitions.
+  // Earlier duplicate, field-name-based KPI computations were removed — they
+  // were never rendered and ran O(n) work on every filter change.
 
   // ── Trend (last 14 days) ──────────────────────────────────────
   const trend = useMemo(() => {
