@@ -342,24 +342,30 @@ function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }
             </table>
 
             {/* ── Professional legend / colour scale ── */}
-            <div className="space-y-1.5 border-t border-border/60 px-3 py-2.5">
+            <div className="space-y-1.5 border-t border-border/60 px-3 py-2.5" role="group" aria-label={`${title} legend and colour scale`}>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <span className="font-semibold text-foreground">Colour</span>
-                  <span className="inline-flex items-center gap-1">
+                  <span
+                    className="inline-flex items-center gap-1"
+                    role="img"
+                    aria-label={`Colour scale from 1 (lightest) to ${max} (darkest) communities at first visit, by count`}
+                  >
                     <span>1</span>
-                    <span className="inline-block h-3 w-16 rounded" style={{ background: `linear-gradient(90deg, rgba(${r},${g},${b},0.12), rgba(${r},${g},${b},0.9))` }} />
+                    <span className="inline-block h-3 w-16 rounded" style={{ background: `linear-gradient(90deg, rgba(${r},${g},${b},0.12), rgba(${r},${g},${b},0.9))` }} aria-hidden />
                     <span>{max}</span>
                   </span>
                   <span>communities at first visit (count)</span>
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="font-semibold text-foreground">↑%</span>
+                  <span className="font-semibold text-foreground" aria-hidden>↑%</span>
                   <span>share followed up over time (% of first-visit communities)</span>
                 </span>
               </div>
               {clickable && (
-                <p className="text-[10px] italic text-muted-foreground">Click any cell to drill into the underlying communities, their first-visit answers and follow-up answers.</p>
+                <p className="text-[10px] italic text-muted-foreground">
+                  Click or focus a cell and press Enter to drill into the underlying communities, their first-visit answers and follow-up answers. Use arrow keys to move between cells.
+                </p>
               )}
             </div>
           </div>
