@@ -362,13 +362,24 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
         {/* ── Filters ── */}
         <div className="space-y-2 border-b bg-muted/30 px-4 py-3">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search ID, supervisor, community, answer…"
-              className="h-9 pl-8 text-sm"
+              placeholder="Search community name, submission ID, supervisor, answer…"
+              aria-label="Search communities by name or submission ID"
+              className="h-9 pl-8 pr-8 text-sm"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-2">
             {moduleOptions.length > 0 && (
