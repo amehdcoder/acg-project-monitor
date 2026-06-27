@@ -311,7 +311,8 @@ const CESSurveyMap = ({
     const { url, maxNativeZoom, subdomains } = activeTileRef.current;
     const bounds = map.getBounds();
     const startZoom = Math.max(Math.floor(map.getZoom()), 12);
-    const endZoom = Math.min(maxNativeZoom, startZoom + 4);
+    // Reach street-level detail offline (deeper zoom) and fill the cache budget.
+    const endZoom = Math.min(maxNativeZoom, startZoom + 5);
 
     const lat2tileY = (lat: number, z: number) => {
       const rad = (lat * Math.PI) / 180;
