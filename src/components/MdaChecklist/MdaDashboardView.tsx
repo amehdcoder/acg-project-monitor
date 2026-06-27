@@ -279,7 +279,17 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
           </div>
         )}
 
-        {loading && !simulate ? (
+        {useCacheNow && (
+          <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+            <WifiOff className="h-4 w-4 shrink-0" />
+            <span>
+              <strong>Offline:</strong> showing the last synced checklist data
+              {cached?.cachedAt ? ` (cached ${new Date(cached.cachedAt).toLocaleString()})` : ""}. It will refresh once you reconnect.
+            </span>
+          </div>
+        )}
+
+        {showLoader ? (
           <Card className="border-dashed">
             <CardContent className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading MDA dashboard data…
@@ -288,10 +298,11 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
         ) : (
           <MdaSupervisoryChecklistDashboard
             submissions={dashboardRows}
-            questions={questions}
+            questions={dashboardQuestions}
             formName={form.name}
             projectName={projectName}
             projectId={form.project_id || null}
+            offline={useCacheNow}
           />
         )}
       </main>
