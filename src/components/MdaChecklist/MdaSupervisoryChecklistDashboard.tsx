@@ -152,42 +152,6 @@ function Kpi({ icon: Icon, label, value, sub, tint, bar, onExport, exporting }: 
 }
 
 
-function Donut({ data, centerLabel, centerValue, height = 180, inner = 56, outer = 80 }: {
-  data: { name: string; value: number; color: string }[]; centerLabel?: string; centerValue?: string;
-  height?: number; inner?: number; outer?: number;
-}) {
-  const total = data.reduce((a, b) => a + b.value, 0);
-  return (
-    <div className="relative">
-      <ResponsiveContainer width="100%" height={height}>
-        <PieChart>
-          <Pie data={total ? data : [{ name: "—", value: 1, color: "#e5e7eb" }]} dataKey="value" innerRadius={inner} outerRadius={outer} paddingAngle={total ? 2 : 0} stroke="none">
-            {(total ? data : [{ color: "#e5e7eb" }]).map((d, i) => <Cell key={i} fill={d.color} />)}
-          </Pie>
-          {total > 0 && <RTooltip />}
-        </PieChart>
-      </ResponsiveContainer>
-      {centerValue && (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center" style={{ height }}>
-          <span className="font-display text-2xl font-bold text-foreground">{centerValue}</span>
-          {centerLabel && <span className="text-[10px] text-muted-foreground">{centerLabel}</span>}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function BarRow({ label, value, pctVal, color }: { label: string; value: number; pctVal: number; color: string }) {
-  return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="w-40 shrink-0 truncate text-muted-foreground" title={label}>{label}</span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full" style={{ width: `${pctVal}%`, background: color }} />
-      </div>
-      <span className="w-16 shrink-0 text-right font-semibold text-foreground">{value} ({pctVal}%)</span>
-    </div>
-  );
-}
 
 function Tag({ text, tint }: { text: string; tint: string }) {
   return (
