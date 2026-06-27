@@ -765,6 +765,38 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     }
   };
 
+  // ── Export the currently filtered household visits to CSV (#9) ──
+  const exportCsv = () => {
+    const rows = windowed;
+    if (!rows.length) { toast.error("No household visits to export"); return; }
+    const esc = (v: any) => {
+      const s = String(v ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const headers = [
+      "Household", "Outcome", "Commodity", "State", "LGA", "Ward", "FLHF",
+      "Community", "Settlement", "Latitude", "Longitude", "GPS Accuracy (m)",
+      "Eligible", "Treated", "Visited At",
+    ];
+    const lines = [headers.join(",")];
+    for (const p of rows) {
+      lines.push([
+        p.hh, outcomeFor(p.status).label, p.commodity || "", p.state, p.lga, p.ward,
+        p.flhf, p.community, p.settlement, p.lat.toFixed(6), p.lng.toFixed(6),
+        p.accuracy ?? "", p.eligible ?? "", p.treated ?? "",
+        p.at ? new Date(p.at).toISOString() : "",
+      ].map(esc).join(","));
+    }
+    const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `household-visits-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${rows.length} household visit(s) to CSV`);
+  };
+
   const currentVisit = windowed[Math.min(sweepIndex, Math.max(0, windowed.length - 1))];
 
   return (
