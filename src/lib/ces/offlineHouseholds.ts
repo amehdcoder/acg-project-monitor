@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 const CES_DB_NAME = "ces_offline";
-const CES_DB_VERSION = 3;
+const CES_DB_VERSION = 4;
 const SURVEY_STORE = "pending_surveys";
 const HH_STORE = "pending_households";
 const AUDIT_STORE = "pending_audit_logs";
@@ -92,6 +92,14 @@ const nextQueueSeq = () => {
   return next;
 };
 
+const sortQueued = <T extends { queue_seq?: number; queued_at?: string; updated_at?: string; visited_at?: string }>(rows: T[]) =>
+  rows.sort((a, b) => {
+    const qa = Number.isFinite(a.queue_seq) ? Number(a.queue_seq) : Number.MAX_SAFE_INTEGER;
+    const qb = Number.isFinite(b.queue_seq) ? Number(b.queue_seq) : Number.MAX_SAFE_INTEGER;
+    if (qa !== qb) return qa - qb;
+    return String(a.queued_at ?? a.updated_at ?? a.visited_at ?? "").localeCompare(String(b.queued_at ?? b.updated_at ?? b.visited_at ?? ""));
+  });
+
 const initCESDB = (): Promise<IDBDatabase> => new Promise((resolve, reject) => {
   const req = indexedDB.open(CES_DB_NAME, CES_DB_VERSION);
   req.onerror = () => reject(req.error);
@@ -104,18 +112,22 @@ const initCESDB = (): Promise<IDBDatabase> => new Promise((resolve, reject) => {
       s.createIndex("synced", "synced", { unique: false });
       s.createIndex("updated_at", "updated_at", { unique: false });
       s.createIndex("queue_seq", "queue_seq", { unique: false });
+      s.createIndex("queued_at", "queued_at", { unique: false });
     } else {
       const s = tx?.objectStore(SURVEY_STORE);
       if (s && !s.indexNames.contains("queue_seq")) s.createIndex("queue_seq", "queue_seq", { unique: false });
+      if (s && !s.indexNames.contains("queued_at")) s.createIndex("queued_at", "queued_at", { unique: false });
     }
     if (!db.objectStoreNames.contains(HH_STORE)) {
       const s = db.createObjectStore(HH_STORE, { keyPath: "local_id" });
       s.createIndex("survey_id", "survey_id", { unique: false });
       s.createIndex("synced", "synced", { unique: false });
       s.createIndex("queue_seq", "queue_seq", { unique: false });
+      s.createIndex("queued_at", "queued_at", { unique: false });
     } else {
       const s = tx?.objectStore(HH_STORE);
       if (s && !s.indexNames.contains("queue_seq")) s.createIndex("queue_seq", "queue_seq", { unique: false });
+      if (s && !s.indexNames.contains("queued_at")) s.createIndex("queued_at", "queued_at", { unique: false });
     }
     if (!db.objectStoreNames.contains(AUDIT_STORE)) {
       const s = db.createObjectStore(AUDIT_STORE, { keyPath: "local_id" });
@@ -155,13 +167,24 @@ async function idbDelete(store: string, key: string) {
   });
 }
 
+async function idbGet<T = any>(store: string, key: string): Promise<T | null> {
+  const db = await initCESDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readonly");
+    const r = tx.objectStore(store).get(key);
+    r.onerror = () => reject(r.error);
+    r.onsuccess = () => resolve((r.result as T | undefined) ?? null);
+  });
+}
+
 export async function saveHouseholdOffline(row: OfflineHousehold): Promise<void> {
+  const existing = row.local_id ? await idbGet<OfflineHousehold>(HH_STORE, row.local_id).catch(() => null) : null;
   const record = {
     ...row,
     local_id: row.local_id || generateUUID(),
     synced: false,
-    queued_at: row.queued_at || new Date().toISOString(),
-    queue_seq: row.queue_seq || nextQueueSeq(),
+    queued_at: row.queued_at || existing?.queued_at || row.visited_at || new Date().toISOString(),
+    queue_seq: row.queue_seq ?? existing?.queue_seq ?? nextQueueSeq(),
   };
   await idbPut(HH_STORE, record);
   const parentDraftStillLocal = await getOfflineSurvey(record.survey_id).catch(() => null);
@@ -169,31 +192,27 @@ export async function saveHouseholdOffline(row: OfflineHousehold): Promise<void>
 }
 
 export async function saveSurveyOffline(draft: OfflineSurveyDraft): Promise<void> {
+  const existing = await idbGet<OfflineSurveyDraft>(SURVEY_STORE, draft.id).catch(() => null);
   await idbPut(SURVEY_STORE, {
     ...draft,
     synced: false,
     retry_count: draft.retry_count || 0,
     updated_at: draft.updated_at || new Date().toISOString(),
-    queued_at: draft.queued_at || new Date().toISOString(),
-    queue_seq: draft.queue_seq || nextQueueSeq(),
+    // Keep the original queue position when autosave refreshes the same draft;
+    // otherwise a child household could appear older than its parent after a
+    // reconnect, making diagnostics confusing even though the barrier protects FK order.
+    queued_at: draft.queued_at || existing?.queued_at || draft.updated_at || new Date().toISOString(),
+    queue_seq: draft.queue_seq ?? existing?.queue_seq ?? nextQueueSeq(),
   });
 }
 
 export async function getOfflineSurvey(id: string): Promise<OfflineSurveyDraft | null> {
-  const db = await initCESDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(SURVEY_STORE, "readonly");
-    const r = tx.objectStore(SURVEY_STORE).get(id);
-    r.onerror = () => reject(r.error);
-    r.onsuccess = () => resolve((r.result as OfflineSurveyDraft | undefined) ?? null);
-  });
+  return idbGet<OfflineSurveyDraft>(SURVEY_STORE, id);
 }
 
 export async function getPendingSurveys(): Promise<OfflineSurveyDraft[]> {
   const all = await idbGetAll(SURVEY_STORE);
-  return all
-    .filter((r) => !r.synced)
-    .sort((a, b) => (a.queue_seq ?? 0) - (b.queue_seq ?? 0) || String(a.updated_at).localeCompare(String(b.updated_at)));
+  return sortQueued(all.filter((r) => !r.synced));
 }
 
 async function mirrorToCloud(record: OfflineHousehold): Promise<void> {
@@ -218,7 +237,7 @@ export async function saveAuditOffline(entry: OfflineAuditEntry): Promise<void> 
 export async function getPendingHouseholds(surveyId?: string): Promise<OfflineHousehold[]> {
   const all = await idbGetAll(HH_STORE);
   const rows = surveyId ? all.filter(r => r.survey_id === surveyId && !r.synced) : all.filter(r => !r.synced);
-  return rows.sort((a, b) => (a.queue_seq ?? 0) - (b.queue_seq ?? 0) || String(a.visited_at).localeCompare(String(b.visited_at)));
+  return sortQueued(rows);
 }
 
 export async function getPendingCount(): Promise<number> {
@@ -266,12 +285,17 @@ export async function syncCESOfflineQueue(
 
     const stillPendingSurveyIds = new Set((await getPendingSurveys()).map((s) => s.id));
     if (stillPendingSurveyIds.size > 0) {
-      const waiting = pending.filter((hh) => stillPendingSurveyIds.has(hh.survey_id));
-      await Promise.all(waiting.map((hh) => idbPut(HH_STORE, {
+      // Global barrier: if ANY parent survey draft remains local, do not resume
+      // ANY household visit upload. This prevents a reconnect race where generic
+      // browser/background replay or a partially failed drain lets child visits
+      // overtake their survey draft.
+      await Promise.all(pending.map((hh) => idbPut(HH_STORE, {
         ...hh,
-        last_error: "Waiting for parent survey draft to sync before household upload resumes",
+        last_error: stillPendingSurveyIds.has(hh.survey_id)
+          ? "Waiting for parent survey draft to sync before household upload resumes"
+          : "Paused by ordered CES queue until all survey drafts sync",
       })));
-      return { synced, failed: failed + waiting.length };
+      return { synced, failed: failed + pending.length };
     }
 
     for (const hh of pending) {
