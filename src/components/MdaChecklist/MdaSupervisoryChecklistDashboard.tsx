@@ -189,7 +189,7 @@ function Tag({ text, tint }: { text: string; tint: string }) {
 const ALL = "__all__";
 
 // ───────────────────────── Main ─────────────────────────
-export default function MdaSupervisoryChecklistDashboard({ submissions, questions, formName, projectName, projectId }: Props) {
+export default function MdaSupervisoryChecklistDashboard({ submissions, questions, formName, projectName, projectId, offline }: Props) {
   // ── Filter state ──────────────────────────────────────────────
   const [fState, setFState] = useState(ALL);
   const [fLga, setFLga] = useState(ALL);
