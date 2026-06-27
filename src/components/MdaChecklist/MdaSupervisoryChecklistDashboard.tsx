@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
-import { MdaQuestionIndex } from "@/lib/mda/analyses";
+
 import { computeMdaKpis, type Heatmap as KHeatmap } from "@/lib/mda/kpis";
 import { exportKpiWorkbook, type KpiId } from "@/lib/mda/kpiExport";
 import MdaDrillDownSheet, { type DrillData } from "./MdaDrillDownSheet";
