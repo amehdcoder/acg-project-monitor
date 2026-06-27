@@ -705,6 +705,7 @@ const CESSurveyMap = ({
             weight: 2,
             fillColor: i === perimeter.length - 1 ? "hsl(142 71% 45%)" : lineColor,
             fillOpacity: 0.95,
+            interactive: !drawMode,
           })
             .bindTooltip(i === 0 ? "Start vertex" : i === perimeter.length - 1 ? "Latest live vertex" : `Vertex ${i + 1}`, { permanent: false })
             .addTo(lg);
