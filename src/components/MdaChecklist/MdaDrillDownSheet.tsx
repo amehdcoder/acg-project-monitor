@@ -333,17 +333,13 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
     exportDrilldownPdf(filtered as PdfRow[], questions as any, data?.title || "MDA Drill-down", data?.subtitle);
   };
 
-
-  const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) {
-      setVisible((v) => (v < filtered.length ? v + PAGE : v));
-    }
-  };
-
   if (!data) return null;
   const tint = data.tint || "#6366f1";
-  const shown = filtered.slice(0, visible);
+  const totalItems = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const shown = filtered.slice(startIndex, startIndex + pageSize);
 
   return (
     <Sheet open={!!data} onOpenChange={(o) => !o && onClose()}>
