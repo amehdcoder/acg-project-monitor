@@ -249,6 +249,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain" | "google" | "google-sat">("hybrid");
   const [autoFenceRadiusM, setAutoFenceRadiusM] = useState<number>(50);
   const [autoFenced, setAutoFenced] = useState<boolean>(false);
+  const lastAutoFenceFollowRef = useRef<{ lat: number; lng: number; t: number } | null>(null);
   // Manual draw-on-map mode (Step 1 alternative to walking the perimeter).
   const [drawMode, setDrawMode] = useState<boolean>(false);
   const [draftPolygon, setDraftPolygon] = useState<{ lat: number; lng: number }[]>([]);
@@ -1137,10 +1138,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     if (!autoFenced || editVertices) return;
     const centre = autoFenceFollow && gps ? { lat: gps.lat, lng: gps.lng } : autoFenceCenter;
     if (!centre) return;
+    if (autoFenceFollow && gps) {
+      const last = lastAutoFenceFollowRef.current;
+      const movedM = last ? haversineMeters({ lat: last.lat, lng: last.lng }, centre) : Infinity;
+      const elapsed = last ? Date.now() - last.t : Infinity;
+      // Do not rebuild the whole boundary/static map layer for GPS jitter.
+      if (last && movedM < 5 && elapsed < 3000) return;
+      lastAutoFenceFollowRef.current = { ...centre, t: Date.now() };
+    }
     const ring = buildAutoFenceRing(centre, autoFenceRadiusM);
-    setPerimeter(ring);
-    setWalkedM(2 * Math.PI * autoFenceRadiusM);
-    if (autoFenceFollow && gps) setAutoFenceCenter({ lat: gps.lat, lng: gps.lng });
+    startTransition(() => {
+      setPerimeter(ring);
+      setWalkedM(2 * Math.PI * autoFenceRadiusM);
+      if (autoFenceFollow && gps) setAutoFenceCenter({ lat: gps.lat, lng: gps.lng });
+    });
   }, [autoFenceRadiusM, autoFenced, autoFenceFollow, gps?.lat, gps?.lng, autoFenceCenter, editVertices, buildAutoFenceRing]);
 
   // Append GPS fixes to the breadcrumb trail (cap at 200 points to keep render
