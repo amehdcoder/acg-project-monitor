@@ -825,6 +825,9 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
               <DropdownMenuItem onClick={() => exportView("pdf")}>
                 <FileText className="h-4 w-4 mr-2" /> Export as PDF
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportCsv}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> Export visits as CSV
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
