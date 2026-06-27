@@ -279,6 +279,11 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
       if (monitorFilter !== ALL && monitorOf(r) !== monitorFilter) return false;
       if (communityFilter !== ALL && communityOf(r) !== communityFilter) return false;
       if (statusFilter !== ALL && statusOf(r) !== statusFilter) return false;
+      if (followUpFilter !== ALL) {
+        const fu = wasFollowedUp(r);
+        if (followUpFilter === "followed" && !fu) return false;
+        if (followUpFilter === "pending" && fu) return false;
+      }
       if (fromTs || toTs) {
         const t = r.submittedAt ? new Date(r.submittedAt).getTime() : NaN;
         if (isNaN(t)) return false;
