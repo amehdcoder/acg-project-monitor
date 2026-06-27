@@ -1025,6 +1025,36 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
               </tbody>
             </table>
           </div>
+          {register.totalPages > 1 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
+              <span>
+                Showing {register.startIndex + 1}–{Math.min(register.startIndex + register.pageSize, register.totalItems)} of {fmt(register.totalItems)}
+              </span>
+              <Pagination className="mx-0 w-auto">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => { e.preventDefault(); register.prevPage(); }}
+                      className={!register.hasPrev ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLink href="#" isActive onClick={(e) => e.preventDefault()}>
+                      {register.currentPage} / {register.totalPages}
+                    </PaginationLink>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => { e.preventDefault(); register.nextPage(); }}
+                      className={!register.hasNext ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
 
