@@ -108,11 +108,15 @@ interface Props {
   /** Optional date-time range (ISO strings) synced from dashboard filters. */
   dateFrom?: string | null;
   dateTo?: string | null;
+  /** Fired when a household marker is clicked — filters the drilldown table to its community. */
+  onSelectCommunity?: (community: string, state?: string | null) => void;
+  /** Fired when an LGA polygon is clicked — filters the drilldown table to that LGA. */
+  onSelectLga?: (lga: string, state?: string | null) => void;
 }
 
 const SPEEDS = [0.5, 1, 2, 4];
 
-export default function HouseholdCoverageSurveyMap({ projectId, formName, stateFilter, dateFrom, dateTo }: Props) {
+export default function HouseholdCoverageSurveyMap({ projectId, formName, stateFilter, dateFrom, dateTo, onSelectCommunity, onSelectLga }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
