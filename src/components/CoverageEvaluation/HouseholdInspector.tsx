@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CheckCircle2, XCircle, AlertTriangle, RefreshCw, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Household3D } from "./Village3DMap";
+import type { Household3D } from "./Village3DMap";
 
 interface HouseholdInspectorProps {
   household: Household3D | null;

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Text, Grid, Html, Float } from "@react-three/drei";
 import * as THREE from "three";
@@ -222,7 +222,12 @@ function PerimeterLine({
 
   if (points.length < 2) return null;
 
-  const geometry = new THREE.BufferGeometry().setFromPoints(points.concat([points[0]]));
+  const geometry = useMemo(
+    () => new THREE.BufferGeometry().setFromPoints(points.concat([points[0]])),
+    [points],
+  );
+
+  useEffect(() => () => geometry.dispose(), [geometry]);
 
   return (
     <line>
@@ -287,7 +292,7 @@ function MapGround({
 
 function CameraSetup({ households }: { households: Household3D[] }) {
   const { camera } = useThree();
-  useMemo(() => {
+  useEffect(() => {
     const range = Math.max(40, Math.min(150, households.length * 5));
     camera.position.set(range * 0.7, range * 0.8, range * 0.7);
     camera.lookAt(0, 0, 0);
@@ -309,6 +314,7 @@ const Village3DMap = ({
   return (
     <Canvas
       shadows
+      dpr={[1, 2]}
       camera={{ position: [60, 60, 60], fov: 45 }}
       style={{ background: "#020617" }}
     >
@@ -321,8 +327,8 @@ const Village3DMap = ({
         position={[-50, 80, 50]}
         intensity={0.8}
         castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
       />
 
       <MapGround onClick={onAddHouseholdAt} centerLat={centerLat} centerLng={centerLng} />

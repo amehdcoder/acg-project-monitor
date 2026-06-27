@@ -234,7 +234,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [gpsRestartNonce, setGpsRestartNonce] = useState(0);
   const [residentialMask, setResidentialMask] = useState<ResidentialMaskResult | null>(null);
   const [maskStatus, setMaskStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
-  const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain" | "google" | "google-sat">("google");
+  const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain" | "google" | "google-sat">("hybrid");
   const [autoFenceRadiusM, setAutoFenceRadiusM] = useState<number>(50);
   const [autoFenced, setAutoFenced] = useState<boolean>(false);
   // Manual draw-on-map mode (Step 1 alternative to walking the perimeter).
@@ -1064,7 +1064,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     setLastVertexAt(Date.now());
     setAutoFenced(true);
     setAutoFenceCenter(center);
-    if (basemap !== "google" && basemap !== "google-sat" && basemap !== "hybrid") setBasemap("google");
+    if (basemap !== "hybrid" && basemap !== "satellite") setBasemap("hybrid");
     try {
       logCESAction(surveyId ?? "draft", "perimeter.auto_fence", {
         radius_m: radiusM,
@@ -4175,10 +4175,10 @@ function BasemapToggle({ value, onChange }: { value: string; onChange: (v: any) 
   return (
     <div className="inline-flex border border-border rounded-md overflow-hidden flex-wrap">
       {[
-        { v: "google", icon: Satellite, label: "Google" },
-        { v: "google-sat", icon: Satellite, label: "Google Sat" },
         { v: "hybrid", icon: Satellite, label: "Esri Hybrid" },
         { v: "satellite", icon: Satellite, label: "Esri Sat" },
+        { v: "google", icon: Satellite, label: "Google" },
+        { v: "google-sat", icon: Satellite, label: "Google Sat" },
         { v: "street", icon: MapIcon, label: "Street" },
         { v: "terrain", icon: Mountain, label: "Terrain" },
       ].map((b) => (

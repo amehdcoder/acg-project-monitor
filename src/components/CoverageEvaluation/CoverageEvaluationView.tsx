@@ -31,6 +31,17 @@ import { readCesLocationPrefill } from "@/lib/mda/cesLocationBridge";
 const CES_PROJECT_KEY = "ces_last_project_id";
 const CES_SESSION_KEY = "ces_last_session_id";
 
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(id);
+  }, [value, delayMs]);
+
+  return debounced;
+}
+
 
 interface Project {
   id: string;
@@ -334,13 +345,15 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
     return { total, covered, missed, refused, revisit, unassessed, coverageRate };
   }, [households]);
 
+  const debouncedHouseholds = useDebouncedValue(households, 350);
+
   const segments = useMemo(() => {
-    if (households.length < 5) return [];
+    if (debouncedHouseholds.length < 5) return [];
     // Calculate segments based on household clusters
-    const points = households.map(h => ({ lat: h.lat, lng: h.lng }));
-    const k = Math.min(6, Math.max(2, Math.ceil(households.length / 10)));
+    const points = debouncedHouseholds.map(h => ({ lat: h.lat, lng: h.lng }));
+    const k = Math.min(6, Math.max(2, Math.ceil(debouncedHouseholds.length / 10)));
     return kmeansSegments(points, k);
-  }, [households]);
+  }, [debouncedHouseholds]);
 
   const inferredCoverage = useMemo(() => {
     if (segments.length === 0) return {};

@@ -133,13 +133,16 @@ export default defineConfig(({ mode }) => {
             // A large cap keeps a whole survey area's imagery resident on-device.
             urlPattern: ({ url }: any) =>
               /(^|\.)arcgisonline\.com$/.test(url.hostname) ||
-              /(^|\.)google\.com$/.test(url.hostname) ||
+              /^mt[0-3]\.google\.com$/.test(url.hostname) ||
               /(^|\.)tile\.openstreetmap\.org$/.test(url.hostname) ||
               /(^|\.)tile\.opentopomap\.org$/.test(url.hostname),
             handler: "CacheFirst",
             options: {
               cacheName: "map-tiles-cache",
-              expiration: { maxEntries: 4000, maxAgeSeconds: 60 * 60 * 24 * 180 },
+              // CES offline areas can legitimately require thousands of imagery
+              // + label tiles across zoom levels. Keep a field-work-sized cache
+              // so downloaded survey areas are not evicted before offline use.
+              expiration: { maxEntries: 50000, maxAgeSeconds: 60 * 60 * 24 * 365 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
