@@ -300,40 +300,47 @@ function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }
           <p className="py-10 text-center text-xs text-muted-foreground">{empty}</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full border-separate border-spacing-0.5 text-[11px]">
+            <table
+              ref={gridRef}
+              role="grid"
+              aria-label={`${title} heatmap — LGA by category. Use arrow keys to move between cells, Enter to drill in.`}
+              className="w-full border-separate border-spacing-0.5 text-[11px]"
+              onKeyDown={clickable ? handleGridKey : undefined}
+            >
               <thead>
-                <tr>
-                  <th className="sticky left-0 z-10 bg-card px-2 py-1.5 text-left font-semibold text-muted-foreground">LGA / Area Council</th>
+                <tr role="row">
+                  <th className="sticky left-0 z-10 bg-card px-2 py-1.5 text-left font-semibold text-muted-foreground" scope="col">LGA / Area Council</th>
                   {heat.categories.map((c) => (
-                    <th key={c} className="px-1.5 py-1.5 text-center font-semibold text-muted-foreground" title={c}>
+                    <th key={c} className="px-1.5 py-1.5 text-center font-semibold text-muted-foreground" title={c} scope="col">
                       <span className="block max-w-[72px] truncate mx-auto">{c}</span>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {heat.rows.map((row) => (
-                  <tr key={row.lga}>
-                    <td className="sticky left-0 z-10 bg-card px-2 py-1.5 font-medium text-foreground">
+                {heat.rows.map((row, ri) => (
+                  <tr key={row.lga} role="row">
+                    <td className="sticky left-0 z-10 bg-card px-2 py-1.5 font-medium text-foreground" scope="row">
                       <span className="block max-w-[120px] truncate" title={row.lga}>{row.lga}</span>
                     </td>
-                    {heat.categories.map((c) => (
+                    {heat.categories.map((c, ci) => (
                       <td key={c} className="px-0.5 py-0.5 text-center">
-                        <Cell cell={row.cells[c] || { value: 0, followed: 0 }} lga={row.lga} category={c} />
+                        <Cell cell={row.cells[c] || { value: 0, followed: 0 }} lga={row.lga} category={c} rowIdx={ri} colIdx={ci} />
                       </td>
                     ))}
                   </tr>
                 ))}
-                <tr>
-                  <td className="sticky left-0 z-10 bg-muted/60 px-2 py-1.5 font-semibold text-foreground">All LGAs</td>
-                  {heat.categories.map((c) => (
+                <tr role="row">
+                  <td className="sticky left-0 z-10 bg-muted/60 px-2 py-1.5 font-semibold text-foreground" scope="row">All LGAs</td>
+                  {heat.categories.map((c, ci) => (
                     <td key={c} className="px-0.5 py-0.5 text-center">
-                      <Cell cell={heat.colTotals[c] || { value: 0, followed: 0 }} lga={null} category={c} isTotal />
+                      <Cell cell={heat.colTotals[c] || { value: 0, followed: 0 }} lga={null} category={c} isTotal rowIdx={heat.rows.length} colIdx={ci} />
                     </td>
                   ))}
                 </tr>
               </tbody>
             </table>
+
             {/* ── Professional legend / colour scale ── */}
             <div className="space-y-1.5 border-t border-border/60 px-3 py-2.5">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
