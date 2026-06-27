@@ -331,7 +331,13 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
           style: () => ({ color: "#14b8a6", weight: 1, opacity: 0.7, fillColor: "#99f6e4", fillOpacity: 0.18 }),
           onEachFeature: (f: any, lyr) => {
             const name = f?.properties?.lga;
-            if (name) lyr.bindTooltip(String(name), { sticky: true, direction: "top", className: "hcs-lga-tip" });
+            const st = f?.properties?.state;
+            if (name) {
+              lyr.bindTooltip(String(name), { sticky: true, direction: "top", className: "hcs-lga-tip" });
+              lyr.on("click", () => onSelectLga?.(String(name), st));
+              lyr.on("mouseover", () => (lyr as any).setStyle?.({ fillOpacity: 0.34, weight: 1.6 }));
+              lyr.on("mouseout", () => (lyr as any).setStyle?.({ fillOpacity: 0.18, weight: 1 }));
+            }
             try { stateBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
           },
         });
