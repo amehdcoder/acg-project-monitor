@@ -634,15 +634,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     return m;
   }, [checklist]);
 
-  const moduleCoverage = (canonical: string) => {
-    let n = 0;
-    for (const k of primaryByCom.keys()) if (fuByCommunity.get(k)?.has(canonical)) n++;
-    return n;
-  };
   const communitiesSupervised = primaryByCom.size;
-  const covCompletion = useMemo(() => moduleCoverage(MDA_FOLLOWUP_COMPLETION), [primaryByCom, fuByCommunity]);
-  const covCommodities = useMemo(() => moduleCoverage(MDA_FOLLOWUP_COMMODITIES), [primaryByCom, fuByCommunity]);
-  const covAdverse = useMemo(() => moduleCoverage(MDA_FOLLOWUP_ADVERSE), [primaryByCom, fuByCommunity]);
 
   // Longitudinal funnel — each follow-up step is expressed against the number of
   // communities that ACTUALLY require that follow-up (Owner definition #7).
