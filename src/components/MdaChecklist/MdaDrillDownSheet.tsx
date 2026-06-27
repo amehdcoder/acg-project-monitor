@@ -216,6 +216,16 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
   const communityOf = (s: DrillSubmission) =>
     stripTags(s.data?.community_name ?? s.data?.community ?? s.data?.settlement_name ?? s.data?.settlement);
   const statusOf = (s: DrillSubmission) => stripTags(s.status);
+  // A community counts as "followed up" if any follow-up field carries an answer.
+  const wasFollowedUp = (s: DrillSubmission) => {
+    if (!followUpFields || followUpFields.size === 0) return false;
+    const d = s.data || {};
+    for (const key of followUpFields) {
+      const v = d[key];
+      if (v !== undefined && v !== null && v !== "") return true;
+    }
+    return false;
+  };
 
   const moduleOptions = useMemo(
     () => Array.from(new Set(rows.map((r) => r.module).filter(Boolean))) as string[],
