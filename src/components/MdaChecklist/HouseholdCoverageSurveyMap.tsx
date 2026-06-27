@@ -85,6 +85,7 @@ const URL_KEYS = {
   state: "hcs_state",
   center: "hcs_center",
   zoom: "hcs_zoom",
+  basemap: "hcs_basemap",
 } as const;
 
 const stateKeys = (value: unknown) => {
