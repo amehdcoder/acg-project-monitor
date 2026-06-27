@@ -33,6 +33,7 @@ import {
 import { toast } from "sonner";
 import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
 import { MdaQuestionIndex } from "@/lib/mda/analyses";
+import { computeMdaKpis, type Heatmap as KHeatmap } from "@/lib/mda/kpis";
 import {
   getMdaFollowUpGroupName, isMdaFollowUpGroup,
   MDA_FOLLOWUP_COMPLETION, MDA_FOLLOWUP_COMMODITIES, MDA_FOLLOWUP_ADVERSE,
@@ -188,6 +189,103 @@ function Tag({ text, tint }: { text: string; tint: string }) {
   );
 }
 
+/**
+ * Professional LGA × category heatmap.
+ * Rows are LGAs / Area Councils, columns are the module's categories. Each cell
+ * encodes the count at first visit (colour intensity) and the follow-up coverage
+ * (small ✓ ratio), giving an at-a-glance, dashboard-friendly read of progress.
+ */
+function hexToRgb(hex: string) {
+  const h = hex.replace("#", "");
+  return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) };
+}
+function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty }: {
+  title: string; icon: any; tint: string; baseTint: string; heat: KHeatmap; empty: string;
+}) {
+  const max = Math.max(1, ...heat.rows.flatMap((r) => heat.categories.map((c) => r.cells[c]?.value || 0)));
+  const { r, g, b } = hexToRgb(baseTint);
+  const cellBg = (v: number) => (v <= 0 ? "transparent" : `rgba(${r}, ${g}, ${b}, ${0.12 + 0.78 * (v / max)})`);
+  const cellFg = (v: number) => (v / max > 0.55 ? "#ffffff" : "hsl(var(--foreground))");
+  const hasData = heat.rows.some((row) => heat.categories.some((c) => (row.cells[c]?.value || 0) > 0));
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-1.5 text-sm"><Icon className="h-4 w-4" style={{ color: tint }} />{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        {!hasData ? (
+          <p className="py-10 text-center text-xs text-muted-foreground">{empty}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full border-separate border-spacing-0.5 text-[11px]">
+              <thead>
+                <tr>
+                  <th className="sticky left-0 z-10 bg-card px-2 py-1.5 text-left font-semibold text-muted-foreground">LGA / Area Council</th>
+                  {heat.categories.map((c) => (
+                    <th key={c} className="px-1.5 py-1.5 text-center font-semibold text-muted-foreground" title={c}>
+                      <span className="block max-w-[72px] truncate mx-auto">{c}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {heat.rows.map((row) => (
+                  <tr key={row.lga}>
+                    <td className="sticky left-0 z-10 bg-card px-2 py-1.5 font-medium text-foreground">
+                      <span className="block max-w-[120px] truncate" title={row.lga}>{row.lga}</span>
+                    </td>
+                    {heat.categories.map((c) => {
+                      const cell = row.cells[c] || { value: 0, followed: 0 };
+                      const fpct = cell.value ? Math.round((cell.followed / cell.value) * 100) : 0;
+                      return (
+                        <td key={c} className="px-0.5 py-0.5 text-center">
+                          <div
+                            className="rounded-md px-1 py-1.5 transition-colors"
+                            style={{ background: cellBg(cell.value), color: cell.value ? cellFg(cell.value) : "hsl(var(--muted-foreground))" }}
+                            title={`${row.lga} · ${c}: ${cell.value} communit${cell.value === 1 ? "y" : "ies"} at first visit, ${cell.followed} followed up (${fpct}%)`}
+                          >
+                            <span className="block font-bold leading-none">{cell.value || "·"}</span>
+                            {cell.value > 0 && (
+                              <span className="block text-[9px] font-medium leading-tight opacity-90">↑{fpct}%</span>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+                <tr>
+                  <td className="sticky left-0 z-10 bg-muted/60 px-2 py-1.5 font-semibold text-foreground">All LGAs</td>
+                  {heat.categories.map((c) => {
+                    const tot = heat.colTotals[c] || { value: 0, followed: 0 };
+                    const fpct = tot.value ? Math.round((tot.followed / tot.value) * 100) : 0;
+                    return (
+                      <td key={c} className="px-0.5 py-0.5 text-center">
+                        <div className="rounded-md bg-muted/60 px-1 py-1.5">
+                          <span className="block font-bold leading-none text-foreground">{tot.value || "·"}</span>
+                          {tot.value > 0 && <span className="block text-[9px] font-medium leading-tight text-muted-foreground">↑{fpct}%</span>}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tbody>
+            </table>
+            <div className="flex items-center gap-3 px-3 py-2 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-3 w-6 rounded" style={{ background: `linear-gradient(90deg, rgba(${r},${g},${b},0.12), rgba(${r},${g},${b},0.9))` }} />
+                fewer → more at first visit
+              </span>
+              <span>↑% = followed up over time</span>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 const ALL = "__all__";
 
 // ───────────────────────── Main ─────────────────────────
@@ -274,10 +372,18 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     });
   }, [submissions, fState, fLga, fWard, fStatus, fFrom, fTo, search]);
 
-  const prepared = useMemo(() => prepareMdaData(filtered, questions as any), [filtered, questions]);
+  // Clone the rows before merging so the KPI engine below always reads clean,
+  // un-mutated first-visit answers (prepareMdaData overwrites linked fields).
+  const prepared = useMemo(
+    () => prepareMdaData(filtered.map((s) => ({ ...s, data: { ...(s.data || {}) } })), questions as any),
+    [filtered, questions],
+  );
   const checklist = prepared.checklist;
   const followUps = prepared.followUps;
   const total = checklist.length;
+
+  // Owner-defined KPI engine (resolves every determinant by question LABEL).
+  const kpis = useMemo(() => computeMdaKpis(filtered as any, questions as any), [filtered, questions]);
 
   const filtersActive =
     fState !== ALL || fLga !== ALL || fWard !== ALL || fStatus !== ALL || fModule !== ALL || !!fFrom || !!fTo || !!search;
@@ -326,11 +432,13 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   const covCommodities = useMemo(() => moduleCoverage(MDA_FOLLOWUP_COMMODITIES), [primaryByCom, fuByCommunity]);
   const covAdverse = useMemo(() => moduleCoverage(MDA_FOLLOWUP_ADVERSE), [primaryByCom, fuByCommunity]);
 
+  // Longitudinal funnel — each follow-up step is expressed against the number of
+  // communities that ACTUALLY require that follow-up (Owner definition #7).
   const funnel = [
-    { label: "Community Checklist", icon: ClipboardList, value: communitiesSupervised, base: communitiesSupervised, tint: BLUE },
-    { label: "MDA Completion follow-up", icon: CheckCircle2, value: covCompletion, base: communitiesSupervised, tint: EMERALD },
-    { label: "Commodities follow-up", icon: Pill, value: covCommodities, base: communitiesSupervised, tint: TEAL },
-    { label: "Adverse Reaction follow-up", icon: AlertTriangle, value: covAdverse, base: communitiesSupervised, tint: AMBER },
+    { label: "Community Checklist", icon: ClipboardList, value: kpis.funnel.checklist, base: kpis.funnel.checklist, pctOverride: undefined as number | undefined, tint: BLUE },
+    { label: "MDA Completion follow-up", icon: CheckCircle2, value: kpis.funnel.completion.value, base: kpis.funnel.completion.base, pctOverride: kpis.funnel.completion.pct, tint: EMERALD },
+    { label: "Commodities follow-up", icon: Pill, value: kpis.funnel.commodities.value, base: kpis.funnel.commodities.base, pctOverride: kpis.funnel.commodities.pct, tint: TEAL },
+    { label: "Adverse Reaction follow-up", icon: AlertTriangle, value: kpis.funnel.adverse.value, base: kpis.funnel.adverse.base, pctOverride: kpis.funnel.adverse.pct, tint: AMBER },
   ];
 
   // ── KPIs (every checklist-bound metric resolved by question LABEL, never a
@@ -662,12 +770,12 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
 
       {/* ── KPI tiles ── */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-        <Kpi icon={MapPin} label="Communities Supervised" value={fmt(communitiesSupervised)} sub={`${fmt(total)} checklist visits`} tint={BLUE} />
-        <Kpi icon={CheckCircle2} label="MDA Completed" value={`${mdaCompleted.pct}%`} sub={`${fmt(mdaCompleted.done)} of ${fmt(mdaCompleted.tot)} reported`} tint={EMERALD} bar={mdaCompleted.pct} />
-        <Kpi icon={Pill} label="Sufficient Medicine" value={`${medicine.pct}%`} sub={`${fmt(medicine.yes)} of ${fmt(medicine.total)}`} tint={TEAL} bar={medicine.pct} />
-        <Kpi icon={Activity} label="Follow-up Coverage" value={`${completionCovPct}%`} sub={`${fmt(covCompletion)} communities followed up`} tint={VIOLET} bar={completionCovPct} />
-        <Kpi icon={AlertTriangle} label="Adverse Cases Managed" value={aeManaged.total ? `${aeManaged.pct}%` : "—"} sub={`${fmt(aeManaged.yes)} of ${fmt(aeManaged.total)} cases`} tint={AMBER} bar={aeManaged.total ? aeManaged.pct : undefined} />
-        <Kpi icon={Flag} label="Red-flag Sites" value={fmt(redFlags)} sub="high-risk visits" tint={RED} />
+        <Kpi icon={MapPin} label="Communities Supervised" value={fmt(kpis.communitiesSupervised)} sub={`${fmt(kpis.distinctCommunities)} distinct communit${kpis.distinctCommunities === 1 ? "y" : "ies"}`} tint={BLUE} />
+        <Kpi icon={CheckCircle2} label="MDA Completed" value={`${kpis.mdaCompleted.pct}%`} sub={`${fmt(kpis.mdaCompleted.done)} of ${fmt(kpis.mdaCompleted.total)} submissions`} tint={EMERALD} bar={kpis.mdaCompleted.pct} />
+        <Kpi icon={Pill} label="Sufficient Medicine" value={`${kpis.sufficientMedicine.pct}%`} sub={`${fmt(kpis.sufficientMedicine.yes)} of ${fmt(kpis.sufficientMedicine.total)} submissions`} tint={TEAL} bar={kpis.sufficientMedicine.pct} />
+        <Kpi icon={Activity} label="Follow-up Coverage" value={kpis.followUpCoverage.needing ? `${kpis.followUpCoverage.pct}%` : "—"} sub={`${fmt(kpis.followUpCoverage.followed)} of ${fmt(kpis.followUpCoverage.needing)} needing follow-up`} tint={VIOLET} bar={kpis.followUpCoverage.needing ? kpis.followUpCoverage.pct : undefined} />
+        <Kpi icon={AlertTriangle} label="Adverse Cases Managed" value={kpis.adverseManaged.reported ? `${kpis.adverseManaged.pct}%` : "—"} sub={`${fmt(kpis.adverseManaged.managed)} of ${fmt(kpis.adverseManaged.reported)} SAE cases`} tint={AMBER} bar={kpis.adverseManaged.reported ? kpis.adverseManaged.pct : undefined} />
+        <Kpi icon={Flag} label="Red-flag Sites" value={fmt(kpis.redFlagSites)} sub="communities needing action" tint={RED} />
       </div>
 
       {/* ── Longitudinal funnel ── */}
@@ -681,7 +789,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         <CardContent>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {funnel.map((f, i) => {
-              const p = pct(f.value, f.base);
+              const p = f.pctOverride ?? pct(f.value, f.base);
               return (
                 <div key={f.label} className="relative rounded-xl border border-border bg-card p-3" style={{ background: `linear-gradient(135deg, ${f.tint}0d, transparent 70%)` }}>
                   <div className="flex items-center justify-between">
@@ -691,9 +799,12 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
                   <p className="mt-2 font-display text-2xl font-bold" style={{ color: f.tint }}>{fmt(f.value)}</p>
                   <p className="text-[11px] text-muted-foreground">{f.label}</p>
                   {i > 0 && (
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full" style={{ width: `${p}%`, background: f.tint }} />
-                    </div>
+                    <>
+                      <p className="text-[10px] text-muted-foreground/80">of {fmt(f.base)} requiring follow-up</p>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full" style={{ width: `${p}%`, background: f.tint }} />
+                      </div>
+                    </>
                   )}
                 </div>
               );
@@ -702,69 +813,32 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         </CardContent>
       </Card>
 
-      {/* ── Follow-up outcome panels ── */}
+      {/* ── Follow-up outcome heatmaps (categories × LGA, first visit + follow-up) ── */}
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* MDA Completion */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-1.5 text-sm"><CheckCircle2 className="h-4 w-4" style={{ color: EMERALD }} />MDA Completion Outcomes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {mdaStatusTotal ? (
-              <>
-                <Donut centerValue={`${pct(mdaCompletedFu, mdaStatusTotal)}%`} centerLabel="Completed" data={mdaStatusDist} />
-                <div className="mt-2 space-y-1 text-xs">
-                  {mdaStatusDist.map((d) => (
-                    <div key={d.name} className="flex items-center justify-between">
-                      <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: d.color }} />{d.name}</span>
-                      <span className="font-semibold">{d.value} ({pct(d.value, mdaStatusTotal)}%)</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : <p className="py-10 text-center text-xs text-muted-foreground">No MDA Completion follow-ups yet.</p>}
-          </CardContent>
-        </Card>
-
-        {/* Commodities */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-1.5 text-sm"><Pill className="h-4 w-4" style={{ color: TEAL }} />Commodities Follow-up</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {commodityDist.length ? (
-              <div className="space-y-2 py-1">
-                <p className="text-[11px] text-muted-foreground">Commodities reported inadequate ({fmt(commoditiesFus.length)} follow-ups)</p>
-                {commodityDist.slice(0, 7).map((d) => (
-                  <BarRow key={d.name} label={d.name} value={d.value} pctVal={d.pct} color={d.color} />
-                ))}
-              </div>
-            ) : <p className="py-10 text-center text-xs text-muted-foreground">No commodity issues reported in follow-ups.</p>}
-          </CardContent>
-        </Card>
-
-        {/* Adverse */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-1.5 text-sm"><AlertTriangle className="h-4 w-4" style={{ color: AMBER }} />Adverse Reactions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {aeTypes.length || aeManaged.total ? (
-              <div className="space-y-2 py-1">
-                <div className="flex items-center justify-between rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs">
-                  <span className="text-muted-foreground">Cases managed</span>
-                  <Tag text={`${aeManaged.yes}/${aeManaged.total} (${aeManaged.pct}%)`} tint={EMERALD} />
-                </div>
-                <div className="flex items-center justify-between rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs">
-                  <span className="text-muted-foreground">Person reported okay</span>
-                  <Tag text={`${aeOkay.yes}/${aeOkay.total} (${aeOkay.pct}%)`} tint={BLUE} />
-                </div>
-                {aeTypes.length > 0 && <p className="pt-1 text-[11px] text-muted-foreground">Reaction types reported</p>}
-                {aeTypes.slice(0, 5).map((d) => <BarRow key={d.name} label={d.name} value={d.value} pctVal={d.pct} color={d.color} />)}
-              </div>
-            ) : <p className="py-10 text-center text-xs text-muted-foreground">No adverse reactions reported.</p>}
-          </CardContent>
-        </Card>
+        <HeatmapPanel
+          title="MDA Completion Outcomes"
+          icon={CheckCircle2}
+          tint={EMERALD}
+          baseTint={EMERALD}
+          heat={kpis.completionHeatmap}
+          empty="No MDA Completion data yet."
+        />
+        <HeatmapPanel
+          title="Commodities Follow-up"
+          icon={Pill}
+          tint={TEAL}
+          baseTint={TEAL}
+          heat={kpis.commoditiesHeatmap}
+          empty="No commodity gaps reported."
+        />
+        <HeatmapPanel
+          title="Adverse Reactions"
+          icon={AlertTriangle}
+          tint={AMBER}
+          baseTint={AMBER}
+          heat={kpis.adverseHeatmap}
+          empty="No adverse reactions reported."
+        />
       </div>
 
       {/* ── Activity trend ── */}
