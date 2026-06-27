@@ -173,7 +173,7 @@ const QUALITY_TONE: Record<QualityLevel, { tone: Tone; tint: string }> = {
   bad: { tone: "bad", tint: RED },
 };
 
-export default function MdaAdvancedAnalyses({ submissions, questions, projectName, followUpFields }: Props) {
+export default function MdaAdvancedAnalyses({ submissions, questions, projectName, followUpFields, offline }: Props) {
   const idx = useMemo(() => new MdaQuestionIndex(questions), [questions]);
   const communities = useMemo(() => aggregateByCommunity(submissions), [submissions]);
 
