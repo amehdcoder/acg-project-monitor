@@ -34,6 +34,7 @@ import { toast } from "sonner";
 import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
 import { MdaQuestionIndex } from "@/lib/mda/analyses";
 import { computeMdaKpis, type Heatmap as KHeatmap } from "@/lib/mda/kpis";
+import MdaDrillDownSheet, { type DrillData } from "./MdaDrillDownSheet";
 import {
   getMdaFollowUpGroupName, isMdaFollowUpGroup,
   MDA_FOLLOWUP_COMPLETION, MDA_FOLLOWUP_COMMODITIES, MDA_FOLLOWUP_ADVERSE,
