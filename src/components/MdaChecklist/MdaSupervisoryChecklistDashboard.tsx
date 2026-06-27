@@ -16,7 +16,7 @@
  */
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip,
+  ResponsiveContainer, Tooltip as RTooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
-import { MdaQuestionIndex } from "@/lib/mda/analyses";
+
 import { computeMdaKpis, type Heatmap as KHeatmap } from "@/lib/mda/kpis";
 import { exportKpiWorkbook, type KpiId } from "@/lib/mda/kpiExport";
 import MdaDrillDownSheet, { type DrillData } from "./MdaDrillDownSheet";
@@ -47,6 +47,11 @@ import FctSupervisoryMap from "./FctSupervisoryMap";
 import HouseholdCoverageSurveyMap from "./HouseholdCoverageSurveyMap";
 import MdaAdvancedAnalyses from "./MdaAdvancedAnalyses";
 import MdaLongitudinalInsights from "./MdaLongitudinalInsights";
+import { useTablePagination } from "@/hooks/useTablePagination";
+import {
+  Pagination, PaginationContent, PaginationItem, PaginationLink,
+  PaginationNext, PaginationPrevious,
+} from "@/components/ui/pagination";
 
 // ───────────────────────── Types ─────────────────────────
 interface QOption { id?: string; label: string; value: string; }
@@ -100,16 +105,8 @@ const FU_TINTS: Record<string, string> = {
   [MDA_FOLLOWUP_ADVERSE]: AMBER,
 };
 
-function yesStat(subs: MdaSubmission[], field: string) {
-  let yes = 0, total = 0;
-  for (const s of subs) {
-    const v = s.data?.[field];
-    if (v === undefined || v === null || v === "") continue;
-    total++;
-    if (POSITIVE.has(norm(v))) yes++;
-  }
-  return { yes, total, pct: pct(yes, total) };
-}
+
+
 
 function pickGeo(s: MdaSubmission, kind: "state" | "lga" | "ward" | "community"): string {
   const d = s.data || {};
@@ -160,42 +157,6 @@ function Kpi({ icon: Icon, label, value, sub, tint, bar, onExport, exporting }: 
 }
 
 
-function Donut({ data, centerLabel, centerValue, height = 180, inner = 56, outer = 80 }: {
-  data: { name: string; value: number; color: string }[]; centerLabel?: string; centerValue?: string;
-  height?: number; inner?: number; outer?: number;
-}) {
-  const total = data.reduce((a, b) => a + b.value, 0);
-  return (
-    <div className="relative">
-      <ResponsiveContainer width="100%" height={height}>
-        <PieChart>
-          <Pie data={total ? data : [{ name: "—", value: 1, color: "#e5e7eb" }]} dataKey="value" innerRadius={inner} outerRadius={outer} paddingAngle={total ? 2 : 0} stroke="none">
-            {(total ? data : [{ color: "#e5e7eb" }]).map((d, i) => <Cell key={i} fill={d.color} />)}
-          </Pie>
-          {total > 0 && <RTooltip />}
-        </PieChart>
-      </ResponsiveContainer>
-      {centerValue && (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center" style={{ height }}>
-          <span className="font-display text-2xl font-bold text-foreground">{centerValue}</span>
-          {centerLabel && <span className="text-[10px] text-muted-foreground">{centerLabel}</span>}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function BarRow({ label, value, pctVal, color }: { label: string; value: number; pctVal: number; color: string }) {
-  return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="w-40 shrink-0 truncate text-muted-foreground" title={label}>{label}</span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full" style={{ width: `${pctVal}%`, background: color }} />
-      </div>
-      <span className="w-16 shrink-0 text-right font-semibold text-foreground">{value} ({pctVal}%)</span>
-    </div>
-  );
-}
 
 function Tag({ text, tint }: { text: string; tint: string }) {
   return (
@@ -634,15 +595,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     return m;
   }, [checklist]);
 
-  const moduleCoverage = (canonical: string) => {
-    let n = 0;
-    for (const k of primaryByCom.keys()) if (fuByCommunity.get(k)?.has(canonical)) n++;
-    return n;
-  };
   const communitiesSupervised = primaryByCom.size;
-  const covCompletion = useMemo(() => moduleCoverage(MDA_FOLLOWUP_COMPLETION), [primaryByCom, fuByCommunity]);
-  const covCommodities = useMemo(() => moduleCoverage(MDA_FOLLOWUP_COMMODITIES), [primaryByCom, fuByCommunity]);
-  const covAdverse = useMemo(() => moduleCoverage(MDA_FOLLOWUP_ADVERSE), [primaryByCom, fuByCommunity]);
 
   // Longitudinal funnel — each follow-up step is expressed against the number of
   // communities that ACTUALLY require that follow-up (Owner definition #7).
@@ -653,98 +606,11 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     { label: "Adverse Reaction follow-up", icon: AlertTriangle, value: kpis.funnel.adverse.value, base: kpis.funnel.adverse.base, pctOverride: kpis.funnel.adverse.pct, tint: AMBER },
   ];
 
-  // ── KPIs (every checklist-bound metric resolved by question LABEL, never a
-  //    hard-coded field name, so each KPI stays wired to the right question per
-  //    project — Jigawa Schisto, ENDFUND/FCT, etc.) ──────────────────────────
-  const qIndex = useMemo(() => new MdaQuestionIndex(questions as any), [questions]);
-  const kpiKeys = useMemo(() => {
-    const find = (patterns: (string | RegExp)[], fallback: string) =>
-      qIndex.find(patterns)?.key || fallback;
-    return {
-      // "Status of MDA" determinant for the completion KPI.
-      mdaStatus: find([/status\s*of\s*mda/i, /mda\s*status/i, /status.*mass\s*drug/i], "status_of_mda"),
-      // Commodity / medicine availability question.
-      medicine: find(
-        [/commodit.*(availab|sufficient|adequate|enough)/i, /medicine.*(availab|sufficient|adequate|enough)/i, /(availab|sufficient|adequate).*(commodit|medicine|drug)/i, /drugs?\s*availab/i],
-        "commodities_available",
-      ),
-      // Risk categorisation question used to flag high-risk sites.
-      risk: find([/risk\s*categor/i, /risk\s*level/i, /risk\s*rating/i, /\brisk\b/i], "risk_category"),
-      // Whether the adverse event was managed (lives on the follow-up module).
-      aeManaged: find([/(adverse|ae|reaction).*manage/i, /manage.*(adverse|ae|reaction)/i, /(ae|adverse).*(addressed|handled|resolved)/i], "ae_been_managed"),
-    };
-  }, [qIndex]);
-
-  const mdaCompleted = useMemo(() => {
-    let done = 0, tot = 0;
-    for (const s of checklist) {
-      const raw = s.data?.[kpiKeys.mdaStatus];
-      if (raw === undefined || raw === null || raw === "") continue;
-      tot++;
-      const lbl = qIndex.label(qIndex.find([/status\s*of\s*mda/i, /mda\s*status/i]) || null, raw) || String(raw);
-      if (norm(lbl) === "completed" || norm(raw) === "completed") done++;
-    }
-    return { done, tot, pct: pct(done, tot) };
-  }, [checklist, kpiKeys.mdaStatus, qIndex]);
-  const medicine = useMemo(() => yesStat(checklist, kpiKeys.medicine), [checklist, kpiKeys.medicine]);
-  const redFlags = useMemo(
-    () => checklist.filter((s) => norm(s.data?.[kpiKeys.risk]) === "high").length,
-    [checklist, kpiKeys.risk],
-  );
-  const aeManaged = useMemo(() => yesStat(followUps, kpiKeys.aeManaged), [followUps, kpiKeys.aeManaged]);
-
-  // ── Follow-up outcome distributions ───────────────────────────
-  const completionFus = followUps.filter((s) => classifyFollowUp(s) === MDA_FOLLOWUP_COMPLETION);
-  const commoditiesFus = followUps.filter((s) => classifyFollowUp(s) === MDA_FOLLOWUP_COMMODITIES);
-  const adverseFus = followUps.filter((s) => classifyFollowUp(s) === MDA_FOLLOWUP_ADVERSE);
-
-  const mdaStatusDist = useMemo(() => {
-    const order = ["Not Started", "Ongoing", "Halted", "Completed"];
-    const colors: Record<string, string> = { "Not Started": SLATE, Ongoing: BLUE, Halted: RED, Completed: EMERALD };
-    const counts = new Map<string, number>();
-    for (const s of completionFus) {
-      const v = s.data?.status_of_mda;
-      if (!v) continue;
-      const lbl = order.find((o) => norm(o) === norm(v)) || stripTags(String(v));
-      counts.set(lbl, (counts.get(lbl) || 0) + 1);
-    }
-    return order.filter((o) => counts.has(o)).map((o) => ({ name: o, value: counts.get(o) || 0, color: colors[o] || SLATE }));
-  }, [completionFus]);
-  const mdaStatusTotal = mdaStatusDist.reduce((a, b) => a + b.value, 0);
-  const mdaCompletedFu = mdaStatusDist.find((d) => d.name === "Completed")?.value || 0;
-
-  const commodityDist = useMemo(() => {
-    const counts = new Map<string, number>();
-    let tot = 0;
-    for (const s of commoditiesFus) {
-      const v = s.data?.commodity_inadequate;
-      if (!v) continue;
-      const arr = Array.isArray(v) ? v : String(v).split(/\s+/);
-      for (const item of arr) {
-        const lbl = stripTags(String(item)).replace(/_/g, " ");
-        if (!lbl) continue;
-        counts.set(lbl, (counts.get(lbl) || 0) + 1); tot++;
-      }
-    }
-    return [...counts.entries()].map(([name, value], i) => ({ name, value, pct: pct(value, tot), color: [TEAL, BLUE, AMBER, RED, VIOLET, PINK][i % 6] })).sort((a, b) => b.value - a.value);
-  }, [commoditiesFus]);
-
-  const aeTypes = useMemo(() => {
-    const counts = new Map<string, number>();
-    let tot = 0;
-    for (const s of adverseFus) {
-      const v = s.data?.adverse_reaction_type;
-      if (!v) continue;
-      const arr = Array.isArray(v) ? v : String(v).split(/\s+/);
-      for (const item of arr) {
-        const lbl = stripTags(String(item)).replace(/_/g, " ");
-        if (!lbl) continue;
-        counts.set(lbl, (counts.get(lbl) || 0) + 1); tot++;
-      }
-    }
-    return [...counts.entries()].map(([name, value], i) => ({ name, value, pct: pct(value, tot), color: [AMBER, RED, VIOLET, PINK, BLUE, TEAL][i % 6] })).sort((a, b) => b.value - a.value);
-  }, [adverseFus]);
-  const aeOkay = useMemo(() => yesStat(adverseFus, "ae_person_okay"), [adverseFus]);
+  // NOTE: Headline KPIs are computed exclusively by the authoritative
+  // `computeMdaKpis` engine (see `kpis` above), which resolves every
+  // determinant by question LABEL per the Owner's published definitions.
+  // Earlier duplicate, field-name-based KPI computations were removed — they
+  // were never rendered and ran O(n) work on every filter change.
 
   // ── Trend (last 14 days) ──────────────────────────────────────
   const trend = useMemo(() => {
@@ -802,6 +668,12 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     if (fModule === MDA_FOLLOWUP_ADVERSE) return rows.filter((r) => r.hasAdverse);
     return rows;
   }, [primaryByCom, fuByCommunity, fModule]);
+
+  // Paginate the register so the DOM stays light with very large datasets
+  // (thousands of communities) instead of rendering every row at once.
+  const register = useTablePagination(linkage, 25);
+
+
 
   // ── Field worker accountability ───────────────────────────────
   const workers = useMemo(() => {
@@ -882,7 +754,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     );
   }
 
-  const completionCovPct = pct(covCompletion, communitiesSupervised);
+
 
   return (
     <div className="space-y-4">
@@ -1124,7 +996,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
               <tbody>
                 {linkage.length === 0 ? (
                   <tr><td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">No communities match the current filters.</td></tr>
-                ) : linkage.map((r) => (
+                ) : register.paginatedData.map((r) => (
                   <tr key={r.id} className="border-t border-border/60 hover:bg-muted/40">
                     <td className="px-3 py-2">
                       <div className="font-semibold text-foreground">{r.community}</div>
@@ -1153,6 +1025,36 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
               </tbody>
             </table>
           </div>
+          {register.totalPages > 1 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
+              <span>
+                Showing {register.startIndex + 1}–{Math.min(register.startIndex + register.pageSize, register.totalItems)} of {fmt(register.totalItems)}
+              </span>
+              <Pagination className="mx-0 w-auto">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => { e.preventDefault(); register.prevPage(); }}
+                      className={!register.hasPrev ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLink href="#" isActive onClick={(e) => e.preventDefault()}>
+                      {register.currentPage} / {register.totalPages}
+                    </PaginationLink>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => { e.preventDefault(); register.nextPage(); }}
+                      className={!register.hasNext ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
 
