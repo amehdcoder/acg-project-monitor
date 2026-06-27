@@ -566,6 +566,7 @@ const CESSurveyMap = ({
   // Static overlays. Kept separate from the live GPS marker/route so frequent
   // location updates don't rebuild thousands of rooftop/road/household layers.
   useEffect(() => {
+    if (!isNearViewport) return;
     if (!mapRef.current || !boundaryLayerGroupRef.current || !featureLayerGroupRef.current || !sampleLayerGroupRef.current) return;
     const boundaryLg = boundaryLayerGroupRef.current;
     const featureLg = featureLayerGroupRef.current;
@@ -971,6 +972,7 @@ const CESSurveyMap = ({
 
   // Live overlays: cheap, rebuilt as GPS updates arrive.
   useEffect(() => {
+    if (!isNearViewport) return;
     if (!mapRef.current || !liveLayerGroupRef.current) return;
     const lg = liveLayerGroupRef.current;
     lg.clearLayers();
