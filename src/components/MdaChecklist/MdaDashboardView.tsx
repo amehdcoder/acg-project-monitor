@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, ChevronUp, Database, Loader2, RotateCcw, Settings2, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, BarChart3, ChevronUp, Database, Loader2, RotateCcw, Settings2, Sparkles, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAuth } from "@/hooks/useAuth";
 import { useDataAnalytics, type SubmissionRecord } from "@/hooks/useDataAnalytics";
 import { generateMdaSimulation } from "@/lib/mda/simulation";
+import { loadMdaCache, saveMdaCache, isOffline } from "@/lib/mda/offlineCache";
 import MdaSupervisoryChecklistDashboard from "./MdaSupervisoryChecklistDashboard";
 
 interface MdaDashboardForm {
