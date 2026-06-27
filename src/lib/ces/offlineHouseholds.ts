@@ -57,6 +57,7 @@ export interface OfflineHousehold {
   gps_snapshot: string;   // JSON of GPS reading at capture time
   eligible_persons?: number;
   treated_persons?: number;
+  last_error?: string;
 }
 
 export interface OfflineAuditEntry {
@@ -79,6 +80,7 @@ export interface OfflineSurveyDraft {
   updated_at: string;
   synced: boolean;
   retry_count: number;
+  last_error?: string;
 }
 
 // ─── DB Init ─────────────────────────────────────────────────────────────────
@@ -243,15 +245,29 @@ export async function syncCESOfflineQueue(
       } catch (err: any) {
         console.warn("CES offline survey sync failed for", draft.id, err);
         const retries = (draft.retry_count || 0) + 1;
-        await idbPut(SURVEY_STORE, { ...draft, retry_count: retries });
+        await idbPut(SURVEY_STORE, { ...draft, retry_count: retries, last_error: err?.message ?? String(err) });
         failed++;
       }
     }
 
+    const stillPendingSurveyIds = new Set((await getPendingSurveys()).map((s) => s.id));
+
     for (const hh of pending) {
       try {
+        if (stillPendingSurveyIds.has(hh.survey_id)) {
+          await idbPut(HH_STORE, { ...hh, last_error: "Waiting for offline survey draft to sync" });
+          failed++;
+          continue;
+        }
+        let createdBy = hh.created_by;
+        if (!createdBy) {
+          const { data: sess } = await supabase.auth.getSession();
+          createdBy = sess.session?.user?.id ?? null;
+        }
+        if (!createdBy) throw new Error("Authenticated user unavailable for CES offline sync");
         // Build the canonical DB row (strip local-only fields)
         const row = {
+          id: hh.local_id,
           survey_id: hh.survey_id,
           hh_number: hh.hh_number,
           latitude: hh.latitude,
@@ -265,7 +281,7 @@ export async function syncCESOfflineQueue(
           device_id: hh.device_id,
           visited_at: hh.visited_at,
           synced_at: new Date().toISOString(),
-          created_by: hh.created_by,
+          created_by: createdBy,
           eligible_persons: (hh as any).eligible_persons ?? 0,
           treated_persons: (hh as any).treated_persons ?? 0,
           segment_label: hh.segment_label,
@@ -274,7 +290,7 @@ export async function syncCESOfflineQueue(
 
         const { data, error } = await supabase
           .from("ces_household_visits" as any)
-          .insert(row)
+          .upsert(row, { onConflict: "id" })
           .select("id")
           .single();
 
@@ -303,13 +319,8 @@ export async function syncCESOfflineQueue(
       } catch (err: any) {
         console.warn("CES offline sync failed for", hh.local_id, err);
         const retries = (hh.retry_count || 0) + 1;
-        if (retries >= 5) {
-          await idbDelete(HH_STORE, hh.local_id);
-          failed++;
-        } else {
-          await idbPut(HH_STORE, { ...hh, retry_count: retries });
-          failed++;
-        }
+        await idbPut(HH_STORE, { ...hh, retry_count: retries, last_error: err?.message ?? String(err) });
+        failed++;
       }
     }
 
