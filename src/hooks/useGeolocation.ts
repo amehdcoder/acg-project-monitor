@@ -34,10 +34,10 @@ export interface GeolocationState {
  *  5. Hard ceiling at TOTAL_TIMEOUT_MS. Only then do we surface an error.
  */
 
-const COARSE_WINDOW_MS = 2500; // if no fix yet, try coarse/network position
-const REFINE_WINDOW_MS = 8000; // keep sharpening up to 8s after first fix
+const COARSE_WINDOW_MS = 1000; // if no fix yet, quickly try coarse/network position
+const REFINE_WINDOW_MS = 6000; // keep sharpening up to 6s after first fix
 const TOTAL_TIMEOUT_MS = 30000;
-const GOOD_ACCURACY_M = 25; // stop refining once this good
+const GOOD_ACCURACY_M = 30; // stop refining once this good (one-click friendly)
 const INSTANT_MAX_AGE_MS = 10 * 60 * 1000; // accept cached fixes up to 10 min old
 
 export const useGeolocation = (options?: PositionOptions) => {

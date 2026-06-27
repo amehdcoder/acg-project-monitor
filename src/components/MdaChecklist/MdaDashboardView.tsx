@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useDataAnalytics, type SubmissionRecord } from "@/hooks/useDataAnalytics";
 import { generateMdaSimulation } from "@/lib/mda/simulation";
 import { loadMdaCache, saveMdaCache, isOffline } from "@/lib/mda/offlineCache";
+import { canonicalizeSubmissionData } from "@/lib/mda/dashboardData";
 import MdaSupervisoryChecklistDashboard from "./MdaSupervisoryChecklistDashboard";
 
 interface MdaDashboardForm {
@@ -136,8 +137,10 @@ function singleStateRestriction(questions: DashboardQuestion[]): string | null {
   return null;
 }
 
-function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm) {
-  const data = s.data || {};
+function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm, questions: DashboardQuestion[]) {
+  // Re-key answers to canonical question keys so historical / re-keyed
+  // submissions still resolve against the current form definition.
+  const data = canonicalizeSubmissionData(s.data || {}, questions as any);
   return {
     id: s.id,
     projectId: form.project_id || undefined,
@@ -165,8 +168,8 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
   );
 
   const realRows = useMemo(
-    () => submissions.map((s) => toMdaSubmission(s, form)),
-    [submissions, form],
+    () => submissions.map((s) => toMdaSubmission(s, form, questions)),
+    [submissions, form, questions],
   );
 
   const simulatedRows = useMemo(() => {

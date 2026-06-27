@@ -30,6 +30,8 @@ import {
   MDA_FOLLOWUP_COMMODITIES,
   MDA_FOLLOWUP_COMPLETION,
 } from "@/lib/mdaFollowUp";
+import { flattenQuestions, isYes } from "@/lib/mda/analyses";
+import { canonicalizeSubmissionData } from "@/lib/mda/dashboardData";
 
 // Default illustrated tile icons (match the supervisory checklist design).
 import imgCommunity from "@/assets/mda-tiles/community-checklist.png";
@@ -433,6 +435,37 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
 
   const filterFor = (groupName: string) => groupByName.get(groupName)?.communityFilter;
 
+  // Raw question tree (checklist + follow-up groups + ungrouped) used to
+  // canonicalize submission data and resolve the "Status of MDA" and SAE
+  // questions for the built-in follow-up eligibility rules.
+  const allQuestionTree = useMemo(
+    () => [...groups, ...(props.questions || [])],
+    [groups, props.questions],
+  );
+
+  // Resolve the canonical keys of the Status-of-MDA and SAE-complaint questions
+  // by tolerant label matching so the rules work across every project. We collect
+  // ALL matches (checklist source AND follow-up destination) so a community
+  // marked "Completed" at either the first visit or any follow-up is recognised.
+  const followUpResolution = useMemo(() => {
+    const flat = flattenQuestions(allQuestionTree as any);
+    const matchAny = (label: string, pats: RegExp[]) => pats.some((p) => p.test(label));
+    const statusPats = [/current status of mda/i, /status of mda/i, /mda.*complet/i, /completion status/i];
+    const saePats = [/complain.*side effect/i, /side effects during mda/i, /anybody complain/i, /adverse reaction/i, /\bsae\b/i];
+    const statusKeys: string[] = [];
+    const saeKeys: string[] = [];
+    for (const q of flat) {
+      const label = String(q.label || "");
+      const key = String(q.key || "");
+      if (!key) continue;
+      if (matchAny(label, statusPats) && !statusKeys.includes(key)) statusKeys.push(key);
+      if (matchAny(label, saePats) && !saeKeys.includes(key)) saeKeys.push(key);
+    }
+    return { statusKeys, saeKeys };
+  }, [allQuestionTree]);
+
+
+
   const builderDialog = builderGroup && canBuildFollowUps ? (
     <FollowUpLinkEditor
       key={`mda-landing-builder-${builderGroup.id}`}
@@ -513,6 +546,9 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
           accent="completion"
           filterExpr={filterFor(GROUP_COMPLETION)}
           nameMap={checklistNameMap}
+          questions={allQuestionTree}
+          statusKeys={followUpResolution.statusKeys}
+          excludeCompleted
           onConfigure={canBuildFollowUps ? () => openBuilder(ensureFollowUpGroup(GROUP_COMPLETION)) : undefined}
           onBack={() => setView("home")}
           onSelect={(c) => { setSelected(c); setView("completion"); }}
@@ -532,6 +568,9 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
           accent="commodities"
           filterExpr={filterFor(GROUP_COMMODITIES)}
           nameMap={checklistNameMap}
+          questions={allQuestionTree}
+          statusKeys={followUpResolution.statusKeys}
+          excludeCompleted
           onConfigure={canBuildFollowUps ? () => openBuilder(ensureFollowUpGroup(GROUP_COMMODITIES)) : undefined}
           onBack={() => setView("home")}
           onSelect={(c) => { setSelected(c); setView("commodities"); }}
@@ -551,6 +590,9 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
           accent="adverse"
           filterExpr={filterFor(GROUP_ADVERSE)}
           nameMap={checklistNameMap}
+          questions={allQuestionTree}
+          saeKeys={followUpResolution.saeKeys}
+          requireSae
           onConfigure={canBuildFollowUps ? () => openBuilder(ensureFollowUpGroup(GROUP_ADVERSE)) : undefined}
           onBack={() => setView("home")}
           onSelect={(c) => { setSelected(c); setView("adverse"); }}
@@ -776,6 +818,11 @@ function CommunityListView({
   accent = "default",
   filterExpr,
   nameMap,
+  questions,
+  statusKeys,
+  saeKeys,
+  excludeCompleted,
+  requireSae,
   onConfigure,
   onBack,
   onSelect,
@@ -787,6 +834,16 @@ function CommunityListView({
   accent?: AccentKey;
   filterExpr?: string;
   nameMap?: NameToIdMap;
+  /** Raw question tree (groups + questions) for canonicalizing answers. */
+  questions?: any[];
+  /** Canonical key(s) of the "Status of MDA" question. */
+  statusKeys?: string[];
+  /** Canonical key(s) of the SAE-complaint question. */
+  saeKeys?: string[];
+  /** Hide communities whose latest Status of MDA is "Completed". */
+  excludeCompleted?: boolean;
+  /** Only show communities with a reported adverse reaction (SAE = Yes). */
+  requireSae?: boolean;
   onConfigure?: () => void;
   onBack: () => void;
   onSelect: (c: VisitedCommunity) => void;
@@ -810,32 +867,77 @@ function CommunityListView({
           .order("submitted_at", { ascending: false })
           .limit(2000);
         if (error) throw error;
+
+        const norm = (v: any) => String(Array.isArray(v) ? v.join(" ") : v ?? "").trim().toLowerCase();
+        const firstVal = (d: Record<string, any>, keys?: string[]) => {
+          for (const k of keys || []) {
+            const v = d[k];
+            if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+          }
+          return undefined;
+        };
+        const isCompleted = (v: any) => norm(v).includes("complet");
+
         const seen = new Set<string>();
         const out: VisitedCommunity[] = [];
+        // Latest (most-recent-first) status / SAE per community across ALL its
+        // submissions (checklist + follow-up), so eligibility reflects reality.
+        const statusByKey = new Map<string, any>();
+        const saeByKey = new Map<string, any>();
+
         for (const s of data || []) {
-          const d = (s.data as Record<string, any>) || {};
-          // Admin-defined appearance condition: only include communities whose
-          // Community Checklist response satisfies the configured filter.
-          // Submission data is keyed by question `name`, and the filter expression
-          // references those same `name`s — build an identity map over the actual
-          // submission keys so conditions evaluate exactly as defined regardless
-          // of which questions are registered in nameMap.
-          if (filterExpr) {
-            const identityMap: NameToIdMap = { ...(nameMap || {}) };
-            for (const k of Object.keys(d)) identityMap[k] = k;
-            if (!evaluateRelevant(filterExpr, d, identityMap)) continue;
-          }
+          const raw = (s.data as Record<string, any>) || {};
+          // Canonicalize so answers stored under regenerated ids / names resolve.
+          const d = questions ? canonicalizeSubmissionData(raw, questions) : raw;
+
           const community = pick(d, ["community", "community_name", "settlement", "settlement_name"]);
           const lga = pick(d, ["lga"]);
           const ward = pick(d, ["ward"]);
           const flhf = pick(d, ["flhf_name", "flhf", "health_facility"]);
           if (!community && !lga && !ward) continue;
           const key = `${lga}|${ward}|${flhf}|${community}`.toLowerCase();
+
+          // Track latest status / SAE for the community (desc order ⇒ first wins).
+          if (!statusByKey.has(key)) {
+            const sv = firstVal(d, statusKeys);
+            if (sv !== undefined) statusByKey.set(key, sv);
+          }
+          if (!saeByKey.has(key)) {
+            const sae = firstVal(d, saeKeys);
+            if (sae !== undefined) saeByKey.set(key, sae);
+          }
+
+          // Admin-defined appearance condition, evaluated against canonical data.
+          if (filterExpr) {
+            const identityMap: NameToIdMap = { ...(nameMap || {}) };
+            for (const k of Object.keys(d)) identityMap[k] = k;
+            if (!evaluateRelevant(filterExpr, d, identityMap)) continue;
+          }
+
           if (seen.has(key)) continue;
           seen.add(key);
           out.push({ id: s.id, lga, ward, flhf, community, data: d });
         }
-        if (active) setRows(out);
+
+        // Built-in eligibility rules:
+        //  • Completion / Commodities: drop communities already Completed.
+        //  • Adverse Reactions: keep only communities with a reported SAE
+        //    (this includes Completed ones that still have adverse reactions).
+        let result = out;
+        if (excludeCompleted) {
+          result = result.filter((r) => {
+            const key = `${r.lga}|${r.ward}|${r.flhf}|${r.community}`.toLowerCase();
+            return !isCompleted(statusByKey.get(key));
+          });
+        }
+        if (requireSae) {
+          result = result.filter((r) => {
+            const key = `${r.lga}|${r.ward}|${r.flhf}|${r.community}`.toLowerCase();
+            return isYes(saeByKey.get(key));
+          });
+        }
+
+        if (active) setRows(result);
       } catch (e) {
         console.error("Community list load error", e);
         if (active) setRows([]);
@@ -844,7 +946,7 @@ function CommunityListView({
       }
     })();
     return () => { active = false; };
-  }, [formId, projectId, filterExpr, nameMap]);
+  }, [formId, projectId, filterExpr, nameMap, questions, statusKeys, saeKeys, excludeCompleted, requireSae]);
 
   const filtered = useMemo(() => {
     const t = query.trim().toLowerCase();
