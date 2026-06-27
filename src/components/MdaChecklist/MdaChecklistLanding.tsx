@@ -444,21 +444,26 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   );
 
   // Resolve the canonical keys of the Status-of-MDA and SAE-complaint questions
-  // by tolerant label matching so the rules work across every project.
+  // by tolerant label matching so the rules work across every project. We collect
+  // ALL matches (checklist source AND follow-up destination) so a community
+  // marked "Completed" at either the first visit or any follow-up is recognised.
   const followUpResolution = useMemo(() => {
-    const idx = new MdaQuestionIndex(allQuestionTree as any);
-    const statusQ = idx.find([
-      /current status of mda/i, /status of mda/i, /mda.*complet/i, /completion status/i,
-    ]);
-    const saeQ = idx.find([
-      /complain.*side effect/i, /side effects during mda/i, /anybody complain/i,
-      /adverse reaction/i, /\bsae\b/i,
-    ]);
-    return {
-      statusKeys: statusQ ? [statusQ.key] : [],
-      saeKeys: saeQ ? [saeQ.key] : [],
-    };
+    const flat = flattenQuestionTree(allQuestionTree);
+    const matchAny = (label: string, pats: RegExp[]) => pats.some((p) => p.test(label));
+    const statusPats = [/current status of mda/i, /status of mda/i, /mda.*complet/i, /completion status/i];
+    const saePats = [/complain.*side effect/i, /side effects during mda/i, /anybody complain/i, /adverse reaction/i, /\bsae\b/i];
+    const statusKeys: string[] = [];
+    const saeKeys: string[] = [];
+    for (const q of flat) {
+      const label = String(q.label || q.name || "");
+      const key = String(q.name || q.id || "");
+      if (!key) continue;
+      if (matchAny(label, statusPats) && !statusKeys.includes(key)) statusKeys.push(key);
+      if (matchAny(label, saePats) && !saeKeys.includes(key)) saeKeys.push(key);
+    }
+    return { statusKeys, saeKeys };
   }, [allQuestionTree]);
+
 
 
   const builderDialog = builderGroup && canBuildFollowUps ? (
