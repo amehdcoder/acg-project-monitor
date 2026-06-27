@@ -199,14 +199,55 @@ function hexToRgb(hex: string) {
   const h = hex.replace("#", "");
   return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) };
 }
-function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty }: {
+function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }: {
   title: string; icon: any; tint: string; baseTint: string; heat: KHeatmap; empty: string;
+  onCell?: (category: string, lga: string | null) => void;
 }) {
   const max = Math.max(1, ...heat.rows.flatMap((r) => heat.categories.map((c) => r.cells[c]?.value || 0)));
   const { r, g, b } = hexToRgb(baseTint);
   const cellBg = (v: number) => (v <= 0 ? "transparent" : `rgba(${r}, ${g}, ${b}, ${0.12 + 0.78 * (v / max)})`);
   const cellFg = (v: number) => (v / max > 0.55 ? "#ffffff" : "hsl(var(--foreground))");
   const hasData = heat.rows.some((row) => heat.categories.some((c) => (row.cells[c]?.value || 0) > 0));
+  const clickable = !!onCell;
+
+  const Cell = ({ cell, lga, category, isTotal }: { cell: KHeatmap["colTotals"][string]; lga: string | null; category: string; isTotal?: boolean }) => {
+    const value = cell?.value || 0;
+    const followed = cell?.followed || 0;
+    const fpct = value ? Math.round((followed / value) * 100) : 0;
+    const tip = value
+      ? `${isTotal ? "All LGAs" : lga} · ${category}\n${value} communit${value === 1 ? "y" : "ies"} at first visit (count)\n${followed} followed up over time — ${fpct}% follow-up coverage${clickable ? "\nClick to view the underlying communities & answers" : ""}`
+      : `${isTotal ? "All LGAs" : lga} · ${category}: none`;
+    const inner = (
+      <>
+        <span className="block font-bold leading-none">{value || "·"}</span>
+        {value > 0 && (
+          <span className="block text-[9px] font-medium leading-tight opacity-90">↑{fpct}%</span>
+        )}
+      </>
+    );
+    const style = isTotal
+      ? undefined
+      : { background: cellBg(value), color: value ? cellFg(value) : "hsl(var(--muted-foreground))" };
+    if (clickable && value > 0) {
+      return (
+        <button
+          type="button"
+          onClick={() => onCell!(category, isTotal ? null : lga)}
+          title={tip}
+          aria-label={tip.replace(/\n/g, ". ")}
+          className={`w-full rounded-md px-1 py-1.5 transition-all hover:ring-2 hover:ring-offset-1 hover:ring-offset-card focus:outline-none focus:ring-2 cursor-pointer ${isTotal ? "bg-muted/60 text-foreground" : ""}`}
+          style={{ ...(style || {}), ...(isTotal ? {} : {}) }}
+        >
+          {inner}
+        </button>
+      );
+    }
+    return (
+      <div className={`rounded-md px-1 py-1.5 transition-colors ${isTotal ? "bg-muted/60 text-foreground" : ""}`} title={tip} style={style}>
+        {inner}
+      </div>
+    );
+  };
 
   return (
     <Card className="overflow-hidden">
@@ -235,49 +276,43 @@ function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty }: {
                     <td className="sticky left-0 z-10 bg-card px-2 py-1.5 font-medium text-foreground">
                       <span className="block max-w-[120px] truncate" title={row.lga}>{row.lga}</span>
                     </td>
-                    {heat.categories.map((c) => {
-                      const cell = row.cells[c] || { value: 0, followed: 0 };
-                      const fpct = cell.value ? Math.round((cell.followed / cell.value) * 100) : 0;
-                      return (
-                        <td key={c} className="px-0.5 py-0.5 text-center">
-                          <div
-                            className="rounded-md px-1 py-1.5 transition-colors"
-                            style={{ background: cellBg(cell.value), color: cell.value ? cellFg(cell.value) : "hsl(var(--muted-foreground))" }}
-                            title={`${row.lga} · ${c}: ${cell.value} communit${cell.value === 1 ? "y" : "ies"} at first visit, ${cell.followed} followed up (${fpct}%)`}
-                          >
-                            <span className="block font-bold leading-none">{cell.value || "·"}</span>
-                            {cell.value > 0 && (
-                              <span className="block text-[9px] font-medium leading-tight opacity-90">↑{fpct}%</span>
-                            )}
-                          </div>
-                        </td>
-                      );
-                    })}
+                    {heat.categories.map((c) => (
+                      <td key={c} className="px-0.5 py-0.5 text-center">
+                        <Cell cell={row.cells[c] || { value: 0, followed: 0 }} lga={row.lga} category={c} />
+                      </td>
+                    ))}
                   </tr>
                 ))}
                 <tr>
                   <td className="sticky left-0 z-10 bg-muted/60 px-2 py-1.5 font-semibold text-foreground">All LGAs</td>
-                  {heat.categories.map((c) => {
-                    const tot = heat.colTotals[c] || { value: 0, followed: 0 };
-                    const fpct = tot.value ? Math.round((tot.followed / tot.value) * 100) : 0;
-                    return (
-                      <td key={c} className="px-0.5 py-0.5 text-center">
-                        <div className="rounded-md bg-muted/60 px-1 py-1.5">
-                          <span className="block font-bold leading-none text-foreground">{tot.value || "·"}</span>
-                          {tot.value > 0 && <span className="block text-[9px] font-medium leading-tight text-muted-foreground">↑{fpct}%</span>}
-                        </div>
-                      </td>
-                    );
-                  })}
+                  {heat.categories.map((c) => (
+                    <td key={c} className="px-0.5 py-0.5 text-center">
+                      <Cell cell={heat.colTotals[c] || { value: 0, followed: 0 }} lga={null} category={c} isTotal />
+                    </td>
+                  ))}
                 </tr>
               </tbody>
             </table>
-            <div className="flex items-center gap-3 px-3 py-2 text-[10px] text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <span className="inline-block h-3 w-6 rounded" style={{ background: `linear-gradient(90deg, rgba(${r},${g},${b},0.12), rgba(${r},${g},${b},0.9))` }} />
-                fewer → more at first visit
-              </span>
-              <span>↑% = followed up over time</span>
+            {/* ── Professional legend / colour scale ── */}
+            <div className="space-y-1.5 border-t border-border/60 px-3 py-2.5">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className="font-semibold text-foreground">Colour</span>
+                  <span className="inline-flex items-center gap-1">
+                    <span>1</span>
+                    <span className="inline-block h-3 w-16 rounded" style={{ background: `linear-gradient(90deg, rgba(${r},${g},${b},0.12), rgba(${r},${g},${b},0.9))` }} />
+                    <span>{max}</span>
+                  </span>
+                  <span>communities at first visit (count)</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="font-semibold text-foreground">↑%</span>
+                  <span>share followed up over time (% of first-visit communities)</span>
+                </span>
+              </div>
+              {clickable && (
+                <p className="text-[10px] italic text-muted-foreground">Click any cell to drill into the underlying communities, their first-visit answers and follow-up answers.</p>
+              )}
             </div>
           </div>
         )}
