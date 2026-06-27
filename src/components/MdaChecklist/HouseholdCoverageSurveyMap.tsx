@@ -483,7 +483,43 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(redraw, [windowed, statesPresent, selectedLga]);
+  useEffect(redraw, [windowed, statesPresent, selectedLga, clustered]);
+
+  // ── Basemap switching (light ↔ satellite) with URL persistence (#8) ──
+  useEffect(() => {
+    const map = mapRef.current;
+    const light = lightTileRef.current;
+    const sat = satTileRef.current;
+    if (!map || !light || !sat) return;
+    if (basemap === "satellite") {
+      if (map.hasLayer(light)) map.removeLayer(light);
+      if (!map.hasLayer(sat)) sat.addTo(map);
+    } else {
+      if (map.hasLayer(sat)) map.removeLayer(sat);
+      if (!map.hasLayer(light)) light.addTo(map);
+    }
+    writeUrl({ [URL_KEYS.basemap]: basemap === "satellite" ? "satellite" : null });
+  }, [basemap]);
+
+  // Pan/zoom to a visit, instantly switch to satellite view, persist viewport.
+  const focusVisit = (p: VisitPoint) => {
+    setSelectedVisit(p);
+    setSelectedLga("");
+    setBasemap("satellite");
+    const map = mapRef.current;
+    if (map) {
+      viewLockedRef.current = true;
+      map.setView([p.lat, p.lng], Math.max(map.getZoom(), 18), { animate: true });
+    }
+    writeUrl({
+      [URL_KEYS.visit]: p.id,
+      [URL_KEYS.community]: p.community || null,
+      [URL_KEYS.state]: p.state || null,
+      [URL_KEYS.lga]: null,
+      [URL_KEYS.basemap]: "satellite",
+    });
+    if (p.community) onSelectCommunity?.(p.community, p.state);
+  };
 
   function redraw() {
     const map = mapRef.current;
