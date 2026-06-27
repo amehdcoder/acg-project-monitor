@@ -846,6 +846,28 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
               Filters: {[stateFilter, dateFrom && `from ${new Date(dateFrom).toLocaleDateString()}`, dateTo && `to ${new Date(dateTo).toLocaleDateString()}`].filter(Boolean).join(" · ")}
             </Badge>
           )}
+          <div className="ml-auto flex items-center gap-1.5">
+            <Button
+              variant={clustered ? "default" : "outline"}
+              size="sm"
+              className="h-7 gap-1.5 px-2 text-[11px]"
+              onClick={() => setClustered((v) => !v)}
+              aria-pressed={clustered}
+              title={clustered ? "Markers are clustered — click to show individual markers" : "Markers are individual — click to cluster"}
+            >
+              <Layers className="h-3.5 w-3.5" /> {clustered ? "Clustered" : "Unclustered"}
+            </Button>
+            <Button
+              variant={basemap === "satellite" ? "default" : "outline"}
+              size="sm"
+              className="h-7 gap-1.5 px-2 text-[11px]"
+              onClick={() => setBasemap((b) => (b === "satellite" ? "light" : "satellite"))}
+              aria-pressed={basemap === "satellite"}
+              title="Toggle satellite imagery"
+            >
+              <Satellite className="h-3.5 w-3.5" /> {basemap === "satellite" ? "Satellite" : "Map"}
+            </Button>
+          </div>
         </div>
 
         {/* Accessible, keyboard-navigable legend (also acts as outcome filter) */}
