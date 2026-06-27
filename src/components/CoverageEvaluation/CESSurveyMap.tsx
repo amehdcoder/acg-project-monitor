@@ -590,13 +590,20 @@ const CESSurveyMap = ({
       fg?.waterways[0]?.id ?? "", fg?.waterways[(fg?.waterways.length ?? 0) - 1]?.id ?? "",
       correctedKey,
     ].join("|");
+    const householdSummary = households.reduce((acc, h) => {
+      acc[h.coverage_status] = (acc[h.coverage_status] ?? 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
     const sampleKey = [
       segments.map((s) => `${s.label}:${s.polygon.length}:${s.centroid.lat.toFixed(6)},${s.centroid.lng.toFixed(6)}`).join("|"),
       selectedSegmentIds.join(","),
       samplingPins.length,
       samplingPins[0] ? `${samplingPins[0].lat.toFixed(6)},${samplingPins[0].lng.toFixed(6)}` : "",
       samplingPins[samplingPins.length - 1] ? `${samplingPins[samplingPins.length - 1].lat.toFixed(6)},${samplingPins[samplingPins.length - 1].lng.toFixed(6)}` : "",
-      households.map((h) => `${h.id}:${h.coverage_status}:${h.lat.toFixed(6)},${h.lng.toFixed(6)}`).join("|"),
+      households.length,
+      households[0] ? `${households[0].id}:${households[0].coverage_status}:${households[0].lat.toFixed(6)},${households[0].lng.toFixed(6)}` : "",
+      households[households.length - 1] ? `${households[households.length - 1].id}:${households[households.length - 1].coverage_status}:${households[households.length - 1].lat.toFixed(6)},${households[households.length - 1].lng.toFixed(6)}` : "",
+      Object.entries(householdSummary).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}:${v}`).join(","),
     ].join("|");
     const boundaryDirty = boundaryKey !== boundaryRenderKeyRef.current;
     const featureDirty = featureKey !== featureRenderKeyRef.current;
