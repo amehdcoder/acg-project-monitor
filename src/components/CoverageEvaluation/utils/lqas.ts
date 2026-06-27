@@ -88,15 +88,56 @@ export function polygonRingDirection(poly: LatLng[]): RingDirection {
 export function polygonHasSelfIntersection(poly: LatLng[]): boolean {
   const n = poly.length;
   if (n < 4) return false;
-  for (let i = 0; i < n - 1; i++) {
+
+  const segCount = n - 1;
+  const lats = poly.map((p) => p.lat);
+  const lngs = poly.map((p) => p.lng);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  const spanLat = Math.max(maxLat - minLat, 1e-9);
+  const spanLng = Math.max(maxLng - minLng, 1e-9);
+  const gridN = Math.max(8, Math.min(80, Math.ceil(Math.sqrt(segCount))));
+  const cellLat = spanLat / gridN;
+  const cellLng = spanLng / gridN;
+  const seen = new Map<string, number[]>();
+  const checked = new Set<string>();
+
+  const cellRange = (a: LatLng, b: LatLng) => {
+    const y0 = Math.max(0, Math.floor((Math.min(a.lat, b.lat) - minLat) / cellLat));
+    const y1 = Math.min(gridN - 1, Math.floor((Math.max(a.lat, b.lat) - minLat) / cellLat));
+    const x0 = Math.max(0, Math.floor((Math.min(a.lng, b.lng) - minLng) / cellLng));
+    const x1 = Math.min(gridN - 1, Math.floor((Math.max(a.lng, b.lng) - minLng) / cellLng));
+    return { x0, x1, y0, y1 };
+  };
+
+  const adjacent = (i: number, j: number) => Math.abs(i - j) <= 1 || (i === 0 && j === segCount - 1) || (j === 0 && i === segCount - 1);
+
+  for (let i = 0; i < segCount; i++) {
     const a1 = poly[i];
     const a2 = poly[i + 1];
-    for (let j = i + 2; j < n - 1; j++) {
-      // skip adjacent edges
-      if (i === 0 && j === n - 2) continue;
-      const b1 = poly[j];
-      const b2 = poly[j + 1];
-      if (segmentsIntersect(a1, a2, b1, b2)) return true;
+    const { x0, x1, y0, y1 } = cellRange(a1, a2);
+    for (let x = x0; x <= x1; x++) {
+      for (let y = y0; y <= y1; y++) {
+        const key = `${x}:${y}`;
+        const candidates = seen.get(key) ?? [];
+        for (const j of candidates) {
+          if (adjacent(i, j)) continue;
+          const pair = i < j ? `${i}:${j}` : `${j}:${i}`;
+          if (checked.has(pair)) continue;
+          checked.add(pair);
+          if (segmentsIntersect(a1, a2, poly[j], poly[j + 1])) return true;
+        }
+      }
+    }
+    for (let x = x0; x <= x1; x++) {
+      for (let y = y0; y <= y1; y++) {
+        const key = `${x}:${y}`;
+        const bucket = seen.get(key);
+        if (bucket) bucket.push(i);
+        else seen.set(key, [i]);
+      }
     }
   }
   return false;

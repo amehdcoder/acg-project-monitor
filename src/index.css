@@ -352,7 +352,13 @@
     border-radius: var(--radius);
   }
 
-  * { scroll-behavior: smooth; }
+  /* Never force animated scrolling globally. On low-end Android devices a
+     universal `scroll-behavior: smooth` makes long ODK/CES forms feel frozen,
+     especially while Leaflet tiles are decoding. Keep smooth scrolling only for
+     fine-pointer desktop users and respect reduced-motion. */
+  @media (prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine) {
+    html:focus-within { scroll-behavior: smooth; }
+  }
 
   select, input[type="text"], input[type="email"], input[type="password"], input[type="number"], textarea {
     @apply transition-colors duration-200;

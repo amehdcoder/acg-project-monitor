@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Segment, LatLng } from "@/lib/ces/kmeansSegments";
@@ -154,6 +154,25 @@ const TILE_LAYERS: Record<CesBasemap, { url: string; attribution: string; subdom
 const ESRI_LABELS_URL =
   "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
 
+const getCesLayerBudget = () => {
+  const nav = typeof navigator !== "undefined" ? navigator as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean } } : null;
+  const lowPower = (nav?.hardwareConcurrency ?? 4) <= 4 || (nav?.deviceMemory ?? 4) <= 4 || nav?.connection?.saveData === true;
+  return {
+    buildings: lowPower ? 900 : 1800,
+    roads: lowPower ? 450 : 900,
+    waterways: lowPower ? 180 : 360,
+    samplingPins: lowPower ? 700 : 1400,
+    households: lowPower ? 900 : 1800,
+    batchSize: lowPower ? 45 : 90,
+    frameMs: lowPower ? 5 : 8,
+  };
+};
+
+const isCoarsePointer = () =>
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(pointer: coarse)").matches;
+
 const CESSurveyMap = ({
   centerLat,
   centerLng,
@@ -194,14 +213,42 @@ const CESSurveyMap = ({
   const tileRef = useRef<L.TileLayer | null>(null);
   const labelsRef = useRef<L.TileLayer | null>(null);
   const staticLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const boundaryLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const featureLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const sampleLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const liveLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const tapHandlerRef = useRef<((lat: number, lng: number) => void) | null>(null);
+  const destroyedRef = useRef(false);
+  const [isNearViewport, setIsNearViewport] = useState(false);
+  const boundaryRenderKeyRef = useRef<string>("");
+  const featureRenderKeyRef = useRef<string>("");
+  const sampleRenderKeyRef = useRef<string>("");
   // Active tile config (url + native zoom + subdomains) used by the offline
   // prefetcher to download the exact same imagery the map is currently showing.
   const activeTileRef = useRef<{ mode: CesBasemap; sources: TileSource[] }>({
     mode: "satellite",
     sources: [{ url: TILE_LAYERS.satellite.url, maxNativeZoom: 19, subdomains: "abc", requestMode: "cors", label: "Esri satellite" }],
   });
+  const staticLayerBudget = useMemo(getCesLayerBudget, []);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setIsNearViewport(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsNearViewport(true);
+          observer.disconnect();
+        }
+      },
+      { root: null, rootMargin: "650px 0px", threshold: 0.01 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const applyBasemap = (map: L.Map, mode: CesBasemap) => {
     if (tileRef.current) { map.removeLayer(tileRef.current); tileRef.current = null; }
@@ -290,16 +337,29 @@ const CESSurveyMap = ({
 
   // init map
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    if (!isNearViewport || !containerRef.current || mapRef.current) return;
+    destroyedRef.current = false;
     const map = L.map(containerRef.current, {
       zoomControl: true,
+      preferCanvas: true,
+      // On Android, Leaflet touch-dragging hijacks the page's vertical scroll
+      // when users swipe across the map. Keep the map tap/zoom-control friendly
+      // but disable one-finger map dragging on coarse pointers for freeze-free
+      // page scrolling through long CES forms.
+      dragging: !isCoarsePointer(),
+      touchZoom: true,
+      scrollWheelZoom: false,
       zoomSnap: 0.25,
       zoomDelta: 0.25,
       wheelPxPerZoomLevel: 80,
+      wheelDebounceTime: 80,
       maxZoom: 23,
     }).setView([centerLat, centerLng], 17);
     applyBasemap(map, basemap);
     staticLayerGroupRef.current = L.layerGroup().addTo(map);
+    boundaryLayerGroupRef.current = L.layerGroup().addTo(staticLayerGroupRef.current);
+    featureLayerGroupRef.current = L.layerGroup().addTo(staticLayerGroupRef.current);
+    sampleLayerGroupRef.current = L.layerGroup().addTo(staticLayerGroupRef.current);
     liveLayerGroupRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
 
@@ -343,10 +403,22 @@ const CESSurveyMap = ({
     map.addControl(new DownloadControl());
 
     let warmTimer: number | null = null;
+    let warmIdle: number | null = null;
     const scheduleWarm = () => {
       if (warmTimer !== null) window.clearTimeout(warmTimer);
+      if (warmIdle !== null && "cancelIdleCallback" in window) {
+        (window as any).cancelIdleCallback(warmIdle);
+        warmIdle = null;
+      }
       warmTimer = window.setTimeout(() => {
-        void prefetchOfflineTiles(undefined, { maxTiles: 320, zoomAhead: 1, zoomBack: 0, padRatio: 0.08, quiet: true, concurrency: 3 });
+        if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+        if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+        const run = () => void prefetchOfflineTiles(undefined, { maxTiles: 96, zoomAhead: 1, zoomBack: 0, padRatio: 0.04, quiet: true, concurrency: 1 });
+        if ("requestIdleCallback" in window) {
+          warmIdle = (window as any).requestIdleCallback(run, { timeout: 2500 });
+        } else {
+          run();
+        }
       }, 1200);
     };
     map.on("moveend zoomend", scheduleWarm);
@@ -356,16 +428,21 @@ const CESSurveyMap = ({
       window.clearTimeout(t0);
       window.clearTimeout(t1);
       if (warmTimer !== null) window.clearTimeout(warmTimer);
+      if (warmIdle !== null && "cancelIdleCallback" in window) (window as any).cancelIdleCallback(warmIdle);
       ro.disconnect();
       window.removeEventListener("resize", fixSize);
       map.off("moveend zoomend", scheduleWarm);
+      destroyedRef.current = true;
       map.remove();
       mapRef.current = null;
       staticLayerGroupRef.current = null;
+      boundaryLayerGroupRef.current = null;
+      featureLayerGroupRef.current = null;
+      sampleLayerGroupRef.current = null;
       liveLayerGroupRef.current = null;
     };
     // eslint-disable-next-line
-  }, []);
+  }, [isNearViewport]);
 
   // Pre-fetch all tiles covering the current map view across zoom levels so the
     // imagery is fully available offline. Caps total tile count to protect the
@@ -489,13 +566,80 @@ const CESSurveyMap = ({
   // Static overlays. Kept separate from the live GPS marker/route so frequent
   // location updates don't rebuild thousands of rooftop/road/household layers.
   useEffect(() => {
-    if (!mapRef.current || !staticLayerGroupRef.current) return;
-    staticLayerGroupRef.current.clearLayers();
-    const lg = staticLayerGroupRef.current;
+    if (!isNearViewport) return;
+    if (!mapRef.current || !boundaryLayerGroupRef.current || !featureLayerGroupRef.current || !sampleLayerGroupRef.current) return;
+    const boundaryLg = boundaryLayerGroupRef.current;
+    const featureLg = featureLayerGroupRef.current;
+    const sampleLg = sampleLayerGroupRef.current;
+    const coordsKey = (pts: LatLng[]) => pts.map((p) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`).join(";");
+    const boundaryKey = [
+      coordsKey(perimeter),
+      coordsKey(draftPolygon),
+      editablePerimeter ? "edit" : "view",
+      lqas?.selfIntersects ? "bad" : lqas?.ready ? "ready" : "progress",
+      Math.round(lqas?.areaM2 ?? -1),
+    ].join("|");
+    const fg = mapFeatures;
+    const correctedKey = Object.entries(correctedLabels).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}:${v}`).join("|");
+    const featureKey = [
+      showFeatures, showResidential, showExclusions,
+      featureLayers.buildings, featureLayers.roads, featureLayers.waterways,
+      qaOverlay, showUncertainOnly, labelMode,
+      fg?.buildings.length ?? 0, fg?.roads.length ?? 0, fg?.waterways.length ?? 0,
+      fg?.buildings[0]?.id ?? "", fg?.buildings[(fg?.buildings.length ?? 0) - 1]?.id ?? "",
+      fg?.roads[0]?.id ?? "", fg?.roads[(fg?.roads.length ?? 0) - 1]?.id ?? "",
+      fg?.waterways[0]?.id ?? "", fg?.waterways[(fg?.waterways.length ?? 0) - 1]?.id ?? "",
+      correctedKey,
+    ].join("|");
+    const householdSummary = households.reduce((acc, h) => {
+      acc[h.coverage_status] = (acc[h.coverage_status] ?? 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    const sampleKey = [
+      segments.map((s) => `${s.label}:${s.polygon.length}:${s.centroid.lat.toFixed(6)},${s.centroid.lng.toFixed(6)}`).join("|"),
+      selectedSegmentIds.join(","),
+      samplingPins.length,
+      samplingPins[0] ? `${samplingPins[0].lat.toFixed(6)},${samplingPins[0].lng.toFixed(6)}` : "",
+      samplingPins[samplingPins.length - 1] ? `${samplingPins[samplingPins.length - 1].lat.toFixed(6)},${samplingPins[samplingPins.length - 1].lng.toFixed(6)}` : "",
+      households.length,
+      households[0] ? `${households[0].id}:${households[0].coverage_status}:${households[0].lat.toFixed(6)},${households[0].lng.toFixed(6)}` : "",
+      households[households.length - 1] ? `${households[households.length - 1].id}:${households[households.length - 1].coverage_status}:${households[households.length - 1].lat.toFixed(6)},${households[households.length - 1].lng.toFixed(6)}` : "",
+      Object.entries(householdSummary).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}:${v}`).join(","),
+    ].join("|");
+    const boundaryDirty = boundaryKey !== boundaryRenderKeyRef.current;
+    const featureDirty = featureKey !== featureRenderKeyRef.current;
+    const sampleDirty = sampleKey !== sampleRenderKeyRef.current;
+    if (!boundaryDirty && !featureDirty && !sampleDirty) return;
+    let cancelled = false;
+    let frame = 0;
+    const deferredLayers: Array<() => void> = [];
+    const deferLayer = (fn: () => void) => deferredLayers.push(fn);
+    const markComplete = () => {
+      if (cancelled || destroyedRef.current) return;
+      if (boundaryDirty) boundaryRenderKeyRef.current = boundaryKey;
+      if (featureDirty) featureRenderKeyRef.current = featureKey;
+      if (sampleDirty) sampleRenderKeyRef.current = sampleKey;
+    };
+    const flushDeferredLayers = () => {
+      if (cancelled || destroyedRef.current) return;
+      const start = typeof performance !== "undefined" ? performance.now() : Date.now();
+      let processed = 0;
+      while (deferredLayers.length > 0 && processed < staticLayerBudget.batchSize) {
+        const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+        if (now - start > staticLayerBudget.frameMs) break;
+        deferredLayers.shift()?.();
+        processed++;
+      }
+      if (deferredLayers.length > 0) frame = window.requestAnimationFrame(flushDeferredLayers);
+      else markComplete();
+    };
 
     // perimeter — LQAS-aware styling: green when the lot boundary passes WHO
     // criteria, amber while still in progress, red when the polygon crosses
     // itself (invalid LQAS lot).
+    if (boundaryDirty) {
+    boundaryLg.clearLayers();
+    const lg = boundaryLg;
     if (perimeter.length >= 2) {
       const lqasState: "ready" | "invalid" | "progress" =
         lqas?.selfIntersects ? "invalid"
@@ -626,17 +770,21 @@ const CESSurveyMap = ({
           .addTo(lg);
       });
     }
+    }
 
     // ---- Rich feature geometry: building footprints + road/water polylines ----
     // This replaces the old centroid-buffer "exclusion" overlay so the map
     // shows actual roof outlines and named roads, like Google Maps.
+    if (featureDirty) {
+    featureLg.clearLayers();
+    const lg = featureLg;
     if ((showFeatures || showResidential || showExclusions) && mapFeatures) {
       const qaThreshold = 0.7;
       const isUncertain = (confidence?: number) => (confidence ?? 1) < qaThreshold;
       const shouldRender = (confidence?: number) => !showUncertainOnly || isUncertain(confidence);
       // Building footprints (roofs) — single uniform style; no residential
       // vs non-residential distinction. Sized by k-means cluster.
-      const buildingsCap = 4000;
+      const buildingsCap = staticLayerBudget.buildings;
       const sizeStyle: Record<string, { fill: string; stroke: string }> = {
         small: { fill: "#fde68a", stroke: "#b45309" },
         medium: { fill: "#fcd34d", stroke: "#92400e" },
@@ -644,28 +792,31 @@ const CESSurveyMap = ({
       };
       for (const b of (featureLayers.buildings ? mapFeatures.buildings : []).slice(0, buildingsCap)) {
         if (!shouldRender(b.confidence)) continue;
-        const st = sizeStyle[b.sizeClass] ?? sizeStyle.medium;
-        const uncertain = isUncertain(b.confidence);
-        const poly = L.polygon(b.ring.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
-          color: qaOverlay && uncertain ? "hsl(0 84% 60%)" : st.stroke,
-          weight: qaOverlay && uncertain ? 3 : 1,
-          opacity: qaOverlay && uncertain ? 1 : 0.9,
-          fillColor: st.fill,
-          fillOpacity: qaOverlay && uncertain ? 0.72 : 0.55,
-          dashArray: uncertain ? "6 3" : b.inferred ? "2 2" : undefined,
-        }).addTo(lg);
-        const label = correctedLabels[b.id] ?? (b.name ? `Building · ${b.name}` : `Building (${b.sizeClass})`);
-        poly.bindTooltip(`${uncertain ? "QA · " : ""}${label} · ${Math.round((b.confidence ?? 0) * 100)}%`, { sticky: true });
-        poly.bindPopup(
-          `<div style="font-size:12px;min-width:160px">
-            <div style="font-weight:700;margin-bottom:4px">${label}</div>
-            <div><strong>Confidence:</strong> ${Math.round((b.confidence ?? 0) * 100)}%</div>
-            <div><strong>Footprint:</strong> ${Math.round(b.areaM2)} m²</div>
-            <div><strong>Class:</strong> ${b.sizeClass} (k-means)</div>
-            <div style="opacity:.7;margin-top:2px">${b.inferred ? "Inferred (unsupervised)" : "OSM-tagged"}</div>
-          </div>`,
-        );
-        if (labelMode && onFeatureLabel) poly.on("click", () => onFeatureLabel({ id: b.id, type: "building", originalLabel: label, confidence: b.confidence, geometry: { ring: b.ring, center: b.center, areaM2: b.areaM2 } }));
+        deferLayer(() => {
+          if (cancelled || destroyedRef.current) return;
+          const st = sizeStyle[b.sizeClass] ?? sizeStyle.medium;
+          const uncertain = isUncertain(b.confidence);
+          const poly = L.polygon(b.ring.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
+            color: qaOverlay && uncertain ? "hsl(0 84% 60%)" : st.stroke,
+            weight: qaOverlay && uncertain ? 3 : 1,
+            opacity: qaOverlay && uncertain ? 1 : 0.9,
+            fillColor: st.fill,
+            fillOpacity: qaOverlay && uncertain ? 0.72 : 0.55,
+            dashArray: uncertain ? "6 3" : b.inferred ? "2 2" : undefined,
+          }).addTo(lg);
+          const label = correctedLabels[b.id] ?? (b.name ? `Building · ${b.name}` : `Building (${b.sizeClass})`);
+          poly.bindTooltip(`${uncertain ? "QA · " : ""}${label} · ${Math.round((b.confidence ?? 0) * 100)}%`, { sticky: true });
+          poly.bindPopup(
+            `<div style="font-size:12px;min-width:160px">
+              <div style="font-weight:700;margin-bottom:4px">${label}</div>
+              <div><strong>Confidence:</strong> ${Math.round((b.confidence ?? 0) * 100)}%</div>
+              <div><strong>Footprint:</strong> ${Math.round(b.areaM2)} m²</div>
+              <div><strong>Class:</strong> ${b.sizeClass} (k-means)</div>
+              <div style="opacity:.7;margin-top:2px">${b.inferred ? "Inferred (unsupervised)" : "OSM-tagged"}</div>
+            </div>`,
+          );
+          if (labelMode && onFeatureLabel) poly.on("click", () => onFeatureLabel({ id: b.id, type: "building", originalLabel: label, confidence: b.confidence, geometry: { ring: b.ring, center: b.center, areaM2: b.areaM2 } }));
+        });
       }
 
       // Road centrelines — single red palette; line weight from class. Named
@@ -674,55 +825,65 @@ const CESSurveyMap = ({
         motorway: 5, trunk: 5, primary: 4, secondary: 3.5, tertiary: 3,
         residential: 2.5, service: 2, track: 2, unclassified: 2.5, path: 1.5,
       };
-      for (const r of (featureLayers.roads ? mapFeatures.roads : []).slice(0, 2000)) {
+      for (const r of (featureLayers.roads ? mapFeatures.roads : []).slice(0, staticLayerBudget.roads)) {
         if (r.points.length < 2) continue;
         if (!shouldRender(r.confidence)) continue;
-        const uncertain = isUncertain(r.confidence);
-        const line = L.polyline(r.points.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
-          color: qaOverlay && uncertain ? "hsl(0 84% 60%)" : "#dc2626",
-          weight: (roadWidth[r.cls] ?? 2.5) + (qaOverlay && uncertain ? 2 : 0),
-          opacity: uncertain ? 1 : 0.85,
-          dashArray: uncertain ? "7 4" : r.inferred ? "5 4" : undefined,
-        }).addTo(lg);
-        const display = correctedLabels[r.id] ?? r.name ?? r.ref ?? `${r.cls} road`;
-        line.bindTooltip(`${display} · ${Math.round((r.confidence ?? 0) * 100)}%`, { sticky: !r.name, permanent: !!r.name && (roadWidth[r.cls] ?? 0) >= 2.5, direction: "center", className: "ces-road-label" });
-        line.bindPopup(
-          `<div style="font-size:12px;min-width:160px">
-            <div style="font-weight:700;margin-bottom:4px">${display}</div>
-            <div><strong>Confidence:</strong> ${Math.round((r.confidence ?? 0) * 100)}%</div>
-            <div><strong>Class:</strong> ${r.cls}</div>
-            <div><strong>Buffer:</strong> ${r.bufferM} m</div>
-            <div style="opacity:.7;margin-top:2px">${r.inferred ? "Inferred from line geometry (ML)" : "OSM-tagged"}</div>
-          </div>`,
-        );
-        if (labelMode && onFeatureLabel) line.on("click", () => onFeatureLabel({ id: r.id, type: "road", originalLabel: display, confidence: r.confidence, geometry: { points: r.points, class: r.cls, name: r.name ?? null, ref: r.ref ?? null } }));
+        deferLayer(() => {
+          if (cancelled || destroyedRef.current) return;
+          const uncertain = isUncertain(r.confidence);
+          const line = L.polyline(r.points.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
+            color: qaOverlay && uncertain ? "hsl(0 84% 60%)" : "#dc2626",
+            weight: (roadWidth[r.cls] ?? 2.5) + (qaOverlay && uncertain ? 2 : 0),
+            opacity: uncertain ? 1 : 0.85,
+            dashArray: uncertain ? "7 4" : r.inferred ? "5 4" : undefined,
+          }).addTo(lg);
+          const display = correctedLabels[r.id] ?? r.name ?? r.ref ?? `${r.cls} road`;
+          line.bindTooltip(`${display} · ${Math.round((r.confidence ?? 0) * 100)}%`, { sticky: !r.name, permanent: !!r.name && (roadWidth[r.cls] ?? 0) >= 2.5, direction: "center", className: "ces-road-label" });
+          line.bindPopup(
+            `<div style="font-size:12px;min-width:160px">
+              <div style="font-weight:700;margin-bottom:4px">${display}</div>
+              <div><strong>Confidence:</strong> ${Math.round((r.confidence ?? 0) * 100)}%</div>
+              <div><strong>Class:</strong> ${r.cls}</div>
+              <div><strong>Buffer:</strong> ${r.bufferM} m</div>
+              <div style="opacity:.7;margin-top:2px">${r.inferred ? "Inferred from line geometry (ML)" : "OSM-tagged"}</div>
+            </div>`,
+          );
+          if (labelMode && onFeatureLabel) line.on("click", () => onFeatureLabel({ id: r.id, type: "road", originalLabel: display, confidence: r.confidence, geometry: { points: r.points, class: r.cls, name: r.name ?? null, ref: r.ref ?? null } }));
+        });
       }
 
       // Waterways — blue lines for rivers/streams, filled polygons for lakes.
-      for (const w of (featureLayers.waterways ? mapFeatures.waterways : []).slice(0, 800)) {
+      for (const w of (featureLayers.waterways ? mapFeatures.waterways : []).slice(0, staticLayerBudget.waterways)) {
         if (w.points.length < 2) continue;
         if (!shouldRender(w.confidence)) continue;
-        const uncertain = isUncertain(w.confidence);
-        const opts: L.PathOptions = {
-          color: qaOverlay && uncertain ? "hsl(0 84% 60%)" : "#1d4ed8",
-          weight: (w.cls === "river" ? 4 : w.cls === "canal" ? 3 : 2) + (qaOverlay && uncertain ? 2 : 0),
-          opacity: uncertain ? 1 : 0.9,
-          fillColor: "#3b82f6",
-          fillOpacity: w.isPolygon ? (uncertain ? 0.5 : 0.35) : 0,
-          dashArray: uncertain ? "7 4" : undefined,
-        };
-        const layer = w.isPolygon
-          ? L.polygon(w.points.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], opts)
-          : L.polyline(w.points.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], opts);
-        layer.addTo(lg);
-        const label = correctedLabels[w.id] ?? w.name ?? `Waterway (${w.cls})`;
-        layer.bindTooltip(`${label} · ${Math.round((w.confidence ?? 0) * 100)}%`, { sticky: true });
-        if (labelMode && onFeatureLabel) layer.on("click", () => onFeatureLabel({ id: w.id, type: "waterway", originalLabel: label, confidence: w.confidence, geometry: { points: w.points, class: w.cls, isPolygon: w.isPolygon } }));
+        deferLayer(() => {
+          if (cancelled || destroyedRef.current) return;
+          const uncertain = isUncertain(w.confidence);
+          const opts: L.PathOptions = {
+            color: qaOverlay && uncertain ? "hsl(0 84% 60%)" : "#1d4ed8",
+            weight: (w.cls === "river" ? 4 : w.cls === "canal" ? 3 : 2) + (qaOverlay && uncertain ? 2 : 0),
+            opacity: uncertain ? 1 : 0.9,
+            fillColor: "#3b82f6",
+            fillOpacity: w.isPolygon ? (uncertain ? 0.5 : 0.35) : 0,
+            dashArray: uncertain ? "7 4" : undefined,
+          };
+          const layer = w.isPolygon
+            ? L.polygon(w.points.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], opts)
+            : L.polyline(w.points.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], opts);
+          layer.addTo(lg);
+          const label = correctedLabels[w.id] ?? w.name ?? `Waterway (${w.cls})`;
+          layer.bindTooltip(`${label} · ${Math.round((w.confidence ?? 0) * 100)}%`, { sticky: true });
+          if (labelMode && onFeatureLabel) layer.on("click", () => onFeatureLabel({ id: w.id, type: "waterway", originalLabel: label, confidence: w.confidence, geometry: { points: w.points, class: w.cls, isPolygon: w.isPolygon } }));
+        });
       }
+    }
     }
 
     // segments — selected = GREEN, others = RED. Always draw a polygon
     // (or a small circle for tiny clusters) so every segment is visibly fenced.
+    if (sampleDirty) {
+    sampleLg.clearLayers();
+    const lg = sampleLg;
     for (const seg of segments) {
       const isSelected = selectedSegmentIds.includes(seg.label);
       // Selected = thick green; others = thick oxblood. Both solid, no dashes,
@@ -733,67 +894,85 @@ const CESSurveyMap = ({
       const areaM2 = seg.polygon.length >= 3 ? polygonAreaM2(seg.polygon) : 0;
       const areaKm2 = areaM2 / 1_000_000;
       const tooltipText = `${seg.label} • ${areaKm2 > 0.01 ? areaKm2.toFixed(2) + " km²" : (areaM2 > 0 ? areaM2.toFixed(0) + " m²" : "—")}`;
-      if (seg.polygon.length >= 3) {
-        L.polygon(seg.polygon.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
-          color: stroke,
-          weight,
-          opacity: 1,
-          fillColor: fill,
-          fillOpacity: isSelected ? 0.28 : 0.10,
-        })
-          .bindTooltip(tooltipText, { permanent: false })
-          .addTo(lg);
-      } else {
-        L.circle([seg.centroid.lat, seg.centroid.lng], {
-          radius: 18,
-          color: stroke,
-          weight,
-          opacity: 1,
-          fillColor: fill,
-          fillOpacity: isSelected ? 0.28 : 0.10,
-        }).bindTooltip(tooltipText, { permanent: false }).addTo(lg);
-      }
-      // label at centroid (S1, S2, …)
-      L.marker([seg.centroid.lat, seg.centroid.lng], {
-        icon: L.divIcon({
-          className: "ces-seg-label",
-          html: `<div style="background:${stroke};color:#fff;border-radius:9999px;padding:2px 8px;font-weight:800;font-size:11px;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)">${seg.label}</div>`,
-          iconSize: [28, 18],
-        }),
-      }).addTo(lg);
+      deferLayer(() => {
+        if (cancelled || destroyedRef.current) return;
+        if (seg.polygon.length >= 3) {
+          L.polygon(seg.polygon.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
+            color: stroke,
+            weight,
+            opacity: 1,
+            fillColor: fill,
+            fillOpacity: isSelected ? 0.28 : 0.10,
+          })
+            .bindTooltip(tooltipText, { permanent: false })
+            .addTo(lg);
+        } else {
+          L.circle([seg.centroid.lat, seg.centroid.lng], {
+            radius: 18,
+            color: stroke,
+            weight,
+            opacity: 1,
+            fillColor: fill,
+            fillOpacity: isSelected ? 0.28 : 0.10,
+          }).bindTooltip(tooltipText, { permanent: false }).addTo(lg);
+        }
+        // label at centroid (S1, S2, …)
+        L.marker([seg.centroid.lat, seg.centroid.lng], {
+          icon: L.divIcon({
+            className: "ces-seg-label",
+            html: `<div style="background:${stroke};color:#fff;border-radius:9999px;padding:2px 8px;font-weight:800;font-size:11px;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)">${seg.label}</div>`,
+            iconSize: [28, 18],
+          }),
+        }).addTo(lg);
+      });
     }
 
     // Sampling pins (red map pins over building rooftops where sampling should occur)
-    for (const p of samplingPins) {
-      L.marker([p.lat, p.lng], {
-        icon: L.divIcon({
-          className: "",
-          html: `<div style="width:18px;height:24px;position:relative">
-                   <div style="position:absolute;top:0;left:0;width:18px;height:18px;border-radius:9999px 9999px 9999px 1px;background:#dc2626;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.5);transform:rotate(-45deg);transform-origin:50% 50%"></div>
-                 </div>`,
-          iconSize: [18, 24],
-          iconAnchor: [9, 22],
-        }),
-      }).bindTooltip("Sample this building", { sticky: true }).addTo(lg);
+    for (const p of samplingPins.slice(0, staticLayerBudget.samplingPins)) {
+      deferLayer(() => {
+        if (cancelled || destroyedRef.current) return;
+        L.marker([p.lat, p.lng], {
+          icon: L.divIcon({
+            className: "",
+            html: `<div style="width:18px;height:24px;position:relative">
+                     <div style="position:absolute;top:0;left:0;width:18px;height:18px;border-radius:9999px 9999px 9999px 1px;background:#dc2626;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.5);transform:rotate(-45deg);transform-origin:50% 50%"></div>
+                   </div>`,
+            iconSize: [18, 24],
+            iconAnchor: [9, 22],
+          }),
+        }).bindTooltip("Sample this building", { sticky: true }).addTo(lg);
+      });
     }
 
     // households
-    for (const h of households) {
-      const color = STATUS_COLORS[h.coverage_status] ?? "#64748b";
-      const sym = STATUS_SYMBOL[h.coverage_status] ?? "?";
-      const m = L.marker([h.lat, h.lng], {
-        icon: L.divIcon({
-          className: "",
-          html: `<div title="${h.hh_number}" style="background:${color};color:#fff;border-radius:6px;padding:2px 4px;min-width:48px;text-align:center;font-size:10px;font-weight:700;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)">${sym} ${h.hh_number}</div>`,
-          iconSize: [56, 22],
-        }),
-      }).addTo(lg);
-      if (onHouseholdClick) m.on("click", () => onHouseholdClick(h.id));
+    for (const h of households.slice(0, staticLayerBudget.households)) {
+      deferLayer(() => {
+        if (cancelled || destroyedRef.current) return;
+        const color = STATUS_COLORS[h.coverage_status] ?? "#64748b";
+        const sym = STATUS_SYMBOL[h.coverage_status] ?? "?";
+        const m = L.marker([h.lat, h.lng], {
+          icon: L.divIcon({
+            className: "",
+            html: `<div title="${h.hh_number}" style="background:${color};color:#fff;border-radius:6px;padding:2px 4px;min-width:48px;text-align:center;font-size:10px;font-weight:700;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)">${sym} ${h.hh_number}</div>`,
+            iconSize: [56, 22],
+          }),
+        }).addTo(lg);
+        if (onHouseholdClick) m.on("click", () => onHouseholdClick(h.id));
+      });
     }
-  }, [perimeter, segments, selectedSegmentIds, households, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, mapFeatures, showFeatures, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas?.selfIntersects, lqas?.ready, lqas?.areaM2, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, samplingPins]);
+    }
+    flushDeferredLayers();
+
+    return () => {
+      cancelled = true;
+      if (frame) window.cancelAnimationFrame(frame);
+      deferredLayers.length = 0;
+    };
+  }, [isNearViewport, perimeter, segments, selectedSegmentIds, households, onHouseholdClick, mapFeatures, showFeatures, showResidential, showExclusions, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas?.selfIntersects, lqas?.ready, lqas?.areaM2, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, samplingPins, staticLayerBudget]);
 
   // Live overlays: cheap, rebuilt as GPS updates arrive.
   useEffect(() => {
+    if (!isNearViewport) return;
     if (!mapRef.current || !liveLayerGroupRef.current) return;
     const lg = liveLayerGroupRef.current;
     lg.clearLayers();
@@ -848,9 +1027,9 @@ const CESSurveyMap = ({
         }),
       }).addTo(lg);
     }
-  }, [centerLat, centerLng, centerLabel, livePosition, perimeter, lqas?.closureM, lqas?.ready, routeTo, gpsTrail]);
+  }, [isNearViewport, centerLat, centerLng, centerLabel, livePosition, perimeter, lqas?.closureM, lqas?.ready, routeTo, gpsTrail]);
 
-  return <div ref={containerRef} style={{ height, width: "100%" }} className="rounded-lg overflow-hidden border border-border" />;
+  return <div ref={containerRef} style={{ height, width: "100%", contain: "layout paint size", touchAction: isCoarsePointer() ? "pan-y pinch-zoom" : undefined }} className="ces-survey-map rounded-lg overflow-hidden border border-border" />;
 };
 
-export default CESSurveyMap;
+export default memo(CESSurveyMap);
