@@ -813,6 +813,11 @@ function CommunityListView({
   accent = "default",
   filterExpr,
   nameMap,
+  questions,
+  statusKeys,
+  saeKeys,
+  excludeCompleted,
+  requireSae,
   onConfigure,
   onBack,
   onSelect,
@@ -824,6 +829,16 @@ function CommunityListView({
   accent?: AccentKey;
   filterExpr?: string;
   nameMap?: NameToIdMap;
+  /** Raw question tree (groups + questions) for canonicalizing answers. */
+  questions?: any[];
+  /** Canonical key(s) of the "Status of MDA" question. */
+  statusKeys?: string[];
+  /** Canonical key(s) of the SAE-complaint question. */
+  saeKeys?: string[];
+  /** Hide communities whose latest Status of MDA is "Completed". */
+  excludeCompleted?: boolean;
+  /** Only show communities with a reported adverse reaction (SAE = Yes). */
+  requireSae?: boolean;
   onConfigure?: () => void;
   onBack: () => void;
   onSelect: (c: VisitedCommunity) => void;
@@ -847,32 +862,77 @@ function CommunityListView({
           .order("submitted_at", { ascending: false })
           .limit(2000);
         if (error) throw error;
+
+        const norm = (v: any) => String(Array.isArray(v) ? v.join(" ") : v ?? "").trim().toLowerCase();
+        const firstVal = (d: Record<string, any>, keys?: string[]) => {
+          for (const k of keys || []) {
+            const v = d[k];
+            if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+          }
+          return undefined;
+        };
+        const isCompleted = (v: any) => norm(v).includes("complet");
+
         const seen = new Set<string>();
         const out: VisitedCommunity[] = [];
+        // Latest (most-recent-first) status / SAE per community across ALL its
+        // submissions (checklist + follow-up), so eligibility reflects reality.
+        const statusByKey = new Map<string, any>();
+        const saeByKey = new Map<string, any>();
+
         for (const s of data || []) {
-          const d = (s.data as Record<string, any>) || {};
-          // Admin-defined appearance condition: only include communities whose
-          // Community Checklist response satisfies the configured filter.
-          // Submission data is keyed by question `name`, and the filter expression
-          // references those same `name`s — build an identity map over the actual
-          // submission keys so conditions evaluate exactly as defined regardless
-          // of which questions are registered in nameMap.
-          if (filterExpr) {
-            const identityMap: NameToIdMap = { ...(nameMap || {}) };
-            for (const k of Object.keys(d)) identityMap[k] = k;
-            if (!evaluateRelevant(filterExpr, d, identityMap)) continue;
-          }
+          const raw = (s.data as Record<string, any>) || {};
+          // Canonicalize so answers stored under regenerated ids / names resolve.
+          const d = questions ? canonicalizeSubmissionData(raw, questions) : raw;
+
           const community = pick(d, ["community", "community_name", "settlement", "settlement_name"]);
           const lga = pick(d, ["lga"]);
           const ward = pick(d, ["ward"]);
           const flhf = pick(d, ["flhf_name", "flhf", "health_facility"]);
           if (!community && !lga && !ward) continue;
           const key = `${lga}|${ward}|${flhf}|${community}`.toLowerCase();
+
+          // Track latest status / SAE for the community (desc order ⇒ first wins).
+          if (!statusByKey.has(key)) {
+            const sv = firstVal(d, statusKeys);
+            if (sv !== undefined) statusByKey.set(key, sv);
+          }
+          if (!saeByKey.has(key)) {
+            const sae = firstVal(d, saeKeys);
+            if (sae !== undefined) saeByKey.set(key, sae);
+          }
+
+          // Admin-defined appearance condition, evaluated against canonical data.
+          if (filterExpr) {
+            const identityMap: NameToIdMap = { ...(nameMap || {}) };
+            for (const k of Object.keys(d)) identityMap[k] = k;
+            if (!evaluateRelevant(filterExpr, d, identityMap)) continue;
+          }
+
           if (seen.has(key)) continue;
           seen.add(key);
           out.push({ id: s.id, lga, ward, flhf, community, data: d });
         }
-        if (active) setRows(out);
+
+        // Built-in eligibility rules:
+        //  • Completion / Commodities: drop communities already Completed.
+        //  • Adverse Reactions: keep only communities with a reported SAE
+        //    (this includes Completed ones that still have adverse reactions).
+        let result = out;
+        if (excludeCompleted) {
+          result = result.filter((r) => {
+            const key = `${r.lga}|${r.ward}|${r.flhf}|${r.community}`.toLowerCase();
+            return !isCompleted(statusByKey.get(key));
+          });
+        }
+        if (requireSae) {
+          result = result.filter((r) => {
+            const key = `${r.lga}|${r.ward}|${r.flhf}|${r.community}`.toLowerCase();
+            return isYes(saeByKey.get(key));
+          });
+        }
+
+        if (active) setRows(result);
       } catch (e) {
         console.error("Community list load error", e);
         if (active) setRows([]);
@@ -881,7 +941,7 @@ function CommunityListView({
       }
     })();
     return () => { active = false; };
-  }, [formId, projectId, filterExpr, nameMap]);
+  }, [formId, projectId, filterExpr, nameMap, questions, statusKeys, saeKeys, excludeCompleted, requireSae]);
 
   const filtered = useMemo(() => {
     const t = query.trim().toLowerCase();
