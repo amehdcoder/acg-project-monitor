@@ -42,6 +42,22 @@ export interface LgaQuality {
   incompleteKeys: string[];
 }
 
+/** Project-wide raw counts behind each section's quality warning. */
+export interface SectionSummary {
+  id: string;
+  label: string;
+  resolved: boolean;
+  /** the checklist question LABEL this section matched, if resolved */
+  questionLabel: string | null;
+  answered: number;
+  missing: number;
+  total: number;
+  pct: number;
+  level: QualityLevel;
+  /** community keys missing an answer for this section */
+  missingKeys: string[];
+}
+
 export interface QualityReport {
   projectName: string;
   totalCommunities: number;
@@ -50,6 +66,8 @@ export interface QualityReport {
   overallScore: number;
   overallLevel: QualityLevel;
   lgas: LgaQuality[];
+  /** project-wide per-section raw counts (drives the "what's missing" panel) */
+  sections: SectionSummary[];
   /** sections that could not be resolved from the form at all */
   unresolved: string[];
 }
