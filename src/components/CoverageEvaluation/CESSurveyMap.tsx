@@ -324,7 +324,7 @@ const CESSurveyMap = ({
       Math.floor(((lng + 180) / 360) * Math.pow(2, z));
 
     const urls: string[] = [];
-    const MAX_TILES = 1500;
+    const MAX_TILES = 3800; // stay within the 4000-entry Workbox map-tiles-cache budget
     for (let z = startZoom; z <= endZoom && urls.length < MAX_TILES; z++) {
       const xMin = lng2tileX(bounds.getWest(), z);
       const xMax = lng2tileX(bounds.getEast(), z);
