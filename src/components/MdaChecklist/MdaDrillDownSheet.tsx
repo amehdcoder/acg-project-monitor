@@ -188,6 +188,7 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
   const [monitorFilter, setMonitorFilter] = useState(ALL);
   const [communityFilter, setCommunityFilter] = useState(ALL);
   const [statusFilter, setStatusFilter] = useState(ALL);
+  const [followUpFilter, setFollowUpFilter] = useState(ALL);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [visible, setVisible] = useState(PAGE);
