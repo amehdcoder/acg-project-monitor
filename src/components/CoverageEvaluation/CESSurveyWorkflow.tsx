@@ -500,13 +500,15 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   });
 
   
-  // Time-Lapse GPS
-  const [gpsLogs, setGpsLogs] = useState<{lat: number, lng: number, ts: number}[]>([]);
+  // Time-Lapse GPS is kept in a ref so the 30-second tracker does not rerender
+  // the entire 4k-line CES workflow while enumerators are scrolling/collecting.
+  const gpsLogsRef = useRef<{lat: number, lng: number, ts: number}[]>([]);
 
   // ── Offline-First State ──
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [offlinePending, setOfflinePending] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const persistingSurveyRef = useRef<Promise<string | null> | null>(null);
 
   // ── Supervisor QC State ──
   const [qcDialogOpen, setQcDialogOpen] = useState(false);
