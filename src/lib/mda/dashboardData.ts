@@ -74,6 +74,90 @@ export function communityKey(s: RawSubmission): string {
   ].join("|");
 }
 
+/** Flatten the question tree into leaf questions (keeping id + name). */
+function flattenLeafQuestions(questions: RawQuestion[]): RawQuestion[] {
+  const out: RawQuestion[] = [];
+  const walk = (arr?: RawQuestion[]) => {
+    for (const it of arr || []) {
+      if (!it || typeof it !== "object") continue;
+      if (it.type && (it.name || it.id)) out.push(it);
+      if (Array.isArray(it.questions)) walk(it.questions);
+    }
+  };
+  walk(questions);
+  return out;
+}
+
+/**
+ * The stable "sequence" prefix of an auto-generated question id.
+ * IDs look like `q_<seq>_<random>` where `<seq>` stays constant for a question
+ * even when the volatile `<random>` suffix is regenerated (form edits, re-imports
+ * or re-copies). Returns null for ids that don't follow this pattern.
+ */
+function idPrefix(id?: string): string | null {
+  const m = /^(q_[^_]+)_/.exec(id || "");
+  return m ? m[1] : null;
+}
+
+/**
+ * Re-key a submission's `data` so every current form question can be read by its
+ * canonical key (`name || id`), regardless of how the answer was originally
+ * stored.
+ *
+ * The Form Filler stores answers under the question `id` at fill time, but the
+ * dashboard/analyses resolve questions by `name || id`. Worse, question id
+ * suffixes can be regenerated when a checklist is edited, re-imported or copied
+ * between projects — which orphans historical answers from the current form and
+ * makes mandatory indicators read 0%/blank even though the data exists.
+ *
+ * This bridges all of that with three tolerant lookups per question:
+ *   1. exact current id            (well-behaved fresh submissions)
+ *   2. exact name                  (submissions stored by name)
+ *   3. stable `q_<seq>` prefix     (submissions from a prior form revision)
+ *
+ * Original keys are preserved; only canonical aliases are added. Multiselect
+ * (array) values are kept intact.
+ */
+export function canonicalizeSubmissionData(
+  data: Record<string, any> | undefined,
+  questions: RawQuestion[],
+): Record<string, any> {
+  if (!data) return {};
+  const out: Record<string, any> = { ...data };
+  const leaves = flattenLeafQuestions(questions);
+
+  // index existing data keys by their stable id prefix
+  const byPrefix: Record<string, string[]> = {};
+  for (const dk of Object.keys(data)) {
+    const p = idPrefix(dk);
+    if (p) (byPrefix[p] ||= []).push(dk);
+  }
+
+  const isEmpty = (v: any) =>
+    v === undefined || v === null || (typeof v === "string" && v.trim() === "");
+
+  for (const q of leaves) {
+    const id = String(q.id || "");
+    const canonical = String(q.name || q.id || "");
+    if (!canonical) continue;
+    if (!isEmpty(out[canonical])) continue; // already resolvable
+
+    let val: any = undefined;
+    if (!isEmpty(data[id])) val = data[id];
+    else if (q.name && !isEmpty(data[q.name])) val = data[q.name];
+    else {
+      const p = idPrefix(id);
+      if (p && byPrefix[p]) {
+        for (const dk of byPrefix[p]) {
+          if (!isEmpty(data[dk])) { val = data[dk]; break; }
+        }
+      }
+    }
+    if (!isEmpty(val)) out[canonical] = val;
+  }
+  return out;
+}
+
 interface GroupInfo {
   canonical: string | null;
   questionNames: string[];
