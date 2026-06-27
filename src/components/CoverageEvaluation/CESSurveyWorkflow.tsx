@@ -241,8 +241,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [recordingPerimeter, setRecordingPerimeter] = useState(false);
   const [walkedM, setWalkedM] = useState(0);
   const [lastVertexAt, setLastVertexAt] = useState<number | null>(null);
-  const [nowTick, setNowTick] = useState(Date.now());
-  const [vertexFlash, setVertexFlash] = useState(0);
+  const lastVertexAtRef = useRef<number | null>(null);
   const [perimeterSessionId, setPerimeterSessionId] = useState(0);
   const [gpsRestartNonce, setGpsRestartNonce] = useState(0);
   const [residentialMask, setResidentialMask] = useState<ResidentialMaskResult | null>(null);
@@ -585,6 +584,21 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
   }, []);
 
+  const commitPerimeterVertexState = useCallback((lat: number, lng: number, opts: { first?: boolean; distM?: number } = {}) => {
+    const now = Date.now();
+    lastVertexAtRef.current = now;
+    startTransition(() => {
+      setLastVertexAt(now);
+      if (typeof opts.distM === "number" && opts.distM > 0) setWalkedM((w) => w + opts.distM!);
+      setPerimeter((prev) => {
+        if (opts.first && prev.length > 0) return prev;
+        const tail = prev[prev.length - 1];
+        if (tail && haversineMeters(tail, { lat, lng }) < 0.75) return prev;
+        return [...prev, { lat, lng }];
+      });
+    });
+  }, []);
+
   // Kalman-fused fix application — Google-Maps-equivalent realtime behavior.
   const applyFix = useCallback((p: CesGpsFix, source: "high" | "low") => {
     const now = Date.now();
@@ -852,9 +866,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       // First vertex always commits; subsequent require real movement.
       if (!last) {
         lastVertexFixRef.current = { lat, lng, acc, t: now, speed: fix.speed, heading: fix.heading };
-        setPerimeter((prev) => (prev.length === 0 ? [{ lat, lng }] : prev));
-        setLastVertexAt(now);
-        setVertexFlash((f) => f + 1);
+        commitPerimeterVertexState(lat, lng, { first: true });
         setPerimeterStatus({ holding: acc > gateM, bestAcc: acc, gateM, lastSource: fix.source, lastFixAgeMs: 0 });
         return;
       }
@@ -876,14 +888,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       }
 
       lastVertexFixRef.current = { lat, lng, acc, t: now, speed: fix.speed, heading: fix.heading };
-      setWalkedM((w) => w + distM);
-      setLastVertexAt(now);
-      setVertexFlash((f) => f + 1);
-      setPerimeter((prev) => {
-        const tail = prev[prev.length - 1];
-        if (tail && haversineMeters(tail, { lat, lng }) < 0.75) return prev;
-        return [...prev, { lat, lng }];
-      });
+      commitPerimeterVertexState(lat, lng, { distM });
       setPerimeterStatus({ holding: acc > gateM, bestAcc: acc, gateM, lastSource: fix.source, lastFixAgeMs: 0 });
     };
 
@@ -900,7 +905,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     let active = true;
 
     startRealtimeGpsWatch(
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000, minimumUpdateInterval: 1000, pollCurrentPositionMs: 1500 },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000, minimumUpdateInterval: 1200 },
       commitVertex,
       onErr,
     ).then((stop) => {
@@ -919,7 +924,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recordingPerimeter, gpsRestartNonce, commitGpsUi]);
+  }, [recordingPerimeter, gpsRestartNonce, commitGpsUi, commitPerimeterVertexState]);
 
   // ---------- Background resilience: Wake Lock + watchdog + persistence ----------
   // Keeps the perimeter watcher alive while moving, screen off, or tab hidden.
@@ -1349,16 +1354,16 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     });
   }, [drawMode, closeManualDraw]);
 
-  // 500ms ticker while recording so "last vertex Xs ago" stays live
+  // Light ticker while recording so status remains live without forcing a full
+  // form/map render twice per second on Android.
   useEffect(() => {
     if (!recordingPerimeter) return;
     const id = window.setInterval(() => {
       const now = Date.now();
-      setNowTick(now);
       if (lastPerimeterFixTsRef.current > 0) {
         setPerimeterStatus((s) => ({ ...s, lastFixAgeMs: now - lastPerimeterFixTsRef.current }));
       }
-    }, 500);
+    }, 2000);
     return () => window.clearInterval(id);
   }, [recordingPerimeter]);
 
