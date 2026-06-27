@@ -953,7 +953,7 @@ const CESSurveyMap = ({
       if (frame) window.cancelAnimationFrame(frame);
       deferredLayers.length = 0;
     };
-  }, [isNearViewport, perimeter, segments, selectedSegmentIds, households, onHouseholdClick, mapFeatures, showFeatures, showResidential, showExclusions, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas?.selfIntersects, lqas?.ready, lqas?.areaM2, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, samplingPins, staticLayerBudget]);
+  }, [isNearViewport, perimeter, segments, selectedSegmentIds, households, onHouseholdClick, mapFeatures, showFeatures, showResidential, showExclusions, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas?.selfIntersects, lqas?.ready, lqas?.areaM2, draftPolygon, drawMode, editablePerimeter, onVertexMove, onVertexDelete, samplingPins, staticLayerBudget]);
 
   // Live overlays: cheap, rebuilt as GPS updates arrive.
   useEffect(() => {
