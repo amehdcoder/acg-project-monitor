@@ -222,10 +222,12 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     return sequence.slice(a, b + 1);
   }, [sequence, timeWindow]);
 
-  const statesPresent = useMemo(
-    () => new Set(windowed.map((p) => norm(p.state)).filter(Boolean)),
-    [windowed],
-  );
+  const statesPresent = useMemo(() => {
+    const set = new Set(windowed.map((p) => norm(p.state)).filter(Boolean));
+    // Always show the selected state's map even if it has no visits yet.
+    if (stateFilter) set.add(norm(stateFilter));
+    return set;
+  }, [windowed, stateFilter]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -307,27 +309,40 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     const map = mapRef.current;
     if (!map) return;
 
-    // ── Bold state boundary overlay ──
+    // ── State map: LGA polygons of every present state ──
     if (boundaryLayerRef.current) { try { map.removeLayer(boundaryLayerRef.current); } catch { /* noop */ } }
     const bGroup = L.layerGroup();
     const bounds = L.latLngBounds([]);
+    const stateBounds = L.latLngBounds([]);
     const feats = geoRef.current;
     if (feats && statesPresent.size) {
       const stateFeats = feats.filter((f: any) => statesPresent.has(norm(f?.properties?.state)));
       if (stateFeats.length) {
+        // Individual LGA fills (light) so the internal LGA divisions read clearly,
+        // matching the LGA Supervision Map reference.
+        const lgas = L.geoJSON({ type: "FeatureCollection", features: stateFeats } as any, {
+          style: () => ({ color: "#14b8a6", weight: 1, opacity: 0.7, fillColor: "#99f6e4", fillOpacity: 0.18 }),
+          onEachFeature: (f: any, lyr) => {
+            const name = f?.properties?.lga;
+            if (name) lyr.bindTooltip(String(name), { sticky: true, direction: "top", className: "hcs-lga-tip" });
+            try { stateBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
+          },
+        });
+        // Bold outer state outline + soft glow.
         const glow = L.geoJSON({ type: "FeatureCollection", features: stateFeats } as any, {
-          style: () => ({ color: "#22c55e", weight: 7, opacity: 0.25, fill: false }),
+          style: () => ({ color: "#0d9488", weight: 7, opacity: 0.22, fill: false }),
         });
         const outline = L.geoJSON({ type: "FeatureCollection", features: stateFeats } as any, {
-          style: () => ({ color: "#22c55e", weight: 2.4, opacity: 0.95, fillColor: "#22c55e", fillOpacity: 0.06 }),
-          onEachFeature: (f: any, lyr) => { try { bounds.extend((lyr as any).getBounds()); } catch { /* noop */ } },
+          style: () => ({ color: "#0d9488", weight: 2.6, opacity: 0.95, fill: false }),
         });
         bGroup.addLayer(glow);
+        bGroup.addLayer(lgas);
         bGroup.addLayer(outline);
       }
     }
     bGroup.addTo(map);
     boundaryLayerRef.current = bGroup;
+    if (stateBounds.isValid()) bounds.extend(stateBounds);
 
     // ── Household outcome markers (clustered) ──
     const cluster = clusterRef.current;
@@ -354,7 +369,12 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
       cluster.addLayers(markers);
     }
 
-    try { if (bounds.isValid()) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 13 }); } catch { /* noop */ }
+    // Prefer fitting to the full state extent so the whole state map is visible;
+    // fall back to the marker bounds when no boundary is available.
+    try {
+      const target = stateBounds.isValid() ? stateBounds : bounds;
+      if (target.isValid()) map.fitBounds(target, { padding: [28, 28], maxZoom: 13 });
+    } catch { /* noop */ }
   }
 
   // ── Heatmap overlay ──

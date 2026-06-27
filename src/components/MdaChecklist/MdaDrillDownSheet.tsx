@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { buildSubmissionsCsv, downloadCsv, slugify, type CsvRow } from "@/lib/mda/csvExport";
 import { exportDrilldownPdf, type PdfRow } from "@/lib/mda/pdfExport";
+import TablePagination from "@/components/ui/table-pagination";
 
 interface QOption { id?: string; label: string; value: string; }
 interface FormQuestion {
@@ -70,7 +71,8 @@ interface Props {
 
 const stripTags = (s?: string) => String(s || "").replace(/<[^>]*>/g, "").trim();
 const ALL = "__all__";
-const PAGE = 25;
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const DEFAULT_PAGE_SIZE = 25;
 
 interface FlatQ { key: string; label: string; q: FormQuestion; }
 function flatten(questions: FormQuestion[]): FlatQ[] {
@@ -191,7 +193,8 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
   const [followUpFilter, setFollowUpFilter] = useState(ALL);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [visible, setVisible] = useState(PAGE);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [page, setPage] = useState(1);
 
   const rows = data?.rows || [];
 
@@ -207,7 +210,7 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
     setFollowUpFilter(ALL);
     setDateFrom("");
     setDateTo("");
-    setVisible(PAGE);
+    setPage(1);
   }, [data]);
 
   const stateOf = (s: DrillSubmission) => stripTags(s.state ?? s.data?.state);
@@ -307,8 +310,8 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
     });
   }, [rows, search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, followUpFilter, dateFrom, dateTo]);
 
-  // Reset pagination whenever the filtered result changes.
-  useEffect(() => setVisible(PAGE), [search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, followUpFilter, dateFrom, dateTo]);
+  // Reset to first page whenever the filtered result changes.
+  useEffect(() => setPage(1), [search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, followUpFilter, dateFrom, dateTo]);
 
   const hasFollowUp = !!followUpFields && followUpFields.size > 0;
   const hasFilters =
@@ -330,17 +333,13 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
     exportDrilldownPdf(filtered as PdfRow[], questions as any, data?.title || "MDA Drill-down", data?.subtitle);
   };
 
-
-  const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) {
-      setVisible((v) => (v < filtered.length ? v + PAGE : v));
-    }
-  };
-
   if (!data) return null;
   const tint = data.tint || "#6366f1";
-  const shown = filtered.slice(0, visible);
+  const totalItems = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const shown = filtered.slice(startIndex, startIndex + pageSize);
 
   return (
     <Sheet open={!!data} onOpenChange={(o) => !o && onClose()}>
@@ -478,8 +477,8 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
           </div>
         </div>
 
-        {/* ── List (incremental scroll) ── */}
-        <div className="min-h-0 flex-1 overflow-y-auto" onScroll={onScroll}>
+        {/* ── List (paginated) ── */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="space-y-2 p-4">
             {filtered.length === 0 ? (
               <p className="py-10 text-center text-sm text-muted-foreground">
@@ -491,19 +490,31 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
                 )}
               </p>
             ) : (
-              <>
-                {shown.map((s) => (
-                  <SubmissionCard key={s.id} s={s} flat={flat} followUpFields={followUpFields} />
-                ))}
-                {visible < filtered.length && (
-                  <p className="py-3 text-center text-[11px] text-muted-foreground">
-                    Showing {shown.length} of {filtered.length} — scroll for more
-                  </p>
-                )}
-              </>
+              shown.map((s) => (
+                <SubmissionCard key={s.id} s={s} flat={flat} followUpFields={followUpFields} />
+              ))
             )}
           </div>
         </div>
+
+        {/* ── Pagination footer ── */}
+        {totalItems > 0 && (
+          <div className="border-t bg-muted/30 px-4 py-2">
+            <TablePagination
+              currentPage={safePage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              startIndex={startIndex}
+              pageSize={pageSize}
+              hasPrev={safePage > 1}
+              hasNext={safePage < totalPages}
+              onPrev={() => setPage((p) => Math.max(1, p - 1))}
+              onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+            />
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );
