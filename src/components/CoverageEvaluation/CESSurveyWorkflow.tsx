@@ -548,6 +548,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const lastFixAtRef = useRef<number>(0);
   const lastGpsUiAtRef = useRef<number>(0);
   const lastGpsUiRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const lastIndoorModeRef = useRef<boolean | null>(null);
   const gpsStartedAtRef = useRef<number>(Date.now());
   const kalmanRef = useRef<{ lat: number; lng: number; variance: number; ts: number } | null>(null);
   const [gpsError, setGpsError] = useState<null | "denied" | "unavailable" | "timeout" | "insecure" | "unsupported">(null);
@@ -646,7 +647,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
 
     lastFixAtRef.current = now;
-    setIndoorMode(source === "low" && p.accuracy > 50);
+    const nextIndoorMode = source === "low" && p.accuracy > 50;
+    if (lastIndoorModeRef.current !== nextIndoorMode) {
+      lastIndoorModeRef.current = nextIndoorMode;
+      startTransition(() => setIndoorMode(nextIndoorMode));
+    }
     const nextGps = {
       lat: k.lat,
       lng: k.lng,
