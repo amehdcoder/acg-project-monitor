@@ -10,7 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 const CES_DB_NAME = "ces_offline";
-const CES_DB_VERSION = 1;
+const CES_DB_VERSION = 2;
+const SURVEY_STORE = "pending_surveys";
 const HH_STORE = "pending_households";
 const AUDIT_STORE = "pending_audit_logs";
 
@@ -69,6 +70,15 @@ export interface OfflineAuditEntry {
   synced: boolean;
 }
 
+export interface OfflineSurveyDraft {
+  id: string;
+  payload: Record<string, any>;
+  created_by: string;
+  updated_at: string;
+  synced: boolean;
+  retry_count: number;
+}
+
 // ─── DB Init ─────────────────────────────────────────────────────────────────
 
 const initCESDB = (): Promise<IDBDatabase> => new Promise((resolve, reject) => {
@@ -77,6 +87,11 @@ const initCESDB = (): Promise<IDBDatabase> => new Promise((resolve, reject) => {
   req.onsuccess = () => resolve(req.result);
   req.onupgradeneeded = (e) => {
     const db = (e.target as IDBOpenDBRequest).result;
+    if (!db.objectStoreNames.contains(SURVEY_STORE)) {
+      const s = db.createObjectStore(SURVEY_STORE, { keyPath: "id" });
+      s.createIndex("synced", "synced", { unique: false });
+      s.createIndex("updated_at", "updated_at", { unique: false });
+    }
     if (!db.objectStoreNames.contains(HH_STORE)) {
       const s = db.createObjectStore(HH_STORE, { keyPath: "local_id" });
       s.createIndex("survey_id", "survey_id", { unique: false });
@@ -136,6 +151,30 @@ export async function saveHouseholdOffline(row: OfflineHousehold): Promise<void>
   void mirrorToCloud(record).catch(() => {});
 }
 
+export async function saveSurveyOffline(draft: OfflineSurveyDraft): Promise<void> {
+  await idbPut(SURVEY_STORE, {
+    ...draft,
+    synced: false,
+    retry_count: draft.retry_count || 0,
+    updated_at: draft.updated_at || new Date().toISOString(),
+  });
+}
+
+export async function getOfflineSurvey(id: string): Promise<OfflineSurveyDraft | null> {
+  const db = await initCESDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SURVEY_STORE, "readonly");
+    const r = tx.objectStore(SURVEY_STORE).get(id);
+    r.onerror = () => reject(r.error);
+    r.onsuccess = () => resolve((r.result as OfflineSurveyDraft | undefined) ?? null);
+  });
+}
+
+export async function getPendingSurveys(): Promise<OfflineSurveyDraft[]> {
+  const all = await idbGetAll(SURVEY_STORE);
+  return all.filter((r) => !r.synced);
+}
+
 /**
  * Best-effort mirror of one offline household record to the ces-captures
  * Storage bucket. Path is namespaced by survey + device + local_id so each
@@ -186,7 +225,26 @@ export async function syncCESOfflineQueue(
 
   try {
     const pending = await getPendingHouseholds();
-    if (pending.length === 0) return { synced: 0, failed: 0 };
+    const pendingSurveys = await getPendingSurveys();
+    if (pending.length === 0 && pendingSurveys.length === 0) return { synced: 0, failed: 0 };
+
+    // Always sync offline-created/updated survey drafts before household visits,
+    // because household rows have a foreign key to ces_surveys. This is what
+    // keeps the Step 3 satellite-map HH flow fully offline-first.
+    for (const draft of pendingSurveys) {
+      try {
+        const { error } = await supabase
+          .from("ces_surveys" as any)
+          .upsert({ id: draft.id, ...draft.payload, created_by: draft.created_by }, { onConflict: "id" });
+        if (error) throw error;
+        await idbDelete(SURVEY_STORE, draft.id);
+      } catch (err: any) {
+        console.warn("CES offline survey sync failed for", draft.id, err);
+        const retries = (draft.retry_count || 0) + 1;
+        await idbPut(SURVEY_STORE, { ...draft, retry_count: retries });
+        failed++;
+      }
+    }
 
     for (const hh of pending) {
       try {
@@ -206,6 +264,10 @@ export async function syncCESOfflineQueue(
           visited_at: hh.visited_at,
           synced_at: new Date().toISOString(),
           created_by: hh.created_by,
+          eligible_persons: (hh as any).eligible_persons ?? 0,
+          treated_persons: (hh as any).treated_persons ?? 0,
+          segment_label: hh.segment_label,
+          gps_snapshot: hh.gps_snapshot ? JSON.parse(hh.gps_snapshot) : null,
         };
 
         const { data, error } = await supabase
