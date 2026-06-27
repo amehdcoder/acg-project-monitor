@@ -168,8 +168,8 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
   );
 
   const realRows = useMemo(
-    () => submissions.map((s) => toMdaSubmission(s, form)),
-    [submissions, form],
+    () => submissions.map((s) => toMdaSubmission(s, form, questions)),
+    [submissions, form, questions],
   );
 
   const simulatedRows = useMemo(() => {
