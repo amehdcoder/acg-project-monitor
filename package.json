@@ -94,7 +94,7 @@
     "react-hook-form": "^7.61.1",
     "react-leaflet": "4.2.1",
     "react-resizable-panels": "^2.1.9",
-    "react-router-dom": "^6.30.1",
+    "react-router-dom": "^6.30.4",
     "recharts": "^2.15.4",
     "shpjs": "^6.2.0",
     "sonner": "^1.7.4",
@@ -130,5 +130,11 @@
     "typescript-eslint": "^8.38.0",
     "vite": "^5.4.19",
     "vitest": "^2"
+  },
+  "overrides": {
+    "protobufjs": "^7.6.4",
+    "dompurify": "^3.4.11",
+    "tar": "^7.5.17",
+    "react-router": "^6.30.4"
   }
 }

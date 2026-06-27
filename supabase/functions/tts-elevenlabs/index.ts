@@ -1,6 +1,7 @@
 // ElevenLabs TTS streaming proxy.
 // POST { text, voiceId?, modelId?, languageCode? } -> audio/mpeg stream
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { guardRequest } from "../_shared/authGuard.ts";
 
 const DEFAULT_VOICE = "EXAVITQu4vr4xnSDxMaL"; // Sarah
 // Multilingual model — works for English + low-resource languages (Hausa,
@@ -12,6 +13,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  const guard = await guardRequest(req, corsHeaders, { requireAdmin: false });
+  if (guard.response) return guard.response;
 
   try {
     const apiKey = Deno.env.get("ELEVENLABS_API_KEY");

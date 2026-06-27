@@ -1,4 +1,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { guardRequest } from "../_shared/authGuard.ts";
+
+// Only Looker Studio / Data Studio hosts may be fetched server-side. This
+// prevents the endpoint from being abused as an SSRF / open proxy.
+const ALLOWED_HOSTS = new Set([
+  "lookerstudio.google.com",
+  "datastudio.google.com",
+]);
+
+function isAllowedUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw.trim());
+    if (u.protocol !== "https:") return false;
+    return ALLOWED_HOSTS.has(u.hostname);
+  } catch {
+    return false;
+  }
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +39,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const guard = await guardRequest(req, corsHeaders, { requireAdmin: false });
+  if (guard.response) return guard.response;
+
   try {
     const { url } = await req.json();
 
@@ -29,6 +50,13 @@ serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (!isAllowedUrl(url)) {
+      return new Response(
+        JSON.stringify({ error: "Only Looker Studio URLs are allowed" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     const normalizedUrl = url.trim().replace("datastudio.google.com", "lookerstudio.google.com");

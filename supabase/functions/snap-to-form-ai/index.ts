@@ -14,6 +14,7 @@
  */
 
 import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
+import { guardRequest } from "../_shared/authGuard.ts";
 
 const QUESTION_TYPES = [
   "text", "number", "select_one", "select_multiple", "date", "time", "datetime",
@@ -215,6 +216,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  const guard = await guardRequest(req, corsHeaders, { requireAdmin: false });
+  if (guard.response) return guard.response;
 
   try {
     const DSS_AI_GATEWAY_KEY = Deno.env.get("DSS_AI_GATEWAY_KEY");

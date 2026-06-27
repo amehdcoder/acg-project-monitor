@@ -4690,6 +4690,27 @@ export type Database = {
         }
         Relationships: []
       }
+      oauth_state_nonces: {
+        Row: {
+          created_at: string
+          expires_at: string
+          nonce: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          nonce: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          nonce?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       office_form_approvers: {
         Row: {
           approver_role: string

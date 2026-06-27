@@ -1,6 +1,7 @@
 // Snap to Form - Convert paper forms (images/PDFs) into structured digital forms
 // Uses DSS Internal AI Gateway with Gemini vision + tool calling for structured output.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { guardRequest } from "../_shared/authGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -327,6 +328,9 @@ const callGeminiDirect = async (apiKey: string, model: string, userContent: any[
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const guard = await guardRequest(req, corsHeaders, { requireAdmin: false });
+  if (guard.response) return guard.response;
 
   try {
     const { images, model, extraInstructions } = await req.json();

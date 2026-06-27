@@ -2,6 +2,7 @@
 // Called from the UPRP form once a valid 10-digit NUBAN + bank code are present.
 // Returns the official account name so the field worker can confirm the payee
 // before proceeding. No data is stored here — this is a read-only lookup.
+import { guardRequest } from "../_shared/authGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +15,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const guard = await guardRequest(req, corsHeaders, { requireAdmin: false });
+  if (guard.response) return guard.response;
 
   try {
     const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY");
