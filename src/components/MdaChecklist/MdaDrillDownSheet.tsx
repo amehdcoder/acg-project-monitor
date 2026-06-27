@@ -209,6 +209,10 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
 
   const stateOf = (s: DrillSubmission) => stripTags(s.state ?? s.data?.state);
   const lgaOf = (s: DrillSubmission) => stripTags(s.lga ?? s.data?.lga);
+  const monitorOf = (s: DrillSubmission) => stripTags(s.submitter ?? s.data?.supervisor_name);
+  const communityOf = (s: DrillSubmission) =>
+    stripTags(s.data?.community_name ?? s.data?.community ?? s.data?.settlement_name ?? s.data?.settlement);
+  const statusOf = (s: DrillSubmission) => stripTags(s.status);
 
   const moduleOptions = useMemo(
     () => Array.from(new Set(rows.map((r) => r.module).filter(Boolean))) as string[],
@@ -229,6 +233,26 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
         ),
       ).sort(),
     [rows, stateFilter],
+  );
+  const monitorOptions = useMemo(
+    () => Array.from(new Set(rows.map(monitorOf).filter(Boolean))).sort(),
+    [rows],
+  );
+  const communityOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          rows
+            .filter((r) => (stateFilter === ALL || stateOf(r) === stateFilter) && (lgaFilter === ALL || lgaOf(r) === lgaFilter))
+            .map(communityOf)
+            .filter(Boolean),
+        ),
+      ).sort(),
+    [rows, stateFilter, lgaFilter],
+  );
+  const statusOptions = useMemo(
+    () => Array.from(new Set(rows.map(statusOf).filter(Boolean))).sort(),
+    [rows],
   );
 
   const filtered = useMemo(() => {
