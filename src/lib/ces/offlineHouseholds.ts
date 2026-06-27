@@ -55,6 +55,8 @@ export interface OfflineHousehold {
   // Extra offline metadata
   segment_label: string | null;
   gps_snapshot: string;   // JSON of GPS reading at capture time
+  eligible_persons?: number;
+  treated_persons?: number;
 }
 
 export interface OfflineAuditEntry {
