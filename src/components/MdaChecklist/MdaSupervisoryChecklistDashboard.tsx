@@ -119,19 +119,27 @@ function pickGeo(s: MdaSubmission, kind: "state" | "lga" | "ward" | "community")
 }
 
 // ───────────────────────── Small UI atoms ─────────────────────────
-function Kpi({ icon: Icon, label, value, sub, tint, bar }: {
+function Kpi({ icon: Icon, label, value, sub, tint, bar, onExport, exporting }: {
   icon: any; label: string; value: string | number; sub?: string; tint: string; bar?: number;
+  onExport?: () => void; exporting?: boolean;
 }) {
+  const clickable = !!onExport;
   return (
     <div
-      className="relative overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={onExport}
+      onKeyDown={clickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onExport?.(); } } : undefined}
+      title={clickable ? `Download the submissions behind “${label}” as Excel` : undefined}
+      aria-label={clickable ? `Download ${label} KPI data as Excel` : undefined}
+      className={`group relative overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${clickable ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1" : ""}`}
       style={{ background: `linear-gradient(135deg, ${tint}0d, transparent 70%)` }}
     >
       <span className="absolute inset-y-0 left-0 w-1" style={{ background: tint }} aria-hidden />
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-medium leading-tight text-muted-foreground">{label}</span>
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: `${tint}1a`, color: tint }}>
-          <Icon className="h-4 w-4" />
+          {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
         </div>
       </div>
       <p className="mt-2 font-display text-2xl font-bold tracking-tight" style={{ color: tint }}>{value}</p>
@@ -141,9 +149,15 @@ function Kpi({ icon: Icon, label, value, sub, tint, bar }: {
           <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, bar)}%`, background: tint }} />
         </div>
       )}
+      {clickable && (
+        <span className="absolute bottom-2 right-2 inline-flex items-center gap-0.5 text-[9px] font-medium text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+          <Download className="h-3 w-3" /> Excel
+        </span>
+      )}
     </div>
   );
 }
+
 
 function Donut({ data, centerLabel, centerValue, height = 180, inner = 56, outer = 80 }: {
   data: { name: string; value: number; color: string }[]; centerLabel?: string; centerValue?: string;
