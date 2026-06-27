@@ -184,6 +184,11 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
   const heatRef = useRef<any>(null);
   const liveRef = useRef<L.Marker | null>(null);
   const geoRef = useRef<any[] | null>(null);
+  // Cached extent of the drawn state boundary so marker redraws can fit the view
+  // without rebuilding the (expensive) LGA polygon layers on every filter change.
+  const stateBoundsRef = useRef<L.LatLngBounds | null>(null);
+  // Signature of the last boundary we drew — skip re-drawing identical polygons.
+  const boundarySigRef = useRef<string>("");
   const sweepTimer = useRef<number | null>(null);
   const restoredSelectionRef = useRef("");
   // True once the saved viewport (center/zoom) has been applied, or the user has
