@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
+import { MdaQuestionIndex } from "@/lib/mda/analyses";
 import {
   getMdaFollowUpGroupName, isMdaFollowUpGroup,
   MDA_FOLLOWUP_COMPLETION, MDA_FOLLOWUP_COMMODITIES, MDA_FOLLOWUP_ADVERSE,
