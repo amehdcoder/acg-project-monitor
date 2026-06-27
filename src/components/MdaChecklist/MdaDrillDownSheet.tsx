@@ -305,24 +305,31 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
       }
       return true;
     });
-  }, [rows, search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, dateFrom, dateTo]);
+  }, [rows, search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, followUpFilter, dateFrom, dateTo]);
 
   // Reset pagination whenever the filtered result changes.
-  useEffect(() => setVisible(PAGE), [search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, dateFrom, dateTo]);
+  useEffect(() => setVisible(PAGE), [search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, followUpFilter, dateFrom, dateTo]);
 
+  const hasFollowUp = !!followUpFields && followUpFields.size > 0;
   const hasFilters =
     !!search || moduleFilter !== ALL || stateFilter !== ALL || lgaFilter !== ALL ||
-    monitorFilter !== ALL || communityFilter !== ALL || statusFilter !== ALL || !!dateFrom || !!dateTo;
+    monitorFilter !== ALL || communityFilter !== ALL || statusFilter !== ALL ||
+    followUpFilter !== ALL || !!dateFrom || !!dateTo;
   const clearFilters = () => {
     setSearch(""); setModuleFilter(ALL); setStateFilter(ALL); setLgaFilter(ALL);
     setMonitorFilter(ALL); setCommunityFilter(ALL); setStatusFilter(ALL);
-    setDateFrom(""); setDateTo("");
+    setFollowUpFilter(ALL); setDateFrom(""); setDateTo("");
   };
 
   const handleExportCsv = () => {
     const csv = buildSubmissionsCsv(filtered as CsvRow[], questions as any);
     downloadCsv(`mda-${slugify(data?.title || "drilldown")}-${new Date().toISOString().slice(0, 10)}`, csv);
   };
+
+  const handleExportPdf = () => {
+    exportDrilldownPdf(filtered as PdfRow[], questions as any, data?.title || "MDA Drill-down", data?.subtitle);
+  };
+
 
   const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
