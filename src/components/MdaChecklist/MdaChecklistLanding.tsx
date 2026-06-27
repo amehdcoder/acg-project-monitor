@@ -30,6 +30,8 @@ import {
   MDA_FOLLOWUP_COMMODITIES,
   MDA_FOLLOWUP_COMPLETION,
 } from "@/lib/mdaFollowUp";
+import { MdaQuestionIndex, isYes } from "@/lib/mda/analyses";
+import { canonicalizeSubmissionData } from "@/lib/mda/dashboardData";
 
 // Default illustrated tile icons (match the supervisory checklist design).
 import imgCommunity from "@/assets/mda-tiles/community-checklist.png";
