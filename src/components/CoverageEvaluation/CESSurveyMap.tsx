@@ -723,31 +723,35 @@ const CESSurveyMap = ({
           weight: 3,
           opacity: 0.95,
           dashArray: "6 4",
+          interactive: false,
         }).addTo(lg);
       }
       if (draftPolygon.length >= 3) {
         L.polyline(
           [[draftPolygon[draftPolygon.length - 1].lat, draftPolygon[draftPolygon.length - 1].lng],
            [draftPolygon[0].lat, draftPolygon[0].lng]] as L.LatLngExpression[],
-          { color: "hsl(38 92% 50%)", weight: 2, opacity: 0.6, dashArray: "2 4" },
+          { color: "hsl(38 92% 50%)", weight: 2, opacity: 0.6, dashArray: "2 4", interactive: false },
         ).addTo(lg);
         L.polygon(pts, {
           color: "hsl(38 92% 50%)",
           weight: 1,
           fillColor: "hsl(38 92% 50%)",
           fillOpacity: 0.08,
+          interactive: false,
         }).addTo(lg);
       }
       draftPolygon.forEach((p, i) => {
+        // Draft vertices are display-only. They MUST be non-interactive so that
+        // tapping on/near the start vertex still reaches the map click handler
+        // (which closes the polygon) instead of being swallowed by the marker.
         L.circleMarker([p.lat, p.lng], {
           radius: i === 0 ? 7 : 5,
           color: "#fff",
           weight: 2,
           fillColor: i === 0 ? "hsl(0 84% 60%)" : "hsl(38 92% 50%)",
           fillOpacity: 1,
-        })
-          .bindTooltip(i === 0 ? "Start (tap here to close)" : `Vertex ${i + 1}`, { permanent: false })
-          .addTo(lg);
+          interactive: false,
+        }).addTo(lg);
       });
     }
     }
