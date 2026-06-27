@@ -71,7 +71,8 @@ interface Props {
 
 const stripTags = (s?: string) => String(s || "").replace(/<[^>]*>/g, "").trim();
 const ALL = "__all__";
-const PAGE = 25;
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const DEFAULT_PAGE_SIZE = 25;
 
 interface FlatQ { key: string; label: string; q: FormQuestion; }
 function flatten(questions: FormQuestion[]): FlatQ[] {
