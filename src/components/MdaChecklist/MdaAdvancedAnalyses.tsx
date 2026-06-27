@@ -228,16 +228,33 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
   const lbl = (c: CommunityAgg, q: ResolvedQ | null) => idx.label(q, val(c, q));
 
   // ── Data-quality report (per LGA section coverage) ──
+  const qualitySectionDefs = useMemo(() => [
+    { id: "status", label: "Status of MDA", q: qStatus },
+    { id: "cdd", label: "CDD presence", q: qCdd },
+    { id: "sae", label: "Adverse reactions", q: qSae },
+    { id: "register", label: "Treatment register", q: qRegister },
+    { id: "dosePole", label: "Dose pole", q: qDosePole },
+  ], [qStatus, qCdd, qSae, qRegister, qDosePole]);
   const quality = useMemo(
-    () => buildQualityReport(communities, [
-      { id: "status", label: "Status of MDA", q: qStatus },
-      { id: "cdd", label: "CDD presence", q: qCdd },
-      { id: "sae", label: "Adverse reactions", q: qSae },
-      { id: "register", label: "Treatment register", q: qRegister },
-      { id: "dosePole", label: "Dose pole", q: qDosePole },
-    ], projectName || ""),
-    [communities, qStatus, qCdd, qSae, qRegister, qDosePole, projectName],
+    () => buildQualityReport(communities, qualitySectionDefs, projectName || ""),
+    [communities, qualitySectionDefs, projectName],
   );
+
+  // ── CSV export of the filtered analyses dataset ──
+  const exportDatasetCsv = () => {
+    const rows: CsvRow[] = submissions.map((s) => ({
+      id: s.id,
+      state: s.state ?? null,
+      lga: s.lga ?? null,
+      ward: s.ward ?? null,
+      submitter: s.submitter ?? null,
+      submittedAt: s.submittedAt ?? null,
+      status: s.status ?? null,
+      data: s.data || {},
+    }));
+    const csv = buildSubmissionsCsv(rows, questions as any);
+    downloadCsv(`mda-analyses-${slugify(projectName || "dataset")}-${new Date().toISOString().slice(0, 10)}`, csv);
+  };
 
   // ── Status of MDA ──
   const statusRows = useMemo(() => {
