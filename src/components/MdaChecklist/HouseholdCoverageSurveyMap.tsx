@@ -476,7 +476,7 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
               <Home className="h-4 w-4 text-primary" /> Household Coverage Survey Map
             </CardTitle>
             <CardDescription className="text-xs">
-              {formName ? `${formName} — ` : ""}Every household visit from Coverage Evaluation 3D, clustered and plotted at its captured GPS with its outcome icon.
+              {formName ? `${formName} — ` : ""}Every household visit from Coverage Evaluation 3D, plotted on the state map at its captured GPS with its outcome icon.
             </CardDescription>
           </div>
           <DropdownMenu>
