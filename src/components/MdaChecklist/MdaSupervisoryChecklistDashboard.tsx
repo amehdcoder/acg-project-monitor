@@ -376,6 +376,22 @@ function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }
 }
 
 const ALL = "__all__";
+const HCS_URL_KEYS = {
+  lga: "hcs_lga",
+  community: "hcs_community",
+  state: "hcs_state",
+  visit: "hcs_visit",
+} as const;
+
+const writeDashboardUrl = (updates: Record<string, string | null | undefined>) => {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  for (const [key, value] of Object.entries(updates)) {
+    if (value === null || value === undefined || value === "") url.searchParams.delete(key);
+    else url.searchParams.set(key, value);
+  }
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+};
 
 // ───────────────────────── Main ─────────────────────────
 export default function MdaSupervisoryChecklistDashboard({ submissions, questions, formName, projectName, projectId, offline }: Props) {
@@ -506,10 +522,14 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   };
 
   // ── Drilldown from the household coverage map (marker / LGA selection) ──
-  const norm = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const openMapCommunityDrill = (community: string, state?: string | null) => {
     const target = norm(community);
     if (!target) return;
+    writeDashboardUrl({
+      [HCS_URL_KEYS.community]: community,
+      [HCS_URL_KEYS.state]: state || null,
+      [HCS_URL_KEYS.lga]: null,
+    });
     const rows = submissions.filter((s) => {
       if (state && pickGeo(s, "state") && norm(pickGeo(s, "state")) !== norm(state)) return false;
       return norm(pickGeo(s, "community")) === target;
@@ -525,6 +545,12 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   const openMapLgaDrill = (lga: string, state?: string | null) => {
     const target = norm(lga);
     if (!target) return;
+    writeDashboardUrl({
+      [HCS_URL_KEYS.lga]: lga,
+      [HCS_URL_KEYS.state]: state || null,
+      [HCS_URL_KEYS.community]: null,
+      [HCS_URL_KEYS.visit]: null,
+    });
     const rows = submissions.filter((s) => {
       if (state && pickGeo(s, "state") && norm(pickGeo(s, "state")) !== norm(state)) return false;
       return norm(pickGeo(s, "lga")) === target;
@@ -793,6 +819,13 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     const fct = checklist.filter((s) => fctStates.has(n2(pickGeo(s, "state")))).length;
     return fct > 0 && fct >= checklist.length * 0.6;
   }, [checklist, formName, projectName]);
+  const householdMapDefaultState = useMemo(() => {
+    if (fState !== ALL) return fState;
+    if (states.length === 1) return states[0];
+    if (/jigawa/i.test(`${projectName || ""} ${formName || ""}`)) return "Jigawa";
+    if (/endfund|\bfct\b|abuja|federalcapital/i.test(`${projectName || ""} ${formName || ""}`)) return "FCT";
+    return null;
+  }, [fState, states, projectName, formName]);
 
   // ── Export ────────────────────────────────────────────────────
   const handleExport = async () => {
@@ -1109,6 +1142,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         projectId={projectId}
         formName={formName}
         stateFilter={fState === ALL ? null : fState}
+        defaultState={householdMapDefaultState}
         dateFrom={fFrom ? fFrom + "T00:00:00" : null}
         dateTo={fTo ? fTo + "T23:59:59" : null}
         onSelectCommunity={openMapCommunityDrill}

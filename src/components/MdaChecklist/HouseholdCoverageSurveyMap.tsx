@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
 
 /**
  * Household Coverage Survey Map
@@ -36,6 +37,7 @@ import jsPDF from "jspdf";
  */
 
 const norm = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const stripTags = (s: unknown) => String(s ?? "").replace(/<[^>]*>/g, "").trim();
 
 interface Outcome {
   key: string;
@@ -70,7 +72,44 @@ const OUTCOMES: Record<string, Outcome> = {
 
 const OTHER: Outcome = { key: "other", label: "Other", color: "#7c3aed", glyph: '<circle cx="10" cy="10" r="3" fill="#fff"/>' };
 
-const outcomeFor = (status?: string | null): Outcome => OUTCOMES[norm(status)] || OTHER;
+const OUTCOME_ALIASES: Record<string, Outcome> = Object.fromEntries(
+  Object.values(OUTCOMES).flatMap((o) => [[norm(o.key), o], [norm(o.label), o]]),
+);
+const outcomeFor = (status?: string | null): Outcome => OUTCOME_ALIASES[norm(status)] || OTHER;
+
+const URL_KEYS = {
+  outcomes: "hcs_outcomes",
+  visit: "hcs_visit",
+  lga: "hcs_lga",
+  community: "hcs_community",
+  state: "hcs_state",
+} as const;
+
+const stateKeys = (value: unknown) => {
+  const n = norm(value);
+  const keys = new Set<string>(n ? [n] : []);
+  if (["fct", "abuja", "fctabuja", "federalcapital", "federalcapitalterritory"].includes(n)) {
+    keys.add("fct");
+    keys.add("abuja");
+    keys.add("federalcapitalterritory");
+  }
+  return keys;
+};
+
+const readUrl = (key: string) => {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get(key) || "";
+};
+
+const writeUrl = (updates: Record<string, string | null | undefined>) => {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  for (const [key, value] of Object.entries(updates)) {
+    if (value === null || value === undefined || value === "") url.searchParams.delete(key);
+    else url.searchParams.set(key, value);
+  }
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+};
 
 function pinIcon(o: Outcome): L.DivIcon {
   return L.divIcon({
@@ -90,13 +129,23 @@ function pinIcon(o: Outcome): L.DivIcon {
 
 interface VisitPoint {
   id: string;
+  surveyId: string;
   lat: number;
   lng: number;
+  accuracy: number | null;
   status: string;
   commodity: string | null;
   hh: string;
   community: string;
   state: string;
+  lga: string;
+  ward: string;
+  flhf: string;
+  settlement: string;
+  segment: string | null;
+  eligible: number | null;
+  treated: number | null;
+  notes: string | null;
   at: string | null;
 }
 
@@ -105,6 +154,8 @@ interface Props {
   formName?: string;
   /** Optional state filter coming from the dashboard filter bar. */
   stateFilter?: string | null;
+  /** State to show when the dashboard is not actively filtered but the project is state-specific. */
+  defaultState?: string | null;
   /** Optional date-time range (ISO strings) synced from dashboard filters. */
   dateFrom?: string | null;
   dateTo?: string | null;
@@ -116,7 +167,7 @@ interface Props {
 
 const SPEEDS = [0.5, 1, 2, 4];
 
-export default function HouseholdCoverageSurveyMap({ projectId, formName, stateFilter, dateFrom, dateTo, onSelectCommunity, onSelectLga }: Props) {
+export default function HouseholdCoverageSurveyMap({ projectId, formName, stateFilter, defaultState, dateFrom, dateTo, onSelectCommunity, onSelectLga }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -126,6 +177,7 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
   const liveRef = useRef<L.Marker | null>(null);
   const geoRef = useRef<any[] | null>(null);
   const sweepTimer = useRef<number | null>(null);
+  const restoredSelectionRef = useRef("");
 
   const [points, setPoints] = useState<VisitPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,7 +192,12 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
   const [heatMetric, setHeatMetric] = useState<"all" | "treated" | "not_treated">("all");
 
   // Legend / outcome filter (keyboard accessible)
-  const [activeOutcomes, setActiveOutcomes] = useState<Set<string>>(new Set());
+  const [activeOutcomes, setActiveOutcomes] = useState<Set<string>>(() => {
+    const raw = readUrl(URL_KEYS.outcomes);
+    if (!raw) return new Set();
+    const allowed = new Set([...Object.keys(OUTCOMES), OTHER.key]);
+    return new Set(raw.split(",").map((s) => s.trim()).filter((s) => allowed.has(s)));
+  });
 
   // Internal visit time-window (index into chronological sequence)
   const [timeWindow, setTimeWindow] = useState<[number, number] | null>(null);
@@ -149,6 +206,7 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
 
   // Marker details panel (GPS + outcome data for the clicked household visit)
   const [selectedVisit, setSelectedVisit] = useState<VisitPoint | null>(null);
+  const [selectedLga, setSelectedLga] = useState(() => readUrl(URL_KEYS.lga));
 
   // ── Load household visits (project-scoped, joined to survey geography) ──
   useEffect(() => {
@@ -156,12 +214,24 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     (async () => {
       setLoading(true);
       try {
-        let sq = supabase.from("ces_surveys" as any).select("id,state,community_name,project_id");
-        if (projectId) sq = sq.eq("project_id", projectId);
-        const { data: surveys } = await sq;
-        const meta = new Map<string, { state: string; community: string }>();
+        const surveys = await fetchAllRowsKeyset<any>((limit, afterId) => {
+          let sq = supabase
+            .from("ces_surveys" as any)
+            .select("id,state,lga,ward,flhf_name,community_name,settlement_name,project_id");
+          if (projectId) sq = sq.eq("project_id", projectId);
+          if (afterId) sq = sq.gt("id", afterId);
+          return sq.order("id", { ascending: true }).limit(limit);
+        });
+        const meta = new Map<string, { state: string; lga: string; ward: string; flhf: string; community: string; settlement: string }>();
         for (const s of (surveys as any[]) || []) {
-          meta.set(s.id, { state: s.state || "", community: s.community_name || "" });
+          meta.set(s.id, {
+            state: stripTags(s.state),
+            lga: stripTags(s.lga),
+            ward: stripTags(s.ward),
+            flhf: stripTags(s.flhf_name),
+            community: stripTags(s.community_name),
+            settlement: stripTags(s.settlement_name),
+          });
         }
         const ids = [...meta.keys()];
         if (ids.length === 0) { if (!cancelled) { setPoints([]); setLoading(false); } return; }
@@ -170,17 +240,38 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
         const CHUNK = 200;
         for (let i = 0; i < ids.length; i += CHUNK) {
           const slice = ids.slice(i, i + CHUNK);
-          const { data: visits } = await supabase
-            .from("ces_household_visits" as any)
-            .select("id,survey_id,latitude,longitude,coverage_status,commodity,hh_number,visited_at")
-            .in("survey_id", slice);
+          const visits = await fetchAllRowsKeyset<any>((limit, afterId) => {
+            let vq = supabase
+              .from("ces_household_visits" as any)
+              .select("id,survey_id,latitude,longitude,gps_accuracy,coverage_status,commodity,hh_number,visited_at,eligible_persons,treated_persons,notes,segment_label")
+              .in("survey_id", slice);
+            if (afterId) vq = vq.gt("id", afterId);
+            return vq.order("id", { ascending: true }).limit(limit);
+          });
           for (const v of (visits as any[]) || []) {
             const lat = Number(v.latitude), lng = Number(v.longitude);
             if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) continue;
-            const m = meta.get(v.survey_id) || { state: "", community: "" };
+            const m = meta.get(v.survey_id) || { state: "", lga: "", ward: "", flhf: "", community: "", settlement: "" };
             collected.push({
-              id: v.id, lat, lng, status: v.coverage_status, commodity: v.commodity,
-              hh: v.hh_number || "HH", community: m.community, state: m.state, at: v.visited_at,
+              id: v.id,
+              surveyId: v.survey_id,
+              lat,
+              lng,
+              accuracy: Number.isFinite(Number(v.gps_accuracy)) ? Number(v.gps_accuracy) : null,
+              status: v.coverage_status,
+              commodity: v.commodity,
+              hh: v.hh_number || "HH",
+              community: m.community,
+              state: m.state,
+              lga: m.lga,
+              ward: m.ward,
+              flhf: m.flhf,
+              settlement: m.settlement,
+              segment: v.segment_label || null,
+              eligible: Number.isFinite(Number(v.eligible_persons)) ? Number(v.eligible_persons) : null,
+              treated: Number.isFinite(Number(v.treated_persons)) ? Number(v.treated_persons) : null,
+              notes: v.notes || null,
+              at: v.visited_at,
             });
           }
         }
@@ -192,6 +283,10 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     })();
     return () => { cancelled = true; };
   }, [projectId]);
+
+  useEffect(() => {
+    writeUrl({ [URL_KEYS.outcomes]: activeOutcomes.size ? [...activeOutcomes].sort().join(",") : null });
+  }, [activeOutcomes]);
 
   // Apply state + dashboard date filters + legend outcome filter
   const filtered = useMemo(() => {
@@ -231,10 +326,38 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
 
   const statesPresent = useMemo(() => {
     const set = new Set(windowed.map((p) => norm(p.state)).filter(Boolean));
-    // Always show the selected state's map even if it has no visits yet.
-    if (stateFilter) set.add(norm(stateFilter));
+    // Always show the selected/default project state's map even if it has no visits yet.
+    if (stateFilter) stateKeys(stateFilter).forEach((key) => set.add(key));
+    else if (defaultState) stateKeys(defaultState).forEach((key) => set.add(key));
     return set;
-  }, [windowed, stateFilter]);
+  }, [windowed, stateFilter, defaultState]);
+
+  useEffect(() => {
+    const key = `${points.length}:${readUrl(URL_KEYS.visit)}:${readUrl(URL_KEYS.lga)}:${readUrl(URL_KEYS.community)}:${readUrl(URL_KEYS.state)}`;
+    if (restoredSelectionRef.current === key || points.length === 0) return;
+    restoredSelectionRef.current = key;
+    const visitId = readUrl(URL_KEYS.visit);
+    const lga = readUrl(URL_KEYS.lga);
+    const community = readUrl(URL_KEYS.community);
+    const state = readUrl(URL_KEYS.state);
+    if (visitId) {
+      const visit = points.find((p) => p.id === visitId);
+      if (visit) {
+        setSelectedVisit(visit);
+        setSelectedLga("");
+        onSelectCommunity?.(visit.community, visit.state);
+        const map = mapRef.current;
+        if (map) map.setView([visit.lat, visit.lng], Math.max(map.getZoom(), 14), { animate: false });
+      }
+    } else if (lga) {
+      setSelectedVisit(null);
+      setSelectedLga(lga);
+      onSelectLga?.(lga, state || stateFilter || defaultState || null);
+    } else if (community) {
+      setSelectedVisit(null);
+      onSelectCommunity?.(community, state || stateFilter || defaultState || null);
+    }
+  }, [points, onSelectCommunity, onSelectLga, stateFilter, defaultState]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -310,7 +433,7 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(redraw, [windowed, statesPresent]);
+  useEffect(redraw, [windowed, statesPresent, selectedLga]);
 
   function redraw() {
     const map = mapRef.current;
@@ -328,15 +451,37 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
         // Individual LGA fills (light) so the internal LGA divisions read clearly,
         // matching the LGA Supervision Map reference.
         const lgas = L.geoJSON({ type: "FeatureCollection", features: stateFeats } as any, {
-          style: () => ({ color: "#14b8a6", weight: 1, opacity: 0.7, fillColor: "#99f6e4", fillOpacity: 0.18 }),
+          style: (feature: any) => {
+            const active = selectedLga && norm(feature?.properties?.lga) === norm(selectedLga);
+            return {
+              color: active ? "#0f766e" : "#14b8a6",
+              weight: active ? 2.8 : 1,
+              opacity: active ? 1 : 0.7,
+              fillColor: active ? "#2dd4bf" : "#99f6e4",
+              fillOpacity: active ? 0.42 : 0.18,
+            };
+          },
           onEachFeature: (f: any, lyr) => {
             const name = f?.properties?.lga;
             const st = f?.properties?.state;
             if (name) {
               lyr.bindTooltip(String(name), { sticky: true, direction: "top", className: "hcs-lga-tip" });
-              lyr.on("click", () => onSelectLga?.(String(name), st));
+              lyr.on("click", () => {
+                setSelectedVisit(null);
+                setSelectedLga(String(name));
+                writeUrl({
+                  [URL_KEYS.lga]: String(name),
+                  [URL_KEYS.state]: st ? String(st) : null,
+                  [URL_KEYS.visit]: null,
+                  [URL_KEYS.community]: null,
+                });
+                onSelectLga?.(String(name), st);
+              });
               lyr.on("mouseover", () => (lyr as any).setStyle?.({ fillOpacity: 0.34, weight: 1.6 }));
-              lyr.on("mouseout", () => (lyr as any).setStyle?.({ fillOpacity: 0.18, weight: 1 }));
+              lyr.on("mouseout", () => {
+                const active = selectedLga && norm(name) === norm(selectedLga);
+                (lyr as any).setStyle?.({ fillOpacity: active ? 0.42 : 0.18, weight: active ? 2.8 : 1 });
+              });
             }
             try { stateBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
           },
@@ -378,6 +523,13 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
         );
         m.on("click", () => {
           setSelectedVisit(p);
+          setSelectedLga("");
+          writeUrl({
+            [URL_KEYS.visit]: p.id,
+            [URL_KEYS.community]: p.community || null,
+            [URL_KEYS.state]: p.state || null,
+            [URL_KEYS.lga]: null,
+          });
           if (p.community) onSelectCommunity?.(p.community, p.state);
         });
         markers.push(m);
@@ -467,6 +619,25 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
+  };
+
+  const copyText = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} copied`);
+    } catch {
+      toast.error(`Unable to copy ${label.toLowerCase()}`);
+    }
+  };
+
+  const openCommunityRow = (visit: VisitPoint) => {
+    writeUrl({
+      [URL_KEYS.visit]: visit.id,
+      [URL_KEYS.community]: visit.community || null,
+      [URL_KEYS.state]: visit.state || null,
+      [URL_KEYS.lga]: null,
+    });
+    onSelectCommunity?.(visit.community, visit.state);
   };
 
   // ── Export current view (with legend + filters) to PNG / PDF ──
@@ -685,26 +856,52 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
                     </span>
                     <span className="text-sm font-semibold">{selectedVisit.hh}</span>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Close details" onClick={() => setSelectedVisit(null)}>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Close details" onClick={() => {
+                    setSelectedVisit(null);
+                    writeUrl({ [URL_KEYS.visit]: null, [URL_KEYS.community]: null });
+                  }}>
                     <X className="h-3.5 w-3.5" />
                   </Button>
                 </div>
+                <div className="mb-2 rounded-md border border-border bg-muted/40 p-2 text-[11px]">
+                  <p className="font-semibold text-foreground">Submission summary</p>
+                  <p className="mt-0.5 text-muted-foreground">
+                    {selectedVisit.community || "Community not recorded"}{selectedVisit.settlement ? ` · ${selectedVisit.settlement}` : ""}
+                  </p>
+                  <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">Visit {selectedVisit.id.slice(0, 8)} · Survey {selectedVisit.surveyId.slice(0, 8)}</p>
+                </div>
                 <dl className="space-y-1 text-[11px]">
                   <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Outcome</dt><dd className="font-semibold" style={{ color: o.color }}>{o.label}</dd></div>
+                  {selectedVisit.lga && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">LGA</dt><dd className="font-medium text-right">{selectedVisit.lga}</dd></div>}
+                  {selectedVisit.ward && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Ward</dt><dd className="font-medium text-right">{selectedVisit.ward}</dd></div>}
+                  {selectedVisit.flhf && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">FLHF</dt><dd className="font-medium text-right">{selectedVisit.flhf}</dd></div>}
                   {selectedVisit.community && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Community</dt><dd className="font-medium text-right">{selectedVisit.community}</dd></div>}
+                  {selectedVisit.settlement && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Settlement</dt><dd className="font-medium text-right">{selectedVisit.settlement}</dd></div>}
                   {selectedVisit.state && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">State</dt><dd className="font-medium text-right">{selectedVisit.state}</dd></div>}
+                  {selectedVisit.segment && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Segment</dt><dd className="font-medium text-right">{selectedVisit.segment}</dd></div>}
                   {selectedVisit.commodity && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Commodity</dt><dd className="font-medium text-right">{selectedVisit.commodity}</dd></div>}
+                  {(selectedVisit.eligible !== null || selectedVisit.treated !== null) && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Treated / eligible</dt><dd className="font-medium text-right">{selectedVisit.treated ?? 0} / {selectedVisit.eligible ?? 0}</dd></div>}
                   {selectedVisit.at && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Visited</dt><dd className="font-medium text-right">{new Date(selectedVisit.at).toLocaleString()}</dd></div>}
-                  <div className="flex justify-between gap-2"><dt className="text-muted-foreground">GPS</dt><dd className="font-mono tabular-nums">{selectedVisit.lat.toFixed(5)}, {selectedVisit.lng.toFixed(5)}</dd></div>
+                  <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Accuracy</dt><dd className="font-medium text-right">{selectedVisit.accuracy != null ? `±${Math.round(selectedVisit.accuracy)}m` : "—"}</dd></div>
+                  <div className="flex justify-between gap-2"><dt className="text-muted-foreground">GPS</dt><dd className="font-mono tabular-nums">{selectedVisit.lat.toFixed(6)}, {selectedVisit.lng.toFixed(6)}</dd></div>
                 </dl>
+                {selectedVisit.notes && <p className="mt-2 rounded-md bg-muted/50 p-2 text-[11px] text-muted-foreground">{selectedVisit.notes}</p>}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="mt-2.5 h-7 w-full text-[11px]"
+                  onClick={() => copyText(`${selectedVisit.lat.toFixed(6)}, ${selectedVisit.lng.toFixed(6)}`, "GPS coordinate")}
+                >
+                  Copy GPS coordinate
+                </Button>
                 {selectedVisit.community && onSelectCommunity && (
                   <Button
                     size="sm"
                     variant="outline"
                     className="mt-2.5 h-7 w-full text-[11px]"
-                    onClick={() => onSelectCommunity(selectedVisit.community, selectedVisit.state)}
+                    onClick={() => openCommunityRow(selectedVisit)}
                   >
-                    <ListFilter className="h-3 w-3 mr-1.5" /> Filter table to this community
+                    <ListFilter className="h-3 w-3 mr-1.5" /> Open matching community row
                   </Button>
                 )}
               </div>
