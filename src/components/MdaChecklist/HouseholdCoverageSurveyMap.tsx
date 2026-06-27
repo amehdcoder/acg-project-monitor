@@ -85,6 +85,17 @@ const URL_KEYS = {
   state: "hcs_state",
 } as const;
 
+const stateKeys = (value: unknown) => {
+  const n = norm(value);
+  const keys = new Set<string>(n ? [n] : []);
+  if (["fct", "abuja", "fctabuja", "federalcapital", "federalcapitalterritory"].includes(n)) {
+    keys.add("fct");
+    keys.add("abuja");
+    keys.add("federalcapitalterritory");
+  }
+  return keys;
+};
+
 const readUrl = (key: string) => {
   if (typeof window === "undefined") return "";
   return new URLSearchParams(window.location.search).get(key) || "";
@@ -316,8 +327,8 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
   const statesPresent = useMemo(() => {
     const set = new Set(windowed.map((p) => norm(p.state)).filter(Boolean));
     // Always show the selected/default project state's map even if it has no visits yet.
-    if (stateFilter) set.add(norm(stateFilter));
-    else if (defaultState) set.add(norm(defaultState));
+    if (stateFilter) stateKeys(stateFilter).forEach((key) => set.add(key));
+    else if (defaultState) stateKeys(defaultState).forEach((key) => set.add(key));
     return set;
   }, [windowed, stateFilter, defaultState]);
 
