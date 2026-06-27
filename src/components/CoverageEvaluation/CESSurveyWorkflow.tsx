@@ -38,7 +38,7 @@ import { logCESAction } from "@/lib/ces/auditLog";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import {
   saveHouseholdOffline, syncCESOfflineQueue, getPendingCount,
-  registerCESSyncOnReconnect, getDeviceId, generateUUID, type OfflineHousehold,
+  registerCESSyncOnReconnect, getDeviceId, generateUUID, saveSurveyOffline, type OfflineHousehold,
 } from "@/lib/ces/offlineHouseholds";
 import StreetViewPanel from "./StreetViewPanel";
 import {
@@ -1665,8 +1665,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       const { data: sess } = await supabase.auth.getSession();
       authedUserId = sess.session?.user?.id ?? null;
       if (!authedUserId) {
-        const { data: u } = await supabase.auth.getUser();
-        authedUserId = u.user?.id ?? null;
+        try {
+          const { data: u } = await supabase.auth.getUser();
+          authedUserId = u.user?.id ?? null;
+        } catch {
+          authedUserId = null;
+        }
       }
       if (!authedUserId) {
         toast({ title: "Sign in required", variant: "destructive" });
@@ -1707,29 +1711,60 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         est_hh_rooftop_source: "detected_rooftops",
       };
 
+      const queueSurveyOffline = async (id: string) => {
+        await saveSurveyOffline({
+          id,
+          payload,
+          created_by: authedUserId!,
+          updated_at: new Date().toISOString(),
+          synced: false,
+          retry_count: 0,
+        });
+        setSurveyId(id);
+        return id;
+      };
+
+      if (!navigator.onLine) {
+        return queueSurveyOffline(surveyId ?? generateUUID());
+      }
+
       if (surveyId) {
         // Concurrency guard — optimistic lock prevents two devices/tabs editing
         // the same survey from clobbering each other's saves.
         const { safeUpdate } = await import("@/lib/optimisticUpdate");
-        const { conflict, error } = await safeUpdate("ces_surveys", surveyId, payload);
+        let updateResult: { conflict: boolean; error: any };
+        try {
+          updateResult = await safeUpdate("ces_surveys", surveyId, payload);
+        } catch (error: any) {
+          await queueSurveyOffline(surveyId);
+          return surveyId;
+        }
+        const { conflict, error } = updateResult;
         if (conflict) {
           toast({ title: "Save conflict", description: "This survey was just updated on another device. Refresh to load the latest version.", variant: "destructive" });
           return null;
         }
         if (error) {
-          toast({ title: "Save failed", description: error.message, variant: "destructive" });
-          return null;
+          await queueSurveyOffline(surveyId);
+          return surveyId;
         }
         return surveyId;
       } else {
-        const { data, error } = await supabase
-          .from("ces_surveys" as any)
-          .insert({ ...payload, created_by: authedUserId })
-          .select()
-          .single();
+        let data: any = null;
+        let error: any = null;
+        try {
+          const resp = await supabase
+            .from("ces_surveys" as any)
+            .insert({ ...payload, created_by: authedUserId })
+            .select()
+            .single();
+          data = resp.data;
+          error = resp.error;
+        } catch (err: any) {
+          error = err;
+        }
         if (error || !data) {
-          toast({ title: "Create failed", description: error?.message, variant: "destructive" });
-          return null;
+          return queueSurveyOffline(generateUUID());
         }
         const id = (data as any).id;
         setSurveyId(id);
