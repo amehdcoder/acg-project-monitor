@@ -541,6 +541,9 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
           accent="completion"
           filterExpr={filterFor(GROUP_COMPLETION)}
           nameMap={checklistNameMap}
+          questions={allQuestionTree}
+          statusKeys={followUpResolution.statusKeys}
+          excludeCompleted
           onConfigure={canBuildFollowUps ? () => openBuilder(ensureFollowUpGroup(GROUP_COMPLETION)) : undefined}
           onBack={() => setView("home")}
           onSelect={(c) => { setSelected(c); setView("completion"); }}
@@ -560,6 +563,9 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
           accent="commodities"
           filterExpr={filterFor(GROUP_COMMODITIES)}
           nameMap={checklistNameMap}
+          questions={allQuestionTree}
+          statusKeys={followUpResolution.statusKeys}
+          excludeCompleted
           onConfigure={canBuildFollowUps ? () => openBuilder(ensureFollowUpGroup(GROUP_COMMODITIES)) : undefined}
           onBack={() => setView("home")}
           onSelect={(c) => { setSelected(c); setView("commodities"); }}
