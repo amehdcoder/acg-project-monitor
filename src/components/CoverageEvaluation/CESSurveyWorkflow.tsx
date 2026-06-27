@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation, type Position as CapacitorPosition } from "@capacitor/geolocation";
@@ -71,6 +71,19 @@ const COVERAGE_OPTIONS = [
 ];
 
 const COMMODITY_OPTIONS = ["Ivermectin", "Praziquantel", "Albendazole", "Zithromax", "LLIN", "Other"];
+const CES_MICROPLAN_PICKER_LIMIT = 100;
+const CES_MAX_SAMPLING_PINS = 1200;
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(id);
+  }, [value, delayMs]);
+
+  return debounced;
+}
 
 type CesGpsFix = {
   lat: number;
@@ -346,24 +359,34 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [microplans, setMicroplans] = useState<any[]>([]);
   const [medicineAllocations, setMedicineAllocations] = useState<any[]>([]);
   const [selectedMicroplanId, setSelectedMicroplanId] = useState<string>("");
+  const [microplanSearch, setMicroplanSearch] = useState("");
+  const [microplanHasMore, setMicroplanHasMore] = useState(false);
+  const debouncedMicroplanSearch = useDebouncedValue(microplanSearch, 350);
 
   const fetchMicroplans = useCallback(async () => {
     if (!projectId) return;
     setLoading(true);
     try {
-      const [mData, aData] = await Promise.all([
+      const term = debouncedMicroplanSearch.trim().replace(/[%,]/g, " ").slice(0, 80);
+      const [mResp, aData] = await Promise.all([
+        (() => {
+          let q = supabase
+            .from("microplan_entries" as any)
+            .select("id, state, lga, ward, flhf_name, community_name, settlement_name, estimated_children_5_14, estimated_adults_15_plus, estimated_total_population")
+            .eq("project_id", projectId);
+          if (term) q = q.or(`community_name.ilike.%${term}%,settlement_name.ilike.%${term}%,ward.ilike.%${term}%,lga.ilike.%${term}%`);
+          return q.order("community_name", { ascending: true }).limit(CES_MICROPLAN_PICKER_LIMIT + 1);
+        })(),
         fetchAllRowsKeyset<any>((limit, afterId) => {
-          let q = supabase.from("microplan_entries" as any).select("*").eq("project_id", projectId);
-          if (afterId) q = q.gt("id", afterId);
-          return q.order("id", { ascending: true }).limit(limit);
-        }),
-        fetchAllRowsKeyset<any>((limit, afterId) => {
-          let q = supabase.from("microplan_medicine_allocations" as any).select("*").eq("project_id", projectId);
+          let q = supabase.from("microplan_medicine_allocations" as any).select("id, lga, amount, medicine_name").eq("project_id", projectId);
           if (afterId) q = q.gt("id", afterId);
           return q.order("id", { ascending: true }).limit(limit);
         }),
       ]);
-      setMicroplans(mData);
+      if (mResp.error) throw mResp.error;
+      const mData = ((mResp.data as any[]) ?? []);
+      setMicroplanHasMore(mData.length > CES_MICROPLAN_PICKER_LIMIT);
+      setMicroplans(mData.slice(0, CES_MICROPLAN_PICKER_LIMIT));
       setMedicineAllocations(aData);
     } catch (err: any) {
       console.error("Error fetching microplan data:", err);
@@ -375,7 +398,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, debouncedMicroplanSearch]);
 
   useEffect(() => {
     fetchMicroplans();
@@ -524,6 +547,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const kickstartIvRef = useRef<number | null>(null);
   const lkgRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
   const lastFixAtRef = useRef<number>(0);
+  const lastGpsUiAtRef = useRef<number>(0);
+  const lastGpsUiRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
   const gpsStartedAtRef = useRef<number>(Date.now());
   const kalmanRef = useRef<{ lat: number; lng: number; variance: number; ts: number } | null>(null);
   const [gpsError, setGpsError] = useState<null | "denied" | "unavailable" | "timeout" | "insecure" | "unsupported">(null);
@@ -544,6 +569,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       }
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const commitGpsUi = useCallback((nextGps: { lat: number; lng: number; accuracy: number }, opts: { minDistanceM?: number; minIntervalMs?: number; force?: boolean } = {}) => {
+    const now = Date.now();
+    const lastUi = lastGpsUiRef.current;
+    const movedM = lastUi ? haversineMeters({ lat: lastUi.lat, lng: lastUi.lng }, { lat: nextGps.lat, lng: nextGps.lng }) : Infinity;
+    const accuracyImproved = lastUi ? nextGps.accuracy < lastUi.accuracy * 0.75 : true;
+    const minDistanceM = opts.minDistanceM ?? 1.25;
+    const minIntervalMs = opts.minIntervalMs ?? 900;
+    if (opts.force || !lastUi || movedM >= minDistanceM || accuracyImproved || now - lastGpsUiAtRef.current >= minIntervalMs) {
+      lastGpsUiAtRef.current = now;
+      lastGpsUiRef.current = nextGps;
+      startTransition(() => setGps(nextGps));
+    }
   }, []);
 
   // Kalman-fused fix application — Google-Maps-equivalent realtime behavior.
@@ -594,14 +633,15 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
     lastFixAtRef.current = now;
     setIndoorMode(source === "low" && p.accuracy > 50);
-    setGps({
+    const nextGps = {
       lat: k.lat,
       lng: k.lng,
       // Reported accuracy = max of raw and filter sigma, so UI never
       // overstates confidence.
       accuracy: Math.max(p.accuracy, Math.sqrt(k.variance)),
-    });
-  }, []);
+    };
+    commitGpsUi(nextGps);
+  }, [commitGpsUi]);
 
   const startGPSLock = useCallback(() => {
     if (!Capacitor.isNativePlatform() && typeof window !== "undefined" && !window.isSecureContext) {
@@ -806,7 +846,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       const last = lastVertexFixRef.current;
       const sinceLastVertex = last ? now - last.t : sinceStart;
       const gateM = computeGate(sinceStart, sinceLastVertex);
-      setGps({ lat, lng, accuracy: acc });
+      commitGpsUi({ lat, lng, accuracy: acc }, { minDistanceM: 4, minIntervalMs: 1200 });
 
       // Movement gate: scale to GPS noise but keep responsive while walking.
       // First vertex always commits; subsequent require real movement.
@@ -879,7 +919,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recordingPerimeter, gpsRestartNonce]);
+  }, [recordingPerimeter, gpsRestartNonce, commitGpsUi]);
 
   // ---------- Background resilience: Wake Lock + watchdog + persistence ----------
   // Keeps the perimeter watcher alive while moving, screen off, or tab hidden.
@@ -1324,23 +1364,39 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   // Prefetch residential mask once we have ≥3 perimeter vertices (or after stop)
   useEffect(() => {
-    if (perimeter.length < 3) return;
+    if (perimeter.length < 3 || recordingPerimeter) return;
+    const controller = new AbortController();
     let cancelled = false;
-    setMaskStatus("loading");
-    getResidentialMask(perimeter)
-      .then((m) => { if (!cancelled) { setResidentialMask(m); setMaskStatus("ok"); } })
-      .catch(() => { if (!cancelled) { setMaskStatus("error"); } });
-    return () => { cancelled = true; };
-  }, [perimeter]);
+    const run = () => {
+      if (cancelled) return;
+      setMaskStatus("loading");
+      getResidentialMask(perimeter, { signal: controller.signal })
+        .then((m) => {
+          if (!cancelled) startTransition(() => { setResidentialMask(m); setMaskStatus("ok"); });
+        })
+        .catch((err) => {
+          if (!cancelled && err?.name !== "AbortError") setMaskStatus("error");
+        });
+    };
+    const timer = window.setTimeout(run, 900);
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [perimeter, recordingPerimeter]);
+
+  const deferredResidentialMask = useDeferredValue(residentialMask);
+  const deferredPerimeter = useDeferredValue(perimeter);
 
   const featureSummary = useMemo(() => {
-    const fg = residentialMask?.featureGeometry;
+    const fg = deferredResidentialMask?.featureGeometry;
     if (!fg) return { buildings: 0, roads: 0, waterways: 0, uncertain: 0, namedRoads: 0, labeled: 0, avgConfidence: 0 };
-    const inPerimeter = perimeter.length >= 3
+    const inPerimeter = deferredPerimeter.length >= 3
       ? {
-          buildings: fg.buildings.filter((b) => pointInPolygonGeo(b.center, perimeter)),
-          roads: fg.roads.filter((r) => r.points.some((p) => pointInPolygonGeo(p, perimeter))),
-          waterways: fg.waterways.filter((w) => w.points.some((p) => pointInPolygonGeo(p, perimeter))),
+          buildings: fg.buildings.filter((b) => pointInPolygonGeo(b.center, deferredPerimeter)),
+          roads: fg.roads.filter((r) => r.points.some((p) => pointInPolygonGeo(p, deferredPerimeter))),
+          waterways: fg.waterways.filter((w) => w.points.some((p) => pointInPolygonGeo(p, deferredPerimeter))),
         }
       : { buildings: fg.buildings, roads: fg.roads, waterways: fg.waterways };
     const all = [...inPerimeter.buildings, ...inPerimeter.roads, ...inPerimeter.waterways];
@@ -1355,7 +1411,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       labeled: Object.keys(featureLabelMap).length,
       avgConfidence,
     };
-  }, [residentialMask, perimeter, featureLabelMap]);
+  }, [deferredResidentialMask, deferredPerimeter, featureLabelMap]);
 
   useEffect(() => {
     if (maskStatus !== "ok") return;
@@ -2461,13 +2517,61 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       bestAccuracyM: perimeterBestAccRef.current,
       recording: recordingPerimeter,
     }),
-    // perimeterBestAccRef is a ref; nowTick keeps the panel ticking while idle
+    // Deliberately do not depend on nowTick: polygon/self-intersection checks
+    // can be expensive and must not run every 500ms just to update a clock label.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [perimeter, gps, walkedM, recordingPerimeter, nowTick],
+    [perimeter, gps, walkedM, recordingPerimeter],
   );
 
   const accColor = (acc: number | null) =>
     acc == null ? "text-muted-foreground" : acc <= 5 ? "text-green-600" : acc <= 10 ? "text-amber-600" : "text-red-600";
+
+  const selectedStepSegments = useMemo(
+    () => segments.filter((s) => selectedSegmentLabels.includes(s.label)),
+    [segments, selectedSegmentLabels],
+  );
+
+  const selectedSegmentSpatialIndex = useMemo(
+    () => selectedStepSegments.map((s) => pointInPolygonIndex(s.polygon)).filter(Boolean) as Array<{ contains: (pt: LatLng) => boolean }>,
+    [selectedStepSegments],
+  );
+
+  const selectedSamplingPins = useMemo(() => {
+    if (step !== 3 || selectedSegmentSpatialIndex.length === 0) return [] as LatLng[];
+    const pins: LatLng[] = [];
+    const buildings = deferredResidentialMask?.residentialBuildings ?? [];
+    for (const b of buildings) {
+      if (selectedSegmentSpatialIndex.some((s) => s.contains(b))) {
+        pins.push(b);
+        if (pins.length >= CES_MAX_SAMPLING_PINS) break;
+      }
+    }
+    return pins;
+  }, [step, selectedSegmentSpatialIndex, deferredResidentialMask]);
+
+  const nearestSelectedSegment = useMemo(() => {
+    if (step !== 3 || !gps || selectedStepSegments.length === 0) return null;
+    return selectedStepSegments.reduce((best, s) => {
+      const d = Math.hypot(s.centroid.lat - gps.lat, s.centroid.lng - gps.lng);
+      return !best || d < best.d ? { d, seg: s } : best;
+    }, null as null | { d: number; seg: Segment });
+  }, [step, gps?.lat, gps?.lng, selectedStepSegments]);
+
+  const coverageMapSegments = useMemo(() => {
+    if (step !== 4 || households.length === 0) return segments;
+    return segments.map((s) => {
+      let total = 0;
+      let treated = 0;
+      for (const h of households) {
+        if (!pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon)) continue;
+        total++;
+        if (h.coverage_status === "treated") treated++;
+      }
+      const pct = total ? (treated / total) * 100 : -1;
+      const color = pct < 0 ? "#94a3b8" : pct >= 80 ? "#16a34a" : pct >= 70 ? "#eab308" : "#dc2626";
+      return { ...s, color };
+    });
+  }, [step, segments, households]);
 
   return (
     <div className="space-y-3">
@@ -2656,7 +2760,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             )}
 
             <Field label="Select Microplanning Data (Optional)">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <Input
+                  value={microplanSearch}
+                  onChange={(e) => setMicroplanSearch(e.target.value)}
+                  placeholder="Search community, settlement, ward, or LGA"
+                  className="h-8 text-xs sm:max-w-64"
+                  disabled={locationLocked}
+                />
                 <Select value={selectedMicroplanId} onValueChange={handleMicroplanSelect} disabled={locationLocked}>
                   <SelectTrigger className="h-8 flex-1 text-xs"><SelectValue placeholder="Choose a community microplan to auto-fill" /></SelectTrigger>
                   <SelectContent>
@@ -2676,7 +2787,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   ? "Loading microplanning entries…"
                   : microplans.length === 0
                   ? "No microplanning entries found for this project. You can still proceed — this community will be flagged as outside the microplan in Step 4."
-                  : `Showing ${microplans.length} entries for this project`}
+                  : microplanHasMore
+                  ? `Showing first ${microplans.length} matching entries. Search to narrow the list.`
+                  : `Showing ${microplans.length} matching entries for this project`}
               </p>
             </Field>
 
@@ -3281,46 +3394,18 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               </Button>
             </div>
 
-            {(() => {
-              // Step 3 shows ALL currently-selected segment polygons (green)
-              // plus red pins on every detected building inside them as the
-              // sampling target. Surveyors can move between any selected
-              // segment and capture households there.
-              const selectedSegs = segments.filter((s) => selectedSegmentLabels.includes(s.label));
-              const buildingsInSegs = selectedSegs.length
-                ? (residentialMask?.residentialBuildings ?? []).filter((b) =>
-                    selectedSegs.some((s) => pointInPolygonGeo(b, s.polygon)),
-                  )
-                : [];
-              const emptySegs = selectedSegs.filter(
-                (s) => !(residentialMask?.residentialBuildings ?? []).some((b) => pointInPolygonGeo(b, s.polygon)),
-              );
-              // Route to the nearest selected segment centroid for navigation.
-              const nearestSeg = selectedSegs.length
-                ? selectedSegs.reduce((best, s) => {
-                    const d = Math.hypot(s.centroid.lat - gps.lat, s.centroid.lng - gps.lng);
-                    return !best || d < best.d ? { d, seg: s } : best;
-                  }, null as null | { d: number; seg: typeof selectedSegs[number] })
-                : null;
-              return (
-                <>
-                  {/* QA Alert removed per UX request — surveyors can still drop pins manually. */}
-
-                  <CESSurveyMap
-                    centerLat={gps.lat} centerLng={gps.lng}
-                    perimeter={perimeter}
-                    segments={selectedSegs}
-                    selectedSegmentIds={selectedSegmentLabels}
-                    households={households}
-                    samplingPins={buildingsInSegs}
-                    routeTo={nearestSeg ? nearestSeg.seg.centroid : null}
-                    basemap={basemap}
-                    onMapTap={handleMapTap}
-                    height="55vh"
-                  />
-                </>
-              );
-            })()}
+            <CESSurveyMap
+              centerLat={gps.lat} centerLng={gps.lng}
+              perimeter={perimeter}
+              segments={selectedStepSegments}
+              selectedSegmentIds={selectedSegmentLabels}
+              households={households}
+              samplingPins={selectedSamplingPins}
+              routeTo={nearestSelectedSegment ? nearestSelectedSegment.seg.centroid : null}
+              basemap={basemap}
+              onMapTap={handleMapTap}
+              height="55vh"
+            />
             <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/20 rounded-xl border border-border">
               <div className="flex-1 min-w-[200px]">
                 <Label className="text-xs font-black uppercase text-muted-foreground">Reported Households in this Segment</Label>
@@ -3543,14 +3628,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   <CESSurveyMap
                     centerLat={gps.lat} centerLng={gps.lng}
                     perimeter={perimeter}
-                    segments={segments.map((s) => {
-                      // choropleth coloring by coverage
-                      const inside = households.filter((h) => pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon));
-                      const tr = inside.filter((h) => h.coverage_status === "treated").length;
-                      const pct = inside.length ? (tr / inside.length) * 100 : -1;
-                      const color = pct < 0 ? "#94a3b8" : pct >= 80 ? "#16a34a" : pct >= 70 ? "#eab308" : "#dc2626";
-                      return { ...s, color };
-                    })}
+                    segments={coverageMapSegments}
                     selectedSegmentIds={selectedSegmentLabels}
                     households={households}
                     basemap={basemap}
@@ -4205,6 +4283,26 @@ function pointInPolygon(pt: LatLng, poly: LatLng[]): boolean {
     if (intersect) inside = !inside;
   }
   return inside;
+}
+
+function pointInPolygonIndex(poly: LatLng[]) {
+  if (poly.length < 3) return null;
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  let minLng = Infinity;
+  let maxLng = -Infinity;
+  for (const p of poly) {
+    minLat = Math.min(minLat, p.lat);
+    maxLat = Math.max(maxLat, p.lat);
+    minLng = Math.min(minLng, p.lng);
+    maxLng = Math.max(maxLng, p.lng);
+  }
+  return {
+    contains(pt: LatLng) {
+      if (pt.lat < minLat || pt.lat > maxLat || pt.lng < minLng || pt.lng > maxLng) return false;
+      return pointInPolygonGeo(pt, poly);
+    },
+  };
 }
 
 function circleAround(c: { lat: number; lng: number }, radiusM: number, n: number): LatLng[] {
