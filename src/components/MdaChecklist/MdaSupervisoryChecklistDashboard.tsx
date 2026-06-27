@@ -669,6 +669,12 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     return rows;
   }, [primaryByCom, fuByCommunity, fModule]);
 
+  // Paginate the register so the DOM stays light with very large datasets
+  // (thousands of communities) instead of rendering every row at once.
+  const register = useTablePagination(linkage, 25);
+
+
+
   // ── Field worker accountability ───────────────────────────────
   const workers = useMemo(() => {
     const map = new Map<string, { name: string; subs: number; days: Set<string>; last: number }>();
