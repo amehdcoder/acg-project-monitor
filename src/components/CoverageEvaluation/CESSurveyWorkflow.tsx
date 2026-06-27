@@ -2206,9 +2206,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       toast({ title: "No household visits yet", description: "Save at least one household visit in Step 3 before computing coverage.", variant: "destructive" });
       return;
     }
-    // attribute each visit to its enclosing segment (fall back to first selected if no polygon match)
+    const householdsBySegment = new Map<string, SurveyHousehold[]>();
+    for (const h of households) {
+      if (h.segment_label) {
+        const list = householdsBySegment.get(h.segment_label) ?? [];
+        list.push(h);
+        householdsBySegment.set(h.segment_label, list);
+      }
+    }
+    // Prefer persisted segment attribution (O(N)); fall back to polygon checks
+    // only for legacy visits that predate segment_label.
     const tallies = segments.map((s) => {
-      const inside = households.filter((h) => pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon));
+      const attributed = householdsBySegment.get(s.label) ?? [];
+      const legacy = households.filter((h) => !h.segment_label && pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon));
+      const inside = attributed.length || legacy.length ? [...attributed, ...legacy] : [];
       const treated = inside.filter((h) => h.coverage_status === "treated").length;
       const eligible_persons = inside.reduce((a, h) => a + (Number(h.eligible_persons) || 0), 0);
       const treated_persons = inside.reduce((a, h) => a + (Number(h.treated_persons) || 0), 0);
@@ -2669,13 +2680,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const coverageMapSegments = useMemo(() => {
     if (step !== 4 || households.length === 0) return segments;
     return segments.map((s) => {
-      let total = 0;
-      let treated = 0;
-      for (const h of households) {
-        if (!pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon)) continue;
-        total++;
-        if (h.coverage_status === "treated") treated++;
-      }
+      const attributed = households.filter((h) => h.segment_label === s.label);
+      const legacy = households.filter((h) => !h.segment_label && pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon));
+      const inside = attributed.length || legacy.length ? [...attributed, ...legacy] : [];
+      const total = inside.length;
+      const treated = inside.filter((h) => h.coverage_status === "treated").length;
       const pct = total ? (treated / total) * 100 : -1;
       const color = pct < 0 ? "#94a3b8" : pct >= 80 ? "#16a34a" : pct >= 70 ? "#eab308" : "#dc2626";
       return { ...s, color };
