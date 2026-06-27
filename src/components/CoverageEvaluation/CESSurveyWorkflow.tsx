@@ -509,6 +509,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [offlinePending, setOfflinePending] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const persistingSurveyRef = useRef<Promise<string | null> | null>(null);
+  const persistingSurveyStatusRef = useRef<"draft" | "completed" | "submitted" | null>(null);
 
   // ── Supervisor QC State ──
   const [qcDialogOpen, setQcDialogOpen] = useState(false);
@@ -1686,7 +1687,10 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // ---------- Save / persist survey ----------
   const persistSurvey = useCallback(
     async (status: "draft" | "completed" | "submitted" = "draft"): Promise<string | null> => {
-      if (persistingSurveyRef.current) return persistingSurveyRef.current;
+      if (persistingSurveyRef.current) {
+        if (status === "draft") return persistingSurveyRef.current;
+        await persistingSurveyRef.current.catch(() => null);
+      }
       const run = (async (): Promise<string | null> => {
       // Resolve the signed-in user resiliently. getUser() makes a network call
       // that can fail/timeout on poor field connectivity even when a valid
@@ -1805,16 +1809,25 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       }
       })();
       persistingSurveyRef.current = run;
+      persistingSurveyStatusRef.current = status;
       try {
         return await run;
       } finally {
-        if (persistingSurveyRef.current === run) persistingSurveyRef.current = null;
+        if (persistingSurveyRef.current === run) {
+          persistingSurveyRef.current = null;
+          persistingSurveyStatusRef.current = null;
+        }
       }
     },
     [projectId, formId, getCurrentGeo, gps, perimeter,
      estHHAi, estHHUser, targetN, segments.length, selectedSegmentLabels, coverage, surveyId,
      outsideMicroplan, outsideMicroplanReason, featureSummary, locationLocked],
   );
+
+  const autosaveRef = useRef<{ surveyId: string | null; step: Step; gps: typeof gps; persistSurvey: typeof persistSurvey }>({ surveyId, step, gps, persistSurvey });
+  useEffect(() => {
+    autosaveRef.current = { surveyId, step, gps, persistSurvey };
+  }, [surveyId, step, gps, persistSurvey]);
 
   const openFeatureLabelDialog = useCallback((feature: FeatureLabelRequest) => {
     setPendingFeatureLabel(feature);
@@ -1926,14 +1939,15 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   }, []);
   useEffect(() => {
     const t = setInterval(() => {
-      if (surveyId) void persistSurvey("draft").catch(() => undefined);
-      if (step === 3 && gps) {
-        const next = [...gpsLogsRef.current, { lat: gps.lat, lng: gps.lng, ts: Date.now() }];
+      const latest = autosaveRef.current;
+      if (latest.surveyId) void latest.persistSurvey("draft").catch(() => undefined);
+      if (latest.step === 3 && latest.gps) {
+        const next = [...gpsLogsRef.current, { lat: latest.gps.lat, lng: latest.gps.lng, ts: Date.now() }];
         gpsLogsRef.current = next.length > 720 ? next.slice(next.length - 720) : next;
       }
     }, 30000);
     return () => clearInterval(t);
-  }, [surveyId, persistSurvey, step, gps]);
+  }, []);
 
   // Module 3: Mock Blockchain Batch Sync
   useEffect(() => {
