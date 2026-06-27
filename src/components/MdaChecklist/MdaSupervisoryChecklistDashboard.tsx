@@ -889,6 +889,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
           baseTint={EMERALD}
           heat={kpis.completionHeatmap}
           empty="No MDA Completion data yet."
+          onCell={(cat, lga) => openHeatDrill(kpis.completionHeatmap, cat, lga, "MDA Completion Outcomes", EMERALD)}
         />
         <HeatmapPanel
           title="Commodities Follow-up"
@@ -897,6 +898,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
           baseTint={TEAL}
           heat={kpis.commoditiesHeatmap}
           empty="No commodity gaps reported."
+          onCell={(cat, lga) => openHeatDrill(kpis.commoditiesHeatmap, cat, lga, "Commodities Follow-up", TEAL)}
         />
         <HeatmapPanel
           title="Adverse Reactions"
@@ -905,6 +907,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
           baseTint={AMBER}
           heat={kpis.adverseHeatmap}
           empty="No adverse reactions reported."
+          onCell={(cat, lga) => openHeatDrill(kpis.adverseHeatmap, cat, lga, "Adverse Reactions", AMBER)}
         />
       </div>
 
