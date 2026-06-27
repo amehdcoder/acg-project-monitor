@@ -2145,6 +2145,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       id: savedId!, hh_number: hhNumber,
       lat: pendingPin.lat, lng: pendingPin.lng,
       coverage_status: hhForm.status,
+      segment_label: segLabel || null,
       eligible_persons: parseInt(hhForm.eligiblePersons) || 0,
       treated_persons: parseInt(hhForm.treatedPersons) || 0,
     }]);
@@ -2182,10 +2183,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         latitude: p.latitude,
         longitude: p.longitude,
         coverage_status: p.coverage_status,
+        segment_label: p.segment_label,
         eligible_persons: p.eligible_persons || 0,
         treated_persons: p.treated_persons || 0,
       }))].map((d: any) => ({
         id: d.id, hh_number: d.hh_number, lat: d.latitude, lng: d.longitude, coverage_status: d.coverage_status,
+        segment_label: d.segment_label ?? d.segment_id ?? null,
         eligible_persons: d.eligible_persons || 0, treated_persons: d.treated_persons || 0,
       }));
 
