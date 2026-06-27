@@ -11,6 +11,7 @@ import { generateMdaSimulation } from "@/lib/mda/simulation";
 import { loadMdaCache, saveMdaCache, isOffline } from "@/lib/mda/offlineCache";
 import { canonicalizeSubmissionData } from "@/lib/mda/dashboardData";
 import MdaSupervisoryChecklistDashboard from "./MdaSupervisoryChecklistDashboard";
+import OwnerDataManagement from "./OwnerDataManagement";
 
 interface MdaDashboardForm {
   id: string;
