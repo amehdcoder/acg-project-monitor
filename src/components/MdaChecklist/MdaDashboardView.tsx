@@ -137,8 +137,10 @@ function singleStateRestriction(questions: DashboardQuestion[]): string | null {
   return null;
 }
 
-function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm) {
-  const data = s.data || {};
+function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm, questions: DashboardQuestion[]) {
+  // Re-key answers to canonical question keys so historical / re-keyed
+  // submissions still resolve against the current form definition.
+  const data = canonicalizeSubmissionData(s.data || {}, questions as any);
   return {
     id: s.id,
     projectId: form.project_id || undefined,
