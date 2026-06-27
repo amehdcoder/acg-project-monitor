@@ -26,12 +26,13 @@ import {
   Tooltip as RTooltip, BarChart, Bar,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
   CheckCircle2, AlertTriangle, Pill, TrendingUp, Users2, Sigma, ClipboardCheck,
-  HelpCircle, ChevronRight, ShieldCheck, ShieldAlert,
+  HelpCircle, ChevronRight, ShieldCheck, ShieldAlert, Download, ListChecks, Ban,
 } from "lucide-react";
 import {
   MdaQuestionIndex, aggregateByCommunity, geo, visitTrendByLga, workerAccountability,
@@ -41,6 +42,8 @@ import { buildQualityReport, type QualityLevel } from "@/lib/mda/dataQuality";
 import { communityKey } from "@/lib/mda/dashboardData";
 import { meanConfidenceInterval, oneWayAnova, formatP } from "@/lib/statisticalInference";
 import { toneBg, toneFg, type Tone } from "@/lib/conditionalFormatting";
+import { buildSubmissionsCsv, downloadCsv, slugify, type CsvRow } from "@/lib/mda/csvExport";
+import MdaMethodsDialog from "./MdaMethodsDialog";
 import MdaDrillDownSheet, { type DrillData, type DrillSubmission } from "./MdaDrillDownSheet";
 
 const NAVY = "#0c2340";
