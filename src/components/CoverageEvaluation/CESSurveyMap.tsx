@@ -416,6 +416,7 @@ const CESSurveyMap = ({
                 .replace("{x}", String(x))
                 .replace("{y}", String(y)),
             });
+          }
         }
       }
     }
