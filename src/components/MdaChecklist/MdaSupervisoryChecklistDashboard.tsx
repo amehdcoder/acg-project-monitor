@@ -505,6 +505,41 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     });
   };
 
+  // ── Drilldown from the household coverage map (marker / LGA selection) ──
+  const norm = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const openMapCommunityDrill = (community: string, state?: string | null) => {
+    const target = norm(community);
+    if (!target) return;
+    const rows = submissions.filter((s) => {
+      if (state && pickGeo(s, "state") && norm(pickGeo(s, "state")) !== norm(state)) return false;
+      return norm(pickGeo(s, "community")) === target;
+    });
+    rows.sort((a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime());
+    setDrill({
+      title: `Household Coverage — ${community}`,
+      subtitle: `${state ? state + " · " : ""}${rows.length} submission${rows.length === 1 ? "" : "s"} for this community`,
+      tint: TEAL,
+      rows: rows as any,
+    });
+  };
+  const openMapLgaDrill = (lga: string, state?: string | null) => {
+    const target = norm(lga);
+    if (!target) return;
+    const rows = submissions.filter((s) => {
+      if (state && pickGeo(s, "state") && norm(pickGeo(s, "state")) !== norm(state)) return false;
+      return norm(pickGeo(s, "lga")) === target;
+    });
+    rows.sort((a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime());
+    setDrill({
+      title: `Household Coverage — ${lga} LGA`,
+      subtitle: `${state ? state + " · " : ""}${rows.length} submission${rows.length === 1 ? "" : "s"} in this LGA`,
+      tint: TEAL,
+      rows: rows as any,
+    });
+  };
+
+
+
   const filtersActive =
     fState !== ALL || fLga !== ALL || fWard !== ALL || fStatus !== ALL || fModule !== ALL || !!fFrom || !!fTo || !!search;
   const resetFilters = () => {
@@ -1076,6 +1111,8 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         stateFilter={fState === ALL ? null : fState}
         dateFrom={fFrom ? fFrom + "T00:00:00" : null}
         dateTo={fTo ? fTo + "T23:59:59" : null}
+        onSelectCommunity={openMapCommunityDrill}
+        onSelectLga={openMapLgaDrill}
       />
 
 

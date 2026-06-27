@@ -12,7 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import {
   Home, MapPin, Loader2, Play, Pause, SkipForward, SkipBack,
-  Flame, Download, FileImage, FileText, RotateCcw,
+  Flame, Download, FileImage, FileText, RotateCcw, X, ListFilter,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -108,11 +108,15 @@ interface Props {
   /** Optional date-time range (ISO strings) synced from dashboard filters. */
   dateFrom?: string | null;
   dateTo?: string | null;
+  /** Fired when a household marker is clicked — filters the drilldown table to its community. */
+  onSelectCommunity?: (community: string, state?: string | null) => void;
+  /** Fired when an LGA polygon is clicked — filters the drilldown table to that LGA. */
+  onSelectLga?: (lga: string, state?: string | null) => void;
 }
 
 const SPEEDS = [0.5, 1, 2, 4];
 
-export default function HouseholdCoverageSurveyMap({ projectId, formName, stateFilter, dateFrom, dateTo }: Props) {
+export default function HouseholdCoverageSurveyMap({ projectId, formName, stateFilter, dateFrom, dateTo, onSelectCommunity, onSelectLga }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -142,6 +146,9 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
   const [timeWindow, setTimeWindow] = useState<[number, number] | null>(null);
 
   const [exporting, setExporting] = useState(false);
+
+  // Marker details panel (GPS + outcome data for the clicked household visit)
+  const [selectedVisit, setSelectedVisit] = useState<VisitPoint | null>(null);
 
   // ── Load household visits (project-scoped, joined to survey geography) ──
   useEffect(() => {
@@ -324,7 +331,13 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
           style: () => ({ color: "#14b8a6", weight: 1, opacity: 0.7, fillColor: "#99f6e4", fillOpacity: 0.18 }),
           onEachFeature: (f: any, lyr) => {
             const name = f?.properties?.lga;
-            if (name) lyr.bindTooltip(String(name), { sticky: true, direction: "top", className: "hcs-lga-tip" });
+            const st = f?.properties?.state;
+            if (name) {
+              lyr.bindTooltip(String(name), { sticky: true, direction: "top", className: "hcs-lga-tip" });
+              lyr.on("click", () => onSelectLga?.(String(name), st));
+              lyr.on("mouseover", () => (lyr as any).setStyle?.({ fillOpacity: 0.34, weight: 1.6 }));
+              lyr.on("mouseout", () => (lyr as any).setStyle?.({ fillOpacity: 0.18, weight: 1 }));
+            }
             try { stateBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
           },
         });
@@ -363,6 +376,10 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
             <span style="color:#64748b">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</span>
           </div>`,
         );
+        m.on("click", () => {
+          setSelectedVisit(p);
+          if (p.community) onSelectCommunity?.(p.community, p.state);
+        });
         markers.push(m);
         try { bounds.extend([p.lat, p.lng]); } catch { /* noop */ }
       }
@@ -655,7 +672,46 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
               ))}
             </ul>
           </div>
+
+          {/* Household visit details panel (opens on marker click) */}
+          {selectedVisit && (() => {
+            const o = outcomeFor(selectedVisit.status);
+            return (
+              <div className="absolute right-3 top-3 z-[600] w-64 rounded-lg border border-border bg-card/97 p-3 shadow-card backdrop-blur-sm">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full" style={{ background: o.color }}>
+                      <svg width="13" height="13" viewBox="2 2 16 16" aria-hidden="true">{<g dangerouslySetInnerHTML={{ __html: o.glyph }} />}</svg>
+                    </span>
+                    <span className="text-sm font-semibold">{selectedVisit.hh}</span>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Close details" onClick={() => setSelectedVisit(null)}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <dl className="space-y-1 text-[11px]">
+                  <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Outcome</dt><dd className="font-semibold" style={{ color: o.color }}>{o.label}</dd></div>
+                  {selectedVisit.community && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Community</dt><dd className="font-medium text-right">{selectedVisit.community}</dd></div>}
+                  {selectedVisit.state && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">State</dt><dd className="font-medium text-right">{selectedVisit.state}</dd></div>}
+                  {selectedVisit.commodity && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Commodity</dt><dd className="font-medium text-right">{selectedVisit.commodity}</dd></div>}
+                  {selectedVisit.at && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Visited</dt><dd className="font-medium text-right">{new Date(selectedVisit.at).toLocaleString()}</dd></div>}
+                  <div className="flex justify-between gap-2"><dt className="text-muted-foreground">GPS</dt><dd className="font-mono tabular-nums">{selectedVisit.lat.toFixed(5)}, {selectedVisit.lng.toFixed(5)}</dd></div>
+                </dl>
+                {selectedVisit.community && onSelectCommunity && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-2.5 h-7 w-full text-[11px]"
+                    onClick={() => onSelectCommunity(selectedVisit.community, selectedVisit.state)}
+                  >
+                    <ListFilter className="h-3 w-3 mr-1.5" /> Filter table to this community
+                  </Button>
+                )}
+              </div>
+            );
+          })()}
         </div>
+
 
         {!loading && windowed.length === 0 && (
           <p className="text-center text-xs text-muted-foreground">
