@@ -147,18 +147,14 @@ export default defineConfig(({ mode }) => {
             },
           },
 
-          // ── Background Sync for offline data collection ──────────────────
-          // Queued follow-up (form_submissions) and Coverage Evaluation 3D
-          // (ces_*) writes made while offline are durably stored by Workbox in
-          // IndexedDB and automatically replayed to the live server via the
-          // browser's Background Sync API — even if the app was closed and is
-          // reopened later, the queued requests flush on the next `sync` event
-          // once connectivity returns. NetworkOnly ensures we never serve a
-          // cached write; if the network fails the BackgroundSyncPlugin re-queues.
+          // ── Background Sync for generic form submissions ─────────────────
+          // CES writes use the app-level ordered IndexedDB queue instead,
+          // because household visits must never replay before their parent
+          // ces_surveys draft after reconnect.
           {
             urlPattern: ({ url, request }: any) =>
               /(^|\.)supabase\.co$/.test(url.hostname) &&
-              /\/rest\/v1\/(form_submissions|ces_surveys|ces_household_visits|ces_segments|ces_households|ces_feature_labels|ces_keyframes|ces_capture_sessions|ces_fenced_communities)\b/.test(url.pathname) &&
+              /\/rest\/v1\/form_submissions\b/.test(url.pathname) &&
               request.method === "POST",
             handler: "NetworkOnly",
             method: "POST",
@@ -172,7 +168,7 @@ export default defineConfig(({ mode }) => {
           {
             urlPattern: ({ url, request }: any) =>
               /(^|\.)supabase\.co$/.test(url.hostname) &&
-              /\/rest\/v1\/(form_submissions|ces_surveys|ces_household_visits|ces_segments|ces_households|ces_feature_labels|ces_keyframes|ces_capture_sessions|ces_fenced_communities)\b/.test(url.pathname) &&
+              /\/rest\/v1\/form_submissions\b/.test(url.pathname) &&
               request.method === "PATCH",
             handler: "NetworkOnly",
             method: "PATCH",

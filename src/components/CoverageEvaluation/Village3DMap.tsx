@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Text, Grid, Html, Float } from "@react-three/drei";
+import { OrbitControls, Text, Grid, Html } from "@react-three/drei";
 import * as THREE from "three";
 import { Segment } from "@/lib/ces/kmeansSegments";
 
@@ -90,11 +90,9 @@ function House({
         onPointerOver={(e) => {
           e.stopPropagation();
           setHovered(true);
-          document.body.style.cursor = "pointer";
         }}
         onPointerOut={() => {
           setHovered(false);
-          document.body.style.cursor = "default";
         }}
       >
         <boxGeometry args={[2.5, height, 2.5]} />
@@ -314,7 +312,7 @@ const Village3DMap = ({
   return (
     <Canvas
       shadows
-      dpr={[1, 2]}
+      dpr={[1, 1.5]}
       camera={{ position: [60, 60, 60], fov: 45 }}
       style={{ background: "#020617" }}
     >
@@ -363,17 +361,15 @@ const Village3DMap = ({
       })}
 
       {/* Compass / North indicator */}
-      <Float speed={2} rotationIntensity={0.5} floatIntensity={0.5}>
-        <group position={[0, 1, -80]}>
-          <Text fontSize={6} color="#3b82f6" anchorX="center" anchorY="middle" rotation={[-Math.PI / 2, 0, 0]}>
-            N
-          </Text>
-          <mesh position={[0, -0.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <coneGeometry args={[2, 8, 4]} />
-            <meshStandardMaterial color="#3b82f6" />
-          </mesh>
-        </group>
-      </Float>
+      <group position={[0, 1, -80]}>
+        <Text fontSize={6} color="#3b82f6" anchorX="center" anchorY="middle" rotation={[-Math.PI / 2, 0, 0]}>
+          N
+        </Text>
+        <mesh position={[0, -0.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[2, 8, 4]} />
+          <meshStandardMaterial color="#3b82f6" />
+        </mesh>
+      </group>
 
       <OrbitControls
         enablePan

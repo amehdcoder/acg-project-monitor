@@ -1,16 +1,15 @@
 /**
- * CES Offline Household Visit Queue
- * -----------------------------------------
- * Dedicated IndexedDB store for CES household visits captured without connectivity.
- * The sync engine uploads pending rows to `ces_household_visits` + optional
- * `ces_blockchain_proof` when the device comes back online.
+ * CES Offline Queue
+ * -----------------
+ * Strictly ordered, resumable IndexedDB queue for Coverage Evaluation 3D.
+ * Parent survey drafts always sync before child household visits resume.
  */
 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 const CES_DB_NAME = "ces_offline";
-const CES_DB_VERSION = 2;
+const CES_DB_VERSION = 4;
 const SURVEY_STORE = "pending_surveys";
 const HH_STORE = "pending_households";
 const AUDIT_STORE = "pending_audit_logs";
@@ -25,18 +24,18 @@ export function getDeviceId(): string {
 }
 
 export function generateUUID(): string {
-  if (typeof crypto !== 'undefined' && (crypto as any).randomUUID) {
+  if (typeof crypto !== "undefined" && (crypto as any).randomUUID) {
     return (crypto as any).randomUUID();
   }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 }
 
 export interface OfflineHousehold {
-  local_id: string;         // uuid generated on device
+  local_id: string;
   survey_id: string;
   hh_number: string;
   latitude: number;
@@ -52,12 +51,13 @@ export interface OfflineHousehold {
   created_by: string | null;
   synced: boolean;
   retry_count: number;
-  // Extra offline metadata
   segment_label: string | null;
-  gps_snapshot: string;   // JSON of GPS reading at capture time
+  gps_snapshot: string;
   eligible_persons?: number;
   treated_persons?: number;
   last_error?: string;
+  queued_at?: string;
+  queue_seq?: number;
 }
 
 export interface OfflineAuditEntry {
@@ -65,7 +65,7 @@ export interface OfflineAuditEntry {
   survey_id: string;
   actor_id: string | null;
   action: string;
-  payload: string;  // JSON string
+  payload: string;
   lat: number | null;
   lng: number | null;
   device_id: string;
@@ -81,9 +81,24 @@ export interface OfflineSurveyDraft {
   synced: boolean;
   retry_count: number;
   last_error?: string;
+  queued_at?: string;
+  queue_seq?: number;
 }
 
-// ─── DB Init ─────────────────────────────────────────────────────────────────
+const nextQueueSeq = () => {
+  const key = "ces_offline_queue_seq";
+  const next = Number(localStorage.getItem(key) || "0") + 1;
+  localStorage.setItem(key, String(next));
+  return next;
+};
+
+const sortQueued = <T extends { queue_seq?: number; queued_at?: string; updated_at?: string; visited_at?: string }>(rows: T[]) =>
+  rows.sort((a, b) => {
+    const qa = Number.isFinite(a.queue_seq) ? Number(a.queue_seq) : Number.MAX_SAFE_INTEGER;
+    const qb = Number.isFinite(b.queue_seq) ? Number(b.queue_seq) : Number.MAX_SAFE_INTEGER;
+    if (qa !== qb) return qa - qb;
+    return String(a.queued_at ?? a.updated_at ?? a.visited_at ?? "").localeCompare(String(b.queued_at ?? b.updated_at ?? b.visited_at ?? ""));
+  });
 
 const initCESDB = (): Promise<IDBDatabase> => new Promise((resolve, reject) => {
   const req = indexedDB.open(CES_DB_NAME, CES_DB_VERSION);
@@ -91,15 +106,28 @@ const initCESDB = (): Promise<IDBDatabase> => new Promise((resolve, reject) => {
   req.onsuccess = () => resolve(req.result);
   req.onupgradeneeded = (e) => {
     const db = (e.target as IDBOpenDBRequest).result;
+    const tx = (e.target as IDBOpenDBRequest).transaction;
     if (!db.objectStoreNames.contains(SURVEY_STORE)) {
       const s = db.createObjectStore(SURVEY_STORE, { keyPath: "id" });
       s.createIndex("synced", "synced", { unique: false });
       s.createIndex("updated_at", "updated_at", { unique: false });
+      s.createIndex("queue_seq", "queue_seq", { unique: false });
+      s.createIndex("queued_at", "queued_at", { unique: false });
+    } else {
+      const s = tx?.objectStore(SURVEY_STORE);
+      if (s && !s.indexNames.contains("queue_seq")) s.createIndex("queue_seq", "queue_seq", { unique: false });
+      if (s && !s.indexNames.contains("queued_at")) s.createIndex("queued_at", "queued_at", { unique: false });
     }
     if (!db.objectStoreNames.contains(HH_STORE)) {
       const s = db.createObjectStore(HH_STORE, { keyPath: "local_id" });
       s.createIndex("survey_id", "survey_id", { unique: false });
       s.createIndex("synced", "synced", { unique: false });
+      s.createIndex("queue_seq", "queue_seq", { unique: false });
+      s.createIndex("queued_at", "queued_at", { unique: false });
+    } else {
+      const s = tx?.objectStore(HH_STORE);
+      if (s && !s.indexNames.contains("queue_seq")) s.createIndex("queue_seq", "queue_seq", { unique: false });
+      if (s && !s.indexNames.contains("queued_at")) s.createIndex("queued_at", "queued_at", { unique: false });
     }
     if (!db.objectStoreNames.contains(AUDIT_STORE)) {
       const s = db.createObjectStore(AUDIT_STORE, { keyPath: "local_id" });
@@ -109,14 +137,11 @@ const initCESDB = (): Promise<IDBDatabase> => new Promise((resolve, reject) => {
   };
 });
 
-// ─── IDB helpers ─────────────────────────────────────────────────────────────
-
 async function idbPut(store: string, record: any) {
   const db = await initCESDB();
   return new Promise<void>((resolve, reject) => {
     const tx = db.transaction(store, "readwrite");
-    const s = tx.objectStore(store);
-    const r = s.put(record);
+    const r = tx.objectStore(store).put(record);
     r.onerror = () => reject(r.error);
     r.onsuccess = () => resolve();
   });
@@ -126,8 +151,7 @@ async function idbGetAll(store: string): Promise<any[]> {
   const db = await initCESDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(store, "readonly");
-    const s = tx.objectStore(store);
-    const r = s.getAll();
+    const r = tx.objectStore(store).getAll();
     r.onerror = () => reject(r.error);
     r.onsuccess = () => resolve(r.result);
   });
@@ -137,53 +161,60 @@ async function idbDelete(store: string, key: string) {
   const db = await initCESDB();
   return new Promise<void>((resolve, reject) => {
     const tx = db.transaction(store, "readwrite");
-    const s = tx.objectStore(store);
-    const r = s.delete(key);
+    const r = tx.objectStore(store).delete(key);
     r.onerror = () => reject(r.error);
     r.onsuccess = () => resolve();
   });
 }
 
-// ─── Public save ─────────────────────────────────────────────────────────────
+async function idbGet<T = any>(store: string, key: string): Promise<T | null> {
+  const db = await initCESDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readonly");
+    const r = tx.objectStore(store).get(key);
+    r.onerror = () => reject(r.error);
+    r.onsuccess = () => resolve((r.result as T | undefined) ?? null);
+  });
+}
 
 export async function saveHouseholdOffline(row: OfflineHousehold): Promise<void> {
-  const record = { ...row, local_id: row.local_id || generateUUID(), synced: false };
+  const existing = row.local_id ? await idbGet<OfflineHousehold>(HH_STORE, row.local_id).catch(() => null) : null;
+  const record = {
+    ...row,
+    local_id: row.local_id || generateUUID(),
+    synced: false,
+    queued_at: row.queued_at || existing?.queued_at || row.visited_at || new Date().toISOString(),
+    queue_seq: row.queue_seq ?? existing?.queue_seq ?? nextQueueSeq(),
+  };
   await idbPut(HH_STORE, record);
-  // Cloud secondary storage: best-effort JSON mirror to ces-captures bucket so
-  // a wiped/lost device can still recover its queue. Never blocks the UI and
-  // never throws — IndexedDB remains the source of truth offline.
-  void mirrorToCloud(record).catch(() => {});
+  const parentDraftStillLocal = await getOfflineSurvey(record.survey_id).catch(() => null);
+  if (!parentDraftStillLocal) void mirrorToCloud(record).catch(() => {});
 }
 
 export async function saveSurveyOffline(draft: OfflineSurveyDraft): Promise<void> {
+  const existing = await idbGet<OfflineSurveyDraft>(SURVEY_STORE, draft.id).catch(() => null);
   await idbPut(SURVEY_STORE, {
     ...draft,
     synced: false,
     retry_count: draft.retry_count || 0,
     updated_at: draft.updated_at || new Date().toISOString(),
+    // Keep the original queue position when autosave refreshes the same draft;
+    // otherwise a child household could appear older than its parent after a
+    // reconnect, making diagnostics confusing even though the barrier protects FK order.
+    queued_at: draft.queued_at || existing?.queued_at || draft.updated_at || new Date().toISOString(),
+    queue_seq: draft.queue_seq ?? existing?.queue_seq ?? nextQueueSeq(),
   });
 }
 
 export async function getOfflineSurvey(id: string): Promise<OfflineSurveyDraft | null> {
-  const db = await initCESDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(SURVEY_STORE, "readonly");
-    const r = tx.objectStore(SURVEY_STORE).get(id);
-    r.onerror = () => reject(r.error);
-    r.onsuccess = () => resolve((r.result as OfflineSurveyDraft | undefined) ?? null);
-  });
+  return idbGet<OfflineSurveyDraft>(SURVEY_STORE, id);
 }
 
 export async function getPendingSurveys(): Promise<OfflineSurveyDraft[]> {
   const all = await idbGetAll(SURVEY_STORE);
-  return all.filter((r) => !r.synced);
+  return sortQueued(all.filter((r) => !r.synced));
 }
 
-/**
- * Best-effort mirror of one offline household record to the ces-captures
- * Storage bucket. Path is namespaced by survey + device + local_id so each
- * record overwrites itself on retries and never collides across devices.
- */
 async function mirrorToCloud(record: OfflineHousehold): Promise<void> {
   if (!navigator.onLine) return;
   try {
@@ -195,7 +226,7 @@ async function mirrorToCloud(record: OfflineHousehold): Promise<void> {
       cacheControl: "0",
     });
   } catch {
-    // Mirror is best-effort — IndexedDB queue + sync engine are authoritative.
+    // IndexedDB is authoritative; the cloud mirror is best-effort recovery only.
   }
 }
 
@@ -205,21 +236,24 @@ export async function saveAuditOffline(entry: OfflineAuditEntry): Promise<void> 
 
 export async function getPendingHouseholds(surveyId?: string): Promise<OfflineHousehold[]> {
   const all = await idbGetAll(HH_STORE);
-  if (surveyId) return all.filter(r => r.survey_id === surveyId && !r.synced);
-  return all.filter(r => !r.synced);
+  const rows = surveyId ? all.filter(r => r.survey_id === surveyId && !r.synced) : all.filter(r => !r.synced);
+  return sortQueued(rows);
 }
 
 export async function getPendingCount(): Promise<number> {
-  const pending = await getPendingHouseholds();
-  return pending.length;
+  const [surveys, households] = await Promise.all([getPendingSurveys(), getPendingHouseholds()]);
+  return surveys.length + households.length;
 }
 
-// ─── Sync engine ─────────────────────────────────────────────────────────────
+export async function getPendingCESQueueCounts(): Promise<{ surveys: number; households: number; total: number }> {
+  const [surveys, households] = await Promise.all([getPendingSurveys(), getPendingHouseholds()]);
+  return { surveys: surveys.length, households: households.length, total: surveys.length + households.length };
+}
 
 let _syncing = false;
 
 export async function syncCESOfflineQueue(
-  onProgress?: (synced: number, total: number) => void
+  onProgress?: (synced: number, total: number) => void,
 ): Promise<{ synced: number; failed: number }> {
   if (_syncing || !navigator.onLine) return { synced: 0, failed: 0 };
   _syncing = true;
@@ -228,15 +262,15 @@ export async function syncCESOfflineQueue(
   let failed = 0;
 
   try {
-    const pending = await getPendingHouseholds();
     const pendingSurveys = await getPendingSurveys();
+    const pending = await getPendingHouseholds();
     if (pending.length === 0 && pendingSurveys.length === 0) return { synced: 0, failed: 0 };
 
-    // Always sync offline-created/updated survey drafts before household visits,
-    // because household rows have a foreign key to ces_surveys. This is what
-    // keeps the Step 3 satellite-map HH flow fully offline-first.
+    // Strict ordered drain: parent survey drafts first, oldest first. Household
+    // visits are intentionally paused while any draft remains pending.
     for (const draft of pendingSurveys) {
       try {
+        if (!navigator.onLine) throw new Error("Offline during CES survey sync");
         const { error } = await supabase
           .from("ces_surveys" as any)
           .upsert({ id: draft.id, ...draft.payload, created_by: draft.created_by }, { onConflict: "id" });
@@ -244,28 +278,36 @@ export async function syncCESOfflineQueue(
         await idbDelete(SURVEY_STORE, draft.id);
       } catch (err: any) {
         console.warn("CES offline survey sync failed for", draft.id, err);
-        const retries = (draft.retry_count || 0) + 1;
-        await idbPut(SURVEY_STORE, { ...draft, retry_count: retries, last_error: err?.message ?? String(err) });
+        await idbPut(SURVEY_STORE, { ...draft, retry_count: (draft.retry_count || 0) + 1, last_error: err?.message ?? String(err) });
         failed++;
       }
     }
 
     const stillPendingSurveyIds = new Set((await getPendingSurveys()).map((s) => s.id));
+    if (stillPendingSurveyIds.size > 0) {
+      // Global barrier: if ANY parent survey draft remains local, do not resume
+      // ANY household visit upload. This prevents a reconnect race where generic
+      // browser/background replay or a partially failed drain lets child visits
+      // overtake their survey draft.
+      await Promise.all(pending.map((hh) => idbPut(HH_STORE, {
+        ...hh,
+        last_error: stillPendingSurveyIds.has(hh.survey_id)
+          ? "Waiting for parent survey draft to sync before household upload resumes"
+          : "Paused by ordered CES queue until all survey drafts sync",
+      })));
+      return { synced, failed: failed + pending.length };
+    }
 
     for (const hh of pending) {
       try {
-        if (stillPendingSurveyIds.has(hh.survey_id)) {
-          await idbPut(HH_STORE, { ...hh, last_error: "Waiting for offline survey draft to sync" });
-          failed++;
-          continue;
-        }
+        if (!navigator.onLine) throw new Error("Offline during CES household sync");
         let createdBy = hh.created_by;
         if (!createdBy) {
           const { data: sess } = await supabase.auth.getSession();
           createdBy = sess.session?.user?.id ?? null;
         }
         if (!createdBy) throw new Error("Authenticated user unavailable for CES offline sync");
-        // Build the canonical DB row (strip local-only fields)
+
         const row = {
           id: hh.local_id,
           survey_id: hh.survey_id,
@@ -282,8 +324,8 @@ export async function syncCESOfflineQueue(
           visited_at: hh.visited_at,
           synced_at: new Date().toISOString(),
           created_by: createdBy,
-          eligible_persons: (hh as any).eligible_persons ?? 0,
-          treated_persons: (hh as any).treated_persons ?? 0,
+          eligible_persons: hh.eligible_persons ?? 0,
+          treated_persons: hh.treated_persons ?? 0,
           segment_label: hh.segment_label,
           gps_snapshot: hh.gps_snapshot ? JSON.parse(hh.gps_snapshot) : null,
         };
@@ -296,11 +338,8 @@ export async function syncCESOfflineQueue(
 
         if (error) throw error;
 
-        // Mock blockchain proof insertion for this synced visit
         if (data) {
-          const txHash = "0x" + Array.from({ length: 64 }, () =>
-            Math.floor(Math.random() * 16).toString(16)
-          ).join("");
+          const txHash = "0x" + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
           await supabase.from("ces_blockchain_proof" as any).insert({
             survey_id: hh.survey_id,
             household_id: (data as any).id,
@@ -312,19 +351,16 @@ export async function syncCESOfflineQueue(
           }).maybeSingle();
         }
 
-        // Mark synced locally then remove from the queue.
         await idbDelete(HH_STORE, hh.local_id);
         synced++;
         onProgress?.(synced, pending.length);
       } catch (err: any) {
         console.warn("CES offline sync failed for", hh.local_id, err);
-        const retries = (hh.retry_count || 0) + 1;
-        await idbPut(HH_STORE, { ...hh, retry_count: retries, last_error: err?.message ?? String(err) });
+        await idbPut(HH_STORE, { ...hh, retry_count: (hh.retry_count || 0) + 1, last_error: err?.message ?? String(err) });
         failed++;
       }
     }
 
-    // Sync pending audit logs too
     const pendingAudits = (await idbGetAll(AUDIT_STORE)).filter(r => !r.synced);
     for (const entry of pendingAudits) {
       try {
@@ -358,8 +394,11 @@ export async function syncCESOfflineQueue(
   }
 }
 
-// Call this on network restore
+let _registered = false;
+
 export function registerCESSyncOnReconnect() {
+  if (_registered) return;
+  _registered = true;
   window.addEventListener("online", () => {
     setTimeout(() => syncCESOfflineQueue(), 2000);
   });

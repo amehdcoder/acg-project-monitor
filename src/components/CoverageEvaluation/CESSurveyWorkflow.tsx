@@ -38,7 +38,7 @@ import { logCESAction } from "@/lib/ces/auditLog";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import {
   saveHouseholdOffline, syncCESOfflineQueue, getPendingCount, getPendingHouseholds,
-  registerCESSyncOnReconnect, getDeviceId, generateUUID, saveSurveyOffline, type OfflineHousehold,
+  registerCESSyncOnReconnect, getDeviceId, generateUUID, saveSurveyOffline, getOfflineSurvey, type OfflineHousehold,
 } from "@/lib/ces/offlineHouseholds";
 import StreetViewPanel from "./StreetViewPanel";
 import {
@@ -241,8 +241,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [recordingPerimeter, setRecordingPerimeter] = useState(false);
   const [walkedM, setWalkedM] = useState(0);
   const [lastVertexAt, setLastVertexAt] = useState<number | null>(null);
-  const [nowTick, setNowTick] = useState(Date.now());
-  const [vertexFlash, setVertexFlash] = useState(0);
+  const lastVertexAtRef = useRef<number | null>(null);
   const [perimeterSessionId, setPerimeterSessionId] = useState(0);
   const [gpsRestartNonce, setGpsRestartNonce] = useState(0);
   const [residentialMask, setResidentialMask] = useState<ResidentialMaskResult | null>(null);
@@ -250,6 +249,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain" | "google" | "google-sat">("hybrid");
   const [autoFenceRadiusM, setAutoFenceRadiusM] = useState<number>(50);
   const [autoFenced, setAutoFenced] = useState<boolean>(false);
+  const lastAutoFenceFollowRef = useRef<{ lat: number; lng: number; t: number } | null>(null);
   // Manual draw-on-map mode (Step 1 alternative to walking the perimeter).
   const [drawMode, setDrawMode] = useState<boolean>(false);
   const [draftPolygon, setDraftPolygon] = useState<{ lat: number; lng: number }[]>([]);
@@ -500,13 +500,15 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   });
 
   
-  // Time-Lapse GPS
-  const [gpsLogs, setGpsLogs] = useState<{lat: number, lng: number, ts: number}[]>([]);
+  // Time-Lapse GPS is kept in a ref so the 30-second tracker does not rerender
+  // the entire 4k-line CES workflow while enumerators are scrolling/collecting.
+  const gpsLogsRef = useRef<{lat: number, lng: number, ts: number}[]>([]);
 
   // ── Offline-First State ──
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [offlinePending, setOfflinePending] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const persistingSurveyRef = useRef<Promise<string | null> | null>(null);
 
   // ── Supervisor QC State ──
   const [qcDialogOpen, setQcDialogOpen] = useState(false);
@@ -549,6 +551,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const lastFixAtRef = useRef<number>(0);
   const lastGpsUiAtRef = useRef<number>(0);
   const lastGpsUiRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const lastIndoorModeRef = useRef<boolean | null>(null);
   const gpsStartedAtRef = useRef<number>(Date.now());
   const kalmanRef = useRef<{ lat: number; lng: number; variance: number; ts: number } | null>(null);
   const [gpsError, setGpsError] = useState<null | "denied" | "unavailable" | "timeout" | "insecure" | "unsupported">(null);
@@ -583,6 +586,21 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       lastGpsUiRef.current = nextGps;
       startTransition(() => setGps(nextGps));
     }
+  }, []);
+
+  const commitPerimeterVertexState = useCallback((lat: number, lng: number, opts: { first?: boolean; distM?: number } = {}) => {
+    const now = Date.now();
+    lastVertexAtRef.current = now;
+    startTransition(() => {
+      setLastVertexAt(now);
+      if (typeof opts.distM === "number" && opts.distM > 0) setWalkedM((w) => w + opts.distM!);
+      setPerimeter((prev) => {
+        if (opts.first && prev.length > 0) return prev;
+        const tail = prev[prev.length - 1];
+        if (tail && haversineMeters(tail, { lat, lng }) < 0.75) return prev;
+        return [...prev, { lat, lng }];
+      });
+    });
   }, []);
 
   // Kalman-fused fix application — Google-Maps-equivalent realtime behavior.
@@ -632,7 +650,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
 
     lastFixAtRef.current = now;
-    setIndoorMode(source === "low" && p.accuracy > 50);
+    const nextIndoorMode = source === "low" && p.accuracy > 50;
+    if (lastIndoorModeRef.current !== nextIndoorMode) {
+      lastIndoorModeRef.current = nextIndoorMode;
+      startTransition(() => setIndoorMode(nextIndoorMode));
+    }
     const nextGps = {
       lat: k.lat,
       lng: k.lng,
@@ -666,7 +688,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     // High-accuracy stream: tight cadence (1s OS push + 1.5s safety poll)
     // so the dot moves continuously while walking — Google-Maps-equivalent.
     startRealtimeGpsWatch(
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000, minimumUpdateInterval: 1000, pollCurrentPositionMs: 1500 },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000, minimumUpdateInterval: 1000 },
       (fix) => applyFix(fix, "high"),
       handleError,
     )
@@ -852,9 +874,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       // First vertex always commits; subsequent require real movement.
       if (!last) {
         lastVertexFixRef.current = { lat, lng, acc, t: now, speed: fix.speed, heading: fix.heading };
-        setPerimeter((prev) => (prev.length === 0 ? [{ lat, lng }] : prev));
-        setLastVertexAt(now);
-        setVertexFlash((f) => f + 1);
+        commitPerimeterVertexState(lat, lng, { first: true });
         setPerimeterStatus({ holding: acc > gateM, bestAcc: acc, gateM, lastSource: fix.source, lastFixAgeMs: 0 });
         return;
       }
@@ -876,14 +896,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       }
 
       lastVertexFixRef.current = { lat, lng, acc, t: now, speed: fix.speed, heading: fix.heading };
-      setWalkedM((w) => w + distM);
-      setLastVertexAt(now);
-      setVertexFlash((f) => f + 1);
-      setPerimeter((prev) => {
-        const tail = prev[prev.length - 1];
-        if (tail && haversineMeters(tail, { lat, lng }) < 0.75) return prev;
-        return [...prev, { lat, lng }];
-      });
+      commitPerimeterVertexState(lat, lng, { distM });
       setPerimeterStatus({ holding: acc > gateM, bestAcc: acc, gateM, lastSource: fix.source, lastFixAgeMs: 0 });
     };
 
@@ -900,7 +913,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     let active = true;
 
     startRealtimeGpsWatch(
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000, minimumUpdateInterval: 1000, pollCurrentPositionMs: 1500 },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000, minimumUpdateInterval: 1200 },
       commitVertex,
       onErr,
     ).then((stop) => {
@@ -919,7 +932,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recordingPerimeter, gpsRestartNonce, commitGpsUi]);
+  }, [recordingPerimeter, gpsRestartNonce, commitGpsUi, commitPerimeterVertexState]);
 
   // ---------- Background resilience: Wake Lock + watchdog + persistence ----------
   // Keeps the perimeter watcher alive while moving, screen off, or tab hidden.
@@ -1127,10 +1140,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     if (!autoFenced || editVertices) return;
     const centre = autoFenceFollow && gps ? { lat: gps.lat, lng: gps.lng } : autoFenceCenter;
     if (!centre) return;
+    if (autoFenceFollow && gps) {
+      const last = lastAutoFenceFollowRef.current;
+      const movedM = last ? haversineMeters({ lat: last.lat, lng: last.lng }, centre) : Infinity;
+      const elapsed = last ? Date.now() - last.t : Infinity;
+      // Do not rebuild the whole boundary/static map layer for GPS jitter.
+      if (last && movedM < 5 && elapsed < 3000) return;
+      lastAutoFenceFollowRef.current = { ...centre, t: Date.now() };
+    }
     const ring = buildAutoFenceRing(centre, autoFenceRadiusM);
-    setPerimeter(ring);
-    setWalkedM(2 * Math.PI * autoFenceRadiusM);
-    if (autoFenceFollow && gps) setAutoFenceCenter({ lat: gps.lat, lng: gps.lng });
+    startTransition(() => {
+      setPerimeter(ring);
+      setWalkedM(2 * Math.PI * autoFenceRadiusM);
+      if (autoFenceFollow && gps) setAutoFenceCenter({ lat: gps.lat, lng: gps.lng });
+    });
   }, [autoFenceRadiusM, autoFenced, autoFenceFollow, gps?.lat, gps?.lng, autoFenceCenter, editVertices, buildAutoFenceRing]);
 
   // Append GPS fixes to the breadcrumb trail (cap at 200 points to keep render
@@ -1349,16 +1372,16 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     });
   }, [drawMode, closeManualDraw]);
 
-  // 500ms ticker while recording so "last vertex Xs ago" stays live
+  // Light ticker while recording so status remains live without forcing a full
+  // form/map render twice per second on Android.
   useEffect(() => {
     if (!recordingPerimeter) return;
     const id = window.setInterval(() => {
       const now = Date.now();
-      setNowTick(now);
       if (lastPerimeterFixTsRef.current > 0) {
         setPerimeterStatus((s) => ({ ...s, lastFixAgeMs: now - lastPerimeterFixTsRef.current }));
       }
-    }, 500);
+    }, 2000);
     return () => window.clearInterval(id);
   }, [recordingPerimeter]);
 
@@ -1389,14 +1412,16 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const deferredResidentialMask = useDeferredValue(residentialMask);
   const deferredPerimeter = useDeferredValue(perimeter);
 
-  const featureSummary = useMemo(() => {
+  const featureSummaryCore = useMemo(() => {
     const fg = deferredResidentialMask?.featureGeometry;
     if (!fg) return { buildings: 0, roads: 0, waterways: 0, uncertain: 0, namedRoads: 0, labeled: 0, avgConfidence: 0 };
-    const inPerimeter = deferredPerimeter.length >= 3
+    const perimeterIndex = deferredPerimeter.length >= 3 ? pointInPolygonIndex(deferredPerimeter) : null;
+    const contains = (p: LatLng) => perimeterIndex ? perimeterIndex.contains(p) : true;
+    const inPerimeter = perimeterIndex
       ? {
-          buildings: fg.buildings.filter((b) => pointInPolygonGeo(b.center, deferredPerimeter)),
-          roads: fg.roads.filter((r) => r.points.some((p) => pointInPolygonGeo(p, deferredPerimeter))),
-          waterways: fg.waterways.filter((w) => w.points.some((p) => pointInPolygonGeo(p, deferredPerimeter))),
+          buildings: fg.buildings.filter((b) => contains(b.center)),
+          roads: fg.roads.filter((r) => r.points.some(contains)),
+          waterways: fg.waterways.filter((w) => w.points.some(contains)),
         }
       : { buildings: fg.buildings, roads: fg.roads, waterways: fg.waterways };
     const all = [...inPerimeter.buildings, ...inPerimeter.roads, ...inPerimeter.waterways];
@@ -1408,10 +1433,16 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       waterways: inPerimeter.waterways.length,
       uncertain,
       namedRoads: inPerimeter.roads.filter((r) => !!(r.name || r.ref)).length,
-      labeled: Object.keys(featureLabelMap).length,
+      labeled: 0,
       avgConfidence,
     };
-  }, [deferredResidentialMask, deferredPerimeter, featureLabelMap]);
+  }, [deferredResidentialMask, deferredPerimeter]);
+
+  const featureLabelCount = useMemo(() => Object.keys(featureLabelMap).length, [featureLabelMap]);
+  const featureSummary = useMemo(
+    () => ({ ...featureSummaryCore, labeled: featureLabelCount }),
+    [featureSummaryCore, featureLabelCount],
+  );
 
   useEffect(() => {
     if (maskStatus !== "ok") return;
@@ -1655,6 +1686,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // ---------- Save / persist survey ----------
   const persistSurvey = useCallback(
     async (status: "draft" | "completed" | "submitted" = "draft"): Promise<string | null> => {
+      if (persistingSurveyRef.current) {
+        if (status === "draft") return persistingSurveyRef.current;
+        await persistingSurveyRef.current.catch(() => null);
+      }
+      const run = (async (): Promise<string | null> => {
       // Resolve the signed-in user resiliently. getUser() makes a network call
       // that can fail/timeout on poor field connectivity even when a valid
       // session exists locally — that produced spurious "Sign in required"
@@ -1770,11 +1806,25 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         setSurveyId(id);
         return id;
       }
+      })();
+      persistingSurveyRef.current = run;
+      try {
+        return await run;
+      } finally {
+        if (persistingSurveyRef.current === run) {
+          persistingSurveyRef.current = null;
+        }
+      }
     },
     [projectId, formId, getCurrentGeo, gps, perimeter,
      estHHAi, estHHUser, targetN, segments.length, selectedSegmentLabels, coverage, surveyId,
      outsideMicroplan, outsideMicroplanReason, featureSummary, locationLocked],
   );
+
+  const autosaveRef = useRef<{ surveyId: string | null; step: Step; gps: typeof gps; persistSurvey: typeof persistSurvey }>({ surveyId, step, gps, persistSurvey });
+  useEffect(() => {
+    autosaveRef.current = { surveyId, step, gps, persistSurvey };
+  }, [surveyId, step, gps, persistSurvey]);
 
   const openFeatureLabelDialog = useCallback((feature: FeatureLabelRequest) => {
     setPendingFeatureLabel(feature);
@@ -1886,13 +1936,15 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   }, []);
   useEffect(() => {
     const t = setInterval(() => {
-      if (surveyId) persistSurvey("draft");
-      if (step === 3 && gps) {
-        setGpsLogs(prev => [...prev, { lat: gps.lat, lng: gps.lng, ts: Date.now() }]);
+      const latest = autosaveRef.current;
+      if (latest.surveyId) void latest.persistSurvey("draft").catch(() => undefined);
+      if (latest.step === 3 && latest.gps) {
+        const next = [...gpsLogsRef.current, { lat: latest.gps.lat, lng: latest.gps.lng, ts: Date.now() }];
+        gpsLogsRef.current = next.length > 720 ? next.slice(next.length - 720) : next;
       }
     }, 30000);
     return () => clearInterval(t);
-  }, [surveyId, persistSurvey, step, gps]);
+  }, []);
 
   // Module 3: Mock Blockchain Batch Sync
   useEffect(() => {
@@ -2055,15 +2107,19 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       treated_persons: parseInt(hhForm.treatedPersons) || 0,
     };
 
-    // ─── Offline-First: try Supabase, fall back to IndexedDB ───
+    const parentSurveyQueued = await getOfflineSurvey(id);
+
+    // ─── Offline-First: try backend only when the parent survey exists online ───
     let savedId: string | null = null;
-    if (!navigator.onLine) {
+    if (!navigator.onLine || parentSurveyQueued) {
       // Save to local IndexedDB immediately
       await saveHouseholdOffline(offlineRow);
       setOfflinePending(p => p + 1);
       toast({
-        title: "Saved Offline ☁️",
-        description: `${hhNumber} stored locally. Will sync when online.`,
+        title: parentSurveyQueued ? "Saved to ordered offline queue" : "Saved Offline ☁️",
+        description: parentSurveyQueued
+          ? `${hhNumber} is queued behind its survey draft and will sync after the survey reaches the server.`
+          : `${hhNumber} stored locally. Will sync when online.`,
         className: "bg-amber-600 text-white",
       });
       savedId = offlineRow.local_id;
@@ -2112,6 +2168,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       id: savedId!, hh_number: hhNumber,
       lat: pendingPin.lat, lng: pendingPin.lng,
       coverage_status: hhForm.status,
+      segment_label: segLabel || null,
       eligible_persons: parseInt(hhForm.eligiblePersons) || 0,
       treated_persons: parseInt(hhForm.treatedPersons) || 0,
     }]);
@@ -2149,10 +2206,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         latitude: p.latitude,
         longitude: p.longitude,
         coverage_status: p.coverage_status,
+        segment_label: p.segment_label,
         eligible_persons: p.eligible_persons || 0,
         treated_persons: p.treated_persons || 0,
       }))].map((d: any) => ({
         id: d.id, hh_number: d.hh_number, lat: d.latitude, lng: d.longitude, coverage_status: d.coverage_status,
+        segment_label: d.segment_label ?? d.segment_id ?? null,
         eligible_persons: d.eligible_persons || 0, treated_persons: d.treated_persons || 0,
       }));
 
@@ -2170,9 +2229,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       toast({ title: "No household visits yet", description: "Save at least one household visit in Step 3 before computing coverage.", variant: "destructive" });
       return;
     }
-    // attribute each visit to its enclosing segment (fall back to first selected if no polygon match)
+    const householdsBySegment = new Map<string, SurveyHousehold[]>();
+    for (const h of households) {
+      if (h.segment_label) {
+        const list = householdsBySegment.get(h.segment_label) ?? [];
+        list.push(h);
+        householdsBySegment.set(h.segment_label, list);
+      }
+    }
+    // Prefer persisted segment attribution (O(N)); fall back to polygon checks
+    // only for legacy visits that predate segment_label.
     const tallies = segments.map((s) => {
-      const inside = households.filter((h) => pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon));
+      const attributed = householdsBySegment.get(s.label) ?? [];
+      const legacy = households.filter((h) => !h.segment_label && pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon));
+      const inside = attributed.length || legacy.length ? [...attributed, ...legacy] : [];
       const treated = inside.filter((h) => h.coverage_status === "treated").length;
       const eligible_persons = inside.reduce((a, h) => a + (Number(h.eligible_persons) || 0), 0);
       const treated_persons = inside.reduce((a, h) => a + (Number(h.treated_persons) || 0), 0);
@@ -2229,6 +2299,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
 
     // Route Realism Calculation (Upgrade 4)
+    const gpsLogs = gpsLogsRef.current;
     if (gpsLogs.length > 2 && households.length > 1) {
       let actualDist = 0;
       for (let i=1; i<gpsLogs.length; i++) {
@@ -2269,7 +2340,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         geographic: cov.geographicCoveragePct,
       });
     }
-  }, [segments, households, state, lga, ward, communityName, surveyId, persistSurvey, gpsLogs]);
+  }, [segments, households, state, lga, ward, communityName, surveyId, persistSurvey]);
 
   // ---------- Exports ----------
   const exportCSV = useCallback(() => {
@@ -2556,7 +2627,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const accuracyColor = !gps ? "text-muted-foreground" :
     gps.accuracy <= 15 ? "text-green-600" : gps.accuracy <= 25 ? "text-indigo-600" : gps.accuracy <= 50 ? "text-yellow-600" : "text-red-600";
 
-  // Live walk-perimeter telemetry (recomputed on perimeter / gps / nowTick change)
+  // Live walk-perimeter telemetry (recomputed on perimeter/GPS/status changes;
+  // no high-frequency whole-form ticker).
   const walkTelemetry = useMemo(() => {
     const vertices = perimeter.length;
     const liveAccuracyM = gps?.accuracy ?? null;
@@ -2565,7 +2637,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       ? haversineMeters({ lat: gps.lat, lng: gps.lng }, perimeter[0])
       : null;
     const estAreaM2 = vertices >= 3 ? polygonAreaM2(perimeter) : null;
-    const lastVertexAgoS = lastVertexAt ? Math.max(0, Math.floor((nowTick - lastVertexAt) / 1000)) : null;
+    const lastVertexAgoS = lastVertexAt ? Math.max(0, Math.floor((Date.now() - lastVertexAt) / 1000)) : null;
     const pace: "good" | "slow" | "stationary" =
       !recordingPerimeter ? "good"
       : lastVertexAgoS == null ? "good"
@@ -2574,7 +2646,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       : "stationary";
     const readyToClose = recordingPerimeter && vertices >= 6 && closureM != null && closureM <= 15;
     return { vertices, walkedM, liveAccuracyM, bestAccuracyM, closureM, estAreaM2, lastVertexAgoS, pace, readyToClose };
-  }, [perimeter, gps, walkedM, lastVertexAt, nowTick, recordingPerimeter]);
+  }, [perimeter, gps, walkedM, lastVertexAt, recordingPerimeter, perimeterStatus.lastFixAgeMs]);
 
   // WHO LQAS-aligned compliance evaluation for the lot boundary walk.
   // Default test threshold is 80% (the WHO MDA program standard); this can
@@ -2589,8 +2661,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       bestAccuracyM: perimeterBestAccRef.current,
       recording: recordingPerimeter,
     }),
-    // Deliberately do not depend on nowTick: polygon/self-intersection checks
-    // can be expensive and must not run every 500ms just to update a clock label.
+    // Deliberately avoid clock-tick dependencies: polygon/self-intersection
+    // checks can be expensive and must not run just to update a label.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [perimeter, gps, walkedM, recordingPerimeter],
   );
@@ -2631,14 +2703,23 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   const coverageMapSegments = useMemo(() => {
     if (step !== 4 || households.length === 0) return segments;
-    return segments.map((s) => {
-      let total = 0;
-      let treated = 0;
-      for (const h of households) {
-        if (!pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon)) continue;
-        total++;
-        if (h.coverage_status === "treated") treated++;
+    const bySegment = new Map<string, SurveyHousehold[]>();
+    const legacy: SurveyHousehold[] = [];
+    for (const h of households) {
+      if (h.segment_label) {
+        const list = bySegment.get(h.segment_label) ?? [];
+        list.push(h);
+        bySegment.set(h.segment_label, list);
+      } else {
+        legacy.push(h);
       }
+    }
+    return segments.map((s) => {
+      const attributed = bySegment.get(s.label) ?? [];
+      const legacyInside = legacy.filter((h) => pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon));
+      const inside = attributed.length || legacyInside.length ? [...attributed, ...legacyInside] : [];
+      const total = inside.length;
+      const treated = inside.filter((h) => h.coverage_status === "treated").length;
       const pct = total ? (treated / total) * 100 : -1;
       const color = pct < 0 ? "#94a3b8" : pct >= 80 ? "#16a34a" : pct >= 70 ? "#eab308" : "#dc2626";
       return { ...s, color };
@@ -2956,11 +3037,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                     <span className="flex items-center gap-1.5 font-semibold">
                       <span className="inline-block h-2 w-2 rounded-full bg-white animate-pulse" />
                       Stop
-                      <span
-                        key={vertexFlash}
-                        className="tabular-nums transition-transform duration-200 inline-block"
-                        style={{ transform: vertexFlash ? "scale(1.18)" : "scale(1)" }}
-                      >
+                      <span className="tabular-nums inline-block">
                         · {walkTelemetry.vertices} pts
                       </span>
                     </span>
