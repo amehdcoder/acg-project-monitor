@@ -3859,6 +3859,57 @@ export type Database = {
         }
         Relationships: []
       }
+      mda_archived_submissions: {
+        Row: {
+          archived_at: string
+          archived_by: string | null
+          created_at: string
+          data: Json
+          form_id: string
+          id: string
+          location: Json | null
+          status: string
+          submission_type: string
+          submitted_at: string | null
+          synced_at: string | null
+          updated_at: string
+          user_id: string
+          within_geofence: boolean | null
+        }
+        Insert: {
+          archived_at?: string
+          archived_by?: string | null
+          created_at?: string
+          data?: Json
+          form_id: string
+          id: string
+          location?: Json | null
+          status?: string
+          submission_type?: string
+          submitted_at?: string | null
+          synced_at?: string | null
+          updated_at?: string
+          user_id: string
+          within_geofence?: boolean | null
+        }
+        Update: {
+          archived_at?: string
+          archived_by?: string | null
+          created_at?: string
+          data?: Json
+          form_id?: string
+          id?: string
+          location?: Json | null
+          status?: string
+          submission_type?: string
+          submitted_at?: string | null
+          synced_at?: string | null
+          updated_at?: string
+          user_id?: string
+          within_geofence?: boolean | null
+        }
+        Relationships: []
+      }
       mda_tile_icons: {
         Row: {
           form_id: string
@@ -7120,6 +7171,10 @@ export type Database = {
         Args: { _form_code: string }
         Returns: string
       }
+      owner_archive_mda_submissions: {
+        Args: { _form_id: string; _from?: string; _to?: string }
+        Returns: Json
+      }
       owner_clear_form_submissions: {
         Args: { _form_id: string }
         Returns: Json
@@ -7134,7 +7189,12 @@ export type Database = {
         Returns: Json
       }
       owner_factory_reset: { Args: { _confirm: string }; Returns: Json }
+      owner_mda_data_summary: { Args: { _form_id: string }; Returns: Json }
       owner_reset_bloomberg_validation_data: { Args: never; Returns: Json }
+      owner_restore_mda_submissions: {
+        Args: { _form_id: string; _from?: string; _to?: string }
+        Returns: Json
+      }
       set_proximity_conversation_flag: {
         Args: { _action: string; _conversation_id: string }
         Returns: undefined
