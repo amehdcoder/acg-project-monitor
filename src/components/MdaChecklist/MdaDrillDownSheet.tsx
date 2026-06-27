@@ -477,8 +477,8 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
           </div>
         </div>
 
-        {/* ── List (incremental scroll) ── */}
-        <div className="min-h-0 flex-1 overflow-y-auto" onScroll={onScroll}>
+        {/* ── List (paginated) ── */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="space-y-2 p-4">
             {filtered.length === 0 ? (
               <p className="py-10 text-center text-sm text-muted-foreground">
@@ -490,19 +490,31 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
                 )}
               </p>
             ) : (
-              <>
-                {shown.map((s) => (
-                  <SubmissionCard key={s.id} s={s} flat={flat} followUpFields={followUpFields} />
-                ))}
-                {visible < filtered.length && (
-                  <p className="py-3 text-center text-[11px] text-muted-foreground">
-                    Showing {shown.length} of {filtered.length} — scroll for more
-                  </p>
-                )}
-              </>
+              shown.map((s) => (
+                <SubmissionCard key={s.id} s={s} flat={flat} followUpFields={followUpFields} />
+              ))
             )}
           </div>
         </div>
+
+        {/* ── Pagination footer ── */}
+        {totalItems > 0 && (
+          <div className="border-t bg-muted/30 px-4 py-2">
+            <TablePagination
+              currentPage={safePage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              startIndex={startIndex}
+              pageSize={pageSize}
+              hasPrev={safePage > 1}
+              hasNext={safePage < totalPages}
+              onPrev={() => setPage((p) => Math.max(1, p - 1))}
+              onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+            />
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );
