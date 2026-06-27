@@ -144,8 +144,43 @@ export default defineConfig(({ mode }) => {
             },
           },
 
+          // ── Background Sync for offline data collection ──────────────────
+          // Queued follow-up (form_submissions) and Coverage Evaluation 3D
+          // (ces_*) writes made while offline are durably stored by Workbox in
+          // IndexedDB and automatically replayed to the live server via the
+          // browser's Background Sync API — even if the app was closed and is
+          // reopened later, the queued requests flush on the next `sync` event
+          // once connectivity returns. NetworkOnly ensures we never serve a
+          // cached write; if the network fails the BackgroundSyncPlugin re-queues.
           {
-            // Always fetch fresh HTML so new builds (e.g. without the old
+            urlPattern: ({ url, request }: any) =>
+              /(^|\.)supabase\.co$/.test(url.hostname) &&
+              /\/rest\/v1\/(form_submissions|ces_surveys|ces_household_visits|ces_segments|ces_households|ces_feature_labels|ces_keyframes|ces_capture_sessions|ces_fenced_communities)\b/.test(url.pathname) &&
+              request.method === "POST",
+            handler: "NetworkOnly",
+            method: "POST",
+            options: {
+              backgroundSync: {
+                name: "mda-ces-offline-write-queue",
+                options: { maxRetentionTime: 60 * 24 * 7 }, // retry for up to 7 days
+              },
+            },
+          },
+          {
+            urlPattern: ({ url, request }: any) =>
+              /(^|\.)supabase\.co$/.test(url.hostname) &&
+              /\/rest\/v1\/(form_submissions|ces_surveys|ces_household_visits|ces_segments|ces_households|ces_feature_labels|ces_keyframes|ces_capture_sessions|ces_fenced_communities)\b/.test(url.pathname) &&
+              request.method === "PATCH",
+            handler: "NetworkOnly",
+            method: "PATCH",
+            options: {
+              backgroundSync: {
+                name: "mda-ces-offline-update-queue",
+                options: { maxRetentionTime: 60 * 24 * 7 },
+              },
+            },
+          },
+
             // green background) display immediately on next navigation.
             urlPattern: ({ request }: any) => request.mode === "navigate",
             handler: "NetworkFirst",
