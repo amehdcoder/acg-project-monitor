@@ -686,7 +686,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     // High-accuracy stream: tight cadence (1s OS push + 1.5s safety poll)
     // so the dot moves continuously while walking — Google-Maps-equivalent.
     startRealtimeGpsWatch(
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000, minimumUpdateInterval: 1000, pollCurrentPositionMs: 1500 },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000, minimumUpdateInterval: 1000 },
       (fix) => applyFix(fix, "high"),
       handleError,
     )
