@@ -12,7 +12,9 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import {
   Home, MapPin, Loader2, Play, Pause, SkipForward, SkipBack,
-  Flame, Download, FileImage, FileText, RotateCcw, X, ListFilter,
+  Flame, Download, FileImage, FileText, FileSpreadsheet, RotateCcw, X, ListFilter,
+  Layers, Satellite,
+
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -85,6 +87,7 @@ const URL_KEYS = {
   state: "hcs_state",
   center: "hcs_center",
   zoom: "hcs_zoom",
+  basemap: "hcs_basemap",
 } as const;
 
 const stateKeys = (value: unknown) => {
@@ -174,6 +177,9 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
   const captureRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const clusterRef = useRef<any>(null);
+  const plainLayerRef = useRef<L.LayerGroup | null>(null);
+  const lightTileRef = useRef<L.TileLayer | null>(null);
+  const satTileRef = useRef<L.TileLayer | null>(null);
   const boundaryLayerRef = useRef<L.LayerGroup | null>(null);
   const heatRef = useRef<any>(null);
   const liveRef = useRef<L.Marker | null>(null);
@@ -184,6 +190,12 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
   // manually moved the map — suppresses auto-fitBounds so shared links / manual
   // panning are respected on refresh.
   const viewLockedRef = useRef(false);
+
+  // Marker clustering toggle (#7) and basemap (#8 — satellite on focus).
+  const [clustered, setClustered] = useState(true);
+  const [basemap, setBasemap] = useState<"light" | "satellite">(() =>
+    readUrl(URL_KEYS.basemap) === "satellite" ? "satellite" : "light",
+  );
 
   const [points, setPoints] = useState<VisitPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -395,9 +407,15 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     // Clean light "state map" basemap (matches the LGA Supervision Map) so the
     // coloured household-outcome pins read clearly against the state boundary —
     // no satellite imagery underneath.
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+    const lightTile = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
       subdomains: "abcd", maxZoom: 19, keepBuffer: 6, updateWhenIdle: false, crossOrigin: true,
-    }).addTo(map);
+    });
+    const satTile = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 21, keepBuffer: 6, updateWhenIdle: false, crossOrigin: true,
+    });
+    lightTileRef.current = lightTile;
+    satTileRef.current = satTile;
+    (basemap === "satellite" ? satTile : lightTile).addTo(map);
     map.setView([9.6, 8.1], 6);
 
     // Restore a saved viewport (center + zoom) from the URL so shared links and
@@ -457,6 +475,8 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     });
     cluster.addTo(map);
     clusterRef.current = cluster;
+    // Plain (unclustered) marker layer — used when the cluster toggle is off.
+    plainLayerRef.current = L.layerGroup();
 
     mapRef.current = map;
     setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 60);
@@ -465,7 +485,43 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(redraw, [windowed, statesPresent, selectedLga]);
+  useEffect(redraw, [windowed, statesPresent, selectedLga, clustered]);
+
+  // ── Basemap switching (light ↔ satellite) with URL persistence (#8) ──
+  useEffect(() => {
+    const map = mapRef.current;
+    const light = lightTileRef.current;
+    const sat = satTileRef.current;
+    if (!map || !light || !sat) return;
+    if (basemap === "satellite") {
+      if (map.hasLayer(light)) map.removeLayer(light);
+      if (!map.hasLayer(sat)) sat.addTo(map);
+    } else {
+      if (map.hasLayer(sat)) map.removeLayer(sat);
+      if (!map.hasLayer(light)) light.addTo(map);
+    }
+    writeUrl({ [URL_KEYS.basemap]: basemap === "satellite" ? "satellite" : null });
+  }, [basemap]);
+
+  // Pan/zoom to a visit, instantly switch to satellite view, persist viewport.
+  const focusVisit = (p: VisitPoint) => {
+    setSelectedVisit(p);
+    setSelectedLga("");
+    setBasemap("satellite");
+    const map = mapRef.current;
+    if (map) {
+      viewLockedRef.current = true;
+      map.setView([p.lat, p.lng], Math.max(map.getZoom(), 18), { animate: true });
+    }
+    writeUrl({
+      [URL_KEYS.visit]: p.id,
+      [URL_KEYS.community]: p.community || null,
+      [URL_KEYS.state]: p.state || null,
+      [URL_KEYS.lga]: null,
+      [URL_KEYS.basemap]: "satellite",
+    });
+    if (p.community) onSelectCommunity?.(p.community, p.state);
+  };
 
   function redraw() {
     const map = mapRef.current;
@@ -534,10 +590,19 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     boundaryLayerRef.current = bGroup;
     if (stateBounds.isValid()) bounds.extend(stateBounds);
 
-    // ── Household outcome markers (clustered) ──
+    // ── Household outcome markers (clustered or plain, per toggle #7) ──
     const cluster = clusterRef.current;
-    if (cluster) {
-      cluster.clearLayers();
+    const plain = plainLayerRef.current;
+    // Detach whichever layer is inactive so toggling is clean.
+    if (cluster) cluster.clearLayers();
+    if (plain) plain.clearLayers();
+    if (cluster && map.hasLayer(cluster) && !clustered) map.removeLayer(cluster);
+    if (cluster && !map.hasLayer(cluster) && clustered) cluster.addTo(map);
+    if (plain && map.hasLayer(plain) && clustered) map.removeLayer(plain);
+    if (plain && !map.hasLayer(plain) && !clustered) plain.addTo(map);
+
+    const target = clustered ? cluster : plain;
+    if (target) {
       const markers: L.Marker[] = [];
       for (const p of windowed) {
         const o = outcomeFor(p.status);
@@ -553,21 +618,13 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
             <span style="color:#64748b">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</span>
           </div>`,
         );
-        m.on("click", () => {
-          setSelectedVisit(p);
-          setSelectedLga("");
-          writeUrl({
-            [URL_KEYS.visit]: p.id,
-            [URL_KEYS.community]: p.community || null,
-            [URL_KEYS.state]: p.state || null,
-            [URL_KEYS.lga]: null,
-          });
-          if (p.community) onSelectCommunity?.(p.community, p.state);
-        });
+        // Clicking a marker pans/zooms and switches to satellite (#8).
+        m.on("click", () => focusVisit(p));
         markers.push(m);
         try { bounds.extend([p.lat, p.lng]); } catch { /* noop */ }
       }
-      cluster.addLayers(markers);
+      if (clustered && cluster) cluster.addLayers(markers);
+      else if (plain) markers.forEach((m) => m.addTo(plain));
     }
 
     // Auto-fit so EVERY household marker is visible. `bounds` already contains
@@ -710,6 +767,38 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     }
   };
 
+  // ── Export the currently filtered household visits to CSV (#9) ──
+  const exportCsv = () => {
+    const rows = windowed;
+    if (!rows.length) { toast.error("No household visits to export"); return; }
+    const esc = (v: any) => {
+      const s = String(v ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const headers = [
+      "Household", "Outcome", "Commodity", "State", "LGA", "Ward", "FLHF",
+      "Community", "Settlement", "Latitude", "Longitude", "GPS Accuracy (m)",
+      "Eligible", "Treated", "Visited At",
+    ];
+    const lines = [headers.join(",")];
+    for (const p of rows) {
+      lines.push([
+        p.hh, outcomeFor(p.status).label, p.commodity || "", p.state, p.lga, p.ward,
+        p.flhf, p.community, p.settlement, p.lat.toFixed(6), p.lng.toFixed(6),
+        p.accuracy ?? "", p.eligible ?? "", p.treated ?? "",
+        p.at ? new Date(p.at).toISOString() : "",
+      ].map(esc).join(","));
+    }
+    const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `household-visits-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${rows.length} household visit(s) to CSV`);
+  };
+
   const currentVisit = windowed[Math.min(sweepIndex, Math.max(0, windowed.length - 1))];
 
   return (
@@ -738,6 +827,9 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
               <DropdownMenuItem onClick={() => exportView("pdf")}>
                 <FileText className="h-4 w-4 mr-2" /> Export as PDF
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportCsv}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> Export visits as CSV
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -754,6 +846,28 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
               Filters: {[stateFilter, dateFrom && `from ${new Date(dateFrom).toLocaleDateString()}`, dateTo && `to ${new Date(dateTo).toLocaleDateString()}`].filter(Boolean).join(" · ")}
             </Badge>
           )}
+          <div className="ml-auto flex items-center gap-1.5">
+            <Button
+              variant={clustered ? "default" : "outline"}
+              size="sm"
+              className="h-7 gap-1.5 px-2 text-[11px]"
+              onClick={() => setClustered((v) => !v)}
+              aria-pressed={clustered}
+              title={clustered ? "Markers are clustered — click to show individual markers" : "Markers are individual — click to cluster"}
+            >
+              <Layers className="h-3.5 w-3.5" /> {clustered ? "Clustered" : "Unclustered"}
+            </Button>
+            <Button
+              variant={basemap === "satellite" ? "default" : "outline"}
+              size="sm"
+              className="h-7 gap-1.5 px-2 text-[11px]"
+              onClick={() => setBasemap((b) => (b === "satellite" ? "light" : "satellite"))}
+              aria-pressed={basemap === "satellite"}
+              title="Toggle satellite imagery"
+            >
+              <Satellite className="h-3.5 w-3.5" /> {basemap === "satellite" ? "Satellite" : "Map"}
+            </Button>
+          </div>
         </div>
 
         {/* Accessible, keyboard-navigable legend (also acts as outcome filter) */}
