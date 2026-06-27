@@ -26,12 +26,13 @@ import {
   Tooltip as RTooltip, BarChart, Bar,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
   CheckCircle2, AlertTriangle, Pill, TrendingUp, Users2, Sigma, ClipboardCheck,
-  HelpCircle, ChevronRight, ShieldCheck, ShieldAlert,
+  HelpCircle, ChevronRight, ShieldCheck, ShieldAlert, Download, ListChecks, Ban,
 } from "lucide-react";
 import {
   MdaQuestionIndex, aggregateByCommunity, geo, visitTrendByLga, workerAccountability,
@@ -41,6 +42,8 @@ import { buildQualityReport, type QualityLevel } from "@/lib/mda/dataQuality";
 import { communityKey } from "@/lib/mda/dashboardData";
 import { meanConfidenceInterval, oneWayAnova, formatP } from "@/lib/statisticalInference";
 import { toneBg, toneFg, type Tone } from "@/lib/conditionalFormatting";
+import { buildSubmissionsCsv, downloadCsv, slugify, type CsvRow } from "@/lib/mda/csvExport";
+import MdaMethodsDialog from "./MdaMethodsDialog";
 import MdaDrillDownSheet, { type DrillData, type DrillSubmission } from "./MdaDrillDownSheet";
 
 const NAVY = "#0c2340";
@@ -63,6 +66,8 @@ interface Props {
   questions: AQuestion[];
   projectName?: string;
   followUpFields?: Set<string>;
+  /** When true, renders an "offline — showing cached data" banner. */
+  offline?: boolean;
 }
 
 // ── Small UI atoms ──
@@ -168,7 +173,7 @@ const QUALITY_TONE: Record<QualityLevel, { tone: Tone; tint: string }> = {
   bad: { tone: "bad", tint: RED },
 };
 
-export default function MdaAdvancedAnalyses({ submissions, questions, projectName, followUpFields }: Props) {
+export default function MdaAdvancedAnalyses({ submissions, questions, projectName, followUpFields, offline }: Props) {
   const idx = useMemo(() => new MdaQuestionIndex(questions), [questions]);
   const communities = useMemo(() => aggregateByCommunity(submissions), [submissions]);
 
@@ -225,16 +230,33 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
   const lbl = (c: CommunityAgg, q: ResolvedQ | null) => idx.label(q, val(c, q));
 
   // ── Data-quality report (per LGA section coverage) ──
+  const qualitySectionDefs = useMemo(() => [
+    { id: "status", label: "Status of MDA", q: qStatus },
+    { id: "cdd", label: "CDD presence", q: qCdd },
+    { id: "sae", label: "Adverse reactions", q: qSae },
+    { id: "register", label: "Treatment register", q: qRegister },
+    { id: "dosePole", label: "Dose pole", q: qDosePole },
+  ], [qStatus, qCdd, qSae, qRegister, qDosePole]);
   const quality = useMemo(
-    () => buildQualityReport(communities, [
-      { id: "status", label: "Status of MDA", q: qStatus },
-      { id: "cdd", label: "CDD presence", q: qCdd },
-      { id: "sae", label: "Adverse reactions", q: qSae },
-      { id: "register", label: "Treatment register", q: qRegister },
-      { id: "dosePole", label: "Dose pole", q: qDosePole },
-    ], projectName || ""),
-    [communities, qStatus, qCdd, qSae, qRegister, qDosePole, projectName],
+    () => buildQualityReport(communities, qualitySectionDefs, projectName || ""),
+    [communities, qualitySectionDefs, projectName],
   );
+
+  // ── CSV export of the filtered analyses dataset ──
+  const exportDatasetCsv = () => {
+    const rows: CsvRow[] = submissions.map((s) => ({
+      id: s.id,
+      state: s.state ?? null,
+      lga: s.lga ?? null,
+      ward: s.ward ?? null,
+      submitter: s.submitter ?? null,
+      submittedAt: s.submittedAt ?? null,
+      status: s.status ?? null,
+      data: s.data || {},
+    }));
+    const csv = buildSubmissionsCsv(rows, questions as any);
+    downloadCsv(`mda-analyses-${slugify(projectName || "dataset")}-${new Date().toISOString().slice(0, 10)}`, csv);
+  };
 
   // ── Status of MDA ──
   const statusRows = useMemo(() => {
@@ -361,11 +383,28 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
   return (
     <TooltipProvider delayDuration={150}>
       <div className="space-y-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Sigma className="h-4 w-4 text-primary" />
           <h3 className="font-display text-sm font-bold text-foreground">Insightful Analyses</h3>
-          <span className="text-[11px] text-muted-foreground">— click any card, chart or row to drill into the exact submissions</span>
+          <span className="hidden text-[11px] text-muted-foreground sm:inline">— click any card, chart or row to drill into the exact submissions</span>
+          <div className="ml-auto flex items-center gap-2">
+            <MdaMethodsDialog />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportDatasetCsv}
+              disabled={submissions.length === 0}
+              className="h-8 gap-1.5 text-xs"
+            >
+              <Download className="h-3.5 w-3.5" /> Export dataset (CSV)
+            </Button>
+          </div>
         </div>
+        {offline && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-400">
+            Offline — showing the last synced checklist data. Analyses, data quality and drill-downs reflect cached submissions.
+          </div>
+        )}
 
         {/* ── Data-quality panel ── */}
         {communities.length > 0 && (
@@ -425,6 +464,63 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
                   );
                 })}
               </SectionTable>
+
+              {/* ── What exactly is missing / inconsistent (raw counts) ── */}
+              <div className="space-y-2">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <ListChecks className="h-3.5 w-3.5 text-primary" /> What's missing or inconsistent
+                  <InfoTip>
+                    Each row is a required checklist section. We show the exact question it maps to and the
+                    raw counts driving the warning: how many supervised communities have a recorded answer
+                    versus how many are missing one. Sections the form doesn't contain are flagged separately.
+                  </InfoTip>
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {quality.sections.map((s) => {
+                    const t = s.resolved ? QUALITY_TONE[s.level] : QUALITY_TONE.bad;
+                    return (
+                      <div key={s.id} className="rounded-lg border border-border bg-card p-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="flex items-center gap-1 text-xs font-semibold text-foreground">
+                              {!s.resolved && <Ban className="h-3 w-3 text-red-500" />}
+                              {s.label}
+                            </p>
+                            <p className="truncate text-[10px] text-muted-foreground">
+                              {s.resolved
+                                ? <>Question: <span className="italic">“{s.questionLabel}”</span></>
+                                : "No matching question in this checklist"}
+                            </p>
+                          </div>
+                          <Pill2 text={s.resolved ? `${s.pct}%` : "N/A"} tone={t.tone} />
+                        </div>
+                        {s.resolved ? (
+                          <div className="mt-2 flex items-center justify-between text-[11px]">
+                            <span className="text-muted-foreground">
+                              <span className="font-semibold text-emerald-600 dark:text-emerald-400">{fmt(s.answered)}</span> answered ·{" "}
+                              <span className="font-semibold" style={{ color: s.missing ? AMBER : undefined }}>{fmt(s.missing)}</span> missing ·{" "}
+                              {fmt(s.total)} communities
+                            </span>
+                            {s.missing > 0 && (
+                              <button
+                                onClick={() => openDrillForKeys(`Missing “${s.label}”`, s.missingKeys, AMBER,
+                                  `${fmt(s.missing)} communit${s.missing === 1 ? "y" : "ies"} with no ${s.label.toLowerCase()} answer`)}
+                                className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline"
+                              >
+                                Review <ChevronRight className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="mt-2 text-[11px] text-red-600 dark:text-red-400">
+                            Cannot be assessed — add a matching question to capture this section.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}

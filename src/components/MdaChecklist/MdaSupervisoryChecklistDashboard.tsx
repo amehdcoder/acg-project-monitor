@@ -62,6 +62,8 @@ interface Props {
   formName?: string;
   projectName?: string;
   projectId?: string | null;
+  /** When true, data is served from the offline cache. */
+  offline?: boolean;
 }
 
 // ───────────────────────── Palette ─────────────────────────
@@ -187,7 +189,7 @@ function Tag({ text, tint }: { text: string; tint: string }) {
 const ALL = "__all__";
 
 // ───────────────────────── Main ─────────────────────────
-export default function MdaSupervisoryChecklistDashboard({ submissions, questions, formName, projectName, projectId }: Props) {
+export default function MdaSupervisoryChecklistDashboard({ submissions, questions, formName, projectName, projectId, offline }: Props) {
   // ── Filter state ──────────────────────────────────────────────
   const [fState, setFState] = useState(ALL);
   const [fLga, setFLga] = useState(ALL);
@@ -761,6 +763,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         questions={questions as any}
         projectName={projectName}
         followUpFields={new Set(Object.values(moduleQuestions).flatMap((s) => Array.from(s)))}
+        offline={offline}
       />
 
       {/* ── Longitudinal linkage register ── */}

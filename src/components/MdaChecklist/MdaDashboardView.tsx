@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, ChevronUp, Database, Loader2, RotateCcw, Settings2, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, BarChart3, ChevronUp, Database, Loader2, RotateCcw, Settings2, Sparkles, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAuth } from "@/hooks/useAuth";
 import { useDataAnalytics, type SubmissionRecord } from "@/hooks/useDataAnalytics";
 import { generateMdaSimulation } from "@/lib/mda/simulation";
+import { loadMdaCache, saveMdaCache, isOffline } from "@/lib/mda/offlineCache";
 import MdaSupervisoryChecklistDashboard from "./MdaSupervisoryChecklistDashboard";
 
 interface MdaDashboardForm {
@@ -187,8 +188,26 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
     }
   }, [simulate, questions, simCount, simSeed, form.project_id]);
 
-  const dashboardRows = simulate ? simulatedRows : realRows;
+  // ── Offline cache: keep the last synced rows + questions per form ──
+  const cached = useMemo(() => loadMdaCache(form.id), [form.id]);
+  useEffect(() => {
+    if (!loading && submissions.length > 0) {
+      saveMdaCache(form.id, realRows, questions);
+    }
+  }, [loading, submissions.length, realRows, questions, form.id]);
+
+  const hasCache = !!cached && cached.rows.length > 0;
+  // Use cached data when live data is unavailable (offline / empty) and a cache exists.
+  const useCacheNow = !simulate && hasCache && submissions.length === 0 && (!loading || isOffline());
+
+  const dashboardRows = simulate
+    ? simulatedRows
+    : useCacheNow
+      ? cached!.rows
+      : realRows;
+  const dashboardQuestions = useCacheNow ? cached!.questions : questions;
   const projectName = projects.find((p) => p.id === form.project_id)?.name;
+  const showLoader = loading && !simulate && !useCacheNow;
 
   return (
     <div
@@ -260,7 +279,17 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
           </div>
         )}
 
-        {loading && !simulate ? (
+        {useCacheNow && (
+          <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+            <WifiOff className="h-4 w-4 shrink-0" />
+            <span>
+              <strong>Offline:</strong> showing the last synced checklist data
+              {cached?.cachedAt ? ` (cached ${new Date(cached.cachedAt).toLocaleString()})` : ""}. It will refresh once you reconnect.
+            </span>
+          </div>
+        )}
+
+        {showLoader ? (
           <Card className="border-dashed">
             <CardContent className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading MDA dashboard data…
@@ -269,10 +298,11 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
         ) : (
           <MdaSupervisoryChecklistDashboard
             submissions={dashboardRows}
-            questions={questions}
+            questions={dashboardQuestions}
             formName={form.name}
             projectName={projectName}
             projectId={form.project_id || null}
+            offline={useCacheNow}
           />
         )}
       </main>

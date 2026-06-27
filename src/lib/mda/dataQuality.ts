@@ -42,6 +42,22 @@ export interface LgaQuality {
   incompleteKeys: string[];
 }
 
+/** Project-wide raw counts behind each section's quality warning. */
+export interface SectionSummary {
+  id: string;
+  label: string;
+  resolved: boolean;
+  /** the checklist question LABEL this section matched, if resolved */
+  questionLabel: string | null;
+  answered: number;
+  missing: number;
+  total: number;
+  pct: number;
+  level: QualityLevel;
+  /** community keys missing an answer for this section */
+  missingKeys: string[];
+}
+
 export interface QualityReport {
   projectName: string;
   totalCommunities: number;
@@ -50,6 +66,8 @@ export interface QualityReport {
   overallScore: number;
   overallLevel: QualityLevel;
   lgas: LgaQuality[];
+  /** project-wide per-section raw counts (drives the "what's missing" panel) */
+  sections: SectionSummary[];
   /** sections that could not be resolved from the form at all */
   unresolved: string[];
 }
@@ -119,6 +137,29 @@ export function buildQualityReport(
       )
     : 0;
 
+  // ── Project-wide per-section raw counts (drives the "what's missing" panel) ──
+  const total = communities.length;
+  const sections: SectionSummary[] = sectionDefs.map((def) => {
+    const answeredList = def.q ? communities.filter((c) => hasValue(c, def.q)) : [];
+    const answered = answeredList.length;
+    const missingKeys = def.q
+      ? communities.filter((c) => !hasValue(c, def.q)).map((c) => c.key)
+      : communities.map((c) => c.key);
+    const pct = def.q && total ? Math.round((answered / total) * 100) : 0;
+    return {
+      id: def.id,
+      label: def.label,
+      resolved: !!def.q,
+      questionLabel: def.q ? def.q.label || null : null,
+      answered,
+      missing: total - answered,
+      total,
+      pct,
+      level: def.q ? levelOf(pct) : "bad",
+      missingKeys,
+    };
+  });
+
   return {
     projectName,
     totalCommunities: communities.length,
@@ -127,6 +168,7 @@ export function buildQualityReport(
     overallScore,
     overallLevel: levelOf(overallScore),
     lgas,
+    sections,
     unresolved,
   };
 }

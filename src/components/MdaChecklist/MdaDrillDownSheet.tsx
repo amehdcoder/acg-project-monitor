@@ -17,6 +17,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -24,8 +25,9 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
-  ChevronDown, MapPin, User2, CalendarClock, ClipboardList, Search, X, Filter,
+  ChevronDown, MapPin, User2, CalendarClock, ClipboardList, Search, X, Filter, Download,
 } from "lucide-react";
+import { buildSubmissionsCsv, downloadCsv, slugify, type CsvRow } from "@/lib/mda/csvExport";
 
 interface QOption { id?: string; label: string; value: string; }
 interface FormQuestion {
@@ -182,6 +184,9 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
   const [moduleFilter, setModuleFilter] = useState(ALL);
   const [stateFilter, setStateFilter] = useState(ALL);
   const [lgaFilter, setLgaFilter] = useState(ALL);
+  const [monitorFilter, setMonitorFilter] = useState(ALL);
+  const [communityFilter, setCommunityFilter] = useState(ALL);
+  const [statusFilter, setStatusFilter] = useState(ALL);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [visible, setVisible] = useState(PAGE);
@@ -194,6 +199,9 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
     setModuleFilter(ALL);
     setStateFilter(ALL);
     setLgaFilter(ALL);
+    setMonitorFilter(ALL);
+    setCommunityFilter(ALL);
+    setStatusFilter(ALL);
     setDateFrom("");
     setDateTo("");
     setVisible(PAGE);
@@ -201,6 +209,10 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
 
   const stateOf = (s: DrillSubmission) => stripTags(s.state ?? s.data?.state);
   const lgaOf = (s: DrillSubmission) => stripTags(s.lga ?? s.data?.lga);
+  const monitorOf = (s: DrillSubmission) => stripTags(s.submitter ?? s.data?.supervisor_name);
+  const communityOf = (s: DrillSubmission) =>
+    stripTags(s.data?.community_name ?? s.data?.community ?? s.data?.settlement_name ?? s.data?.settlement);
+  const statusOf = (s: DrillSubmission) => stripTags(s.status);
 
   const moduleOptions = useMemo(
     () => Array.from(new Set(rows.map((r) => r.module).filter(Boolean))) as string[],
@@ -222,6 +234,26 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
       ).sort(),
     [rows, stateFilter],
   );
+  const monitorOptions = useMemo(
+    () => Array.from(new Set(rows.map(monitorOf).filter(Boolean))).sort(),
+    [rows],
+  );
+  const communityOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          rows
+            .filter((r) => (stateFilter === ALL || stateOf(r) === stateFilter) && (lgaFilter === ALL || lgaOf(r) === lgaFilter))
+            .map(communityOf)
+            .filter(Boolean),
+        ),
+      ).sort(),
+    [rows, stateFilter, lgaFilter],
+  );
+  const statusOptions = useMemo(
+    () => Array.from(new Set(rows.map(statusOf).filter(Boolean))).sort(),
+    [rows],
+  );
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -231,6 +263,9 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
       if (moduleFilter !== ALL && r.module !== moduleFilter) return false;
       if (stateFilter !== ALL && stateOf(r) !== stateFilter) return false;
       if (lgaFilter !== ALL && lgaOf(r) !== lgaFilter) return false;
+      if (monitorFilter !== ALL && monitorOf(r) !== monitorFilter) return false;
+      if (communityFilter !== ALL && communityOf(r) !== communityFilter) return false;
+      if (statusFilter !== ALL && statusOf(r) !== statusFilter) return false;
       if (fromTs || toTs) {
         const t = r.submittedAt ? new Date(r.submittedAt).getTime() : NaN;
         if (isNaN(t)) return false;
@@ -252,16 +287,23 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
       }
       return true;
     });
-  }, [rows, search, moduleFilter, stateFilter, lgaFilter, dateFrom, dateTo]);
+  }, [rows, search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, dateFrom, dateTo]);
 
   // Reset pagination whenever the filtered result changes.
-  useEffect(() => setVisible(PAGE), [search, moduleFilter, stateFilter, lgaFilter, dateFrom, dateTo]);
+  useEffect(() => setVisible(PAGE), [search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, dateFrom, dateTo]);
 
   const hasFilters =
-    !!search || moduleFilter !== ALL || stateFilter !== ALL || lgaFilter !== ALL || !!dateFrom || !!dateTo;
+    !!search || moduleFilter !== ALL || stateFilter !== ALL || lgaFilter !== ALL ||
+    monitorFilter !== ALL || communityFilter !== ALL || statusFilter !== ALL || !!dateFrom || !!dateTo;
   const clearFilters = () => {
     setSearch(""); setModuleFilter(ALL); setStateFilter(ALL); setLgaFilter(ALL);
+    setMonitorFilter(ALL); setCommunityFilter(ALL); setStatusFilter(ALL);
     setDateFrom(""); setDateTo("");
+  };
+
+  const handleExportCsv = () => {
+    const csv = buildSubmissionsCsv(filtered as CsvRow[], questions as any);
+    downloadCsv(`mda-${slugify(data?.title || "drilldown")}-${new Date().toISOString().slice(0, 10)}`, csv);
   };
 
   const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -320,11 +362,32 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
                 {stateOptions.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={lgaFilter} onValueChange={setLgaFilter} disabled={lgaOptions.length === 0}>
+            <Select value={lgaFilter} onValueChange={(v) => { setLgaFilter(v); setCommunityFilter(ALL); }} disabled={lgaOptions.length === 0}>
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="LGA" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All LGAs</SelectItem>
                 {lgaOptions.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={monitorFilter} onValueChange={setMonitorFilter} disabled={monitorOptions.length === 0}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Monitor" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All monitors</SelectItem>
+                {monitorOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={communityFilter} onValueChange={setCommunityFilter} disabled={communityOptions.length === 0}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Community" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All communities</SelectItem>
+                {communityOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter} disabled={statusOptions.length === 0}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>Any status</SelectItem>
+                {statusOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
             <div className="flex items-center gap-1">
@@ -334,14 +397,25 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 px-2 text-xs" aria-label="To date" />
             </div>
           </div>
-          {hasFilters && (
-            <button
-              onClick={clearFilters}
-              className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+          <div className="flex items-center justify-between gap-2">
+            {hasFilters ? (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3 w-3" /> Clear filters
+              </button>
+            ) : <span />}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCsv}
+              disabled={filtered.length === 0}
+              className="h-7 gap-1.5 text-[11px]"
             >
-              <X className="h-3 w-3" /> Clear filters
-            </button>
-          )}
+              <Download className="h-3 w-3" /> Export {filtered.length} rows (CSV)
+            </Button>
+          </div>
         </div>
 
         {/* ── List (incremental scroll) ── */}
