@@ -996,7 +996,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
               <tbody>
                 {linkage.length === 0 ? (
                   <tr><td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">No communities match the current filters.</td></tr>
-                ) : linkage.map((r) => (
+                ) : register.paginatedData.map((r) => (
                   <tr key={r.id} className="border-t border-border/60 hover:bg-muted/40">
                     <td className="px-3 py-2">
                       <div className="font-semibold text-foreground">{r.community}</div>
