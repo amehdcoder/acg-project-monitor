@@ -100,16 +100,8 @@ const FU_TINTS: Record<string, string> = {
   [MDA_FOLLOWUP_ADVERSE]: AMBER,
 };
 
-function yesStat(subs: MdaSubmission[], field: string) {
-  let yes = 0, total = 0;
-  for (const s of subs) {
-    const v = s.data?.[field];
-    if (v === undefined || v === null || v === "") continue;
-    total++;
-    if (POSITIVE.has(norm(v))) yes++;
-  }
-  return { yes, total, pct: pct(yes, total) };
-}
+
+
 
 function pickGeo(s: MdaSubmission, kind: "state" | "lga" | "ward" | "community"): string {
   const d = s.data || {};
