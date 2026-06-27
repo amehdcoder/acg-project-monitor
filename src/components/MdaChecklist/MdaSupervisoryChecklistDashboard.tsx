@@ -14,7 +14,7 @@
  * follow-up outcome panels, a per-community linkage register and a coverage
  * map — all driven by a comprehensive, professional filter bar.
  */
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend,
@@ -34,6 +34,7 @@ import { toast } from "sonner";
 import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
 import { MdaQuestionIndex } from "@/lib/mda/analyses";
 import { computeMdaKpis, type Heatmap as KHeatmap } from "@/lib/mda/kpis";
+import { exportKpiWorkbook, type KpiId } from "@/lib/mda/kpiExport";
 import MdaDrillDownSheet, { type DrillData } from "./MdaDrillDownSheet";
 import {
   getMdaFollowUpGroupName, isMdaFollowUpGroup,
@@ -119,19 +120,27 @@ function pickGeo(s: MdaSubmission, kind: "state" | "lga" | "ward" | "community")
 }
 
 // ───────────────────────── Small UI atoms ─────────────────────────
-function Kpi({ icon: Icon, label, value, sub, tint, bar }: {
+function Kpi({ icon: Icon, label, value, sub, tint, bar, onExport, exporting }: {
   icon: any; label: string; value: string | number; sub?: string; tint: string; bar?: number;
+  onExport?: () => void; exporting?: boolean;
 }) {
+  const clickable = !!onExport;
   return (
     <div
-      className="relative overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={onExport}
+      onKeyDown={clickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onExport?.(); } } : undefined}
+      title={clickable ? `Download the submissions behind “${label}” as Excel` : undefined}
+      aria-label={clickable ? `Download ${label} KPI data as Excel` : undefined}
+      className={`group relative overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${clickable ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1" : ""}`}
       style={{ background: `linear-gradient(135deg, ${tint}0d, transparent 70%)` }}
     >
       <span className="absolute inset-y-0 left-0 w-1" style={{ background: tint }} aria-hidden />
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-medium leading-tight text-muted-foreground">{label}</span>
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: `${tint}1a`, color: tint }}>
-          <Icon className="h-4 w-4" />
+          {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
         </div>
       </div>
       <p className="mt-2 font-display text-2xl font-bold tracking-tight" style={{ color: tint }}>{value}</p>
@@ -141,9 +150,15 @@ function Kpi({ icon: Icon, label, value, sub, tint, bar }: {
           <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, bar)}%`, background: tint }} />
         </div>
       )}
+      {clickable && (
+        <span className="absolute bottom-2 right-2 inline-flex items-center gap-0.5 text-[9px] font-medium text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+          <Download className="h-3 w-3" /> Excel
+        </span>
+      )}
     </div>
   );
 }
+
 
 function Donut({ data, centerLabel, centerValue, height = 180, inner = 56, outer = 80 }: {
   data: { name: string; value: number; color: string }[]; centerLabel?: string; centerValue?: string;
@@ -489,6 +504,22 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
 
   // Owner-defined KPI engine (resolves every determinant by question LABEL).
   const kpis = useMemo(() => computeMdaKpis(filtered as any, questions as any), [filtered, questions]);
+
+  // ── KPI data export (#2): clicking a KPI downloads the underlying submissions ──
+  const [kpiExporting, setKpiExporting] = useState<KpiId | null>(null);
+  const exportKpi = useCallback(async (id: KpiId) => {
+    if (kpiExporting) return;
+    setKpiExporting(id);
+    try {
+      await exportKpiWorkbook(id, filtered as any, questions as any, formName || "Integrated MDA Supervisory Checklist", projectName);
+      toast.success("KPI data exported to Excel");
+    } catch (e: any) {
+      console.error("KPI export failed", e);
+      toast.error(e?.message || "Could not export KPI data");
+    } finally {
+      setKpiExporting(null);
+    }
+  }, [kpiExporting, filtered, questions, formName, projectName]);
 
   // ── Heatmap cell drill-down ──────────────────────────────────
   const [drill, setDrill] = useState<DrillData | null>(null);
@@ -958,12 +989,12 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
 
       {/* ── KPI tiles ── */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-        <Kpi icon={MapPin} label="Communities Supervised" value={fmt(kpis.communitiesSupervised)} sub={`${fmt(kpis.distinctCommunities)} distinct communit${kpis.distinctCommunities === 1 ? "y" : "ies"}`} tint={BLUE} />
-        <Kpi icon={CheckCircle2} label="MDA Completed" value={`${kpis.mdaCompleted.pct}%`} sub={`${fmt(kpis.mdaCompleted.done)} of ${fmt(kpis.mdaCompleted.total)} submissions`} tint={EMERALD} bar={kpis.mdaCompleted.pct} />
-        <Kpi icon={Pill} label="Sufficient Medicine" value={`${kpis.sufficientMedicine.pct}%`} sub={`${fmt(kpis.sufficientMedicine.yes)} of ${fmt(kpis.sufficientMedicine.total)} submissions`} tint={TEAL} bar={kpis.sufficientMedicine.pct} />
-        <Kpi icon={Activity} label="Follow-up Coverage" value={kpis.followUpCoverage.needing ? `${kpis.followUpCoverage.pct}%` : "—"} sub={`${fmt(kpis.followUpCoverage.followed)} of ${fmt(kpis.followUpCoverage.needing)} needing follow-up`} tint={VIOLET} bar={kpis.followUpCoverage.needing ? kpis.followUpCoverage.pct : undefined} />
-        <Kpi icon={AlertTriangle} label="Adverse Cases Managed" value={kpis.adverseManaged.reported ? `${kpis.adverseManaged.pct}%` : "—"} sub={`${fmt(kpis.adverseManaged.managed)} of ${fmt(kpis.adverseManaged.reported)} SAE cases`} tint={AMBER} bar={kpis.adverseManaged.reported ? kpis.adverseManaged.pct : undefined} />
-        <Kpi icon={Flag} label="Red-flag Sites" value={fmt(kpis.redFlagSites)} sub="communities needing action" tint={RED} />
+        <Kpi icon={MapPin} label="Communities Supervised" value={fmt(kpis.communitiesSupervised)} sub={`${fmt(kpis.distinctCommunities)} distinct communit${kpis.distinctCommunities === 1 ? "y" : "ies"}`} tint={BLUE} onExport={() => exportKpi("communitiesSupervised")} exporting={kpiExporting === "communitiesSupervised"} />
+        <Kpi icon={CheckCircle2} label="MDA Completed" value={`${kpis.mdaCompleted.pct}%`} sub={`${fmt(kpis.mdaCompleted.done)} of ${fmt(kpis.mdaCompleted.total)} submissions`} tint={EMERALD} bar={kpis.mdaCompleted.pct} onExport={() => exportKpi("mdaCompleted")} exporting={kpiExporting === "mdaCompleted"} />
+        <Kpi icon={Pill} label="Sufficient Medicine" value={`${kpis.sufficientMedicine.pct}%`} sub={`${fmt(kpis.sufficientMedicine.yes)} of ${fmt(kpis.sufficientMedicine.total)} submissions`} tint={TEAL} bar={kpis.sufficientMedicine.pct} onExport={() => exportKpi("sufficientMedicine")} exporting={kpiExporting === "sufficientMedicine"} />
+        <Kpi icon={Activity} label="Follow-up Coverage" value={kpis.followUpCoverage.needing ? `${kpis.followUpCoverage.pct}%` : "—"} sub={`${fmt(kpis.followUpCoverage.followed)} of ${fmt(kpis.followUpCoverage.needing)} needing follow-up`} tint={VIOLET} bar={kpis.followUpCoverage.needing ? kpis.followUpCoverage.pct : undefined} onExport={() => exportKpi("followUpCoverage")} exporting={kpiExporting === "followUpCoverage"} />
+        <Kpi icon={AlertTriangle} label="Adverse Cases Managed" value={kpis.adverseManaged.reported ? `${kpis.adverseManaged.pct}%` : "—"} sub={`${fmt(kpis.adverseManaged.managed)} of ${fmt(kpis.adverseManaged.reported)} SAE cases`} tint={AMBER} bar={kpis.adverseManaged.reported ? kpis.adverseManaged.pct : undefined} onExport={() => exportKpi("adverseManaged")} exporting={kpiExporting === "adverseManaged"} />
+        <Kpi icon={Flag} label="Red-flag Sites" value={fmt(kpis.redFlagSites)} sub="communities needing action" tint={RED} onExport={() => exportKpi("redFlagSites")} exporting={kpiExporting === "redFlagSites"} />
       </div>
 
       {/* ── Longitudinal funnel ── */}

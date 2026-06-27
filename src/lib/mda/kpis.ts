@@ -107,7 +107,41 @@ export interface MdaKpis {
 const STATUS_ORDER = ["Not Started", "Ongoing", "Halted", "Completed"];
 const COMMODITY_CATS = ["Treatment Register", "Dose Pole/Tape", "Sufficient Medicine"];
 
-export function computeMdaKpis(submissions: KSubmission[], questions: KQuestion[]): MdaKpis {
+export interface ModelCom {
+  key: string;
+  state: string; lga: string; ward: string; community: string;
+  checklist: KSubmission[]; // ascending by date
+  fu: Record<string, KSubmission[]>; // canonical -> ascending
+}
+
+export interface MdaModel {
+  qIndex: MdaQuestionIndex;
+  labelOf: (q: ResolvedQ | null, raw: any) => string;
+  dq: Record<string, ResolvedQ | null>;
+  hasFollowUps: boolean;
+  isFollowUpRow: (s: KSubmission) => boolean;
+  totalChecklist: number;
+  allComs: ModelCom[];
+  firstChecklistVal: (c: ModelCom, q: ResolvedQ | null) => any;
+  isYes: (q: ResolvedQ | null, raw: any) => boolean;
+  isNo: (q: ResolvedQ | null, raw: any) => boolean;
+  latestStatus: (c: ModelCom) => string;
+  statusTitle: (n: string) => string;
+  hasFu: (c: ModelCom, canonical: string) => boolean;
+  needsCompletion: (c: ModelCom) => boolean;
+  needsCommodities: (c: ModelCom) => boolean;
+  saeYes: (c: ModelCom) => boolean;
+  needsAdverse: (c: ModelCom) => boolean;
+  ts: (s: KSubmission) => number;
+}
+
+/**
+ * Builds the shared community model (grouping + determinant resolution +
+ * value helpers) used by both the KPI engine and the KPI export. Keeping this
+ * in one place guarantees the dashboard KPIs and the downloadable workbooks
+ * are computed from exactly the same logic.
+ */
+export function buildMdaModel(submissions: KSubmission[], questions: KQuestion[]): MdaModel {
   const qIndex = new MdaQuestionIndex(questions as any);
   const labelOf = (q: ResolvedQ | null, raw: any) => qIndex.label(q, raw);
 
@@ -159,13 +193,7 @@ export function computeMdaKpis(submissions: KSubmission[], questions: KQuestion[
     hasFollowUps && Object.keys(s.data || {}).some((k) => followUpOnly.has(k));
 
   // ── Group submissions by community ──
-  interface Com {
-    key: string;
-    state: string; lga: string; ward: string; community: string;
-    checklist: KSubmission[]; // ascending by date
-    fu: Record<string, KSubmission[]>; // canonical -> ascending
-  }
-  const coms = new Map<string, Com>();
+  const coms = new Map<string, ModelCom>();
   const geo = (s: KSubmission, kind: "state" | "lga" | "ward" | "community") => {
     const d = s.data || {};
     if (kind === "state") return strip(s.state || d.state || d.state_name);
@@ -202,8 +230,7 @@ export function computeMdaKpis(submissions: KSubmission[], questions: KQuestion[
   const allComs = [...coms.values()].filter((c) => c.checklist.length > 0);
 
   // ── Per-community value helpers ──
-  // First non-empty checklist value for a determinant question.
-  const firstChecklistVal = (c: Com, q: ResolvedQ | null): any => {
+  const firstChecklistVal = (c: ModelCom, q: ResolvedQ | null): any => {
     if (!q) return undefined;
     for (const s of c.checklist) {
       const v = s.data?.[q.key];
@@ -222,9 +249,7 @@ export function computeMdaKpis(submissions: KSubmission[], questions: KQuestion[
     return lbl === "no" || lbl === "false" || lbl === "0";
   };
 
-  // Latest known MDA status for a community (follow-up wins, then checklist,
-  // then legacy/orphaned keys). Returns normalized status label.
-  const latestStatus = (c: Com): string => {
+  const latestStatus = (c: ModelCom): string => {
     const candidates: { t: number; raw: any }[] = [];
     const push = (s: KSubmission, raw: any) => {
       if (raw !== undefined && raw !== null && String(raw).trim() !== "") candidates.push({ t: ts(s), raw });
@@ -241,6 +266,31 @@ export function computeMdaKpis(submissions: KSubmission[], questions: KQuestion[
   };
   const statusTitle = (n: string) =>
     STATUS_ORDER.find((o) => norm(o) === n) || (n ? n.replace(/\b\w/g, (m) => m.toUpperCase()) : "Unknown");
+
+  const hasFu = (c: ModelCom, canonical: string) => (c.fu[canonical]?.length || 0) > 0;
+  const needsCompletion = (c: ModelCom) => latestStatus(c) !== "completed";
+  const needsCommodities = (c: ModelCom) =>
+    isNo(dq.registers, firstChecklistVal(c, dq.registers)) ||
+    isNo(dq.dose, firstChecklistVal(c, dq.dose)) ||
+    isNo(dq.suffMed, firstChecklistVal(c, dq.suffMed));
+  const saeYes = (c: ModelCom) => isYes(dq.sae, firstChecklistVal(c, dq.sae));
+  const needsAdverse = (c: ModelCom) => saeYes(c);
+
+  return {
+    qIndex, labelOf, dq, hasFollowUps, isFollowUpRow, totalChecklist, allComs,
+    firstChecklistVal, isYes, isNo, latestStatus, statusTitle, hasFu,
+    needsCompletion, needsCommodities, saeYes, needsAdverse, ts,
+  };
+}
+
+export function computeMdaKpis(submissions: KSubmission[], questions: KQuestion[]): MdaKpis {
+  const model = buildMdaModel(submissions, questions);
+  const {
+    labelOf, dq, hasFollowUps, isFollowUpRow, totalChecklist, allComs,
+    firstChecklistVal, isYes, isNo, latestStatus, statusTitle, hasFu,
+    needsCompletion, needsCommodities, saeYes, needsAdverse,
+  } = model;
+  type Com = ModelCom;
 
   // ── Headline KPIs (submission-level for 1-3, community-level for 4-6) ──
   // 1. Communities Supervised
@@ -263,15 +313,6 @@ export function computeMdaKpis(submissions: KSubmission[], questions: KQuestion[
   }
   const sufficientMedicine = { yes: suffYes, total: totalChecklist, pct: pct(suffYes, totalChecklist) };
 
-  // Requirement flags + follow-up presence per community
-  const hasFu = (c: Com, canonical: string) => (c.fu[canonical]?.length || 0) > 0;
-  const needsCompletion = (c: Com) => latestStatus(c) !== "completed";
-  const needsCommodities = (c: Com) =>
-    isNo(dq.registers, firstChecklistVal(c, dq.registers)) ||
-    isNo(dq.dose, firstChecklistVal(c, dq.dose)) ||
-    isNo(dq.suffMed, firstChecklistVal(c, dq.suffMed));
-  const saeYes = (c: Com) => isYes(dq.sae, firstChecklistVal(c, dq.sae));
-  const needsAdverse = (c: Com) => saeYes(c);
 
   // 4. Follow-up Coverage (deduplicated across modules)
   let needingAny = 0, followedAny = 0;
