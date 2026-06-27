@@ -395,7 +395,7 @@ const CESSurveyMap = ({
 
     const requests: Array<{ url: string; mode: RequestMode }> = [];
     const MAX_TILES = opts.maxTiles ?? 12000;
-    for (let z = startZoom; z <= endZoom && urls.length < MAX_TILES; z++) {
+    for (let z = startZoom; z <= endZoom && requests.length < MAX_TILES; z++) {
       const xMin = lng2tileX(bounds.getWest(), z);
       const xMax = lng2tileX(bounds.getEast(), z);
       const yMin = lat2tileY(bounds.getNorth(), z);
