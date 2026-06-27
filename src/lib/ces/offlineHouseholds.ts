@@ -164,7 +164,8 @@ export async function saveHouseholdOffline(row: OfflineHousehold): Promise<void>
     queue_seq: row.queue_seq || nextQueueSeq(),
   };
   await idbPut(HH_STORE, record);
-  void mirrorToCloud(record).catch(() => {});
+  const parentDraftStillLocal = await getOfflineSurvey(record.survey_id).catch(() => null);
+  if (!parentDraftStillLocal) void mirrorToCloud(record).catch(() => {});
 }
 
 export async function saveSurveyOffline(draft: OfflineSurveyDraft): Promise<void> {
