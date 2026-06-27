@@ -200,7 +200,7 @@ const CESSurveyMap = ({
   // prefetcher to download the exact same imagery the map is currently showing.
   const activeTileRef = useRef<{ mode: CesBasemap; sources: TileSource[] }>({
     mode: "satellite",
-    sources: [{ url: TILE_LAYERS.satellite.url, maxNativeZoom: 19, subdomains: "abc", requestMode: "no-cors", label: "Esri satellite" }],
+    sources: [{ url: TILE_LAYERS.satellite.url, maxNativeZoom: 19, subdomains: "abc", requestMode: "cors", label: "Esri satellite" }],
   });
 
   const applyBasemap = (map: L.Map, mode: CesBasemap) => {
@@ -368,8 +368,8 @@ const CESSurveyMap = ({
   }, []);
 
   // Pre-fetch all tiles covering the current map view across zoom levels so the
-  // imagery is fully available offline. Caps total tile count to protect the
-  // device and the runtime cache (4,000-tile budget).
+    // imagery is fully available offline. Caps total tile count to protect the
+    // device while matching the enlarged Workbox tile cache budget.
   const prefetchOfflineTiles = async (
     btn?: HTMLElement,
     opts: { maxTiles?: number; zoomAhead?: number; zoomBack?: number; padRatio?: number; quiet?: boolean; concurrency?: number } = {},
