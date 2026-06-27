@@ -188,8 +188,26 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
     }
   }, [simulate, questions, simCount, simSeed, form.project_id]);
 
-  const dashboardRows = simulate ? simulatedRows : realRows;
+  // ── Offline cache: keep the last synced rows + questions per form ──
+  const cached = useMemo(() => loadMdaCache(form.id), [form.id]);
+  useEffect(() => {
+    if (!loading && submissions.length > 0) {
+      saveMdaCache(form.id, realRows, questions);
+    }
+  }, [loading, submissions.length, realRows, questions, form.id]);
+
+  const hasCache = !!cached && cached.rows.length > 0;
+  // Use cached data when live data is unavailable (offline / empty) and a cache exists.
+  const useCacheNow = !simulate && hasCache && submissions.length === 0 && (!loading || isOffline());
+
+  const dashboardRows = simulate
+    ? simulatedRows
+    : useCacheNow
+      ? cached!.rows
+      : realRows;
+  const dashboardQuestions = useCacheNow ? cached!.questions : questions;
   const projectName = projects.find((p) => p.id === form.project_id)?.name;
+  const showLoader = loading && !simulate && !useCacheNow;
 
   return (
     <div
