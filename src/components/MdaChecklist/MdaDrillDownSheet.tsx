@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { buildSubmissionsCsv, downloadCsv, slugify, type CsvRow } from "@/lib/mda/csvExport";
 import { exportDrilldownPdf, type PdfRow } from "@/lib/mda/pdfExport";
+import TablePagination from "@/components/ui/table-pagination";
 
 interface QOption { id?: string; label: string; value: string; }
 interface FormQuestion {
