@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useDataAnalytics, type SubmissionRecord } from "@/hooks/useDataAnalytics";
 import { generateMdaSimulation } from "@/lib/mda/simulation";
 import { loadMdaCache, saveMdaCache, isOffline } from "@/lib/mda/offlineCache";
+import { canonicalizeSubmissionData } from "@/lib/mda/dashboardData";
 import MdaSupervisoryChecklistDashboard from "./MdaSupervisoryChecklistDashboard";
 
 interface MdaDashboardForm {
