@@ -528,14 +528,18 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     if (p.community) onSelectCommunity?.(p.community, p.state);
   };
 
-  function redraw() {
+  // ── Draw (memoized) state/LGA boundary polygons (#10) ──
+  // Rebuilds only when the set of present states or the selected LGA changes —
+  // marker/filter/sweep updates no longer re-tessellate the (expensive) polygons.
+  function drawBoundary() {
     const map = mapRef.current;
     if (!map) return;
+    const sig = `${[...statesPresent].sort().join("|")}::${norm(selectedLga)}`;
+    if (sig === boundarySigRef.current && boundaryLayerRef.current) return;
+    boundarySigRef.current = sig;
 
-    // ── State map: LGA polygons of every present state ──
     if (boundaryLayerRef.current) { try { map.removeLayer(boundaryLayerRef.current); } catch { /* noop */ } }
     const bGroup = L.layerGroup();
-    const bounds = L.latLngBounds([]);
     const stateBounds = L.latLngBounds([]);
     const feats = geoRef.current;
     if (feats && statesPresent.size) {
@@ -593,9 +597,16 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     }
     bGroup.addTo(map);
     boundaryLayerRef.current = bGroup;
-    if (stateBounds.isValid()) bounds.extend(stateBounds);
+    stateBoundsRef.current = stateBounds.isValid() ? stateBounds : null;
+  }
 
-    // ── Household outcome markers (clustered or plain, per toggle #7) ──
+  // ── Draw household outcome markers (clustered or plain, per toggle #7) ──
+  function drawMarkers() {
+    const map = mapRef.current;
+    if (!map) return;
+    const bounds = L.latLngBounds([]);
+    if (stateBoundsRef.current?.isValid()) bounds.extend(stateBoundsRef.current);
+
     const cluster = clusterRef.current;
     const plain = plainLayerRef.current;
     // Detach whichever layer is inactive so toggling is clean.
@@ -628,8 +639,17 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
         markers.push(m);
         try { bounds.extend([p.lat, p.lng]); } catch { /* noop */ }
       }
+      // Cluster plugin chunk-loads internally; for the plain layer we batch-add
+      // so very large sets don't block the main thread in one synchronous pass.
       if (clustered && cluster) cluster.addLayers(markers);
-      else if (plain) markers.forEach((m) => m.addTo(plain));
+      else if (plain) {
+        const batch = 400;
+        const addBatch = (start: number) => {
+          for (let i = start; i < Math.min(start + batch, markers.length); i++) markers[i].addTo(plain);
+          if (start + batch < markers.length) requestAnimationFrame(() => addBatch(start + batch));
+        };
+        addBatch(0);
+      }
     }
 
     // Auto-fit so EVERY household marker is visible. `bounds` already contains
@@ -644,6 +664,9 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
       } catch { /* noop */ }
     }
   }
+
+  function redraw() { drawBoundary(); drawMarkers(); }
+
 
   // ── Heatmap overlay ──
   useEffect(() => {
