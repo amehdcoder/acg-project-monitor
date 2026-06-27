@@ -16,7 +16,7 @@
  */
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip,
+  ResponsiveContainer, Tooltip as RTooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
