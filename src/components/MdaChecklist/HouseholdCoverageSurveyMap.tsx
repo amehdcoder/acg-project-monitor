@@ -376,6 +376,10 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
             <span style="color:#64748b">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</span>
           </div>`,
         );
+        m.on("click", () => {
+          setSelectedVisit(p);
+          if (p.community) onSelectCommunity?.(p.community, p.state);
+        });
         markers.push(m);
         try { bounds.extend([p.lat, p.lng]); } catch { /* noop */ }
       }
