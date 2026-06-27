@@ -362,11 +362,32 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
                 {stateOptions.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={lgaFilter} onValueChange={setLgaFilter} disabled={lgaOptions.length === 0}>
+            <Select value={lgaFilter} onValueChange={(v) => { setLgaFilter(v); setCommunityFilter(ALL); }} disabled={lgaOptions.length === 0}>
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="LGA" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All LGAs</SelectItem>
                 {lgaOptions.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={monitorFilter} onValueChange={setMonitorFilter} disabled={monitorOptions.length === 0}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Monitor" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All monitors</SelectItem>
+                {monitorOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={communityFilter} onValueChange={setCommunityFilter} disabled={communityOptions.length === 0}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Community" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All communities</SelectItem>
+                {communityOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter} disabled={statusOptions.length === 0}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>Any status</SelectItem>
+                {statusOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
             <div className="flex items-center gap-1">
@@ -376,14 +397,25 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 px-2 text-xs" aria-label="To date" />
             </div>
           </div>
-          {hasFilters && (
-            <button
-              onClick={clearFilters}
-              className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+          <div className="flex items-center justify-between gap-2">
+            {hasFilters ? (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3 w-3" /> Clear filters
+              </button>
+            ) : <span />}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCsv}
+              disabled={filtered.length === 0}
+              className="h-7 gap-1.5 text-[11px]"
             >
-              <X className="h-3 w-3" /> Clear filters
-            </button>
-          )}
+              <Download className="h-3 w-3" /> Export {filtered.length} rows (CSV)
+            </Button>
+          </div>
         </div>
 
         {/* ── List (incremental scroll) ── */}
