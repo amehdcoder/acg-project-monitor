@@ -14,7 +14,7 @@
  * follow-up outcome panels, a per-community linkage register and a coverage
  * map — all driven by a comprehensive, professional filter bar.
  */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend,
@@ -210,14 +210,50 @@ function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }
   const cellFg = (v: number) => (v / max > 0.55 ? "#ffffff" : "hsl(var(--foreground))");
   const hasData = heat.rows.some((row) => heat.categories.some((c) => (row.cells[c]?.value || 0) > 0));
   const clickable = !!onCell;
+  const gridRef = useRef<HTMLTableElement>(null);
 
-  const Cell = ({ cell, lga, category, isTotal }: { cell: KHeatmap["colTotals"][string]; lga: string | null; category: string; isTotal?: boolean }) => {
+  // Roving arrow-key navigation across heatmap cells (grid pattern).
+  const handleGridKey = (e: React.KeyboardEvent<HTMLTableElement>) => {
+    const keys = ["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "Home", "End"];
+    if (!keys.includes(e.key)) return;
+    const cells: HTMLButtonElement[] = Array.from(gridRef.current?.querySelectorAll<HTMLButtonElement>("button[data-r]") ?? []);
+    if (cells.length === 0) return;
+    const active = document.activeElement as HTMLButtonElement | null;
+    const cur = active && active.dataset.r !== undefined
+      ? { r: Number(active.dataset.r), c: Number(active.dataset.c) }
+      : { r: 0, c: -1 };
+    e.preventDefault();
+    const at = (r: number, c: number) => cells.find((el) => Number(el.dataset.r) === r && Number(el.dataset.c) === c);
+    const maxR = Math.max(...cells.map((el) => Number(el.dataset.r)));
+    const maxC = Math.max(...cells.map((el) => Number(el.dataset.c)));
+    let { r: nr, c: nc } = cur;
+    if (e.key === "ArrowRight") nc = Math.min(maxC, nc + 1);
+    else if (e.key === "ArrowLeft") nc = Math.max(0, nc - 1);
+    else if (e.key === "ArrowDown") nr = Math.min(maxR, nr + 1);
+    else if (e.key === "ArrowUp") nr = Math.max(0, nr - 1);
+    else if (e.key === "Home") { nc = 0; }
+    else if (e.key === "End") { nc = maxC; }
+    // Find the nearest existing cell on the target row (cells with 0 value are not focusable).
+    let target = at(nr, nc);
+    if (!target) {
+      const rowCells = cells.filter((el) => Number(el.dataset.r) === nr).sort((a, b) => Number(a.dataset.c) - Number(b.dataset.c));
+      target = rowCells.find((el) => Number(el.dataset.c) >= nc) || rowCells[rowCells.length - 1] || cells[0];
+    }
+    target?.focus();
+  };
+
+
+  const Cell = ({ cell, lga, category, isTotal, rowIdx, colIdx }: { cell: KHeatmap["colTotals"][string]; lga: string | null; category: string; isTotal?: boolean; rowIdx: number; colIdx: number }) => {
     const value = cell?.value || 0;
     const followed = cell?.followed || 0;
     const fpct = value ? Math.round((followed / value) * 100) : 0;
+    const label = `${isTotal ? "All LGAs" : lga} · ${category}`;
     const tip = value
-      ? `${isTotal ? "All LGAs" : lga} · ${category}\n${value} communit${value === 1 ? "y" : "ies"} at first visit (count)\n${followed} followed up over time — ${fpct}% follow-up coverage${clickable ? "\nClick to view the underlying communities & answers" : ""}`
-      : `${isTotal ? "All LGAs" : lga} · ${category}: none`;
+      ? `${label}\n${value} communit${value === 1 ? "y" : "ies"} at first visit (count)\n${followed} followed up over time — ${fpct}% follow-up coverage${clickable ? "\nPress Enter to view the underlying communities & answers" : ""}`
+      : `${label}: none`;
+    const ariaLabel = value
+      ? `${label}. ${value} communities at first visit, ${fpct}% followed up over time.${clickable ? " Activate to view underlying communities." : ""}`
+      : `${label}. No communities.`;
     const inner = (
       <>
         <span className="block font-bold leading-none">{value || "·"}</span>
@@ -233,10 +269,13 @@ function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }
       return (
         <button
           type="button"
+          data-r={rowIdx}
+          data-c={colIdx}
+          role="gridcell"
           onClick={() => onCell!(category, isTotal ? null : lga)}
           title={tip}
-          aria-label={tip.replace(/\n/g, ". ")}
-          className={`w-full rounded-md px-1 py-1.5 transition-all hover:ring-2 hover:ring-offset-1 hover:ring-offset-card focus:outline-none focus:ring-2 cursor-pointer ${isTotal ? "bg-muted/60 text-foreground" : ""}`}
+          aria-label={ariaLabel}
+          className={`w-full rounded-md px-1 py-1.5 transition-all hover:ring-2 hover:ring-offset-1 hover:ring-offset-card focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer ${isTotal ? "bg-muted/60 text-foreground" : ""}`}
           style={{ ...(style || {}), ...(isTotal ? {} : {}) }}
         >
           {inner}
@@ -244,11 +283,12 @@ function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }
       );
     }
     return (
-      <div className={`rounded-md px-1 py-1.5 transition-colors ${isTotal ? "bg-muted/60 text-foreground" : ""}`} title={tip} style={style}>
+      <div className={`rounded-md px-1 py-1.5 transition-colors ${isTotal ? "bg-muted/60 text-foreground" : ""}`} role="gridcell" title={tip} aria-label={ariaLabel} style={style}>
         {inner}
       </div>
     );
   };
+
 
   return (
     <Card className="overflow-hidden">
@@ -260,59 +300,72 @@ function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }
           <p className="py-10 text-center text-xs text-muted-foreground">{empty}</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full border-separate border-spacing-0.5 text-[11px]">
+            <table
+              ref={gridRef}
+              role="grid"
+              aria-label={`${title} heatmap — LGA by category. Use arrow keys to move between cells, Enter to drill in.`}
+              className="w-full border-separate border-spacing-0.5 text-[11px]"
+              onKeyDown={clickable ? handleGridKey : undefined}
+            >
               <thead>
-                <tr>
-                  <th className="sticky left-0 z-10 bg-card px-2 py-1.5 text-left font-semibold text-muted-foreground">LGA / Area Council</th>
+                <tr role="row">
+                  <th className="sticky left-0 z-10 bg-card px-2 py-1.5 text-left font-semibold text-muted-foreground" scope="col">LGA / Area Council</th>
                   {heat.categories.map((c) => (
-                    <th key={c} className="px-1.5 py-1.5 text-center font-semibold text-muted-foreground" title={c}>
+                    <th key={c} className="px-1.5 py-1.5 text-center font-semibold text-muted-foreground" title={c} scope="col">
                       <span className="block max-w-[72px] truncate mx-auto">{c}</span>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {heat.rows.map((row) => (
-                  <tr key={row.lga}>
-                    <td className="sticky left-0 z-10 bg-card px-2 py-1.5 font-medium text-foreground">
+                {heat.rows.map((row, ri) => (
+                  <tr key={row.lga} role="row">
+                    <td className="sticky left-0 z-10 bg-card px-2 py-1.5 font-medium text-foreground" scope="row">
                       <span className="block max-w-[120px] truncate" title={row.lga}>{row.lga}</span>
                     </td>
-                    {heat.categories.map((c) => (
+                    {heat.categories.map((c, ci) => (
                       <td key={c} className="px-0.5 py-0.5 text-center">
-                        <Cell cell={row.cells[c] || { value: 0, followed: 0 }} lga={row.lga} category={c} />
+                        <Cell cell={row.cells[c] || { value: 0, followed: 0 }} lga={row.lga} category={c} rowIdx={ri} colIdx={ci} />
                       </td>
                     ))}
                   </tr>
                 ))}
-                <tr>
-                  <td className="sticky left-0 z-10 bg-muted/60 px-2 py-1.5 font-semibold text-foreground">All LGAs</td>
-                  {heat.categories.map((c) => (
+                <tr role="row">
+                  <td className="sticky left-0 z-10 bg-muted/60 px-2 py-1.5 font-semibold text-foreground" scope="row">All LGAs</td>
+                  {heat.categories.map((c, ci) => (
                     <td key={c} className="px-0.5 py-0.5 text-center">
-                      <Cell cell={heat.colTotals[c] || { value: 0, followed: 0 }} lga={null} category={c} isTotal />
+                      <Cell cell={heat.colTotals[c] || { value: 0, followed: 0 }} lga={null} category={c} isTotal rowIdx={heat.rows.length} colIdx={ci} />
                     </td>
                   ))}
                 </tr>
               </tbody>
             </table>
+
             {/* ── Professional legend / colour scale ── */}
-            <div className="space-y-1.5 border-t border-border/60 px-3 py-2.5">
+            <div className="space-y-1.5 border-t border-border/60 px-3 py-2.5" role="group" aria-label={`${title} legend and colour scale`}>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <span className="font-semibold text-foreground">Colour</span>
-                  <span className="inline-flex items-center gap-1">
+                  <span
+                    className="inline-flex items-center gap-1"
+                    role="img"
+                    aria-label={`Colour scale from 1 (lightest) to ${max} (darkest) communities at first visit, by count`}
+                  >
                     <span>1</span>
-                    <span className="inline-block h-3 w-16 rounded" style={{ background: `linear-gradient(90deg, rgba(${r},${g},${b},0.12), rgba(${r},${g},${b},0.9))` }} />
+                    <span className="inline-block h-3 w-16 rounded" style={{ background: `linear-gradient(90deg, rgba(${r},${g},${b},0.12), rgba(${r},${g},${b},0.9))` }} aria-hidden />
                     <span>{max}</span>
                   </span>
                   <span>communities at first visit (count)</span>
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="font-semibold text-foreground">↑%</span>
+                  <span className="font-semibold text-foreground" aria-hidden>↑%</span>
                   <span>share followed up over time (% of first-visit communities)</span>
                 </span>
               </div>
               {clickable && (
-                <p className="text-[10px] italic text-muted-foreground">Click any cell to drill into the underlying communities, their first-visit answers and follow-up answers.</p>
+                <p className="text-[10px] italic text-muted-foreground">
+                  Click or focus a cell and press Enter to drill into the underlying communities, their first-visit answers and follow-up answers. Use arrow keys to move between cells.
+                </p>
               )}
             </div>
           </div>

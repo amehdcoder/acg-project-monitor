@@ -25,9 +25,10 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
-  ChevronDown, MapPin, User2, CalendarClock, ClipboardList, Search, X, Filter, Download,
+  ChevronDown, MapPin, User2, CalendarClock, ClipboardList, Search, X, Filter, Download, FileText,
 } from "lucide-react";
 import { buildSubmissionsCsv, downloadCsv, slugify, type CsvRow } from "@/lib/mda/csvExport";
+import { exportDrilldownPdf, type PdfRow } from "@/lib/mda/pdfExport";
 
 interface QOption { id?: string; label: string; value: string; }
 interface FormQuestion {
@@ -187,6 +188,7 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
   const [monitorFilter, setMonitorFilter] = useState(ALL);
   const [communityFilter, setCommunityFilter] = useState(ALL);
   const [statusFilter, setStatusFilter] = useState(ALL);
+  const [followUpFilter, setFollowUpFilter] = useState(ALL);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [visible, setVisible] = useState(PAGE);
@@ -202,6 +204,7 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
     setMonitorFilter(ALL);
     setCommunityFilter(ALL);
     setStatusFilter(ALL);
+    setFollowUpFilter(ALL);
     setDateFrom("");
     setDateTo("");
     setVisible(PAGE);
@@ -213,6 +216,16 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
   const communityOf = (s: DrillSubmission) =>
     stripTags(s.data?.community_name ?? s.data?.community ?? s.data?.settlement_name ?? s.data?.settlement);
   const statusOf = (s: DrillSubmission) => stripTags(s.status);
+  // A community counts as "followed up" if any follow-up field carries an answer.
+  const wasFollowedUp = (s: DrillSubmission) => {
+    if (!followUpFields || followUpFields.size === 0) return false;
+    const d = s.data || {};
+    for (const key of followUpFields) {
+      const v = d[key];
+      if (v !== undefined && v !== null && v !== "") return true;
+    }
+    return false;
+  };
 
   const moduleOptions = useMemo(
     () => Array.from(new Set(rows.map((r) => r.module).filter(Boolean))) as string[],
@@ -266,6 +279,11 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
       if (monitorFilter !== ALL && monitorOf(r) !== monitorFilter) return false;
       if (communityFilter !== ALL && communityOf(r) !== communityFilter) return false;
       if (statusFilter !== ALL && statusOf(r) !== statusFilter) return false;
+      if (followUpFilter !== ALL) {
+        const fu = wasFollowedUp(r);
+        if (followUpFilter === "followed" && !fu) return false;
+        if (followUpFilter === "pending" && fu) return false;
+      }
       if (fromTs || toTs) {
         const t = r.submittedAt ? new Date(r.submittedAt).getTime() : NaN;
         if (isNaN(t)) return false;
@@ -287,24 +305,31 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
       }
       return true;
     });
-  }, [rows, search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, dateFrom, dateTo]);
+  }, [rows, search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, followUpFilter, dateFrom, dateTo]);
 
   // Reset pagination whenever the filtered result changes.
-  useEffect(() => setVisible(PAGE), [search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, dateFrom, dateTo]);
+  useEffect(() => setVisible(PAGE), [search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, followUpFilter, dateFrom, dateTo]);
 
+  const hasFollowUp = !!followUpFields && followUpFields.size > 0;
   const hasFilters =
     !!search || moduleFilter !== ALL || stateFilter !== ALL || lgaFilter !== ALL ||
-    monitorFilter !== ALL || communityFilter !== ALL || statusFilter !== ALL || !!dateFrom || !!dateTo;
+    monitorFilter !== ALL || communityFilter !== ALL || statusFilter !== ALL ||
+    followUpFilter !== ALL || !!dateFrom || !!dateTo;
   const clearFilters = () => {
     setSearch(""); setModuleFilter(ALL); setStateFilter(ALL); setLgaFilter(ALL);
     setMonitorFilter(ALL); setCommunityFilter(ALL); setStatusFilter(ALL);
-    setDateFrom(""); setDateTo("");
+    setFollowUpFilter(ALL); setDateFrom(""); setDateTo("");
   };
 
   const handleExportCsv = () => {
     const csv = buildSubmissionsCsv(filtered as CsvRow[], questions as any);
     downloadCsv(`mda-${slugify(data?.title || "drilldown")}-${new Date().toISOString().slice(0, 10)}`, csv);
   };
+
+  const handleExportPdf = () => {
+    exportDrilldownPdf(filtered as PdfRow[], questions as any, data?.title || "MDA Drill-down", data?.subtitle);
+  };
+
 
   const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
@@ -337,18 +362,29 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
         {/* ── Filters ── */}
         <div className="space-y-2 border-b bg-muted/30 px-4 py-3">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search ID, supervisor, community, answer…"
-              className="h-9 pl-8 text-sm"
+              placeholder="Search community name, submission ID, supervisor, answer…"
+              aria-label="Search communities by name or submission ID"
+              className="h-9 pl-8 pr-8 text-sm"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-2">
             {moduleOptions.length > 0 && (
               <Select value={moduleFilter} onValueChange={setModuleFilter}>
-                <SelectTrigger className="col-span-2 h-8 text-xs"><SelectValue placeholder="Module" /></SelectTrigger>
+                <SelectTrigger className="col-span-2 h-8 text-xs" aria-label="Module"><SelectValue placeholder="Module" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL}>All modules</SelectItem>
                   {moduleOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
@@ -356,40 +392,50 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
               </Select>
             )}
             <Select value={stateFilter} onValueChange={(v) => { setStateFilter(v); setLgaFilter(ALL); }}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="State" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs" aria-label="State"><SelectValue placeholder="State" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All states</SelectItem>
                 {stateOptions.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={lgaFilter} onValueChange={(v) => { setLgaFilter(v); setCommunityFilter(ALL); }} disabled={lgaOptions.length === 0}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="LGA" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs" aria-label="LGA"><SelectValue placeholder="LGA" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All LGAs</SelectItem>
                 {lgaOptions.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={monitorFilter} onValueChange={setMonitorFilter} disabled={monitorOptions.length === 0}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Monitor" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs" aria-label="Monitor"><SelectValue placeholder="Monitor" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All monitors</SelectItem>
                 {monitorOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={communityFilter} onValueChange={setCommunityFilter} disabled={communityOptions.length === 0}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Community" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs" aria-label="Community"><SelectValue placeholder="Community" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All communities</SelectItem>
                 {communityOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter} disabled={statusOptions.length === 0}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs" aria-label="Status"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Any status</SelectItem>
                 {statusOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
+            {hasFollowUp && (
+              <Select value={followUpFilter} onValueChange={setFollowUpFilter}>
+                <SelectTrigger className="col-span-2 h-8 text-xs" aria-label="Follow-up status"><SelectValue placeholder="Follow-up status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>Any follow-up status</SelectItem>
+                  <SelectItem value="followed">Followed up</SelectItem>
+                  <SelectItem value="pending">Not yet followed up</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
             <div className="flex items-center gap-1">
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 px-2 text-xs" aria-label="From date" />
             </div>
@@ -406,15 +452,29 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
                 <X className="h-3 w-3" /> Clear filters
               </button>
             ) : <span />}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportCsv}
-              disabled={filtered.length === 0}
-              className="h-7 gap-1.5 text-[11px]"
-            >
-              <Download className="h-3 w-3" /> Export {filtered.length} rows (CSV)
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportCsv}
+                disabled={filtered.length === 0}
+                aria-label={`Export ${filtered.length} communities as CSV`}
+                className="h-7 gap-1.5 text-[11px]"
+              >
+                <Download className="h-3 w-3" aria-hidden /> CSV
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportPdf}
+                disabled={filtered.length === 0}
+                aria-label={`Export ${filtered.length} communities as PDF`}
+                className="h-7 gap-1.5 text-[11px]"
+              >
+                <FileText className="h-3 w-3" aria-hidden /> PDF
+              </Button>
+              <span className="text-[11px] text-muted-foreground">{filtered.length} rows</span>
+            </div>
           </div>
         </div>
 
