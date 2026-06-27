@@ -333,19 +333,45 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     { label: "Adverse Reaction follow-up", icon: AlertTriangle, value: covAdverse, base: communitiesSupervised, tint: AMBER },
   ];
 
-  // ── KPIs ──────────────────────────────────────────────────────
+  // ── KPIs (every checklist-bound metric resolved by question LABEL, never a
+  //    hard-coded field name, so each KPI stays wired to the right question per
+  //    project — Jigawa Schisto, ENDFUND/FCT, etc.) ──────────────────────────
+  const qIndex = useMemo(() => new MdaQuestionIndex(questions as any), [questions]);
+  const kpiKeys = useMemo(() => {
+    const find = (patterns: (string | RegExp)[], fallback: string) =>
+      qIndex.find(patterns)?.key || fallback;
+    return {
+      // "Status of MDA" determinant for the completion KPI.
+      mdaStatus: find([/status\s*of\s*mda/i, /mda\s*status/i, /status.*mass\s*drug/i], "status_of_mda"),
+      // Commodity / medicine availability question.
+      medicine: find(
+        [/commodit.*(availab|sufficient|adequate|enough)/i, /medicine.*(availab|sufficient|adequate|enough)/i, /(availab|sufficient|adequate).*(commodit|medicine|drug)/i, /drugs?\s*availab/i],
+        "commodities_available",
+      ),
+      // Risk categorisation question used to flag high-risk sites.
+      risk: find([/risk\s*categor/i, /risk\s*level/i, /risk\s*rating/i, /\brisk\b/i], "risk_category"),
+      // Whether the adverse event was managed (lives on the follow-up module).
+      aeManaged: find([/(adverse|ae|reaction).*manage/i, /manage.*(adverse|ae|reaction)/i, /(ae|adverse).*(addressed|handled|resolved)/i], "ae_been_managed"),
+    };
+  }, [qIndex]);
+
   const mdaCompleted = useMemo(() => {
     let done = 0, tot = 0;
     for (const s of checklist) {
-      const v = s.data?.status_of_mda;
-      if (v === undefined || v === null || v === "") continue;
-      tot++; if (norm(v) === "completed") done++;
+      const raw = s.data?.[kpiKeys.mdaStatus];
+      if (raw === undefined || raw === null || raw === "") continue;
+      tot++;
+      const lbl = qIndex.label(qIndex.find([/status\s*of\s*mda/i, /mda\s*status/i]) || null, raw) || String(raw);
+      if (norm(lbl) === "completed" || norm(raw) === "completed") done++;
     }
     return { done, tot, pct: pct(done, tot) };
-  }, [checklist]);
-  const medicine = useMemo(() => yesStat(checklist, "commodities_available"), [checklist]);
-  const redFlags = useMemo(() => checklist.filter((s) => norm(s.data?.risk_category) === "high").length, [checklist]);
-  const aeManaged = useMemo(() => yesStat(followUps, "ae_been_managed"), [followUps]);
+  }, [checklist, kpiKeys.mdaStatus, qIndex]);
+  const medicine = useMemo(() => yesStat(checklist, kpiKeys.medicine), [checklist, kpiKeys.medicine]);
+  const redFlags = useMemo(
+    () => checklist.filter((s) => norm(s.data?.[kpiKeys.risk]) === "high").length,
+    [checklist, kpiKeys.risk],
+  );
+  const aeManaged = useMemo(() => yesStat(followUps, kpiKeys.aeManaged), [followUps, kpiKeys.aeManaged]);
 
   // ── Follow-up outcome distributions ───────────────────────────
   const completionFus = followUps.filter((s) => classifyFollowUp(s) === MDA_FOLLOWUP_COMPLETION);
