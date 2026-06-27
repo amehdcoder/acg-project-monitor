@@ -67,6 +67,7 @@ const LEGACY_STATUS_KEYS = ["status_of_mda", "q-1782326272193-cbcu", "q-17822495
 export interface HeatCell {
   value: number; // count at latest/first visit for this category
   followed: number; // how many of those were followed up
+  members?: string[]; // community keys behind this cell (for drill-down)
 }
 export interface HeatRow {
   lga: string;
