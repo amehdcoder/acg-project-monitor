@@ -435,6 +435,32 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
 
   const filterFor = (groupName: string) => groupByName.get(groupName)?.communityFilter;
 
+  // Raw question tree (checklist + follow-up groups + ungrouped) used to
+  // canonicalize submission data and resolve the "Status of MDA" and SAE
+  // questions for the built-in follow-up eligibility rules.
+  const allQuestionTree = useMemo(
+    () => [...groups, ...(props.questions || [])],
+    [groups, props.questions],
+  );
+
+  // Resolve the canonical keys of the Status-of-MDA and SAE-complaint questions
+  // by tolerant label matching so the rules work across every project.
+  const followUpResolution = useMemo(() => {
+    const idx = new MdaQuestionIndex(allQuestionTree as any);
+    const statusQ = idx.find([
+      /current status of mda/i, /status of mda/i, /mda.*complet/i, /completion status/i,
+    ]);
+    const saeQ = idx.find([
+      /complain.*side effect/i, /side effects during mda/i, /anybody complain/i,
+      /adverse reaction/i, /\bsae\b/i,
+    ]);
+    return {
+      statusKeys: statusQ ? [statusQ.key] : [],
+      saeKeys: saeQ ? [saeQ.key] : [],
+    };
+  }, [allQuestionTree]);
+
+
   const builderDialog = builderGroup && canBuildFollowUps ? (
     <FollowUpLinkEditor
       key={`mda-landing-builder-${builderGroup.id}`}
