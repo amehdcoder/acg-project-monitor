@@ -310,8 +310,8 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
     });
   }, [rows, search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, followUpFilter, dateFrom, dateTo]);
 
-  // Reset pagination whenever the filtered result changes.
-  useEffect(() => setVisible(PAGE), [search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, followUpFilter, dateFrom, dateTo]);
+  // Reset to first page whenever the filtered result changes.
+  useEffect(() => setPage(1), [search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, followUpFilter, dateFrom, dateTo]);
 
   const hasFollowUp = !!followUpFields && followUpFields.size > 0;
   const hasFilters =
