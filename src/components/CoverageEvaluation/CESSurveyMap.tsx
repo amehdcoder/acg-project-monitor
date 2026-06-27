@@ -34,6 +34,7 @@ export interface SurveyHousehold {
   lng: number;
   coverage_status: string;
   segment_id?: string | null;
+  segment_label?: string | null;
   eligible_persons?: number;
   treated_persons?: number;
 }
@@ -221,6 +222,7 @@ const CESSurveyMap = ({
   const boundaryRenderKeyRef = useRef<string>("");
   const featureRenderKeyRef = useRef<string>("");
   const sampleRenderKeyRef = useRef<string>("");
+  const gpsLedPanUntilRef = useRef(0);
   // Active tile config (url + native zoom + subdomains) used by the offline
   // prefetcher to download the exact same imagery the map is currently showing.
   const activeTileRef = useRef<{ mode: CesBasemap; sources: CesTileSource[] }>({
@@ -403,6 +405,10 @@ const CESSurveyMap = ({
     let warmTimer: number | null = null;
     let warmIdle: number | null = null;
     const scheduleWarm = () => {
+      // GPS-follow panning can fire many moveend events while walking. Do not
+      // start cache I/O from those moves; the visible tile layer will render,
+      // and manual/off-idle validation remains available without scroll jank.
+      if (Date.now() < gpsLedPanUntilRef.current) return;
       if (warmTimer !== null) window.clearTimeout(warmTimer);
       if (warmIdle !== null && "cancelIdleCallback" in window) {
         (window as any).cancelIdleCallback(warmIdle);
@@ -411,13 +417,13 @@ const CESSurveyMap = ({
       warmTimer = window.setTimeout(() => {
         if (typeof navigator !== "undefined" && navigator.onLine === false) return;
         if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
-        const run = () => void prefetchOfflineTiles(undefined, { maxTiles: 96, zoomAhead: 1, zoomBack: 0, padRatio: 0.04, quiet: true, concurrency: 1 });
+        const run = () => void prefetchOfflineTiles(undefined, { maxTiles: 32, zoomAhead: 1, zoomBack: 0, padRatio: 0.02, quiet: true, concurrency: 1 });
         if ("requestIdleCallback" in window) {
           warmIdle = (window as any).requestIdleCallback(run, { timeout: 2500 });
         } else {
           run();
         }
-      }, 1200);
+      }, 5000);
     };
     map.on("moveend zoomend", scheduleWarm);
     scheduleWarm();
@@ -470,7 +476,7 @@ const CESSurveyMap = ({
     if (btn) { btn.innerHTML = "…"; btn.style.pointerEvents = "none"; }
     let done = 0;
     let saved = 0;
-    const CONCURRENCY = opts.concurrency ?? 8;
+    const CONCURRENCY = Math.max(1, Math.min(opts.concurrency ?? 4, 4));
     let idx = 0;
     const cache = "caches" in window ? await caches.open(CES_MAP_TILE_CACHE).catch(() => null) : null;
     const worker = async () => {
@@ -482,7 +488,7 @@ const CESSurveyMap = ({
         done++;
         if (btn) btn.title = `Caching offline map… ${done}/${requests.length}`;
         // Yield regularly so large offline downloads never lock scrolling/taps.
-        if (done % 24 === 0) await waitForCesTileFrame();
+        if (done % 12 === 0) await waitForCesTileFrame();
       }
     };
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
@@ -525,6 +531,7 @@ const CESSurveyMap = ({
       // Avoid tile churn from 1–5 m GPS jitter. The marker still moves every
       // update; the expensive basemap only recentres after meaningful movement.
       if (!current || current.distanceTo(next) > 25) {
+        gpsLedPanUntilRef.current = Date.now() + 6000;
         map.panTo(next, { animate: false });
       }
     }
@@ -580,6 +587,7 @@ const CESSurveyMap = ({
     let cancelled = false;
     let frame = 0;
     const deferredLayers: Array<() => void> = [];
+    let deferredIndex = 0;
     const deferLayer = (fn: () => void) => deferredLayers.push(fn);
     const markComplete = () => {
       if (cancelled || destroyedRef.current) return;
@@ -591,13 +599,13 @@ const CESSurveyMap = ({
       if (cancelled || destroyedRef.current) return;
       const start = typeof performance !== "undefined" ? performance.now() : Date.now();
       let processed = 0;
-      while (deferredLayers.length > 0 && processed < staticLayerBudget.batchSize) {
+      while (deferredIndex < deferredLayers.length && processed < staticLayerBudget.batchSize) {
         const now = typeof performance !== "undefined" ? performance.now() : Date.now();
         if (now - start > staticLayerBudget.frameMs) break;
-        deferredLayers.shift()?.();
+        deferredLayers[deferredIndex++]?.();
         processed++;
       }
-      if (deferredLayers.length > 0) frame = window.requestAnimationFrame(flushDeferredLayers);
+      if (deferredIndex < deferredLayers.length) frame = window.requestAnimationFrame(flushDeferredLayers);
       else markComplete();
     };
 
