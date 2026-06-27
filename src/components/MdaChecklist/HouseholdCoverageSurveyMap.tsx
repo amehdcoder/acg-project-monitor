@@ -570,12 +570,17 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
       cluster.addLayers(markers);
     }
 
-    // Prefer fitting to the full state extent so the whole state map is visible;
-    // fall back to the marker bounds when no boundary is available.
-    try {
-      const target = stateBounds.isValid() ? stateBounds : bounds;
-      if (target.isValid()) map.fitBounds(target, { padding: [28, 28], maxZoom: 13 });
-    } catch { /* noop */ }
+    // Auto-fit so EVERY household marker is visible. `bounds` already contains
+    // both the state extent (when available) and every plotted marker — markers
+    // can fall outside their recorded state (e.g. blank/captured-only geography),
+    // so we must never fit to the state polygon alone or those pins land
+    // off-screen. Skip the auto-fit entirely once the viewport is locked by a
+    // restored/shared URL view or a manual pan/zoom.
+    if (!viewLockedRef.current) {
+      try {
+        if (bounds.isValid()) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 14 });
+      } catch { /* noop */ }
+    }
   }
 
   // ── Heatmap overlay ──
