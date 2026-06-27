@@ -28,6 +28,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useCESRoles } from "@/hooks/useCESRoles";
+import { clearCesLocationHandoffIntent, isUsableCesLocationPrefill, readCesLocationPrefill } from "@/lib/mda/cesLocationBridge";
 import CESSurveyMap, { SurveyHousehold, type FeatureLabelRequest } from "./CESSurveyMap";
 import { kmeansSegments, Segment, LatLng } from "@/lib/ces/kmeansSegments";
 import { equalPerimeterSegments } from "@/lib/ces/equalPerimeterSegments";
@@ -274,73 +275,34 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [prefillMissing, setPrefillMissing] = useState(false);
 
   const applyChecklistPrefill = useCallback(() => {
-    let fromChecklist = false;
-    let bridgePayload: string | null = null;
-    try {
-      fromChecklist = sessionStorage.getItem("amehnities:cesFromChecklist") === "1";
-      if (!fromChecklist) {
-        // Fallback to localStorage bridge if sessionStorage was lost (e.g. new tab/session)
-        bridgePayload = localStorage.getItem("amehnities:cesPrefillBridge");
-        if (bridgePayload) {
-          const p = JSON.parse(bridgePayload);
-          // 10-minute expiry (600,000ms)
-          if (p && p.ts && Date.now() - p.ts < 600000) {
-            fromChecklist = true;
-          }
-        }
-      }
-    } catch { /* ignore */ }
-
-    // Nothing was stashed by the checklist on this navigation — leave any prior
-    // manual selection untouched and don't trigger the fallback flow.
-    if (!fromChecklist) return;
-
-    let applied = false;
-    try {
-      let raw = sessionStorage.getItem("amehnities:cesLocationPrefill");
-      if (!raw) raw = bridgePayload || localStorage.getItem("amehnities:cesPrefillBridge");
-      
-      if (raw) {
-        const p = JSON.parse(raw);
-        if (p && (!p.projectId || !projectId || p.projectId === projectId)) {
-          const loc = {
-            state: p.state || "",
-            lga: p.lga || "",
-            ward: p.ward || "",
-            flhf_name: p.flhf_name || "",
-            community_name: p.community_name || "",
-            settlement_name: p.settlement_name || "",
-          };
-          // A valid prefill must at least identify State + LGA + Ward + Community.
-          if (loc.state && loc.lga && loc.ward && loc.community_name) {
-            setState(loc.state);
-            setLga(loc.lga);
-            setWard(loc.ward);
-            setFlhfName(loc.flhf_name);
-            setCommunityName(loc.community_name);
-            setSettlementName(loc.settlement_name);
-            lockedLocationRef.current = loc;
-            setLocationLocked(true);
-            setPrefillMissing(false);
-            applied = true;
-          }
-        }
-      }
-    } catch { /* ignore */ }
-
-    // Fallback: user came from the checklist but no usable prefill was found.
-    if (!applied) {
+    const { intent, prefill } = readCesLocationPrefill();
+    if (!intent) return;
+    // Wait until Coverage Evaluation has selected the same project. The previous
+    // implementation consumed the bridge while `projectId` was still empty or on
+    // an older saved project, causing the false Code red fallback.
+    if (!projectId || (prefill?.projectId && prefill.projectId !== projectId)) return;
+    if (!isUsableCesLocationPrefill(prefill)) {
       setPrefillMissing(true);
-    } else {
-      // Clear the bridge only on success to allow retries if projectId was mismatched initially
-      try { localStorage.removeItem("amehnities:cesPrefillBridge"); } catch { /* ignore */ }
+      return;
     }
-
-    // One-shot: consume sessionStorage signals so a later manual visit isn't affected.
-    try {
-      sessionStorage.removeItem("amehnities:cesLocationPrefill");
-      sessionStorage.removeItem("amehnities:cesFromChecklist");
-    } catch { /* ignore */ }
+    const loc = {
+      state: prefill.state,
+      lga: prefill.lga,
+      ward: prefill.ward,
+      flhf_name: prefill.flhf_name,
+      community_name: prefill.community_name,
+      settlement_name: prefill.settlement_name,
+    };
+    setState(loc.state);
+    setLga(loc.lga);
+    setWard(loc.ward);
+    setFlhfName(loc.flhf_name);
+    setCommunityName(loc.community_name);
+    setSettlementName(loc.settlement_name);
+    lockedLocationRef.current = loc;
+    setLocationLocked(true);
+    setPrefillMissing(false);
+    clearCesLocationHandoffIntent();
   }, [projectId]);
   // Apply on mount, and again whenever the user re-enters this tab from the
   // checklist while the component is already mounted (tab switch, no remount).
@@ -365,6 +327,18 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     setCommunityName("");
     setSettlementName("");
   }, []);
+
+  const getCurrentGeo = useCallback(() => {
+    const locked = locationLocked && lockedLocationRef.current ? lockedLocationRef.current : null;
+    return locked ?? {
+      state,
+      lga,
+      ward,
+      flhf_name: flhfName,
+      community_name: communityName,
+      settlement_name: settlementName,
+    };
+  }, [locationLocked, state, lga, ward, flhfName, communityName, settlementName]);
 
 
   // Microplanning Data
