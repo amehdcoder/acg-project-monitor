@@ -421,6 +421,37 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   // Owner-defined KPI engine (resolves every determinant by question LABEL).
   const kpis = useMemo(() => computeMdaKpis(filtered as any, questions as any), [filtered, questions]);
 
+  // ── Heatmap cell drill-down ──────────────────────────────────
+  const [drill, setDrill] = useState<DrillData | null>(null);
+  const comRows = useMemo(() => {
+    const m = new Map<string, MdaSubmission[]>();
+    for (const s of filtered) {
+      const k = communityKey(s as any);
+      let arr = m.get(k);
+      if (!arr) { arr = []; m.set(k, arr); }
+      arr.push(s);
+    }
+    return m;
+  }, [filtered]);
+  const followUpFieldSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const names of Object.values(moduleQuestions)) for (const n of names) set.add(n);
+    return set;
+  }, [moduleQuestions]);
+  const openHeatDrill = (heat: KHeatmap, category: string, lga: string | null, title: string, tint: string) => {
+    const cell = lga === null ? heat.colTotals[category] : heat.rows.find((r) => r.lga === lga)?.cells[category];
+    const keys = new Set(cell?.members || []);
+    const rows: MdaSubmission[] = [];
+    for (const k of keys) for (const s of comRows.get(k) || []) rows.push(s);
+    rows.sort((a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime());
+    setDrill({
+      title: `${title} — ${category}`,
+      subtitle: `${lga ? lga + " · " : "All LGAs · "}${keys.size} communit${keys.size === 1 ? "y" : "ies"} at first visit · ${rows.length} submission${rows.length === 1 ? "" : "s"}`,
+      tint,
+      rows: rows as any,
+    });
+  };
+
   const filtersActive =
     fState !== ALL || fLga !== ALL || fWard !== ALL || fStatus !== ALL || fModule !== ALL || !!fFrom || !!fTo || !!search;
   const resetFilters = () => {
