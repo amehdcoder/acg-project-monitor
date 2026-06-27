@@ -66,6 +66,8 @@ interface Props {
   questions: AQuestion[];
   projectName?: string;
   followUpFields?: Set<string>;
+  /** When true, renders an "offline — showing cached data" banner. */
+  offline?: boolean;
 }
 
 // ── Small UI atoms ──
