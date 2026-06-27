@@ -174,6 +174,9 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
   const captureRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const clusterRef = useRef<any>(null);
+  const plainLayerRef = useRef<L.LayerGroup | null>(null);
+  const lightTileRef = useRef<L.TileLayer | null>(null);
+  const satTileRef = useRef<L.TileLayer | null>(null);
   const boundaryLayerRef = useRef<L.LayerGroup | null>(null);
   const heatRef = useRef<any>(null);
   const liveRef = useRef<L.Marker | null>(null);
@@ -184,6 +187,12 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
   // manually moved the map — suppresses auto-fitBounds so shared links / manual
   // panning are respected on refresh.
   const viewLockedRef = useRef(false);
+
+  // Marker clustering toggle (#7) and basemap (#8 — satellite on focus).
+  const [clustered, setClustered] = useState(true);
+  const [basemap, setBasemap] = useState<"light" | "satellite">(() =>
+    readUrl(URL_KEYS.basemap) === "satellite" ? "satellite" : "light",
+  );
 
   const [points, setPoints] = useState<VisitPoint[]>([]);
   const [loading, setLoading] = useState(true);
