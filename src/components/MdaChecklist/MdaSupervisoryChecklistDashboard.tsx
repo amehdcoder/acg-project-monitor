@@ -989,12 +989,12 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
 
       {/* ── KPI tiles ── */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-        <Kpi icon={MapPin} label="Communities Supervised" value={fmt(kpis.communitiesSupervised)} sub={`${fmt(kpis.distinctCommunities)} distinct communit${kpis.distinctCommunities === 1 ? "y" : "ies"}`} tint={BLUE} />
-        <Kpi icon={CheckCircle2} label="MDA Completed" value={`${kpis.mdaCompleted.pct}%`} sub={`${fmt(kpis.mdaCompleted.done)} of ${fmt(kpis.mdaCompleted.total)} submissions`} tint={EMERALD} bar={kpis.mdaCompleted.pct} />
-        <Kpi icon={Pill} label="Sufficient Medicine" value={`${kpis.sufficientMedicine.pct}%`} sub={`${fmt(kpis.sufficientMedicine.yes)} of ${fmt(kpis.sufficientMedicine.total)} submissions`} tint={TEAL} bar={kpis.sufficientMedicine.pct} />
-        <Kpi icon={Activity} label="Follow-up Coverage" value={kpis.followUpCoverage.needing ? `${kpis.followUpCoverage.pct}%` : "—"} sub={`${fmt(kpis.followUpCoverage.followed)} of ${fmt(kpis.followUpCoverage.needing)} needing follow-up`} tint={VIOLET} bar={kpis.followUpCoverage.needing ? kpis.followUpCoverage.pct : undefined} />
-        <Kpi icon={AlertTriangle} label="Adverse Cases Managed" value={kpis.adverseManaged.reported ? `${kpis.adverseManaged.pct}%` : "—"} sub={`${fmt(kpis.adverseManaged.managed)} of ${fmt(kpis.adverseManaged.reported)} SAE cases`} tint={AMBER} bar={kpis.adverseManaged.reported ? kpis.adverseManaged.pct : undefined} />
-        <Kpi icon={Flag} label="Red-flag Sites" value={fmt(kpis.redFlagSites)} sub="communities needing action" tint={RED} />
+        <Kpi icon={MapPin} label="Communities Supervised" value={fmt(kpis.communitiesSupervised)} sub={`${fmt(kpis.distinctCommunities)} distinct communit${kpis.distinctCommunities === 1 ? "y" : "ies"}`} tint={BLUE} onExport={() => exportKpi("communitiesSupervised")} exporting={kpiExporting === "communitiesSupervised"} />
+        <Kpi icon={CheckCircle2} label="MDA Completed" value={`${kpis.mdaCompleted.pct}%`} sub={`${fmt(kpis.mdaCompleted.done)} of ${fmt(kpis.mdaCompleted.total)} submissions`} tint={EMERALD} bar={kpis.mdaCompleted.pct} onExport={() => exportKpi("mdaCompleted")} exporting={kpiExporting === "mdaCompleted"} />
+        <Kpi icon={Pill} label="Sufficient Medicine" value={`${kpis.sufficientMedicine.pct}%`} sub={`${fmt(kpis.sufficientMedicine.yes)} of ${fmt(kpis.sufficientMedicine.total)} submissions`} tint={TEAL} bar={kpis.sufficientMedicine.pct} onExport={() => exportKpi("sufficientMedicine")} exporting={kpiExporting === "sufficientMedicine"} />
+        <Kpi icon={Activity} label="Follow-up Coverage" value={kpis.followUpCoverage.needing ? `${kpis.followUpCoverage.pct}%` : "—"} sub={`${fmt(kpis.followUpCoverage.followed)} of ${fmt(kpis.followUpCoverage.needing)} needing follow-up`} tint={VIOLET} bar={kpis.followUpCoverage.needing ? kpis.followUpCoverage.pct : undefined} onExport={() => exportKpi("followUpCoverage")} exporting={kpiExporting === "followUpCoverage"} />
+        <Kpi icon={AlertTriangle} label="Adverse Cases Managed" value={kpis.adverseManaged.reported ? `${kpis.adverseManaged.pct}%` : "—"} sub={`${fmt(kpis.adverseManaged.managed)} of ${fmt(kpis.adverseManaged.reported)} SAE cases`} tint={AMBER} bar={kpis.adverseManaged.reported ? kpis.adverseManaged.pct : undefined} onExport={() => exportKpi("adverseManaged")} exporting={kpiExporting === "adverseManaged"} />
+        <Kpi icon={Flag} label="Red-flag Sites" value={fmt(kpis.redFlagSites)} sub="communities needing action" tint={RED} onExport={() => exportKpi("redFlagSites")} exporting={kpiExporting === "redFlagSites"} />
       </div>
 
       {/* ── Longitudinal funnel ── */}
