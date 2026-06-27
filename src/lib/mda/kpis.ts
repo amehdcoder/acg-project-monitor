@@ -67,6 +67,7 @@ const LEGACY_STATUS_KEYS = ["status_of_mda", "q-1782326272193-cbcu", "q-17822495
 export interface HeatCell {
   value: number; // count at latest/first visit for this category
   followed: number; // how many of those were followed up
+  members?: string[]; // community keys behind this cell (for drill-down)
 }
 export interface HeatRow {
   lga: string;
@@ -338,21 +339,23 @@ export function computeMdaKpis(submissions: KSubmission[], questions: KQuestion[
     followedIn: (c: Com) => boolean,
   ): Heatmap => {
     const byLga = new Map<string, HeatRow>();
-    const colTotals: Record<string, HeatCell> = Object.fromEntries(cats.map((c) => [c, { value: 0, followed: 0 }]));
+    const colTotals: Record<string, HeatCell> = Object.fromEntries(cats.map((c) => [c, { value: 0, followed: 0, members: [] }]));
     for (const c of relevant) {
       const lga = c.lga || "Unspecified";
       let row = byLga.get(lga);
       if (!row) {
-        row = { lga, total: 0, cells: Object.fromEntries(cats.map((cc) => [cc, { value: 0, followed: 0 }])) };
+        row = { lga, total: 0, cells: Object.fromEntries(cats.map((cc) => [cc, { value: 0, followed: 0, members: [] }])) };
         byLga.set(lga, row);
       }
       row.total++;
       const followed = followedIn(c);
       for (const cat of categoryOf(c)) {
-        if (!row.cells[cat]) row.cells[cat] = { value: 0, followed: 0 };
+        if (!row.cells[cat]) row.cells[cat] = { value: 0, followed: 0, members: [] };
         row.cells[cat].value++;
+        (row.cells[cat].members ||= []).push(c.key);
         if (followed) row.cells[cat].followed++;
         colTotals[cat].value++;
+        (colTotals[cat].members ||= []).push(c.key);
         if (followed) colTotals[cat].followed++;
       }
     }
