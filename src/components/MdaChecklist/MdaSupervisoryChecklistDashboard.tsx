@@ -47,6 +47,11 @@ import FctSupervisoryMap from "./FctSupervisoryMap";
 import HouseholdCoverageSurveyMap from "./HouseholdCoverageSurveyMap";
 import MdaAdvancedAnalyses from "./MdaAdvancedAnalyses";
 import MdaLongitudinalInsights from "./MdaLongitudinalInsights";
+import { useTablePagination } from "@/hooks/useTablePagination";
+import {
+  Pagination, PaginationContent, PaginationItem, PaginationLink,
+  PaginationNext, PaginationPrevious,
+} from "@/components/ui/pagination";
 
 // ───────────────────────── Types ─────────────────────────
 interface QOption { id?: string; label: string; value: string; }
