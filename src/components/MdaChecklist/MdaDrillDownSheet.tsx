@@ -426,6 +426,16 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
                 {statusOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
+            {hasFollowUp && (
+              <Select value={followUpFilter} onValueChange={setFollowUpFilter}>
+                <SelectTrigger className="col-span-2 h-8 text-xs" aria-label="Follow-up status"><SelectValue placeholder="Follow-up status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>Any follow-up status</SelectItem>
+                  <SelectItem value="followed">Followed up</SelectItem>
+                  <SelectItem value="pending">Not yet followed up</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
             <div className="flex items-center gap-1">
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 px-2 text-xs" aria-label="From date" />
             </div>
