@@ -589,18 +589,6 @@ const CESSurveyMap = ({
       });
     }
 
-    // GPS breadcrumb trail — faint blue polyline showing where the surveyor walked.
-    if (gpsTrail.length >= 2) {
-      L.polyline(gpsTrail.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
-        color: "hsl(217 91% 60%)",
-        weight: 2,
-        opacity: 0.55,
-        dashArray: "1 4",
-      })
-        .bindTooltip(`GPS trail · ${gpsTrail.length} fixes`, { permanent: false, sticky: true })
-        .addTo(lg);
-    }
-
     // Draft polygon (manual draw mode) — dashed amber line + numbered vertices,
     // closing line back to the first vertex so the user sees the shape live.
     if (draftPolygon.length >= 1) {
@@ -802,7 +790,7 @@ const CESSurveyMap = ({
       }).addTo(lg);
       if (onHouseholdClick) m.on("click", () => onHouseholdClick(h.id));
     }
-  }, [perimeter, segments, selectedSegmentIds, households, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, mapFeatures, showFeatures, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas?.selfIntersects, lqas?.ready, lqas?.areaM2, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, gpsTrail, samplingPins]);
+  }, [perimeter, segments, selectedSegmentIds, households, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, mapFeatures, showFeatures, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas?.selfIntersects, lqas?.ready, lqas?.areaM2, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, samplingPins]);
 
   // Live overlays: cheap, rebuilt as GPS updates arrive.
   useEffect(() => {
@@ -834,6 +822,19 @@ const CESSurveyMap = ({
         .addTo(lg);
     }
 
+    // GPS breadcrumb trail — kept in the cheap live layer so moving in the
+    // field does not redraw static rooftops, roads, segments or household pins.
+    if (gpsTrail.length >= 2) {
+      L.polyline(gpsTrail.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
+        color: "hsl(217 91% 60%)",
+        weight: 2,
+        opacity: 0.55,
+        dashArray: "1 4",
+      })
+        .bindTooltip(`GPS trail · ${gpsTrail.length} fixes`, { permanent: false, sticky: true })
+        .addTo(lg);
+    }
+
     if (routeTo && Number.isFinite(centerLat) && Number.isFinite(centerLng)) {
       L.polyline(
         [[centerLat, centerLng], [routeTo.lat, routeTo.lng]] as L.LatLngExpression[],
@@ -847,7 +848,7 @@ const CESSurveyMap = ({
         }),
       }).addTo(lg);
     }
-  }, [centerLat, centerLng, centerLabel, livePosition, perimeter, lqas?.closureM, lqas?.ready, routeTo]);
+  }, [centerLat, centerLng, centerLabel, livePosition, perimeter, lqas?.closureM, lqas?.ready, routeTo, gpsTrail]);
 
   return <div ref={containerRef} style={{ height, width: "100%" }} className="rounded-lg overflow-hidden border border-border" />;
 };
