@@ -634,6 +634,9 @@ const CESSurveyMap = ({
         weight: 4,
         opacity: 0.9,
         dashArray: lqasState === "invalid" ? "6 4" : undefined,
+        // While drawing, overlays must NOT capture taps or the map click handler
+        // (which records vertices) never fires.
+        interactive: !drawMode,
       }).addTo(lg);
 
       const polygonLayer = L.polygon(perimeter.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
@@ -641,6 +644,7 @@ const CESSurveyMap = ({
         weight: 2,
         fillColor,
         fillOpacity: lqasState === "ready" ? 0.12 : 0.05,
+        interactive: !drawMode,
       }).addTo(lg);
 
       const areaTxt = lqas?.areaM2 != null
