@@ -216,7 +216,7 @@ function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }
   const handleGridKey = (e: React.KeyboardEvent<HTMLTableElement>) => {
     const keys = ["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "Home", "End"];
     if (!keys.includes(e.key)) return;
-    const cells = Array.from(gridRef.current?.querySelectorAll<HTMLButtonElement>("button[data-r]") || []);
+    const cells: HTMLButtonElement[] = Array.from(gridRef.current?.querySelectorAll<HTMLButtonElement>("button[data-r]") ?? []);
     if (cells.length === 0) return;
     const active = document.activeElement as HTMLButtonElement | null;
     const cur = active && active.dataset.r !== undefined
