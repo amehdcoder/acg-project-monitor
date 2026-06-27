@@ -1054,6 +1054,14 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Heatmap cell drill-down ── */}
+      <MdaDrillDownSheet
+        data={drill}
+        questions={questions as any}
+        followUpFields={followUpFieldSet}
+        onClose={() => setDrill(null)}
+      />
     </div>
   );
 }
