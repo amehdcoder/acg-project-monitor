@@ -272,28 +272,34 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // True when the user explicitly proceeded from the checklist but the prefill
   // was missing/unreadable — drives the fallback "reselect" error flow.
   const [prefillMissing, setPrefillMissing] = useState(false);
+
   const applyChecklistPrefill = useCallback(() => {
     let fromChecklist = false;
+    let bridgePayload: string | null = null;
     try {
       fromChecklist = sessionStorage.getItem("amehnities:cesFromChecklist") === "1";
       if (!fromChecklist) {
         // Fallback to localStorage bridge if sessionStorage was lost (e.g. new tab/session)
-        const bridge = localStorage.getItem("amehnities:cesPrefillBridge");
-        if (bridge) {
-          const p = JSON.parse(bridge);
+        bridgePayload = localStorage.getItem("amehnities:cesPrefillBridge");
+        if (bridgePayload) {
+          const p = JSON.parse(bridgePayload);
           // 10-minute expiry (600,000ms)
           if (p && p.ts && Date.now() - p.ts < 600000) {
-      let raw = sessionStorage.getItem("amehnities:cesLocationPrefill");
-      if (!raw) raw = localStorage.getItem("amehnities:cesPrefillBridge");
-      if (raw) {
+            fromChecklist = true;
           }
         }
       }
     } catch { /* ignore */ }
+
+    // Nothing was stashed by the checklist on this navigation — leave any prior
+    // manual selection untouched and don't trigger the fallback flow.
     if (!fromChecklist) return;
+
     let applied = false;
     try {
-      const raw = sessionStorage.getItem("amehnities:cesLocationPrefill");
+      let raw = sessionStorage.getItem("amehnities:cesLocationPrefill");
+      if (!raw) raw = bridgePayload || localStorage.getItem("amehnities:cesPrefillBridge");
+      
       if (raw) {
         const p = JSON.parse(raw);
         if (p && (!p.projectId || !projectId || p.projectId === projectId)) {
@@ -318,21 +324,24 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             setPrefillMissing(false);
             applied = true;
           }
-      localStorage.removeItem("amehnities:cesPrefillBridge");
         }
       }
     } catch { /* ignore */ }
+
     // Fallback: user came from the checklist but no usable prefill was found.
     if (!applied) {
       setPrefillMissing(true);
+    } else {
+      // Clear the bridge only on success to allow retries if projectId was mismatched initially
+      try { localStorage.removeItem("amehnities:cesPrefillBridge"); } catch { /* ignore */ }
     }
-    // One-shot: consume both signals so a later manual visit isn't affected.
+
+    // One-shot: consume sessionStorage signals so a later manual visit isn't affected.
     try {
       sessionStorage.removeItem("amehnities:cesLocationPrefill");
       sessionStorage.removeItem("amehnities:cesFromChecklist");
     } catch { /* ignore */ }
   }, [projectId]);
-
   // Apply on mount, and again whenever the user re-enters this tab from the
   // checklist while the component is already mounted (tab switch, no remount).
   useEffect(() => {
