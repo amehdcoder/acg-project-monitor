@@ -37,7 +37,7 @@ import { downloadCSV, downloadGeoJSON, generateCESReportPDF } from "@/lib/ces/ex
 import { logCESAction } from "@/lib/ces/auditLog";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import {
-  saveHouseholdOffline, syncCESOfflineQueue, getPendingCount,
+  saveHouseholdOffline, syncCESOfflineQueue, getPendingCount, getPendingHouseholds,
   registerCESSyncOnReconnect, getDeviceId, generateUUID, saveSurveyOffline, type OfflineHousehold,
 } from "@/lib/ces/offlineHouseholds";
 import StreetViewPanel from "./StreetViewPanel";
@@ -2000,7 +2000,17 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
     const id = surveyId || (await persistSurvey("draft"));
     if (!id) return;
-    const { data: u } = await supabase.auth.getUser();
+    let currentUserId: string | null = null;
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      currentUserId = sess.session?.user?.id ?? null;
+      if (!currentUserId && navigator.onLine) {
+        const { data: u } = await supabase.auth.getUser();
+        currentUserId = u.user?.id ?? null;
+      }
+    } catch {
+      currentUserId = null;
+    }
     const next = households.length + 1;
     const hhNumber = `HH${String(next).padStart(3, "0")}`;
     // Attribute the visit to whichever selected segment actually contains the pin
@@ -2017,7 +2027,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     const fingerprintHash = Array.from(new Uint8Array(fgHashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
     // Evidence Hash
-    const rawEvidence = `${id}${hhNumber}${pendingPin.lat}${pendingPin.lng}mock_photo_hash${ts}${u.user?.id || 'unknown'}${hhForm.status}`;
+    const rawEvidence = `${id}${hhNumber}${pendingPin.lat}${pendingPin.lng}mock_photo_hash${ts}${currentUserId || 'unknown'}${hhForm.status}`;
     const evHashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(rawEvidence));
     const evidenceHash = Array.from(new Uint8Array(evHashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
@@ -2036,11 +2046,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
       device_id: devId,
       visited_at: ts,
-      created_by: u.user?.id ?? null,
+      created_by: currentUserId,
       synced: false,
       retry_count: 0,
       segment_label: segLabel || null,
       gps_snapshot: JSON.stringify(gps),
+      eligible_persons: parseInt(hhForm.eligiblePersons) || 0,
+      treated_persons: parseInt(hhForm.treatedPersons) || 0,
     };
 
     // ─── Offline-First: try Supabase, fall back to IndexedDB ───
@@ -2063,14 +2075,22 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         commodity: hhForm.commodity, notes: hhForm.notes,
         duplicate_reason: hhForm.duplicateReason || null,
         evidence_hash: evidenceHash, device_id: devId,
-        visited_at: ts, synced_at: ts, created_by: u.user?.id,
+        visited_at: ts, synced_at: ts, created_by: currentUserId,
         eligible_persons: parseInt(hhForm.eligiblePersons) || 0,
         treated_persons: parseInt(hhForm.treatedPersons) || 0,
         segment_label: segLabel || null,
         gps_snapshot: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy, captured_at: ts } : null,
       };
 
-      const { data, error } = await supabase.from("ces_household_visits" as any).insert(row).select().single();
+      let data: any = null;
+      let error: any = null;
+      try {
+        const resp = await supabase.from("ces_household_visits" as any).insert(row).select().single();
+        data = resp.data;
+        error = resp.error;
+      } catch (err: any) {
+        error = err;
+      }
       if (error || !data) {
         // Network error even though "online" — fall back to offline
         await saveHouseholdOffline(offlineRow);
@@ -2083,7 +2103,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         supabase.from("ces_household_fingerprints" as any).insert({
           survey_id: id, household_id: savedId, fingerprint_hash: fingerprintHash,
           location_fingerprint_hash: "mock-cell-tower", lat: pendingPin.lat, long: pendingPin.lng,
-          timestamp: ts, interviewer_id: u.user?.id
+          timestamp: ts, interviewer_id: currentUserId
         }).then(() => {});
       }
     }
@@ -2112,9 +2132,26 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   useEffect(() => {
     if (!surveyId) return;
     (async () => {
-      const { data } = await supabase
-        .from("ces_household_visits" as any).select("*").eq("survey_id", surveyId);
-      const mapped: SurveyHousehold[] = ((data as any) ?? []).map((d: any) => ({
+      const pending = await getPendingHouseholds(surveyId);
+      let data: any[] = [];
+      if (navigator.onLine) {
+        try {
+          const resp = await supabase
+            .from("ces_household_visits" as any).select("*").eq("survey_id", surveyId);
+          data = (resp.data as any[]) ?? [];
+        } catch {
+          data = [];
+        }
+      }
+      const mapped: SurveyHousehold[] = [...data, ...pending.map((p) => ({
+        id: p.local_id,
+        hh_number: p.hh_number,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        coverage_status: p.coverage_status,
+        eligible_persons: p.eligible_persons || 0,
+        treated_persons: p.treated_persons || 0,
+      }))].map((d: any) => ({
         id: d.id, hh_number: d.hh_number, lat: d.latitude, lng: d.longitude, coverage_status: d.coverage_status,
         eligible_persons: d.eligible_persons || 0, treated_persons: d.treated_persons || 0,
       }));
