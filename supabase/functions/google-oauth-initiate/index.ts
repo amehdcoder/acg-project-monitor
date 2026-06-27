@@ -50,8 +50,23 @@ serve(async (req) => {
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const returnTo: string = body.return_to ?? "";
 
-    // state = base64(user_id|nonce|return_to)
+    // state = base64(user_id|nonce|return_to). Persist the nonce server-side so
+    // the callback can verify it and prevent OAuth token-injection forgery.
     const nonce = crypto.randomUUID();
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    });
+    const { error: nonceErr } = await admin
+      .from("oauth_state_nonces")
+      .insert({ nonce, user_id: userRes.user.id });
+    if (nonceErr) {
+      return new Response(
+        JSON.stringify({ error: "Could not initialize OAuth session. Please try again." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const stateRaw = `${userRes.user.id}|${nonce}|${returnTo}`;
     const state = btoa(stateRaw).replace(/=+$/, "");
 

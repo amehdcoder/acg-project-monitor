@@ -43,11 +43,13 @@ serve(async (req) => {
 
   let returnTo = "";
   let userId = "";
+  let nonce = "";
   try {
     if (state) {
       const decoded = atob(state);
-      const [uid, _nonce, ret] = decoded.split("|");
+      const [uid, n, ret] = decoded.split("|");
       userId = uid;
+      nonce = n ?? "";
       returnTo = ret ?? "";
     }
   } catch {}
@@ -57,7 +59,7 @@ serve(async (req) => {
       headers: { "Content-Type": "text/html" },
     });
   }
-  if (!code || !userId) {
+  if (!code || !userId || !nonce) {
     return new Response(htmlPage("error", "Missing code or state.", returnTo), {
       headers: { "Content-Type": "text/html" },
     });
@@ -74,6 +76,28 @@ serve(async (req) => {
       { headers: { "Content-Type": "text/html" } },
     );
   }
+
+  // Verify the state nonce against the value stored at initiation time. This
+  // prevents an attacker from forging a state with a victim's user_id and
+  // injecting their own Google tokens under the victim's account.
+  const stateValidator = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false },
+  });
+  const { data: nonceRow, error: nonceLookupErr } = await stateValidator
+    .from("oauth_state_nonces")
+    .select("user_id, expires_at")
+    .eq("nonce", nonce)
+    .maybeSingle();
+
+  if (nonceLookupErr || !nonceRow || nonceRow.user_id !== userId ||
+      new Date(nonceRow.expires_at).getTime() < Date.now()) {
+    return new Response(
+      htmlPage("error", "Invalid or expired sign-in request. Please try connecting again.", returnTo),
+      { headers: { "Content-Type": "text/html" } },
+    );
+  }
+  // One-time use: delete immediately to prevent replay.
+  await stateValidator.from("oauth_state_nonces").delete().eq("nonce", nonce);
 
   try {
     const redirectUri = `${supabaseUrl}/functions/v1/google-oauth-callback`;
