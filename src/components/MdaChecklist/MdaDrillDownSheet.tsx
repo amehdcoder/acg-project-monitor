@@ -384,7 +384,7 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
           <div className="grid grid-cols-2 gap-2">
             {moduleOptions.length > 0 && (
               <Select value={moduleFilter} onValueChange={setModuleFilter}>
-                <SelectTrigger className="col-span-2 h-8 text-xs"><SelectValue placeholder="Module" /></SelectTrigger>
+                <SelectTrigger className="col-span-2 h-8 text-xs" aria-label="Module"><SelectValue placeholder="Module" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL}>All modules</SelectItem>
                   {moduleOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
@@ -392,35 +392,35 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
               </Select>
             )}
             <Select value={stateFilter} onValueChange={(v) => { setStateFilter(v); setLgaFilter(ALL); }}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="State" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs" aria-label="State"><SelectValue placeholder="State" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All states</SelectItem>
                 {stateOptions.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={lgaFilter} onValueChange={(v) => { setLgaFilter(v); setCommunityFilter(ALL); }} disabled={lgaOptions.length === 0}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="LGA" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs" aria-label="LGA"><SelectValue placeholder="LGA" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All LGAs</SelectItem>
                 {lgaOptions.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={monitorFilter} onValueChange={setMonitorFilter} disabled={monitorOptions.length === 0}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Monitor" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs" aria-label="Monitor"><SelectValue placeholder="Monitor" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All monitors</SelectItem>
                 {monitorOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={communityFilter} onValueChange={setCommunityFilter} disabled={communityOptions.length === 0}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Community" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs" aria-label="Community"><SelectValue placeholder="Community" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All communities</SelectItem>
                 {communityOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter} disabled={statusOptions.length === 0}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs" aria-label="Status"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Any status</SelectItem>
                 {statusOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
