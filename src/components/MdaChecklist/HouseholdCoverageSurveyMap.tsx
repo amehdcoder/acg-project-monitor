@@ -400,6 +400,32 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     }).addTo(map);
     map.setView([9.6, 8.1], 6);
 
+    // Restore a saved viewport (center + zoom) from the URL so shared links and
+    // page refreshes reopen to the exact same view.
+    const savedCenter = readUrl(URL_KEYS.center);
+    const savedZoom = readUrl(URL_KEYS.zoom);
+    if (savedCenter) {
+      const [latS, lngS] = savedCenter.split(",");
+      const lat = Number(latS), lng = Number(lngS), z = Number(savedZoom);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        map.setView([lat, lng], Number.isFinite(z) ? z : map.getZoom(), { animate: false });
+        viewLockedRef.current = true;
+      }
+    }
+
+    // Persist viewport on user-driven pan/zoom; mark the view as locked so the
+    // auto-fit in redraw() no longer overrides the user's chosen view.
+    const persistView = () => {
+      const c = map.getCenter();
+      viewLockedRef.current = true;
+      writeUrl({
+        [URL_KEYS.center]: `${c.lat.toFixed(5)},${c.lng.toFixed(5)}`,
+        [URL_KEYS.zoom]: String(map.getZoom()),
+      });
+    };
+    map.on("moveend", persistView);
+    map.on("zoomend", persistView);
+
     // Clustering group with an outcome-aware cluster icon.
     const cluster = (L as any).markerClusterGroup({
       chunkedLoading: true,
