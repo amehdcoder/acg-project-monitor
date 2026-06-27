@@ -144,7 +144,11 @@ export function aggregateByCommunity(subs: ASubmission[]): CommunityAgg[] {
     if (ts) { agg.firstTs = Math.min(agg.firstTs, ts); agg.lastTs = Math.max(agg.lastTs, ts); }
     const loc = readGps(s); if (loc) agg.location = loc;
     for (const [key, val] of Object.entries(s.data || {})) {
-      if (val !== undefined && val !== null && String(val).trim() !== "" && typeof val !== "object") {
+      // Keep scalars AND multiselect arrays (e.g. "Type of SAE"); skip only
+      // structured objects like geopoints / metadata blobs.
+      const isArr = Array.isArray(val);
+      const keepable = val !== undefined && val !== null && (isArr ? val.length > 0 : typeof val !== "object" && String(val).trim() !== "");
+      if (keepable) {
         agg.values[key] = val;
       }
     }
