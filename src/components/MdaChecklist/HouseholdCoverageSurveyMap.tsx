@@ -12,7 +12,9 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import {
   Home, MapPin, Loader2, Play, Pause, SkipForward, SkipBack,
-  Flame, Download, FileImage, FileText, RotateCcw, X, ListFilter,
+  Flame, Download, FileImage, FileText, FileSpreadsheet, RotateCcw, X, ListFilter,
+  Layers, Satellite,
+
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
