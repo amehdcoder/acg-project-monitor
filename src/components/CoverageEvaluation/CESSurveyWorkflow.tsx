@@ -2637,8 +2637,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       bestAccuracyM: perimeterBestAccRef.current,
       recording: recordingPerimeter,
     }),
-    // Deliberately do not depend on nowTick: polygon/self-intersection checks
-    // can be expensive and must not run every 500ms just to update a clock label.
+    // Deliberately avoid clock-tick dependencies: polygon/self-intersection
+    // checks can be expensive and must not run just to update a label.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [perimeter, gps, walkedM, recordingPerimeter],
   );
