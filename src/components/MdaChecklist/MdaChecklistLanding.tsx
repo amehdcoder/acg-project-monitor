@@ -585,6 +585,9 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
           accent="adverse"
           filterExpr={filterFor(GROUP_ADVERSE)}
           nameMap={checklistNameMap}
+          questions={allQuestionTree}
+          saeKeys={followUpResolution.saeKeys}
+          requireSae
           onConfigure={canBuildFollowUps ? () => openBuilder(ensureFollowUpGroup(GROUP_ADVERSE)) : undefined}
           onBack={() => setView("home")}
           onSelect={(c) => { setSelected(c); setView("adverse"); }}
