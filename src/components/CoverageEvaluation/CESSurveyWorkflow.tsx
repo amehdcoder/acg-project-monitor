@@ -2567,7 +2567,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const accuracyColor = !gps ? "text-muted-foreground" :
     gps.accuracy <= 15 ? "text-green-600" : gps.accuracy <= 25 ? "text-indigo-600" : gps.accuracy <= 50 ? "text-yellow-600" : "text-red-600";
 
-  // Live walk-perimeter telemetry (recomputed on perimeter / gps / nowTick change)
+  // Live walk-perimeter telemetry (recomputed on perimeter/GPS/status changes;
+  // no high-frequency whole-form ticker).
   const walkTelemetry = useMemo(() => {
     const vertices = perimeter.length;
     const liveAccuracyM = gps?.accuracy ?? null;
@@ -2576,7 +2577,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       ? haversineMeters({ lat: gps.lat, lng: gps.lng }, perimeter[0])
       : null;
     const estAreaM2 = vertices >= 3 ? polygonAreaM2(perimeter) : null;
-    const lastVertexAgoS = lastVertexAt ? Math.max(0, Math.floor((nowTick - lastVertexAt) / 1000)) : null;
+    const lastVertexAgoS = lastVertexAt ? Math.max(0, Math.floor((Date.now() - lastVertexAt) / 1000)) : null;
     const pace: "good" | "slow" | "stationary" =
       !recordingPerimeter ? "good"
       : lastVertexAgoS == null ? "good"
@@ -2585,7 +2586,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       : "stationary";
     const readyToClose = recordingPerimeter && vertices >= 6 && closureM != null && closureM <= 15;
     return { vertices, walkedM, liveAccuracyM, bestAccuracyM, closureM, estAreaM2, lastVertexAgoS, pace, readyToClose };
-  }, [perimeter, gps, walkedM, lastVertexAt, nowTick, recordingPerimeter]);
+  }, [perimeter, gps, walkedM, lastVertexAt, recordingPerimeter, perimeterStatus.lastFixAgeMs]);
 
   // WHO LQAS-aligned compliance evaluation for the lot boundary walk.
   // Default test threshold is 80% (the WHO MDA program standard); this can
@@ -2967,11 +2968,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                     <span className="flex items-center gap-1.5 font-semibold">
                       <span className="inline-block h-2 w-2 rounded-full bg-white animate-pulse" />
                       Stop
-                      <span
-                        key={vertexFlash}
-                        className="tabular-nums transition-transform duration-200 inline-block"
-                        style={{ transform: vertexFlash ? "scale(1.18)" : "scale(1)" }}
-                      >
+                      <span className="tabular-nums inline-block">
                         · {walkTelemetry.vertices} pts
                       </span>
                     </span>
