@@ -83,6 +83,8 @@ const URL_KEYS = {
   lga: "hcs_lga",
   community: "hcs_community",
   state: "hcs_state",
+  center: "hcs_center",
+  zoom: "hcs_zoom",
 } as const;
 
 const stateKeys = (value: unknown) => {
