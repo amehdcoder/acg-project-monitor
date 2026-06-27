@@ -193,7 +193,8 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
   const [followUpFilter, setFollowUpFilter] = useState(ALL);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [visible, setVisible] = useState(PAGE);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [page, setPage] = useState(1);
 
   const rows = data?.rows || [];
 
