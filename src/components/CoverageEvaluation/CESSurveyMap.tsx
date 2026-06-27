@@ -550,6 +550,7 @@ const CESSurveyMap = ({
       coordsKey(perimeter),
       coordsKey(draftPolygon),
       editablePerimeter ? "edit" : "view",
+      drawMode ? "draw" : "static",
       lqas?.selfIntersects ? "bad" : lqas?.ready ? "ready" : "progress",
       Math.round(lqas?.areaM2 ?? -1),
     ].join("|");
