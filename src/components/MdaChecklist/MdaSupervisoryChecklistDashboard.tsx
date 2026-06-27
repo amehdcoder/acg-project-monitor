@@ -243,13 +243,17 @@ function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }
   };
 
 
-  const Cell = ({ cell, lga, category, isTotal }: { cell: KHeatmap["colTotals"][string]; lga: string | null; category: string; isTotal?: boolean }) => {
+  const Cell = ({ cell, lga, category, isTotal, rowIdx, colIdx }: { cell: KHeatmap["colTotals"][string]; lga: string | null; category: string; isTotal?: boolean; rowIdx: number; colIdx: number }) => {
     const value = cell?.value || 0;
     const followed = cell?.followed || 0;
     const fpct = value ? Math.round((followed / value) * 100) : 0;
+    const label = `${isTotal ? "All LGAs" : lga} · ${category}`;
     const tip = value
-      ? `${isTotal ? "All LGAs" : lga} · ${category}\n${value} communit${value === 1 ? "y" : "ies"} at first visit (count)\n${followed} followed up over time — ${fpct}% follow-up coverage${clickable ? "\nClick to view the underlying communities & answers" : ""}`
-      : `${isTotal ? "All LGAs" : lga} · ${category}: none`;
+      ? `${label}\n${value} communit${value === 1 ? "y" : "ies"} at first visit (count)\n${followed} followed up over time — ${fpct}% follow-up coverage${clickable ? "\nPress Enter to view the underlying communities & answers" : ""}`
+      : `${label}: none`;
+    const ariaLabel = value
+      ? `${label}. ${value} communities at first visit, ${fpct}% followed up over time.${clickable ? " Activate to view underlying communities." : ""}`
+      : `${label}. No communities.`;
     const inner = (
       <>
         <span className="block font-bold leading-none">{value || "·"}</span>
@@ -265,10 +269,13 @@ function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }
       return (
         <button
           type="button"
+          data-r={rowIdx}
+          data-c={colIdx}
+          role="gridcell"
           onClick={() => onCell!(category, isTotal ? null : lga)}
           title={tip}
-          aria-label={tip.replace(/\n/g, ". ")}
-          className={`w-full rounded-md px-1 py-1.5 transition-all hover:ring-2 hover:ring-offset-1 hover:ring-offset-card focus:outline-none focus:ring-2 cursor-pointer ${isTotal ? "bg-muted/60 text-foreground" : ""}`}
+          aria-label={ariaLabel}
+          className={`w-full rounded-md px-1 py-1.5 transition-all hover:ring-2 hover:ring-offset-1 hover:ring-offset-card focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer ${isTotal ? "bg-muted/60 text-foreground" : ""}`}
           style={{ ...(style || {}), ...(isTotal ? {} : {}) }}
         >
           {inner}
@@ -276,11 +283,12 @@ function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }
       );
     }
     return (
-      <div className={`rounded-md px-1 py-1.5 transition-colors ${isTotal ? "bg-muted/60 text-foreground" : ""}`} title={tip} style={style}>
+      <div className={`rounded-md px-1 py-1.5 transition-colors ${isTotal ? "bg-muted/60 text-foreground" : ""}`} role="gridcell" title={tip} aria-label={ariaLabel} style={style}>
         {inner}
       </div>
     );
   };
+
 
   return (
     <Card className="overflow-hidden">
