@@ -147,6 +147,9 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
 
   const [exporting, setExporting] = useState(false);
 
+  // Marker details panel (GPS + outcome data for the clicked household visit)
+  const [selectedVisit, setSelectedVisit] = useState<VisitPoint | null>(null);
+
   // ── Load household visits (project-scoped, joined to survey geography) ──
   useEffect(() => {
     let cancelled = false;
