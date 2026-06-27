@@ -204,6 +204,7 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
     setMonitorFilter(ALL);
     setCommunityFilter(ALL);
     setStatusFilter(ALL);
+    setFollowUpFilter(ALL);
     setDateFrom("");
     setDateTo("");
     setVisible(PAGE);
