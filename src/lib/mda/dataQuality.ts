@@ -137,6 +137,29 @@ export function buildQualityReport(
       )
     : 0;
 
+  // ── Project-wide per-section raw counts (drives the "what's missing" panel) ──
+  const total = communities.length;
+  const sections: SectionSummary[] = sectionDefs.map((def) => {
+    const answeredList = def.q ? communities.filter((c) => hasValue(c, def.q)) : [];
+    const answered = answeredList.length;
+    const missingKeys = def.q
+      ? communities.filter((c) => !hasValue(c, def.q)).map((c) => c.key)
+      : communities.map((c) => c.key);
+    const pct = def.q && total ? Math.round((answered / total) * 100) : 0;
+    return {
+      id: def.id,
+      label: def.label,
+      resolved: !!def.q,
+      questionLabel: def.q ? def.q.label || null : null,
+      answered,
+      missing: total - answered,
+      total,
+      pct,
+      level: def.q ? levelOf(pct) : "bad",
+      missingKeys,
+    };
+  });
+
   return {
     projectName,
     totalCommunities: communities.length,
@@ -145,6 +168,7 @@ export function buildQualityReport(
     overallScore,
     overallLevel: levelOf(overallScore),
     lgas,
+    sections,
     unresolved,
   };
 }
