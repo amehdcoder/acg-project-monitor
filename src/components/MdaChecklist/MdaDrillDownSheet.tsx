@@ -452,15 +452,29 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
                 <X className="h-3 w-3" /> Clear filters
               </button>
             ) : <span />}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportCsv}
-              disabled={filtered.length === 0}
-              className="h-7 gap-1.5 text-[11px]"
-            >
-              <Download className="h-3 w-3" /> Export {filtered.length} rows (CSV)
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportCsv}
+                disabled={filtered.length === 0}
+                aria-label={`Export ${filtered.length} communities as CSV`}
+                className="h-7 gap-1.5 text-[11px]"
+              >
+                <Download className="h-3 w-3" aria-hidden /> CSV
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportPdf}
+                disabled={filtered.length === 0}
+                aria-label={`Export ${filtered.length} communities as PDF`}
+                className="h-7 gap-1.5 text-[11px]"
+              >
+                <FileText className="h-3 w-3" aria-hidden /> PDF
+              </Button>
+              <span className="text-[11px] text-muted-foreground">{filtered.length} rows</span>
+            </div>
           </div>
         </div>
 
