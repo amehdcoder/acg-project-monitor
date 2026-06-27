@@ -756,7 +756,12 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       </Card>
 
       {/* ── Insightful, conditionally-formatted analyses ── */}
-      <MdaAdvancedAnalyses submissions={filtered as any} questions={questions as any} />
+      <MdaAdvancedAnalyses
+        submissions={filtered as any}
+        questions={questions as any}
+        projectName={projectName}
+        followUpFields={new Set(Object.values(moduleQuestions).flatMap((s) => Array.from(s)))}
+      />
 
       {/* ── Longitudinal linkage register ── */}
       <Card>
