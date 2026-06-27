@@ -14,7 +14,7 @@
  * follow-up outcome panels, a per-community linkage register and a coverage
  * map — all driven by a comprehensive, professional filter bar.
  */
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend,
