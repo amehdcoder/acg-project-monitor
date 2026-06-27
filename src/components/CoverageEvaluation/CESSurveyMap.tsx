@@ -436,7 +436,7 @@ const CESSurveyMap = ({
           if (cached) {
             saved++;
           } else {
-            const res = await fetch(req, { cache: "force-cache" });
+            const res = await fetch(req, { cache: "no-store" });
             if (cache && (res.ok || res.type === "opaque")) {
               await cache.put(req, res.clone()).catch(() => undefined);
               saved++;
@@ -802,7 +802,7 @@ const CESSurveyMap = ({
       }).addTo(lg);
       if (onHouseholdClick) m.on("click", () => onHouseholdClick(h.id));
     }
-  }, [perimeter, segments, selectedSegmentIds, households, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, mapFeatures, showFeatures, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, gpsTrail, samplingPins]);
+  }, [perimeter, segments, selectedSegmentIds, households, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, mapFeatures, showFeatures, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas?.selfIntersects, lqas?.ready, lqas?.areaM2, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, gpsTrail, samplingPins]);
 
   // Live overlays: cheap, rebuilt as GPS updates arrive.
   useEffect(() => {

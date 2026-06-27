@@ -133,7 +133,7 @@ export default defineConfig(({ mode }) => {
             // A large cap keeps a whole survey area's imagery resident on-device.
             urlPattern: ({ url }: any) =>
               /(^|\.)arcgisonline\.com$/.test(url.hostname) ||
-              /(^|\.)google\.com$/.test(url.hostname) ||
+              /^mt[0-3]\.google\.com$/.test(url.hostname) ||
               /(^|\.)tile\.openstreetmap\.org$/.test(url.hostname) ||
               /(^|\.)tile\.opentopomap\.org$/.test(url.hostname),
             handler: "CacheFirst",
