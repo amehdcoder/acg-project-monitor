@@ -180,6 +180,10 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
   const geoRef = useRef<any[] | null>(null);
   const sweepTimer = useRef<number | null>(null);
   const restoredSelectionRef = useRef("");
+  // True once the saved viewport (center/zoom) has been applied, or the user has
+  // manually moved the map — suppresses auto-fitBounds so shared links / manual
+  // panning are respected on refresh.
+  const viewLockedRef = useRef(false);
 
   const [points, setPoints] = useState<VisitPoint[]>([]);
   const [loading, setLoading] = useState(true);
