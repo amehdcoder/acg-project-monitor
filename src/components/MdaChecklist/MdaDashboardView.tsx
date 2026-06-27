@@ -158,10 +158,20 @@ function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm, questions:
 
 export default function MdaDashboardView({ form, projects = [], onClose, embedded = false }: Props) {
   const { isOwner } = useAuth();
-  const { submissions, loading } = useDataAnalytics({ formId: form.id });
+  const { submissions, loading, refresh } = useDataAnalytics({ formId: form.id });
   const [simulate, setSimulate] = useState(false);
   const [simCount, setSimCount] = useState(SIM_DEFAULTS.count);
   const [simSeed, setSimSeed] = useState(SIM_DEFAULTS.seed);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const questions = useMemo(
     () => normalizeQuestions([...(form.groups || []), ...(form.questions || [])]),
