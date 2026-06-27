@@ -31,6 +31,8 @@ export interface SurveyHousehold {
 }
 
 
+type CesBasemap = "satellite" | "hybrid" | "street" | "terrain" | "google" | "google-sat";
+
 interface CESSurveyMapProps {
   centerLat: number;
   centerLng: number;
@@ -39,7 +41,7 @@ interface CESSurveyMapProps {
   selectedSegmentIds: string[]; // labels
   households: SurveyHousehold[];
   routeTo?: { lat: number; lng: number } | null;
-  basemap?: "satellite" | "hybrid" | "street" | "terrain" | "google" | "google-sat";
+  basemap?: CesBasemap;
   onMapTap?: (lat: number, lng: number) => void;
   onHouseholdClick?: (id: string) => void;
   height?: string;
@@ -107,7 +109,17 @@ const STATUS_SYMBOL: Record<string, string> = {
   unassessed: "?",
 };
 
-const TILE_LAYERS: Record<string, { url: string; attribution: string; subdomains?: string }> = {
+const MAP_TILE_CACHE = "map-tiles-cache";
+
+type TileSource = {
+  url: string;
+  maxNativeZoom: number;
+  subdomains: string;
+  requestMode: RequestMode;
+  label: string;
+};
+
+const TILE_LAYERS: Record<CesBasemap, { url: string; attribution: string; subdomains?: string }> = {
   satellite: {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     attribution: "Tiles © Esri — World Imagery",
@@ -181,36 +193,54 @@ const CESSurveyMap = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const tileRef = useRef<L.TileLayer | null>(null);
   const labelsRef = useRef<L.TileLayer | null>(null);
-  const layerGroupRef = useRef<L.LayerGroup | null>(null);
+  const staticLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const liveLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const tapHandlerRef = useRef<((lat: number, lng: number) => void) | null>(null);
   // Active tile config (url + native zoom + subdomains) used by the offline
   // prefetcher to download the exact same imagery the map is currently showing.
-  const activeTileRef = useRef<{ url: string; maxNativeZoom: number; subdomains: string }>({
-    url: TILE_LAYERS.satellite.url,
-    maxNativeZoom: 19,
-    subdomains: "abc",
+  const activeTileRef = useRef<{ mode: CesBasemap; sources: TileSource[] }>({
+    mode: "satellite",
+    sources: [{ url: TILE_LAYERS.satellite.url, maxNativeZoom: 19, subdomains: "abc", requestMode: "no-cors", label: "Esri satellite" }],
   });
 
-  const applyBasemap = (map: L.Map, mode: typeof basemap) => {
+  const applyBasemap = (map: L.Map, mode: CesBasemap) => {
     if (tileRef.current) { map.removeLayer(tileRef.current); tileRef.current = null; }
     if (labelsRef.current) { map.removeLayer(labelsRef.current); labelsRef.current = null; }
     const tl = TILE_LAYERS[mode] ?? TILE_LAYERS.satellite;
+    const isGoogle = mode === "google" || mode === "google-sat";
     const nativeZoom = mode === "google" || mode === "google-sat" ? 21 : 19;
-    activeTileRef.current = { url: tl.url, maxNativeZoom: nativeZoom, subdomains: tl.subdomains ?? "abc" };
-    const primary = L.tileLayer(tl.url, {
+    const sources: TileSource[] = [{
+      url: tl.url,
+      maxNativeZoom: nativeZoom,
+      subdomains: tl.subdomains ?? "abc",
+      // Google tiles must stay no-cors; setting crossOrigin causes tile errors
+      // on many Android/WebView installs and forces slow/mismatched fallbacks.
+      requestMode: isGoogle ? "no-cors" : "cors",
+      label: tl.attribution,
+    }];
+    if (mode === "satellite" || mode === "hybrid") {
+      sources.push({ url: ESRI_LABELS_URL, maxNativeZoom: 19, subdomains: "abc", requestMode: "no-cors", label: "Esri reference labels" });
+    }
+    activeTileRef.current = { mode, sources };
+
+    const commonTileOptions: L.TileLayerOptions = {
       attribution: tl.attribution,
       maxZoom: 23,
-      maxNativeZoom: mode === "google" || mode === "google-sat" ? 21 : 19,
-      detectRetina: true,
-      crossOrigin: true,
-      // Instant + smooth rendering: keep a generous off-screen tile buffer so
-      // panning shows imagery immediately, and paint tiles as they stream in
-      // (no waiting for the whole viewport) so cached tiles appear with no delay.
-      keepBuffer: 8,
-      updateWhenIdle: false,
+      maxNativeZoom: nativeZoom,
+      // Deterministic tile URLs are essential for offline: detectRetina silently
+      // requests different z/x/y tiles on high-DPR phones, so prefetched imagery
+      // no longer matches what Leaflet asks for when the device is offline.
+      detectRetina: false,
+      // Smaller buffer + idle updates prevent the map from spawning hundreds of
+      // tile requests while GPS jitters/pans, which was the main slow-render path.
+      keepBuffer: 3,
+      updateWhenIdle: true,
       updateWhenZooming: false,
       ...(tl.subdomains ? { subdomains: tl.subdomains } : {}),
-    } as L.TileLayerOptions).addTo(map);
+      ...(isGoogle ? {} : { crossOrigin: true as const }),
+    };
+
+    const primary = L.tileLayer(tl.url, commonTileOptions).addTo(map);
 
     tileRef.current = primary;
     // Resilience: if Google tiles fail (region block, throttling, offline cache miss),
@@ -219,16 +249,24 @@ const CESSurveyMap = ({
     primary.on("tileerror", () => {
       if (fellBack) return;
       if (mode !== "google" && mode !== "google-sat") return;
+      // Do not swap to a different provider offline. If the user downloaded
+      // Google tiles, replacing the whole layer with uncached Esri tiles makes
+      // the offline map look incomplete/different from the saved online view.
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
       fellBack = true;
       try {
+        activeTileRef.current = {
+          mode: "satellite",
+          sources: [{ url: TILE_LAYERS.satellite.url, maxNativeZoom: 19, subdomains: "abc", requestMode: "cors", label: "Esri satellite fallback" }],
+        };
         const fb = L.tileLayer(TILE_LAYERS.satellite.url, {
           attribution: TILE_LAYERS.satellite.attribution,
           maxZoom: 23,
           maxNativeZoom: 19,
-          detectRetina: true,
+          detectRetina: false,
           crossOrigin: true,
-          keepBuffer: 8,
-          updateWhenIdle: false,
+          keepBuffer: 3,
+          updateWhenIdle: true,
           updateWhenZooming: false,
         } as L.TileLayerOptions).addTo(map);
 
@@ -243,6 +281,7 @@ const CESSurveyMap = ({
       labelsRef.current = L.tileLayer(ESRI_LABELS_URL, {
         maxZoom: 23,
         maxNativeZoom: 19,
+        detectRetina: false,
         opacity: mode === "hybrid" ? 1 : 0.85,
         pane: "overlayPane",
       } as L.TileLayerOptions).addTo(map);
@@ -260,8 +299,16 @@ const CESSurveyMap = ({
       maxZoom: 23,
     }).setView([centerLat, centerLng], 17);
     applyBasemap(map, basemap);
-    layerGroupRef.current = L.layerGroup().addTo(map);
+    staticLayerGroupRef.current = L.layerGroup().addTo(map);
+    liveLayerGroupRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
+
+    const fixSize = () => map.invalidateSize({ animate: false });
+    const t0 = window.setTimeout(fixSize, 0);
+    const t1 = window.setTimeout(fixSize, 300);
+    const ro = new ResizeObserver(fixSize);
+    if (containerRef.current) ro.observe(containerRef.current);
+    window.addEventListener("resize", fixSize);
 
     // Single click handler that delegates to whatever the latest onMapTap is
     // (kept fresh via tapHandlerRef so toggling drawMode never detaches the listener).
@@ -295,9 +342,27 @@ const CESSurveyMap = ({
     });
     map.addControl(new DownloadControl());
 
+    let warmTimer: number | null = null;
+    const scheduleWarm = () => {
+      if (warmTimer !== null) window.clearTimeout(warmTimer);
+      warmTimer = window.setTimeout(() => {
+        void prefetchOfflineTiles(undefined, { maxTiles: 320, zoomAhead: 1, zoomBack: 0, padRatio: 0.08, quiet: true, concurrency: 3 });
+      }, 1200);
+    };
+    map.on("moveend zoomend", scheduleWarm);
+    scheduleWarm();
+
     return () => {
+      window.clearTimeout(t0);
+      window.clearTimeout(t1);
+      if (warmTimer !== null) window.clearTimeout(warmTimer);
+      ro.disconnect();
+      window.removeEventListener("resize", fixSize);
+      map.off("moveend zoomend", scheduleWarm);
       map.remove();
       mapRef.current = null;
+      staticLayerGroupRef.current = null;
+      liveLayerGroupRef.current = null;
     };
     // eslint-disable-next-line
   }, []);
@@ -305,14 +370,19 @@ const CESSurveyMap = ({
   // Pre-fetch all tiles covering the current map view across zoom levels so the
   // imagery is fully available offline. Caps total tile count to protect the
   // device and the runtime cache (4,000-tile budget).
-  const prefetchOfflineTiles = async (btn?: HTMLElement) => {
+  const prefetchOfflineTiles = async (
+    btn?: HTMLElement,
+    opts: { maxTiles?: number; zoomAhead?: number; zoomBack?: number; padRatio?: number; quiet?: boolean; concurrency?: number } = {},
+  ) => {
     const map = mapRef.current;
     if (!map) return;
-    const { url, maxNativeZoom, subdomains } = activeTileRef.current;
-    const bounds = map.getBounds();
-    const startZoom = Math.max(Math.floor(map.getZoom()), 12);
-    // Reach street-level detail offline (deeper zoom) and fill the cache budget.
-    const endZoom = Math.min(maxNativeZoom, startZoom + 5);
+    const { sources } = activeTileRef.current;
+    const bounds = map.getBounds().pad(opts.padRatio ?? 0.3);
+    const currentZoom = Math.max(1, Math.round(map.getZoom()));
+    const maxNativeZoom = Math.max(...sources.map((s) => s.maxNativeZoom));
+    const startZoom = Math.max(Math.min(currentZoom - (opts.zoomBack ?? 1), maxNativeZoom), 12);
+    // Reach street-level detail offline without requesting an unbounded village.
+    const endZoom = Math.min(maxNativeZoom, currentZoom + (opts.zoomAhead ?? 4));
 
     const lat2tileY = (lat: number, z: number) => {
       const rad = (lat * Math.PI) / 180;
@@ -323,45 +393,60 @@ const CESSurveyMap = ({
     const lng2tileX = (lng: number, z: number) =>
       Math.floor(((lng + 180) / 360) * Math.pow(2, z));
 
-    const urls: string[] = [];
-    const MAX_TILES = 3800; // stay within the 4000-entry Workbox map-tiles-cache budget
+    const requests: Array<{ url: string; mode: RequestMode }> = [];
+    const MAX_TILES = opts.maxTiles ?? 12000;
     for (let z = startZoom; z <= endZoom && urls.length < MAX_TILES; z++) {
       const xMin = lng2tileX(bounds.getWest(), z);
       const xMax = lng2tileX(bounds.getEast(), z);
       const yMin = lat2tileY(bounds.getNorth(), z);
       const yMax = lat2tileY(bounds.getSouth(), z);
-      for (let x = xMin; x <= xMax && urls.length < MAX_TILES; x++) {
-        for (let y = yMin; y <= yMax && urls.length < MAX_TILES; y++) {
-          const sub = subdomains[(x + y) % subdomains.length] ?? subdomains[0];
-          urls.push(
-            url
-              .replace("{s}", sub)
-              .replace("{z}", String(z))
-              .replace("{x}", String(x))
-              .replace("{y}", String(y)),
-          );
+      for (const source of sources) {
+        for (let x = xMin; x <= xMax && requests.length < MAX_TILES; x++) {
+          for (let y = yMin; y <= yMax && requests.length < MAX_TILES; y++) {
+            const sub = source.subdomains[(x + y) % source.subdomains.length] ?? source.subdomains[0];
+            requests.push({
+              mode: source.requestMode,
+              url: source.url
+                .replace("{s}", sub)
+                .replace("{z}", String(z))
+                .replace("{x}", String(x))
+                .replace("{y}", String(y)),
+            });
+          }
         }
       }
     }
 
     if (btn) { btn.innerHTML = "…"; btn.style.pointerEvents = "none"; }
     let done = 0;
-    const CONCURRENCY = 6;
+    let saved = 0;
+    const CONCURRENCY = opts.concurrency ?? 8;
     let idx = 0;
+    const cache = "caches" in window ? await caches.open(MAP_TILE_CACHE).catch(() => null) : null;
     const worker = async () => {
-      while (idx < urls.length) {
+      while (idx < requests.length) {
         const i = idx++;
         try {
-          await fetch(urls[i], { mode: "no-cors", cache: "force-cache" });
+          const req = new Request(requests[i].url, { mode: requests[i].mode });
+          const cached = cache ? await cache.match(req) : null;
+          if (cached) {
+            saved++;
+          } else {
+            const res = await fetch(req, { cache: "force-cache" });
+            if (cache && (res.ok || res.type === "opaque")) {
+              await cache.put(req, res.clone()).catch(() => undefined);
+              saved++;
+            }
+          }
         } catch { /* offline / blocked tiles are skipped */ }
         done++;
-        if (btn) btn.title = `Caching offline map… ${done}/${urls.length}`;
+        if (btn) btn.title = `Caching offline map… ${done}/${requests.length}`;
       }
     };
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
     if (btn) {
       btn.innerHTML = "✓";
-      btn.title = `Saved ${done} tiles for offline use`;
+      btn.title = `Saved ${saved}/${requests.length} map tiles for offline use`;
       btn.style.color = "#16a34a";
       btn.style.pointerEvents = "";
       window.setTimeout(() => { btn.innerHTML = "⬇"; btn.style.color = "#1656BA"; }, 4000);
@@ -386,15 +471,23 @@ const CESSurveyMap = ({
   // recenter
   useEffect(() => {
     if (mapRef.current && Number.isFinite(centerLat) && Number.isFinite(centerLng)) {
-      mapRef.current.setView([centerLat, centerLng], mapRef.current.getZoom() || 17);
+      const map = mapRef.current;
+      const next = L.latLng(centerLat, centerLng);
+      const current = map.getCenter();
+      // Avoid tile churn from 1–5 m GPS jitter. The marker still moves every
+      // update; the expensive basemap only recentres after meaningful movement.
+      if (!current || current.distanceTo(next) > 25) {
+        map.panTo(next, { animate: false });
+      }
     }
   }, [centerLat, centerLng]);
 
-  // overlays
+  // Static overlays. Kept separate from the live GPS marker/route so frequent
+  // location updates don't rebuild thousands of rooftop/road/household layers.
   useEffect(() => {
-    if (!mapRef.current || !layerGroupRef.current) return;
-    layerGroupRef.current.clearLayers();
-    const lg = layerGroupRef.current;
+    if (!mapRef.current || !staticLayerGroupRef.current) return;
+    staticLayerGroupRef.current.clearLayers();
+    const lg = staticLayerGroupRef.current;
 
     // perimeter — LQAS-aware styling: green when the lot boundary passes WHO
     // criteria, amber while still in progress, red when the polygon crosses
@@ -447,22 +540,6 @@ const CESSurveyMap = ({
       `;
       polylineLayer.bindPopup(popupHtml);
       polygonLayer.bindPopup(popupHtml);
-
-      // Live closure line — dashed segment from current GPS back to start vertex.
-      if (livePosition && perimeter.length >= 3) {
-        const start = perimeter[0];
-        L.polyline(
-          [[livePosition.lat, livePosition.lng], [start.lat, start.lng]] as L.LatLngExpression[],
-          {
-            color: lqasState === "ready" ? "hsl(142 71% 45%)" : "hsl(38 92% 50%)",
-            weight: 2,
-            opacity: 0.85,
-            dashArray: "4 6",
-          },
-        )
-          .bindTooltip(`Closure: ${closureTxt} to start vertex`, { permanent: false, sticky: true })
-          .addTo(lg);
-      }
 
       // Skip the duplicated closing vertex (last === first) when rendering handles
       // so we don't show two markers stacked at the start.
@@ -556,18 +633,6 @@ const CESSurveyMap = ({
           .bindTooltip(i === 0 ? "Start (tap here to close)" : `Vertex ${i + 1}`, { permanent: false })
           .addTo(lg);
       });
-    }
-
-    if (Number.isFinite(centerLat) && Number.isFinite(centerLng)) {
-      L.circleMarker([centerLat, centerLng], {
-        radius: 8,
-        color: "hsl(var(--background))",
-        weight: 3,
-        fillColor: "hsl(0 84% 60%)",
-        fillOpacity: 0.95,
-      })
-        .bindTooltip(centerLabel, { permanent: false })
-        .addTo(lg);
     }
 
     // ---- Rich feature geometry: building footprints + road/water polylines ----
@@ -720,24 +785,6 @@ const CESSurveyMap = ({
       }).bindTooltip("Sample this building", { sticky: true }).addTo(lg);
     }
 
-    // route
-    if (routeTo) {
-      L.polyline(
-        [
-          [centerLat, centerLng],
-          [routeTo.lat, routeTo.lng],
-        ],
-        { color: "#1d4ed8", weight: 4, dashArray: "6 6" },
-      ).addTo(lg);
-      L.marker([routeTo.lat, routeTo.lng], {
-        icon: L.divIcon({
-          className: "",
-          html: `<div style="background:#1d4ed8;color:#fff;border-radius:9999px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff">⚑</div>`,
-          iconSize: [24, 24],
-        }),
-      }).addTo(lg);
-    }
-
     // households
     for (const h of households) {
       const color = STATUS_COLORS[h.coverage_status] ?? "#64748b";
@@ -751,7 +798,52 @@ const CESSurveyMap = ({
       }).addTo(lg);
       if (onHouseholdClick) m.on("click", () => onHouseholdClick(h.id));
     }
-  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, centerLabel, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, mapFeatures, showFeatures, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas, livePosition, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, gpsTrail, samplingPins]);
+  }, [perimeter, segments, selectedSegmentIds, households, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, mapFeatures, showFeatures, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, gpsTrail, samplingPins]);
+
+  // Live overlays: cheap, rebuilt as GPS updates arrive.
+  useEffect(() => {
+    if (!mapRef.current || !liveLayerGroupRef.current) return;
+    const lg = liveLayerGroupRef.current;
+    lg.clearLayers();
+
+    const closureM = lqas?.closureM != null ? `${Math.round(lqas.closureM)} m` : "—";
+    const closureColor = lqas?.ready ? "hsl(142 71% 45%)" : "hsl(38 92% 50%)";
+    if (livePosition && perimeter.length >= 3) {
+      const start = perimeter[0];
+      L.polyline(
+        [[livePosition.lat, livePosition.lng], [start.lat, start.lng]] as L.LatLngExpression[],
+        { color: closureColor, weight: 2, opacity: 0.85, dashArray: "4 6" },
+      )
+        .bindTooltip(`Closure: ${closureM} to start vertex`, { permanent: false, sticky: true })
+        .addTo(lg);
+    }
+
+    if (Number.isFinite(centerLat) && Number.isFinite(centerLng)) {
+      L.circleMarker([centerLat, centerLng], {
+        radius: 8,
+        color: "hsl(var(--background))",
+        weight: 3,
+        fillColor: "hsl(0 84% 60%)",
+        fillOpacity: 0.95,
+      })
+        .bindTooltip(centerLabel, { permanent: false })
+        .addTo(lg);
+    }
+
+    if (routeTo && Number.isFinite(centerLat) && Number.isFinite(centerLng)) {
+      L.polyline(
+        [[centerLat, centerLng], [routeTo.lat, routeTo.lng]] as L.LatLngExpression[],
+        { color: "#1d4ed8", weight: 4, dashArray: "6 6" },
+      ).addTo(lg);
+      L.marker([routeTo.lat, routeTo.lng], {
+        icon: L.divIcon({
+          className: "",
+          html: `<div style="background:#1d4ed8;color:#fff;border-radius:9999px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff">⚑</div>`,
+          iconSize: [24, 24],
+        }),
+      }).addTo(lg);
+    }
+  }, [centerLat, centerLng, centerLabel, livePosition, perimeter, lqas?.closureM, lqas?.ready, routeTo]);
 
   return <div ref={containerRef} style={{ height, width: "100%" }} className="rounded-lg overflow-hidden border border-border" />;
 };
