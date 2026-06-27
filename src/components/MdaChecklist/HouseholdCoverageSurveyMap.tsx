@@ -588,10 +588,19 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     boundaryLayerRef.current = bGroup;
     if (stateBounds.isValid()) bounds.extend(stateBounds);
 
-    // ── Household outcome markers (clustered) ──
+    // ── Household outcome markers (clustered or plain, per toggle #7) ──
     const cluster = clusterRef.current;
-    if (cluster) {
-      cluster.clearLayers();
+    const plain = plainLayerRef.current;
+    // Detach whichever layer is inactive so toggling is clean.
+    if (cluster) cluster.clearLayers();
+    if (plain) plain.clearLayers();
+    if (cluster && map.hasLayer(cluster) && !clustered) map.removeLayer(cluster);
+    if (cluster && !map.hasLayer(cluster) && clustered) cluster.addTo(map);
+    if (plain && map.hasLayer(plain) && clustered) map.removeLayer(plain);
+    if (plain && !map.hasLayer(plain) && !clustered) plain.addTo(map);
+
+    const target = clustered ? cluster : plain;
+    if (target) {
       const markers: L.Marker[] = [];
       for (const p of windowed) {
         const o = outcomeFor(p.status);
@@ -607,21 +616,13 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
             <span style="color:#64748b">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</span>
           </div>`,
         );
-        m.on("click", () => {
-          setSelectedVisit(p);
-          setSelectedLga("");
-          writeUrl({
-            [URL_KEYS.visit]: p.id,
-            [URL_KEYS.community]: p.community || null,
-            [URL_KEYS.state]: p.state || null,
-            [URL_KEYS.lga]: null,
-          });
-          if (p.community) onSelectCommunity?.(p.community, p.state);
-        });
+        // Clicking a marker pans/zooms and switches to satellite (#8).
+        m.on("click", () => focusVisit(p));
         markers.push(m);
         try { bounds.extend([p.lat, p.lng]); } catch { /* noop */ }
       }
-      cluster.addLayers(markers);
+      if (clustered && cluster) cluster.addLayers(markers);
+      else if (plain) markers.forEach((m) => m.addTo(plain));
     }
 
     // Auto-fit so EVERY household marker is visible. `bounds` already contains
