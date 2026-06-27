@@ -405,9 +405,15 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     // Clean light "state map" basemap (matches the LGA Supervision Map) so the
     // coloured household-outcome pins read clearly against the state boundary —
     // no satellite imagery underneath.
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+    const lightTile = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
       subdomains: "abcd", maxZoom: 19, keepBuffer: 6, updateWhenIdle: false, crossOrigin: true,
-    }).addTo(map);
+    });
+    const satTile = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 21, keepBuffer: 6, updateWhenIdle: false, crossOrigin: true,
+    });
+    lightTileRef.current = lightTile;
+    satTileRef.current = satTile;
+    (basemap === "satellite" ? satTile : lightTile).addTo(map);
     map.setView([9.6, 8.1], 6);
 
     // Restore a saved viewport (center + zoom) from the URL so shared links and
