@@ -222,10 +222,12 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     return sequence.slice(a, b + 1);
   }, [sequence, timeWindow]);
 
-  const statesPresent = useMemo(
-    () => new Set(windowed.map((p) => norm(p.state)).filter(Boolean)),
-    [windowed],
-  );
+  const statesPresent = useMemo(() => {
+    const set = new Set(windowed.map((p) => norm(p.state)).filter(Boolean));
+    // Always show the selected state's map even if it has no visits yet.
+    if (stateFilter) set.add(norm(stateFilter));
+    return set;
+  }, [windowed, stateFilter]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
