@@ -243,45 +243,60 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
             </div>
           </div>
 
-          {isOwner && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant={simulate ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSimulate((v) => !v)}
-                className={simulate ? "bg-violet-600 hover:bg-violet-700" : ""}
-              >
-                {simulate ? <Sparkles className="mr-2 h-4 w-4" /> : <Database className="mr-2 h-4 w-4" />}
-                {simulate ? "Simulating" : "Simulate"}
-              </Button>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Simulation controls">
-                    <Settings2 className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-72" align="end">
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm font-semibold">Simulation controls</p>
-                      <p className="text-xs text-muted-foreground">Owner-only, generated locally, never saved.</p>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Submissions</Label>
-                      <Input type="number" min={10} max={5000} value={simCount} onChange={(e) => setSimCount(Math.max(1, Math.min(5000, Number(e.target.value) || 1)))} className="h-8" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Seed</Label>
-                      <Input type="number" value={simSeed} onChange={(e) => setSimSeed(Number(e.target.value) || 0)} className="h-8" />
-                    </div>
-                    <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => { setSimCount(SIM_DEFAULTS.count); setSimSeed(SIM_DEFAULTS.seed); }}>
-                      <RotateCcw className="mr-2 h-3.5 w-3.5" /> Reset
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5"
+            >
+              {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {refreshing ? "Refreshing" : "Refresh"}
+            </Button>
+
+            {isOwner && <OwnerDataManagement formId={form.id} onChanged={() => refresh()} />}
+
+            {isOwner && (
+              <>
+                <Button
+                  variant={simulate ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSimulate((v) => !v)}
+                  className={simulate ? "bg-violet-600 hover:bg-violet-700" : ""}
+                >
+                  {simulate ? <Sparkles className="mr-2 h-4 w-4" /> : <Database className="mr-2 h-4 w-4" />}
+                  {simulate ? "Simulating" : "Simulate"}
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Simulation controls">
+                      <Settings2 className="h-4 w-4" />
                     </Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-          )}
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72" align="end">
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-sm font-semibold">Simulation controls</p>
+                        <p className="text-xs text-muted-foreground">Owner-only, generated locally, never saved.</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Submissions</Label>
+                        <Input type="number" min={10} max={5000} value={simCount} onChange={(e) => setSimCount(Math.max(1, Math.min(5000, Number(e.target.value) || 1)))} className="h-8" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Seed</Label>
+                        <Input type="number" value={simSeed} onChange={(e) => setSimSeed(Number(e.target.value) || 0)} className="h-8" />
+                      </div>
+                      <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => { setSimCount(SIM_DEFAULTS.count); setSimSeed(SIM_DEFAULTS.seed); }}>
+                        <RotateCcw className="mr-2 h-3.5 w-3.5" /> Reset
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
