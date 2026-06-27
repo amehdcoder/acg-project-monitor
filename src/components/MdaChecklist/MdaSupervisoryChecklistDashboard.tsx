@@ -787,7 +787,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     );
   }
 
-  const completionCovPct = pct(covCompletion, communitiesSupervised);
+
 
   return (
     <div className="space-y-4">
