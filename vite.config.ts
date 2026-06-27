@@ -139,7 +139,10 @@ export default defineConfig(({ mode }) => {
             handler: "CacheFirst",
             options: {
               cacheName: "map-tiles-cache",
-              expiration: { maxEntries: 4000, maxAgeSeconds: 60 * 60 * 24 * 180 },
+              // CES offline areas can legitimately require thousands of imagery
+              // + label tiles across zoom levels. Keep a field-work-sized cache
+              // so downloaded survey areas are not evicted before offline use.
+              expiration: { maxEntries: 50000, maxAgeSeconds: 60 * 60 * 24 * 365 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
