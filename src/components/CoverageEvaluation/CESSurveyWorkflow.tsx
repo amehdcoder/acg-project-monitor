@@ -2679,10 +2679,21 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   const coverageMapSegments = useMemo(() => {
     if (step !== 4 || households.length === 0) return segments;
+    const bySegment = new Map<string, SurveyHousehold[]>();
+    const legacy: SurveyHousehold[] = [];
+    for (const h of households) {
+      if (h.segment_label) {
+        const list = bySegment.get(h.segment_label) ?? [];
+        list.push(h);
+        bySegment.set(h.segment_label, list);
+      } else {
+        legacy.push(h);
+      }
+    }
     return segments.map((s) => {
-      const attributed = households.filter((h) => h.segment_label === s.label);
-      const legacy = households.filter((h) => !h.segment_label && pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon));
-      const inside = attributed.length || legacy.length ? [...attributed, ...legacy] : [];
+      const attributed = bySegment.get(s.label) ?? [];
+      const legacyInside = legacy.filter((h) => pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon));
+      const inside = attributed.length || legacyInside.length ? [...attributed, ...legacyInside] : [];
       const total = inside.length;
       const treated = inside.filter((h) => h.coverage_status === "treated").length;
       const pct = total ? (treated / total) * 100 : -1;
