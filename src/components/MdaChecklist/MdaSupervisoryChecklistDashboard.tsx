@@ -505,6 +505,22 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   // Owner-defined KPI engine (resolves every determinant by question LABEL).
   const kpis = useMemo(() => computeMdaKpis(filtered as any, questions as any), [filtered, questions]);
 
+  // ── KPI data export (#2): clicking a KPI downloads the underlying submissions ──
+  const [kpiExporting, setKpiExporting] = useState<KpiId | null>(null);
+  const exportKpi = useCallback(async (id: KpiId) => {
+    if (kpiExporting) return;
+    setKpiExporting(id);
+    try {
+      await exportKpiWorkbook(id, filtered as any, questions as any, formName || "Integrated MDA Supervisory Checklist", projectName);
+      toast.success("KPI data exported to Excel");
+    } catch (e: any) {
+      console.error("KPI export failed", e);
+      toast.error(e?.message || "Could not export KPI data");
+    } finally {
+      setKpiExporting(null);
+    }
+  }, [kpiExporting, filtered, questions, formName, projectName]);
+
   // ── Heatmap cell drill-down ──────────────────────────────────
   const [drill, setDrill] = useState<DrillData | null>(null);
   const comRows = useMemo(() => {
