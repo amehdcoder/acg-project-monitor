@@ -524,6 +524,8 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
                 ts: Date.now(),
               };
               sessionStorage.setItem("amehnities:cesLocationPrefill", JSON.stringify(prefill));
+              // Bridge for new-session / cross-tab / PWA-navigation resilience
+              localStorage.setItem("amehnities:cesPrefillBridge", JSON.stringify(prefill));
               sessionStorage.setItem("amehnities:cesFromChecklist", "1");
             } catch { /* ignore */ }
             window.dispatchEvent(new CustomEvent("amehnities:navigate-tab", { detail: { tab: "coverage-eval" } }));

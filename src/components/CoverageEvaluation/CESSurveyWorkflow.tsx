@@ -276,9 +276,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     let fromChecklist = false;
     try {
       fromChecklist = sessionStorage.getItem("amehnities:cesFromChecklist") === "1";
+      if (!fromChecklist) {
+        // Fallback to localStorage bridge if sessionStorage was lost (e.g. new tab/session)
+        const bridge = localStorage.getItem("amehnities:cesPrefillBridge");
+        if (bridge) {
+          const p = JSON.parse(bridge);
+          // 10-minute expiry (600,000ms)
+          if (p && p.ts && Date.now() - p.ts < 600000) {
+      let raw = sessionStorage.getItem("amehnities:cesLocationPrefill");
+      if (!raw) raw = localStorage.getItem("amehnities:cesPrefillBridge");
+      if (raw) {
+          }
+        }
+      }
     } catch { /* ignore */ }
-    // Nothing was stashed by the checklist on this navigation — leave any prior
-    // manual selection untouched and don't trigger the fallback flow.
     if (!fromChecklist) return;
     let applied = false;
     try {
@@ -307,6 +318,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             setPrefillMissing(false);
             applied = true;
           }
+      localStorage.removeItem("amehnities:cesPrefillBridge");
         }
       }
     } catch { /* ignore */ }

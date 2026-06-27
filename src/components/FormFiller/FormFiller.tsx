@@ -3991,6 +3991,8 @@ const FormFiller = ({
                     ts: Date.now(),
                   };
                   sessionStorage.setItem("amehnities:cesLocationPrefill", JSON.stringify(prefill));
+                  // Bridge for new-session / cross-tab / PWA-navigation resilience
+                  localStorage.setItem("amehnities:cesPrefillBridge", JSON.stringify(prefill));
                   // Intent flag: lets the Coverage Evaluation page show a clear
                   // fallback error + manual reselection if the prefill is missing.
                   sessionStorage.setItem("amehnities:cesFromChecklist", "1");
