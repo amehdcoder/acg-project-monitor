@@ -473,6 +473,8 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     });
     cluster.addTo(map);
     clusterRef.current = cluster;
+    // Plain (unclustered) marker layer — used when the cluster toggle is off.
+    plainLayerRef.current = L.layerGroup();
 
     mapRef.current = map;
     setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 60);
