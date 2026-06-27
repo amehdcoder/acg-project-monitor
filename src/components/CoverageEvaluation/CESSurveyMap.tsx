@@ -347,7 +347,7 @@ const CESSurveyMap = ({
       // but disable one-finger map dragging on coarse pointers for freeze-free
       // page scrolling through long CES forms.
       dragging: !isCoarsePointer(),
-      touchZoom: !isCoarsePointer(),
+      touchZoom: true,
       scrollWheelZoom: false,
       zoomSnap: 0.25,
       zoomDelta: 0.25,
@@ -1020,7 +1020,7 @@ const CESSurveyMap = ({
     }
   }, [isNearViewport, centerLat, centerLng, centerLabel, livePosition, perimeter, lqas?.closureM, lqas?.ready, routeTo, gpsTrail]);
 
-  return <div ref={containerRef} style={{ height, width: "100%", contain: "layout paint size" }} className="rounded-lg overflow-hidden border border-border" />;
+  return <div ref={containerRef} style={{ height, width: "100%", contain: "layout paint size", touchAction: isCoarsePointer() ? "pan-y pinch-zoom" : undefined }} className="ces-survey-map rounded-lg overflow-hidden border border-border" />;
 };
 
 export default memo(CESSurveyMap);
