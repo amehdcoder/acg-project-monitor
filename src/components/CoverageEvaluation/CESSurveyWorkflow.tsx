@@ -1410,7 +1410,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const deferredResidentialMask = useDeferredValue(residentialMask);
   const deferredPerimeter = useDeferredValue(perimeter);
 
-  const featureSummary = useMemo(() => {
+  const featureSummaryCore = useMemo(() => {
     const fg = deferredResidentialMask?.featureGeometry;
     if (!fg) return { buildings: 0, roads: 0, waterways: 0, uncertain: 0, namedRoads: 0, labeled: 0, avgConfidence: 0 };
     const perimeterIndex = deferredPerimeter.length >= 3 ? pointInPolygonIndex(deferredPerimeter) : null;
@@ -1431,10 +1431,16 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       waterways: inPerimeter.waterways.length,
       uncertain,
       namedRoads: inPerimeter.roads.filter((r) => !!(r.name || r.ref)).length,
-      labeled: Object.keys(featureLabelMap).length,
+      labeled: 0,
       avgConfidence,
     };
-  }, [deferredResidentialMask, deferredPerimeter, featureLabelMap]);
+  }, [deferredResidentialMask, deferredPerimeter]);
+
+  const featureLabelCount = useMemo(() => Object.keys(featureLabelMap).length, [featureLabelMap]);
+  const featureSummary = useMemo(
+    () => ({ ...featureSummaryCore, labeled: featureLabelCount }),
+    [featureSummaryCore, featureLabelCount],
+  );
 
   useEffect(() => {
     if (maskStatus !== "ok") return;
