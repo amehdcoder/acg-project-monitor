@@ -184,6 +184,9 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
   const [moduleFilter, setModuleFilter] = useState(ALL);
   const [stateFilter, setStateFilter] = useState(ALL);
   const [lgaFilter, setLgaFilter] = useState(ALL);
+  const [monitorFilter, setMonitorFilter] = useState(ALL);
+  const [communityFilter, setCommunityFilter] = useState(ALL);
+  const [statusFilter, setStatusFilter] = useState(ALL);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [visible, setVisible] = useState(PAGE);
@@ -196,6 +199,9 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
     setModuleFilter(ALL);
     setStateFilter(ALL);
     setLgaFilter(ALL);
+    setMonitorFilter(ALL);
+    setCommunityFilter(ALL);
+    setStatusFilter(ALL);
     setDateFrom("");
     setDateTo("");
     setVisible(PAGE);
