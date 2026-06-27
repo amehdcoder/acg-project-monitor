@@ -62,6 +62,8 @@ interface Props {
   formName?: string;
   projectName?: string;
   projectId?: string | null;
+  /** When true, data is served from the offline cache. */
+  offline?: boolean;
 }
 
 // ───────────────────────── Palette ─────────────────────────
