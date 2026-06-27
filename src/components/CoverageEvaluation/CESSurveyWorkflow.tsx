@@ -969,6 +969,36 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     } catch { /* quota — ignore */ }
   }, [perimeter, walkedM, recordingPerimeter, surveyId]);
 
+  // Persist BUILT segments (offline-safe) so a crash/refresh/offline-reload or a
+  // restored network session never loses segmentation work. Segments are saved to
+  // localStorage keyed by survey and restored on mount; persistSurvey() pushes
+  // them to the live server once connectivity returns.
+  useEffect(() => {
+    try {
+      const key = `ces:segments:${surveyId ?? "draft"}`;
+      if (segments.length === 0) localStorage.removeItem(key);
+      else localStorage.setItem(key, JSON.stringify({ segments, selectedSegmentLabels, t: Date.now() }));
+    } catch { /* quota — ignore */ }
+  }, [segments, selectedSegmentLabels, surveyId]);
+
+  const segmentsRestoredRef = useRef(false);
+  useEffect(() => {
+    if (segmentsRestoredRef.current) return;
+    if (segments.length > 0) { segmentsRestoredRef.current = true; return; }
+    try {
+      const key = `ces:segments:${surveyId ?? "draft"}`;
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const saved = JSON.parse(raw) as { segments: Segment[]; selectedSegmentLabels: string[] };
+        if (Array.isArray(saved.segments) && saved.segments.length > 0) {
+          setSegments(saved.segments);
+          setSelectedSegmentLabels(Array.isArray(saved.selectedSegmentLabels) ? saved.selectedSegmentLabels : []);
+        }
+      }
+      segmentsRestoredRef.current = true;
+    } catch { segmentsRestoredRef.current = true; }
+  }, [surveyId, segments.length]);
+
   const togglePerimeterRecording = useCallback(() => {
     setRecordingPerimeter((wasRecording) => {
       if (wasRecording) {

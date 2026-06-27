@@ -42,6 +42,7 @@ import JigawaSupervisoryMap from "./JigawaSupervisoryMap";
 import FctSupervisoryMap from "./FctSupervisoryMap";
 import HouseholdCoverageSurveyMap from "./HouseholdCoverageSurveyMap";
 import MdaAdvancedAnalyses from "./MdaAdvancedAnalyses";
+import MdaLongitudinalInsights from "./MdaLongitudinalInsights";
 
 // ───────────────────────── Types ─────────────────────────
 interface QOption { id?: string; label: string; value: string; }
@@ -765,6 +766,15 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         followUpFields={new Set(Object.values(moduleQuestions).flatMap((s) => Array.from(s)))}
         offline={offline}
       />
+
+      {/* ── Longitudinal follow-up outcome trend + duplicate community flags ── */}
+      <MdaLongitudinalInsights
+        checklist={checklist as any}
+        submissions={filtered as any}
+        questions={questions as any}
+      />
+
+
 
       {/* ── Longitudinal linkage register ── */}
       <Card>
