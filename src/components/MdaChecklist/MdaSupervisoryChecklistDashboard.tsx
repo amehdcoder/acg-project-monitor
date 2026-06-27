@@ -210,6 +210,38 @@ function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }
   const cellFg = (v: number) => (v / max > 0.55 ? "#ffffff" : "hsl(var(--foreground))");
   const hasData = heat.rows.some((row) => heat.categories.some((c) => (row.cells[c]?.value || 0) > 0));
   const clickable = !!onCell;
+  const gridRef = useRef<HTMLTableElement>(null);
+
+  // Roving arrow-key navigation across heatmap cells (grid pattern).
+  const handleGridKey = (e: React.KeyboardEvent<HTMLTableElement>) => {
+    const keys = ["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "Home", "End"];
+    if (!keys.includes(e.key)) return;
+    const cells = Array.from(gridRef.current?.querySelectorAll<HTMLButtonElement>("button[data-r]") || []);
+    if (cells.length === 0) return;
+    const active = document.activeElement as HTMLButtonElement | null;
+    const cur = active && active.dataset.r !== undefined
+      ? { r: Number(active.dataset.r), c: Number(active.dataset.c) }
+      : { r: 0, c: -1 };
+    e.preventDefault();
+    const at = (r: number, c: number) => cells.find((el) => Number(el.dataset.r) === r && Number(el.dataset.c) === c);
+    const maxR = Math.max(...cells.map((el) => Number(el.dataset.r)));
+    const maxC = Math.max(...cells.map((el) => Number(el.dataset.c)));
+    let { r: nr, c: nc } = cur;
+    if (e.key === "ArrowRight") nc = Math.min(maxC, nc + 1);
+    else if (e.key === "ArrowLeft") nc = Math.max(0, nc - 1);
+    else if (e.key === "ArrowDown") nr = Math.min(maxR, nr + 1);
+    else if (e.key === "ArrowUp") nr = Math.max(0, nr - 1);
+    else if (e.key === "Home") { nc = 0; }
+    else if (e.key === "End") { nc = maxC; }
+    // Find the nearest existing cell on the target row (cells with 0 value are not focusable).
+    let target = at(nr, nc);
+    if (!target) {
+      const rowCells = cells.filter((el) => Number(el.dataset.r) === nr).sort((a, b) => Number(a.dataset.c) - Number(b.dataset.c));
+      target = rowCells.find((el) => Number(el.dataset.c) >= nc) || rowCells[rowCells.length - 1] || cells[0];
+    }
+    target?.focus();
+  };
+
 
   const Cell = ({ cell, lga, category, isTotal }: { cell: KHeatmap["colTotals"][string]; lga: string | null; category: string; isTotal?: boolean }) => {
     const value = cell?.value || 0;
