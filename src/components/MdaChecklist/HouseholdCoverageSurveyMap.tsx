@@ -254,11 +254,11 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     const el = containerRef.current;
     if (!el || mapRef.current) return;
     const map = L.map(el, { zoomControl: true, attributionControl: false });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+    // Clean light "state map" basemap (matches the LGA Supervision Map) so the
+    // coloured household-outcome pins read clearly against the state boundary —
+    // no satellite imagery underneath.
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
       subdomains: "abcd", maxZoom: 19, keepBuffer: 6, updateWhenIdle: false, crossOrigin: true,
-    }).addTo(map);
-    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
-      maxZoom: 19, opacity: 0.92, keepBuffer: 6, updateWhenIdle: false, crossOrigin: true,
     }).addTo(map);
     map.setView([9.6, 8.1], 6);
 
@@ -476,7 +476,7 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
               <Home className="h-4 w-4 text-primary" /> Household Coverage Survey Map
             </CardTitle>
             <CardDescription className="text-xs">
-              {formName ? `${formName} — ` : ""}Every household visit from Coverage Evaluation 3D, clustered and plotted at its captured GPS with its outcome icon.
+              {formName ? `${formName} — ` : ""}Every household visit from Coverage Evaluation 3D, plotted on the state map at its captured GPS with its outcome icon.
             </CardDescription>
           </div>
           <DropdownMenu>
