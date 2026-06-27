@@ -210,7 +210,7 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
     setFollowUpFilter(ALL);
     setDateFrom("");
     setDateTo("");
-    setVisible(PAGE);
+    setPage(1);
   }, [data]);
 
   const stateOf = (s: DrillSubmission) => stripTags(s.state ?? s.data?.state);
