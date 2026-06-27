@@ -509,7 +509,6 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [offlinePending, setOfflinePending] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const persistingSurveyRef = useRef<Promise<string | null> | null>(null);
-  const persistingSurveyStatusRef = useRef<"draft" | "completed" | "submitted" | null>(null);
 
   // ── Supervisor QC State ──
   const [qcDialogOpen, setQcDialogOpen] = useState(false);
@@ -1809,13 +1808,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       }
       })();
       persistingSurveyRef.current = run;
-      persistingSurveyStatusRef.current = status;
       try {
         return await run;
       } finally {
         if (persistingSurveyRef.current === run) {
           persistingSurveyRef.current = null;
-          persistingSurveyStatusRef.current = null;
         }
       }
     },
