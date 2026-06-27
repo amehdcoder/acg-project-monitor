@@ -1619,11 +1619,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       // When the location is locked (carried over from the MDA Supervisory
       // Checklist), always source the geography from the immutable ref so the
       // submitted values cannot be overridden by tampered component state.
-      const locked = locationLocked ? lockedLocationRef.current : null;
-      const geo = locked ?? {
-        state, lga, ward, flhf_name: flhfName,
-        community_name: communityName, settlement_name: settlementName,
-      };
+      const geo = getCurrentGeo();
       const payload: any = {
         project_id: projectId ?? null,
         form_id: formId ?? null,
@@ -1684,7 +1680,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         return id;
       }
     },
-    [projectId, formId, communityName, state, lga, ward, flhfName, settlementName, gps, perimeter,
+    [projectId, formId, getCurrentGeo, gps, perimeter,
      estHHAi, estHHUser, targetN, segments.length, selectedSegmentLabels, coverage, surveyId,
      outsideMicroplan, outsideMicroplanReason, featureSummary, locationLocked],
   );
@@ -3106,10 +3102,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <Button variant="outline" onClick={onClose}>Cancel</Button>
               <Button onClick={async () => {
                 const missing = [];
-                if (!state) missing.push("State");
-                if (!lga) missing.push("LGA");
-                if (!ward) missing.push("Ward");
-                if (!communityName) missing.push("Community Name");
+                const geo = getCurrentGeo();
+                if (!geo.state) missing.push("State");
+                if (!geo.lga) missing.push("LGA");
+                if (!geo.ward) missing.push("Ward");
+                if (!geo.community_name) missing.push("Community Name");
                 
                 if (missing.length > 0) {
                   toast({ 
@@ -3135,10 +3132,10 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                     if (u.user) {
                       await supabase.from("ces_fenced_communities" as any).insert({
                         project_id: projectId,
-                        state, lga, ward,
-                        flhf_name: flhfName || null,
-                        community_name: communityName,
-                        settlement_name: settlementName || null,
+                        state: geo.state, lga: geo.lga, ward: geo.ward,
+                        flhf_name: geo.flhf_name || null,
+                        community_name: geo.community_name,
+                        settlement_name: geo.settlement_name || null,
                         center_lat: gps.lat, center_lng: gps.lng,
                         perimeter_coords: perimeter,
                         source_survey_id: sid,
