@@ -763,6 +763,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         questions={questions as any}
         projectName={projectName}
         followUpFields={new Set(Object.values(moduleQuestions).flatMap((s) => Array.from(s)))}
+        offline={offline}
       />
 
       {/* ── Longitudinal linkage register ── */}
