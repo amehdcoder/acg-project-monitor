@@ -400,9 +400,13 @@ const CESSurveyMap = ({
       const xMax = lng2tileX(bounds.getEast(), z);
       const yMin = lat2tileY(bounds.getNorth(), z);
       const yMax = lat2tileY(bounds.getSouth(), z);
-      for (const source of sources) {
-        for (let x = xMin; x <= xMax && requests.length < MAX_TILES; x++) {
-          for (let y = yMin; y <= yMax && requests.length < MAX_TILES; y++) {
+      for (let x = xMin; x <= xMax && requests.length < MAX_TILES; x++) {
+        for (let y = yMin; y <= yMax && requests.length < MAX_TILES; y++) {
+          // Interleave imagery + label sources per tile coordinate. This keeps
+          // an offline hybrid map visually identical instead of filling the
+          // entire cache budget with imagery before labels get a chance to save.
+          for (const source of sources) {
+            if (requests.length >= MAX_TILES) break;
             const sub = source.subdomains[(x + y) % source.subdomains.length] ?? source.subdomains[0];
             requests.push({
               mode: source.requestMode,
@@ -412,7 +416,6 @@ const CESSurveyMap = ({
                 .replace("{x}", String(x))
                 .replace("{y}", String(y)),
             });
-          }
         }
       }
     }
