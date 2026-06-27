@@ -181,6 +181,8 @@ export default defineConfig(({ mode }) => {
             },
           },
 
+          {
+            // Always fetch fresh HTML so new builds (e.g. without the old
             // green background) display immediately on next navigation.
             urlPattern: ({ request }: any) => request.mode === "navigate",
             handler: "NetworkFirst",
