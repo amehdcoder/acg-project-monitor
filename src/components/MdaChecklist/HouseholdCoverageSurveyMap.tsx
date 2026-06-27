@@ -83,6 +83,8 @@ const URL_KEYS = {
   lga: "hcs_lga",
   community: "hcs_community",
   state: "hcs_state",
+  center: "hcs_center",
+  zoom: "hcs_zoom",
 } as const;
 
 const stateKeys = (value: unknown) => {
@@ -178,6 +180,10 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
   const geoRef = useRef<any[] | null>(null);
   const sweepTimer = useRef<number | null>(null);
   const restoredSelectionRef = useRef("");
+  // True once the saved viewport (center/zoom) has been applied, or the user has
+  // manually moved the map — suppresses auto-fitBounds so shared links / manual
+  // panning are respected on refresh.
+  const viewLockedRef = useRef(false);
 
   const [points, setPoints] = useState<VisitPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -394,6 +400,32 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     }).addTo(map);
     map.setView([9.6, 8.1], 6);
 
+    // Restore a saved viewport (center + zoom) from the URL so shared links and
+    // page refreshes reopen to the exact same view.
+    const savedCenter = readUrl(URL_KEYS.center);
+    const savedZoom = readUrl(URL_KEYS.zoom);
+    if (savedCenter) {
+      const [latS, lngS] = savedCenter.split(",");
+      const lat = Number(latS), lng = Number(lngS), z = Number(savedZoom);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        map.setView([lat, lng], Number.isFinite(z) ? z : map.getZoom(), { animate: false });
+        viewLockedRef.current = true;
+      }
+    }
+
+    // Persist viewport on user-driven pan/zoom; mark the view as locked so the
+    // auto-fit in redraw() no longer overrides the user's chosen view.
+    const persistView = () => {
+      const c = map.getCenter();
+      viewLockedRef.current = true;
+      writeUrl({
+        [URL_KEYS.center]: `${c.lat.toFixed(5)},${c.lng.toFixed(5)}`,
+        [URL_KEYS.zoom]: String(map.getZoom()),
+      });
+    };
+    map.on("moveend", persistView);
+    map.on("zoomend", persistView);
+
     // Clustering group with an outcome-aware cluster icon.
     const cluster = (L as any).markerClusterGroup({
       chunkedLoading: true,
@@ -538,12 +570,17 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
       cluster.addLayers(markers);
     }
 
-    // Prefer fitting to the full state extent so the whole state map is visible;
-    // fall back to the marker bounds when no boundary is available.
-    try {
-      const target = stateBounds.isValid() ? stateBounds : bounds;
-      if (target.isValid()) map.fitBounds(target, { padding: [28, 28], maxZoom: 13 });
-    } catch { /* noop */ }
+    // Auto-fit so EVERY household marker is visible. `bounds` already contains
+    // both the state extent (when available) and every plotted marker — markers
+    // can fall outside their recorded state (e.g. blank/captured-only geography),
+    // so we must never fit to the state polygon alone or those pins land
+    // off-screen. Skip the auto-fit entirely once the viewport is locked by a
+    // restored/shared URL view or a manual pan/zoom.
+    if (!viewLockedRef.current) {
+      try {
+        if (bounds.isValid()) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 14 });
+      } catch { /* noop */ }
+    }
   }
 
   // ── Heatmap overlay ──
