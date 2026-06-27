@@ -381,11 +381,28 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
   return (
     <TooltipProvider delayDuration={150}>
       <div className="space-y-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Sigma className="h-4 w-4 text-primary" />
           <h3 className="font-display text-sm font-bold text-foreground">Insightful Analyses</h3>
-          <span className="text-[11px] text-muted-foreground">— click any card, chart or row to drill into the exact submissions</span>
+          <span className="hidden text-[11px] text-muted-foreground sm:inline">— click any card, chart or row to drill into the exact submissions</span>
+          <div className="ml-auto flex items-center gap-2">
+            <MdaMethodsDialog />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportDatasetCsv}
+              disabled={submissions.length === 0}
+              className="h-8 gap-1.5 text-xs"
+            >
+              <Download className="h-3.5 w-3.5" /> Export dataset (CSV)
+            </Button>
+          </div>
         </div>
+        {offline && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-400">
+            Offline — showing the last synced checklist data. Analyses, data quality and drill-downs reflect cached submissions.
+          </div>
+        )}
 
         {/* ── Data-quality panel ── */}
         {communities.length > 0 && (
