@@ -550,6 +550,7 @@ const CESSurveyMap = ({
       coordsKey(perimeter),
       coordsKey(draftPolygon),
       editablePerimeter ? "edit" : "view",
+      drawMode ? "draw" : "static",
       lqas?.selfIntersects ? "bad" : lqas?.ready ? "ready" : "progress",
       Math.round(lqas?.areaM2 ?? -1),
     ].join("|");
@@ -634,6 +635,9 @@ const CESSurveyMap = ({
         weight: 4,
         opacity: 0.9,
         dashArray: lqasState === "invalid" ? "6 4" : undefined,
+        // While drawing, overlays must NOT capture taps or the map click handler
+        // (which records vertices) never fires.
+        interactive: !drawMode,
       }).addTo(lg);
 
       const polygonLayer = L.polygon(perimeter.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
@@ -641,6 +645,7 @@ const CESSurveyMap = ({
         weight: 2,
         fillColor,
         fillOpacity: lqasState === "ready" ? 0.12 : 0.05,
+        interactive: !drawMode,
       }).addTo(lg);
 
       const areaTxt = lqas?.areaM2 != null
@@ -701,6 +706,7 @@ const CESSurveyMap = ({
             weight: 2,
             fillColor: i === perimeter.length - 1 ? "hsl(142 71% 45%)" : lineColor,
             fillOpacity: 0.95,
+            interactive: !drawMode,
           })
             .bindTooltip(i === 0 ? "Start vertex" : i === perimeter.length - 1 ? "Latest live vertex" : `Vertex ${i + 1}`, { permanent: false })
             .addTo(lg);
@@ -718,31 +724,35 @@ const CESSurveyMap = ({
           weight: 3,
           opacity: 0.95,
           dashArray: "6 4",
+          interactive: false,
         }).addTo(lg);
       }
       if (draftPolygon.length >= 3) {
         L.polyline(
           [[draftPolygon[draftPolygon.length - 1].lat, draftPolygon[draftPolygon.length - 1].lng],
            [draftPolygon[0].lat, draftPolygon[0].lng]] as L.LatLngExpression[],
-          { color: "hsl(38 92% 50%)", weight: 2, opacity: 0.6, dashArray: "2 4" },
+          { color: "hsl(38 92% 50%)", weight: 2, opacity: 0.6, dashArray: "2 4", interactive: false },
         ).addTo(lg);
         L.polygon(pts, {
           color: "hsl(38 92% 50%)",
           weight: 1,
           fillColor: "hsl(38 92% 50%)",
           fillOpacity: 0.08,
+          interactive: false,
         }).addTo(lg);
       }
       draftPolygon.forEach((p, i) => {
+        // Draft vertices are display-only. They MUST be non-interactive so that
+        // tapping on/near the start vertex still reaches the map click handler
+        // (which closes the polygon) instead of being swallowed by the marker.
         L.circleMarker([p.lat, p.lng], {
           radius: i === 0 ? 7 : 5,
           color: "#fff",
           weight: 2,
           fillColor: i === 0 ? "hsl(0 84% 60%)" : "hsl(38 92% 50%)",
           fillOpacity: 1,
-        })
-          .bindTooltip(i === 0 ? "Start (tap here to close)" : `Vertex ${i + 1}`, { permanent: false })
-          .addTo(lg);
+          interactive: false,
+        }).addTo(lg);
       });
     }
     }
@@ -943,7 +953,7 @@ const CESSurveyMap = ({
       if (frame) window.cancelAnimationFrame(frame);
       deferredLayers.length = 0;
     };
-  }, [isNearViewport, perimeter, segments, selectedSegmentIds, households, onHouseholdClick, mapFeatures, showFeatures, showResidential, showExclusions, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas?.selfIntersects, lqas?.ready, lqas?.areaM2, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, samplingPins, staticLayerBudget]);
+  }, [isNearViewport, perimeter, segments, selectedSegmentIds, households, onHouseholdClick, mapFeatures, showFeatures, showResidential, showExclusions, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas?.selfIntersects, lqas?.ready, lqas?.areaM2, draftPolygon, drawMode, editablePerimeter, onVertexMove, onVertexDelete, samplingPins, staticLayerBudget]);
 
   // Live overlays: cheap, rebuilt as GPS updates arrive.
   useEffect(() => {
