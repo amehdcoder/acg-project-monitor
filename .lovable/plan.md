@@ -1,39 +1,41 @@
-## Bloomberg School Enrolment Validation — Standard Form, Dashboard & Cascade Assignment
+# Integrated MDA Supervisory Dashboard — Enhancement Plan
 
-### Goal
-Build a self-contained Bloomberg validation system that lives permanently in the **Standard Forms** folder (independent of whether the Bloomberg project still exists in Projects), is **visible only to the Owner** (and the data it produces), exactly matches the two reference images, and adds a **global owner capability** to scope a user to specific cascade field values (State/LGA/Ward/Community/School).
+This is a large request. I've grouped the 10 items into 4 phases that can be shipped and verified independently. Each phase is self-contained so the dashboard never ends up half-broken.
 
-### 1. Database & data import
-- **`bloomberg_schools`** table — identifying fields only (school_key, school_name, school_code, school_type, school_level, ownership, state/lga/ward/location + labels). Readable by `authenticated` (validators must pick their school). No baseline columns here.
-- **`bloomberg_school_baselines`** table — keyed by `school_key`, holds all `*_baseline` figures + quality flag. **Owner-only** RLS (via `has_role`/owner email check) so validators can never read baselines.
-- **`bloomberg_validations`** table — one row per submission: school_key, location answers, verification block, actual enrolment by class/sex, GPS, photos (storage paths), validator id, status, timestamps. Validators insert/read own rows; Owner/Admins read all.
-- **`user_cascade_assignments`** table (global feature) — `(form_id, user_id, field_key, value)`. Owner-managed. Used app-wide to filter cascade options.
-- Import all ~2,853 rows from `Schools.csv` into the two tables via an insert migration (split: identity → `bloomberg_schools`, baselines → `bloomberg_school_baselines`).
-- All tables get GRANTs + RLS in the same migration. A storage bucket `bloomberg-evidence` for photos.
+## Phase 1 — Owner Data Management (item 1)
+A new **Owner Data Management** panel inside the dashboard (gated to Owner/Super Admin).
 
-### 2. The Standard Form (mobile-first, matches Form image)
-- Add a Bloomberg definition + filler so it appears as a card in the **Standard Forms** folder in `FormsView`, gated so **only the Owner** sees the card and its submissions.
-- 4-step wizard exactly like the reference: **1 School** (cascading State→LGA→Ward→Community→School + code/type/level + GPS capture), **2 Verify** (exists?, operational status, head teacher, date, register toggles), **3 Enrolment** (P1–P6 + JSS1–JSS3 male/female tables with live totals, grand total), **4 Evidence** (required signboard/classroom/register photos + optional + remarks + confirm checkbox + Save Draft / Submit).
-- Deep-navy header, stepper, blue primary buttons, rounded cards, soft shadows; offline-capable via existing saved-forms store.
-- **Privacy:** baseline figures are looked up server-side for the dashboard only and are never fetched or shown anywhere in the filler.
+- Beautiful drawer/dialog with two modes:
+  - **Delete submissions** — clear simulated/test data to "go live" for real field data. Supports: delete all, or delete within a defined date range, with a confirmation step + count preview.
+  - **Restore submissions** — soft-delete model so deleted rows can be restored (all, or for a defined period). Implemented via a new `mda_submission_archive` table (or a `deleted_at` soft-delete column + restore RPC) so nothing is permanently lost unless explicitly purged.
+- Backend: new RPCs `owner_soft_delete_mda_submissions(period)`, `owner_restore_mda_submissions(period)` with Owner-only authorization (reuse existing owner checks). RLS + GRANTs included.
 
-### 3. The Dashboard (matches Dashboard image, Owner/Admin only)
-- New `BloombergDashboardView`: Bloomberg branded navy sidebar, top filter bar (LGA/Ward/date), 7 KPI tiles (Total Schools, Visited, Validated, Partially Matched, Not Matched, Total Validated Enrolment), Nigeria map of validation status (reusing existing MapVisualization with Bauchi/Jigawa boundaries, colored status pins), Enrollment Comparison donut, aggregated Baseline-vs-Validated bar chart, Gender Distribution donut, Top Discrepancies table, Data Quality + Sync + Quick Actions panels.
-- Baseline vs validated comparison + discrepancy % computed here (owner-only data).
+## Phase 2 — KPI Excel Exports with provenance highlighting (item 2)
+- Make each of the 6 KPI cards (Communities Supervised, MDA Completed, Sufficient Medicine, Follow-up Coverage, Adverse Cases Managed, Red-flag Sites) clickable to **download a formatted `.xlsx`**.
+- One row per contributing submission; one column per question (resolved by label via `MdaQuestionIndex`).
+- **Highlight** the exact column/cell that drove the KPI (e.g. "Status of MDA"=Completed cells highlighted green; "Sufficient medicine"=Yes; SAE=Yes etc.), plus a header note stating the formula. Generated with a library producing real styled xlsx (exceljs).
+- Accuracy guaranteed by reusing the same determinant resolution logic already in `kpis.ts` (refactor the determinant selectors into a shared module so export and KPI use one source of truth).
 
-### 4. Global cascade-field assignment (owner right, app-wide)
-- Extend `OwnerRolesAccessManager` with a "Cascade Scope" section: pick a user + form, then assign allowed values for chosen cascade fields (State/LGA/Ward/Community/School).
-- In `FormFiller` (and the Bloomberg filler), when a `user_cascade_assignments` record exists for the current user+form, **pre-filter and lock** the assigned cascade levels so the user only sees schools/areas within their assignment. Generic across any form with cascade fields.
+## Phase 3 — CES Geography Prefill bridge (item 3)
+- When Household Coverage Survey module → community selected → opening Coverage Evaluation 3D, map the checklist geography to CES Step 1 fields:
+  - State→State, LGA→LGA, Ward→Ward, FLHF→FLHF Name, Community→Community, Settlement→Settlement.
+- Harden the existing sessionStorage prefill bridge to carry all six fields with correct keys, lock them, include them in the CES submission payload, and tag the CES submission with the source checklist community so Community Checklist + all follow-up modules link to it and reflect on the dashboard.
 
-### Technical notes
-- School cascade options are sourced from `bloomberg_schools` (DB-backed `select_one_from_file`-style), filtered by parent selection and by the user's cascade assignment.
-- Folder persistence: the form is registered as a built-in standard form (code-defined like existing WG-SS/PHQ-9), so it survives project deletion and never depends on the `projects` table.
-- Owner gating reuses `useAuth` `isOwnerLevel` / owner email (`amehjoey1@gmail.com`).
+## Phase 4 — Map, performance, UI & audit (items 4,5,6,7,8,9,10)
+On `MdaSupervisoryChecklistDashboard.tsx` and `HouseholdCoverageSurveyMap.tsx`:
 
-### Files (high level)
-- Migrations: schools + baselines + validations + cascade_assignments + storage bucket + CSV import.
-- New: `src/lib/bloomberg/definition.ts`, `src/components/Bloomberg/BloombergFormFiller.tsx`, `BloombergDashboardView.tsx`, `useBloombergData.ts`.
-- Edits: `FormsView.tsx` (Standard Forms card, owner gate), `OwnerRolesAccessManager.tsx` (cascade scope UI), `FormFiller.tsx` (assignment filtering), nav/route wiring.
+- **(5)** Add a polished, responsive **Refresh** button (spinner state, re-fetches data).
+- **(7)** **Clustered/unclustered toggle** for household markers.
+- **(8)** Click an outcome icon or visit-list row → pan/zoom to marker, switch basemap to **Satellite**, update shareable URL viewport.
+- **(9)** **Export filtered household visits CSV** (outcome, LGA, GPS).
+- **(10)** Memoize state/LGA boundary layers; lazy/virtualized marker rendering for large datasets.
+- **(6)** UI/color revamp using semantic design tokens for a sharper, professional look.
+- **(4)** Audit pass: fix wrong computations, remove dead code, fix non-responsive controls, guard against freezes on large datasets (paginated/aggregated fetches, capped renders, memoization, abortable fetches).
 
-### Open question
-Will be confirmed before build: should the dashboard be a brand-new full-screen Bloomberg-skinned view (its own navy sidebar as in the image), or embedded inside the existing app shell/analytics area?
+## Technical notes
+- Data fetching already uses `fetchAllRowsKeyset`; Phase 4 will cap/aggregate where unbounded.
+- New backend objects (Phase 1) follow the project's GRANT + RLS rules and owner-auth helpers.
+- KPI export refactor keeps `kpis.ts` as the single source of determinant logic to guarantee export/KPI parity.
+
+## Suggested order
+Phase 3 (prefill correctness) and Phase 1 (owner data mgmt) are highest user value; Phase 2 next; Phase 4 last as it's the broadest. I can proceed in this order, or reprioritize.
