@@ -263,6 +263,9 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
       if (moduleFilter !== ALL && r.module !== moduleFilter) return false;
       if (stateFilter !== ALL && stateOf(r) !== stateFilter) return false;
       if (lgaFilter !== ALL && lgaOf(r) !== lgaFilter) return false;
+      if (monitorFilter !== ALL && monitorOf(r) !== monitorFilter) return false;
+      if (communityFilter !== ALL && communityOf(r) !== communityFilter) return false;
+      if (statusFilter !== ALL && statusOf(r) !== statusFilter) return false;
       if (fromTs || toTs) {
         const t = r.submittedAt ? new Date(r.submittedAt).getTime() : NaN;
         if (isNaN(t)) return false;
@@ -284,16 +287,23 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
       }
       return true;
     });
-  }, [rows, search, moduleFilter, stateFilter, lgaFilter, dateFrom, dateTo]);
+  }, [rows, search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, dateFrom, dateTo]);
 
   // Reset pagination whenever the filtered result changes.
-  useEffect(() => setVisible(PAGE), [search, moduleFilter, stateFilter, lgaFilter, dateFrom, dateTo]);
+  useEffect(() => setVisible(PAGE), [search, moduleFilter, stateFilter, lgaFilter, monitorFilter, communityFilter, statusFilter, dateFrom, dateTo]);
 
   const hasFilters =
-    !!search || moduleFilter !== ALL || stateFilter !== ALL || lgaFilter !== ALL || !!dateFrom || !!dateTo;
+    !!search || moduleFilter !== ALL || stateFilter !== ALL || lgaFilter !== ALL ||
+    monitorFilter !== ALL || communityFilter !== ALL || statusFilter !== ALL || !!dateFrom || !!dateTo;
   const clearFilters = () => {
     setSearch(""); setModuleFilter(ALL); setStateFilter(ALL); setLgaFilter(ALL);
+    setMonitorFilter(ALL); setCommunityFilter(ALL); setStatusFilter(ALL);
     setDateFrom(""); setDateTo("");
+  };
+
+  const handleExportCsv = () => {
+    const csv = buildSubmissionsCsv(filtered as CsvRow[], questions as any);
+    downloadCsv(`mda-${slugify(data?.title || "drilldown")}-${new Date().toISOString().slice(0, 10)}`, csv);
   };
 
   const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
