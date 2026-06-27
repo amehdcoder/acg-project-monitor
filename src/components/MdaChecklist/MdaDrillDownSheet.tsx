@@ -25,9 +25,10 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
-  ChevronDown, MapPin, User2, CalendarClock, ClipboardList, Search, X, Filter, Download,
+  ChevronDown, MapPin, User2, CalendarClock, ClipboardList, Search, X, Filter, Download, FileText,
 } from "lucide-react";
 import { buildSubmissionsCsv, downloadCsv, slugify, type CsvRow } from "@/lib/mda/csvExport";
+import { exportDrilldownPdf, type PdfRow } from "@/lib/mda/pdfExport";
 
 interface QOption { id?: string; label: string; value: string; }
 interface FormQuestion {
