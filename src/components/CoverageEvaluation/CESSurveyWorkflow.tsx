@@ -1686,6 +1686,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // ---------- Save / persist survey ----------
   const persistSurvey = useCallback(
     async (status: "draft" | "completed" | "submitted" = "draft"): Promise<string | null> => {
+      if (persistingSurveyRef.current) return persistingSurveyRef.current;
+      const run = (async (): Promise<string | null> => {
       // Resolve the signed-in user resiliently. getUser() makes a network call
       // that can fail/timeout on poor field connectivity even when a valid
       // session exists locally — that produced spurious "Sign in required"
@@ -1800,6 +1802,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         const id = (data as any).id;
         setSurveyId(id);
         return id;
+      }
+      })();
+      persistingSurveyRef.current = run;
+      try {
+        return await run;
+      } finally {
+        if (persistingSurveyRef.current === run) persistingSurveyRef.current = null;
       }
     },
     [projectId, formId, getCurrentGeo, gps, perimeter,
@@ -1917,9 +1926,10 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   }, []);
   useEffect(() => {
     const t = setInterval(() => {
-      if (surveyId) persistSurvey("draft");
+      if (surveyId) void persistSurvey("draft").catch(() => undefined);
       if (step === 3 && gps) {
-        setGpsLogs(prev => [...prev, { lat: gps.lat, lng: gps.lng, ts: Date.now() }]);
+        const next = [...gpsLogsRef.current, { lat: gps.lat, lng: gps.lng, ts: Date.now() }];
+        gpsLogsRef.current = next.length > 720 ? next.slice(next.length - 720) : next;
       }
     }, 30000);
     return () => clearInterval(t);
@@ -2278,6 +2288,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
 
     // Route Realism Calculation (Upgrade 4)
+    const gpsLogs = gpsLogsRef.current;
     if (gpsLogs.length > 2 && households.length > 1) {
       let actualDist = 0;
       for (let i=1; i<gpsLogs.length; i++) {
@@ -2318,7 +2329,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         geographic: cov.geographicCoveragePct,
       });
     }
-  }, [segments, households, state, lga, ward, communityName, surveyId, persistSurvey, gpsLogs]);
+  }, [segments, households, state, lga, ward, communityName, surveyId, persistSurvey]);
 
   // ---------- Exports ----------
   const exportCSV = useCallback(() => {
