@@ -22,6 +22,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import type { Question, FormGroup } from "@/components/FormBuilder/types";
 import { evaluateRelevant, type NameToIdMap } from "@/lib/skipLogic";
+import { buildCesLocationUrl } from "@/lib/mda/cesLocationBridge";
 import {
   getMdaFollowUpGroupName,
   isMdaFollowUpGroup,
@@ -511,7 +512,7 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
             // identity fields are never confused with each other.
             try {
               const d = c.data || {};
-              const prefill = {
+              const url = buildCesLocationUrl({
                 state: pick(d, ["state", "state_name", "admin_state", "state_of_residence"]),
                 lga: pick(d, ["lga", "lga_name", "local_government", "lga_of_residence"]) || c.lga,
                 ward: pick(d, ["ward", "ward_name"]) || c.ward,
@@ -521,11 +522,15 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
                 community_name: pick(d, ["community", "community_name"]) || c.community,
                 settlement_name: pick(d, ["settlement", "settlement_name", "settlement_village"]),
                 projectId: projectId ?? "",
+                formId,
+                submissionId: c.id,
+                source: "mda_community_list",
                 ts: Date.now(),
-              };
-              sessionStorage.setItem("amehnities:cesLocationPrefill", JSON.stringify(prefill));
-              sessionStorage.setItem("amehnities:cesFromChecklist", "1");
-            } catch { /* ignore */ }
+              });
+              window.dispatchEvent(new CustomEvent("amehnities:navigate-tab", { detail: { tab: "coverage-eval" } }));
+              navigate(url, { replace: true });
+              return;
+            } catch { /* fall back to plain tab navigation */ }
             window.dispatchEvent(new CustomEvent("amehnities:navigate-tab", { detail: { tab: "coverage-eval" } }));
             navigate("/?tab=coverage-eval", { replace: true });
           }}

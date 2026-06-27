@@ -123,6 +123,7 @@ import {
   hasMeaningfulFormResponses,
 } from "@/lib/formProgressPersistence";
 import { isMdaChecklistLike } from "@/lib/mdaFollowUp";
+import { buildCesLocationUrl } from "@/lib/mda/cesLocationBridge";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
 
 // Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
@@ -3980,21 +3981,33 @@ const FormFiller = ({
                 // to the Coverage Evaluation 3D page, where it will be prefilled
                 // and locked (not user-editable).
                 try {
-                  const prefill = {
-                    state: responses.state ?? "",
-                    lga: responses.lga ?? "",
-                    ward: responses.ward ?? "",
-                    flhf_name: responses.flhf_name ?? "",
-                    community_name: responses.community_name ?? responses.community ?? "",
-                    settlement_name: responses.settlement_name ?? "",
-                    projectId: projectId ?? "",
-                    ts: Date.now(),
+                  const answer = (...names: string[]) => {
+                    for (const name of names) {
+                      const direct = responses[name];
+                      if (direct !== undefined && direct !== null && String(direct).trim() !== "") return direct;
+                      const id = nameToIdMap[name];
+                      const byId = id ? responses[id] : undefined;
+                      if (byId !== undefined && byId !== null && String(byId).trim() !== "") return byId;
+                    }
+                    return "";
                   };
-                  sessionStorage.setItem("amehnities:cesLocationPrefill", JSON.stringify(prefill));
-                  // Intent flag: lets the Coverage Evaluation page show a clear
-                  // fallback error + manual reselection if the prefill is missing.
-                  sessionStorage.setItem("amehnities:cesFromChecklist", "1");
-                } catch { /* ignore storage errors */ }
+                  const url = buildCesLocationUrl({
+                    state: answer("state", "state_name", "admin_state"),
+                    lga: answer("lga", "lga_name", "local_government", "local_government_area"),
+                    ward: answer("ward", "ward_name"),
+                    flhf_name: answer("flhf_name", "flhf", "health_facility", "facility", "facility_name"),
+                    community_name: answer("community_name", "community"),
+                    settlement_name: answer("settlement_name", "settlement"),
+                    projectId: projectId ?? "",
+                    formId,
+                    source: "mda_checklist",
+                    ts: Date.now(),
+                  });
+                  window.dispatchEvent(new CustomEvent("amehnities:navigate-tab", { detail: { tab: "coverage-eval" } }));
+                  navigate(url, { replace: true });
+                  requestAnimationFrame(() => onClose());
+                  return;
+                } catch { /* fall back to plain tab navigation */ }
                 window.dispatchEvent(new CustomEvent("amehnities:navigate-tab", { detail: { tab: "coverage-eval" } }));
                 navigate("/?tab=coverage-eval", { replace: true });
                 requestAnimationFrame(() => onClose());

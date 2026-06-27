@@ -25,6 +25,7 @@ import { Settings2, Lock } from "lucide-react";
 import { kmeansSegments } from "@/lib/ces/kmeansSegments";
 import { inferSegmentCoverage, pointInPolygon } from "@/lib/ces/geostatistics";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
+import { readCesLocationPrefill } from "@/lib/mda/cesLocationBridge";
 
 // Workflow continuity: persist project + active session across reloads.
 const CES_PROJECT_KEY = "ces_last_project_id";
@@ -72,7 +73,9 @@ interface FencedCommunityRow {
 const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>(() => {
-    try { return localStorage.getItem(CES_PROJECT_KEY) || ""; } catch { return ""; }
+    const bridged = readCesLocationPrefill().prefill?.projectId;
+    if (bridged) return bridged;
+    try { return new URLSearchParams(window.location.search).get("project") || localStorage.getItem(CES_PROJECT_KEY) || ""; } catch { return ""; }
   });
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [activeSession, setActiveSession] = useState<SessionRow | null>(null);
@@ -103,7 +106,9 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
     (async () => {
       const { data } = await supabase.from("projects").select("id, name").order("created_at", { ascending: false });
       setProjects(data ?? []);
-      if (data?.length && !selectedProject) setSelectedProject(data[0].id);
+      const bridgedProject = readCesLocationPrefill().prefill?.projectId;
+      if (bridgedProject && data?.some((p) => p.id === bridgedProject)) setSelectedProject(bridgedProject);
+      else if (data?.length && !selectedProject) setSelectedProject(data[0].id);
     })();
     // eslint-disable-next-line
   }, []);
