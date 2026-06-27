@@ -17,6 +17,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -24,8 +25,9 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
-  ChevronDown, MapPin, User2, CalendarClock, ClipboardList, Search, X, Filter,
+  ChevronDown, MapPin, User2, CalendarClock, ClipboardList, Search, X, Filter, Download,
 } from "lucide-react";
+import { buildSubmissionsCsv, downloadCsv, slugify, type CsvRow } from "@/lib/mda/csvExport";
 
 interface QOption { id?: string; label: string; value: string; }
 interface FormQuestion {
