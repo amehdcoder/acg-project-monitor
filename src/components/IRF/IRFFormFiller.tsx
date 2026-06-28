@@ -91,8 +91,18 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
 
   const [values, setValues] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Set<string>>(new Set());
-  const setVal = (k: string, v: any) =>
+  const setVal = (k: string, v: any) => {
     setValues((p) => ({ ...p, [k]: v }));
+    // Clear a mandatory-field error as soon as the user provides a value.
+    if (v !== undefined && v !== null && String(v).trim() !== "") {
+      setErrors((prev) => {
+        if (!prev.has(k)) return prev;
+        const next = new Set(prev);
+        next.delete(k);
+        return next;
+      });
+    }
+  };
 
   // Clear an "Other (specify)" error as soon as the user types something.
   const setOtherVal = (k: string, v: any) => {
@@ -110,6 +120,25 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   const totalSteps = IRF_SECTIONS.length + 1;
   const canSubmit = !!state && !!lga && !!reportingMonth;
 
+  /** Additional non-metric fields that must be answered. */
+  const REQUIRED_SELECT_KEYS = new Set(["participation_level"]);
+  /** A field is mandatory if explicitly flagged, an indicator metric, or a required select. */
+  const isFieldRequired = (f: IrfField) =>
+    !!f.required || f.metric === true || REQUIRED_SELECT_KEYS.has(f.key);
+  /** Booleans always carry a value; everything else is empty when blank. */
+  const isFieldEmpty = (f: IrfField) => {
+    if (f.type === "boolean") return false;
+    const v = values[f.key];
+    return v === undefined || v === null || String(v).trim() === "";
+  };
+
+  /** Keys of mandatory fields not yet answered in a section. */
+  const missingRequiredForSection = (sec: typeof IRF_SECTIONS[number]) =>
+    sec.groups
+      .flatMap((g) => g.fields)
+      .filter((f) => isFieldRequired(f) && isFieldEmpty(f))
+      .map((f) => f.key);
+
   /** Select fields with an "Other" choice selected but no specify text yet. */
   const missingOtherForSection = (sec: typeof IRF_SECTIONS[number]) =>
     sec.groups
@@ -126,10 +155,20 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   /** Validate the current step; returns true if OK, else flags errors. */
   const validateStep = (stepIndex: number): boolean => {
     const sec = stepIndex > 0 ? IRF_SECTIONS[stepIndex - 1] : null;
-    const missing = sec ? missingOtherForSection(sec) : [];
+    if (stepIndex === 0) {
+      // Report identity is mandatory before leaving the first step.
+      if (!state || !lga || !reportingMonth) {
+        toast.error("Please complete the report identity (Month, State, LGA).");
+        return false;
+      }
+      return true;
+    }
+    const missingReq = sec ? missingRequiredForSection(sec) : [];
+    const missingOther = sec ? missingOtherForSection(sec) : [];
+    const missing = [...missingReq, ...missingOther];
     if (missing.length) {
       setErrors((prev) => new Set([...prev, ...missing]));
-      toast.error("Please specify a value for every “Other” selection.");
+      toast.error("Please answer all mandatory questions before proceeding.");
       return false;
     }
     return true;
@@ -146,13 +185,18 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
       setStep(0);
       return;
     }
-    // Block submission if any "Other (specify)" box is still empty.
-    const allMissing = IRF_SECTIONS.flatMap((sec) => missingOtherForSection(sec));
+    // Block submission if any mandatory field is unanswered or "Other" is unspecified.
+    const allMissing = IRF_SECTIONS.flatMap((sec) => [
+      ...missingRequiredForSection(sec),
+      ...missingOtherForSection(sec),
+    ]);
     if (allMissing.length) {
       setErrors((prev) => new Set([...prev, ...allMissing]));
-      const firstSecIdx = IRF_SECTIONS.findIndex((sec) => missingOtherForSection(sec).length);
+      const firstSecIdx = IRF_SECTIONS.findIndex(
+        (sec) => missingRequiredForSection(sec).length || missingOtherForSection(sec).length,
+      );
       if (firstSecIdx >= 0) setStep(firstSecIdx + 1);
-      toast.error("Please specify a value for every “Other” selection.");
+      toast.error("Please answer all mandatory questions before submitting.");
       return;
     }
     setSaving(true);
