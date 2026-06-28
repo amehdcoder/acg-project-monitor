@@ -276,12 +276,16 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
   };
 
   // ── Status of MDA ──
+  // Every community that was SUPERVISED (has a Community Checklist visit) appears
+  // in exactly one of the two registers. Because "Status of MDA" is a mandatory
+  // question, "Completed" + "Halted / Not Started / Ongoing (or Unknown)" always
+  // reconciles to the total number of communities visited.
   const statusRows = useMemo(() => {
     if (!qStatus) return [];
     return communities
-      .map((c) => ({ c, status: idx.label(qStatus, val(c, qStatus)) }))
-      .filter((r) => r.status);
-  }, [communities, qStatus, idx]);
+      .filter((c) => checklistKeys.has(c.key))
+      .map((c) => ({ c, status: statusByKey.get(c.key) || "Unknown" }));
+  }, [communities, qStatus, checklistKeys, statusByKey]);
 
   const statusTone = (s: string): Tone => {
     const n = norm(s);
@@ -293,6 +297,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
   };
   const completedRows = statusRows.filter((r) => norm(r.status).includes("complet"));
   const issueRows = statusRows.filter((r) => !norm(r.status).includes("complet"));
+
 
   // Statistical inference — completion proportion + per-LGA ANOVA
   const completionStat = useMemo(() => {
