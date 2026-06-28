@@ -196,11 +196,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Focal person name *</Label>
-                <Input value={focalName} onChange={(e) => setFocalName(e.target.value)} className="h-12" placeholder="Full name" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Phone</Label>
+                <Label>Contact phone (optional)</Label>
                 <Input value={focalPhone} onChange={(e) => setFocalPhone(e.target.value)} className="h-12" placeholder="0801…" />
               </div>
               <div className="space-y-1.5">
