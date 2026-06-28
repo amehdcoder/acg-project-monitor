@@ -38,8 +38,9 @@ function Kpi({ icon: Icon, label, value, sub, color }: { icon: any; label: strin
 }
 
 export default function IRFDashboard({ projectId, onClose }: Props) {
+  const overrides = useAcsmDuplicateOverrides(projectId);
   const { rows, loading, reload, stats, sectionTotals, genderSplit, ncBreakdown, topLgas, trend, dataQuality, duplicates } =
-    useIrfDashboard(projectId);
+    useIrfDashboard(projectId, overrides.irfMap);
   const [exporting, setExporting] = useState(false);
 
   const exportCsv = () => {
