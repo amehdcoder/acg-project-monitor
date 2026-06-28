@@ -22,10 +22,15 @@ export interface IrfField {
   what?: string; // "what to record" helper
   type: IrfFieldType;
   options?: readonly string[];
+  /** When true, a select adds an "Other (specify)" choice with a free-text box. */
+  allowOther?: boolean;
   example?: string;
   /** Numeric fields that should roll up into dashboard totals. */
   metric?: boolean;
 }
+
+/** Sentinel value used for the "Other (specify)" option in selects. */
+export const OTHER_OPTION = "Other (specify)";
 
 export interface IrfSection {
   id: string;
