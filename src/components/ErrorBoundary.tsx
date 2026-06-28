@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   children: ReactNode;
@@ -23,6 +24,25 @@ const persistClientError = (payload: Record<string, unknown>) => {
     window.localStorage.setItem(ERROR_LOG_KEY, JSON.stringify(next));
   } catch {
     // Local logging must never create a secondary render failure.
+  }
+};
+
+const sendClientErrorToBackend = async (payload: Record<string, unknown>) => {
+  try {
+    await (supabase as any).rpc("log_client_error", {
+      _component: String(payload.boundary || "Component"),
+      _message: String(payload.message || "Unknown client error"),
+      _stack: typeof payload.stack === "string" ? payload.stack : null,
+      _component_stack: typeof payload.componentStack === "string" ? payload.componentStack : null,
+      _route: typeof payload.url === "string" ? payload.url : null,
+      _user_agent: typeof payload.userAgent === "string" ? payload.userAgent : null,
+      _metadata: {
+        eventId: payload.eventId,
+        timestamp: payload.timestamp,
+      },
+    });
+  } catch (logError) {
+    console.warn("Client error backend logging failed", logError);
   }
 };
 
@@ -50,6 +70,7 @@ export class ErrorBoundary extends Component<Props, State> {
     };
     console.error(`[ErrorBoundary:${payload.boundary}]`, payload);
     persistClientError(payload);
+    void sendClientErrorToBackend(payload);
   }
 
   private handleReset = () => {
