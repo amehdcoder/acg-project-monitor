@@ -30,19 +30,19 @@ export function IrfWatermark() {
       inert=""
       className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden"
     >
-      {/* Full-bleed brand image: visible, but always below fields/charts and softened by the wash layers. */}
+      {/* Full-bleed brand image: bright, high-resolution and clearly visible, while staying below fields/charts. */}
       <img
         src={irfBg}
         alt=""
         aria-hidden="true"
         draggable={false}
         tabIndex={-1}
-        loading="lazy"
-        className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover opacity-[0.08] dark:opacity-[0.14]"
+        decoding="async"
+        className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover opacity-40 dark:opacity-45 [image-rendering:auto]"
       />
-      {/* Soft washes keep text, fields and charts crisp while preserving the SARMAAN CDD brand signal. */}
-      <div className="absolute inset-0 bg-background/80 dark:bg-background/78" />
-      <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/55 to-background/85 dark:from-background/72 dark:via-background/60 dark:to-background/88" />
+      {/* Light washes keep text and fields readable while the SARMAAN CDD brand stays bright and clear. */}
+      <div className="absolute inset-0 bg-background/35 dark:bg-background/40" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/25 via-background/20 to-background/40 dark:from-background/30 dark:via-background/25 dark:to-background/45" />
     </div>
   );
 }
