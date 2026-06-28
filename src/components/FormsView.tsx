@@ -1934,6 +1934,55 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     );
                   }
 
+                  // IRF (LGA ACSM Focal Person) markers launch their dedicated UI.
+                  const irfKind = (form.settings as any)?.irf_kind as ("form" | "dashboard" | undefined);
+                  if (irfKind === "form" || irfKind === "dashboard") {
+                    const isDash = irfKind === "dashboard";
+                    const IrfIcon = isDash ? BarChart3 : ClipboardCheck;
+                    return (
+                      <div
+                        key={form.id}
+                        className="group flex items-center gap-3 border-l-4 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
+                        style={{ borderLeftColor: "#0c2340" }}
+                      >
+                        <button
+                          onClick={() => (isDash ? setShowIrfDash(true) : setShowIrfForm(true))}
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#D7E3F0]"
+                          aria-label={`Open ${form.name}`}
+                        >
+                          <IrfIcon className="h-5 w-5 text-[#0c2340]" strokeWidth={2} />
+                        </button>
+                        <button
+                          onClick={() => (isDash ? setShowIrfDash(true) : setShowIrfForm(true))}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <h4 className="truncate text-[15px] font-bold text-[#0c2340]">{form.name}</h4>
+                          <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">{form.description || "LGA ACSM Focal Person indicator tool"}</p>
+                        </button>
+                        {!isDash && (
+                          <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold bg-[#E2F5EC] text-[#22A55A]">
+                            Finalized
+                          </span>
+                        )}
+                        {isAdmin && !isDash && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-[#0c2340]">
+                                <ChevronRight className="h-5 w-5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setFormToDelete(form)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Remove from project
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                    );
+                  }
+
 
 
 
