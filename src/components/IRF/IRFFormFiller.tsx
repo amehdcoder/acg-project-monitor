@@ -71,15 +71,69 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   const wards = useMemo(() => (state && lga ? getWardsForLGA(state, lga) : []), [state, lga]);
 
   const [values, setValues] = useState<Record<string, any>>({});
-  const setVal = (k: string, v: any) => setValues((p) => ({ ...p, [k]: v }));
+  const [errors, setErrors] = useState<Set<string>>(new Set());
+  const setVal = (k: string, v: any) =>
+    setValues((p) => ({ ...p, [k]: v }));
+
+  // Clear an "Other (specify)" error as soon as the user types something.
+  const setOtherVal = (k: string, v: any) => {
+    setVal(k, v);
+    if (String(v ?? "").trim()) {
+      setErrors((prev) => {
+        if (!prev.has(k)) return prev;
+        const next = new Set(prev);
+        next.delete(k);
+        return next;
+      });
+    }
+  };
 
   const totalSteps = IRF_SECTIONS.length + 1;
   const canSubmit = !!state && !!lga && !!reportingMonth;
+
+  /** Select fields with an "Other" choice selected but no specify text yet. */
+  const missingOtherForSection = (sec: typeof IRF_SECTIONS[number]) =>
+    sec.groups
+      .flatMap((g) => g.fields)
+      .filter(
+        (f) =>
+          f.type === "select" &&
+          f.allowOther &&
+          values[f.key] === OTHER_OPTION &&
+          !String(values[`${f.key}__other`] ?? "").trim(),
+      )
+      .map((f) => `${f.key}__other`);
+
+  /** Validate the current step; returns true if OK, else flags errors. */
+  const validateStep = (stepIndex: number): boolean => {
+    const sec = stepIndex > 0 ? IRF_SECTIONS[stepIndex - 1] : null;
+    const missing = sec ? missingOtherForSection(sec) : [];
+    if (missing.length) {
+      setErrors((prev) => new Set([...prev, ...missing]));
+      toast.error("Please specify a value for every “Other” selection.");
+      return false;
+    }
+    return true;
+  };
+
+  const goNext = () => {
+    if (!validateStep(step)) return;
+    setStep((s) => Math.min(totalSteps - 1, s + 1));
+  };
 
   const submit = async () => {
     if (!canSubmit) {
       toast.error("Please complete the report identity (Month, State, LGA).");
       setStep(0);
+      return;
+    }
+    // Block submission if any "Other (specify)" box is still empty.
+    const allMissing = IRF_SECTIONS.flatMap((sec) => missingOtherForSection(sec));
+    if (allMissing.length) {
+      setErrors((prev) => new Set([...prev, ...allMissing]));
+      const firstSecIdx = IRF_SECTIONS.findIndex((sec) => missingOtherForSection(sec).length);
+      if (firstSecIdx >= 0) setStep(firstSecIdx + 1);
+      toast.error("Please specify a value for every “Other” selection.");
       return;
     }
     setSaving(true);
@@ -165,26 +219,35 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
         {f.type === "date" && (
           <Input type="date" value={v} onChange={(e) => setVal(f.key, e.target.value)} className="h-12 text-base" />
         )}
-        {f.type === "select" && (
-          <>
-            <Select value={v || undefined} onValueChange={(val) => setVal(f.key, val)}>
-              <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Select…" /></SelectTrigger>
-              <SelectContent>
-                {f.options?.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                {f.allowOther && <SelectItem value={OTHER_OPTION}>{OTHER_OPTION}</SelectItem>}
-              </SelectContent>
-            </Select>
-            {f.allowOther && v === OTHER_OPTION && (
-              <Input
-                autoFocus
-                value={values[`${f.key}__other`] ?? ""}
-                onChange={(e) => setVal(`${f.key}__other`, e.target.value)}
-                placeholder="Please specify…"
-                className="mt-2 h-12 text-base"
-              />
-            )}
-          </>
-        )}
+        {f.type === "select" && (() => {
+          const otherKey = `${f.key}__other`;
+          const otherErr = errors.has(otherKey);
+          return (
+            <>
+              <Select value={v || undefined} onValueChange={(val) => setVal(f.key, val)}>
+                <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Select…" /></SelectTrigger>
+                <SelectContent className="max-h-[50vh]">
+                  {f.options?.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                  {f.allowOther && <SelectItem value={OTHER_OPTION}>{OTHER_OPTION}</SelectItem>}
+                </SelectContent>
+              </Select>
+              {f.allowOther && v === OTHER_OPTION && (
+                <div className="mt-2 space-y-1">
+                  <Label className="text-xs font-medium text-foreground">Please specify *</Label>
+                  <Input
+                    autoFocus
+                    value={values[otherKey] ?? ""}
+                    onChange={(e) => setOtherVal(otherKey, e.target.value)}
+                    placeholder="Type the specific value…"
+                    aria-invalid={otherErr}
+                    className={`h-12 text-base ${otherErr ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                  />
+                  {otherErr && <p className="text-xs text-destructive">This field is required when “Other” is selected.</p>}
+                </div>
+              )}
+            </>
+          );
+        })()}
         {f.type === "boolean" && (
           <div className="flex h-12 items-center justify-between rounded-md border border-input px-3">
             <span className="text-sm text-muted-foreground">{v ? "Yes" : "No"}</span>
@@ -218,13 +281,26 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
       </div>
 
       {/* Progress */}
-      <div className="relative z-10 flex gap-1.5 px-4 pt-3">
-        {Array.from({ length: totalSteps }).map((_, i) => (
-          <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i <= step ? "bg-primary" : "bg-muted"}`} />
-        ))}
+      <div className="relative z-10 space-y-2 px-4 pt-3 sm:px-6">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-semibold text-foreground">
+            {step === 0 ? "Report Identity" : IRF_SECTIONS[step - 1].short}
+          </span>
+          <span className="text-muted-foreground">Step {step + 1} of {totalSteps}</span>
+        </div>
+        <div className="flex gap-1.5">
+          {Array.from({ length: totalSteps }).map((_, i) => (
+            <div
+              key={i}
+              className={`h-1.5 flex-1 rounded-full transition-colors ${
+                i < step ? "bg-primary" : i === step ? "bg-primary/70" : "bg-muted"
+              }`}
+            />
+          ))}
+        </div>
       </div>
 
-      <div className="relative z-10 px-4 py-4">
+      <div className="relative z-10 px-4 py-4 sm:px-6">
         {step === 0 ? (
           <Card className="space-y-4 p-4 sm:p-6">
             <div className="flex items-center gap-2">
@@ -298,15 +374,15 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
       </div>
 
       {/* Footer nav */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
-          <Button variant="outline" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>Back</Button>
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 px-4 py-3 backdrop-blur supports-[padding:max(0px)]:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 sm:px-2">
+          <Button variant="outline" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))} className="min-w-[88px]">Back</Button>
           {step < totalSteps - 1 ? (
-            <Button onClick={() => setStep((s) => Math.min(totalSteps - 1, s + 1))} className="gap-1">
+            <Button onClick={goNext} className="min-w-[88px] flex-1 gap-1 sm:flex-none">
               Next <ChevronRight className="h-4 w-4" />
             </Button>
           ) : (
-            <Button onClick={submit} disabled={saving} className="gap-2">
+            <Button onClick={submit} disabled={saving} className="flex-1 gap-2 sm:flex-none">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Submit report
             </Button>
