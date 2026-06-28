@@ -684,7 +684,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     if (fModule === MDA_FOLLOWUP_COMMODITIES) return rows.filter((r) => r.hasCommodities);
     if (fModule === MDA_FOLLOWUP_ADVERSE) return rows.filter((r) => r.hasAdverse);
     return rows;
-  }, [primaryByCom, fuByCommunity, fModule]);
+  }, [primaryByCom, fuByCommunity, fModule, authoritativeStatusByCom]);
 
   // Paginate the register so the DOM stays light with very large datasets
   // (thousands of communities) instead of rendering every row at once.
