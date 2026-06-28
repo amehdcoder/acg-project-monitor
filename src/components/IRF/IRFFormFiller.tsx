@@ -72,7 +72,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
         reporting_period: monthOptions.find((m) => m.value === reportingMonth)?.label ?? reportingMonth,
         reporting_month: `${reportingMonth}-01`,
         state, lga, ward: ward || null,
-        focal_person_name: focalName, focal_person_phone: focalPhone || null,
+        focal_person_phone: focalPhone || null,
         narrative: narrative || null,
         gps_lat: position?.lat ?? null, gps_lng: position?.lng ?? null,
         submission_status: "submitted",
