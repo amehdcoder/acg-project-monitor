@@ -35,6 +35,26 @@ type Palette = AcsmDashboardPalette;
 
 const fmt = (n: number) => n.toLocaleString();
 
+const safeAchievement = (value: unknown): number => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+};
+
+const achievementTone = (pct: unknown, C: Palette): string => {
+  const value = safeAchievement(pct);
+  if (value >= 80) return C.success;
+  if (value >= 50) return C.warning;
+  if (value >= 30) return C.orange;
+  return C.danger;
+};
+
+const statusTone = (status: AcsmStatus, C: Palette): string => {
+  if (status === "on_track") return C.success;
+  if (status === "at_risk") return C.warning;
+  if (status === "behind_target") return C.danger;
+  return C.blue;
+};
+
 export default function ACSMDashboard({ projectId, onClose }: Props) {
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
@@ -98,7 +118,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
     .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
     .map((p) => ({
       id: p.id, lat: p.lat, lng: p.lng, title: p.label,
-      description: `${p.pct}% achievement`, markerColor: achievementColor(p.pct),
+      description: `${safeAchievement(p.pct)}% achievement`, markerColor: achievementTone(p.pct, C),
     }));
 
   const navIcons: Record<string, any> = {
@@ -204,7 +224,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
               </span>
               {duplicateInfo.total > 0 && (
                 <span className="flex items-center gap-1.5 rounded-md px-2 py-1 font-semibold"
-                  style={{ background: "#f59e0b22", color: "#fbbf24", border: "1px solid #f59e0b55" }}>
+                  style={{ background: `${C.warning}22`, color: C.warning, border: `1px solid ${C.warning}66` }}>
                   <AlertTriangle className="h-3.5 w-3.5" />
                   {fmt(duplicateInfo.total)} duplicate submission(s) flagged & excluded from counts
                 </span>
@@ -232,11 +252,11 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
           {/* KPI cards */}
           <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <Kpi icon={Users} label="People Benefiting" value={fmt(stats.peopleBenefiting)} tint={C.primary} delta="+18.6%" up palette={C} />
-            <Kpi icon={CheckCircle2} label="Indicators On Track" value={String(stats.onTrack)} tint="#22c55e" delta={`${pct(stats.onTrack, stats.total)}% of total`} up palette={C} />
-            <Kpi icon={AlertTriangle} label="At Risk" value={String(stats.atRisk)} tint="#f59e0b" delta={`${pct(stats.atRisk, stats.total)}% of total`} palette={C} />
-            <Kpi icon={Ban} label="Behind Target" value={String(stats.behind)} tint="#ef4444" delta={`${pct(stats.behind, stats.total)}% of total`} down palette={C} />
+            <Kpi icon={CheckCircle2} label="Indicators On Track" value={String(stats.onTrack)} tint={C.success} delta={`${pct(stats.onTrack, stats.total)}% of total`} up palette={C} />
+            <Kpi icon={AlertTriangle} label="At Risk" value={String(stats.atRisk)} tint={C.warning} delta={`${pct(stats.atRisk, stats.total)}% of total`} palette={C} />
+            <Kpi icon={Ban} label="Behind Target" value={String(stats.behind)} tint={C.danger} delta={`${pct(stats.behind, stats.total)}% of total`} down palette={C} />
             <Kpi icon={CircleDashed} label="Draft / Pending" value={String(stats.draft)} tint={C.blue} delta={`${pct(stats.draft, stats.total)}% of total`} palette={C} />
-            <Kpi icon={TrendingUp} label="Avg Achievement" value={`${stats.avgAchievement}%`} tint={achievementColor(stats.avgAchievement)} delta="this period" up palette={C} />
+            <Kpi icon={TrendingUp} label="Avg Achievement" value={`${stats.avgAchievement}%`} tint={achievementTone(stats.avgAchievement, C)} delta="this period" up palette={C} />
           </div>
 
           {/* Trend + Status + Top locations */}
@@ -268,7 +288,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                   {statusDistribution.map((d) => (
                     <div key={d.key} className="flex items-center justify-between text-[12.5px]">
                       <span className="flex items-center gap-2" style={{ color: C.text }}>
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: d.color }} /> {d.name}
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: statusTone(d.key, C) }} /> {d.name}
                       </span>
                       <span className="font-semibold">{d.value} ({pct(d.value, stats.total)}%)</span>
                     </div>
@@ -285,9 +305,9 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                     <MapPin className="h-3.5 w-3.5 shrink-0" style={{ color: C.sub }} />
                     <span className="w-24 truncate text-[13px]">{l.location}</span>
                     <div className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: C.track }}>
-                      <div className="h-full rounded-full" style={{ width: `${Math.min(100, l.achievement)}%`, background: achievementColor(l.achievement) }} />
+                        <div className="h-full rounded-full" style={{ width: `${Math.min(100, safeAchievement(l.achievement))}%`, background: achievementTone(l.achievement, C) }} />
                     </div>
-                    <span className="w-10 text-right text-[12.5px] font-semibold" style={{ color: achievementColor(l.achievement) }}>{l.achievement}%</span>
+                    <span className="w-10 text-right text-[12.5px] font-semibold" style={{ color: achievementTone(l.achievement, C) }}>{l.achievement}%</span>
                     <span className="w-10 text-right text-[11px]" style={{ color: C.sub }}>{l.onTrack}/{l.total}</span>
                   </div>
                 ))}
@@ -302,10 +322,10 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                 <div className="relative flex h-28 w-28 shrink-0 items-center justify-center">
                   <svg viewBox="0 0 36 36" className="h-28 w-28 -rotate-90">
                     <circle cx="18" cy="18" r="15.5" fill="none" stroke={C.borderSoft} strokeWidth="3.5" />
-                    <circle cx="18" cy="18" r="15.5" fill="none" stroke={achievementColor(dataQuality.overall)} strokeWidth="3.5" strokeLinecap="round" strokeDasharray={`${(dataQuality.overall / 100) * 97.4} 97.4`} />
+                    <circle cx="18" cy="18" r="15.5" fill="none" stroke={achievementTone(dataQuality.overall, C)} strokeWidth="3.5" strokeLinecap="round" strokeDasharray={`${(safeAchievement(dataQuality.overall) / 100) * 97.4} 97.4`} />
                   </svg>
                   <div className="absolute text-center">
-                    <p className="text-xl font-bold" style={{ color: achievementColor(dataQuality.overall) }}>{dataQuality.overall}%</p>
+                    <p className="text-xl font-bold" style={{ color: achievementTone(dataQuality.overall, C) }}>{dataQuality.overall}%</p>
                     <p className="text-[10px]" style={{ color: C.sub }}>Quality</p>
                   </div>
                 </div>
@@ -318,10 +338,10 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                     ["Validity", dataQuality.validity],
                   ] as [string, number][]).map(([k, v]) => (
                     <div key={k} className="flex items-center gap-2 text-[12.5px]">
-                      <CheckCircle2 className="h-3.5 w-3.5" style={{ color: achievementColor(v) }} />
+                      <CheckCircle2 className="h-3.5 w-3.5" style={{ color: achievementTone(v, C) }} />
                       <span className="w-24" style={{ color: C.text }}>{k}</span>
                       <div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: C.track }}>
-                        <div className="h-full rounded-full" style={{ width: `${v}%`, background: achievementColor(v) }} />
+                        <div className="h-full rounded-full" style={{ width: `${safeAchievement(v)}%`, background: achievementTone(v, C) }} />
                       </div>
                       <span className="w-9 text-right font-semibold">{v}%</span>
                     </div>
@@ -365,7 +385,9 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                 </thead>
                 <tbody>
                   {paged.map((r) => {
-                    const m = STATUS_META[r.status as AcsmStatus] ?? STATUS_META.draft_pending;
+                    const status = (r.status as AcsmStatus) || "draft_pending";
+                    const m = STATUS_META[status] ?? STATUS_META.draft_pending;
+                    const mColor = statusTone(status, C);
                     return (
                       <tr key={r.id} className="border-t" style={{ borderColor: C.borderSoft }}>
                         <td className="px-2 py-2.5 font-mono text-[11.5px]" style={{ color: C.sub }}>{r.code}</td>
@@ -377,15 +399,15 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                         <td className="px-2 py-2.5 text-right font-medium">{formatByUnit(r.actual, r.unit)}</td>
                         <td className="px-2 py-2.5">
                           <div className="flex items-center gap-2">
-                            <span className="w-9 font-semibold" style={{ color: achievementColor(r.pct) }}>{r.pct}%</span>
+                            <span className="w-9 font-semibold" style={{ color: achievementTone(r.pct, C) }}>{r.pct}%</span>
                             <div className="h-1.5 w-20 overflow-hidden rounded-full" style={{ background: C.track }}>
-                              <div className="h-full rounded-full" style={{ width: `${Math.min(100, r.pct)}%`, background: achievementColor(r.pct) }} />
+                              <div className="h-full rounded-full" style={{ width: `${Math.min(100, safeAchievement(r.pct))}%`, background: achievementTone(r.pct, C) }} />
                             </div>
                           </div>
                         </td>
                         <td className="px-2 py-2.5">
-                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${m.color}22`, color: m.color }}>
-                            <span className="h-1.5 w-1.5 rounded-full" style={{ background: m.color }} /> {m.label}
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${mColor}22`, color: mColor, border: `1px solid ${mColor}55` }}>
+                            <span className="h-1.5 w-1.5 rounded-full" style={{ background: mColor }} /> {m.label}
                           </span>
                         </td>
                         <td className="px-2 py-2.5" style={{ color: C.sub }}>{r.lastUpdated}</td>
@@ -428,7 +450,7 @@ const Kpi = ({ icon: Icon, label, value, tint, delta, up, down, palette: C }: { 
     </div>
     <p className="mt-2 text-2xl font-bold" style={{ color: tint }}>{value}</p>
     {delta && (
-      <p className="mt-0.5 flex items-center gap-1 text-[11px]" style={{ color: up ? "#22c55e" : down ? "#ef4444" : C.sub }}>
+      <p className="mt-0.5 flex items-center gap-1 text-[11px]" style={{ color: up ? C.success : down ? C.danger : C.sub }}>
         {up && <TrendingUp className="h-3 w-3" />}{down && <TrendingDown className="h-3 w-3" />}{delta}
       </p>
     )}
