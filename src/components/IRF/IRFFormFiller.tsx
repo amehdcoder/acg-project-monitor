@@ -374,15 +374,15 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
       </div>
 
       {/* Footer nav */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
-          <Button variant="outline" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>Back</Button>
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 px-4 py-3 backdrop-blur supports-[padding:max(0px)]:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 sm:px-2">
+          <Button variant="outline" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))} className="min-w-[88px]">Back</Button>
           {step < totalSteps - 1 ? (
-            <Button onClick={() => setStep((s) => Math.min(totalSteps - 1, s + 1))} className="gap-1">
+            <Button onClick={goNext} className="min-w-[88px] flex-1 gap-1 sm:flex-none">
               Next <ChevronRight className="h-4 w-4" />
             </Button>
           ) : (
-            <Button onClick={submit} disabled={saving} className="gap-2">
+            <Button onClick={submit} disabled={saving} className="flex-1 gap-2 sm:flex-none">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Submit report
             </Button>
