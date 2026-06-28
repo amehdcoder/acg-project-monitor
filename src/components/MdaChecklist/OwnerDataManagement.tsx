@@ -320,11 +320,11 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className={mode === "delete" ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-600 hover:bg-emerald-700"}
+              className={mode === "delete" ? "bg-rose-600 hover:bg-rose-700" : mode === "restore" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-800 hover:bg-red-900"}
               disabled={!canConfirm || busy}
               onClick={run}
             >
-              {mode === "delete" ? "Yes, archive" : "Yes, restore"}
+              {mode === "delete" ? "Yes, archive" : mode === "restore" ? "Yes, restore" : "Yes, delete forever"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
