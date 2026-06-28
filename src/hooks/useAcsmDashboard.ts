@@ -103,6 +103,9 @@ export const useAcsmDashboard = (projectId?: string | null, categoryFilter: Acsm
   const [allRows, setAllRows] = useState<AcsmRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [simulate, setSimulate] = useState(false);
+  const [duplicateInfo, setDuplicateInfo] = useState<AcsmDuplicateInfo>({
+    acsmDuplicates: 0, irfDuplicates: 0, total: 0, irfReports: 0, irfUnique: 0,
+  });
 
   const reqIdRef = useRef(0);
   const simulateRef = useRef(simulate);
@@ -112,9 +115,27 @@ export const useAcsmDashboard = (projectId?: string | null, categoryFilter: Acsm
     const myReq = ++reqIdRef.current;
     setLoading(true);
     try {
-      const data = await fetchAll(projectId);
+      const [acsmRaw, irfRaw] = await Promise.all([fetchAll(projectId), fetchIrf(projectId)]);
       if (myReq !== reqIdRef.current || simulateRef.current) return;
-      setAllRows(data);
+
+      // De-duplicate native ACSM reports.
+      const acsmDedup = flagDuplicates(
+        acsmRaw, acsmSignature, (r) => r.id,
+        (r) => new Date(r.created_at || 0).getTime(),
+      );
+      // De-duplicate IRF submissions BEFORE mapping so duplicates can't inflate the
+      // Advocacy Dashboard contributions.
+      const irfDedup = flagDuplicates(irfRaw, irfSignature, (r) => r.id, irfOrder);
+      const derived = mapIrfRowsToAcsmRows(irfDedup.unique);
+
+      setAllRows([...acsmDedup.unique, ...derived]);
+      setDuplicateInfo({
+        acsmDuplicates: acsmDedup.duplicateCount,
+        irfDuplicates: irfDedup.duplicateCount,
+        total: acsmDedup.duplicateCount + irfDedup.duplicateCount,
+        irfReports: irfRaw.length,
+        irfUnique: irfDedup.uniqueCount,
+      });
     } finally {
       if (myReq === reqIdRef.current) setLoading(false);
     }
@@ -134,6 +155,21 @@ export const useAcsmDashboard = (projectId?: string | null, categoryFilter: Acsm
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simulate, projectId]);
+
+  // Realtime: refresh when either the ACSM IRF table or the IRF table changes.
+  useEffect(() => {
+    if (simulate) return;
+    const channel = supabase
+      .channel(`advocacy_dashboard_${projectId || "all"}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "acsm_reports" },
+        () => { void reload(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "irf_reports" },
+        () => { void reload(); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, simulate]);
+
 
   const rows = useMemo(
     () => (categoryFilter === "all" ? allRows : allRows.filter((r) => r.category === categoryFilter)),
