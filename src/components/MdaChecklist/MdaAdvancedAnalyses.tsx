@@ -848,7 +848,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
               <CardContent className="p-3 pt-0">
                 <SectionTable headers={["Community", "Start", "End", "Supervisor"]}>
                   {timeline.map((t) => (
-                    <tr key={t.id} className="border-t border-border/60 hover:bg-muted/40">
+                    <tr key={t.id} className="border-t border-border/60 hover:bg-muted/40" data-testid="timeline-row" data-worker={t.worker}>
                       <td className="cursor-pointer px-3 py-2 font-medium text-foreground" onClick={() => openDrillForCommunity(t.c, BLUE)}>{t.community}</td>
                       <td className="cursor-pointer px-3 py-2 whitespace-nowrap text-muted-foreground" onClick={() => openDrillForCommunity(t.c, BLUE)}>{t.start}</td>
                       <td className="cursor-pointer px-3 py-2 whitespace-nowrap text-muted-foreground" onClick={() => openDrillForCommunity(t.c, BLUE)}>{t.end}</td>
