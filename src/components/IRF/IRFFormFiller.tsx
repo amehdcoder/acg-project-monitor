@@ -112,7 +112,8 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
 
   if (done) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-8 text-center">
+      <div className="relative flex min-h-[60vh] flex-col items-center justify-center gap-4 p-8 text-center">
+        <IrfWatermark />
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#E2F5EC]">
           <CheckCircle2 className="h-10 w-10 text-[#22A55A]" />
         </div>
