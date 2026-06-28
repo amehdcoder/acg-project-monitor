@@ -113,14 +113,14 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
     return (
       <div className="relative flex min-h-[60vh] flex-col items-center justify-center gap-4 p-8 text-center">
         <IrfWatermark />
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#E2F5EC]">
+        <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-[#E2F5EC]">
           <CheckCircle2 className="h-10 w-10 text-[#22A55A]" />
         </div>
-        <h2 className="text-2xl font-bold text-foreground">Report submitted</h2>
-        <p className="max-w-md text-muted-foreground">
+        <h2 className="relative z-10 text-2xl font-bold text-foreground">Report submitted</h2>
+        <p className="relative z-10 max-w-md text-muted-foreground">
           Your indicator report for <strong>{lga}, {state}</strong> has been recorded and the dashboard has been updated in real time.
         </p>
-        <div className="flex gap-3">
+        <div className="relative z-10 flex gap-3">
           <Button variant="outline" onClick={() => { setDone(false); setValues({}); setStep(0); }}>Submit another</Button>
           <Button onClick={onClose}>Done</Button>
         </div>
