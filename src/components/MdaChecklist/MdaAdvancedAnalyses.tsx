@@ -35,7 +35,7 @@ import {
   HelpCircle, ChevronRight, ShieldCheck, ShieldAlert, Download, ListChecks, Ban, X,
 } from "lucide-react";
 import {
-  MdaQuestionIndex, aggregateByCommunity, geo, visitTrendByLga, workerAccountability,
+  MdaQuestionIndex, aggregateByCommunity, geo, visitTrendByLga,
   type AQuestion, type ASubmission, type CommunityAgg, type ResolvedQ,
 } from "@/lib/mda/analyses";
 import { buildQualityReport, type QualityLevel } from "@/lib/mda/dataQuality";
