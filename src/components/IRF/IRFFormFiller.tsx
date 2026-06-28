@@ -262,7 +262,8 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   const SectionIcon = section ? ((Icons as any)[section.icon] || Icons.ClipboardList) : Icons.ClipboardList;
 
   return (
-    <div className="relative mx-auto w-full max-w-3xl pb-28">
+    <div className="dark relative min-h-screen w-full bg-background text-foreground">
+      <div className="relative mx-auto w-full max-w-3xl pb-28">
       <IrfWatermark />
       {/* Header */}
       <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/10 bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3 shadow-sm">
