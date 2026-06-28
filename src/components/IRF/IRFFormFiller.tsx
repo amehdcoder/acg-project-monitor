@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
 import { ArrowLeft, Save, Loader2, MapPin, CheckCircle2, ChevronRight, Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useGeolocation } from "@/hooks/useGeolocation";
