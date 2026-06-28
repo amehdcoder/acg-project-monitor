@@ -40,6 +40,7 @@ import {
 } from "@/lib/mda/analyses";
 import { buildQualityReport, type QualityLevel } from "@/lib/mda/dataQuality";
 import { communityKey } from "@/lib/mda/dashboardData";
+import { buildMdaModel } from "@/lib/mda/kpis";
 import { meanConfidenceInterval, oneWayAnova, formatP } from "@/lib/statisticalInference";
 import { toneBg, toneFg, type Tone } from "@/lib/conditionalFormatting";
 import { buildSubmissionsCsv, downloadCsv, slugify, type CsvRow } from "@/lib/mda/csvExport";
