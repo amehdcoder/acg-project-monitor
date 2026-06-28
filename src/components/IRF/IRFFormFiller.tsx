@@ -20,13 +20,25 @@ import irfBg from "@/assets/irf-bg.jpg";
 /** Subtle, professional brand watermark that covers the entire IRF interface. */
 export function IrfWatermark() {
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+    // Non-interactive decorative layer: hidden from screen readers (aria-hidden),
+    // removed from the keyboard focus order/AX tree (inert), and click-through
+    // (pointer-events-none) so it can never affect navigation or focus order.
+    <div
+      aria-hidden="true"
+      role="presentation"
+      // @ts-expect-error inert is valid HTML; React types lag behind
+      inert=""
+      className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden"
+    >
       {/* Full-bleed brand image: visible, but always below fields/charts and softened by the wash layers. */}
       <img
         src={irfBg}
         alt=""
+        aria-hidden="true"
+        draggable={false}
+        tabIndex={-1}
         loading="lazy"
-        className="absolute inset-0 h-full w-full object-cover opacity-[0.08] dark:opacity-[0.14]"
+        className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover opacity-[0.08] dark:opacity-[0.14]"
       />
       {/* Soft washes keep text, fields and charts crisp while preserving the SARMAAN CDD brand signal. */}
       <div className="absolute inset-0 bg-background/80 dark:bg-background/78" />
