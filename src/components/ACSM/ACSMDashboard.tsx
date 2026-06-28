@@ -195,6 +195,12 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
             </div>
           )}
 
+          {/* Realtime sync + duplicate review */}
+          <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <AcsmKpiSyncPanel sync={kpiSync} getPayload={buildKpiPayload} canManage={isAdmin || isOwnerLevel} dark />
+            <DuplicateReviewPanel projectId={projectId} dark />
+          </div>
+
           {/* Filters bar */}
           <div className="mb-5 flex flex-wrap gap-3">
             <FilterChip icon={Calendar} label="Reporting Period" value="May 2025" />
