@@ -405,9 +405,9 @@ export default function MdaDrillDownSheet({ data, questions, followUpFields, onC
               </SelectContent>
             </Select>
             <Select value={monitorFilter} onValueChange={setMonitorFilter} disabled={monitorOptions.length === 0}>
-              <SelectTrigger className="h-8 text-xs" aria-label="Monitor"><SelectValue placeholder="Monitor" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs" aria-label="Supervisor"><SelectValue placeholder="Supervisor" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL}>All monitors</SelectItem>
+                <SelectItem value={ALL}>All supervisors</SelectItem>
                 {monitorOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
               </SelectContent>
             </Select>
