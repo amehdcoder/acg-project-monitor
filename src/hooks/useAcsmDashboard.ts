@@ -99,6 +99,15 @@ export interface AcsmDuplicateInfo {
 
 const MONTHS = ["Nov 2024", "Dec 2024", "Jan 2025", "Feb 2025", "Mar 2025", "Apr 2025", "May 2025"];
 
+function normalizeAcsmStatus(status: unknown, pct: number): AcsmStatus {
+  const raw = String(status ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (raw === "on_track" || raw === "ontrack" || raw === "complete" || raw === "completed") return "on_track";
+  if (raw === "at_risk" || raw === "risk" || raw === "warning") return "at_risk";
+  if (raw === "behind_target" || raw === "behind" || raw === "off_track" || raw === "delayed") return "behind_target";
+  if (raw === "draft_pending" || raw === "draft" || raw === "pending") return "draft_pending";
+  return statusFromAchievement(pct);
+}
+
 
 export const useAcsmDashboard = (
   projectId?: string | null,
@@ -198,8 +207,9 @@ export const useAcsmDashboard = (
         const actual = Number(r.actual_achieved) || 0;
         const pct =
           r.achievement_pct != null ? Number(r.achievement_pct) : computeAchievement(target, actual);
-        const status = (r.status as AcsmStatus) || statusFromAchievement(pct);
-        return { ...r, _pct: pct, _status: status };
+        const safePct = Number.isFinite(pct) ? pct : 0;
+        const status = normalizeAcsmStatus(r.status, safePct);
+        return { ...r, _pct: safePct, _status: status };
       }),
     [rows],
   );
