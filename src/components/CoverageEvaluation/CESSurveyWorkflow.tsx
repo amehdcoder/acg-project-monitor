@@ -3863,6 +3863,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                     households={households}
                     basemap={basemap}
                     height="45vh"
+                    zoom={instantMapZoom}
                     centerLabel={instantCenterLabel}
                   />
                 )}
