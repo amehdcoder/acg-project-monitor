@@ -23,7 +23,7 @@
 import { useMemo, useState } from "react";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend,
-  Tooltip as RTooltip, BarChart, Bar,
+  Tooltip as RTooltip, BarChart, Bar, Cell,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
