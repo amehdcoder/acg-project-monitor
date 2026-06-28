@@ -30,7 +30,8 @@ export function IrfWatermark() {
       inert=""
       className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden"
     >
-      {/* Full-bleed brand image: bright, high-resolution and clearly visible, while staying below fields/charts. */}
+      {/* Full-bleed brand image: bright, high-resolution and clearly visible, while staying below fields/charts.
+          object-center keeps the SARMAAN CDD mark aligned and crisp across every mobile and tablet width. */}
       <img
         src={irfBg}
         alt=""
@@ -38,7 +39,7 @@ export function IrfWatermark() {
         draggable={false}
         tabIndex={-1}
         decoding="async"
-        className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover opacity-40 dark:opacity-45 [image-rendering:auto]"
+        className="pointer-events-none absolute left-1/2 top-1/2 h-full w-full max-w-none -translate-x-1/2 -translate-y-1/2 select-none object-cover object-center opacity-40 dark:opacity-45 [image-rendering:auto] [backface-visibility:hidden] [transform:translate3d(-50%,-50%,0)]"
       />
       {/* Light washes keep text and fields readable while the SARMAAN CDD brand stays bright and clear. */}
       <div className="absolute inset-0 bg-background/35 dark:bg-background/40" />
