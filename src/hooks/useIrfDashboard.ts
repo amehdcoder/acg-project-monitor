@@ -16,7 +16,7 @@ async function fetchAll(projectId?: string | null): Promise<IrfReport[]> {
 const num = (v: any) => (v == null || v === "" ? 0 : Number(v) || 0);
 
 export const useIrfDashboard = (projectId?: string | null, overrideMap?: OverrideMap | null) => {
-  const [rows, setRows] = useState<IrfReport[]>([]);
+  const [rawRows, setRawRows] = useState<IrfReport[]>([]);
   const [loading, setLoading] = useState(true);
   const reqIdRef = useRef(0);
 
