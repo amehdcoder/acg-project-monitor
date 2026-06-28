@@ -777,9 +777,18 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-1.5 text-sm">
-                  <Users2 className="h-4 w-4" style={{ color: EMERALD }} /> Monitor Accountability
-                  <span className="font-normal text-muted-foreground">— click a bar to drill</span>
+                <CardTitle className="flex flex-wrap items-center gap-1.5 text-sm">
+                  <Users2 className="h-4 w-4" style={{ color: EMERALD }} /> Supervisor Accountability
+                  <span className="font-normal text-muted-foreground">— click a bar to filter the timeline</span>
+                  {selectedSup && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSup(null)}
+                      className="ml-auto inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/20"
+                    >
+                      {selectedSup} <X className="h-3 w-3" />
+                    </button>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -790,8 +799,16 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
                     <YAxis type="category" dataKey="name" width={84} tick={{ fontSize: 10 }} />
                     <RTooltip />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="Communities" name="Communities visited" fill={EMERALD} radius={[0, 3, 3, 0]} style={{ cursor: "pointer" }} onClick={(d: any) => d?.name && drillWorker(d.name, EMERALD)} />
-                    <Bar dataKey="Days" name="Days monitor worked" fill={ORANGE} radius={[0, 3, 3, 0]} style={{ cursor: "pointer" }} onClick={(d: any) => d?.name && drillWorker(d.name, ORANGE)} />
+                    <Bar dataKey="Communities" name="Communities visited" fill={EMERALD} radius={[0, 3, 3, 0]} style={{ cursor: "pointer" }} onClick={(d: any) => d?.name && toggleSup(d.name)}>
+                      {workerChart.map((w) => (
+                        <Cell key={w.name} fill={EMERALD} fillOpacity={selectedSup && selectedSup !== w.name ? 0.3 : 1} />
+                      ))}
+                    </Bar>
+                    <Bar dataKey="Days" name="Days supervisor worked" fill={ORANGE} radius={[0, 3, 3, 0]} style={{ cursor: "pointer" }} onClick={(d: any) => d?.name && toggleSup(d.name)}>
+                      {workerChart.map((w) => (
+                        <Cell key={w.name} fill={ORANGE} fillOpacity={selectedSup && selectedSup !== w.name ? 0.3 : 1} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -801,23 +818,39 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-1.5 text-sm">
                   <ClipboardCheck className="h-4 w-4 text-primary" /> Community Visit Timeline
+                  {selectedSup && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSup(null)}
+                      className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/20"
+                    >
+                      {selectedSup} <X className="h-3 w-3" />
+                    </button>
+                  )}
                   <span className="ml-auto text-xs font-normal text-muted-foreground">{fmt(timeline.length)}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 pt-0">
-                <SectionTable headers={["Community", "Start", "End", "Monitor"]}>
+                <SectionTable headers={["Community", "Start", "End", "Supervisor"]}>
                   {timeline.map((t) => (
-                    <tr key={t.id} className="cursor-pointer border-t border-border/60 hover:bg-muted/40" onClick={() => openDrillForCommunity(t.c, BLUE)}>
-                      <td className="px-3 py-2 font-medium text-foreground">{t.community}</td>
-                      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{t.start}</td>
-                      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{t.end}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{t.worker}</td>
+                    <tr key={t.id} className="border-t border-border/60 hover:bg-muted/40">
+                      <td className="cursor-pointer px-3 py-2 font-medium text-foreground" onClick={() => openDrillForCommunity(t.c, BLUE)}>{t.community}</td>
+                      <td className="cursor-pointer px-3 py-2 whitespace-nowrap text-muted-foreground" onClick={() => openDrillForCommunity(t.c, BLUE)}>{t.start}</td>
+                      <td className="cursor-pointer px-3 py-2 whitespace-nowrap text-muted-foreground" onClick={() => openDrillForCommunity(t.c, BLUE)}>{t.end}</td>
+                      <td
+                        className="cursor-pointer px-3 py-2 font-medium text-primary hover:underline"
+                        title="Filter the chart & timeline by this supervisor"
+                        onClick={() => toggleSup(t.worker)}
+                      >
+                        {t.worker}
+                      </td>
                     </tr>
                   ))}
                 </SectionTable>
               </CardContent>
             </Card>
           </div>
+
         )}
 
         {/* ── Drill-down sheet (exact underlying submissions) ── */}
