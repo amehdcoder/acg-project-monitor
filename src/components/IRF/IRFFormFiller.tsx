@@ -293,7 +293,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
           return (
             <>
               <Select value={v || undefined} onValueChange={(val) => setVal(f.key, val)}>
-                <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Select…" /></SelectTrigger>
+                <SelectTrigger aria-invalid={fieldErr} className={`h-12 text-base ${errCls}`}><SelectValue placeholder="Select…" /></SelectTrigger>
                 <SelectContent className="max-h-[50vh]">
                   {f.options?.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                   {f.allowOther && <SelectItem value={OTHER_OPTION}>{OTHER_OPTION}</SelectItem>}
