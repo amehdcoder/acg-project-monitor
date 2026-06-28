@@ -23,6 +23,9 @@ import { ALL_STANDARD_FORMS } from "@/lib/standardAssessments/allStandardForms";
 import ACSMFormFiller from "@/components/ACSM/ACSMFormFiller";
 import ACSMDashboard from "@/components/ACSM/ACSMDashboard";
 import { ACSM_FORM_NAME, ACSM_FORM_DESC, ACSM_DASH_NAME, ACSM_DASH_DESC } from "@/lib/acsm/definition";
+import IRFFormFiller from "@/components/IRF/IRFFormFiller";
+import IRFDashboard from "@/components/IRF/IRFDashboard";
+import { IRF_FORM_NAME, IRF_FORM_DESC, IRF_DASH_NAME, IRF_DASH_DESC } from "@/lib/irf/definition";
 import SBCFormFiller from "@/components/SBC/SBCFormFiller";
 import SBCDashboard from "@/components/SBC/SBCDashboard";
 import { SBC_FORM_NAME, SBC_FORM_DESC, SBC_DASH_NAME, SBC_DASH_DESC } from "@/lib/sbc/definition";
@@ -257,6 +260,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showAcsmDash, setShowAcsmDash] = useState(false);
   const [showSbcForm, setShowSbcForm] = useState(false);
   const [showSbcDash, setShowSbcDash] = useState(false);
+  const [showIrfForm, setShowIrfForm] = useState(false);
+  const [showIrfDash, setShowIrfDash] = useState(false);
   const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [showFormsExplorer, setShowFormsExplorer] = useState(false);
   const [openTopFolder, setOpenTopFolder] = useState<"custom" | "standard" | null>("custom");
@@ -325,6 +330,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       case "acsm_dash": setShowAcsmDash(true); break;
       case "sbc_form": setShowSbcForm(true); break;
       case "sbc_dash": setShowSbcDash(true); break;
+      case "irf_form": setShowIrfForm(true); break;
+      case "irf_dash": setShowIrfDash(true); break;
       case "microplan_entry": setMicroplanFillingActive(true); break;
       case "srf":
       case "incident":
@@ -950,6 +957,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         );
         if (linkedDash) idsToDelete.push(linkedDash.id);
       }
+      const irfKind = (form?.settings as any)?.irf_kind as ("form" | "dashboard" | undefined);
+      if (irfKind === "form" && form?.project_id) {
+        const linkedDash = forms.find(
+          f => f.project_id === form.project_id && (f.settings as any)?.irf_kind === "dashboard",
+        );
+        if (linkedDash) idsToDelete.push(linkedDash.id);
+      }
       const { error } = await supabase.from("forms").delete().in("id", idsToDelete);
       if (error) throw error;
       await logAction("delete_form", `Deleted form "${form?.name || formId}"`, "form", formId);
@@ -1253,6 +1267,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   if (showSbcDash) {
     return <SBCDashboard projectId={currentProjectId} onClose={() => setShowSbcDash(false)} />;
+  }
+
+  if (showIrfForm) {
+    return <IRFFormFiller projectId={currentProjectId} onClose={() => setShowIrfForm(false)} />;
+  }
+
+  if (showIrfDash) {
+    return <IRFDashboard projectId={currentProjectId} onClose={() => setShowIrfDash(false)} />;
   }
 
 
@@ -1897,6 +1919,55 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-[#0891b2]">
+                                <ChevronRight className="h-5 w-5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setFormToDelete(form)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Remove from project
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // IRF (LGA ACSM Focal Person) markers launch their dedicated UI.
+                  const irfKind = (form.settings as any)?.irf_kind as ("form" | "dashboard" | undefined);
+                  if (irfKind === "form" || irfKind === "dashboard") {
+                    const isDash = irfKind === "dashboard";
+                    const IrfIcon = isDash ? BarChart3 : ClipboardCheck;
+                    return (
+                      <div
+                        key={form.id}
+                        className="group flex items-center gap-3 border-l-4 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
+                        style={{ borderLeftColor: "#0c2340" }}
+                      >
+                        <button
+                          onClick={() => (isDash ? setShowIrfDash(true) : setShowIrfForm(true))}
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#D7E3F0]"
+                          aria-label={`Open ${form.name}`}
+                        >
+                          <IrfIcon className="h-5 w-5 text-[#0c2340]" strokeWidth={2} />
+                        </button>
+                        <button
+                          onClick={() => (isDash ? setShowIrfDash(true) : setShowIrfForm(true))}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <h4 className="truncate text-[15px] font-bold text-[#0c2340]">{form.name}</h4>
+                          <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">{form.description || "LGA ACSM Focal Person indicator tool"}</p>
+                        </button>
+                        {!isDash && (
+                          <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold bg-[#E2F5EC] text-[#22A55A]">
+                            Finalized
+                          </span>
+                        )}
+                        {isAdmin && !isDash && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-[#0c2340]">
                                 <ChevronRight className="h-5 w-5" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -2585,6 +2656,65 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         fetchForms(currentProjectId);
                       } catch (e: any) {
                         console.error("SBC add error", e);
+                        toast({ title: "Could not add", description: e?.message || "Please try again.", variant: "destructive" });
+                      }
+                    }}
+                  >
+                    <Sparkles className="h-4 w-4 mr-1.5" /> Add to project
+                  </Button>
+                </div>
+              </div>
+
+              {/* LGA ACSM Focal Person IRF — Independent Activity Tracker — addable to any project */}
+              <div className="px-3 sm:px-4 py-3 border-t border-border/60">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-[#9db4d4] bg-gradient-to-r from-[#eaf0f8] to-transparent p-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-lg bg-[#d7e3f0] shrink-0">
+                      <BarChart3 className="h-5 w-5 text-[#0c2340]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">LGA ACSM Focal Person IRF (Independent Activity Tracker)</p>
+                      <p className="text-xs text-muted-foreground">Sectioned indicator reporting form + real-time dashboard for advocacy, social mobilization, awareness creation &amp; non-compliance resolution.</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="shrink-0"
+                    onClick={async () => {
+                      if (!currentProjectId) {
+                        toast({ title: "Select a project", description: "Choose a project before adding the IRF tools.", variant: "destructive" });
+                        return;
+                      }
+                      if (forms.find((f) => (f.settings as any)?.irf_kind)) {
+                        toast({ title: "Already added", description: "The LGA ACSM Focal Person tools already exist in this project. Open them from the list above." });
+                        return;
+                      }
+                      try {
+                        const { error } = await supabase.from("forms").insert([
+                          {
+                            name: IRF_FORM_NAME,
+                            description: IRF_FORM_DESC,
+                            questions: [] as any,
+                            settings: { irf_kind: "form" } as any,
+                            project_id: currentProjectId,
+                            created_by: user?.id,
+                            status: "active",
+                          },
+                          {
+                            name: IRF_DASH_NAME,
+                            description: IRF_DASH_DESC,
+                            questions: [] as any,
+                            settings: { irf_kind: "dashboard" } as any,
+                            project_id: currentProjectId,
+                            created_by: user?.id,
+                            status: "active",
+                          },
+                        ] as any);
+                        if (error) throw error;
+                        toast({ title: "Added to project", description: "Open the reporting form and dashboard from your forms list above." });
+                        fetchForms(currentProjectId);
+                      } catch (e: any) {
+                        console.error("IRF add error", e);
                         toast({ title: "Could not add", description: e?.message || "Please try again.", variant: "destructive" });
                       }
                     }}
