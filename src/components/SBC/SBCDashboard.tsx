@@ -13,6 +13,7 @@ import MapVisualization from "@/components/MapVisualization/MapVisualization";
 import { MapMarker } from "@/components/MapVisualization/types";
 import { useSbcDashboard } from "@/hooks/useSbcDashboard";
 import { useAuth } from "@/hooks/useAuth";
+import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 import {
   STATUS_META, achievementColor, formatByUnit,
   categoryLabel, indicatorLevelLabel, type SbcCategory, type SbcStatus,
