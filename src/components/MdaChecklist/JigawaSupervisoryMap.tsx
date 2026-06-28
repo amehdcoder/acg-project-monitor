@@ -40,6 +40,9 @@ const LGA_LABEL: Record<string, string> = {
 
 const prettyLga = (raw: string) => LGA_LABEL[norm(raw)] ?? raw;
 
+const SATELLITE_TILE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+const SATELLITE_ATTRIBUTION = "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community";
+
 // Ray-casting point-in-polygon, handling Polygon + MultiPolygon rings.
 function pointInFeature(lat: number, lng: number, geom: any): boolean {
   if (!geom) return false;
@@ -110,11 +113,14 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
   useEffect(() => {
     const el = containerRef.current;
     if (!el || mapRef.current) return;
-    const map = L.map(el, { zoomControl: true, attributionControl: false });
-    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    const map = L.map(el, { zoomControl: true, attributionControl: true });
+    L.tileLayer(SATELLITE_TILE_URL, {
       maxZoom: 19,
-      attribution: "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
-    }).addTo(map);
+      attribution: SATELLITE_ATTRIBUTION,
+      crossOrigin: true,
+    })
+      .on("tileerror", (event) => console.warn("Jigawa satellite basemap tile failed", event))
+      .addTo(map);
     map.setView([12.228, 9.5616], 8);
     mapRef.current = map;
     setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 50);

@@ -65,6 +65,24 @@ async function fetchAll(projectId?: string | null): Promise<AcsmRow[]> {
   });
 }
 
+const logAcsmDataError = (label: string, error: unknown, extra?: Record<string, unknown>) => {
+  const payload = {
+    label,
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : null,
+    timestamp: new Date().toISOString(),
+    ...extra,
+  };
+  console.error("[useAcsmDashboard]", payload);
+  try {
+    const key = "amehnities.acsm_data_errors.v1";
+    const existing = JSON.parse(window.localStorage.getItem(key) || "[]");
+    window.localStorage.setItem(key, JSON.stringify([payload, ...(Array.isArray(existing) ? existing : [])].slice(0, 30)));
+  } catch {
+    // Diagnostic persistence is best-effort only.
+  }
+};
+
 async function fetchIrf(projectId?: string | null): Promise<IrfReport[]> {
   return fetchAllRowsKeyset<IrfReport>((limit, afterId) => {
     let q = supabase.from("irf_reports" as any).select("*");
@@ -156,7 +174,7 @@ export const useAcsmDashboard = (
         irfUnique: irfDedup.uniqueCount,
       });
     } catch (error) {
-      console.error("Failed to load ACSM dashboard data", error);
+      logAcsmDataError("reload", error, { projectId, categoryFilter });
       if (myReq === reqIdRef.current) {
         setAllRows([]);
         setDuplicateInfo({
@@ -240,7 +258,7 @@ export const useAcsmDashboard = (
     };
     enriched.forEach((r) => {
       if (r.submission_status === "draft") counts.draft_pending++;
-      else counts[r._status]++;
+      else counts[r._status] = (counts[r._status] || 0) + 1;
     });
     return (Object.keys(counts) as AcsmStatus[]).map((k) => ({
       key: k,

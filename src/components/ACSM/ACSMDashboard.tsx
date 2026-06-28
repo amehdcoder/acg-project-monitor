@@ -23,6 +23,7 @@ import { useAcsmKpiSync, type AcsmKpiPayload } from "@/hooks/useAcsmKpiSync";
 import DuplicateReviewPanel from "@/components/ACSM/DuplicateReviewPanel";
 import AcsmKpiSyncPanel from "@/components/ACSM/AcsmKpiSyncPanel";
 import { ACSM_DASHBOARD_PALETTE, type AcsmDashboardPalette } from "@/lib/acsm/dashboardPalette";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 interface Props {
   projectId?: string | null;
@@ -55,6 +56,25 @@ const normalizeDashboardStatus = (status: unknown): AcsmStatus => {
   return "draft_pending";
 };
 
+const logAdvocacyDashboardError = (label: string, error: unknown, extra?: Record<string, unknown>) => {
+  const payload = {
+    label,
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : null,
+    url: typeof window !== "undefined" ? window.location.href : null,
+    timestamp: new Date().toISOString(),
+    ...extra,
+  };
+  console.error("[AdvocacyDashboard]", payload);
+  try {
+    const key = "amehnities.advocacy_dashboard_errors.v1";
+    const existing = JSON.parse(window.localStorage.getItem(key) || "[]");
+    window.localStorage.setItem(key, JSON.stringify([payload, ...(Array.isArray(existing) ? existing : [])].slice(0, 30)));
+  } catch {
+    // Never let diagnostic persistence crash the dashboard.
+  }
+};
+
 const statusTone = (status: AcsmStatus, C: Palette): string => {
   if (status === "on_track") return C.success;
   if (status === "at_risk") return C.warning;
@@ -75,6 +95,17 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
   const { isOwnerLevel, isAdmin } = useAuth();
   const kpiSync = useAcsmKpiSync(projectId);
   const autoSync = kpiSync.autoSync;
+
+  useEffect(() => {
+    const onError = (event: ErrorEvent) => logAdvocacyDashboardError("window.error", event.error || event.message, { projectId, category });
+    const onRejection = (event: PromiseRejectionEvent) => logAdvocacyDashboardError("unhandledrejection", event.reason, { projectId, category });
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, [projectId, category]);
 
   const buildKpiPayload = useCallback((): AcsmKpiPayload => ({
     generatedAt: new Date().toISOString(),
@@ -241,8 +272,12 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
 
           {/* Realtime sync + duplicate review */}
           <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <AcsmKpiSyncPanel sync={kpiSync} getPayload={buildKpiPayload} canManage={isAdmin || isOwnerLevel} dark={isDark} />
-            <DuplicateReviewPanel projectId={projectId} dark={isDark} />
+            <ErrorBoundary name="Advocacy KPI sync panel">
+              <AcsmKpiSyncPanel sync={kpiSync} getPayload={buildKpiPayload} canManage={isAdmin || isOwnerLevel} dark={isDark} />
+            </ErrorBoundary>
+            <ErrorBoundary name="Advocacy duplicate review panel">
+              <DuplicateReviewPanel projectId={projectId} dark={isDark} />
+            </ErrorBoundary>
           </div>
 
           {/* Filters bar */}
@@ -359,7 +394,9 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
 
             <Panel title="Geospatial Distribution" sub={`${markers.length} reporting points`} palette={C}>
               <div className="overflow-hidden rounded-xl" style={{ border: `1px solid ${C.borderSoft}` }}>
-                <MapVisualization markers={markers} height="320px" showNigeriaBoundaries showLegend={false} />
+                <ErrorBoundary name="Advocacy geospatial distribution map">
+                  <MapVisualization markers={markers} height="320px" showNigeriaBoundaries showLegend={false} />
+                </ErrorBoundary>
               </div>
             </Panel>
           </div>
