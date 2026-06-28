@@ -83,6 +83,16 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
     }
     setSaving(true);
     try {
+      // Resolve "Other (specify)" selections into their typed text, then drop temp keys.
+      const resolved: Record<string, any> = {};
+      Object.keys(values).forEach((k) => {
+        if (k.endsWith("__other")) return; // temp specify holder, handled below
+        if (values[k] === OTHER_OPTION) {
+          resolved[k] = (values[`${k}__other`] || "").trim() || OTHER_OPTION;
+        } else {
+          resolved[k] = values[k];
+        }
+      });
       const payload: Record<string, any> = {
         project_id: projectId || null,
         created_by: user?.id,
@@ -93,10 +103,10 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
         narrative: narrative || null,
         gps_lat: position?.lat ?? null, gps_lng: position?.lng ?? null,
         submission_status: "submitted",
-        ...values,
+        ...resolved,
       };
       // Coerce empties for typed columns.
-      Object.keys(values).forEach((k) => { if (values[k] === "") payload[k] = null; });
+      Object.keys(resolved).forEach((k) => { if (resolved[k] === "") payload[k] = null; });
       const { error } = await supabase.from("irf_reports" as any).insert(payload);
       if (error) throw error;
       setDone(true);
