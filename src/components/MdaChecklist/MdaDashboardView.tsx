@@ -48,7 +48,7 @@ interface Props {
   embedded?: boolean;
 }
 
-const SIM_DEFAULTS = { count: 250, seed: 1337 };
+
 
 const norm = (v: unknown) => String(v ?? "").trim();
 
