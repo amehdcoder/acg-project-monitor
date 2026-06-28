@@ -160,8 +160,19 @@ export const useIrfDashboard = (projectId?: string | null) => {
     return Math.round((complete / rows.length) * 100);
   }, [rows]);
 
+  // Duplicate flagging + unique counts (same logic shared with the Advocacy Dashboard).
+  const duplicates = useMemo(() => {
+    const res = flagDuplicates(rows, irfSignature, (r) => r.id, irfOrder);
+    return {
+      duplicateIds: res.duplicateIds,
+      duplicateCount: res.duplicateCount,
+      uniqueCount: res.uniqueCount,
+      totalCount: rows.length,
+    };
+  }, [rows]);
+
   return {
-    rows, loading, reload,
+    rows, loading, reload, duplicates,
     totals, stats, sectionTotals, genderSplit, ncBreakdown, topLgas, trend, points, dataQuality,
   };
 };
