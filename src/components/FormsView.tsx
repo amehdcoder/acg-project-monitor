@@ -260,6 +260,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showAcsmDash, setShowAcsmDash] = useState(false);
   const [showSbcForm, setShowSbcForm] = useState(false);
   const [showSbcDash, setShowSbcDash] = useState(false);
+  const [showIrfForm, setShowIrfForm] = useState(false);
+  const [showIrfDash, setShowIrfDash] = useState(false);
   const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [showFormsExplorer, setShowFormsExplorer] = useState(false);
   const [openTopFolder, setOpenTopFolder] = useState<"custom" | "standard" | null>("custom");
