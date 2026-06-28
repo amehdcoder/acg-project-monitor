@@ -1,7 +1,7 @@
 export const ACSM_DASHBOARD_PALETTE = {
   dark: {
-    bg: "#071426", panel: "#0d213a", panel2: "#112b49", border: "#3d5f86",
-    borderSoft: "#29486e", text: "#f5f9ff", sub: "#b9c9df", primary: "#67e8f9", blue: "#60a5fa",
+    bg: "#071426", panel: "#0d213a", panel2: "#112b49", border: "#456f9d",
+    borderSoft: "#426fa3", text: "#f5f9ff", sub: "#b9c9df", primary: "#67e8f9", blue: "#60a5fa",
     track: "#17304f", buttonText: "#06121f", active: "#13345a",
   },
   light: {
