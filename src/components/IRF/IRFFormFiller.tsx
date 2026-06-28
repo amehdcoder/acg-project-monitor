@@ -300,7 +300,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
         </div>
       </div>
 
-      <div className="relative z-10 px-4 py-4">
+      <div className="relative z-10 px-4 py-4 sm:px-6">
         {step === 0 ? (
           <Card className="space-y-4 p-4 sm:p-6">
             <div className="flex items-center gap-2">
