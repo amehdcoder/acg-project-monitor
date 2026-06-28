@@ -407,8 +407,11 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
       </div>
 
 
-      {/* Footer nav — pinned in normal flex flow so it is always visible (Android-safe) */}
-      <div className="relative z-20 shrink-0 border-t bg-background/95 px-4 py-3 backdrop-blur pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      {/* Footer nav — pinned in normal flex flow so it is always visible (Android-safe).
+          Reserve room for the app's fixed mobile bottom nav bar (lg:hidden, ~4.5rem tall)
+          so the Next/Submit buttons are never hidden behind it on Android. */}
+      <div className="relative z-20 shrink-0 border-t bg-background/95 px-4 py-3 backdrop-blur pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:pb-3">
+
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 sm:px-2">
           <Button variant="outline" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))} className="min-w-[88px]">Back</Button>
           {step < totalSteps - 1 ? (
