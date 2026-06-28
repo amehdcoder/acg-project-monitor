@@ -1385,12 +1385,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     return simplified.filter((p, i, arr) => i === 0 || sqDist(arr[i - 1], p) > 1e-12);
   }, []);
 
-  const closeManualDraw = useCallback(() => {
-    if (draftPolygon.length < 3) {
+  const finalizeManualDraw = useCallback((points: LatLng[]) => {
+    if (points.length < 3) {
       toast({ title: "Need at least 3 vertices", description: "Tap a few more points before closing.", variant: "destructive" });
       return;
     }
-    const ring = simplifyRing(draftPolygon);
+    const ring = simplifyRing(points);
     const closed = [...ring, { ...ring[0] }];
     setPerimeter(closed);
     // Approximate walked distance = polygon perimeter
@@ -1410,16 +1410,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     setDraftPolygon([]);
     try {
       logCESAction(surveyId ?? "draft", "perimeter.manual_draw", {
-        raw_vertices: draftPolygon.length,
+        raw_vertices: points.length,
         simplified_vertices: ring.length,
         perimeter_m: Math.round(perimM),
       }, gps ? { lat: gps.lat, lng: gps.lng } : undefined);
     } catch { /* audit best-effort */ }
     toast({
       title: "✓ Polygon closed",
-      description: `Auto-detected ${ring.length} vertices from ${draftPolygon.length} taps. Proceed to Step 2.`,
+      description: `Auto-detected ${ring.length} vertices from ${points.length} taps. Proceed to Step 2.`,
     });
-  }, [draftPolygon, simplifyRing, surveyId, gps]);
+  }, [simplifyRing, surveyId, gps]);
+
+  const closeManualDraw = useCallback(() => {
+    finalizeManualDraw(draftPolygon);
+  }, [draftPolygon, finalizeManualDraw]);
 
   const handleDrawTap = useCallback((lat: number, lng: number) => {
     if (!drawMode) return;
@@ -1433,14 +1437,15 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         const latMid = ((a.lat + lat) / 2) * Math.PI / 180;
         const d = R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
         if (d < 8) {
-          // Schedule close on next tick so React state stays consistent.
-          queueMicrotask(closeManualDraw);
+          // Close using the updater's `prev` snapshot so rapid Android taps do
+          // not read a stale draftPolygon from the previous React render.
+          queueMicrotask(() => finalizeManualDraw(prev));
           return prev;
         }
       }
       return [...prev, { lat, lng }];
     });
-  }, [drawMode, closeManualDraw]);
+  }, [drawMode, finalizeManualDraw]);
 
   // Light ticker while recording so status remains live without forcing a full
   // form/map render twice per second on Android.
