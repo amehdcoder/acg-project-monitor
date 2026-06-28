@@ -190,13 +190,13 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
       </div>
 
       {/* Progress */}
-      <div className="flex gap-1.5 px-4 pt-3">
+      <div className="relative z-10 flex gap-1.5 px-4 pt-3">
         {Array.from({ length: totalSteps }).map((_, i) => (
           <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i <= step ? "bg-primary" : "bg-muted"}`} />
         ))}
       </div>
 
-      <div className="px-4 py-4">
+      <div className="relative z-10 px-4 py-4">
         {step === 0 ? (
           <Card className="space-y-4 p-4 sm:p-6">
             <div className="flex items-center gap-2">
