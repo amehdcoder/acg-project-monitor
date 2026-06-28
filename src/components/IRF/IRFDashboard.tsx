@@ -66,7 +66,8 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
   );
 
   return (
-    <div className="relative mx-auto w-full max-w-6xl pb-16">
+    <div className="dark relative min-h-screen w-full bg-background text-foreground">
+      <div className="relative mx-auto w-full max-w-6xl pb-16">
       <IrfWatermark />
       {/* Header */}
       <div className="sticky top-0 z-20 flex items-center gap-3 border-b bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3">
