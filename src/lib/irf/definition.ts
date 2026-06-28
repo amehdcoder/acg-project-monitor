@@ -177,7 +177,7 @@ export const IRF_SECTIONS: IrfSection[] = [
       {
         activity: "Resolution & Follow-up",
         fields: [
-          { key: "resolution_method", label: "Approach used", what: "Dialogue, leader engagement", type: "text", example: "Religious leader" },
+          { key: "resolution_method", label: "Approach used", what: "Dialogue, leader engagement", type: "select", allowOther: true, options: ["One-on-one dialogue", "Religious leader engagement", "Traditional leader engagement", "Health education", "Referral to facility"], example: "Religious leader engagement" },
           { key: "followup_date", label: "Follow-up date", what: "Date revisited", type: "date" },
         ],
       },
