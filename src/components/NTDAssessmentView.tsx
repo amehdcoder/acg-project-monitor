@@ -210,10 +210,11 @@ const NTDAssessmentView = () => {
           <OwnerSubmissionManager
             table="ntd_assessments"
             title="assessments"
-            labelColumns={["patient_name", "suspected_disease"]}
+            labelColumns={["beneficiary_name", "protocol_name", "lga"]}
             onChanged={fetchHistory}
             compact
           />
+
         </div>
 
       </div>
