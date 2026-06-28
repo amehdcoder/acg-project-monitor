@@ -319,6 +319,7 @@ export const useAcsmDashboard = (projectId?: string | null, categoryFilter: Acsm
     points,
     dataQuality,
     draftCount,
+    duplicateInfo,
     loading,
     reload,
     simulate,
