@@ -258,9 +258,14 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
 
   const renderField = (f: IrfField) => {
     const v = values[f.key] ?? "";
+    const required = isFieldRequired(f);
+    const fieldErr = errors.has(f.key);
+    const errCls = fieldErr ? "border-destructive focus-visible:ring-destructive" : "";
     const common = (
       <div className="flex items-baseline justify-between gap-2">
-        <Label className="text-sm font-medium text-foreground">{f.label}</Label>
+        <Label className="text-sm font-medium text-foreground">
+          {f.label}{required && <span className="text-destructive"> *</span>}
+        </Label>
         {f.example && <span className="text-[11px] text-muted-foreground">e.g. {f.example}</span>}
       </div>
     );
@@ -271,16 +276,16 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
         {f.type === "number" && (
           <Input type="number" inputMode="numeric" min={0} value={v}
             onChange={(e) => setVal(f.key, e.target.value === "" ? "" : Number(e.target.value))}
-            placeholder="0" className="h-12 text-base" />
+            placeholder="0" aria-invalid={fieldErr} className={`h-12 text-base ${errCls}`} />
         )}
         {f.type === "text" && (
-          <Input value={v} onChange={(e) => setVal(f.key, e.target.value)} className="h-12 text-base" />
+          <Input value={v} onChange={(e) => setVal(f.key, e.target.value)} aria-invalid={fieldErr} className={`h-12 text-base ${errCls}`} />
         )}
         {f.type === "longtext" && (
-          <Textarea value={v} onChange={(e) => setVal(f.key, e.target.value)} rows={2} className="text-base" />
+          <Textarea value={v} onChange={(e) => setVal(f.key, e.target.value)} rows={2} aria-invalid={fieldErr} className={`text-base ${errCls}`} />
         )}
         {f.type === "date" && (
-          <Input type="date" value={v} onChange={(e) => setVal(f.key, e.target.value)} className="h-12 text-base" />
+          <Input type="date" value={v} onChange={(e) => setVal(f.key, e.target.value)} aria-invalid={fieldErr} className={`h-12 text-base ${errCls}`} />
         )}
         {f.type === "select" && (() => {
           const otherKey = `${f.key}__other`;
