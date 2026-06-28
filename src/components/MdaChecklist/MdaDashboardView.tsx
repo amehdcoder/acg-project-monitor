@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, ChevronUp, Database, Loader2, RefreshCw, RotateCcw, Settings2, Sparkles, WifiOff } from "lucide-react";
+import { ArrowLeft, BarChart3, ChevronUp, Loader2, RefreshCw, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/hooks/useAuth";
 import { useDataAnalytics, type SubmissionRecord } from "@/hooks/useDataAnalytics";
-import { generateMdaSimulation } from "@/lib/mda/simulation";
 import { loadMdaCache, saveMdaCache, isOffline } from "@/lib/mda/offlineCache";
 import { canonicalizeSubmissionData } from "@/lib/mda/dashboardData";
 import MdaSupervisoryChecklistDashboard from "./MdaSupervisoryChecklistDashboard";
