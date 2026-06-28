@@ -35,6 +35,10 @@ interface Summary {
 interface ActionResult {
   archived?: number;
   restored?: number;
+  deleted?: number;
+  deleted_live?: number;
+  deleted_archived?: number;
+  deleted_versions?: number;
   error?: string;
   form_id?: string;
   consistency?: {
