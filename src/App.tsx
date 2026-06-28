@@ -14,6 +14,7 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 import DataCleaner from "./pages/DataCleaner";
+import MdaAnalysesHarness from "./pages/MdaAnalysesHarness";
 import InstallBanner from "./components/InstallBanner";
 import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
