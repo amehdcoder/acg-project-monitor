@@ -62,6 +62,7 @@ import DashboardExport from "./DashboardExport";
 import DraggableWidgetGrid from "./DraggableWidgetGrid";
 import DashboardFilters, { DashboardFilterValues } from "./DashboardFilters";
 import DashboardActions from "./DashboardActions";
+import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 import AutoInsightsDashboard from "./AutoInsightsDashboard";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
