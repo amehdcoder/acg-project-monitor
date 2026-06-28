@@ -20,15 +20,15 @@ import irfBg from "@/assets/irf-bg.jpg";
 export function IrfWatermark() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-      {/* Full-bleed brand image, very low opacity so content stays legible */}
+      {/* Full-bleed brand image — slightly stronger in dark mode so it stays visible without obscuring content */}
       <img
         src={irfBg}
         alt=""
         loading="lazy"
-        className="absolute inset-0 h-full w-full object-cover opacity-[0.06]"
+        className="absolute inset-0 h-full w-full object-cover opacity-[0.06] dark:opacity-[0.14]"
       />
       {/* Soft wash to keep text crisp over the imagery */}
-      <div className="absolute inset-0 bg-background/55" />
+      <div className="absolute inset-0 bg-background/55 dark:bg-background/45" />
     </div>
   );
 }
