@@ -165,12 +165,24 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
           <Input type="date" value={v} onChange={(e) => setVal(f.key, e.target.value)} className="h-12 text-base" />
         )}
         {f.type === "select" && (
-          <Select value={v || undefined} onValueChange={(val) => setVal(f.key, val)}>
-            <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Select…" /></SelectTrigger>
-            <SelectContent>
-              {f.options?.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <>
+            <Select value={v || undefined} onValueChange={(val) => setVal(f.key, val)}>
+              <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Select…" /></SelectTrigger>
+              <SelectContent>
+                {f.options?.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                {f.allowOther && <SelectItem value={OTHER_OPTION}>{OTHER_OPTION}</SelectItem>}
+              </SelectContent>
+            </Select>
+            {f.allowOther && v === OTHER_OPTION && (
+              <Input
+                autoFocus
+                value={values[`${f.key}__other`] ?? ""}
+                onChange={(e) => setVal(`${f.key}__other`, e.target.value)}
+                placeholder="Please specify…"
+                className="mt-2 h-12 text-base"
+              />
+            )}
+          </>
         )}
         {f.type === "boolean" && (
           <div className="flex h-12 items-center justify-between rounded-md border border-input px-3">
