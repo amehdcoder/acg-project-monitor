@@ -466,6 +466,21 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   // Owner-defined KPI engine (resolves every determinant by question LABEL).
   const kpis = useMemo(() => computeMdaKpis(filtered as any, questions as any), [filtered, questions]);
 
+  // Authoritative per-community "Status of MDA" (resolved by question LABEL with
+  // legacy-key fallbacks) — keyed by communityKey so the Longitudinal Linkage
+  // register reconciles exactly with the headline KPIs and the heatmaps, instead
+  // of reading a single hard-coded `status_of_mda` field that breaks on copied
+  // projects whose status question has a different key.
+  const authoritativeStatusByCom = useMemo(() => {
+    const model = buildMdaModel(filtered as any, questions as any);
+    const m = new Map<string, string>();
+    for (const c of model.allComs) {
+      const st = model.latestStatus(c);
+      m.set(c.key, st ? model.statusTitle(st) : "");
+    }
+    return m;
+  }, [filtered, questions]);
+
   // ── KPI data export (#2): clicking a KPI downloads the underlying submissions ──
   const [kpiExporting, setKpiExporting] = useState<KpiId | null>(null);
   const exportKpi = useCallback(async (id: KpiId) => {
