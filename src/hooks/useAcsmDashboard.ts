@@ -115,6 +115,8 @@ export const useAcsmDashboard = (
   const reqIdRef = useRef(0);
   const simulateRef = useRef(simulate);
   simulateRef.current = simulate;
+  const overridesRef = useRef(overrides);
+  overridesRef.current = overrides;
 
   const reload = async () => {
     const myReq = ++reqIdRef.current;
