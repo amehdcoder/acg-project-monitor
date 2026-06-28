@@ -330,6 +330,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       case "acsm_dash": setShowAcsmDash(true); break;
       case "sbc_form": setShowSbcForm(true); break;
       case "sbc_dash": setShowSbcDash(true); break;
+      case "irf_form": setShowIrfForm(true); break;
+      case "irf_dash": setShowIrfDash(true); break;
       case "microplan_entry": setMicroplanFillingActive(true); break;
       case "srf":
       case "incident":
