@@ -1150,14 +1150,22 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
 
       {/* ── Field worker accountability ── */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="flex items-center gap-1.5 text-sm"><Users2 className="h-4 w-4 text-primary" />Field Worker Submissions</CardTitle></CardHeader>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-1.5 text-sm"><Users2 className="h-4 w-4 text-primary" />Field Worker Submissions</CardTitle>
+          <p className="text-[11px] text-muted-foreground">
+            Total = Checklist visits + Follow-ups. Checklist visits reconcile with the {fmt(total)} supervised communities above.
+          </p>
+        </CardHeader>
         <CardContent className="p-0">
           <div className="max-h-[320px] overflow-auto">
             <table className="w-full text-xs">
               <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
                 <tr className="text-left text-[11px] text-muted-foreground">
                   <th className="px-3 py-2 font-semibold">Field worker</th>
-                  <th className="px-3 py-2 text-right font-semibold">Submissions</th>
+                  <th className="px-3 py-2 text-right font-semibold">Checklist</th>
+                  <th className="px-3 py-2 text-right font-semibold">Follow-ups</th>
+                  <th className="px-3 py-2 text-right font-semibold">Total</th>
+                  <th className="px-3 py-2 text-right font-semibold">Communities</th>
                   <th className="px-3 py-2 text-right font-semibold">Days worked</th>
                   <th className="px-3 py-2 text-right font-semibold">Last active</th>
                 </tr>
@@ -1166,16 +1174,33 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
                 {workers.map((w) => (
                   <tr key={w.name} className="border-t border-border/60 hover:bg-muted/40">
                     <td className="px-3 py-2 font-medium text-foreground">{w.name}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmt(w.subs)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmt(w.checklist)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmt(w.followups)}</td>
+                    <td className="px-3 py-2 text-right font-semibold tabular-nums">{fmt(w.subs)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmt(w.communities)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmt(w.days)}</td>
                     <td className="px-3 py-2 text-right whitespace-nowrap text-muted-foreground">{w.last}</td>
                   </tr>
                 ))}
               </tbody>
+              {workers.length > 0 && (
+                <tfoot className="sticky bottom-0 bg-muted/90 backdrop-blur">
+                  <tr className="border-t-2 border-border text-[11px] font-semibold">
+                    <td className="px-3 py-2">All supervisors</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmt(workers.reduce((a, w) => a + w.checklist, 0))}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmt(workers.reduce((a, w) => a + w.followups, 0))}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmt(workers.reduce((a, w) => a + w.subs, 0))}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">—</td>
+                    <td className="px-3 py-2 text-right tabular-nums">—</td>
+                    <td className="px-3 py-2 text-right">—</td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </CardContent>
       </Card>
+
 
       {/* ── Heatmap cell drill-down ── */}
       <MdaDrillDownSheet
