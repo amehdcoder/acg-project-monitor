@@ -48,6 +48,8 @@ export interface AcsmRow {
   gps_lng: number | null;
   submission_status: string | null;
   created_at: string;
+  /** "irf" when this row was derived from an LGA ACSM Focal Person IRF submission. */
+  _source?: string;
 }
 
 const COLUMNS =
