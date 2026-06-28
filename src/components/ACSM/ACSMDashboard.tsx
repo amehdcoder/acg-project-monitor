@@ -134,6 +134,26 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
             </div>
           </div>
 
+          {/* IRF contribution + duplicate flagging banner */}
+          {!simulate && (duplicateInfo.irfReports > 0 || duplicateInfo.total > 0) && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl px-4 py-3 text-[12.5px]"
+              style={{ background: C.panel2, border: `1px solid ${C.border}`, color: C.sub }}>
+              <span className="flex items-center gap-1.5 font-medium" style={{ color: C.primary }}>
+                <Layers className="h-4 w-4" /> Linked sources
+              </span>
+              <span>
+                {fmt(duplicateInfo.irfUnique)} LGA ACSM Focal Person IRF submission(s) contributing
+              </span>
+              {duplicateInfo.total > 0 && (
+                <span className="flex items-center gap-1.5 rounded-md px-2 py-1 font-semibold"
+                  style={{ background: "#f59e0b22", color: "#fbbf24", border: "1px solid #f59e0b55" }}>
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  {fmt(duplicateInfo.total)} duplicate submission(s) flagged & excluded from counts
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Filters bar */}
           <div className="mb-5 flex flex-wrap gap-3">
             <FilterChip icon={Calendar} label="Reporting Period" value="May 2025" />
