@@ -2065,6 +2065,51 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const handleMapTap = useCallback(
     (lat: number, lng: number) => {
       if (step !== 3) return;
+      const selected = segments.filter((s) => selectedSegmentLabels.includes(s.label));
+
+      // Segment-based sampling: to record visit details the surveyor MUST have a
+      // live device GPS fix AND be physically standing inside one of the highlighted
+      // (selected) segments. The map-only / handoff fallback is NOT allowed here —
+      // it previously let users record visits while physically outside the segment.
+      if (selected.length > 0) {
+        if (!gps) {
+          toast({
+            title: "GPS lock required",
+            description: "Recording visit details requires a live device GPS fix inside the highlighted segment. Wait for the GPS lock, then try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        // STRICT physical geofence — the device's real position must be inside the segment.
+        const userInside = selected.some((s) => pointInPolygon({ lat: gps.lat, lng: gps.lng }, s.polygon));
+        if (!userInside) {
+          toast({
+            title: "Physical Geofence Violation",
+            description: "You are physically outside the highlighted segment. Move inside the segment to record visit details.",
+            variant: "destructive",
+          });
+          return;
+        }
+        // The tapped household pin must also fall inside the selected segment.
+        const tapInside = selected.some((s) => pointInPolygon({ lat, lng }, s.polygon));
+        if (!tapInside) {
+          toast({
+            title: "Pin Outside Segment",
+            description: "Tap inside the highlighted segment to add households.",
+            variant: "destructive",
+          });
+          return;
+        }
+        if (gps.accuracy > 50) {
+          toast({ title: "Low GPS accuracy", description: `±${gps.accuracy.toFixed(0)} m — pin saved, but consider moving to a clearer spot.` });
+        }
+        setPendingPin({ lat, lng, accuracy: gps.accuracy, source: "gps" });
+        setPickerOpen(true);
+        return;
+      }
+
+      // No segment selected yet (free placement) — keep the position fallback so
+      // early/legacy flows still work, but never bypass the segment geofence above.
       const surveyPosition = getCurrentSurveyPosition();
       if (!gps && !surveyPosition) {
         toast({ title: "Location not ready", description: "Wait for GPS or return to Step 1 and draw/load a boundary first.", variant: "destructive" });
@@ -2072,28 +2117,6 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       }
       if (gps && gps.accuracy > 50) {
         toast({ title: "Low GPS accuracy", description: `±${gps.accuracy.toFixed(0)} m — pin saved, but consider moving to a clearer spot.` });
-      }
-      // Strict physical geofence check — USER must be physically inside the selected segment polygon
-      const selected = segments.filter((s) => selectedSegmentLabels.includes(s.label));
-      const userInside = gps ? selected.some((s) => pointInPolygon({ lat: gps.lat, lng: gps.lng }, s.polygon)) : true;
-      if (gps && selected.length > 0 && !userInside) {
-        toast({
-          title: "Physical Geofence Violation",
-          description: "You are physically outside the highlighted segment. Move inside or sample another segment.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Also check if the pin being dropped is inside
-      const tapInside = selected.some((s) => pointInPolygon({ lat, lng }, s.polygon));
-      if (selected.length > 0 && !tapInside) {
-        toast({
-          title: "Pin Outside Segment",
-          description: "Tap inside the highlighted segment to add households.",
-          variant: "destructive",
-        });
-        return;
       }
       if (!gps) {
         toast({ title: "Map-only fallback", description: "GPS is still unavailable, so this visit will be tagged with the tapped map position for later review." });
@@ -2103,6 +2126,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     },
     [step, gps, getCurrentSurveyPosition, segments, selectedSegmentLabels],
   );
+
 
   const isDuplicatePin = useMemo(() => {
     if (!pendingPin) return false;
