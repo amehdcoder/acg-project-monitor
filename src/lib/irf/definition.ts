@@ -157,7 +157,7 @@ export const IRF_SECTIONS: IrfSection[] = [
         activity: "Non-compliance Issues",
         fields: [
           { key: "noncompliance_cases", label: "Cases identified", what: "Number of refusal / non-compliance cases", type: "number", metric: true, example: "8" },
-          { key: "noncompliance_type", label: "Type of issue", what: "Reason for refusal", type: "text", example: "Misinformation" },
+          { key: "noncompliance_type", label: "Type of issue", what: "Reason for refusal", type: "select", allowOther: true, options: ["Misinformation", "Religious belief", "Fear of side effects", "Distrust of government", "Caregiver absent", "Child sick / ineligible"], example: "Misinformation" },
         ],
       },
       {
