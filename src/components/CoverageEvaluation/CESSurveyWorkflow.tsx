@@ -356,11 +356,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     };
     const prefillSeed = seedFromPrefill(prefill);
     if (prefillSeed) {
+      // Use the checklist coordinates ONLY as a brief visual seed so the satellite
+      // map can mount instantly. The GPS lock itself must come from the device's
+      // own current position (instantMapCenter = gps ?? mapSeed), so we deliberately
+      // do NOT promote the checklist handoff coords to the device "last known good"
+      // fix — otherwise the lock would track the checklist location, not the device.
       setMapSeed(prefillSeed);
-      if (prefillSeed.source === "handoff") {
-        lkgRef.current = { lat: prefillSeed.lat, lng: prefillSeed.lng, accuracy: prefillSeed.accuracy };
-      }
     }
+
     setState(loc.state);
     setLga(loc.lga);
     setWard(loc.ward);
