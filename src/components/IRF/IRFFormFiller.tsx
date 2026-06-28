@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
 import { ArrowLeft, Save, Loader2, MapPin, CheckCircle2, ChevronRight, Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useGeolocation } from "@/hooks/useGeolocation";
@@ -30,8 +29,8 @@ export function IrfWatermark() {
       inert=""
       className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden"
     >
-      {/* Full-bleed brand image: bright, high-resolution and clearly visible, while staying below fields/charts.
-          object-center keeps the SARMAAN CDD mark aligned and crisp across every mobile and tablet width. */}
+      {/* Brand image shown in full (object-contain) so the faces of the SARMAAN CDD
+          and the child are always clearly visible and never cropped on any screen. */}
       <img
         src={irfBg}
         alt=""
@@ -39,11 +38,11 @@ export function IrfWatermark() {
         draggable={false}
         tabIndex={-1}
         decoding="async"
-        className="pointer-events-none absolute left-1/2 top-1/2 h-full w-full max-w-none -translate-x-1/2 -translate-y-1/2 select-none object-cover object-center opacity-40 dark:opacity-45 [image-rendering:auto] [backface-visibility:hidden] [transform:translate3d(-50%,-50%,0)]"
+        className="pointer-events-none absolute left-1/2 top-1/2 h-full w-full max-w-none -translate-x-1/2 -translate-y-1/2 select-none object-contain object-center opacity-70 dark:opacity-75 [image-rendering:auto] [backface-visibility:hidden] [transform:translate3d(-50%,-50%,0)]"
       />
-      {/* Light washes keep text and fields readable while the SARMAAN CDD brand stays bright and clear. */}
-      <div className="absolute inset-0 bg-background/35 dark:bg-background/40" />
-      <div className="absolute inset-0 bg-gradient-to-b from-background/25 via-background/20 to-background/40 dark:from-background/30 dark:via-background/25 dark:to-background/45" />
+      {/* Very light washes keep fields readable while the SARMAAN CDD and child faces stay bright and clear. */}
+      <div className="absolute inset-0 bg-background/20 dark:bg-background/25" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/10 via-background/5 to-background/25 dark:from-background/15 dark:via-background/10 dark:to-background/30" />
     </div>
   );
 }
@@ -66,10 +65,13 @@ const monthOptions = (() => {
 
 export default function IRFFormFiller({ projectId, onClose }: Props) {
   const { user } = useAuth();
-  const { resolvedTheme, setTheme } = useTheme();
-  const isDarkTheme = resolvedTheme === "dark";
+  // The IRF opens in dark mode by default. A self-contained toggle controls only
+  // this form's appearance (via a scoped `dark` class) so it never disturbs the
+  // user's persistent app-wide theme preference.
+  const [isDarkTheme, setIsDarkTheme] = useState(true);
   const { position, getCurrentPosition } = useGeolocation();
   useEffect(() => { try { getCurrentPosition(); } catch { /* ignore */ } }, []);
+
 
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -89,8 +91,18 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
 
   const [values, setValues] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Set<string>>(new Set());
-  const setVal = (k: string, v: any) =>
+  const setVal = (k: string, v: any) => {
     setValues((p) => ({ ...p, [k]: v }));
+    // Clear a mandatory-field error as soon as the user provides a value.
+    if (v !== undefined && v !== null && String(v).trim() !== "") {
+      setErrors((prev) => {
+        if (!prev.has(k)) return prev;
+        const next = new Set(prev);
+        next.delete(k);
+        return next;
+      });
+    }
+  };
 
   // Clear an "Other (specify)" error as soon as the user types something.
   const setOtherVal = (k: string, v: any) => {
@@ -108,6 +120,25 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   const totalSteps = IRF_SECTIONS.length + 1;
   const canSubmit = !!state && !!lga && !!reportingMonth;
 
+  /** Additional non-metric fields that must be answered. */
+  const REQUIRED_SELECT_KEYS = new Set(["participation_level"]);
+  /** A field is mandatory if explicitly flagged, an indicator metric, or a required select. */
+  const isFieldRequired = (f: IrfField) =>
+    !!f.required || f.metric === true || REQUIRED_SELECT_KEYS.has(f.key);
+  /** Booleans always carry a value; everything else is empty when blank. */
+  const isFieldEmpty = (f: IrfField) => {
+    if (f.type === "boolean") return false;
+    const v = values[f.key];
+    return v === undefined || v === null || String(v).trim() === "";
+  };
+
+  /** Keys of mandatory fields not yet answered in a section. */
+  const missingRequiredForSection = (sec: typeof IRF_SECTIONS[number]) =>
+    sec.groups
+      .flatMap((g) => g.fields)
+      .filter((f) => isFieldRequired(f) && isFieldEmpty(f))
+      .map((f) => f.key);
+
   /** Select fields with an "Other" choice selected but no specify text yet. */
   const missingOtherForSection = (sec: typeof IRF_SECTIONS[number]) =>
     sec.groups
@@ -124,10 +155,20 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   /** Validate the current step; returns true if OK, else flags errors. */
   const validateStep = (stepIndex: number): boolean => {
     const sec = stepIndex > 0 ? IRF_SECTIONS[stepIndex - 1] : null;
-    const missing = sec ? missingOtherForSection(sec) : [];
+    if (stepIndex === 0) {
+      // Report identity is mandatory before leaving the first step.
+      if (!state || !lga || !reportingMonth) {
+        toast.error("Please complete the report identity (Month, State, LGA).");
+        return false;
+      }
+      return true;
+    }
+    const missingReq = sec ? missingRequiredForSection(sec) : [];
+    const missingOther = sec ? missingOtherForSection(sec) : [];
+    const missing = [...missingReq, ...missingOther];
     if (missing.length) {
       setErrors((prev) => new Set([...prev, ...missing]));
-      toast.error("Please specify a value for every “Other” selection.");
+      toast.error("Please answer all mandatory questions before proceeding.");
       return false;
     }
     return true;
@@ -144,13 +185,18 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
       setStep(0);
       return;
     }
-    // Block submission if any "Other (specify)" box is still empty.
-    const allMissing = IRF_SECTIONS.flatMap((sec) => missingOtherForSection(sec));
+    // Block submission if any mandatory field is unanswered or "Other" is unspecified.
+    const allMissing = IRF_SECTIONS.flatMap((sec) => [
+      ...missingRequiredForSection(sec),
+      ...missingOtherForSection(sec),
+    ]);
     if (allMissing.length) {
       setErrors((prev) => new Set([...prev, ...allMissing]));
-      const firstSecIdx = IRF_SECTIONS.findIndex((sec) => missingOtherForSection(sec).length);
+      const firstSecIdx = IRF_SECTIONS.findIndex(
+        (sec) => missingRequiredForSection(sec).length || missingOtherForSection(sec).length,
+      );
       if (firstSecIdx >= 0) setStep(firstSecIdx + 1);
-      toast.error("Please specify a value for every “Other” selection.");
+      toast.error("Please answer all mandatory questions before submitting.");
       return;
     }
     setSaving(true);
@@ -193,7 +239,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
 
   if (done) {
     return (
-      <div className="relative isolate flex min-h-[60vh] flex-col items-center justify-center gap-4 overflow-hidden bg-background p-8 text-center text-foreground">
+      <div className={`${isDarkTheme ? "dark" : ""} relative isolate flex min-h-[60vh] flex-col items-center justify-center gap-4 overflow-hidden bg-background p-8 text-center text-foreground`}>
         <IrfWatermark />
         <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-[#E2F5EC]">
           <CheckCircle2 className="h-10 w-10 text-[#22A55A]" />
@@ -212,9 +258,14 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
 
   const renderField = (f: IrfField) => {
     const v = values[f.key] ?? "";
+    const required = isFieldRequired(f);
+    const fieldErr = errors.has(f.key);
+    const errCls = fieldErr ? "border-destructive focus-visible:ring-destructive" : "";
     const common = (
       <div className="flex items-baseline justify-between gap-2">
-        <Label className="text-sm font-medium text-foreground">{f.label}</Label>
+        <Label className="text-sm font-medium text-foreground">
+          {f.label}{required && <span className="text-destructive"> *</span>}
+        </Label>
         {f.example && <span className="text-[11px] text-muted-foreground">e.g. {f.example}</span>}
       </div>
     );
@@ -225,16 +276,16 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
         {f.type === "number" && (
           <Input type="number" inputMode="numeric" min={0} value={v}
             onChange={(e) => setVal(f.key, e.target.value === "" ? "" : Number(e.target.value))}
-            placeholder="0" className="h-12 text-base" />
+            placeholder="0" aria-invalid={fieldErr} className={`h-12 text-base ${errCls}`} />
         )}
         {f.type === "text" && (
-          <Input value={v} onChange={(e) => setVal(f.key, e.target.value)} className="h-12 text-base" />
+          <Input value={v} onChange={(e) => setVal(f.key, e.target.value)} aria-invalid={fieldErr} className={`h-12 text-base ${errCls}`} />
         )}
         {f.type === "longtext" && (
-          <Textarea value={v} onChange={(e) => setVal(f.key, e.target.value)} rows={2} className="text-base" />
+          <Textarea value={v} onChange={(e) => setVal(f.key, e.target.value)} rows={2} aria-invalid={fieldErr} className={`text-base ${errCls}`} />
         )}
         {f.type === "date" && (
-          <Input type="date" value={v} onChange={(e) => setVal(f.key, e.target.value)} className="h-12 text-base" />
+          <Input type="date" value={v} onChange={(e) => setVal(f.key, e.target.value)} aria-invalid={fieldErr} className={`h-12 text-base ${errCls}`} />
         )}
         {f.type === "select" && (() => {
           const otherKey = `${f.key}__other`;
@@ -242,7 +293,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
           return (
             <>
               <Select value={v || undefined} onValueChange={(val) => setVal(f.key, val)}>
-                <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Select…" /></SelectTrigger>
+                <SelectTrigger aria-invalid={fieldErr} className={`h-12 text-base ${errCls}`}><SelectValue placeholder="Select…" /></SelectTrigger>
                 <SelectContent className="max-h-[50vh]">
                   {f.options?.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                   {f.allowOther && <SelectItem value={OTHER_OPTION}>{OTHER_OPTION}</SelectItem>}
@@ -279,7 +330,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   const SectionIcon = section ? ((Icons as any)[section.icon] || Icons.ClipboardList) : Icons.ClipboardList;
 
   return (
-    <div className="fixed inset-0 z-40 isolate flex h-[100dvh] min-h-[100dvh] w-full flex-col overflow-hidden bg-background text-foreground">
+    <div className={`${isDarkTheme ? "dark" : ""} fixed inset-0 z-40 isolate flex h-[100dvh] min-h-[100dvh] w-full flex-col overflow-hidden bg-background text-foreground`}>
       <IrfWatermark />
       {/* Header */}
       <div className="relative z-20 flex shrink-0 items-center gap-3 border-b border-white/10 bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3 shadow-sm">
@@ -301,7 +352,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
           type="button"
           aria-label={isDarkTheme ? "Switch IRF form to light mode" : "Switch IRF form to dark mode"}
           aria-pressed={isDarkTheme}
-          onClick={() => setTheme(isDarkTheme ? "light" : "dark")}
+          onClick={() => setIsDarkTheme((d) => !d)}
           className="text-white hover:bg-white/10"
         >
           {isDarkTheme ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}

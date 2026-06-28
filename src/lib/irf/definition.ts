@@ -24,6 +24,8 @@ export interface IrfField {
   options?: readonly string[];
   /** When true, a select adds an "Other (specify)" choice with a free-text box. */
   allowOther?: boolean;
+  /** When true, the field must be answered before the section/form can proceed. */
+  required?: boolean;
   example?: string;
   /** Numeric fields that should roll up into dashboard totals. */
   metric?: boolean;
