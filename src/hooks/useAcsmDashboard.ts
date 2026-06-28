@@ -5,6 +5,11 @@ import {
   findIndicator, computeAchievement, statusFromAchievement,
 } from "@/lib/acsm/definition";
 import { generateAcsmSimulation } from "@/lib/acsm/simulation";
+import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
+import {
+  mapIrfRowsToAcsmRows, flagDuplicates, irfSignature, irfOrder,
+} from "@/lib/acsm/irfBridge";
+import type { IrfReport } from "@/lib/irf/definition";
 
 export interface AcsmRow {
   id: string;
