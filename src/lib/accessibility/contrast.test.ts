@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ACSM_DASHBOARD_PALETTE } from "@/components/ACSM/ACSMDashboard";
+import { ACSM_DASHBOARD_PALETTE } from "@/lib/acsm/dashboardPalette";
 import { contrastRatio, meetsWcagAA } from "./contrast";
 
 describe("theme contrast checks", () => {
