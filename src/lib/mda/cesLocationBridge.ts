@@ -5,6 +5,10 @@ export interface CesLocationPrefill {
   flhf_name: string;
   community_name: string;
   settlement_name: string;
+  /** Optional coordinates carried from the checklist/submission so the CES satellite map can mount immediately. */
+  lat?: number;
+  lng?: number;
+  accuracy?: number;
   projectId?: string;
   formId?: string;
   submissionId?: string;
@@ -20,19 +24,35 @@ const URL_INTENT_KEY = "ces_from";
 
 const clean = (value: unknown) => String(value ?? "").trim();
 
-const normalizePrefill = (input: Partial<CesLocationPrefill> & Record<string, unknown>): CesLocationPrefill => ({
-  state: clean(input.state),
-  lga: clean(input.lga),
-  ward: clean(input.ward),
-  flhf_name: clean(input.flhf_name ?? input.flhf),
-  community_name: clean(input.community_name ?? input.community),
-  settlement_name: clean(input.settlement_name ?? input.settlement),
-  projectId: clean(input.projectId) || undefined,
-  formId: clean(input.formId) || undefined,
-  submissionId: clean(input.submissionId) || undefined,
-  source: (input.source as CesLocationPrefill["source"]) || "mda_checklist",
-  ts: Number(input.ts) || Date.now(),
-});
+const finiteNumber = (...values: unknown[]): number | undefined => {
+  for (const value of values) {
+    if (value === undefined || value === null || value === "") continue;
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+};
+
+const normalizePrefill = (input: Partial<CesLocationPrefill> & Record<string, unknown>): CesLocationPrefill => {
+  const lat = finiteNumber(input.lat, input.latitude, input.community_latitude, input.settlement_latitude);
+  const lng = finiteNumber(input.lng, input.lon, input.long, input.longitude, input.community_longitude, input.settlement_longitude);
+  const accuracy = finiteNumber(input.accuracy, input.gps_accuracy, input.gps_accuracy_m);
+  return {
+    state: clean(input.state),
+    lga: clean(input.lga),
+    ward: clean(input.ward),
+    flhf_name: clean(input.flhf_name ?? input.flhf),
+    community_name: clean(input.community_name ?? input.community),
+    settlement_name: clean(input.settlement_name ?? input.settlement),
+    ...(lat !== undefined && lng !== undefined ? { lat, lng } : {}),
+    ...(accuracy !== undefined ? { accuracy } : {}),
+    projectId: clean(input.projectId) || undefined,
+    formId: clean(input.formId) || undefined,
+    submissionId: clean(input.submissionId) || undefined,
+    source: (input.source as CesLocationPrefill["source"]) || "mda_checklist",
+    ts: Number(input.ts) || Date.now(),
+  };
+};
 
 export const isUsableCesLocationPrefill = (prefill: CesLocationPrefill | null | undefined): prefill is CesLocationPrefill =>
   !!prefill?.state && !!prefill.lga && !!prefill.ward && !!prefill.community_name;

@@ -98,6 +98,8 @@ interface CESSurveyMapProps {
   samplingPins?: LatLng[];
   /** Tooltip for the center marker; defaults to live GPS wording for capture screens. */
   centerLabel?: string;
+  /** Initial/current zoom. Coarse fallback centres use lower zooms so imagery paints immediately. */
+  zoom?: number;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -206,6 +208,7 @@ const CESSurveyMap = ({
   gpsTrail = [],
   samplingPins = [],
   centerLabel = "Current device GPS",
+  zoom = 17,
 }: CESSurveyMapProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -218,7 +221,7 @@ const CESSurveyMap = ({
   const liveLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const tapHandlerRef = useRef<((lat: number, lng: number) => void) | null>(null);
   const destroyedRef = useRef(false);
-  const [isNearViewport, setIsNearViewport] = useState(false);
+  const [isNearViewport, setIsNearViewport] = useState(true);
   const boundaryRenderKeyRef = useRef<string>("");
   const featureRenderKeyRef = useRef<string>("");
   const sampleRenderKeyRef = useRef<string>("");
@@ -232,22 +235,11 @@ const CESSurveyMap = ({
   const staticLayerBudget = useMemo(getCesLayerBudget, []);
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el || typeof IntersectionObserver === "undefined") {
-      setIsNearViewport(true);
-      return;
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsNearViewport(true);
-          observer.disconnect();
-        }
-      },
-      { root: null, rootMargin: "650px 0px", threshold: 0.01 },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
+    // The CES workflow must show satellite imagery as soon as the page loads.
+    // Do not lazy-mount behind IntersectionObserver: GPS/fallback centering and
+    // tile requests should begin immediately, even if the map is slightly below
+    // the current fold on Android.
+    setIsNearViewport(true);
   }, []);
 
   const applyBasemap = (map: L.Map, mode: CesBasemap) => {
@@ -278,11 +270,11 @@ const CESSurveyMap = ({
       // requests different z/x/y tiles on high-DPR phones, so prefetched imagery
       // no longer matches what Leaflet asks for when the device is offline.
       detectRetina: false,
-      // Smaller buffer + idle updates prevent the map from spawning hundreds of
-      // tile requests while GPS jitters/pans, which was the main slow-render path.
-      keepBuffer: 3,
-      updateWhenIdle: true,
-      updateWhenZooming: false,
+      // Keep enough surrounding satellite imagery resident that first paint,
+      // small pans, and GPS refinements do not reveal gray tile gaps.
+      keepBuffer: 8,
+      updateWhenIdle: false,
+      updateWhenZooming: true,
       ...(tl.subdomains ? { subdomains: tl.subdomains } : {}),
       ...(isGoogle ? {} : { crossOrigin: true as const }),
     };
@@ -312,9 +304,9 @@ const CESSurveyMap = ({
           maxNativeZoom: 19,
           detectRetina: false,
           crossOrigin: true,
-          keepBuffer: 3,
-          updateWhenIdle: true,
-          updateWhenZooming: false,
+          keepBuffer: 8,
+          updateWhenIdle: false,
+          updateWhenZooming: true,
         } as L.TileLayerOptions).addTo(map);
 
         // Keep a reference so it gets cleaned up on next basemap change
@@ -354,7 +346,7 @@ const CESSurveyMap = ({
       wheelPxPerZoomLevel: 80,
       wheelDebounceTime: 80,
       maxZoom: 23,
-    }).setView([centerLat, centerLng], 17);
+    }).setView([centerLat, centerLng], zoom);
     applyBasemap(map, basemap);
     staticLayerGroupRef.current = L.layerGroup().addTo(map);
     boundaryLayerGroupRef.current = L.layerGroup().addTo(staticLayerGroupRef.current);
@@ -530,12 +522,14 @@ const CESSurveyMap = ({
       const current = map.getCenter();
       // Avoid tile churn from 1–5 m GPS jitter. The marker still moves every
       // update; the expensive basemap only recentres after meaningful movement.
-      if (!current || current.distanceTo(next) > 25) {
+      const shouldZoom = Math.abs(map.getZoom() - zoom) > 0.1;
+      if (!current || current.distanceTo(next) > 25 || shouldZoom) {
         gpsLedPanUntilRef.current = Date.now() + 6000;
-        map.panTo(next, { animate: false });
+        if (shouldZoom) map.setView(next, zoom, { animate: false });
+        else map.panTo(next, { animate: false });
       }
     }
-  }, [centerLat, centerLng]);
+  }, [centerLat, centerLng, zoom]);
 
   // Static overlays. Kept separate from the live GPS marker/route so frequent
   // location updates don't rebuild thousands of rooftop/road/household layers.
@@ -1014,7 +1008,7 @@ const CESSurveyMap = ({
     }
   }, [isNearViewport, centerLat, centerLng, centerLabel, livePosition, perimeter, lqas?.closureM, lqas?.ready, routeTo, gpsTrail]);
 
-  return <div ref={containerRef} style={{ height, width: "100%", contain: "layout paint size", touchAction: isCoarsePointer() ? "pan-y pinch-zoom" : undefined }} className="ces-survey-map rounded-lg overflow-hidden border border-border" />;
+  return <div ref={containerRef} style={{ height, width: "100%", contain: "layout paint", touchAction: isCoarsePointer() ? "pan-y pinch-zoom" : undefined }} className="ces-survey-map rounded-lg overflow-hidden border border-border" />;
 };
 
 export default memo(CESSurveyMap);
