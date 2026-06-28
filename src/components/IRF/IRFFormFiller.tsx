@@ -219,26 +219,35 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
         {f.type === "date" && (
           <Input type="date" value={v} onChange={(e) => setVal(f.key, e.target.value)} className="h-12 text-base" />
         )}
-        {f.type === "select" && (
-          <>
-            <Select value={v || undefined} onValueChange={(val) => setVal(f.key, val)}>
-              <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Select…" /></SelectTrigger>
-              <SelectContent>
-                {f.options?.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                {f.allowOther && <SelectItem value={OTHER_OPTION}>{OTHER_OPTION}</SelectItem>}
-              </SelectContent>
-            </Select>
-            {f.allowOther && v === OTHER_OPTION && (
-              <Input
-                autoFocus
-                value={values[`${f.key}__other`] ?? ""}
-                onChange={(e) => setVal(`${f.key}__other`, e.target.value)}
-                placeholder="Please specify…"
-                className="mt-2 h-12 text-base"
-              />
-            )}
-          </>
-        )}
+        {f.type === "select" && (() => {
+          const otherKey = `${f.key}__other`;
+          const otherErr = errors.has(otherKey);
+          return (
+            <>
+              <Select value={v || undefined} onValueChange={(val) => setVal(f.key, val)}>
+                <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Select…" /></SelectTrigger>
+                <SelectContent className="max-h-[50vh]">
+                  {f.options?.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                  {f.allowOther && <SelectItem value={OTHER_OPTION}>{OTHER_OPTION}</SelectItem>}
+                </SelectContent>
+              </Select>
+              {f.allowOther && v === OTHER_OPTION && (
+                <div className="mt-2 space-y-1">
+                  <Label className="text-xs font-medium text-foreground">Please specify *</Label>
+                  <Input
+                    autoFocus
+                    value={values[otherKey] ?? ""}
+                    onChange={(e) => setOtherVal(otherKey, e.target.value)}
+                    placeholder="Type the specific value…"
+                    aria-invalid={otherErr}
+                    className={`h-12 text-base ${otherErr ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                  />
+                  {otherErr && <p className="text-xs text-destructive">This field is required when “Other” is selected.</p>}
+                </div>
+              )}
+            </>
+          );
+        })()}
         {f.type === "boolean" && (
           <div className="flex h-12 items-center justify-between rounded-md border border-input px-3">
             <span className="text-sm text-muted-foreground">{v ? "Yes" : "No"}</span>
