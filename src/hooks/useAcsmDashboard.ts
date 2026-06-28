@@ -117,6 +117,11 @@ export const useAcsmDashboard = (
   simulateRef.current = simulate;
   const overridesRef = useRef(overrides);
   overridesRef.current = overrides;
+  const overrideSig = useMemo(() => {
+    const ser = (m?: OverrideMap | null) =>
+      m ? [...m.entries()].map(([k, v]) => `${k}:${v}`).sort().join(",") : "";
+    return `${ser(overrides?.acsmMap)}|${ser(overrides?.irfMap)}`;
+  }, [overrides?.acsmMap, overrides?.irfMap]);
 
   const reload = async () => {
     const myReq = ++reqIdRef.current;
