@@ -18,6 +18,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { GuidedQuestionFlow, AssessmentSummary, NTD_PROTOCOLS } from "./NTDAssessment";
+import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 import { suggestStage } from "./NTDAssessment/ntdClinicalRules";
 import { format } from "date-fns";
 
