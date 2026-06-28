@@ -57,17 +57,12 @@ const COLUMNS =
   "id,reporting_period,reporting_level,state,lga,ward,community,category,indicator,indicator_level,unit_of_measure,target_value,actual_achieved,achievement_pct,status,responsible_officer,data_source,date_reported,stakeholder_type,engagement_type,communication_channel,reach_type,female_count,male_count,age_under18,age_18_35,age_35_plus,narrative_progress,contribution_story,key_challenges,actions_next_steps,evidence,gps_lat,gps_lng,submission_status,created_at";
 
 async function fetchAll(projectId?: string | null): Promise<AcsmRow[]> {
-  const all: AcsmRow[] = [];
-  const PAGE = 1000;
-  for (let from = 0; ; from += PAGE) {
+  return fetchAllRowsKeyset<AcsmRow>((limit, afterId) => {
     let q = supabase.from("acsm_reports" as any).select(COLUMNS).range(from, from + PAGE - 1);
     if (projectId) q = q.eq("project_id", projectId);
-    const { data, error } = await q;
-    if (error || !data || data.length === 0) break;
-    all.push(...(data as any as AcsmRow[]));
-    if (data.length < PAGE) break;
-  }
-  return all;
+    if (afterId) q = q.gt("id", afterId);
+    return q.order("id", { ascending: true }).limit(limit);
+  });
 }
 
 async function fetchIrf(projectId?: string | null): Promise<IrfReport[]> {
@@ -159,6 +154,14 @@ export const useAcsmDashboard = (
         irfReports: irfRaw.length,
         irfUnique: irfDedup.uniqueCount,
       });
+    } catch (error) {
+      console.error("Failed to load ACSM dashboard data", error);
+      if (myReq === reqIdRef.current) {
+        setAllRows([]);
+        setDuplicateInfo({
+          acsmDuplicates: 0, irfDuplicates: 0, total: 0, irfReports: 0, irfUnique: 0,
+        });
+      }
     } finally {
       if (myReq === reqIdRef.current) setLoading(false);
     }
