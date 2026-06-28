@@ -173,19 +173,18 @@ export const useIrfDashboard = (projectId?: string | null, overrideMap?: Overrid
     return Math.round((complete / rows.length) * 100);
   }, [rows]);
 
-  // Duplicate flagging + unique counts (same logic shared with the Advocacy Dashboard).
-  const duplicates = useMemo(() => {
-    const res = flagDuplicates(rows, irfSignature, (r) => r.id, irfOrder);
-    return {
-      duplicateIds: res.duplicateIds,
-      duplicateCount: res.duplicateCount,
-      uniqueCount: res.uniqueCount,
-      totalCount: rows.length,
-    };
-  }, [rows]);
+  // Duplicate flagging + unique counts (override-aware; shared with the Advocacy Dashboard).
+  const duplicates = useMemo(() => ({
+    duplicateIds: dedup.duplicateIds,
+    duplicateCount: dedup.duplicateCount,
+    uniqueCount: dedup.uniqueCount,
+    rejectedCount: dedup.rejectedCount,
+    overriddenToUnique: dedup.overriddenToUnique,
+    totalCount: rawRows.length,
+  }), [dedup, rawRows.length]);
 
   return {
-    rows, loading, reload, duplicates,
+    rows, rawRows, loading, reload, duplicates,
     totals, stats, sectionTotals, genderSplit, ncBreakdown, topLgas, trend, points, dataQuality,
   };
 };
