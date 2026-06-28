@@ -32,11 +32,47 @@ const fmt = (n: number) => n.toLocaleString();
 
 export default function ACSMDashboard({ projectId, onClose }: Props) {
   const [category, setCategory] = useState<AcsmCategory | "all">("results_of_advocacy");
+  const overrides = useAcsmDuplicateOverrides(projectId);
   const {
     stats, statusDistribution, trend, topLocations, indicatorRows, points,
     dataQuality, loading, reload, simulate, setSimulate, duplicateInfo,
-  } = useAcsmDashboard(projectId, category);
-  const { isOwnerLevel } = useAuth();
+  } = useAcsmDashboard(projectId, category, { acsmMap: overrides.acsmMap, irfMap: overrides.irfMap });
+  const { isOwnerLevel, isAdmin } = useAuth();
+  const kpiSync = useAcsmKpiSync(projectId);
+
+  const buildKpiPayload = useCallback((): AcsmKpiPayload => ({
+    generatedAt: new Date().toISOString(),
+    projectName: projectId || undefined,
+    kpis: [
+      { key: "people_benefiting", label: "People Benefiting", value: stats.peopleBenefiting, source: "linked" },
+      { key: "indicators_total", label: "Total Indicators", value: stats.total, source: "linked" },
+      { key: "on_track", label: "Indicators On Track", value: stats.onTrack, source: "linked" },
+      { key: "at_risk", label: "Indicators At Risk", value: stats.atRisk, source: "linked" },
+      { key: "behind", label: "Indicators Behind Target", value: stats.behind, source: "linked" },
+      { key: "avg_achievement", label: "Average Achievement", value: stats.avgAchievement, unit: "%", source: "linked" },
+      { key: "irf_contributing", label: "IRF Submissions Contributing", value: duplicateInfo.irfUnique, source: "irf" },
+      { key: "duplicates_excluded", label: "Duplicates Excluded", value: duplicateInfo.total, source: "integrity" },
+    ],
+    indicators: indicatorRows.map((r) => ({
+      code: r.code, name: r.name, category: r.category, level: r.level, unit: r.unit,
+      target: r.target, actual: r.actual, pct: r.pct, status: r.status,
+      officer: r.officer, lastUpdated: r.lastUpdated, source: (r as any)._source || "acsm",
+    })),
+    duplicates: {
+      acsmDuplicates: duplicateInfo.acsmDuplicates, irfDuplicates: duplicateInfo.irfDuplicates,
+      total: duplicateInfo.total, irfReports: duplicateInfo.irfReports, irfUnique: duplicateInfo.irfUnique,
+      overriddenToUnique: [...overrides.acsmMap.values(), ...overrides.irfMap.values()].filter((d) => d === "unique").length,
+      rejected: [...overrides.acsmMap.values(), ...overrides.irfMap.values()].filter((d) => d === "rejected").length,
+    },
+  }), [stats, indicatorRows, duplicateInfo, overrides.acsmMap, overrides.irfMap, projectId]);
+
+  // Realtime auto-publish to Google Sheets → Looker Studio whenever the
+  // deduplicated KPIs or admin duplicate decisions change.
+  useEffect(() => {
+    if (loading) return;
+    kpiSync.autoSync(buildKpiPayload());
+  }, [loading, buildKpiPayload, kpiSync]);
+
 
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
