@@ -40,6 +40,7 @@ import {
 } from "@/lib/mda/analyses";
 import { buildQualityReport, type QualityLevel } from "@/lib/mda/dataQuality";
 import { communityKey } from "@/lib/mda/dashboardData";
+import { buildMdaModel } from "@/lib/mda/kpis";
 import { meanConfidenceInterval, oneWayAnova, formatP } from "@/lib/statisticalInference";
 import { toneBg, toneFg, type Tone } from "@/lib/conditionalFormatting";
 import { buildSubmissionsCsv, downloadCsv, slugify, type CsvRow } from "@/lib/mda/csvExport";
@@ -177,6 +178,22 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
   const idx = useMemo(() => new MdaQuestionIndex(questions), [questions]);
   const communities = useMemo(() => aggregateByCommunity(submissions), [submissions]);
 
+  // Authoritative MDA model (same engine that powers the headline KPIs). This
+  // guarantees the "Status of MDA" tables reconcile exactly with the headline
+  // "MDA Completed" KPI and the longitudinal funnel — it resolves every
+  // community's status by question LABEL with legacy-key + follow-up fallbacks,
+  // so no supervised community is ever silently dropped from the registers.
+  const model = useMemo(() => buildMdaModel(submissions as any, questions as any), [submissions, questions]);
+  // Keys of communities that have at least one Community Checklist visit.
+  const checklistKeys = useMemo(() => new Set(model.allComs.map((c) => c.key)), [model]);
+  // communityKey -> resolved Status of MDA title ("Completed" / "Ongoing" /
+  // "Halted" / "Not Started" / "Unknown" when the mandatory answer is missing).
+  const statusByKey = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of model.allComs) m.set(c.key, model.statusTitle(model.latestStatus(c)));
+    return m;
+  }, [model]);
+
   // Map communityKey → raw submissions, to drill into the EXACT records.
   const subsByCommunity = useMemo(() => {
     const m = new Map<string, ASubmission[]>();
@@ -259,12 +276,16 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
   };
 
   // ── Status of MDA ──
+  // Every community that was SUPERVISED (has a Community Checklist visit) appears
+  // in exactly one of the two registers. Because "Status of MDA" is a mandatory
+  // question, "Completed" + "Halted / Not Started / Ongoing (or Unknown)" always
+  // reconciles to the total number of communities visited.
   const statusRows = useMemo(() => {
     if (!qStatus) return [];
     return communities
-      .map((c) => ({ c, status: idx.label(qStatus, val(c, qStatus)) }))
-      .filter((r) => r.status);
-  }, [communities, qStatus, idx]);
+      .filter((c) => checklistKeys.has(c.key))
+      .map((c) => ({ c, status: statusByKey.get(c.key) || "Unknown" }));
+  }, [communities, qStatus, checklistKeys, statusByKey]);
 
   const statusTone = (s: string): Tone => {
     const n = norm(s);
@@ -276,6 +297,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
   };
   const completedRows = statusRows.filter((r) => norm(r.status).includes("complet"));
   const issueRows = statusRows.filter((r) => !norm(r.status).includes("complet"));
+
 
   // Statistical inference — completion proportion + per-LGA ANOVA
   const completionStat = useMemo(() => {
