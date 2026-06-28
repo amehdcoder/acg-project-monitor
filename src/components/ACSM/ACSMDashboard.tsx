@@ -4,7 +4,7 @@ import {
   ArrowLeft, Megaphone, Bell, HelpCircle, Download, Filter, Calendar, MapPin,
   Layers, Users, ListChecks, ChevronLeft, ChevronRight, Search, TrendingUp,
   TrendingDown, CheckCircle2, AlertTriangle, Ban, CircleDashed, FileText,
-  RefreshCw, Sparkles, ShieldCheck, BarChart3, MessageSquare, Radio,
+  RefreshCw, Sparkles, ShieldCheck, BarChart3, MessageSquare, Radio, Moon, Sun,
 } from "lucide-react";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -32,12 +32,12 @@ const PALETTE = {
   dark: {
     bg: "#071426", panel: "#0d213a", panel2: "#112b49", border: "#3d5f86",
     borderSoft: "#29486e", text: "#f5f9ff", sub: "#b9c9df", primary: "#67e8f9", blue: "#60a5fa",
-    track: "#17304f", buttonText: "#06121f",
+    track: "#17304f", buttonText: "#06121f", active: "#13345a",
   },
   light: {
     bg: "#f7fafc", panel: "#ffffff", panel2: "#eef6fb", border: "#c5d3e2",
     borderSoft: "#d5e0eb", text: "#172133", sub: "#4f6178", primary: "#0369a1", blue: "#1d4ed8",
-    track: "#dbe7f3", buttonText: "#ffffff",
+    track: "#dbe7f3", buttonText: "#ffffff", active: "#e0f2fe",
   },
 };
 
@@ -104,10 +104,12 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
   const paged = filtered.slice(page * PER, page * PER + PER);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER));
 
-  const markers: MapMarker[] = points.map((p) => ({
-    id: p.id, lat: p.lat, lng: p.lng, title: p.label,
-    description: `${p.pct}% achievement`, markerColor: achievementColor(p.pct),
-  }));
+  const markers: MapMarker[] = points
+    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+    .map((p) => ({
+      id: p.id, lat: p.lat, lng: p.lng, title: p.label,
+      description: `${p.pct}% achievement`, markerColor: achievementColor(p.pct),
+    }));
 
   const navIcons: Record<string, any> = {
     results_of_advocacy: Megaphone,
@@ -124,7 +126,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
         {/* Sidebar */}
         <aside className="hidden w-60 shrink-0 lg:block" style={{ background: C.panel, borderRight: `1px solid ${C.borderSoft}`, minHeight: "100vh" }}>
           <div className="flex items-center gap-2 px-5 py-5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: "#13345a", color: C.primary }}>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: C.active, color: C.primary }}>
               <BarChart3 className="h-5 w-5" />
             </div>
             <div>
@@ -138,7 +140,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
               key={n.value}
               onClick={() => { setCategory(n.value as AcsmCategory); setPage(0); }}
               className="flex w-full items-center gap-3 px-5 py-2.5 text-[13.5px] font-medium transition-colors"
-              style={category === n.value ? { background: "#13345a", color: C.primary, borderLeft: `3px solid ${C.primary}` } : { color: C.sub }}
+              style={category === n.value ? { background: C.active, color: C.primary, borderLeft: `3px solid ${C.primary}` } : { color: C.sub }}
             >
               <n.icon className="h-4 w-4" /> {n.label}
             </button>
@@ -146,7 +148,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
           <button
             onClick={() => { setCategory("all"); setPage(0); }}
             className="flex w-full items-center gap-3 px-5 py-2.5 text-[13.5px] font-medium"
-            style={category === "all" ? { background: "#13345a", color: C.primary, borderLeft: `3px solid ${C.primary}` } : { color: C.sub }}
+            style={category === "all" ? { background: C.active, color: C.primary, borderLeft: `3px solid ${C.primary}` } : { color: C.sub }}
           >
             <Layers className="h-4 w-4" /> All Modules
           </button>
@@ -160,7 +162,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
               <ArrowLeft className="h-4 w-4" /> Back
             </button>
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: "#13345a", color: C.primary }}>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: C.active, color: C.primary }}>
                 <Megaphone className="h-5 w-5" />
               </div>
               <div>
@@ -180,11 +182,21 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                   <Sparkles className="h-4 w-4" /> {simulate ? "Simulating" : "Simulate"}
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => setTheme(isDark ? "light" : "dark")}
+                aria-label={isDark ? "Switch Advocacy dashboard to light mode" : "Switch Advocacy dashboard to dark mode"}
+                aria-pressed={isDark}
+                className="flex h-9 w-9 items-center justify-center rounded-lg"
+                style={{ border: `1px solid ${C.border}`, color: C.sub }}
+              >
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
               <button onClick={() => reload()} className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ border: `1px solid ${C.border}`, color: C.sub }}>
 
                 <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               </button>
-              <button className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold text-[#06121f]" style={{ background: `linear-gradient(135deg, ${C.primary}, ${C.blue})` }}>
+              <button className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold" style={{ background: `linear-gradient(135deg, ${C.primary}, ${C.blue})`, color: C.buttonText }}>
                 <Download className="h-4 w-4" /> Download
               </button>
             </div>
@@ -212,8 +224,8 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
 
           {/* Realtime sync + duplicate review */}
           <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <AcsmKpiSyncPanel sync={kpiSync} getPayload={buildKpiPayload} canManage={isAdmin || isOwnerLevel} dark />
-            <DuplicateReviewPanel projectId={projectId} dark />
+            <AcsmKpiSyncPanel sync={kpiSync} getPayload={buildKpiPayload} canManage={isAdmin || isOwnerLevel} dark={isDark} />
+            <DuplicateReviewPanel projectId={projectId} dark={isDark} />
           </div>
 
           {/* Filters bar */}
@@ -282,7 +294,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                   <div key={l.location} className="flex items-center gap-3">
                     <MapPin className="h-3.5 w-3.5 shrink-0" style={{ color: C.sub }} />
                     <span className="w-24 truncate text-[13px]">{l.location}</span>
-                    <div className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: "#0a1c33" }}>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: C.track }}>
                       <div className="h-full rounded-full" style={{ width: `${Math.min(100, l.achievement)}%`, background: achievementColor(l.achievement) }} />
                     </div>
                     <span className="w-10 text-right text-[12.5px] font-semibold" style={{ color: achievementColor(l.achievement) }}>{l.achievement}%</span>
@@ -318,7 +330,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                     <div key={k} className="flex items-center gap-2 text-[12.5px]">
                       <CheckCircle2 className="h-3.5 w-3.5" style={{ color: achievementColor(v) }} />
                       <span className="w-24" style={{ color: C.text }}>{k}</span>
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: "#0a1c33" }}>
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: C.track }}>
                         <div className="h-full rounded-full" style={{ width: `${v}%`, background: achievementColor(v) }} />
                       </div>
                       <span className="w-9 text-right font-semibold">{v}%</span>
@@ -363,7 +375,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                 </thead>
                 <tbody>
                   {paged.map((r) => {
-                    const m = STATUS_META[r.status as AcsmStatus];
+                    const m = STATUS_META[r.status as AcsmStatus] ?? STATUS_META.draft_pending;
                     return (
                       <tr key={r.id} className="border-t" style={{ borderColor: C.borderSoft }}>
                         <td className="px-2 py-2.5 font-mono text-[11.5px]" style={{ color: C.sub }}>{r.code}</td>
@@ -376,7 +388,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                         <td className="px-2 py-2.5">
                           <div className="flex items-center gap-2">
                             <span className="w-9 font-semibold" style={{ color: achievementColor(r.pct) }}>{r.pct}%</span>
-                            <div className="h-1.5 w-20 overflow-hidden rounded-full" style={{ background: "#0a1c33" }}>
+                            <div className="h-1.5 w-20 overflow-hidden rounded-full" style={{ background: C.track }}>
                               <div className="h-full rounded-full" style={{ width: `${Math.min(100, r.pct)}%`, background: achievementColor(r.pct) }} />
                             </div>
                           </div>
