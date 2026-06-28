@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
-import { ArrowLeft, Save, Loader2, MapPin, CheckCircle2, ChevronRight } from "lucide-react";
+import { ArrowLeft, Save, Loader2, MapPin, CheckCircle2, ChevronRight, Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useGeolocation } from "@/hooks/useGeolocation";
@@ -52,6 +53,8 @@ const monthOptions = (() => {
 
 export default function IRFFormFiller({ projectId, onClose }: Props) {
   const { user } = useAuth();
+  const { resolvedTheme, setTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const { position, getCurrentPosition } = useGeolocation();
   useEffect(() => { try { getCurrentPosition(); } catch { /* ignore */ } }, []);
 
@@ -280,6 +283,17 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
         <span className="hidden shrink-0 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white sm:inline">
           Step {step + 1}/{totalSteps}
         </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          type="button"
+          aria-label={isDarkTheme ? "Switch IRF form to light mode" : "Switch IRF form to dark mode"}
+          aria-pressed={isDarkTheme}
+          onClick={() => setTheme(isDarkTheme ? "light" : "dark")}
+          className="text-white hover:bg-white/10"
+        >
+          {isDarkTheme ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </Button>
       </div>
 
       {/* Progress */}
