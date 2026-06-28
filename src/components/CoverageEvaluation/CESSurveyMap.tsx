@@ -98,6 +98,8 @@ interface CESSurveyMapProps {
   samplingPins?: LatLng[];
   /** Tooltip for the center marker; defaults to live GPS wording for capture screens. */
   centerLabel?: string;
+  /** Initial/current zoom. Coarse fallback centres use lower zooms so imagery paints immediately. */
+  zoom?: number;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -206,6 +208,7 @@ const CESSurveyMap = ({
   gpsTrail = [],
   samplingPins = [],
   centerLabel = "Current device GPS",
+  zoom = 17,
 }: CESSurveyMapProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -267,11 +270,11 @@ const CESSurveyMap = ({
       // requests different z/x/y tiles on high-DPR phones, so prefetched imagery
       // no longer matches what Leaflet asks for when the device is offline.
       detectRetina: false,
-      // Smaller buffer + idle updates prevent the map from spawning hundreds of
-      // tile requests while GPS jitters/pans, which was the main slow-render path.
-      keepBuffer: 3,
+      // Keep enough surrounding satellite imagery resident that first paint,
+      // small pans, and GPS refinements do not reveal gray tile gaps.
+      keepBuffer: 8,
       updateWhenIdle: false,
-      updateWhenZooming: false,
+      updateWhenZooming: true,
       ...(tl.subdomains ? { subdomains: tl.subdomains } : {}),
       ...(isGoogle ? {} : { crossOrigin: true as const }),
     };
@@ -301,9 +304,9 @@ const CESSurveyMap = ({
           maxNativeZoom: 19,
           detectRetina: false,
           crossOrigin: true,
-          keepBuffer: 3,
+          keepBuffer: 8,
           updateWhenIdle: false,
-          updateWhenZooming: false,
+          updateWhenZooming: true,
         } as L.TileLayerOptions).addTo(map);
 
         // Keep a reference so it gets cleaned up on next basemap change
@@ -343,7 +346,7 @@ const CESSurveyMap = ({
       wheelPxPerZoomLevel: 80,
       wheelDebounceTime: 80,
       maxZoom: 23,
-    }).setView([centerLat, centerLng], 17);
+    }).setView([centerLat, centerLng], zoom);
     applyBasemap(map, basemap);
     staticLayerGroupRef.current = L.layerGroup().addTo(map);
     boundaryLayerGroupRef.current = L.layerGroup().addTo(staticLayerGroupRef.current);
@@ -519,12 +522,14 @@ const CESSurveyMap = ({
       const current = map.getCenter();
       // Avoid tile churn from 1–5 m GPS jitter. The marker still moves every
       // update; the expensive basemap only recentres after meaningful movement.
-      if (!current || current.distanceTo(next) > 25) {
+      const shouldZoom = Math.abs(map.getZoom() - zoom) > 0.1;
+      if (!current || current.distanceTo(next) > 25 || shouldZoom) {
         gpsLedPanUntilRef.current = Date.now() + 6000;
-        map.panTo(next, { animate: false });
+        if (shouldZoom) map.setView(next, zoom, { animate: false });
+        else map.panTo(next, { animate: false });
       }
     }
-  }, [centerLat, centerLng]);
+  }, [centerLat, centerLng, zoom]);
 
   // Static overlays. Kept separate from the live GPS marker/route so frequent
   // location updates don't rebuild thousands of rooftop/road/household layers.
@@ -1003,7 +1008,7 @@ const CESSurveyMap = ({
     }
   }, [isNearViewport, centerLat, centerLng, centerLabel, livePosition, perimeter, lqas?.closureM, lqas?.ready, routeTo, gpsTrail]);
 
-  return <div ref={containerRef} style={{ height, width: "100%", contain: "layout paint size", touchAction: isCoarsePointer() ? "pan-y pinch-zoom" : undefined }} className="ces-survey-map rounded-lg overflow-hidden border border-border" />;
+  return <div ref={containerRef} style={{ height, width: "100%", contain: "layout paint", touchAction: isCoarsePointer() ? "pan-y pinch-zoom" : undefined }} className="ces-survey-map rounded-lg overflow-hidden border border-border" />;
 };
 
 export default memo(CESSurveyMap);
