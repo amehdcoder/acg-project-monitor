@@ -65,10 +65,13 @@ const monthOptions = (() => {
 
 export default function IRFFormFiller({ projectId, onClose }: Props) {
   const { user } = useAuth();
-  const { resolvedTheme, setTheme } = useTheme();
-  const isDarkTheme = resolvedTheme === "dark";
+  // The IRF opens in dark mode by default. A self-contained toggle controls only
+  // this form's appearance (via a scoped `dark` class) so it never disturbs the
+  // user's persistent app-wide theme preference.
+  const [isDarkTheme, setIsDarkTheme] = useState(true);
   const { position, getCurrentPosition } = useGeolocation();
   useEffect(() => { try { getCurrentPosition(); } catch { /* ignore */ } }, []);
+
 
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
