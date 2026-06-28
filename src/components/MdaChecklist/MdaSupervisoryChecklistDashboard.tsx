@@ -717,20 +717,44 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
 
 
   // ── Field worker accountability ───────────────────────────────
+  // Reconciles with the headline KPIs: `checklist` submissions are the supervised
+  // community visits (the "12" everywhere else), `followups` are the linked
+  // follow-up module submissions. Total = checklist + follow-ups so the column
+  // sums always tally with the dashboard header counts.
   const workers = useMemo(() => {
-    const map = new Map<string, { name: string; subs: number; days: Set<string>; last: number }>();
-    for (const s of checklist.concat(followUps)) {
+    const map = new Map<string, {
+      name: string; checklist: number; followups: number;
+      communities: Set<string>; days: Set<string>; last: number;
+    }>();
+    const tally = (s: typeof checklist[number], isFollowUp: boolean) => {
       const name = stripTags(s.submitter || s.data?.supervisor_name) || "Unknown";
-      const rec = map.get(name) || { name, subs: 0, days: new Set<string>(), last: 0 };
-      rec.subs++;
+      const rec = map.get(name) || {
+        name, checklist: 0, followups: 0,
+        communities: new Set<string>(), days: new Set<string>(), last: 0,
+      };
+      if (isFollowUp) rec.followups++; else {
+        rec.checklist++;
+        const c = pickGeo(s, "community");
+        if (c) rec.communities.add(c.toLowerCase().trim());
+      }
       if (s.submittedAt) {
         rec.days.add(new Date(s.submittedAt).toISOString().slice(0, 10));
         rec.last = Math.max(rec.last, new Date(s.submittedAt).getTime());
       }
       map.set(name, rec);
-    }
+    };
+    for (const s of checklist) tally(s, false);
+    for (const s of followUps) tally(s, true);
     return [...map.values()]
-      .map((r) => ({ name: r.name, subs: r.subs, days: r.days.size, last: r.last ? new Date(r.last).toLocaleDateString() : "—" }))
+      .map((r) => ({
+        name: r.name,
+        checklist: r.checklist,
+        followups: r.followups,
+        subs: r.checklist + r.followups,
+        communities: r.communities.size,
+        days: r.days.size,
+        last: r.last ? new Date(r.last).toLocaleDateString() : "—",
+      }))
       .sort((a, b) => b.subs - a.subs).slice(0, 12);
   }, [checklist, followUps]);
 
