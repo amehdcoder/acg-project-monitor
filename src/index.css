@@ -272,6 +272,25 @@
 
   table { max-width: 100%; }
 
+  /* Leaflet maps manage their own tile / canvas / svg sizing internally.
+     The global media cap above resolves `max-width: 100%` against the zero-width
+     Leaflet panes, collapsing the canvas renderer (preferCanvas) to 0px wide —
+     which silently hides EVERY vector overlay (perimeter, manual-draw polygon,
+     auto-fence, segments, household markers). Restore natural sizing for any
+     element Leaflet positions so overlays always render. */
+  .leaflet-container img,
+  .leaflet-container canvas,
+  .leaflet-container svg,
+  .leaflet-pane img,
+  .leaflet-pane canvas,
+  .leaflet-pane svg,
+  .leaflet-tile,
+  .leaflet-marker-icon,
+  .leaflet-image-layer {
+    max-width: none !important;
+    height: auto;
+  }
+
   /* Long words/URLs wrap instead of overflowing */
   p, span, h1, h2, h3, h4, h5, h6, li, td, th, a {
     overflow-wrap: anywhere;
