@@ -26,7 +26,7 @@ export function IrfWatermark() {
         src={irfBg}
         alt=""
         loading="lazy"
-        className="absolute inset-0 h-full w-full object-cover opacity-[0.07] dark:opacity-[0.12]"
+        className="absolute inset-0 h-full w-full object-cover opacity-[0.08] dark:opacity-[0.14]"
       />
       {/* Soft washes keep text, fields and charts crisp while preserving the SARMAAN CDD brand signal. */}
       <div className="absolute inset-0 bg-background/80 dark:bg-background/78" />
