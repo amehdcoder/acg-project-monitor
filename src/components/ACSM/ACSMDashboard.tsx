@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useEffect } from "react";
+import { useTheme } from "next-themes";
 import {
   ArrowLeft, Megaphone, Bell, HelpCircle, Download, Filter, Calendar, MapPin,
   Layers, Users, ListChecks, ChevronLeft, ChevronRight, Search, TrendingUp,
@@ -27,10 +28,20 @@ interface Props {
   onClose: () => void;
 }
 
-const C = {
-  bg: "#0a1628", panel: "#0f1f38", panel2: "#11253f", border: "#1c3a5e",
-  borderSoft: "#16304f", text: "#e6eefb", sub: "#8aa2c4", primary: "#22d3ee", blue: "#3b82f6",
+const PALETTE = {
+  dark: {
+    bg: "#071426", panel: "#0d213a", panel2: "#112b49", border: "#3d5f86",
+    borderSoft: "#29486e", text: "#f5f9ff", sub: "#b9c9df", primary: "#67e8f9", blue: "#60a5fa",
+    track: "#17304f", buttonText: "#06121f",
+  },
+  light: {
+    bg: "#f7fafc", panel: "#ffffff", panel2: "#eef6fb", border: "#c5d3e2",
+    borderSoft: "#d5e0eb", text: "#172133", sub: "#4f6178", primary: "#0369a1", blue: "#1d4ed8",
+    track: "#dbe7f3", buttonText: "#ffffff",
+  },
 };
+
+type Palette = typeof PALETTE.dark;
 
 const fmt = (n: number) => n.toLocaleString();
 
