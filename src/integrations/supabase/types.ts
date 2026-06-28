@@ -5153,6 +5153,39 @@ export type Database = {
         }
         Relationships: []
       }
+      owner_deleted_records: {
+        Row: {
+          deleted_at: string
+          deleted_by: string | null
+          id: string
+          label: string | null
+          record_id: string
+          restored_at: string | null
+          snapshot: Json
+          source_table: string
+        }
+        Insert: {
+          deleted_at?: string
+          deleted_by?: string | null
+          id?: string
+          label?: string | null
+          record_id: string
+          restored_at?: string | null
+          snapshot: Json
+          source_table: string
+        }
+        Update: {
+          deleted_at?: string
+          deleted_by?: string | null
+          id?: string
+          label?: string | null
+          record_id?: string
+          restored_at?: string | null
+          snapshot?: Json
+          source_table?: string
+        }
+        Relationships: []
+      }
       patient_referrals: {
         Row: {
           accepted_by: string | null
@@ -7383,6 +7416,7 @@ export type Database = {
         Returns: boolean
       }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_owner_level: { Args: { _user_id: string }; Returns: boolean }
       is_owner_or_co_owner: { Args: { _user_id: string }; Returns: boolean }
       is_project_member: {
         Args: { _project_id: string; _user_id: string }
@@ -7450,6 +7484,17 @@ export type Database = {
         Args: { _form_id: string; _from?: string; _to?: string }
         Returns: Json
       }
+      owner_bulk_delete_records: {
+        Args: {
+          _archive?: boolean
+          _filter_column?: string
+          _filter_value?: string
+          _from?: string
+          _table: string
+          _to?: string
+        }
+        Returns: Json
+      }
       owner_clear_form_submissions: {
         Args: { _form_id: string }
         Returns: Json
@@ -7463,6 +7508,14 @@ export type Database = {
         }
         Returns: Json
       }
+      owner_delete_assert_allowed: {
+        Args: { _table: string }
+        Returns: undefined
+      }
+      owner_delete_records: {
+        Args: { _archive?: boolean; _ids: string[]; _table: string }
+        Returns: Json
+      }
       owner_factory_reset: { Args: { _confirm: string }; Returns: Json }
       owner_mda_data_summary: { Args: { _form_id: string }; Returns: Json }
       owner_permanent_delete_mda_submissions: {
@@ -7474,6 +7527,7 @@ export type Database = {
         Args: { _form_id: string; _from?: string; _to?: string }
         Returns: Json
       }
+      owner_restore_records: { Args: { _record_ids: string[] }; Returns: Json }
       set_proximity_conversation_flag: {
         Args: { _action: string; _conversation_id: string }
         Returns: undefined
