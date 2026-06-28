@@ -417,7 +417,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
 /* ---------- helpers ---------- */
 const pct = (n: number, d: number) => (d ? Math.round((n / d) * 100) : 0);
 
-const Kpi = ({ icon: Icon, label, value, tint, delta, up, down }: { icon: any; label: string; value: string; tint: string; delta?: string; up?: boolean; down?: boolean }) => (
+const Kpi = ({ icon: Icon, label, value, tint, delta, up, down, palette: C }: { icon: any; label: string; value: string; tint: string; delta?: string; up?: boolean; down?: boolean; palette: Palette }) => (
   <div className="relative overflow-hidden rounded-2xl p-4" style={{ background: `linear-gradient(135deg, ${tint}14, ${C.panel} 60%)`, border: `1px solid ${C.borderSoft}` }}>
     <span className="absolute inset-y-0 left-0 w-1" style={{ background: tint }} />
     <div className="flex items-center justify-between">
@@ -433,7 +433,7 @@ const Kpi = ({ icon: Icon, label, value, tint, delta, up, down }: { icon: any; l
   </div>
 );
 
-const Panel = ({ title, sub, right, children }: { title: string; sub?: string; right?: React.ReactNode; children: React.ReactNode }) => (
+const Panel = ({ title, sub, right, children, palette: C }: { title: string; sub?: string; right?: React.ReactNode; children: React.ReactNode; palette: Palette }) => (
   <div className="rounded-2xl p-4 sm:p-5" style={{ background: C.panel, border: `1px solid ${C.borderSoft}` }}>
     <div className="mb-4 flex items-center justify-between gap-3">
       <div>
@@ -446,7 +446,7 @@ const Panel = ({ title, sub, right, children }: { title: string; sub?: string; r
   </div>
 );
 
-const FilterChip = ({ icon: Icon, label, value }: { icon: any; label: string; value: string }) => (
+const FilterChip = ({ icon: Icon, label, value, palette: C }: { icon: any; label: string; value: string; palette: Palette }) => (
   <div className="flex items-center gap-2 rounded-xl px-3 py-2.5" style={{ background: C.panel, border: `1px solid ${C.borderSoft}` }}>
     <Icon className="h-4 w-4" style={{ color: C.primary }} />
     <div>
