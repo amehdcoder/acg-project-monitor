@@ -127,12 +127,7 @@ function normalizeQuestions(items: unknown[]): DashboardQuestion[] {
     .filter((item): item is DashboardQuestion => !!item);
 }
 
-function singleStateRestriction(questions: DashboardQuestion[]): string | null {
-  const stateQuestion = flattenQuestions(questions).find((q) => String(q?.name || q?.id || "").toLowerCase() === "state");
-  const options = stateQuestion?.options || [];
-  if (options.length === 1) return String(options[0].value || options[0].label || "") || null;
-  return null;
-}
+
 
 function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm, questions: DashboardQuestion[]) {
   // Re-key answers to canonical question keys so historical / re-keyed
