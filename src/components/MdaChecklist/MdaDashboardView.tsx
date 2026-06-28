@@ -233,60 +233,14 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
                 labelColumns={["state", "submitter_name"]}
                 filter={{ column: "form_id", value: form.id }}
                 onChanged={() => refresh()}
-                compact
               />
-            )}
-
-            {isOwner && (
-              <>
-                <Button
-                  variant={simulate ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSimulate((v) => !v)}
-                  className={simulate ? "bg-violet-600 hover:bg-violet-700" : ""}
-                >
-                  {simulate ? <Sparkles className="mr-2 h-4 w-4" /> : <Database className="mr-2 h-4 w-4" />}
-                  {simulate ? "Simulating" : "Simulate"}
-                </Button>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Simulation controls">
-                      <Settings2 className="h-4 w-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-72" align="end">
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-sm font-semibold">Simulation controls</p>
-                        <p className="text-xs text-muted-foreground">Owner-only, generated locally, never saved.</p>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Submissions</Label>
-                        <Input type="number" min={10} max={5000} value={simCount} onChange={(e) => setSimCount(Math.max(1, Math.min(5000, Number(e.target.value) || 1)))} className="h-8" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Seed</Label>
-                        <Input type="number" value={simSeed} onChange={(e) => setSimSeed(Number(e.target.value) || 0)} className="h-8" />
-                      </div>
-                      <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => { setSimCount(SIM_DEFAULTS.count); setSimSeed(SIM_DEFAULTS.seed); }}>
-                        <RotateCcw className="mr-2 h-3.5 w-3.5" /> Reset
-                      </Button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </>
             )}
           </div>
         </div>
       </div>
 
       <main className={`space-y-6 px-4 py-6 ${embedded ? "" : "container mx-auto"}`}>
-        {simulate && (
-          <div className="flex items-center gap-2 rounded-lg border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm text-violet-800">
-            <Sparkles className="h-4 w-4 shrink-0" />
-            <span><strong>Simulation mode:</strong> showing synthetic MDA submissions only. Real submissions are not changed.</span>
-          </div>
-        )}
+
 
         {useCacheNow && (
           <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
