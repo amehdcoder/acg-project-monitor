@@ -38,7 +38,7 @@ function Kpi({ icon: Icon, label, value, sub, color }: { icon: any; label: strin
 }
 
 export default function IRFDashboard({ projectId, onClose }: Props) {
-  const { rows, loading, reload, stats, sectionTotals, genderSplit, ncBreakdown, topLgas, trend, dataQuality } =
+  const { rows, loading, reload, stats, sectionTotals, genderSplit, ncBreakdown, topLgas, trend, dataQuality, duplicates } =
     useIrfDashboard(projectId);
   const [exporting, setExporting] = useState(false);
 
