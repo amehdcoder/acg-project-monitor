@@ -294,7 +294,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [gpsRestartNonce, setGpsRestartNonce] = useState(0);
   const [residentialMask, setResidentialMask] = useState<ResidentialMaskResult | null>(null);
   const [maskStatus, setMaskStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
-  const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain" | "google" | "google-sat">("hybrid");
+  const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain" | "google" | "google-sat">("satellite");
   const [autoFenceRadiusM, setAutoFenceRadiusM] = useState<number>(50);
   const [autoFenced, setAutoFenced] = useState<boolean>(false);
   const lastAutoFenceFollowRef = useRef<{ lat: number; lng: number; t: number } | null>(null);
@@ -2678,6 +2678,15 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const lgaOptions = state ? getLGAsForState(state) : [];
   const wardOptions = state && lga ? getWardsForLGA(state, lga) : [];
   const instantMapCenter = gps ?? mapSeed;
+  const instantMapZoom = gps
+    ? 17
+    : mapSeed.source === "handoff"
+      ? 17
+      : mapSeed.source === "last_known"
+        ? 16
+        : mapSeed.source === "state"
+          ? 8
+          : 6;
   const instantCenterLabel = gps
     ? "Current device GPS"
     : mapSeed.source === "handoff"
@@ -3407,6 +3416,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 households={[]}
                 basemap={basemap}
                 height="50vh"
+                zoom={instantMapZoom}
                 exclusionZones={residentialMask?.exclusionZones ?? null}
                 showExclusions={showExclusionLayer}
                 residentialBuildings={residentialMask?.residentialBuildings ?? null}
@@ -3556,6 +3566,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               households={[]}
               basemap={basemap}
               height="50vh"
+              zoom={instantMapZoom}
               onMapTap={smartCountMode ? handleSmartCountTap : undefined}
               centerLabel={instantCenterLabel}
             />
@@ -3622,6 +3633,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               basemap={basemap}
               onMapTap={handleMapTap}
               height="55vh"
+              zoom={instantMapZoom}
               centerLabel={instantCenterLabel}
             />
             <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/20 rounded-xl border border-border">

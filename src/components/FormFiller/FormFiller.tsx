@@ -1221,6 +1221,10 @@ const FormFiller = ({
     }
   }, [gpsQuestionAnswer?.lat, gpsQuestionAnswer?.lng]);
 
+  useEffect(() => {
+    if (currentGpsPosition) setGpsPosition(currentGpsPosition);
+  }, [currentGpsPosition]);
+
   
   const {
     selectedCase,
