@@ -18,6 +18,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { GuidedQuestionFlow, AssessmentSummary, NTD_PROTOCOLS } from "./NTDAssessment";
+import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 import { suggestStage } from "./NTDAssessment/ntdClinicalRules";
 import { format } from "date-fns";
 
@@ -203,11 +204,20 @@ const NTDAssessmentView = () => {
           <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
             <Stethoscope className="h-8 w-8 text-primary" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="font-display text-xl sm:text-2xl font-bold text-foreground">NTD Guided Assessment</h1>
             <p className="text-sm text-muted-foreground">Clinical decision support for field workers</p>
           </div>
+          <OwnerSubmissionManager
+            table="ntd_assessments"
+            title="assessments"
+            labelColumns={["beneficiary_name", "protocol_name", "lga"]}
+            onChanged={fetchHistory}
+            compact
+          />
+
         </div>
+
       </div>
 
       {/* Main Tabs: New Assessment vs History */}

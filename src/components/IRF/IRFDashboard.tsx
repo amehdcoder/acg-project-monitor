@@ -15,6 +15,7 @@ import { useAcsmDuplicateOverrides } from "@/hooks/useAcsmDuplicateOverrides";
 import DuplicateReviewPanel from "@/components/ACSM/DuplicateReviewPanel";
 import { IRF_DASH_NAME } from "@/lib/irf/definition";
 import { IrfWatermark } from "@/components/IRF/IRFFormFiller";
+import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 
 interface Props {
   projectId?: string | null;
@@ -101,6 +102,15 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
         </Button>
         <Button variant="ghost" size="icon" aria-label="Refresh LGA ACSM dashboard" onClick={() => reload()} className="text-white hover:bg-white/10"><RefreshCw className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} /></Button>
         <Button variant="ghost" size="icon" aria-label="Export LGA ACSM reports as CSV" onClick={exportCsv} disabled={exporting || !rows.length} className="text-white hover:bg-white/10"><Download className="h-5 w-5" /></Button>
+        <OwnerSubmissionManager
+          table="irf_reports"
+          title="IRF reports"
+          labelColumns={["lga", "ward", "state"]}
+          filter={projectId ? { column: "project_id", value: projectId } : null}
+          onChanged={reload}
+          compact
+          className="text-white border-white/30 hover:bg-white/10"
+        />
       </div>
 
       {loading && !rows.length ? (

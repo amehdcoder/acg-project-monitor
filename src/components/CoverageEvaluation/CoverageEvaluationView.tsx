@@ -26,6 +26,7 @@ import { kmeansSegments } from "@/lib/ces/kmeansSegments";
 import { inferSegmentCoverage, pointInPolygon } from "@/lib/ces/geostatistics";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
 import { readCesLocationPrefill } from "@/lib/mda/cesLocationBridge";
+import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 
 // Workflow continuity: persist project + active session across reloads.
 const CES_PROJECT_KEY = "ces_last_project_id";
@@ -416,6 +417,14 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
               ))}
             </SelectContent>
           </Select>
+          <OwnerSubmissionManager
+            table="ces_surveys"
+            title="CES surveys"
+            labelColumns={["community_name", "settlement_name", "lga"]}
+            filter={selectedProject ? { column: "project_id", value: selectedProject } : null}
+            compact
+            className="w-full sm:w-auto"
+          />
         </div>
       </div>
 

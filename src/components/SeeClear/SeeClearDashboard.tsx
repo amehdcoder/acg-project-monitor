@@ -19,6 +19,7 @@ import jsPDF from "jspdf";
 import handsLogo from "@/assets/logo-amehnities.png";
 import coatOfArms from "@/assets/nigeria-coat-of-arms.png.asset.json";
 import { pctTone, toneColor } from "@/lib/conditionalFormatting";
+import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 
 const NAVY = "#0c2340";
 const BLUE = "#2563eb";
@@ -110,6 +111,14 @@ export default function SeeClearDashboard({ onClose }: Props) {
               <Button size="sm" variant="secondary" onClick={() => setSimulate(!simulate)} className={`h-9 border-0 ${simulate ? "bg-[#2dd4a8] font-semibold text-[#0c2340] hover:bg-[#22c0a0]" : "bg-white/15 text-white hover:bg-white/25"}`}><Sparkles className="h-4 w-4" /><span className="ml-1.5 hidden sm:inline">{simulate ? "Simulating" : "Simulate"}</span></Button>
             )}
             <Button size="sm" variant="secondary" onClick={reload} disabled={loading} className="h-9 border-0 bg-white/15 text-white hover:bg-white/25"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></Button>
+            <OwnerSubmissionManager
+              table="seeclear_monitoring"
+              title="facility records"
+              labelColumns={["facility_name", "lga", "ward", "community"]}
+              onChanged={reload}
+              compact
+              className="h-9 border-0 bg-white/15 text-white hover:bg-white/25"
+            />
           </div>
         </div>
         <h1 className="mt-3 text-2xl font-bold">Eye Health Facility Monitoring Dashboard</h1>

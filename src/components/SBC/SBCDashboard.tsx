@@ -13,6 +13,7 @@ import MapVisualization from "@/components/MapVisualization/MapVisualization";
 import { MapMarker } from "@/components/MapVisualization/types";
 import { useSbcDashboard } from "@/hooks/useSbcDashboard";
 import { useAuth } from "@/hooks/useAuth";
+import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 import {
   STATUS_META, achievementColor, formatByUnit,
   categoryLabel, indicatorLevelLabel, type SbcCategory, type SbcStatus,
@@ -131,6 +132,14 @@ export default function SBCDashboard({ projectId, onClose }: Props) {
               <button className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold text-[#06121f]" style={{ background: `linear-gradient(135deg, ${C.primary}, ${C.blue})` }}>
                 <Download className="h-4 w-4" /> Download
               </button>
+              <OwnerSubmissionManager
+                table="sbc_reports"
+                title="SBC reports"
+                labelColumns={["lga", "ward", "community", "state"]}
+                filter={projectId ? { column: "project_id", value: projectId } : null}
+                onChanged={reload}
+                compact
+              />
             </div>
           </div>
 

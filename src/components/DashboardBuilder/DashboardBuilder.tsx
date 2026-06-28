@@ -62,6 +62,7 @@ import DashboardExport from "./DashboardExport";
 import DraggableWidgetGrid from "./DraggableWidgetGrid";
 import DashboardFilters, { DashboardFilterValues } from "./DashboardFilters";
 import DashboardActions from "./DashboardActions";
+import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 import AutoInsightsDashboard from "./AutoInsightsDashboard";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -416,6 +417,14 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
                 dashboardName={currentDashboard.name}
                 containerRef={dashboardContainerRef}
               />
+              <OwnerSubmissionManager
+                table="form_submissions"
+                title="submissions"
+                labelColumns={["status"]}
+                filter={{ column: "form_id", value: formId }}
+                onChanged={refresh}
+              />
+
               {isAdmin && user && (
                 <>
                   <DashboardActions
