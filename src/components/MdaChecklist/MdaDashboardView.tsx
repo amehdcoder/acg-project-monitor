@@ -11,7 +11,7 @@ import { generateMdaSimulation } from "@/lib/mda/simulation";
 import { loadMdaCache, saveMdaCache, isOffline } from "@/lib/mda/offlineCache";
 import { canonicalizeSubmissionData } from "@/lib/mda/dashboardData";
 import MdaSupervisoryChecklistDashboard from "./MdaSupervisoryChecklistDashboard";
-import OwnerDataManagement from "./OwnerDataManagement";
+import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 
 interface MdaDashboardForm {
   id: string;
@@ -255,7 +255,16 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
               {refreshing ? "Refreshing" : "Refresh"}
             </Button>
 
-            {isOwner && <OwnerDataManagement formId={form.id} onChanged={() => refresh()} />}
+            {isOwner && (
+              <OwnerSubmissionManager
+                table="form_submissions"
+                title="MDA checklist submissions"
+                labelColumns={["state", "submitter_name"]}
+                filter={{ column: "form_id", value: form.id }}
+                onChanged={() => refresh()}
+                compact
+              />
+            )}
 
             {isOwner && (
               <>
