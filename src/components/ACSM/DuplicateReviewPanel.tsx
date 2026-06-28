@@ -87,10 +87,8 @@ export default function DuplicateReviewPanel({ projectId, dark }: Props) {
   // We run the SAME flagDuplicates + applyOverrides pipeline the dashboards use so the
   // numbers shown here always match the unique counts rendered everywhere else.
   const reconciled = useMemo(() => {
-    const irfOv = buildOverrideMap(
-      overrides.map((o) => ({ submission_id: o.submission_id, decision: o.decision })),
-    );
     const irfBase = flagDuplicates(irfRows, irfSignature, (r) => r.id, irfOrder);
+
     const irfFinal = applyOverrides(irfBase, (r) => r.id, irfMap);
     const acsmBase = flagDuplicates(acsmRows, acsmSignature, (r) => r.id, acsmOrder);
     const acsmFinal = applyOverrides(acsmBase, (r) => r.id, acsmMap);
