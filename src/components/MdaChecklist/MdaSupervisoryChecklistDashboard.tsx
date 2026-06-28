@@ -657,7 +657,9 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       const completionSub = inner?.get(MDA_FOLLOWUP_COMPLETION)?.[0];
       const commoditySub = inner?.get(MDA_FOLLOWUP_COMMODITIES)?.[0];
       const adverseSub = inner?.get(MDA_FOLLOWUP_ADVERSE)?.[0];
-      const mdaStatus = statusLabel(completionSub?.data?.status_of_mda ?? s.data?.status_of_mda);
+      const mdaStatus =
+        authoritativeStatusByCom.get(ck) ??
+        statusLabel(completionSub?.data?.status_of_mda ?? s.data?.status_of_mda);
       return {
         id: s.id,
         community: pickGeo(s, "community") || "Unspecified",
