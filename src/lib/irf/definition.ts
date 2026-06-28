@@ -97,7 +97,7 @@ export const IRF_SECTIONS: IrfSection[] = [
         activity: "Healthcare Workers",
         fields: [
           { key: "healthcare_workers_engaged", label: "Healthcare workers engaged", what: "Health staff reached", type: "number", metric: true, example: "12" },
-          { key: "healthcare_facility_type", label: "Type of facility", what: "PHC, General Hospital, etc.", type: "text", example: "PHC" },
+          { key: "healthcare_facility_type", label: "Type of facility", what: "PHC, General Hospital, etc.", type: "select", allowOther: true, options: ["PHC", "General Hospital", "Teaching Hospital", "Private Clinic", "Patent Medicine Vendor"], example: "PHC" },
         ],
       },
       {
