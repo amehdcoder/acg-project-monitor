@@ -303,7 +303,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
           type="button"
           aria-label={isDarkTheme ? "Switch IRF form to light mode" : "Switch IRF form to dark mode"}
           aria-pressed={isDarkTheme}
-          onClick={() => setTheme(isDarkTheme ? "light" : "dark")}
+          onClick={() => setIsDarkTheme((d) => !d)}
           className="text-white hover:bg-white/10"
         >
           {isDarkTheme ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
