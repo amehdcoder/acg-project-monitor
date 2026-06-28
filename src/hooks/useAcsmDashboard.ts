@@ -168,7 +168,7 @@ export const useAcsmDashboard = (
       if (myReq === reqIdRef.current) reqIdRef.current++;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simulate, projectId]);
+  }, [simulate, projectId, overrideSig]);
 
   // Realtime: refresh when either the ACSM IRF table or the IRF table changes.
   useEffect(() => {
