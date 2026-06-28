@@ -46,6 +46,9 @@ type Palette = typeof PALETTE.dark;
 const fmt = (n: number) => n.toLocaleString();
 
 export default function ACSMDashboard({ projectId, onClose }: Props) {
+  const { resolvedTheme, setTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+  const C = isDark ? PALETTE.dark : PALETTE.light;
   const [category, setCategory] = useState<AcsmCategory | "all">("results_of_advocacy");
   const overrides = useAcsmDuplicateOverrides(projectId);
   const {
@@ -54,6 +57,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
   } = useAcsmDashboard(projectId, category, { acsmMap: overrides.acsmMap, irfMap: overrides.irfMap });
   const { isOwnerLevel, isAdmin } = useAuth();
   const kpiSync = useAcsmKpiSync(projectId);
+  const autoSync = kpiSync.autoSync;
 
   const buildKpiPayload = useCallback((): AcsmKpiPayload => ({
     generatedAt: new Date().toISOString(),
@@ -85,8 +89,8 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
   // deduplicated KPIs or admin duplicate decisions change.
   useEffect(() => {
     if (loading) return;
-    kpiSync.autoSync(buildKpiPayload());
-  }, [loading, buildKpiPayload, kpiSync]);
+    autoSync(buildKpiPayload());
+  }, [loading, buildKpiPayload, autoSync]);
 
 
   const [page, setPage] = useState(0);
