@@ -45,7 +45,6 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   const [state, setState] = useState("");
   const [lga, setLga] = useState("");
   const [ward, setWard] = useState("");
-  const [focalName, setFocalName] = useState("");
   const [focalPhone, setFocalPhone] = useState("");
   const [narrative, setNarrative] = useState("");
 
