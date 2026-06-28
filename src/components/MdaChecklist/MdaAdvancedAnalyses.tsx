@@ -826,6 +826,25 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+                <div className="mt-3 flex flex-wrap gap-1.5" data-testid="sup-chip-list">
+                  {workerChart.map((w) => (
+                    <button
+                      key={w.name}
+                      type="button"
+                      data-testid="sup-chip"
+                      data-worker={w.name}
+                      aria-pressed={selectedSup === w.name}
+                      onClick={() => toggleSup(w.name)}
+                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                        selectedSup === w.name
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-muted/40 text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {w.name} <span className="opacity-70">({w.Communities})</span>
+                    </button>
+                  ))}
+                </div>
               </CardContent>
             </Card>
 
