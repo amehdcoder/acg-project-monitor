@@ -21,6 +21,16 @@ interface Props {
 }
 
 const fmt = (n: number) => new Intl.NumberFormat().format(Math.round(n || 0));
+const chartText = "hsl(var(--foreground))";
+const chartMuted = "hsl(var(--muted-foreground))";
+const chartBorder = "hsl(var(--border))";
+const chartTooltipStyle = {
+  background: "hsl(var(--popover))",
+  border: "1px solid hsl(var(--border))",
+  borderRadius: 8,
+  color: chartText,
+};
+const chartLegendStyle = { color: chartText, fontSize: 12 };
 
 function Kpi({ icon: Icon, label, value, sub, color }: { icon: any; label: string; value: string; sub?: string; color: string }) {
   return (
@@ -66,18 +76,18 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
   );
 
   return (
-    <div className="dark relative min-h-screen w-full bg-background text-foreground">
-      <div className="relative mx-auto w-full max-w-6xl pb-16">
+    <div className="relative isolate min-h-screen w-full overflow-hidden bg-background text-foreground">
       <IrfWatermark />
+      <div className="relative z-10 mx-auto w-full max-w-6xl pb-16">
       {/* Header */}
       <div className="sticky top-0 z-20 flex items-center gap-3 border-b bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3">
-        <Button variant="ghost" size="icon" onClick={onClose} className="text-white hover:bg-white/10"><ArrowLeft className="h-5 w-5" /></Button>
+        <Button variant="ghost" size="icon" aria-label="Back to forms" onClick={onClose} className="text-white hover:bg-white/10"><ArrowLeft className="h-5 w-5" /></Button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-base font-bold text-white sm:text-lg">{IRF_DASH_NAME}</h1>
           <p className="truncate text-xs text-white/70">{stats.totalReports} reports · {stats.lgas} LGAs · live updates on</p>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => reload()} className="text-white hover:bg-white/10"><RefreshCw className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} /></Button>
-        <Button variant="ghost" size="icon" onClick={exportCsv} disabled={exporting || !rows.length} className="text-white hover:bg-white/10"><Download className="h-5 w-5" /></Button>
+        <Button variant="ghost" size="icon" aria-label="Refresh LGA ACSM dashboard" onClick={() => reload()} className="text-white hover:bg-white/10"><RefreshCw className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} /></Button>
+        <Button variant="ghost" size="icon" aria-label="Export LGA ACSM reports as CSV" onClick={exportCsv} disabled={exporting || !rows.length} className="text-white hover:bg-white/10"><Download className="h-5 w-5" /></Button>
       </div>
 
       {loading && !rows.length ? (
@@ -117,11 +127,11 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
               <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground"><TrendingUp className="h-4 w-4 text-primary" /> Monthly Reach & Reports</h3>
               <ResponsiveContainer width="100%" height={250}>
                 <LineChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Legend />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartBorder} opacity={0.7} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: chartMuted }} axisLine={{ stroke: chartBorder }} tickLine={{ stroke: chartBorder }} />
+                  <YAxis tick={{ fontSize: 11, fill: chartMuted }} axisLine={{ stroke: chartBorder }} tickLine={{ stroke: chartBorder }} />
+                  <Tooltip contentStyle={chartTooltipStyle} labelStyle={{ color: chartText }} />
+                  <Legend wrapperStyle={chartLegendStyle} />
                   <Line type="monotone" dataKey="reach" name="People reached" stroke="#0891b2" strokeWidth={2} dot={{ r: 3 }} />
                   <Line type="monotone" dataKey="reports" name="Reports" stroke="#7c3aed" strokeWidth={2} dot={{ r: 3 }} />
                 </LineChart>
@@ -132,10 +142,10 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
               <h3 className="mb-2 text-sm font-semibold text-foreground">Activity by Section</h3>
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={sectionTotals} layout="vertical" margin={{ left: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis type="number" tick={{ fontSize: 11 }} />
-                  <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
-                  <Tooltip />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartBorder} opacity={0.7} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: chartMuted }} axisLine={{ stroke: chartBorder }} tickLine={{ stroke: chartBorder }} />
+                  <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11, fill: chartMuted }} axisLine={{ stroke: chartBorder }} tickLine={{ stroke: chartBorder }} />
+                  <Tooltip contentStyle={chartTooltipStyle} labelStyle={{ color: chartText }} />
                   <Bar dataKey="value" name="Total" radius={[0, 4, 4, 0]}>
                     {sectionTotals.map((s) => <Cell key={s.id} fill={s.color} />)}
                   </Bar>
@@ -153,7 +163,7 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
                   <Pie data={genderSplit} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={2}>
                     {genderSplit.map((g) => <Cell key={g.name} fill={g.color} />)}
                   </Pie>
-                  <Tooltip /><Legend />
+                  <Tooltip contentStyle={chartTooltipStyle} labelStyle={{ color: chartText }} /><Legend wrapperStyle={chartLegendStyle} />
                 </PieChart>
               </ResponsiveContainer>
             </Card>
@@ -165,7 +175,7 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
                   <Pie data={ncBreakdown} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={2}>
                     {ncBreakdown.map((g) => <Cell key={g.name} fill={g.color} />)}
                   </Pie>
-                  <Tooltip /><Legend />
+                  <Tooltip contentStyle={chartTooltipStyle} labelStyle={{ color: chartText }} /><Legend wrapperStyle={chartLegendStyle} />
                 </PieChart>
               </ResponsiveContainer>
             </Card>

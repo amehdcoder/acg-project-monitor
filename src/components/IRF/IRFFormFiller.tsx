@@ -19,16 +19,17 @@ import irfBg from "@/assets/irf-bg.jpg";
 /** Subtle, professional brand watermark that covers the entire IRF interface. */
 export function IrfWatermark() {
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-      {/* Full-bleed brand image — slightly stronger in dark mode so it stays visible without obscuring content */}
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+      {/* Full-bleed brand image: visible, but always below fields/charts and softened by the wash layers. */}
       <img
         src={irfBg}
         alt=""
         loading="lazy"
-        className="absolute inset-0 h-full w-full object-cover opacity-[0.06] dark:opacity-[0.14]"
+        className="absolute inset-0 h-full w-full object-cover opacity-[0.07] dark:opacity-[0.12]"
       />
-      {/* Soft wash to keep text crisp over the imagery */}
-      <div className="absolute inset-0 bg-background/55 dark:bg-background/45" />
+      {/* Soft washes keep text, fields and charts crisp while preserving the SARMAAN CDD brand signal. */}
+      <div className="absolute inset-0 bg-background/80 dark:bg-background/78" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/55 to-background/85 dark:from-background/72 dark:via-background/60 dark:to-background/88" />
     </div>
   );
 }
@@ -176,7 +177,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
 
   if (done) {
     return (
-      <div className="dark relative flex min-h-[60vh] flex-col items-center justify-center gap-4 bg-background p-8 text-center text-foreground">
+      <div className="relative isolate flex min-h-[60vh] flex-col items-center justify-center gap-4 overflow-hidden bg-background p-8 text-center text-foreground">
         <IrfWatermark />
         <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-[#E2F5EC]">
           <CheckCircle2 className="h-10 w-10 text-[#22A55A]" />
@@ -262,12 +263,12 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   const SectionIcon = section ? ((Icons as any)[section.icon] || Icons.ClipboardList) : Icons.ClipboardList;
 
   return (
-    <div className="dark relative min-h-screen w-full bg-background text-foreground">
-      <div className="relative mx-auto w-full max-w-3xl pb-28">
+    <div className="relative isolate min-h-screen w-full overflow-hidden bg-background text-foreground">
       <IrfWatermark />
+      <div className="relative z-10 mx-auto w-full max-w-3xl pb-28">
       {/* Header */}
       <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/10 bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3 shadow-sm">
-        <Button variant="ghost" size="icon" onClick={onClose} className="text-white hover:bg-white/10"><ArrowLeft className="h-5 w-5" /></Button>
+        <Button variant="ghost" size="icon" aria-label="Back to forms" onClick={onClose} className="text-white hover:bg-white/10"><ArrowLeft className="h-5 w-5" /></Button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-base font-bold text-white sm:text-lg">{IRF_FORM_NAME}</h1>
           <p className="truncate text-xs text-white/70">
