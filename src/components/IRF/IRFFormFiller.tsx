@@ -16,18 +16,19 @@ import * as Icons from "lucide-react";
 import { IRF_SECTIONS, IRF_FORM_NAME, OTHER_OPTION, type IrfField } from "@/lib/irf/definition";
 import irfBg from "@/assets/irf-bg.jpg";
 
-/** Subtle, professional brand watermark used behind IRF screens. */
+/** Subtle, professional brand watermark that covers the entire IRF interface. */
 export function IrfWatermark() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+      {/* Full-bleed brand image, very low opacity so content stays legible */}
       <img
         src={irfBg}
         alt=""
         loading="lazy"
-        width={1280}
-        height={1280}
-        className="absolute bottom-0 right-0 h-[55vh] w-auto max-w-none object-contain opacity-[0.08] sm:opacity-[0.10]"
+        className="absolute inset-0 h-full w-full object-cover opacity-[0.06]"
       />
+      {/* Soft wash to keep text crisp over the imagery */}
+      <div className="absolute inset-0 bg-background/55" />
     </div>
   );
 }
