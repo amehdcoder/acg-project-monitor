@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow, format } from "date-fns";
 import type { SavedFormEntry } from "@/lib/savedForms";
 import type { Question } from "@/components/FormBuilder/types";
+import MediaAttachment from "@/components/DataAnalytics/MediaAttachment";
 
 interface SentFormViewerProps {
   entry: SavedFormEntry;
@@ -169,11 +170,9 @@ const SentFormViewer = ({ entry, onClose }: SentFormViewerProps) => {
                       )}
                       <p className="text-sm font-semibold text-foreground">{q.label}</p>
                       {isMedia(q) && value ? (
-                        <p className="mt-1.5 text-sm text-foreground break-words">
-                          {Array.isArray(value)
-                            ? `${value.length} file(s) attached`
-                            : "File attached"}
-                        </p>
+                        <div className="mt-1.5">
+                          <MediaAttachment value={value} questionType={q.type as string} label="attachment(s)" />
+                        </div>
                       ) : (
                         <p
                           className={`mt-1.5 text-sm break-words ${
