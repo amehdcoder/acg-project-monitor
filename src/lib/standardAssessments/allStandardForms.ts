@@ -48,6 +48,8 @@ const EXTRA_STANDARD_FORMS: StandardFormOption[] = [
   { code: "acsm_dash", name: "ACSM Dashboard", group: "Project Tools" },
   { code: "sbc_form", name: "SBC Reporting Form", group: "Project Tools" },
   { code: "sbc_dash", name: "SBC Dashboard", group: "Project Tools" },
+  { code: "irf_form", name: "LGA ACSM Focal Person IRF", group: "Project Tools" },
+  { code: "irf_dash", name: "LGA ACSM Focal Person Dashboard", group: "Project Tools" },
 ];
 
 /** The full, de-duplicated list of assignable standard forms. */
