@@ -125,14 +125,16 @@ export const useAcsmDashboard = (
       const [acsmRaw, irfRaw] = await Promise.all([fetchAll(projectId), fetchIrf(projectId)]);
       if (myReq !== reqIdRef.current || simulateRef.current) return;
 
-      // De-duplicate native ACSM reports.
-      const acsmDedup = flagDuplicates(
+      // De-duplicate native ACSM reports, then apply any admin overrides.
+      const acsmBase = flagDuplicates(
         acsmRaw, acsmSignature, (r) => r.id,
         (r) => new Date(r.created_at || 0).getTime(),
       );
+      const acsmDedup = applyOverrides(acsmBase, (r) => r.id, overridesRef.current?.acsmMap);
       // De-duplicate IRF submissions BEFORE mapping so duplicates can't inflate the
-      // Advocacy Dashboard contributions.
-      const irfDedup = flagDuplicates(irfRaw, irfSignature, (r) => r.id, irfOrder);
+      // Advocacy Dashboard contributions; admin overrides win here too.
+      const irfBase = flagDuplicates(irfRaw, irfSignature, (r) => r.id, irfOrder);
+      const irfDedup = applyOverrides(irfBase, (r) => r.id, overridesRef.current?.irfMap);
       const derived = mapIrfRowsToAcsmRows(irfDedup.unique);
 
       setAllRows([...acsmDedup.unique, ...derived]);
