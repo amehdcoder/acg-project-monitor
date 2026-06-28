@@ -56,7 +56,7 @@ interface Props {
   onChanged?: () => void;
 }
 
-type Mode = "delete" | "restore";
+type Mode = "delete" | "restore" | "purge";
 
 const fmtDate = (v: string | null) => (v ? new Date(v).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" }) : "—");
 

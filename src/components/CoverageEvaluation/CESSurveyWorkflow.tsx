@@ -541,7 +541,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   // Settings & Upgrades
 
-  const [witnessSystemEnabled, setWitnessSystemEnabled] = useState(true);
+  const [witnessSystemEnabled, setWitnessSystemEnabled] = useState(false);
   const [qrCodeOpen, setQrCodeOpen] = useState(false);
   const [lastSavedHHData, setLastSavedHHData] = useState<{ hhId: string, url: string } | null>(null);
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
@@ -2901,7 +2901,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 <Label className="text-sm font-semibold flex items-center gap-2">
                   <Shield className="h-4 w-4 text-primary" /> Enable Community Witness System
                 </Label>
-                <div className="text-xs text-muted-foreground">Recommended. Generates QR codes for community verification.</div>
+                <div className="text-xs text-muted-foreground">Off by default. When enabled, generates a scannable QR code that opens the community verification form.</div>
               </div>
               <Switch checked={witnessSystemEnabled} onCheckedChange={setWitnessSystemEnabled} />
             </div>
@@ -4274,19 +4274,24 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               Ask a community member or leader to scan this QR code to open the public verification form and confirm this interview.
             </p>
             <div className="p-4 bg-white rounded-xl shadow-sm border inline-block">
-              <QRCodeSVG
-                value="https://script.google.com/macros/s/AKfycbyyPNLlG6zD3B0fRoXiv5gpAIMDcAfTDC_1wABmSht0dkX_C3x6kBCCxQ_UP-PF7LB_/exec"
-                size={200}
-              />
+              {lastSavedHHData?.url ? (
+                <QRCodeSVG value={lastSavedHHData.url} size={200} level="M" includeMargin />
+              ) : (
+                <div className="flex h-[200px] w-[200px] items-center justify-center text-xs text-muted-foreground">
+                  Save a household to generate a witness QR code.
+                </div>
+              )}
             </div>
-            <a
-              href="https://script.google.com/macros/s/AKfycbyyPNLlG6zD3B0fRoXiv5gpAIMDcAfTDC_1wABmSht0dkX_C3x6kBCCxQ_UP-PF7LB_/exec"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[10px] text-primary underline font-mono bg-muted p-2 rounded w-full truncate"
-            >
-              Open Witness Form
-            </a>
+            {lastSavedHHData?.url && (
+              <a
+                href={lastSavedHHData.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-primary underline font-mono bg-muted p-2 rounded w-full truncate"
+              >
+                Open Witness Form
+              </a>
+            )}
           </div>
           <DialogFooter>
             <Button className="w-full" onClick={() => setQrCodeOpen(false)}>Done</Button>
