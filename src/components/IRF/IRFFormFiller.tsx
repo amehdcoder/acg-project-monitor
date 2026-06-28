@@ -391,5 +391,6 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
         </div>
       </div>
     </div>
+    </div>
   );
 }
