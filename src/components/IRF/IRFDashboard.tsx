@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import {
   ArrowLeft, RefreshCw, Download, Users, Megaphone, ShieldCheck, MapPin,
-  Landmark, TrendingUp, FileSpreadsheet,
+  Landmark, TrendingUp, FileSpreadsheet, Moon, Sun,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, PieChart, Pie, Cell,
@@ -50,6 +51,8 @@ function Kpi({ icon: Icon, label, value, sub, color }: { icon: any; label: strin
 }
 
 export default function IRFDashboard({ projectId, onClose }: Props) {
+  const { resolvedTheme, setTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const overrides = useAcsmDuplicateOverrides(projectId);
   const { rows, loading, reload, stats, sectionTotals, genderSplit, ncBreakdown, topLgas, trend, dataQuality, duplicates } =
     useIrfDashboard(projectId, overrides.irfMap);
@@ -86,6 +89,16 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
           <h1 className="truncate text-base font-bold text-white sm:text-lg">{IRF_DASH_NAME}</h1>
           <p className="truncate text-xs text-white/70">{stats.totalReports} reports · {stats.lgas} LGAs · live updates on</p>
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={isDarkTheme ? "Switch LGA ACSM dashboard to light mode" : "Switch LGA ACSM dashboard to dark mode"}
+          aria-pressed={isDarkTheme}
+          onClick={() => setTheme(isDarkTheme ? "light" : "dark")}
+          className="text-white hover:bg-white/10"
+        >
+          {isDarkTheme ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </Button>
         <Button variant="ghost" size="icon" aria-label="Refresh LGA ACSM dashboard" onClick={() => reload()} className="text-white hover:bg-white/10"><RefreshCw className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} /></Button>
         <Button variant="ghost" size="icon" aria-label="Export LGA ACSM reports as CSV" onClick={exportCsv} disabled={exporting || !rows.length} className="text-white hover:bg-white/10"><Download className="h-5 w-5" /></Button>
       </div>
