@@ -218,7 +218,7 @@ const CESSurveyMap = ({
   const liveLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const tapHandlerRef = useRef<((lat: number, lng: number) => void) | null>(null);
   const destroyedRef = useRef(false);
-  const [isNearViewport, setIsNearViewport] = useState(false);
+  const [isNearViewport, setIsNearViewport] = useState(true);
   const boundaryRenderKeyRef = useRef<string>("");
   const featureRenderKeyRef = useRef<string>("");
   const sampleRenderKeyRef = useRef<string>("");
@@ -232,22 +232,11 @@ const CESSurveyMap = ({
   const staticLayerBudget = useMemo(getCesLayerBudget, []);
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el || typeof IntersectionObserver === "undefined") {
-      setIsNearViewport(true);
-      return;
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsNearViewport(true);
-          observer.disconnect();
-        }
-      },
-      { root: null, rootMargin: "650px 0px", threshold: 0.01 },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
+    // The CES workflow must show satellite imagery as soon as the page loads.
+    // Do not lazy-mount behind IntersectionObserver: GPS/fallback centering and
+    // tile requests should begin immediately, even if the map is slightly below
+    // the current fold on Android.
+    setIsNearViewport(true);
   }, []);
 
   const applyBasemap = (map: L.Map, mode: CesBasemap) => {
@@ -281,7 +270,7 @@ const CESSurveyMap = ({
       // Smaller buffer + idle updates prevent the map from spawning hundreds of
       // tile requests while GPS jitters/pans, which was the main slow-render path.
       keepBuffer: 3,
-      updateWhenIdle: true,
+      updateWhenIdle: false,
       updateWhenZooming: false,
       ...(tl.subdomains ? { subdomains: tl.subdomains } : {}),
       ...(isGoogle ? {} : { crossOrigin: true as const }),
@@ -313,7 +302,7 @@ const CESSurveyMap = ({
           detectRetina: false,
           crossOrigin: true,
           keepBuffer: 3,
-          updateWhenIdle: true,
+          updateWhenIdle: false,
           updateWhenZooming: false,
         } as L.TileLayerOptions).addTo(map);
 

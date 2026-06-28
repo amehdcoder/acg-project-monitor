@@ -53,6 +53,7 @@ interface VisitedCommunity {
   flhf: string;
   community: string;
   data: Record<string, any>;
+  location?: { lat?: number; lng?: number; latitude?: number; longitude?: number; accuracy?: number } | null;
 }
 
 interface MdaChecklistLandingProps {
@@ -86,6 +87,37 @@ const pick = (d: Record<string, any>, keys: string[]): string => {
     if (v !== undefined && v !== null && String(v).trim() !== "") return String(v);
   }
   return "";
+};
+
+const asFinite = (value: any): number | undefined => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+const pickCoordinate = (d: Record<string, any>, location?: VisitedCommunity["location"]) => {
+  const meta = d?.form_metadata || {};
+  const autoGps = meta?.auto_gps || {};
+  const gpsCandidates = [
+    location,
+    autoGps,
+    d?.gps,
+    d?.geopoint,
+    d?.location,
+    d?.coordinates,
+    d?.community_gps,
+    d?.settlement_gps,
+  ].filter(Boolean);
+  for (const c of gpsCandidates) {
+    const lat = asFinite((c as any).lat ?? (c as any).latitude);
+    const lng = asFinite((c as any).lng ?? (c as any).lon ?? (c as any).long ?? (c as any).longitude);
+    if (lat !== undefined && lng !== undefined) {
+      return { lat, lng, accuracy: asFinite((c as any).accuracy ?? (c as any).gps_accuracy_m) };
+    }
+  }
+  const lat = asFinite(d?.lat ?? d?.latitude ?? d?.community_latitude ?? d?.settlement_latitude);
+  const lng = asFinite(d?.lng ?? d?.lon ?? d?.long ?? d?.longitude ?? d?.community_longitude ?? d?.settlement_longitude);
+  if (lat !== undefined && lng !== undefined) return { lat, lng, accuracy: asFinite(d?.accuracy ?? d?.gps_accuracy_m) };
+  return {};
 };
 
 interface TileDef {
@@ -512,6 +544,7 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
             // identity fields are never confused with each other.
             try {
               const d = c.data || {};
+              const coords = pickCoordinate(d, c.location);
               const url = buildCesLocationUrl({
                 state: pick(d, ["state", "state_name", "admin_state", "state_of_residence"]),
                 lga: pick(d, ["lga", "lga_name", "local_government", "lga_of_residence"]) || c.lga,
@@ -521,6 +554,7 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
                   c.flhf,
                 community_name: pick(d, ["community", "community_name"]) || c.community,
                 settlement_name: pick(d, ["settlement", "settlement_name", "settlement_village"]),
+                ...coords,
                 projectId: projectId ?? "",
                 formId,
                 submissionId: c.id,
@@ -867,7 +901,7 @@ function CommunityListView({
         // instance is itself project-scoped, so filtering by form_id is enough.
         const { data, error } = await supabase
           .from("form_submissions")
-          .select("id, data, submitted_at")
+          .select("id, data, location, submitted_at")
           .eq("form_id", formId)
           .order("submitted_at", { ascending: false })
           .limit(2000);
@@ -921,7 +955,7 @@ function CommunityListView({
 
           if (seen.has(key)) continue;
           seen.add(key);
-          out.push({ id: s.id, lga, ward, flhf, community, data: d });
+          out.push({ id: s.id, lga, ward, flhf, community, data: d, location: (s as any).location ?? null });
         }
 
         // Built-in eligibility rules:

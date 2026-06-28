@@ -74,6 +74,53 @@ const COMMODITY_OPTIONS = ["Ivermectin", "Praziquantel", "Albendazole", "Zithrom
 const CES_MICROPLAN_PICKER_LIMIT = 100;
 const CES_MAX_SAMPLING_PINS = 1200;
 
+type InstantMapSeed = { lat: number; lng: number; accuracy: number; source: "handoff" | "last_known" | "state" | "default" };
+
+const CES_STATE_CENTROIDS: Record<string, { lat: number; lng: number }> = {
+  jigawa: { lat: 12.228, lng: 9.5616 },
+  kano: { lat: 12.0022, lng: 8.592 },
+  katsina: { lat: 12.6, lng: 7.6 },
+  sokoto: { lat: 13.05, lng: 5.25 },
+  bauchi: { lat: 10.3158, lng: 9.8442 },
+  yobe: { lat: 12.29, lng: 11.44 },
+  kebbi: { lat: 11.5, lng: 4.2 },
+  zamfara: { lat: 12.17, lng: 6.25 },
+  fct: { lat: 9.0765, lng: 7.3986 },
+  abuja: { lat: 9.0765, lng: 7.3986 },
+  federalcapitalterritory: { lat: 9.0765, lng: 7.3986 },
+};
+const CES_DEFAULT_MAP_SEED: InstantMapSeed = { lat: 9.082, lng: 8.6753, accuracy: 250_000, source: "default" };
+const adminKey = (value: unknown) => String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const finiteCoord = (value: unknown): number | null => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+const seedFromState = (stateName?: string): InstantMapSeed => {
+  const spaced = adminKey(stateName);
+  const compact = spaced.replace(/ /g, "");
+  const withoutSuffix = compact.replace(/state$/, "");
+  const centroid = CES_STATE_CENTROIDS[compact] || CES_STATE_CENTROIDS[withoutSuffix] || CES_STATE_CENTROIDS[spaced];
+  return centroid ? { ...centroid, accuracy: 75_000, source: "state" } : CES_DEFAULT_MAP_SEED;
+};
+const seedFromPrefill = (prefill: ReturnType<typeof readCesLocationPrefill>["prefill"]): InstantMapSeed | null => {
+  const lat = finiteCoord(prefill?.lat);
+  const lng = finiteCoord(prefill?.lng);
+  if (lat !== null && lng !== null) return { lat, lng, accuracy: Math.max(finiteCoord(prefill?.accuracy) ?? 75, 25), source: "handoff" };
+  if (prefill?.state) return seedFromState(prefill.state);
+  return null;
+};
+const readLastKnownMapSeed = (): InstantMapSeed | null => {
+  try {
+    const raw = localStorage.getItem("ces.lkg.v1");
+    const lkg = raw ? JSON.parse(raw) : null;
+    const lat = finiteCoord(lkg?.lat);
+    const lng = finiteCoord(lkg?.lng);
+    if (lat !== null && lng !== null) return { lat, lng, accuracy: Math.max(finiteCoord(lkg?.accuracy) ?? 100, 25), source: "last_known" };
+  } catch { /* ignore */ }
+  return null;
+};
+
+
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
 
@@ -236,6 +283,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   // Step 1 — Locate & boundaries
   const [gps, setGps] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const [mapSeed, setMapSeed] = useState<InstantMapSeed>(() => seedFromPrefill(readCesLocationPrefill().prefill) ?? readLastKnownMapSeed() ?? CES_DEFAULT_MAP_SEED);
   const [gpsWatching, setGpsWatching] = useState(false);
   const [perimeter, setPerimeter] = useState<LatLng[]>([]);
   const [recordingPerimeter, setRecordingPerimeter] = useState(false);
@@ -306,6 +354,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       community_name: prefill.community_name,
       settlement_name: prefill.settlement_name,
     };
+    const prefillSeed = seedFromPrefill(prefill);
+    if (prefillSeed) {
+      setMapSeed(prefillSeed);
+      if (prefillSeed.source === "handoff") {
+        lkgRef.current = { lat: prefillSeed.lat, lng: prefillSeed.lng, accuracy: prefillSeed.accuracy };
+      }
+    }
     setState(loc.state);
     setLga(loc.lga);
     setWard(loc.ward);
@@ -568,6 +623,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         const lkg = JSON.parse(raw);
         if (lkg && typeof lkg.lat === "number" && typeof lkg.lng === "number") {
           lkgRef.current = lkg;
+          setMapSeed((current) => current.source === "default" ? { lat: lkg.lat, lng: lkg.lng, accuracy: Math.max(Number(lkg.accuracy) || 100, 25), source: "last_known" } : current);
         }
       }
     } catch { /* ignore */ }
@@ -2621,6 +2677,16 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // ---------- render ----------
   const lgaOptions = state ? getLGAsForState(state) : [];
   const wardOptions = state && lga ? getWardsForLGA(state, lga) : [];
+  const instantMapCenter = gps ?? mapSeed;
+  const instantCenterLabel = gps
+    ? "Current device GPS"
+    : mapSeed.source === "handoff"
+      ? "Checklist handoff location — refining GPS"
+      : mapSeed.source === "last_known"
+        ? "Last known CES location — refining GPS"
+        : mapSeed.source === "state"
+          ? "State fallback centre — refining GPS"
+          : "Nigeria fallback centre — refining GPS";
 
   const accuracyOk = gps && gps.accuracy <= 25;
   const highAccuracyOk = gps && gps.accuracy <= 15;
@@ -3331,10 +3397,10 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               </div>
             )}
 
-            {gps && (
+            {instantMapCenter && (
               <CESSurveyMap
-                centerLat={gps.lat}
-                centerLng={gps.lng}
+                centerLat={instantMapCenter.lat}
+                centerLng={instantMapCenter.lng}
                 perimeter={perimeter}
                 segments={[]}
                 selectedSegmentIds={[]}
@@ -3348,6 +3414,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 mapFeatures={residentialMask?.featureGeometry ?? null}
                 showFeatures={showResidentialLayer || showExclusionLayer}
                 livePosition={gps ? { lat: gps.lat, lng: gps.lng } : null}
+                centerLabel={instantCenterLabel}
                 drawMode={drawMode}
                 draftPolygon={draftPolygon}
                 onMapTap={drawMode ? handleDrawTap : undefined}
@@ -3415,7 +3482,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       )}
 
       {/* STEP 2 */}
-      {step === 2 && gps && (
+      {step === 2 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5" />Step 2 — Estimate Households & Design Sample</CardTitle>
@@ -3483,13 +3550,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             </div>
 
             <CESSurveyMap
-              centerLat={gps.lat} centerLng={gps.lng}
+              centerLat={instantMapCenter.lat} centerLng={instantMapCenter.lng}
               perimeter={perimeter} segments={segments}
               selectedSegmentIds={selectedSegmentLabels}
               households={[]}
               basemap={basemap}
               height="50vh"
               onMapTap={smartCountMode ? handleSmartCountTap : undefined}
+              centerLabel={instantCenterLabel}
             />
 
             <div className="flex justify-between">
@@ -3503,7 +3571,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       )}
 
       {/* STEP 3 */}
-      {step === 3 && gps && (
+      {step === 3 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />Step 3 — Visit Households (geofenced)</CardTitle>
@@ -3544,7 +3612,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             </div>
 
             <CESSurveyMap
-              centerLat={gps.lat} centerLng={gps.lng}
+              centerLat={instantMapCenter.lat} centerLng={instantMapCenter.lng}
               perimeter={perimeter}
               segments={selectedStepSegments}
               selectedSegmentIds={selectedSegmentLabels}
@@ -3554,6 +3622,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               basemap={basemap}
               onMapTap={handleMapTap}
               height="55vh"
+              centerLabel={instantCenterLabel}
             />
             <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/20 rounded-xl border border-border">
               <div className="flex-1 min-w-[200px]">
@@ -3773,15 +3842,16 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
 
 
-                {gps && (
+                {instantMapCenter && (
                   <CESSurveyMap
-                    centerLat={gps.lat} centerLng={gps.lng}
+                    centerLat={instantMapCenter.lat} centerLng={instantMapCenter.lng}
                     perimeter={perimeter}
                     segments={coverageMapSegments}
                     selectedSegmentIds={selectedSegmentLabels}
                     households={households}
                     basemap={basemap}
                     height="45vh"
+                    centerLabel={instantCenterLabel}
                   />
                 )}
 

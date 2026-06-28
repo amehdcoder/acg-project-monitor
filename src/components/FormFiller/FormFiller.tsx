@@ -1181,7 +1181,7 @@ const FormFiller = ({
 
   const effectiveGeofence = userGeofenceLoaded ? userGeofence : undefined;
   const { validatePosition, isGeofenceEnabled, normalizedGeofence } = useGeofenceValidation(effectiveGeofence);
-  const { getCurrentPosition, isLoading: isGpsLoading } = useGeolocation();
+  const { position: currentGpsPosition, getCurrentPosition, isLoading: isGpsLoading } = useGeolocation();
 
   // ============================================================
   // GLOBAL LOCATION ENFORCEMENT
@@ -3991,6 +3991,7 @@ const FormFiller = ({
                     }
                     return "";
                   };
+                  const handoffGps = gpsQuestionAnswer || gpsPosition || locEnforcement.autoGps || backgroundLocation || null;
                   const url = buildCesLocationUrl({
                     state: answer("state", "state_name", "admin_state"),
                     lga: answer("lga", "lga_name", "local_government", "local_government_area"),
@@ -3998,6 +3999,7 @@ const FormFiller = ({
                     flhf_name: answer("flhf_name", "flhf", "health_facility", "facility", "facility_name"),
                     community_name: answer("community_name", "community"),
                     settlement_name: answer("settlement_name", "settlement"),
+                    ...(handoffGps ? { lat: handoffGps.lat, lng: handoffGps.lng, accuracy: (handoffGps as any).accuracy } : {}),
                     projectId: projectId ?? "",
                     formId,
                     source: "mda_checklist",
