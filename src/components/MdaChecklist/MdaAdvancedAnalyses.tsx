@@ -385,7 +385,13 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
 
   // helpers to drill from charts
   const drillLga = (lga: string, tint: string) => {
-    const subs = submissions.filter((s) => (geo(s, "lga") || "Unspecified") === lga);
+    // "Other LGAs" is the folded series for every LGA outside the charted top 6 —
+    // drill into all of them so the chart line reconciles with the drill-down.
+    const namedTop = new Set(trendLgas.filter((l) => l !== "Other LGAs"));
+    const subs =
+      lga === "Other LGAs"
+        ? submissions.filter((s) => !namedTop.has(geo(s, "lga") || "Unspecified"))
+        : submissions.filter((s) => (geo(s, "lga") || "Unspecified") === lga);
     openDrillForSubs(`LGA — ${lga}`, subs, tint, `${subs.length} checklist submission${subs.length === 1 ? "" : "s"}`);
   };
   const drillWorker = (name: string, tint: string) => {
