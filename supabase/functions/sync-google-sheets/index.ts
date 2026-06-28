@@ -595,6 +595,79 @@ serve(async (req) => {
       );
     }
 
+    // ─────────────  ACSM / IRF LINKED KPI SYNC  ─────────────
+    // Pushes the deduplicated, override-aware linked IRF + Advocacy (ACSM) KPIs into
+    // Looker-Studio-friendly sheets. The client computes the KPIs (single source of
+    // truth shared with both dashboards) and passes them in `payload`.
+    // Body: { action: "sync_acsm_kpis", spreadsheetId, payload: {
+    //   generatedAt, projectName?, kpis: [{ key, label, value, unit?, source? }],
+    //   indicators: [{ code, name, category, level, unit, target, actual, pct, status, officer, lastUpdated, source }],
+    //   duplicates: { acsmDuplicates, irfDuplicates, total, irfReports, irfUnique, overriddenToUnique, rejected } } }
+    if (action === "sync_acsm_kpis") {
+      const payload = body.payload;
+      if (!payload || !Array.isArray(payload.kpis)) {
+        return new Response(
+          JSON.stringify({ error: "Missing payload.kpis" }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+      const stamp = payload.generatedAt || new Date().toISOString();
+
+      // Sheet 1 — KPI summary (one row per headline KPI; Looker scorecards source)
+      const kpiHeader = ["Run Timestamp", "Project", "KPI", "Value", "Unit", "Source"];
+      const kpiRows: any[][] = [kpiHeader];
+      for (const k of payload.kpis) {
+        kpiRows.push([
+          stamp, payload.projectName || "", k.label ?? k.key ?? "",
+          k.value ?? "", k.unit ?? "", k.source ?? "linked",
+        ]);
+      }
+      await clearAndWriteSheet(accessToken, spreadsheetId, "ACSM_KPIs", undefined, kpiRows);
+
+      // Sheet 2 — indicator detail (one row per indicator; Looker tables/charts source)
+      const indHeader = [
+        "Run Timestamp", "Project", "Code", "Indicator", "Category", "Level", "Unit",
+        "Target", "Actual", "Achievement %", "Status", "Responsible Officer", "Last Updated", "Source",
+      ];
+      const indRows: any[][] = [indHeader];
+      for (const r of (payload.indicators || [])) {
+        indRows.push([
+          stamp, payload.projectName || "", r.code ?? "", r.name ?? "", r.category ?? "",
+          r.level ?? "", r.unit ?? "", r.target ?? "", r.actual ?? "", r.pct ?? "",
+          r.status ?? "", r.officer ?? "", r.lastUpdated ?? "", r.source ?? "",
+        ]);
+      }
+      await clearAndWriteSheet(accessToken, spreadsheetId, "ACSM_Indicators", undefined, indRows);
+
+      // Sheet 3 — run info / data integrity (Looker filters + unique-count provenance)
+      const d = payload.duplicates || {};
+      const metaHeader = [
+        "Run Timestamp", "Project", "ACSM Duplicates", "IRF Duplicates", "Total Duplicates",
+        "IRF Reports", "IRF Unique", "Overridden To Unique", "Rejected", "KPI Count", "Indicator Count",
+      ];
+      const metaRows: any[][] = [
+        metaHeader,
+        [
+          stamp, payload.projectName || "",
+          d.acsmDuplicates ?? "", d.irfDuplicates ?? "", d.total ?? "",
+          d.irfReports ?? "", d.irfUnique ?? "", d.overriddenToUnique ?? "", d.rejected ?? "",
+          payload.kpis.length, (payload.indicators || []).length,
+        ],
+      ];
+      await clearAndWriteSheet(accessToken, spreadsheetId, "ACSM_KPI_Run_Info", undefined, metaRows);
+
+      console.log(`Synced ${payload.kpis.length} ACSM KPIs + ${(payload.indicators || []).length} indicators`);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: `Synced ${payload.kpis.length} KPIs and ${(payload.indicators || []).length} indicators`,
+          sheets: ["ACSM_KPIs", "ACSM_Indicators", "ACSM_KPI_Run_Info"],
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     // ─────────────  CES SURVEYS SYNC  ─────────────
     // Pushes CES surveys + resamples to two Looker-friendly sheets.
     // Body: { action: "sync_ces", spreadsheetId, projectId?, surveyIds?: string[] }
