@@ -33,7 +33,7 @@ import {
 import { toast } from "sonner";
 import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
 
-import { computeMdaKpis, type Heatmap as KHeatmap } from "@/lib/mda/kpis";
+import { computeMdaKpis, buildMdaModel, type Heatmap as KHeatmap } from "@/lib/mda/kpis";
 import { exportKpiWorkbook, type KpiId } from "@/lib/mda/kpiExport";
 import MdaDrillDownSheet, { type DrillData } from "./MdaDrillDownSheet";
 import {
@@ -466,6 +466,34 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   // Owner-defined KPI engine (resolves every determinant by question LABEL).
   const kpis = useMemo(() => computeMdaKpis(filtered as any, questions as any), [filtered, questions]);
 
+  // Shared authoritative model (resolves every determinant by question LABEL with
+  // legacy-key fallbacks). Reused so the Longitudinal Linkage register reconciles
+  // exactly with the headline KPIs/heatmaps instead of reading hard-coded fields
+  // that break on copied projects whose question keys differ.
+  const mdaModel = useMemo(() => buildMdaModel(filtered as any, questions as any), [filtered, questions]);
+
+  // Follow-up determinant keys resolved by LABEL (work across projects):
+  //  • commodity "available/sufficient now" answer in the Commodities module
+  //  • adverse "has it been managed?" answer in the Adverse Reaction module
+  const fuKeys = useMemo(() => {
+    const qi = mdaModel.qIndex;
+    return {
+      commodityAvailable: qi.find([/commodit(y|ies).*(availab|sufficient)/i, /(medicine|commodit).*now\s*availab/i, /availab.*commodit/i]),
+      commodityInadequate: qi.find([/commodit(y|ies).*(inadequate|insufficient|short)/i, /(stock|medicine).*out/i]),
+      adverseManaged: mdaModel.dq.managed,
+    };
+  }, [mdaModel]);
+
+  const authoritativeStatusByCom = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of mdaModel.allComs) {
+      const st = mdaModel.latestStatus(c);
+      m.set(c.key, st ? mdaModel.statusTitle(st) : "");
+    }
+    return m;
+  }, [mdaModel]);
+
+
   // ── KPI data export (#2): clicking a KPI downloads the underlying submissions ──
   const [kpiExporting, setKpiExporting] = useState<KpiId | null>(null);
   const exportKpi = useCallback(async (id: KpiId) => {
@@ -642,7 +670,9 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       const completionSub = inner?.get(MDA_FOLLOWUP_COMPLETION)?.[0];
       const commoditySub = inner?.get(MDA_FOLLOWUP_COMMODITIES)?.[0];
       const adverseSub = inner?.get(MDA_FOLLOWUP_ADVERSE)?.[0];
-      const mdaStatus = statusLabel(completionSub?.data?.status_of_mda ?? s.data?.status_of_mda);
+      const mdaStatus =
+        authoritativeStatusByCom.get(ck) ??
+        statusLabel(completionSub?.data?.status_of_mda ?? s.data?.status_of_mda);
       return {
         id: s.id,
         community: pickGeo(s, "community") || "Unspecified",
@@ -657,8 +687,19 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         hasCompletion: !!completionSub,
         hasCommodities: !!commoditySub,
         hasAdverse: !!adverseSub,
-        commodityIssue: commoditySub ? !POSITIVE.has(norm(commoditySub.data?.commodities_available ?? "yes")) || !!commoditySub.data?.commodity_inadequate : false,
-        adverseManaged: adverseSub ? POSITIVE.has(norm(adverseSub.data?.ae_been_managed)) : null,
+        commodityIssue: commoditySub
+          ? (fuKeys.commodityAvailable
+              ? mdaModel.isNo(fuKeys.commodityAvailable, commoditySub.data?.[fuKeys.commodityAvailable.key])
+              : !POSITIVE.has(norm(commoditySub.data?.commodities_available ?? "yes"))) ||
+            (fuKeys.commodityInadequate
+              ? mdaModel.isYes(fuKeys.commodityInadequate, commoditySub.data?.[fuKeys.commodityInadequate.key])
+              : !!commoditySub.data?.commodity_inadequate)
+          : false,
+        adverseManaged: adverseSub
+          ? (fuKeys.adverseManaged
+              ? mdaModel.isYes(fuKeys.adverseManaged, adverseSub.data?.[fuKeys.adverseManaged.key])
+              : POSITIVE.has(norm(adverseSub.data?.ae_been_managed)))
+          : null,
       };
     });
     rows.sort((a, b) => b.visitTs - a.visitTs);
@@ -667,7 +708,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     if (fModule === MDA_FOLLOWUP_COMMODITIES) return rows.filter((r) => r.hasCommodities);
     if (fModule === MDA_FOLLOWUP_ADVERSE) return rows.filter((r) => r.hasAdverse);
     return rows;
-  }, [primaryByCom, fuByCommunity, fModule]);
+  }, [primaryByCom, fuByCommunity, fModule, authoritativeStatusByCom, fuKeys, mdaModel]);
 
   // Paginate the register so the DOM stays light with very large datasets
   // (thousands of communities) instead of rendering every row at once.

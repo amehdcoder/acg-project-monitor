@@ -537,7 +537,11 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
   function drawBoundary() {
     const map = mapRef.current;
     if (!map) return;
-    const sig = `${[...statesPresent].sort().join("|")}::${norm(selectedLga)}`;
+    // Include GeoJSON readiness (feature count) in the signature so the redraw
+    // that fires once boundaries finish loading is NOT skipped by memoization —
+    // the pre-load draw caches an empty layer with the same state/LGA signature.
+    const feats0 = geoRef.current;
+    const sig = `${[...statesPresent].sort().join("|")}::${norm(selectedLga)}::${feats0 ? feats0.length : 0}`;
     if (sig === boundarySigRef.current && boundaryLayerRef.current) return;
     boundarySigRef.current = sig;
 

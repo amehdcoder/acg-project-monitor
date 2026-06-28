@@ -159,7 +159,7 @@ export function aggregateByCommunity(subs: ASubmission[]): CommunityAgg[] {
 
 // ── Visit trend per LGA (communities visited per day) ──
 export interface TrendPoint { date: string; key: string; [lga: string]: any }
-export function visitTrendByLga(subs: ASubmission[], maxDays = 30): { rows: TrendPoint[]; lgas: string[] } {
+export function visitTrendByLga(subs: ASubmission[], maxDays = 365): { rows: TrendPoint[]; lgas: string[] } {
   // one visit = a distinct community first seen on a day
   const seen = new Set<string>();
   const ordered = [...subs].sort(
@@ -179,8 +179,15 @@ export function visitTrendByLga(subs: ASubmission[], maxDays = 30): { rows: Tren
     m.set(lga, (m.get(lga) || 0) + 1);
     lgaTotals.set(lga, (lgaTotals.get(lga) || 0) + 1);
   }
-  // top LGAs by volume (cap for readability)
-  const lgas = [...lgaTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map((e) => e[0]);
+  // Top LGAs get their own line (for legibility); every remaining LGA is folded
+  // into an explicit "Other LGAs" series so NO community is dropped from the
+  // chart — the per-line values always sum to Total.
+  const sortedLgas = [...lgaTotals.entries()].sort((a, b) => b[1] - a[1]).map((e) => e[0]);
+  const topLgas = sortedLgas.slice(0, 6);
+  const topSet = new Set(topLgas);
+  const hasOther = sortedLgas.length > topLgas.length;
+  const lgas = hasOther ? [...topLgas, "Other LGAs"] : topLgas;
+  // Show every active day (full campaign span), capped only by a generous guard.
   const days = [...byDayLga.keys()].sort().slice(-maxDays);
   const rows: TrendPoint[] = days.map((day) => {
     const m = byDayLga.get(day)!;
@@ -188,8 +195,16 @@ export function visitTrendByLga(subs: ASubmission[], maxDays = 30): { rows: Tren
       key: day,
       date: new Date(day + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }),
     };
-    for (const lga of lgas) row[lga] = m.get(lga) || 0;
-    row.Total = [...m.values()].reduce((a, b) => a + b, 0);
+    let other = 0;
+    let total = 0;
+    for (const [lga, n] of m.entries()) {
+      total += n;
+      if (topSet.has(lga)) row[lga] = (row[lga] as number || 0) + n;
+      else other += n;
+    }
+    for (const lga of topLgas) if (row[lga] === undefined) row[lga] = 0;
+    if (hasOther) row["Other LGAs"] = other;
+    row.Total = total;
     return row;
   });
   return { rows, lgas };
