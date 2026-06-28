@@ -127,6 +127,15 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
       setStep(0);
       return;
     }
+    // Block submission if any "Other (specify)" box is still empty.
+    const allMissing = IRF_SECTIONS.flatMap((sec) => missingOtherForSection(sec));
+    if (allMissing.length) {
+      setErrors((prev) => new Set([...prev, ...allMissing]));
+      const firstSecIdx = IRF_SECTIONS.findIndex((sec) => missingOtherForSection(sec).length);
+      if (firstSecIdx >= 0) setStep(firstSecIdx + 1);
+      toast.error("Please specify a value for every “Other” selection.");
+      return;
+    }
     setSaving(true);
     try {
       // Resolve "Other (specify)" selections into their typed text, then drop temp keys.
