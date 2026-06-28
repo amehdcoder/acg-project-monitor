@@ -7,7 +7,8 @@ import {
 import { generateAcsmSimulation } from "@/lib/acsm/simulation";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
 import {
-  mapIrfRowsToAcsmRows, flagDuplicates, irfSignature, irfOrder,
+  mapIrfRowsToAcsmRows, flagDuplicates, applyOverrides, irfSignature, irfOrder,
+  type OverrideMap,
 } from "@/lib/acsm/irfBridge";
 import type { IrfReport } from "@/lib/irf/definition";
 
