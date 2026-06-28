@@ -261,9 +261,13 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
                 </div>
               )}
               <p className="mt-2 text-[11px] text-muted-foreground">
-                {useRange
-                  ? `Only ${mode === "delete" ? "live" : "archived"} submissions in the selected period will be ${mode === "delete" ? "archived" : "restored"}.`
-                  : `All ${mode === "delete" ? "live" : "archived"} submissions will be ${mode === "delete" ? "archived" : "restored"}.`}
+                {mode === "purge"
+                  ? useRange
+                    ? "Live AND archived submissions in the selected period will be permanently deleted. This cannot be undone."
+                    : "ALL live AND archived submissions will be permanently deleted. This cannot be undone."
+                  : useRange
+                    ? `Only ${mode === "delete" ? "live" : "archived"} submissions in the selected period will be ${mode === "delete" ? "archived" : "restored"}.`
+                    : `All ${mode === "delete" ? "live" : "archived"} submissions will be ${mode === "delete" ? "archived" : "restored"}.`}
               </p>
             </div>
 
