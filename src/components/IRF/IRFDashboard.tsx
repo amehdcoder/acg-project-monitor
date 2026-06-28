@@ -155,7 +155,7 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
               <h3 className="mb-2 text-sm font-semibold text-foreground">Data Quality</h3>
               <div className="flex h-[200px] flex-col items-center justify-center gap-2">
                 <div className="text-5xl font-bold" style={{ color: dataQuality >= 80 ? "#16a34a" : dataQuality >= 50 ? "#f59e0b" : "#dc2626" }}>{dataQuality}%</div>
-                <p className="text-center text-xs text-muted-foreground">Reports with complete identity (state, LGA, focal person, month)</p>
+                <p className="text-center text-xs text-muted-foreground">Reports with complete identity (state, LGA, reporter, month)</p>
               </div>
             </Card>
           </div>
