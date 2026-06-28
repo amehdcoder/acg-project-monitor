@@ -202,14 +202,19 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
     <div className="relative mx-auto w-full max-w-3xl pb-28">
       <IrfWatermark />
       {/* Header */}
-      <div className="sticky top-0 z-20 flex items-center gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur">
-        <Button variant="ghost" size="icon" onClick={onClose}><ArrowLeft className="h-5 w-5" /></Button>
-        <div className="min-w-0">
-          <h1 className="truncate text-base font-bold text-foreground sm:text-lg">{IRF_FORM_NAME}</h1>
-          <p className="truncate text-xs text-muted-foreground">
-            {position ? <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> GPS locked</span> : "Acquiring GPS…"}
+      <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/10 bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3 shadow-sm">
+        <Button variant="ghost" size="icon" onClick={onClose} className="text-white hover:bg-white/10"><ArrowLeft className="h-5 w-5" /></Button>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-base font-bold text-white sm:text-lg">{IRF_FORM_NAME}</h1>
+          <p className="truncate text-xs text-white/70">
+            {position
+              ? <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> GPS locked · ready to report</span>
+              : "Acquiring GPS…"}
           </p>
         </div>
+        <span className="hidden shrink-0 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white sm:inline">
+          Step {step + 1}/{totalSteps}
+        </span>
       </div>
 
       {/* Progress */}
