@@ -19,16 +19,15 @@ import irfBg from "@/assets/irf-bg.jpg";
 /** Subtle, professional brand watermark used behind IRF screens. */
 export function IrfWatermark() {
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+    <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
       <img
         src={irfBg}
         alt=""
         loading="lazy"
         width={1280}
         height={1280}
-        className="absolute bottom-0 right-0 h-[60vh] w-auto max-w-none object-contain opacity-[0.07] sm:opacity-[0.09]"
+        className="absolute bottom-0 right-0 h-[55vh] w-auto max-w-none object-contain opacity-[0.08] sm:opacity-[0.10]"
       />
-      <div className="absolute inset-0 bg-background/40" />
     </div>
   );
 }
