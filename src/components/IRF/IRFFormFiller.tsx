@@ -29,8 +29,8 @@ export function IrfWatermark() {
       inert=""
       className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden"
     >
-      {/* Full-bleed brand image: bright, high-resolution and clearly visible, while staying below fields/charts.
-          object-center keeps the SARMAAN CDD mark aligned and crisp across every mobile and tablet width. */}
+      {/* Brand image shown in full (object-contain) so the faces of the SARMAAN CDD
+          and the child are always clearly visible and never cropped on any screen. */}
       <img
         src={irfBg}
         alt=""
@@ -38,11 +38,11 @@ export function IrfWatermark() {
         draggable={false}
         tabIndex={-1}
         decoding="async"
-        className="pointer-events-none absolute left-1/2 top-1/2 h-full w-full max-w-none -translate-x-1/2 -translate-y-1/2 select-none object-cover object-center opacity-40 dark:opacity-45 [image-rendering:auto] [backface-visibility:hidden] [transform:translate3d(-50%,-50%,0)]"
+        className="pointer-events-none absolute left-1/2 top-1/2 h-full w-full max-w-none -translate-x-1/2 -translate-y-1/2 select-none object-contain object-center opacity-70 dark:opacity-75 [image-rendering:auto] [backface-visibility:hidden] [transform:translate3d(-50%,-50%,0)]"
       />
-      {/* Light washes keep text and fields readable while the SARMAAN CDD brand stays bright and clear. */}
-      <div className="absolute inset-0 bg-background/35 dark:bg-background/40" />
-      <div className="absolute inset-0 bg-gradient-to-b from-background/25 via-background/20 to-background/40 dark:from-background/30 dark:via-background/25 dark:to-background/45" />
+      {/* Very light washes keep fields readable while the SARMAAN CDD and child faces stay bright and clear. */}
+      <div className="absolute inset-0 bg-background/20 dark:bg-background/25" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/10 via-background/5 to-background/25 dark:from-background/15 dark:via-background/10 dark:to-background/30" />
     </div>
   );
 }
