@@ -3475,8 +3475,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   return;
                 }
 
-                if (!gps) {
-                  toast({ title: "No GPS Signal", description: "Wait for a GPS lock before proceeding.", variant: "destructive" });
+                const surveyPosition = getCurrentSurveyPosition();
+                if (!surveyPosition) {
+                  toast({ title: "Location not ready", description: "Draw/load a boundary or wait for a GPS lock before proceeding.", variant: "destructive" });
+                  return;
+                }
+
+                if (!gps && perimeter.length < 3) {
+                  toast({ title: "Boundary required", description: "GPS is still unavailable. Use Draw on Map or load a saved fence so the survey has a stable community boundary.", variant: "destructive" });
                   return;
                 }
 
@@ -3494,7 +3500,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                         flhf_name: geo.flhf_name || null,
                         community_name: geo.community_name,
                         settlement_name: geo.settlement_name || null,
-                        center_lat: gps.lat, center_lng: gps.lng,
+                        center_lat: surveyPosition.lat, center_lng: surveyPosition.lng,
                         perimeter_coords: perimeter,
                         source_survey_id: sid,
                         created_by: u.user.id,
@@ -3620,7 +3626,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                You must remain inside the highlighted segment. GPS accuracy must be &lt;20 m to drop a pin.
+                You must remain inside the highlighted segment. GPS is preferred; if GPS is still unavailable, tap the map inside the highlighted segment and the visit will be tagged for review.
               </AlertDescription>
             </Alert>
 
@@ -3628,7 +3634,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <div className="flex-1 min-w-[180px] text-xs">
                 <div className="font-semibold text-emerald-800 dark:text-emerald-200">Drop pin at my live location</div>
                 <div className="text-[11px] text-muted-foreground">
-                  Uses your current GPS ({gps ? `±${Math.round(gps.accuracy)} m` : "acquiring…"}). You must be physically inside the highlighted segment.
+                  Uses your current GPS ({gps ? `±${Math.round(gps.accuracy)} m` : "acquiring…"}). You must be physically inside the highlighted segment when GPS is available.
                 </div>
               </div>
               <Button
