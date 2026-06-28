@@ -247,8 +247,17 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
               <button className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold" style={{ background: `linear-gradient(135deg, ${C.primary}, ${C.blue})`, color: C.buttonText }}>
                 <Download className="h-4 w-4" /> Download
               </button>
+              <OwnerSubmissionManager
+                table="acsm_reports"
+                title="ACSM reports"
+                labelColumns={["lga", "ward", "community", "state"]}
+                filter={projectId ? { column: "project_id", value: projectId } : null}
+                onChanged={reload}
+                compact
+              />
             </div>
           </div>
+
 
           {/* IRF contribution + duplicate flagging banner */}
           {!simulate && (duplicateInfo.irfReports > 0 || duplicateInfo.total > 0) && (
