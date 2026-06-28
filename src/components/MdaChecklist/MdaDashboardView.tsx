@@ -155,9 +155,6 @@ function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm, questions:
 export default function MdaDashboardView({ form, projects = [], onClose, embedded = false }: Props) {
   const { isOwner } = useAuth();
   const { submissions, loading, refresh } = useDataAnalytics({ formId: form.id });
-  const [simulate, setSimulate] = useState(false);
-  const [simCount, setSimCount] = useState(SIM_DEFAULTS.count);
-  const [simSeed, setSimSeed] = useState(SIM_DEFAULTS.seed);
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -179,25 +176,6 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
     [submissions, form, questions],
   );
 
-  const simulatedRows = useMemo(() => {
-    if (!simulate) return [];
-    const originalRandom = Math.random;
-    let seed = simSeed || SIM_DEFAULTS.seed;
-    Math.random = () => {
-      seed = (seed * 1664525 + 1013904223) % 4294967296;
-      return seed / 4294967296;
-    };
-    try {
-      return generateMdaSimulation(questions, {
-        count: simCount,
-        projectId: form.project_id || null,
-        restrictState: singleStateRestriction(questions),
-      });
-    } finally {
-      Math.random = originalRandom;
-    }
-  }, [simulate, questions, simCount, simSeed, form.project_id]);
-
   // ── Offline cache: keep the last synced rows + questions per form ──
   const cached = useMemo(() => loadMdaCache(form.id), [form.id]);
   useEffect(() => {
@@ -208,16 +186,13 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
 
   const hasCache = !!cached && cached.rows.length > 0;
   // Use cached data when live data is unavailable (offline / empty) and a cache exists.
-  const useCacheNow = !simulate && hasCache && submissions.length === 0 && (!loading || isOffline());
+  const useCacheNow = hasCache && submissions.length === 0 && (!loading || isOffline());
 
-  const dashboardRows = simulate
-    ? simulatedRows
-    : useCacheNow
-      ? cached!.rows
-      : realRows;
+  const dashboardRows = useCacheNow ? cached!.rows : realRows;
   const dashboardQuestions = useCacheNow ? cached!.questions : questions;
   const projectName = projects.find((p) => p.id === form.project_id)?.name;
-  const showLoader = loading && !simulate && !useCacheNow;
+  const showLoader = loading && !useCacheNow;
+
 
   return (
     <div
