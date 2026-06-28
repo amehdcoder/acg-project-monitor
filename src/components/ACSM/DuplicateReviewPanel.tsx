@@ -64,7 +64,11 @@ export default function DuplicateReviewPanel({ projectId, dark }: Props) {
       let irfQ = supabase.from("irf_reports" as any).select("*");
       let acsmQ = supabase.from("acsm_reports" as any).select("*");
       if (projectId) { irfQ = irfQ.eq("project_id", projectId); acsmQ = acsmQ.eq("project_id", projectId); }
-      const [{ data: irf }, { data: acsm }] = await Promise.all([irfQ, acsmQ]);
+      const [{ data: irf, error: irfError }, { data: acsm, error: acsmError }] = await Promise.all([irfQ, acsmQ]);
+      if (irfError || acsmError) {
+        console.error("DuplicateReviewPanel load failed", irfError || acsmError);
+        toast({ title: "Could not load duplicate review data", description: (irfError || acsmError)?.message || "Please refresh and try again.", variant: "destructive" });
+      }
       setIrfRows((irf as any) || []);
       setAcsmRows((acsm as any) || []);
     } finally { setLoading(false); }

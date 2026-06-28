@@ -48,6 +48,13 @@ const achievementTone = (pct: unknown, C: Palette): string => {
   return C.danger;
 };
 
+const normalizeDashboardStatus = (status: unknown): AcsmStatus => {
+  if (status === "on_track" || status === "at_risk" || status === "behind_target" || status === "draft_pending") {
+    return status;
+  }
+  return "draft_pending";
+};
+
 const statusTone = (status: AcsmStatus, C: Palette): string => {
   if (status === "on_track") return C.success;
   if (status === "at_risk") return C.warning;
@@ -73,7 +80,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
     generatedAt: new Date().toISOString(),
     projectName: projectId || undefined,
     kpis: [
-      { key: "people_benefiting", label: "People Benefiting", value: stats.peopleBenefiting, source: "linked" },
+      { key: "people_reached_or_benefiting", label: "People Reached / Benefiting", value: stats.peopleBenefiting, source: "linked" },
       { key: "indicators_total", label: "Total Indicators", value: stats.total, source: "linked" },
       { key: "on_track", label: "Indicators On Track", value: stats.onTrack, source: "linked" },
       { key: "at_risk", label: "Indicators At Risk", value: stats.atRisk, source: "linked" },
@@ -251,7 +258,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
 
           {/* KPI cards */}
           <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            <Kpi icon={Users} label="People Benefiting" value={fmt(stats.peopleBenefiting)} tint={C.primary} delta="+18.6%" up palette={C} />
+            <Kpi icon={Users} label="People Reached / Benefiting" value={fmt(stats.peopleBenefiting)} tint={C.primary} delta="IRF + ACSM" up palette={C} />
             <Kpi icon={CheckCircle2} label="Indicators On Track" value={String(stats.onTrack)} tint={C.success} delta={`${pct(stats.onTrack, stats.total)}% of total`} up palette={C} />
             <Kpi icon={AlertTriangle} label="At Risk" value={String(stats.atRisk)} tint={C.warning} delta={`${pct(stats.atRisk, stats.total)}% of total`} palette={C} />
             <Kpi icon={Ban} label="Behind Target" value={String(stats.behind)} tint={C.danger} delta={`${pct(stats.behind, stats.total)}% of total`} down palette={C} />
@@ -385,7 +392,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                 </thead>
                 <tbody>
                   {paged.map((r) => {
-                    const status = (r.status as AcsmStatus) || "draft_pending";
+                    const status = normalizeDashboardStatus(r.status);
                     const m = STATUS_META[status] ?? STATUS_META.draft_pending;
                     const mColor = statusTone(status, C);
                     return (
