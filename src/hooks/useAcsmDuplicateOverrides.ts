@@ -25,6 +25,7 @@ export const useAcsmDuplicateOverrides = (projectId?: string | null) => {
   const [overrides, setOverrides] = useState<DuplicateOverrideRow[]>([]);
   const [loading, setLoading] = useState(true);
   const reqRef = useRef(0);
+  const instanceRef = useRef(Math.random().toString(36).slice(2, 10));
 
   const reload = useCallback(async () => {
     const my = ++reqRef.current;
@@ -40,16 +41,31 @@ export const useAcsmDuplicateOverrides = (projectId?: string | null) => {
     }
   }, [projectId]);
 
+  const reloadRef = useRef(reload);
+  useEffect(() => { reloadRef.current = reload; }, [reload]);
+
   useEffect(() => { void reload(); }, [reload]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel(`acsm_dup_overrides_${projectId || "all"}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "acsm_duplicate_overrides" },
-        () => { void reload(); })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [projectId, reload]);
+    const scope = projectId || "all";
+    const channel = supabase.channel(`acsm_dup_overrides_${scope}_${instanceRef.current}`);
+
+    channel.on(
+      "postgres_changes" as any,
+      { event: "*", schema: "public", table: "acsm_duplicate_overrides" },
+      () => { void reloadRef.current(); },
+    );
+
+    channel.subscribe((status) => {
+      if (status === "CHANNEL_ERROR") {
+        console.warn("[useAcsmDuplicateOverrides] realtime subscription error", { scope });
+      }
+    });
+
+    return () => {
+      try { void supabase.removeChannel(channel); } catch {}
+    };
+  }, [projectId]);
 
   /** map for a single source table, keyed by submission id */
   const mapFor = useCallback((table: "irf_reports" | "acsm_reports"): OverrideMap => {
