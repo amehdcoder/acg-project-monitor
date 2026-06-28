@@ -405,17 +405,25 @@ export function computeMdaKpis(submissions: KSubmission[], questions: KQuestion[
   };
 
   // MDA Completion Outcomes — categories = MDA status; followed = completion FU exists.
+  // Communities with NO recorded status are kept in a distinct "Unknown" column
+  // (never silently folded into "Not Started"), so every supervised community is
+  // represented in exactly one cell and the columns sum to the community total.
+  const hasUnknownStatus = allComs.some((c) => !latestStatus(c));
+  const completionCats = hasUnknownStatus ? [...STATUS_ORDER, "Unknown"] : STATUS_ORDER;
   const completionHeatmap = allComs.length
     ? buildHeatmap(
         allComs,
-        STATUS_ORDER,
+        completionCats,
         (c) => {
           const st = latestStatus(c);
-          return [statusTitle(st || "not started")].filter((x) => STATUS_ORDER.includes(x));
+          if (!st) return ["Unknown"];
+          const title = statusTitle(st);
+          return completionCats.includes(title) ? [title] : ["Unknown"];
         },
         (c) => hasFu(c, MDA_FOLLOWUP_COMPLETION),
       )
-    : blankHeat(STATUS_ORDER);
+    : blankHeat(completionCats);
+
 
   // Commodities Follow-up — categories = which commodity was inadequate at first visit.
   const commoditiesHeatmap = commoditiesNeeding.length
