@@ -26,7 +26,7 @@ export const useIrfDashboard = (projectId?: string | null, overrideMap?: Overrid
     try {
       const data = await fetchAll(projectId);
       if (myReq !== reqIdRef.current) return;
-      setRows(data);
+      setRawRows(data);
     } finally {
       if (myReq === reqIdRef.current) setLoading(false);
     }
