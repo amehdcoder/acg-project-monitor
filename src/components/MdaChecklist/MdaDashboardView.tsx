@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, ChevronUp, Database, Loader2, RefreshCw, RotateCcw, Settings2, Sparkles, WifiOff } from "lucide-react";
+import { ArrowLeft, BarChart3, ChevronUp, Loader2, RefreshCw, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/hooks/useAuth";
 import { useDataAnalytics, type SubmissionRecord } from "@/hooks/useDataAnalytics";
-import { generateMdaSimulation } from "@/lib/mda/simulation";
 import { loadMdaCache, saveMdaCache, isOffline } from "@/lib/mda/offlineCache";
 import { canonicalizeSubmissionData } from "@/lib/mda/dashboardData";
 import MdaSupervisoryChecklistDashboard from "./MdaSupervisoryChecklistDashboard";
@@ -52,7 +48,7 @@ interface Props {
   embedded?: boolean;
 }
 
-const SIM_DEFAULTS = { count: 250, seed: 1337 };
+
 
 const norm = (v: unknown) => String(v ?? "").trim();
 
@@ -131,12 +127,7 @@ function normalizeQuestions(items: unknown[]): DashboardQuestion[] {
     .filter((item): item is DashboardQuestion => !!item);
 }
 
-function singleStateRestriction(questions: DashboardQuestion[]): string | null {
-  const stateQuestion = flattenQuestions(questions).find((q) => String(q?.name || q?.id || "").toLowerCase() === "state");
-  const options = stateQuestion?.options || [];
-  if (options.length === 1) return String(options[0].value || options[0].label || "") || null;
-  return null;
-}
+
 
 function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm, questions: DashboardQuestion[]) {
   // Re-key answers to canonical question keys so historical / re-keyed
@@ -159,9 +150,6 @@ function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm, questions:
 export default function MdaDashboardView({ form, projects = [], onClose, embedded = false }: Props) {
   const { isOwner } = useAuth();
   const { submissions, loading, refresh } = useDataAnalytics({ formId: form.id });
-  const [simulate, setSimulate] = useState(false);
-  const [simCount, setSimCount] = useState(SIM_DEFAULTS.count);
-  const [simSeed, setSimSeed] = useState(SIM_DEFAULTS.seed);
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -183,25 +171,6 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
     [submissions, form, questions],
   );
 
-  const simulatedRows = useMemo(() => {
-    if (!simulate) return [];
-    const originalRandom = Math.random;
-    let seed = simSeed || SIM_DEFAULTS.seed;
-    Math.random = () => {
-      seed = (seed * 1664525 + 1013904223) % 4294967296;
-      return seed / 4294967296;
-    };
-    try {
-      return generateMdaSimulation(questions, {
-        count: simCount,
-        projectId: form.project_id || null,
-        restrictState: singleStateRestriction(questions),
-      });
-    } finally {
-      Math.random = originalRandom;
-    }
-  }, [simulate, questions, simCount, simSeed, form.project_id]);
-
   // ── Offline cache: keep the last synced rows + questions per form ──
   const cached = useMemo(() => loadMdaCache(form.id), [form.id]);
   useEffect(() => {
@@ -212,16 +181,13 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
 
   const hasCache = !!cached && cached.rows.length > 0;
   // Use cached data when live data is unavailable (offline / empty) and a cache exists.
-  const useCacheNow = !simulate && hasCache && submissions.length === 0 && (!loading || isOffline());
+  const useCacheNow = hasCache && submissions.length === 0 && (!loading || isOffline());
 
-  const dashboardRows = simulate
-    ? simulatedRows
-    : useCacheNow
-      ? cached!.rows
-      : realRows;
+  const dashboardRows = useCacheNow ? cached!.rows : realRows;
   const dashboardQuestions = useCacheNow ? cached!.questions : questions;
   const projectName = projects.find((p) => p.id === form.project_id)?.name;
-  const showLoader = loading && !simulate && !useCacheNow;
+  const showLoader = loading && !useCacheNow;
+
 
   return (
     <div
@@ -262,60 +228,14 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
                 labelColumns={["state", "submitter_name"]}
                 filter={{ column: "form_id", value: form.id }}
                 onChanged={() => refresh()}
-                compact
               />
-            )}
-
-            {isOwner && (
-              <>
-                <Button
-                  variant={simulate ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSimulate((v) => !v)}
-                  className={simulate ? "bg-violet-600 hover:bg-violet-700" : ""}
-                >
-                  {simulate ? <Sparkles className="mr-2 h-4 w-4" /> : <Database className="mr-2 h-4 w-4" />}
-                  {simulate ? "Simulating" : "Simulate"}
-                </Button>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Simulation controls">
-                      <Settings2 className="h-4 w-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-72" align="end">
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-sm font-semibold">Simulation controls</p>
-                        <p className="text-xs text-muted-foreground">Owner-only, generated locally, never saved.</p>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Submissions</Label>
-                        <Input type="number" min={10} max={5000} value={simCount} onChange={(e) => setSimCount(Math.max(1, Math.min(5000, Number(e.target.value) || 1)))} className="h-8" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Seed</Label>
-                        <Input type="number" value={simSeed} onChange={(e) => setSimSeed(Number(e.target.value) || 0)} className="h-8" />
-                      </div>
-                      <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => { setSimCount(SIM_DEFAULTS.count); setSimSeed(SIM_DEFAULTS.seed); }}>
-                        <RotateCcw className="mr-2 h-3.5 w-3.5" /> Reset
-                      </Button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </>
             )}
           </div>
         </div>
       </div>
 
       <main className={`space-y-6 px-4 py-6 ${embedded ? "" : "container mx-auto"}`}>
-        {simulate && (
-          <div className="flex items-center gap-2 rounded-lg border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm text-violet-800">
-            <Sparkles className="h-4 w-4 shrink-0" />
-            <span><strong>Simulation mode:</strong> showing synthetic MDA submissions only. Real submissions are not changed.</span>
-          </div>
-        )}
+
 
         {useCacheNow && (
           <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
