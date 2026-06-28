@@ -2665,6 +2665,65 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 </div>
               </div>
 
+              {/* LGA ACSM Focal Person IRF — Independent Activity Tracker — addable to any project */}
+              <div className="px-3 sm:px-4 py-3 border-t border-border/60">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-[#9db4d4] bg-gradient-to-r from-[#eaf0f8] to-transparent p-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-lg bg-[#d7e3f0] shrink-0">
+                      <BarChart3 className="h-5 w-5 text-[#0c2340]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">LGA ACSM Focal Person IRF (Independent Activity Tracker)</p>
+                      <p className="text-xs text-muted-foreground">Sectioned indicator reporting form + real-time dashboard for advocacy, social mobilization, awareness creation &amp; non-compliance resolution.</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="shrink-0"
+                    onClick={async () => {
+                      if (!currentProjectId) {
+                        toast({ title: "Select a project", description: "Choose a project before adding the IRF tools.", variant: "destructive" });
+                        return;
+                      }
+                      if (forms.find((f) => (f.settings as any)?.irf_kind)) {
+                        toast({ title: "Already added", description: "The LGA ACSM Focal Person tools already exist in this project. Open them from the list above." });
+                        return;
+                      }
+                      try {
+                        const { error } = await supabase.from("forms").insert([
+                          {
+                            name: IRF_FORM_NAME,
+                            description: IRF_FORM_DESC,
+                            questions: [] as any,
+                            settings: { irf_kind: "form" } as any,
+                            project_id: currentProjectId,
+                            created_by: user?.id,
+                            status: "active",
+                          },
+                          {
+                            name: IRF_DASH_NAME,
+                            description: IRF_DASH_DESC,
+                            questions: [] as any,
+                            settings: { irf_kind: "dashboard" } as any,
+                            project_id: currentProjectId,
+                            created_by: user?.id,
+                            status: "active",
+                          },
+                        ] as any);
+                        if (error) throw error;
+                        toast({ title: "Added to project", description: "Open the reporting form and dashboard from your forms list above." });
+                        fetchForms(currentProjectId);
+                      } catch (e: any) {
+                        console.error("IRF add error", e);
+                        toast({ title: "Could not add", description: e?.message || "Please try again.", variant: "destructive" });
+                      }
+                    }}
+                  >
+                    <Sparkles className="h-4 w-4 mr-1.5" /> Add to project
+                  </Button>
+                </div>
+              </div>
+
 
 
 
