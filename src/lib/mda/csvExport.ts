@@ -78,7 +78,7 @@ export function buildSubmissionsCsv(rows: CsvRow[], questions: CsvQuestion[]): s
   const flat = flatten(questions);
   const baseHeaders = [
     "Submission ID", "State", "LGA", "Ward", "Community", "Settlement",
-    "Monitor", "Submitted At", "Status",
+    "Supervisor", "Submitted At", "Status",
   ];
   const headers = [...baseHeaders, ...flat.map((f) => f.label)];
   const dataRows = rows.map((r) => {
