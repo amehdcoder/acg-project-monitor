@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
+import { flagDuplicates, irfSignature, irfOrder } from "@/lib/acsm/irfBridge";
 import { IRF_METRIC_FIELDS, IRF_SECTIONS, type IrfReport } from "@/lib/irf/definition";
 
 async function fetchAll(projectId?: string | null): Promise<IrfReport[]> {
