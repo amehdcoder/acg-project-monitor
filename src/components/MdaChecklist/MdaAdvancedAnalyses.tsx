@@ -367,7 +367,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
   // bar count for a supervisor ALWAYS equals the number of communities filtered
   // in the timeline (each community is attributed to exactly one supervisor — its
   // aggregated submitter — so totals are never under- or over-counted).
-  const supOf = (c: CommunityAgg) => stripTags(c.submitter) || "Unknown";
+  const supOf = (c: CommunityAgg) => String(c.submitter ?? "").replace(/<[^>]*>/g, "").trim() || "Unknown";
   const workers = useMemo(() => {
     const map = new Map<string, { name: string; communities: number; days: Set<string>; firstTs: number; lastTs: number }>();
     for (const c of communities) {
