@@ -104,7 +104,7 @@ export const IRF_SECTIONS: IrfSection[] = [
         activity: "Religious Leaders",
         fields: [
           { key: "religious_leaders_engaged", label: "Religious leaders engaged", what: "Imams / pastors engaged", type: "number", metric: true, example: "6" },
-          { key: "religious_leaders_support_mode", label: "Mode of support", what: "Sermons, announcements", type: "text", example: "Friday sermon" },
+          { key: "religious_leaders_support_mode", label: "Mode of support", what: "Sermons, announcements", type: "select", allowOther: true, options: ["Friday sermon", "Church announcement", "Public announcement", "Door-to-door outreach", "Community gathering"], example: "Friday sermon" },
         ],
       },
     ],
