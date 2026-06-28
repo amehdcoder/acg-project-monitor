@@ -774,7 +774,22 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
 
         {/* ── Field-worker accountability ── */}
         {workers.length > 0 && (
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2" data-testid="sup-accountability-section">
+            {selectedSup && (
+              <div className="lg:col-span-2 flex items-center justify-between rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+                <span className="text-xs text-muted-foreground">
+                  Filtered by supervisor: <span className="font-semibold text-primary" data-testid="active-filter-name">{selectedSup}</span>
+                </span>
+                <button
+                  type="button"
+                  data-testid="reset-sup-filter"
+                  onClick={() => setSelectedSup(null)}
+                  className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-[11px] font-medium text-primary-foreground hover:opacity-90"
+                >
+                  <X className="h-3 w-3" /> Reset view
+                </button>
+              </div>
+            )}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="flex flex-wrap items-center gap-1.5 text-sm">
@@ -811,6 +826,25 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+                <div className="mt-3 flex flex-wrap gap-1.5" data-testid="sup-chip-list">
+                  {workerChart.map((w) => (
+                    <button
+                      key={w.name}
+                      type="button"
+                      data-testid="sup-chip"
+                      data-worker={w.name}
+                      aria-pressed={selectedSup === w.name}
+                      onClick={() => toggleSup(w.name)}
+                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                        selectedSup === w.name
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-muted/40 text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {w.name} <span className="opacity-70">({w.Communities})</span>
+                    </button>
+                  ))}
+                </div>
               </CardContent>
             </Card>
 
@@ -827,19 +861,20 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
                       {selectedSup} <X className="h-3 w-3" />
                     </button>
                   )}
-                  <span className="ml-auto text-xs font-normal text-muted-foreground">{fmt(timeline.length)}</span>
+                  <span className="ml-auto text-xs font-normal text-muted-foreground" data-testid="timeline-count">{fmt(timeline.length)}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 pt-0">
                 <SectionTable headers={["Community", "Start", "End", "Supervisor"]}>
                   {timeline.map((t) => (
-                    <tr key={t.id} className="border-t border-border/60 hover:bg-muted/40">
+                    <tr key={t.id} className="border-t border-border/60 hover:bg-muted/40" data-testid="timeline-row" data-worker={t.worker}>
                       <td className="cursor-pointer px-3 py-2 font-medium text-foreground" onClick={() => openDrillForCommunity(t.c, BLUE)}>{t.community}</td>
                       <td className="cursor-pointer px-3 py-2 whitespace-nowrap text-muted-foreground" onClick={() => openDrillForCommunity(t.c, BLUE)}>{t.start}</td>
                       <td className="cursor-pointer px-3 py-2 whitespace-nowrap text-muted-foreground" onClick={() => openDrillForCommunity(t.c, BLUE)}>{t.end}</td>
                       <td
                         className="cursor-pointer px-3 py-2 font-medium text-primary hover:underline"
                         title="Filter the chart & timeline by this supervisor"
+                        data-testid="timeline-supervisor"
                         onClick={() => toggleSup(t.worker)}
                       >
                         {t.worker}

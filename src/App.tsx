@@ -14,6 +14,7 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 import DataCleaner from "./pages/DataCleaner";
+import MdaAnalysesHarness from "./pages/MdaAnalysesHarness";
 import InstallBanner from "./components/InstallBanner";
 import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
@@ -81,6 +82,7 @@ const App = () => (
                   <Route path="/witness/:surveyId/:hhId" element={<CESWitnessForm />} />
                   <Route path="/satellite-messenger" element={<ProtectedRoute><OffGridSatelliteMessenger /></ProtectedRoute>} />
                   <Route path="/data-cleaner" element={<ProtectedRoute><DataCleaner /></ProtectedRoute>} />
+                  <Route path="/__test/mda-analyses" element={<MdaAnalysesHarness />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </ImpersonationProvider>
