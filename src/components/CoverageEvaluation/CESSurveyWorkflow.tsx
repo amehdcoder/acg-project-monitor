@@ -2960,11 +2960,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
                 <AlertDescription className="space-y-2 text-xs text-blue-800">
                   <div className="flex items-center justify-between gap-2">
-                    <span>Acquiring GPS lock… {gpsElapsed}s elapsed.</span>
+                    <span>
+                      {perimeter.length >= 3
+                        ? `GPS still acquiring (${gpsElapsed}s), but your drawn boundary is usable.`
+                        : `Acquiring GPS lock… ${gpsElapsed}s elapsed.`}
+                    </span>
                     <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={retryGPSLock}>
                       <RefreshCw className="h-3 w-3" /> Lock GPS
                     </Button>
                   </div>
+                  {perimeter.length >= 3 && (
+                    <div className="rounded-md border border-blue-200 bg-white/70 px-2 py-1 text-[11px] text-blue-900">
+                      You can proceed with the manual boundary now; the survey center will be saved from the polygon centre and GPS will keep refining in the background.
+                    </div>
+                  )}
                   {gpsElapsed >= 10 && (
                     <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={acceptApproximate} disabled={acceptingApprox}>
                       {acceptingApprox ? <Loader2 className="h-3 w-3 animate-spin" /> : <MapPin className="h-3 w-3" />}
