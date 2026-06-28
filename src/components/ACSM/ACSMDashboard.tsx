@@ -1,10 +1,10 @@
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { useTheme } from "next-themes";
 import {
-  ArrowLeft, Megaphone, Bell, HelpCircle, Download, Filter, Calendar, MapPin,
-  Layers, Users, ListChecks, ChevronLeft, ChevronRight, Search, TrendingUp,
+  ArrowLeft, Megaphone, Download, Filter, Calendar, MapPin,
+  Layers, Users, ChevronLeft, ChevronRight, Search, TrendingUp,
   TrendingDown, CheckCircle2, AlertTriangle, Ban, CircleDashed, FileText,
-  RefreshCw, Sparkles, ShieldCheck, BarChart3, MessageSquare, Radio, Moon, Sun,
+  RefreshCw, Sparkles, ShieldCheck, BarChart3, Moon, Sun,
 } from "lucide-react";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -15,7 +15,7 @@ import { MapMarker } from "@/components/MapVisualization/types";
 import { useAcsmDashboard } from "@/hooks/useAcsmDashboard";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  ACSM_CATEGORIES, STATUS_META, achievementColor, formatByUnit, findIndicator,
+  ACSM_CATEGORIES, STATUS_META, achievementColor, formatByUnit,
   categoryLabel, indicatorLevelLabel, type AcsmCategory, type AcsmStatus,
 } from "@/lib/acsm/definition";
 import { useAcsmDuplicateOverrides } from "@/hooks/useAcsmDuplicateOverrides";
@@ -28,7 +28,7 @@ interface Props {
   onClose: () => void;
 }
 
-const PALETTE = {
+export const ACSM_DASHBOARD_PALETTE = {
   dark: {
     bg: "#071426", panel: "#0d213a", panel2: "#112b49", border: "#3d5f86",
     borderSoft: "#29486e", text: "#f5f9ff", sub: "#b9c9df", primary: "#67e8f9", blue: "#60a5fa",
@@ -41,7 +41,9 @@ const PALETTE = {
   },
 };
 
-type Palette = typeof PALETTE.dark;
+const PALETTE = ACSM_DASHBOARD_PALETTE;
+
+type Palette = typeof ACSM_DASHBOARD_PALETTE.dark;
 
 const fmt = (n: number) => n.toLocaleString();
 
