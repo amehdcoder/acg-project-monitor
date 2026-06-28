@@ -8,7 +8,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useAcsmDuplicateOverrides } from "@/hooks/useAcsmDuplicateOverrides";
 import {
-  flagDuplicates, applyOverrides, buildOverrideMap,
+  flagDuplicates, applyOverrides,
   irfSignature, irfOrder, acsmSignature, acsmOrder,
 } from "@/lib/acsm/irfBridge";
 import type { IrfReport } from "@/lib/irf/definition";
