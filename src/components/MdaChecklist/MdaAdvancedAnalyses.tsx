@@ -178,6 +178,22 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
   const idx = useMemo(() => new MdaQuestionIndex(questions), [questions]);
   const communities = useMemo(() => aggregateByCommunity(submissions), [submissions]);
 
+  // Authoritative MDA model (same engine that powers the headline KPIs). This
+  // guarantees the "Status of MDA" tables reconcile exactly with the headline
+  // "MDA Completed" KPI and the longitudinal funnel — it resolves every
+  // community's status by question LABEL with legacy-key + follow-up fallbacks,
+  // so no supervised community is ever silently dropped from the registers.
+  const model = useMemo(() => buildMdaModel(submissions as any, questions as any), [submissions, questions]);
+  // Keys of communities that have at least one Community Checklist visit.
+  const checklistKeys = useMemo(() => new Set(model.allComs.map((c) => c.key)), [model]);
+  // communityKey -> resolved Status of MDA title ("Completed" / "Ongoing" /
+  // "Halted" / "Not Started" / "Unknown" when the mandatory answer is missing).
+  const statusByKey = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of model.allComs) m.set(c.key, model.statusTitle(model.latestStatus(c)));
+    return m;
+  }, [model]);
+
   // Map communityKey → raw submissions, to drill into the EXACT records.
   const subsByCommunity = useMemo(() => {
     const m = new Map<string, ASubmission[]>();
