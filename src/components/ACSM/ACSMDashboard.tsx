@@ -15,7 +15,7 @@ import { MapMarker } from "@/components/MapVisualization/types";
 import { useAcsmDashboard } from "@/hooks/useAcsmDashboard";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  ACSM_CATEGORIES, STATUS_META, achievementColor, formatByUnit,
+  ACSM_CATEGORIES, STATUS_META, formatByUnit,
   categoryLabel, indicatorLevelLabel, type AcsmCategory, type AcsmStatus,
 } from "@/lib/acsm/definition";
 import { useAcsmDuplicateOverrides } from "@/hooks/useAcsmDuplicateOverrides";
