@@ -536,7 +536,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // Step 3 — Visits
   const [households, setHouseholds] = useState<SurveyHousehold[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pendingPin, setPendingPin] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const [pendingPin, setPendingPin] = useState<{ lat: number; lng: number; accuracy: number; source?: "gps" | "map" } | null>(null);
   const [editingHH, setEditingHH] = useState<SurveyHousehold | null>(null);
 
   // Settings & Upgrades
@@ -853,6 +853,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       finalize(null);
     }
   }, [applyFix]);
+
+  const getCurrentSurveyPosition = useCallback((): { lat: number; lng: number; accuracy: number | null; source: "gps" | "perimeter" | "handoff" | "last_known" } | null => {
+    if (gps) return { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy, source: "gps" };
+    if (perimeter.length >= 3) {
+      const center = polygonCenter(perimeter);
+      if (Number.isFinite(center.lat) && Number.isFinite(center.lng)) {
+        return { lat: center.lat, lng: center.lng, accuracy: null, source: "perimeter" };
+      }
+    }
+    if (mapSeed.source === "handoff" || mapSeed.source === "last_known") {
+      return { lat: mapSeed.lat, lng: mapSeed.lng, accuracy: mapSeed.accuracy, source: mapSeed.source };
+    }
+    return null;
+  }, [gps, perimeter, mapSeed]);
 
   // Mount-only: register watches exactly once, tear down on unmount.
   useEffect(() => {
@@ -1371,12 +1385,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     return simplified.filter((p, i, arr) => i === 0 || sqDist(arr[i - 1], p) > 1e-12);
   }, []);
 
-  const closeManualDraw = useCallback(() => {
-    if (draftPolygon.length < 3) {
+  const finalizeManualDraw = useCallback((points: LatLng[]) => {
+    if (points.length < 3) {
       toast({ title: "Need at least 3 vertices", description: "Tap a few more points before closing.", variant: "destructive" });
       return;
     }
-    const ring = simplifyRing(draftPolygon);
+    const ring = simplifyRing(points);
     const closed = [...ring, { ...ring[0] }];
     setPerimeter(closed);
     // Approximate walked distance = polygon perimeter
@@ -1396,16 +1410,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     setDraftPolygon([]);
     try {
       logCESAction(surveyId ?? "draft", "perimeter.manual_draw", {
-        raw_vertices: draftPolygon.length,
+        raw_vertices: points.length,
         simplified_vertices: ring.length,
         perimeter_m: Math.round(perimM),
       }, gps ? { lat: gps.lat, lng: gps.lng } : undefined);
     } catch { /* audit best-effort */ }
     toast({
       title: "✓ Polygon closed",
-      description: `Auto-detected ${ring.length} vertices from ${draftPolygon.length} taps. Proceed to Step 2.`,
+      description: `Auto-detected ${ring.length} vertices from ${points.length} taps. Proceed to Step 2.`,
     });
-  }, [draftPolygon, simplifyRing, surveyId, gps]);
+  }, [simplifyRing, surveyId, gps]);
+
+  const closeManualDraw = useCallback(() => {
+    finalizeManualDraw(draftPolygon);
+  }, [draftPolygon, finalizeManualDraw]);
 
   const handleDrawTap = useCallback((lat: number, lng: number) => {
     if (!drawMode) return;
@@ -1419,14 +1437,15 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         const latMid = ((a.lat + lat) / 2) * Math.PI / 180;
         const d = R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
         if (d < 8) {
-          // Schedule close on next tick so React state stays consistent.
-          queueMicrotask(closeManualDraw);
+          // Close using the updater's `prev` snapshot so rapid Android taps do
+          // not read a stale draftPolygon from the previous React render.
+          queueMicrotask(() => finalizeManualDraw(prev));
           return prev;
         }
       }
       return [...prev, { lat, lng }];
     });
-  }, [drawMode, closeManualDraw]);
+  }, [drawMode, finalizeManualDraw]);
 
   // Light ticker while recording so status remains live without forcing a full
   // form/map render twice per second on Android.
@@ -1623,7 +1642,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // ---------- Sampling design (residential-aware) ----------
   const buildSegments = useCallback(async () => {
     const N = estHHUser ?? estHHAi ?? 0;
-    if (!gps || N <= 0 || targetN <= 0) {
+    if (N <= 0 || targetN <= 0) {
       toast({ title: "Need household estimate + target N", variant: "destructive" });
       return;
     }
@@ -1707,7 +1726,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         : `${segs.length} equal segment${segs.length === 1 ? "" : "s"} created from the walked perimeter. Selected segment ${segs[rIdx].label} highlighted.`,
     });
     setBuildingSegments(false);
-  }, [estHHUser, estHHAi, targetN, gps, perimeter, surveyId, residentialMask]);
+  }, [estHHUser, estHHAi, targetN, perimeter, surveyId, residentialMask]);
 
   // Reactive auto-resync: whenever the walked perimeter vertices change AFTER segments
   // have been built, re-cluster automatically (debounced, skipped while still recording).
@@ -1772,6 +1791,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       // Checklist), always source the geography from the immutable ref so the
       // submitted values cannot be overridden by tampered component state.
       const geo = getCurrentGeo();
+      const surveyPosition = getCurrentSurveyPosition();
       const payload: any = {
         project_id: projectId ?? null,
         form_id: formId ?? null,
@@ -1779,7 +1799,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         survey_date: new Date().toISOString().slice(0, 10),
         state: geo.state, lga: geo.lga, ward: geo.ward, flhf_name: geo.flhf_name,
         community_name: geo.community_name, settlement_name: geo.settlement_name,
-        center_lat: gps?.lat ?? null, center_lng: gps?.lng ?? null,
+        center_lat: surveyPosition?.lat ?? null, center_lng: surveyPosition?.lng ?? null,
         perimeter_coords: perimeter,
         est_hh_ai: estHHAi, est_hh_user: estHHUser,
         target_sample_n: targetN,
@@ -1872,7 +1892,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         }
       }
     },
-    [projectId, formId, getCurrentGeo, gps, perimeter,
+    [projectId, formId, getCurrentGeo, getCurrentSurveyPosition, perimeter,
      estHHAi, estHHUser, targetN, segments.length, selectedSegmentLabels, coverage, surveyId,
      outsideMicroplan, outsideMicroplanReason, featureSummary, locationLocked],
   );
@@ -1957,23 +1977,23 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     toast({ title: "Segment added", description: `Added ${label}. Reason saved.` });
   }, [segments, selectedSegmentLabels, surveyId, persistSurvey, resampleReason]);
 
-  // Auto-advance Step 1 → Step 2 only after a real walked perimeter exists.
+  // Auto-advance Step 1 → Step 2 only after a stable community boundary exists.
   // Advancing immediately after microplan autofill/GPS lock can interrupt the
   // boundary walk before live vertices are captured.
   useEffect(() => {
     if (autoAdvancedRef.current) return;
     if (step !== 1) return;
-    if (!gps) return;
+    if (!getCurrentSurveyPosition()) return;
     if (!state || !lga || !ward || !communityName) return;
     if (perimeter.length < 3) return;
     if (recordingPerimeter) return;
     autoAdvancedRef.current = true;
     toast({
       title: "Perimeter captured",
-      description: `${perimeter.length} live GPS vertices captured — continuing to Step 2.`,
+      description: `${perimeter.length} boundary vertices captured — continuing to Step 2.`,
     });
     persistSurvey("draft").finally(() => setStep(2));
-  }, [step, gps, state, lga, ward, communityName, perimeter.length, recordingPerimeter, persistSurvey]);
+  }, [step, getCurrentSurveyPosition, state, lga, ward, communityName, perimeter.length, recordingPerimeter, persistSurvey]);
 
   // autosave 30s & time-lapse gps (Upgrade 4)
   useEffect(() => {
@@ -2045,17 +2065,18 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const handleMapTap = useCallback(
     (lat: number, lng: number) => {
       if (step !== 3) return;
-      if (!gps) {
-        toast({ title: "GPS not ready", variant: "destructive" });
+      const surveyPosition = getCurrentSurveyPosition();
+      if (!gps && !surveyPosition) {
+        toast({ title: "Location not ready", description: "Wait for GPS or return to Step 1 and draw/load a boundary first.", variant: "destructive" });
         return;
       }
-      if (gps.accuracy > 50) {
+      if (gps && gps.accuracy > 50) {
         toast({ title: "Low GPS accuracy", description: `±${gps.accuracy.toFixed(0)} m — pin saved, but consider moving to a clearer spot.` });
       }
       // Strict physical geofence check — USER must be physically inside the selected segment polygon
       const selected = segments.filter((s) => selectedSegmentLabels.includes(s.label));
-      const userInside = selected.some((s) => pointInPolygon({ lat: gps.lat, lng: gps.lng }, s.polygon));
-      if (selected.length > 0 && !userInside) {
+      const userInside = gps ? selected.some((s) => pointInPolygon({ lat: gps.lat, lng: gps.lng }, s.polygon)) : true;
+      if (gps && selected.length > 0 && !userInside) {
         toast({
           title: "Physical Geofence Violation",
           description: "You are physically outside the highlighted segment. Move inside or sample another segment.",
@@ -2074,10 +2095,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         });
         return;
       }
-      setPendingPin({ lat, lng, accuracy: gps.accuracy });
+      if (!gps) {
+        toast({ title: "Map-only fallback", description: "GPS is still unavailable, so this visit will be tagged with the tapped map position for later review." });
+      }
+      setPendingPin({ lat, lng, accuracy: gps?.accuracy ?? surveyPosition?.accuracy ?? 999, source: gps ? "gps" : "map" });
       setPickerOpen(true);
     },
-    [step, gps, segments, selectedSegmentLabels],
+    [step, gps, getCurrentSurveyPosition, segments, selectedSegmentLabels],
   );
 
   const isDuplicatePin = useMemo(() => {
@@ -2158,7 +2182,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       synced: false,
       retry_count: 0,
       segment_label: segLabel || null,
-      gps_snapshot: JSON.stringify(gps),
+      gps_snapshot: JSON.stringify(gps ?? { source: pendingPin.source ?? "map", accuracy: pendingPin.accuracy, captured_at: ts }),
       eligible_persons: parseInt(hhForm.eligiblePersons) || 0,
       treated_persons: parseInt(hhForm.treatedPersons) || 0,
     };
@@ -2191,7 +2215,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         eligible_persons: parseInt(hhForm.eligiblePersons) || 0,
         treated_persons: parseInt(hhForm.treatedPersons) || 0,
         segment_label: segLabel || null,
-        gps_snapshot: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy, captured_at: ts } : null,
+        gps_snapshot: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy, captured_at: ts } : { source: pendingPin.source ?? "map", accuracy: pendingPin.accuracy, captured_at: ts },
       };
 
       let data: any = null;
@@ -2936,11 +2960,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
                 <AlertDescription className="space-y-2 text-xs text-blue-800">
                   <div className="flex items-center justify-between gap-2">
-                    <span>Acquiring GPS lock… {gpsElapsed}s elapsed.</span>
+                    <span>
+                      {perimeter.length >= 3
+                        ? `GPS still acquiring (${gpsElapsed}s), but your drawn boundary is usable.`
+                        : `Acquiring GPS lock… ${gpsElapsed}s elapsed.`}
+                    </span>
                     <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={retryGPSLock}>
                       <RefreshCw className="h-3 w-3" /> Lock GPS
                     </Button>
                   </div>
+                  {perimeter.length >= 3 && (
+                    <div className="rounded-md border border-blue-200 bg-white/70 px-2 py-1 text-[11px] text-blue-900">
+                      You can proceed with the manual boundary now; the survey center will be saved from the polygon centre and GPS will keep refining in the background.
+                    </div>
+                  )}
                   {gpsElapsed >= 10 && (
                     <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={acceptApproximate} disabled={acceptingApprox}>
                       {acceptingApprox ? <Loader2 className="h-3 w-3 animate-spin" /> : <MapPin className="h-3 w-3" />}
@@ -3456,8 +3489,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   return;
                 }
 
-                if (!gps) {
-                  toast({ title: "No GPS Signal", description: "Wait for a GPS lock before proceeding.", variant: "destructive" });
+                const surveyPosition = getCurrentSurveyPosition();
+                if (!surveyPosition) {
+                  toast({ title: "Location not ready", description: "Draw/load a boundary or wait for a GPS lock before proceeding.", variant: "destructive" });
+                  return;
+                }
+
+                if (!gps && perimeter.length < 3) {
+                  toast({ title: "Boundary required", description: "GPS is still unavailable. Use Draw on Map or load a saved fence so the survey has a stable community boundary.", variant: "destructive" });
                   return;
                 }
 
@@ -3475,7 +3514,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                         flhf_name: geo.flhf_name || null,
                         community_name: geo.community_name,
                         settlement_name: geo.settlement_name || null,
-                        center_lat: gps.lat, center_lng: gps.lng,
+                        center_lat: surveyPosition.lat, center_lng: surveyPosition.lng,
                         perimeter_coords: perimeter,
                         source_survey_id: sid,
                         created_by: u.user.id,
@@ -3601,7 +3640,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                You must remain inside the highlighted segment. GPS accuracy must be &lt;20 m to drop a pin.
+                You must remain inside the highlighted segment. GPS is preferred; if GPS is still unavailable, tap the map inside the highlighted segment and the visit will be tagged for review.
               </AlertDescription>
             </Alert>
 
@@ -3609,14 +3648,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <div className="flex-1 min-w-[180px] text-xs">
                 <div className="font-semibold text-emerald-800 dark:text-emerald-200">Drop pin at my live location</div>
                 <div className="text-[11px] text-muted-foreground">
-                  Uses your current GPS ({gps ? `±${Math.round(gps.accuracy)} m` : "acquiring…"}). You must be physically inside the highlighted segment.
+                  Uses your current GPS ({gps ? `±${Math.round(gps.accuracy)} m` : "acquiring…"}). You must be physically inside the highlighted segment when GPS is available.
                 </div>
               </div>
               <Button
                 size="sm"
                 variant="acg"
                 disabled={!gps}
-                onClick={() => { if (gps) handleMapTap(gps.lat, gps.lng); }}
+                  onClick={() => { if (gps) handleMapTap(gps.lat, gps.lng); }}
               >
                 <MapPin className="h-4 w-4 mr-1" /> Capture Live Location
               </Button>
