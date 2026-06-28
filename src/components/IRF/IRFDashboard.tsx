@@ -38,7 +38,7 @@ function Kpi({ icon: Icon, label, value, sub, color }: { icon: any; label: strin
 }
 
 export default function IRFDashboard({ projectId, onClose }: Props) {
-  const { rows, loading, reload, stats, sectionTotals, genderSplit, ncBreakdown, topLgas, trend, dataQuality } =
+  const { rows, loading, reload, stats, sectionTotals, genderSplit, ncBreakdown, topLgas, trend, dataQuality, duplicates } =
     useIrfDashboard(projectId);
   const [exporting, setExporting] = useState(false);
 
@@ -86,6 +86,15 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
         </div>
       ) : (
         <div className="relative z-10 space-y-5 p-4">
+          {/* Duplicate flagging + unique counts */}
+          {duplicates && duplicates.duplicateCount > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
+              <ShieldCheck className="h-4 w-4" />
+              <span className="font-semibold">{fmt(duplicates.duplicateCount)} duplicate submission(s) flagged</span>
+              <span>·</span>
+              <span>{fmt(duplicates.uniqueCount)} unique of {fmt(duplicates.totalCount)} total reports</span>
+            </div>
+          )}
           {/* KPIs */}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Kpi icon={Users} label="People Reached" value={fmt(stats.peopleReached)} sub="Reach + attendance" color="#0891b2" />
