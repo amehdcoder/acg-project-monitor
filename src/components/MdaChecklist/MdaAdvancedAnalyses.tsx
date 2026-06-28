@@ -842,7 +842,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
                       {selectedSup} <X className="h-3 w-3" />
                     </button>
                   )}
-                  <span className="ml-auto text-xs font-normal text-muted-foreground">{fmt(timeline.length)}</span>
+                  <span className="ml-auto text-xs font-normal text-muted-foreground" data-testid="timeline-count">{fmt(timeline.length)}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 pt-0">
