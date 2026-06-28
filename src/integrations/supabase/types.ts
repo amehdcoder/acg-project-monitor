@@ -3817,6 +3817,188 @@ export type Database = {
         }
         Relationships: []
       }
+      irf_reports: {
+        Row: {
+          attendance_men: number | null
+          attendance_women: number | null
+          cases_pending: number | null
+          cases_resolved: number | null
+          community_dialogue_location: string | null
+          community_dialogue_sessions: number | null
+          created_at: string
+          created_by: string
+          emirate_council_meetings: number | null
+          emirate_council_support: string | null
+          evidence: Json | null
+          focal_person_name: string | null
+          focal_person_phone: string | null
+          followup_date: string | null
+          gps_lat: number | null
+          gps_lng: number | null
+          healthcare_facility_type: string | null
+          healthcare_workers_engaged: number | null
+          id: string
+          iec_locations: string | null
+          iec_materials_distributed: number | null
+          iec_visibility: boolean | null
+          issues_raised: string | null
+          issues_resolved: string | null
+          lga: string | null
+          mdas_names: string | null
+          mdas_visited_count: number | null
+          mosque_announcements: number | null
+          narrative: string | null
+          noncompliance_area: string | null
+          noncompliance_cases: number | null
+          noncompliance_household_id: string | null
+          noncompliance_type: string | null
+          participation_level: string | null
+          policy_makers_engaged: number | null
+          policy_makers_names: string | null
+          project_id: string | null
+          questions_asked: number | null
+          radio_estimated_reach: number | null
+          radio_messages_aired: number | null
+          religious_leaders_engaged: number | null
+          religious_leaders_support_mode: string | null
+          reporting_month: string | null
+          reporting_period: string | null
+          resolution_method: string | null
+          state: string | null
+          state_advocacy_meetings: number | null
+          state_advocacy_outcomes: string | null
+          submission_status: string
+          total_reach: number | null
+          town_announcements: number | null
+          traditional_leaders_engaged: number | null
+          traditional_leaders_support: string | null
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          attendance_men?: number | null
+          attendance_women?: number | null
+          cases_pending?: number | null
+          cases_resolved?: number | null
+          community_dialogue_location?: string | null
+          community_dialogue_sessions?: number | null
+          created_at?: string
+          created_by: string
+          emirate_council_meetings?: number | null
+          emirate_council_support?: string | null
+          evidence?: Json | null
+          focal_person_name?: string | null
+          focal_person_phone?: string | null
+          followup_date?: string | null
+          gps_lat?: number | null
+          gps_lng?: number | null
+          healthcare_facility_type?: string | null
+          healthcare_workers_engaged?: number | null
+          id?: string
+          iec_locations?: string | null
+          iec_materials_distributed?: number | null
+          iec_visibility?: boolean | null
+          issues_raised?: string | null
+          issues_resolved?: string | null
+          lga?: string | null
+          mdas_names?: string | null
+          mdas_visited_count?: number | null
+          mosque_announcements?: number | null
+          narrative?: string | null
+          noncompliance_area?: string | null
+          noncompliance_cases?: number | null
+          noncompliance_household_id?: string | null
+          noncompliance_type?: string | null
+          participation_level?: string | null
+          policy_makers_engaged?: number | null
+          policy_makers_names?: string | null
+          project_id?: string | null
+          questions_asked?: number | null
+          radio_estimated_reach?: number | null
+          radio_messages_aired?: number | null
+          religious_leaders_engaged?: number | null
+          religious_leaders_support_mode?: string | null
+          reporting_month?: string | null
+          reporting_period?: string | null
+          resolution_method?: string | null
+          state?: string | null
+          state_advocacy_meetings?: number | null
+          state_advocacy_outcomes?: string | null
+          submission_status?: string
+          total_reach?: number | null
+          town_announcements?: number | null
+          traditional_leaders_engaged?: number | null
+          traditional_leaders_support?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          attendance_men?: number | null
+          attendance_women?: number | null
+          cases_pending?: number | null
+          cases_resolved?: number | null
+          community_dialogue_location?: string | null
+          community_dialogue_sessions?: number | null
+          created_at?: string
+          created_by?: string
+          emirate_council_meetings?: number | null
+          emirate_council_support?: string | null
+          evidence?: Json | null
+          focal_person_name?: string | null
+          focal_person_phone?: string | null
+          followup_date?: string | null
+          gps_lat?: number | null
+          gps_lng?: number | null
+          healthcare_facility_type?: string | null
+          healthcare_workers_engaged?: number | null
+          id?: string
+          iec_locations?: string | null
+          iec_materials_distributed?: number | null
+          iec_visibility?: boolean | null
+          issues_raised?: string | null
+          issues_resolved?: string | null
+          lga?: string | null
+          mdas_names?: string | null
+          mdas_visited_count?: number | null
+          mosque_announcements?: number | null
+          narrative?: string | null
+          noncompliance_area?: string | null
+          noncompliance_cases?: number | null
+          noncompliance_household_id?: string | null
+          noncompliance_type?: string | null
+          participation_level?: string | null
+          policy_makers_engaged?: number | null
+          policy_makers_names?: string | null
+          project_id?: string | null
+          questions_asked?: number | null
+          radio_estimated_reach?: number | null
+          radio_messages_aired?: number | null
+          religious_leaders_engaged?: number | null
+          religious_leaders_support_mode?: string | null
+          reporting_month?: string | null
+          reporting_period?: string | null
+          resolution_method?: string | null
+          state?: string | null
+          state_advocacy_meetings?: number | null
+          state_advocacy_outcomes?: string | null
+          submission_status?: string
+          total_reach?: number | null
+          town_announcements?: number | null
+          traditional_leaders_engaged?: number | null
+          traditional_leaders_support?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irf_reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           accuracy: number | null
