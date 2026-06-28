@@ -23,7 +23,7 @@
 import { useMemo, useState } from "react";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend,
-  Tooltip as RTooltip, BarChart, Bar,
+  Tooltip as RTooltip, BarChart, Bar, Cell,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,10 +32,10 @@ import {
 } from "@/components/ui/tooltip";
 import {
   CheckCircle2, AlertTriangle, Pill, TrendingUp, Users2, Sigma, ClipboardCheck,
-  HelpCircle, ChevronRight, ShieldCheck, ShieldAlert, Download, ListChecks, Ban,
+  HelpCircle, ChevronRight, ShieldCheck, ShieldAlert, Download, ListChecks, Ban, X,
 } from "lucide-react";
 import {
-  MdaQuestionIndex, aggregateByCommunity, geo, visitTrendByLga, workerAccountability,
+  MdaQuestionIndex, aggregateByCommunity, geo, visitTrendByLga,
   type AQuestion, type ASubmission, type CommunityAgg, type ResolvedQ,
 } from "@/lib/mda/analyses";
 import { buildQualityReport, type QualityLevel } from "@/lib/mda/dataQuality";
@@ -363,25 +363,52 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
   const { rows: trendRows, lgas: trendLgas } = useMemo(() => visitTrendByLga(submissions), [submissions]);
 
   // ── Field-worker accountability ──
-  const workers = useMemo(() => workerAccountability(submissions).slice(0, 12), [submissions]);
+  // Derived from the SAME per-community aggregate that feeds the timeline so the
+  // bar count for a supervisor ALWAYS equals the number of communities filtered
+  // in the timeline (each community is attributed to exactly one supervisor — its
+  // aggregated submitter — so totals are never under- or over-counted).
+  const supOf = (c: CommunityAgg) => String(c.submitter ?? "").replace(/<[^>]*>/g, "").trim() || "Unknown";
+  const workers = useMemo(() => {
+    const map = new Map<string, { name: string; communities: number; days: Set<string>; firstTs: number; lastTs: number }>();
+    for (const c of communities) {
+      const name = supOf(c);
+      const rec = map.get(name) || { name, communities: 0, days: new Set<string>(), firstTs: Infinity, lastTs: 0 };
+      rec.communities += 1;
+      if (c.firstTs) { rec.days.add(new Date(c.firstTs).toISOString().slice(0, 10)); rec.firstTs = Math.min(rec.firstTs, c.firstTs); }
+      if (c.lastTs) { rec.days.add(new Date(c.lastTs).toISOString().slice(0, 10)); rec.lastTs = Math.max(rec.lastTs, c.lastTs); }
+      map.set(name, rec);
+    }
+    return [...map.values()]
+      .map((r) => ({ name: r.name, communities: r.communities, days: r.days.size }))
+      .sort((a, b) => b.communities - a.communities)
+      .slice(0, 12);
+  }, [communities]);
   const workerChart = useMemo(
     () => workers.map((w) => ({ name: w.name, Communities: w.communities, Days: w.days })),
     [workers],
   );
-  const timeline = useMemo(() => {
+
+  // Cross-filter between the accountability chart and the visit timeline.
+  const [selectedSup, setSelectedSup] = useState<string | null>(null);
+  const toggleSup = (name: string) => setSelectedSup((cur) => (cur === name ? null : name));
+
+  const timelineAll = useMemo(() => {
     return [...communities]
       .filter((c) => c.firstTs)
       .sort((a, b) => b.lastTs - a.lastTs)
-      .slice(0, 60)
       .map((c) => ({
         id: c.key,
         c,
         community: c.community || "Unspecified",
         start: c.firstTs ? new Date(c.firstTs).toLocaleString() : "—",
         end: c.lastTs ? new Date(c.lastTs).toLocaleString() : "—",
-        worker: c.submitter || "—",
+        worker: supOf(c),
       }));
   }, [communities]);
+  const timeline = useMemo(
+    () => (selectedSup ? timelineAll.filter((t) => t.worker === selectedSup) : timelineAll).slice(0, 200),
+    [timelineAll, selectedSup],
+  );
 
   // helpers to drill from charts
   const drillLga = (lga: string, tint: string) => {
@@ -394,10 +421,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
         : submissions.filter((s) => (geo(s, "lga") || "Unspecified") === lga);
     openDrillForSubs(`LGA — ${lga}`, subs, tint, `${subs.length} checklist submission${subs.length === 1 ? "" : "s"}`);
   };
-  const drillWorker = (name: string, tint: string) => {
-    const subs = submissions.filter((s) => (String(s.submitter || s.data?.supervisor_name || "Unknown").replace(/<[^>]*>/g, "").trim()) === name);
-    openDrillForSubs(`Monitor — ${name}`, subs, tint);
-  };
+
 
   const cellYesNo = (text: string, badWhenNo = true) => {
     if (!text) return <span className="text-muted-foreground">—</span>;
@@ -753,9 +777,18 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-1.5 text-sm">
-                  <Users2 className="h-4 w-4" style={{ color: EMERALD }} /> Monitor Accountability
-                  <span className="font-normal text-muted-foreground">— click a bar to drill</span>
+                <CardTitle className="flex flex-wrap items-center gap-1.5 text-sm">
+                  <Users2 className="h-4 w-4" style={{ color: EMERALD }} /> Supervisor Accountability
+                  <span className="font-normal text-muted-foreground">— click a bar to filter the timeline</span>
+                  {selectedSup && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSup(null)}
+                      className="ml-auto inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/20"
+                    >
+                      {selectedSup} <X className="h-3 w-3" />
+                    </button>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -766,8 +799,16 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
                     <YAxis type="category" dataKey="name" width={84} tick={{ fontSize: 10 }} />
                     <RTooltip />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="Communities" name="Communities visited" fill={EMERALD} radius={[0, 3, 3, 0]} style={{ cursor: "pointer" }} onClick={(d: any) => d?.name && drillWorker(d.name, EMERALD)} />
-                    <Bar dataKey="Days" name="Days monitor worked" fill={ORANGE} radius={[0, 3, 3, 0]} style={{ cursor: "pointer" }} onClick={(d: any) => d?.name && drillWorker(d.name, ORANGE)} />
+                    <Bar dataKey="Communities" name="Communities visited" fill={EMERALD} radius={[0, 3, 3, 0]} style={{ cursor: "pointer" }} onClick={(d: any) => d?.name && toggleSup(d.name)}>
+                      {workerChart.map((w) => (
+                        <Cell key={w.name} fill={EMERALD} fillOpacity={selectedSup && selectedSup !== w.name ? 0.3 : 1} />
+                      ))}
+                    </Bar>
+                    <Bar dataKey="Days" name="Days supervisor worked" fill={ORANGE} radius={[0, 3, 3, 0]} style={{ cursor: "pointer" }} onClick={(d: any) => d?.name && toggleSup(d.name)}>
+                      {workerChart.map((w) => (
+                        <Cell key={w.name} fill={ORANGE} fillOpacity={selectedSup && selectedSup !== w.name ? 0.3 : 1} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -777,23 +818,39 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-1.5 text-sm">
                   <ClipboardCheck className="h-4 w-4 text-primary" /> Community Visit Timeline
+                  {selectedSup && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSup(null)}
+                      className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/20"
+                    >
+                      {selectedSup} <X className="h-3 w-3" />
+                    </button>
+                  )}
                   <span className="ml-auto text-xs font-normal text-muted-foreground">{fmt(timeline.length)}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 pt-0">
-                <SectionTable headers={["Community", "Start", "End", "Monitor"]}>
+                <SectionTable headers={["Community", "Start", "End", "Supervisor"]}>
                   {timeline.map((t) => (
-                    <tr key={t.id} className="cursor-pointer border-t border-border/60 hover:bg-muted/40" onClick={() => openDrillForCommunity(t.c, BLUE)}>
-                      <td className="px-3 py-2 font-medium text-foreground">{t.community}</td>
-                      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{t.start}</td>
-                      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{t.end}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{t.worker}</td>
+                    <tr key={t.id} className="border-t border-border/60 hover:bg-muted/40">
+                      <td className="cursor-pointer px-3 py-2 font-medium text-foreground" onClick={() => openDrillForCommunity(t.c, BLUE)}>{t.community}</td>
+                      <td className="cursor-pointer px-3 py-2 whitespace-nowrap text-muted-foreground" onClick={() => openDrillForCommunity(t.c, BLUE)}>{t.start}</td>
+                      <td className="cursor-pointer px-3 py-2 whitespace-nowrap text-muted-foreground" onClick={() => openDrillForCommunity(t.c, BLUE)}>{t.end}</td>
+                      <td
+                        className="cursor-pointer px-3 py-2 font-medium text-primary hover:underline"
+                        title="Filter the chart & timeline by this supervisor"
+                        onClick={() => toggleSup(t.worker)}
+                      >
+                        {t.worker}
+                      </td>
                     </tr>
                   ))}
                 </SectionTable>
               </CardContent>
             </Card>
           </div>
+
         )}
 
         {/* ── Drill-down sheet (exact underlying submissions) ── */}
