@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import * as Icons from "lucide-react";
-import { IRF_SECTIONS, IRF_FORM_NAME, type IrfField } from "@/lib/irf/definition";
+import { IRF_SECTIONS, IRF_FORM_NAME, OTHER_OPTION, type IrfField } from "@/lib/irf/definition";
 import irfBg from "@/assets/irf-bg.jpg";
 
 /** Subtle, professional brand watermark used behind IRF screens. */
