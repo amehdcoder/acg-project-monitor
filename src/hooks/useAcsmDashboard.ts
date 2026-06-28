@@ -100,7 +100,11 @@ export interface AcsmDuplicateInfo {
 const MONTHS = ["Nov 2024", "Dec 2024", "Jan 2025", "Feb 2025", "Mar 2025", "Apr 2025", "May 2025"];
 
 
-export const useAcsmDashboard = (projectId?: string | null, categoryFilter: AcsmCategory | "all" = "all") => {
+export const useAcsmDashboard = (
+  projectId?: string | null,
+  categoryFilter: AcsmCategory | "all" = "all",
+  overrides?: { acsmMap?: OverrideMap | null; irfMap?: OverrideMap | null },
+) => {
   const [allRows, setAllRows] = useState<AcsmRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [simulate, setSimulate] = useState(false);
