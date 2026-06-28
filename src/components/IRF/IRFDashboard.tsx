@@ -208,5 +208,6 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
         </div>
       )}
     </div>
+    </div>
   );
 }
