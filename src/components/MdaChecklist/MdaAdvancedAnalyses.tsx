@@ -363,25 +363,52 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
   const { rows: trendRows, lgas: trendLgas } = useMemo(() => visitTrendByLga(submissions), [submissions]);
 
   // ── Field-worker accountability ──
-  const workers = useMemo(() => workerAccountability(submissions).slice(0, 12), [submissions]);
+  // Derived from the SAME per-community aggregate that feeds the timeline so the
+  // bar count for a supervisor ALWAYS equals the number of communities filtered
+  // in the timeline (each community is attributed to exactly one supervisor — its
+  // aggregated submitter — so totals are never under- or over-counted).
+  const supOf = (c: CommunityAgg) => stripTags(c.submitter) || "Unknown";
+  const workers = useMemo(() => {
+    const map = new Map<string, { name: string; communities: number; days: Set<string>; firstTs: number; lastTs: number }>();
+    for (const c of communities) {
+      const name = supOf(c);
+      const rec = map.get(name) || { name, communities: 0, days: new Set<string>(), firstTs: Infinity, lastTs: 0 };
+      rec.communities += 1;
+      if (c.firstTs) { rec.days.add(new Date(c.firstTs).toISOString().slice(0, 10)); rec.firstTs = Math.min(rec.firstTs, c.firstTs); }
+      if (c.lastTs) { rec.days.add(new Date(c.lastTs).toISOString().slice(0, 10)); rec.lastTs = Math.max(rec.lastTs, c.lastTs); }
+      map.set(name, rec);
+    }
+    return [...map.values()]
+      .map((r) => ({ name: r.name, communities: r.communities, days: r.days.size }))
+      .sort((a, b) => b.communities - a.communities)
+      .slice(0, 12);
+  }, [communities]);
   const workerChart = useMemo(
     () => workers.map((w) => ({ name: w.name, Communities: w.communities, Days: w.days })),
     [workers],
   );
-  const timeline = useMemo(() => {
+
+  // Cross-filter between the accountability chart and the visit timeline.
+  const [selectedSup, setSelectedSup] = useState<string | null>(null);
+  const toggleSup = (name: string) => setSelectedSup((cur) => (cur === name ? null : name));
+
+  const timelineAll = useMemo(() => {
     return [...communities]
       .filter((c) => c.firstTs)
       .sort((a, b) => b.lastTs - a.lastTs)
-      .slice(0, 60)
       .map((c) => ({
         id: c.key,
         c,
         community: c.community || "Unspecified",
         start: c.firstTs ? new Date(c.firstTs).toLocaleString() : "—",
         end: c.lastTs ? new Date(c.lastTs).toLocaleString() : "—",
-        worker: c.submitter || "—",
+        worker: supOf(c),
       }));
   }, [communities]);
+  const timeline = useMemo(
+    () => (selectedSup ? timelineAll.filter((t) => t.worker === selectedSup) : timelineAll).slice(0, 200),
+    [timelineAll, selectedSup],
+  );
 
   // helpers to drill from charts
   const drillLga = (lga: string, tint: string) => {
@@ -394,10 +421,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
         : submissions.filter((s) => (geo(s, "lga") || "Unspecified") === lga);
     openDrillForSubs(`LGA — ${lga}`, subs, tint, `${subs.length} checklist submission${subs.length === 1 ? "" : "s"}`);
   };
-  const drillWorker = (name: string, tint: string) => {
-    const subs = submissions.filter((s) => (String(s.submitter || s.data?.supervisor_name || "Unknown").replace(/<[^>]*>/g, "").trim()) === name);
-    openDrillForSubs(`Monitor — ${name}`, subs, tint);
-  };
+
 
   const cellYesNo = (text: string, badWhenNo = true) => {
     if (!text) return <span className="text-muted-foreground">—</span>;
