@@ -855,6 +855,7 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
                       <td
                         className="cursor-pointer px-3 py-2 font-medium text-primary hover:underline"
                         title="Filter the chart & timeline by this supervisor"
+                        data-testid="timeline-supervisor"
                         onClick={() => toggleSup(t.worker)}
                       >
                         {t.worker}
