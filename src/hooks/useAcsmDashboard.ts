@@ -285,9 +285,10 @@ export const useAcsmDashboard = (
     () =>
       enriched.map((r) => {
         const ind = findIndicator(r.indicator || "");
+        const rowId = String(r.id ?? `${r.indicator || "indicator"}-${r.created_at || "unknown"}`);
         return {
-          id: r.id,
-          code: (r.category || "").slice(0, 3).toUpperCase() + "-" + r.id.slice(-2).toUpperCase(),
+          id: rowId,
+          code: (r.category || "").slice(0, 3).toUpperCase() + "-" + rowId.slice(-2).toUpperCase(),
           name: ind?.label || r.indicator || "—",
           category: r.category || "",
           level: r.indicator_level || ind?.level || "",
@@ -310,7 +311,7 @@ export const useAcsmDashboard = (
       enriched
         .filter((r) => r.gps_lat != null && r.gps_lng != null)
         .map((r) => ({
-          id: r.id,
+          id: String(r.id ?? `${r.indicator || "indicator"}-${r.created_at || "unknown"}`),
           lat: Number(r.gps_lat),
           lng: Number(r.gps_lng),
           pct: r._pct,
