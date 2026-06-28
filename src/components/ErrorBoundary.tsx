@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   children: ReactNode;
@@ -11,24 +12,69 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  eventId: string | null;
 }
+
+const ERROR_LOG_KEY = "amehnities.client_error_log.v1";
+
+const persistClientError = (payload: Record<string, unknown>) => {
+  try {
+    const existing = JSON.parse(window.localStorage.getItem(ERROR_LOG_KEY) || "[]");
+    const next = [payload, ...(Array.isArray(existing) ? existing : [])].slice(0, 30);
+    window.localStorage.setItem(ERROR_LOG_KEY, JSON.stringify(next));
+  } catch {
+    // Local logging must never create a secondary render failure.
+  }
+};
+
+const sendClientErrorToBackend = async (payload: Record<string, unknown>) => {
+  try {
+    await (supabase as any).rpc("log_client_error", {
+      _component: String(payload.boundary || "Component"),
+      _message: String(payload.message || "Unknown client error"),
+      _stack: typeof payload.stack === "string" ? payload.stack : null,
+      _component_stack: typeof payload.componentStack === "string" ? payload.componentStack : null,
+      _route: typeof payload.url === "string" ? payload.url : null,
+      _user_agent: typeof payload.userAgent === "string" ? payload.userAgent : null,
+      _metadata: {
+        eventId: payload.eventId,
+        timestamp: payload.timestamp,
+      },
+    });
+  } catch (logError) {
+    console.warn("Client error backend logging failed", logError);
+  }
+};
 
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
     error: null,
+    eventId: null,
   };
 
   public static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return { hasError: true, error, eventId: `ui-${Date.now().toString(36)}` };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error(`Uncaught error in ${this.props.name || 'Component'}:`, error, errorInfo);
+    const payload = {
+      eventId: this.state.eventId,
+      boundary: this.props.name || "Component",
+      message: error?.message || String(error),
+      stack: error?.stack || null,
+      componentStack: errorInfo.componentStack,
+      url: typeof window !== "undefined" ? window.location.href : null,
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+      timestamp: new Date().toISOString(),
+    };
+    console.error(`[ErrorBoundary:${payload.boundary}]`, payload);
+    persistClientError(payload);
+    void sendClientErrorToBackend(payload);
   }
 
   private handleReset = () => {
-    this.setState({ hasError: false, error: null });
+    this.setState({ hasError: false, error: null, eventId: null });
   };
 
   public render() {
@@ -47,6 +93,9 @@ export class ErrorBoundary extends Component<Props, State> {
             <p className="text-xs text-slate-500 mt-1 max-w-[240px] mx-auto">
               {this.props.name || "This component"} failed to render telemetry.
             </p>
+            {this.state.eventId && (
+              <p className="mt-2 font-mono text-[10px] text-slate-400">Error ID: {this.state.eventId}</p>
+            )}
           </div>
           <Button 
             variant="outline" 

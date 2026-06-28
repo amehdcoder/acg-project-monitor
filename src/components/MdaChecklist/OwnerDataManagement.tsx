@@ -9,7 +9,7 @@
  * archive store and can be restored at any time. Backed by the owner-only
  * RPCs `owner_archive_mda_submissions` / `owner_restore_mda_submissions`.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Database, Trash2, RotateCcw, Loader2, ShieldAlert, CalendarRange,
   Archive, History, CheckCircle2, AlertTriangle,
@@ -37,6 +37,18 @@ interface ActionResult {
   restored?: number;
   error?: string;
   form_id?: string;
+  consistency?: {
+    ok?: boolean;
+    action?: string;
+    expected_affected?: number;
+    affected?: number;
+    before_live?: number;
+    after_live?: number;
+    before_archived?: number;
+    after_archived?: number;
+    live_archive_overlap?: number;
+    submission_version_orphans?: number;
+  };
 }
 
 interface Props {
@@ -58,15 +70,20 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [confirmSummary, setConfirmSummary] = useState<Summary | null>(null);
 
-  const loadSummary = useCallback(async () => {
+  const loadSummary = useCallback(async (): Promise<Summary | null> => {
     setLoading(true);
     try {
       const { data, error } = await (supabase as any).rpc("owner_mda_data_summary", { _form_id: formId });
       if (error) throw error;
-      setSummary(data as Summary);
+      const next = data as Summary;
+      setSummary(next);
+      return next;
     } catch (e: any) {
       toast.error(e?.message || "Could not load data summary");
+      return null;
     } finally {
       setLoading(false);
     }
@@ -93,13 +110,27 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
       if (error) throw error;
       const result = (data || {}) as ActionResult;
       if (result.error) throw new Error(result.error);
+      if (result.consistency && result.consistency.ok === false) {
+        throw new Error("Consistency check failed. No dashboard refresh was applied; please contact support with the logged clear-submissions result.");
+      }
       const n = mode === "delete" ? (result.archived ?? 0) : (result.restored ?? 0);
       toast.success(
         mode === "delete"
           ? `${n.toLocaleString()} submission(s) archived. Dashboard restored to live data.`
           : `${n.toLocaleString()} submission(s) restored to the dashboard.`,
       );
-      await loadSummary();
+      const refreshed = await loadSummary();
+      const c = result.consistency;
+      if (c) {
+        console.info("MDA owner data-management consistency", c);
+        const noOverlap = Number(c.live_archive_overlap || 0) === 0;
+        const noOrphans = Number(c.submission_version_orphans || 0) === 0;
+        if (!noOverlap || !noOrphans) {
+          toast.error("Records moved, but a consistency warning was detected. Refresh before collecting new data.");
+        } else if (refreshed) {
+          toast.success(`Consistency verified: ${refreshed.live_count.toLocaleString()} live, ${refreshed.archived_count.toLocaleString()} archived.`);
+        }
+      }
       onChanged?.();
     } catch (e: any) {
       toast.error(e?.message || "Action failed");
@@ -109,6 +140,16 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
   };
 
   const targetCount = mode === "delete" ? summary?.live_count ?? 0 : summary?.archived_count ?? 0;
+  const confirmPhrase = useMemo(() => `${mode === "delete" ? "CLEAR" : "RESTORE"} ${targetCount}`, [mode, targetCount]);
+  const canConfirm = confirmText.trim().toUpperCase() === confirmPhrase;
+
+  const openConfirmation = async () => {
+    const latest = await loadSummary();
+    if (!latest) return;
+    setConfirmSummary(latest);
+    setConfirmText("");
+    setConfirmOpen(true);
+  };
 
   return (
     <>
@@ -199,7 +240,7 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
             <Button
               className={`w-full ${mode === "delete" ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-600 hover:bg-emerald-700"}`}
               disabled={busy || loading || targetCount === 0}
-              onClick={() => setConfirmOpen(true)}
+              onClick={openConfirmation}
             >
               {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : mode === "delete" ? <Trash2 className="mr-2 h-4 w-4" /> : <RotateCcw className="mr-2 h-4 w-4" />}
               {mode === "delete" ? "Archive submissions" : "Restore submissions"}
@@ -221,10 +262,30 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
                 : `This will move ${useRange ? "the selected" : "all"} archived submissions back into the live dashboard.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-3 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <p className="text-muted-foreground">Live before action</p>
+                <p className="font-semibold tabular-nums">{(confirmSummary?.live_count ?? targetCount).toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Archived before action</p>
+                <p className="font-semibold tabular-nums">{(confirmSummary?.archived_count ?? 0).toLocaleString()}</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              A backend consistency check will verify moved counts, live/archive overlap, and orphaned submission history before the dashboard refreshes.
+            </p>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Type {confirmPhrase} to confirm</Label>
+              <Input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder={confirmPhrase} className="h-9 font-mono" />
+            </div>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className={mode === "delete" ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-600 hover:bg-emerald-700"}
+              disabled={!canConfirm || busy}
               onClick={run}
             >
               {mode === "delete" ? "Yes, archive" : "Yes, restore"}
