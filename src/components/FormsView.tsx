@@ -957,6 +957,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         );
         if (linkedDash) idsToDelete.push(linkedDash.id);
       }
+      const irfKind = (form?.settings as any)?.irf_kind as ("form" | "dashboard" | undefined);
+      if (irfKind === "form" && form?.project_id) {
+        const linkedDash = forms.find(
+          f => f.project_id === form.project_id && (f.settings as any)?.irf_kind === "dashboard",
+        );
+        if (linkedDash) idsToDelete.push(linkedDash.id);
+      }
       const { error } = await supabase.from("forms").delete().in("id", idsToDelete);
       if (error) throw error;
       await logAction("delete_form", `Deleted form "${form?.name || formId}"`, "form", formId);
