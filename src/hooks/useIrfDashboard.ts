@@ -51,6 +51,19 @@ export const useIrfDashboard = (projectId?: string | null, overrideMap?: Overrid
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
+  // Duplicate detection + admin overrides. Rejected submissions are dropped from all
+  // analyses; "unique" overrides force-include auto-flagged rows. The remaining
+  // (active) rows feed every KPI so unique counts stay authoritative.
+  const dedup = useMemo(() => {
+    const res = flagDuplicates(rawRows, irfSignature, (r) => r.id, irfOrder);
+    return applyOverrides(res, (r) => r.id, overrideMap);
+  }, [rawRows, overrideMap]);
+
+  const rejectedIds = useMemo(() => new Set(dedup.rejected.map((r) => r.id)), [dedup]);
+  const rows = useMemo(() => rawRows.filter((r) => !rejectedIds.has(r.id)), [rawRows, rejectedIds]);
+
+
+
   // Headline totals across all metric fields.
   const totals = useMemo(() => {
     const t: Record<string, number> = {};
