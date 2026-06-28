@@ -155,7 +155,7 @@ export const useIrfDashboard = (projectId?: string | null) => {
 
   const dataQuality = useMemo(() => {
     if (!rows.length) return 0;
-    const complete = rows.filter((r) => r.state && r.lga && r.focal_person_name && r.reporting_month).length;
+    const complete = rows.filter((r) => r.state && r.lga && r.created_by && r.reporting_month).length;
     return Math.round((complete / rows.length) * 100);
   }, [rows]);
 

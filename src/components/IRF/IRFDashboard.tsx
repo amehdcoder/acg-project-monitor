@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useIrfDashboard } from "@/hooks/useIrfDashboard";
 import { IRF_DASH_NAME } from "@/lib/irf/definition";
+import { IrfWatermark } from "@/components/IRF/IRFFormFiller";
 
 interface Props {
   projectId?: string | null;
@@ -62,7 +63,8 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
   );
 
   return (
-    <div className="mx-auto w-full max-w-6xl pb-16">
+    <div className="relative mx-auto w-full max-w-6xl pb-16">
+      <IrfWatermark />
       {/* Header */}
       <div className="sticky top-0 z-20 flex items-center gap-3 border-b bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3">
         <Button variant="ghost" size="icon" onClick={onClose} className="text-white hover:bg-white/10"><ArrowLeft className="h-5 w-5" /></Button>
@@ -75,15 +77,15 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
       </div>
 
       {loading && !rows.length ? (
-        <div className="flex h-64 items-center justify-center text-muted-foreground">Loading reports…</div>
+        <div className="relative z-10 flex h-64 items-center justify-center text-muted-foreground">Loading reports…</div>
       ) : !rows.length ? (
-        <div className="flex h-64 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+        <div className="relative z-10 flex h-64 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
           <FileSpreadsheet className="h-10 w-10 opacity-40" />
           <p>No reports submitted yet.</p>
           <p className="text-xs">Submitted reports appear here instantly.</p>
         </div>
       ) : (
-        <div className="space-y-5 p-4">
+        <div className="relative z-10 space-y-5 p-4">
           {/* KPIs */}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Kpi icon={Users} label="People Reached" value={fmt(stats.peopleReached)} sub="Reach + attendance" color="#0891b2" />
@@ -155,7 +157,7 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
               <h3 className="mb-2 text-sm font-semibold text-foreground">Data Quality</h3>
               <div className="flex h-[200px] flex-col items-center justify-center gap-2">
                 <div className="text-5xl font-bold" style={{ color: dataQuality >= 80 ? "#16a34a" : dataQuality >= 50 ? "#f59e0b" : "#dc2626" }}>{dataQuality}%</div>
-                <p className="text-center text-xs text-muted-foreground">Reports with complete identity (state, LGA, focal person, month)</p>
+                <p className="text-center text-xs text-muted-foreground">Reports with complete identity (state, LGA, reporter, month)</p>
               </div>
             </Card>
           </div>

@@ -14,6 +14,23 @@ import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import * as Icons from "lucide-react";
 import { IRF_SECTIONS, IRF_FORM_NAME, type IrfField } from "@/lib/irf/definition";
+import irfBg from "@/assets/irf-bg.jpg";
+
+/** Subtle, professional brand watermark used behind IRF screens. */
+export function IrfWatermark() {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+      <img
+        src={irfBg}
+        alt=""
+        loading="lazy"
+        width={1280}
+        height={1280}
+        className="absolute bottom-0 right-0 h-[55vh] w-auto max-w-none object-contain opacity-[0.08] sm:opacity-[0.10]"
+      />
+    </div>
+  );
+}
 
 interface Props {
   projectId?: string | null;
@@ -45,7 +62,6 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   const [state, setState] = useState("");
   const [lga, setLga] = useState("");
   const [ward, setWard] = useState("");
-  const [focalName, setFocalName] = useState("");
   const [focalPhone, setFocalPhone] = useState("");
   const [narrative, setNarrative] = useState("");
 
@@ -57,11 +73,11 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   const setVal = (k: string, v: any) => setValues((p) => ({ ...p, [k]: v }));
 
   const totalSteps = IRF_SECTIONS.length + 1;
-  const canSubmit = !!state && !!lga && !!focalName && !!reportingMonth;
+  const canSubmit = !!state && !!lga && !!reportingMonth;
 
   const submit = async () => {
     if (!canSubmit) {
-      toast.error("Please complete the report identity (Month, State, LGA, Focal Person).");
+      toast.error("Please complete the report identity (Month, State, LGA).");
       setStep(0);
       return;
     }
@@ -73,7 +89,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
         reporting_period: monthOptions.find((m) => m.value === reportingMonth)?.label ?? reportingMonth,
         reporting_month: `${reportingMonth}-01`,
         state, lga, ward: ward || null,
-        focal_person_name: focalName, focal_person_phone: focalPhone || null,
+        focal_person_phone: focalPhone || null,
         narrative: narrative || null,
         gps_lat: position?.lat ?? null, gps_lng: position?.lng ?? null,
         submission_status: "submitted",
@@ -95,15 +111,16 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
 
   if (done) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-8 text-center">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#E2F5EC]">
+      <div className="relative flex min-h-[60vh] flex-col items-center justify-center gap-4 p-8 text-center">
+        <IrfWatermark />
+        <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-[#E2F5EC]">
           <CheckCircle2 className="h-10 w-10 text-[#22A55A]" />
         </div>
-        <h2 className="text-2xl font-bold text-foreground">Report submitted</h2>
-        <p className="max-w-md text-muted-foreground">
+        <h2 className="relative z-10 text-2xl font-bold text-foreground">Report submitted</h2>
+        <p className="relative z-10 max-w-md text-muted-foreground">
           Your indicator report for <strong>{lga}, {state}</strong> has been recorded and the dashboard has been updated in real time.
         </p>
-        <div className="flex gap-3">
+        <div className="relative z-10 flex gap-3">
           <Button variant="outline" onClick={() => { setDone(false); setValues({}); setStep(0); }}>Submit another</Button>
           <Button onClick={onClose}>Done</Button>
         </div>
@@ -159,7 +176,8 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   const SectionIcon = section ? ((Icons as any)[section.icon] || Icons.ClipboardList) : Icons.ClipboardList;
 
   return (
-    <div className="mx-auto w-full max-w-3xl pb-28">
+    <div className="relative mx-auto w-full max-w-3xl pb-28">
+      <IrfWatermark />
       {/* Header */}
       <div className="sticky top-0 z-20 flex items-center gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur">
         <Button variant="ghost" size="icon" onClick={onClose}><ArrowLeft className="h-5 w-5" /></Button>
@@ -172,13 +190,13 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
       </div>
 
       {/* Progress */}
-      <div className="flex gap-1.5 px-4 pt-3">
+      <div className="relative z-10 flex gap-1.5 px-4 pt-3">
         {Array.from({ length: totalSteps }).map((_, i) => (
           <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i <= step ? "bg-primary" : "bg-muted"}`} />
         ))}
       </div>
 
-      <div className="px-4 py-4">
+      <div className="relative z-10 px-4 py-4">
         {step === 0 ? (
           <Card className="space-y-4 p-4 sm:p-6">
             <div className="flex items-center gap-2">
@@ -197,11 +215,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Focal person name *</Label>
-                <Input value={focalName} onChange={(e) => setFocalName(e.target.value)} className="h-12" placeholder="Full name" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Phone</Label>
+                <Label>Contact phone (optional)</Label>
                 <Input value={focalPhone} onChange={(e) => setFocalPhone(e.target.value)} className="h-12" placeholder="0801…" />
               </div>
               <div className="space-y-1.5">
