@@ -417,6 +417,14 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
               ))}
             </SelectContent>
           </Select>
+          <OwnerSubmissionManager
+            table="ces_surveys"
+            title="CES surveys"
+            labelColumns={["community_name", "settlement_name", "lga"]}
+            filter={selectedProject ? { column: "project_id", value: selectedProject } : null}
+            compact
+            className="w-full sm:w-auto"
+          />
         </div>
       </div>
 
