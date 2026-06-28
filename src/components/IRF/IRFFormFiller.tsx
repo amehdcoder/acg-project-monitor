@@ -13,21 +13,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import * as Icons from "lucide-react";
-import { IRF_SECTIONS, IRF_FORM_NAME, type IrfField } from "@/lib/irf/definition";
+import { IRF_SECTIONS, IRF_FORM_NAME, OTHER_OPTION, type IrfField } from "@/lib/irf/definition";
 import irfBg from "@/assets/irf-bg.jpg";
 
-/** Subtle, professional brand watermark used behind IRF screens. */
+/** Subtle, professional brand watermark that covers the entire IRF interface. */
 export function IrfWatermark() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+      {/* Full-bleed brand image, very low opacity so content stays legible */}
       <img
         src={irfBg}
         alt=""
         loading="lazy"
-        width={1280}
-        height={1280}
-        className="absolute bottom-0 right-0 h-[55vh] w-auto max-w-none object-contain opacity-[0.08] sm:opacity-[0.10]"
+        className="absolute inset-0 h-full w-full object-cover opacity-[0.06]"
       />
+      {/* Soft wash to keep text crisp over the imagery */}
+      <div className="absolute inset-0 bg-background/55" />
     </div>
   );
 }
@@ -83,6 +84,16 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
     }
     setSaving(true);
     try {
+      // Resolve "Other (specify)" selections into their typed text, then drop temp keys.
+      const resolved: Record<string, any> = {};
+      Object.keys(values).forEach((k) => {
+        if (k.endsWith("__other")) return; // temp specify holder, handled below
+        if (values[k] === OTHER_OPTION) {
+          resolved[k] = (values[`${k}__other`] || "").trim() || OTHER_OPTION;
+        } else {
+          resolved[k] = values[k];
+        }
+      });
       const payload: Record<string, any> = {
         project_id: projectId || null,
         created_by: user?.id,
@@ -93,10 +104,10 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
         narrative: narrative || null,
         gps_lat: position?.lat ?? null, gps_lng: position?.lng ?? null,
         submission_status: "submitted",
-        ...values,
+        ...resolved,
       };
       // Coerce empties for typed columns.
-      Object.keys(values).forEach((k) => { if (values[k] === "") payload[k] = null; });
+      Object.keys(resolved).forEach((k) => { if (resolved[k] === "") payload[k] = null; });
       const { error } = await supabase.from("irf_reports" as any).insert(payload);
       if (error) throw error;
       setDone(true);
@@ -155,12 +166,24 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
           <Input type="date" value={v} onChange={(e) => setVal(f.key, e.target.value)} className="h-12 text-base" />
         )}
         {f.type === "select" && (
-          <Select value={v || undefined} onValueChange={(val) => setVal(f.key, val)}>
-            <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Select…" /></SelectTrigger>
-            <SelectContent>
-              {f.options?.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <>
+            <Select value={v || undefined} onValueChange={(val) => setVal(f.key, val)}>
+              <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Select…" /></SelectTrigger>
+              <SelectContent>
+                {f.options?.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                {f.allowOther && <SelectItem value={OTHER_OPTION}>{OTHER_OPTION}</SelectItem>}
+              </SelectContent>
+            </Select>
+            {f.allowOther && v === OTHER_OPTION && (
+              <Input
+                autoFocus
+                value={values[`${f.key}__other`] ?? ""}
+                onChange={(e) => setVal(`${f.key}__other`, e.target.value)}
+                placeholder="Please specify…"
+                className="mt-2 h-12 text-base"
+              />
+            )}
+          </>
         )}
         {f.type === "boolean" && (
           <div className="flex h-12 items-center justify-between rounded-md border border-input px-3">
@@ -179,14 +202,19 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
     <div className="relative mx-auto w-full max-w-3xl pb-28">
       <IrfWatermark />
       {/* Header */}
-      <div className="sticky top-0 z-20 flex items-center gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur">
-        <Button variant="ghost" size="icon" onClick={onClose}><ArrowLeft className="h-5 w-5" /></Button>
-        <div className="min-w-0">
-          <h1 className="truncate text-base font-bold text-foreground sm:text-lg">{IRF_FORM_NAME}</h1>
-          <p className="truncate text-xs text-muted-foreground">
-            {position ? <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> GPS locked</span> : "Acquiring GPS…"}
+      <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/10 bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3 shadow-sm">
+        <Button variant="ghost" size="icon" onClick={onClose} className="text-white hover:bg-white/10"><ArrowLeft className="h-5 w-5" /></Button>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-base font-bold text-white sm:text-lg">{IRF_FORM_NAME}</h1>
+          <p className="truncate text-xs text-white/70">
+            {position
+              ? <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> GPS locked · ready to report</span>
+              : "Acquiring GPS…"}
           </p>
         </div>
+        <span className="hidden shrink-0 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white sm:inline">
+          Step {step + 1}/{totalSteps}
+        </span>
       </div>
 
       {/* Progress */}

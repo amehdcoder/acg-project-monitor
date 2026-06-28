@@ -22,10 +22,15 @@ export interface IrfField {
   what?: string; // "what to record" helper
   type: IrfFieldType;
   options?: readonly string[];
+  /** When true, a select adds an "Other (specify)" choice with a free-text box. */
+  allowOther?: boolean;
   example?: string;
   /** Numeric fields that should roll up into dashboard totals. */
   metric?: boolean;
 }
+
+/** Sentinel value used for the "Other (specify)" option in selects. */
+export const OTHER_OPTION = "Other (specify)";
 
 export interface IrfSection {
   id: string;
@@ -92,14 +97,14 @@ export const IRF_SECTIONS: IrfSection[] = [
         activity: "Healthcare Workers",
         fields: [
           { key: "healthcare_workers_engaged", label: "Healthcare workers engaged", what: "Health staff reached", type: "number", metric: true, example: "12" },
-          { key: "healthcare_facility_type", label: "Type of facility", what: "PHC, General Hospital, etc.", type: "text", example: "PHC" },
+          { key: "healthcare_facility_type", label: "Type of facility", what: "PHC, General Hospital, etc.", type: "select", allowOther: true, options: ["PHC", "General Hospital", "Teaching Hospital", "Private Clinic", "Patent Medicine Vendor"], example: "PHC" },
         ],
       },
       {
         activity: "Religious Leaders",
         fields: [
           { key: "religious_leaders_engaged", label: "Religious leaders engaged", what: "Imams / pastors engaged", type: "number", metric: true, example: "6" },
-          { key: "religious_leaders_support_mode", label: "Mode of support", what: "Sermons, announcements", type: "text", example: "Friday sermon" },
+          { key: "religious_leaders_support_mode", label: "Mode of support", what: "Sermons, announcements", type: "select", allowOther: true, options: ["Friday sermon", "Church announcement", "Public announcement", "Door-to-door outreach", "Community gathering"], example: "Friday sermon" },
         ],
       },
     ],
@@ -152,7 +157,7 @@ export const IRF_SECTIONS: IrfSection[] = [
         activity: "Non-compliance Issues",
         fields: [
           { key: "noncompliance_cases", label: "Cases identified", what: "Number of refusal / non-compliance cases", type: "number", metric: true, example: "8" },
-          { key: "noncompliance_type", label: "Type of issue", what: "Reason for refusal", type: "text", example: "Misinformation" },
+          { key: "noncompliance_type", label: "Type of issue", what: "Reason for refusal", type: "select", allowOther: true, options: ["Misinformation", "Religious belief", "Fear of side effects", "Distrust of government", "Caregiver absent", "Child sick / ineligible"], example: "Misinformation" },
         ],
       },
       {
@@ -172,7 +177,7 @@ export const IRF_SECTIONS: IrfSection[] = [
       {
         activity: "Resolution & Follow-up",
         fields: [
-          { key: "resolution_method", label: "Approach used", what: "Dialogue, leader engagement", type: "text", example: "Religious leader" },
+          { key: "resolution_method", label: "Approach used", what: "Dialogue, leader engagement", type: "select", allowOther: true, options: ["One-on-one dialogue", "Religious leader engagement", "Traditional leader engagement", "Health education", "Referral to facility"], example: "Religious leader engagement" },
           { key: "followup_date", label: "Follow-up date", what: "Date revisited", type: "date" },
         ],
       },
