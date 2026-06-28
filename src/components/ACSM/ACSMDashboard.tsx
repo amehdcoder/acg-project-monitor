@@ -164,15 +164,9 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                 >
                   <Sparkles className="h-4 w-4" /> {simulate ? "Simulating" : "Simulate"}
                 </button>
-          )}
-
-          {/* Realtime sync + duplicate review */}
-          <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <AcsmKpiSyncPanel sync={kpiSync} getPayload={buildKpiPayload} canManage={isAdmin || isOwnerLevel} dark />
-            <DuplicateReviewPanel projectId={projectId} dark />
-          </div>
-
+              )}
               <button onClick={() => reload()} className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ border: `1px solid ${C.border}`, color: C.sub }}>
+
                 <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               </button>
               <button className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold text-[#06121f]" style={{ background: `linear-gradient(135deg, ${C.primary}, ${C.blue})` }}>
