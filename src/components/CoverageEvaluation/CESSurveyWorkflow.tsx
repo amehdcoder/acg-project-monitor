@@ -3641,7 +3641,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 size="sm"
                 variant="acg"
                 disabled={!gps}
-                onClick={() => { if (gps) handleMapTap(gps.lat, gps.lng); }}
+                  onClick={() => { if (gps) handleMapTap(gps.lat, gps.lng); }}
               >
                 <MapPin className="h-4 w-4 mr-1" /> Capture Live Location
               </Button>
