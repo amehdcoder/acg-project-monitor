@@ -34,7 +34,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
   const [category, setCategory] = useState<AcsmCategory | "all">("results_of_advocacy");
   const {
     stats, statusDistribution, trend, topLocations, indicatorRows, points,
-    dataQuality, loading, reload, simulate, setSimulate,
+    dataQuality, loading, reload, simulate, setSimulate, duplicateInfo,
   } = useAcsmDashboard(projectId, category);
   const { isOwnerLevel } = useAuth();
 
