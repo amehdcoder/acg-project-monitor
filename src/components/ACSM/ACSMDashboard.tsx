@@ -218,10 +218,10 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
 
           {/* Filters bar */}
           <div className="mb-5 flex flex-wrap gap-3">
-            <FilterChip icon={Calendar} label="Reporting Period" value="May 2025" />
-            <FilterChip icon={MapPin} label="Location" value="All Locations" />
-            <FilterChip icon={Layers} label="Category" value={category === "all" ? "All" : categoryLabel(category)} />
-            <FilterChip icon={Users} label="Responsible Officer" value="All Officers" />
+            <FilterChip icon={Calendar} label="Reporting Period" value="May 2025" palette={C} />
+            <FilterChip icon={MapPin} label="Location" value="All Locations" palette={C} />
+            <FilterChip icon={Layers} label="Category" value={category === "all" ? "All" : categoryLabel(category)} palette={C} />
+            <FilterChip icon={Users} label="Responsible Officer" value="All Officers" palette={C} />
             <div className="ml-auto flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px]" style={{ background: C.blue, color: "#fff" }}>
               <Filter className="h-4 w-4" /> Filters
             </div>
@@ -229,17 +229,17 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
 
           {/* KPI cards */}
           <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            <Kpi icon={Users} label="People Benefiting" value={fmt(stats.peopleBenefiting)} tint={C.primary} delta="+18.6%" up />
-            <Kpi icon={CheckCircle2} label="Indicators On Track" value={String(stats.onTrack)} tint="#22c55e" delta={`${pct(stats.onTrack, stats.total)}% of total`} up />
-            <Kpi icon={AlertTriangle} label="At Risk" value={String(stats.atRisk)} tint="#f59e0b" delta={`${pct(stats.atRisk, stats.total)}% of total`} />
-            <Kpi icon={Ban} label="Behind Target" value={String(stats.behind)} tint="#ef4444" delta={`${pct(stats.behind, stats.total)}% of total`} down />
-            <Kpi icon={CircleDashed} label="Draft / Pending" value={String(stats.draft)} tint={C.blue} delta={`${pct(stats.draft, stats.total)}% of total`} />
-            <Kpi icon={TrendingUp} label="Avg Achievement" value={`${stats.avgAchievement}%`} tint={achievementColor(stats.avgAchievement)} delta="this period" up />
+            <Kpi icon={Users} label="People Benefiting" value={fmt(stats.peopleBenefiting)} tint={C.primary} delta="+18.6%" up palette={C} />
+            <Kpi icon={CheckCircle2} label="Indicators On Track" value={String(stats.onTrack)} tint="#22c55e" delta={`${pct(stats.onTrack, stats.total)}% of total`} up palette={C} />
+            <Kpi icon={AlertTriangle} label="At Risk" value={String(stats.atRisk)} tint="#f59e0b" delta={`${pct(stats.atRisk, stats.total)}% of total`} palette={C} />
+            <Kpi icon={Ban} label="Behind Target" value={String(stats.behind)} tint="#ef4444" delta={`${pct(stats.behind, stats.total)}% of total`} down palette={C} />
+            <Kpi icon={CircleDashed} label="Draft / Pending" value={String(stats.draft)} tint={C.blue} delta={`${pct(stats.draft, stats.total)}% of total`} palette={C} />
+            <Kpi icon={TrendingUp} label="Avg Achievement" value={`${stats.avgAchievement}%`} tint={achievementColor(stats.avgAchievement)} delta="this period" up palette={C} />
           </div>
 
           {/* Trend + Status + Top locations */}
           <div className="mb-5 grid grid-cols-1 gap-4 xl:grid-cols-[1.3fr_1fr_1fr]">
-            <Panel title="Achievement Trend" sub="This period vs previous 6 periods">
+            <Panel title="Achievement Trend" sub="This period vs previous 6 periods" palette={C}>
               <ResponsiveContainer width="100%" height={230}>
                 <LineChart data={trend} margin={{ top: 8, right: 12, bottom: 0, left: -18 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={C.borderSoft} vertical={false} />
@@ -252,7 +252,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
               </ResponsiveContainer>
             </Panel>
 
-            <Panel title="Status Distribution" sub={`${stats.total} indicators`}>
+            <Panel title="Status Distribution" sub={`${stats.total} indicators`} palette={C}>
               <div className="flex items-center gap-3">
                 <ResponsiveContainer width="55%" height={200}>
                   <PieChart>
@@ -275,7 +275,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
               </div>
             </Panel>
 
-            <Panel title="Top Performing Locations">
+            <Panel title="Top Performing Locations" palette={C}>
               <div className="space-y-2.5">
                 {topLocations.length === 0 && <p className="text-[13px]" style={{ color: C.sub }}>No data yet.</p>}
                 {topLocations.map((l) => (
@@ -295,7 +295,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
 
           {/* Data quality + map */}
           <div className="mb-5 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.4fr]">
-            <Panel title="Data Quality Overview">
+            <Panel title="Data Quality Overview" palette={C}>
               <div className="flex items-center gap-5">
                 <div className="relative flex h-28 w-28 shrink-0 items-center justify-center">
                   <svg viewBox="0 0 36 36" className="h-28 w-28 -rotate-90">
@@ -328,7 +328,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
               </div>
             </Panel>
 
-            <Panel title="Geospatial Distribution" sub={`${markers.length} reporting points`}>
+            <Panel title="Geospatial Distribution" sub={`${markers.length} reporting points`} palette={C}>
               <div className="overflow-hidden rounded-xl" style={{ border: `1px solid ${C.borderSoft}` }}>
                 <MapVisualization markers={markers} height="320px" showNigeriaBoundaries showLegend={false} />
               </div>
@@ -338,6 +338,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
           {/* Indicator table */}
           <Panel
             title={`${category === "all" ? "All" : categoryLabel(category)} Indicators (${filtered.length})`}
+            palette={C}
             right={
               <div className="flex items-center gap-2 rounded-lg px-2.5 py-1.5" style={{ background: C.panel2, border: `1px solid ${C.border}` }}>
                 <Search className="h-3.5 w-3.5" style={{ color: C.sub }} />
