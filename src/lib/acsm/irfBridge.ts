@@ -210,3 +210,103 @@ export function irfSignature(r: IrfReport): string {
 export function irfOrder(r: IrfReport): number {
   return new Date(r.created_at || 0).getTime();
 }
+
+// ---------------------------------------------------------------------------------------
+// Native ACSM report signature (kept here so the review panel + dashboards share it).
+// ---------------------------------------------------------------------------------------
+export function acsmSignature(r: any): string {
+  return [
+    norm(r.indicator), norm(r.category), norm(r.state), norm(r.lga), norm(r.ward),
+    norm(r.reporting_period), norm(r.responsible_officer),
+    Number(r.target_value) || 0, Number(r.actual_achieved) || 0,
+  ].join("|");
+}
+
+export function acsmOrder(r: any): number {
+  return new Date(r.created_at || 0).getTime();
+}
+
+// ---------------------------------------------------------------------------------------
+// Admin duplicate-flag overrides.
+//   • "unique"   => force-include a row in the unique set even if auto-flagged duplicate.
+//   • "rejected" => exclude a row entirely (not unique, not counted anywhere).
+// Overrides are keyed by submission id and applied after auto-detection so a manual
+// admin review always wins.
+// ---------------------------------------------------------------------------------------
+export type OverrideDecision = "unique" | "rejected";
+
+/** submission_id -> decision */
+export type OverrideMap = Map<string, OverrideDecision>;
+
+export interface OverriddenDuplicateResult<T> {
+  unique: T[];
+  /** rows still considered duplicates after applying overrides */
+  duplicates: T[];
+  /** rows an admin explicitly rejected */
+  rejected: T[];
+  duplicateIds: Set<string>;
+  uniqueCount: number;
+  duplicateCount: number;
+  rejectedCount: number;
+  /** number of auto-flags an admin overrode to unique */
+  overriddenToUnique: number;
+}
+
+export function buildOverrideMap(
+  overrides: Array<{ submission_id: string; decision: string }>,
+  table?: string,
+  filterTable?: string,
+): OverrideMap {
+  const m: OverrideMap = new Map();
+  for (const o of overrides) {
+    if (filterTable && table && table !== filterTable) continue;
+    if (o.decision === "unique" || o.decision === "rejected") {
+      m.set(o.submission_id, o.decision);
+    }
+  }
+  return m;
+}
+
+export function applyOverrides<T>(
+  res: DuplicateResult<T>,
+  idFn: (row: T) => string,
+  overrides?: OverrideMap | null,
+): OverriddenDuplicateResult<T> {
+  if (!overrides || overrides.size === 0) {
+    return {
+      unique: res.unique,
+      duplicates: res.duplicates,
+      rejected: [],
+      duplicateIds: res.duplicateIds,
+      uniqueCount: res.uniqueCount,
+      duplicateCount: res.duplicateCount,
+      rejectedCount: 0,
+      overriddenToUnique: 0,
+    };
+  }
+  const unique: T[] = [];
+  const duplicates: T[] = [];
+  const rejected: T[] = [];
+  const duplicateIds = new Set<string>();
+  let overriddenToUnique = 0;
+  const computedDup = res.duplicateIds;
+  for (const row of [...res.unique, ...res.duplicates]) {
+    const id = idFn(row);
+    const ov = overrides.get(id);
+    if (ov === "rejected") { rejected.push(row); continue; }
+    if (ov === "unique") {
+      unique.push(row);
+      if (computedDup.has(id)) overriddenToUnique++;
+      continue;
+    }
+    if (computedDup.has(id)) { duplicates.push(row); duplicateIds.add(id); }
+    else unique.push(row);
+  }
+  return {
+    unique, duplicates, rejected, duplicateIds,
+    uniqueCount: unique.length,
+    duplicateCount: duplicates.length,
+    rejectedCount: rejected.length,
+    overriddenToUnique,
+  };
+}

@@ -208,6 +208,48 @@ export type Database = {
         }
         Relationships: []
       }
+      acsm_duplicate_overrides: {
+        Row: {
+          created_at: string
+          decision: string
+          id: string
+          project_id: string | null
+          reason: string | null
+          reviewed_by: string | null
+          reviewed_by_name: string | null
+          signature: string | null
+          source_table: string
+          submission_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          decision: string
+          id?: string
+          project_id?: string | null
+          reason?: string | null
+          reviewed_by?: string | null
+          reviewed_by_name?: string | null
+          signature?: string | null
+          source_table: string
+          submission_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          decision?: string
+          id?: string
+          project_id?: string | null
+          reason?: string | null
+          reviewed_by?: string | null
+          reviewed_by_name?: string | null
+          signature?: string | null
+          source_table?: string
+          submission_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       acsm_reports: {
         Row: {
           achievement_pct: number | null

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import {
   ArrowLeft, Megaphone, Bell, HelpCircle, Download, Filter, Calendar, MapPin,
   Layers, Users, ListChecks, ChevronLeft, ChevronRight, Search, TrendingUp,
@@ -17,6 +17,10 @@ import {
   ACSM_CATEGORIES, STATUS_META, achievementColor, formatByUnit, findIndicator,
   categoryLabel, indicatorLevelLabel, type AcsmCategory, type AcsmStatus,
 } from "@/lib/acsm/definition";
+import { useAcsmDuplicateOverrides } from "@/hooks/useAcsmDuplicateOverrides";
+import { useAcsmKpiSync, type AcsmKpiPayload } from "@/hooks/useAcsmKpiSync";
+import DuplicateReviewPanel from "@/components/ACSM/DuplicateReviewPanel";
+import AcsmKpiSyncPanel from "@/components/ACSM/AcsmKpiSyncPanel";
 
 interface Props {
   projectId?: string | null;
@@ -32,11 +36,47 @@ const fmt = (n: number) => n.toLocaleString();
 
 export default function ACSMDashboard({ projectId, onClose }: Props) {
   const [category, setCategory] = useState<AcsmCategory | "all">("results_of_advocacy");
+  const overrides = useAcsmDuplicateOverrides(projectId);
   const {
     stats, statusDistribution, trend, topLocations, indicatorRows, points,
     dataQuality, loading, reload, simulate, setSimulate, duplicateInfo,
-  } = useAcsmDashboard(projectId, category);
-  const { isOwnerLevel } = useAuth();
+  } = useAcsmDashboard(projectId, category, { acsmMap: overrides.acsmMap, irfMap: overrides.irfMap });
+  const { isOwnerLevel, isAdmin } = useAuth();
+  const kpiSync = useAcsmKpiSync(projectId);
+
+  const buildKpiPayload = useCallback((): AcsmKpiPayload => ({
+    generatedAt: new Date().toISOString(),
+    projectName: projectId || undefined,
+    kpis: [
+      { key: "people_benefiting", label: "People Benefiting", value: stats.peopleBenefiting, source: "linked" },
+      { key: "indicators_total", label: "Total Indicators", value: stats.total, source: "linked" },
+      { key: "on_track", label: "Indicators On Track", value: stats.onTrack, source: "linked" },
+      { key: "at_risk", label: "Indicators At Risk", value: stats.atRisk, source: "linked" },
+      { key: "behind", label: "Indicators Behind Target", value: stats.behind, source: "linked" },
+      { key: "avg_achievement", label: "Average Achievement", value: stats.avgAchievement, unit: "%", source: "linked" },
+      { key: "irf_contributing", label: "IRF Submissions Contributing", value: duplicateInfo.irfUnique, source: "irf" },
+      { key: "duplicates_excluded", label: "Duplicates Excluded", value: duplicateInfo.total, source: "integrity" },
+    ],
+    indicators: indicatorRows.map((r) => ({
+      code: r.code, name: r.name, category: r.category, level: r.level, unit: r.unit,
+      target: r.target, actual: r.actual, pct: r.pct, status: r.status,
+      officer: r.officer, lastUpdated: r.lastUpdated, source: (r as any)._source || "acsm",
+    })),
+    duplicates: {
+      acsmDuplicates: duplicateInfo.acsmDuplicates, irfDuplicates: duplicateInfo.irfDuplicates,
+      total: duplicateInfo.total, irfReports: duplicateInfo.irfReports, irfUnique: duplicateInfo.irfUnique,
+      overriddenToUnique: [...overrides.acsmMap.values(), ...overrides.irfMap.values()].filter((d) => d === "unique").length,
+      rejected: [...overrides.acsmMap.values(), ...overrides.irfMap.values()].filter((d) => d === "rejected").length,
+    },
+  }), [stats, indicatorRows, duplicateInfo, overrides.acsmMap, overrides.irfMap, projectId]);
+
+  // Realtime auto-publish to Google Sheets → Looker Studio whenever the
+  // deduplicated KPIs or admin duplicate decisions change.
+  useEffect(() => {
+    if (loading) return;
+    kpiSync.autoSync(buildKpiPayload());
+  }, [loading, buildKpiPayload, kpiSync]);
+
 
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
@@ -126,6 +166,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                 </button>
               )}
               <button onClick={() => reload()} className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ border: `1px solid ${C.border}`, color: C.sub }}>
+
                 <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               </button>
               <button className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold text-[#06121f]" style={{ background: `linear-gradient(135deg, ${C.primary}, ${C.blue})` }}>
@@ -153,6 +194,12 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
               )}
             </div>
           )}
+
+          {/* Realtime sync + duplicate review */}
+          <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <AcsmKpiSyncPanel sync={kpiSync} getPayload={buildKpiPayload} canManage={isAdmin || isOwnerLevel} dark />
+            <DuplicateReviewPanel projectId={projectId} dark />
+          </div>
 
           {/* Filters bar */}
           <div className="mb-5 flex flex-wrap gap-3">

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
-import { flagDuplicates, irfSignature, irfOrder } from "@/lib/acsm/irfBridge";
+import { flagDuplicates, applyOverrides, irfSignature, irfOrder, type OverrideMap } from "@/lib/acsm/irfBridge";
 import { IRF_METRIC_FIELDS, IRF_SECTIONS, type IrfReport } from "@/lib/irf/definition";
 
 async function fetchAll(projectId?: string | null): Promise<IrfReport[]> {
@@ -15,8 +15,8 @@ async function fetchAll(projectId?: string | null): Promise<IrfReport[]> {
 
 const num = (v: any) => (v == null || v === "" ? 0 : Number(v) || 0);
 
-export const useIrfDashboard = (projectId?: string | null) => {
-  const [rows, setRows] = useState<IrfReport[]>([]);
+export const useIrfDashboard = (projectId?: string | null, overrideMap?: OverrideMap | null) => {
+  const [rawRows, setRawRows] = useState<IrfReport[]>([]);
   const [loading, setLoading] = useState(true);
   const reqIdRef = useRef(0);
 
@@ -26,7 +26,7 @@ export const useIrfDashboard = (projectId?: string | null) => {
     try {
       const data = await fetchAll(projectId);
       if (myReq !== reqIdRef.current) return;
-      setRows(data);
+      setRawRows(data);
     } finally {
       if (myReq === reqIdRef.current) setLoading(false);
     }
@@ -50,6 +50,19 @@ export const useIrfDashboard = (projectId?: string | null) => {
     return () => { supabase.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
+
+  // Duplicate detection + admin overrides. Rejected submissions are dropped from all
+  // analyses; "unique" overrides force-include auto-flagged rows. The remaining
+  // (active) rows feed every KPI so unique counts stay authoritative.
+  const dedup = useMemo(() => {
+    const res = flagDuplicates(rawRows, irfSignature, (r) => r.id, irfOrder);
+    return applyOverrides(res, (r) => r.id, overrideMap);
+  }, [rawRows, overrideMap]);
+
+  const rejectedIds = useMemo(() => new Set(dedup.rejected.map((r) => r.id)), [dedup]);
+  const rows = useMemo(() => rawRows.filter((r) => !rejectedIds.has(r.id)), [rawRows, rejectedIds]);
+
+
 
   // Headline totals across all metric fields.
   const totals = useMemo(() => {
@@ -160,19 +173,18 @@ export const useIrfDashboard = (projectId?: string | null) => {
     return Math.round((complete / rows.length) * 100);
   }, [rows]);
 
-  // Duplicate flagging + unique counts (same logic shared with the Advocacy Dashboard).
-  const duplicates = useMemo(() => {
-    const res = flagDuplicates(rows, irfSignature, (r) => r.id, irfOrder);
-    return {
-      duplicateIds: res.duplicateIds,
-      duplicateCount: res.duplicateCount,
-      uniqueCount: res.uniqueCount,
-      totalCount: rows.length,
-    };
-  }, [rows]);
+  // Duplicate flagging + unique counts (override-aware; shared with the Advocacy Dashboard).
+  const duplicates = useMemo(() => ({
+    duplicateIds: dedup.duplicateIds,
+    duplicateCount: dedup.duplicateCount,
+    uniqueCount: dedup.uniqueCount,
+    rejectedCount: dedup.rejectedCount,
+    overriddenToUnique: dedup.overriddenToUnique,
+    totalCount: rawRows.length,
+  }), [dedup, rawRows.length]);
 
   return {
-    rows, loading, reload, duplicates,
+    rows, rawRows, loading, reload, duplicates,
     totals, stats, sectionTotals, genderSplit, ncBreakdown, topLgas, trend, points, dataQuality,
   };
 };

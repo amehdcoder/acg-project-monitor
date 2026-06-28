@@ -10,6 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useIrfDashboard } from "@/hooks/useIrfDashboard";
+import { useAcsmDuplicateOverrides } from "@/hooks/useAcsmDuplicateOverrides";
+import DuplicateReviewPanel from "@/components/ACSM/DuplicateReviewPanel";
 import { IRF_DASH_NAME } from "@/lib/irf/definition";
 import { IrfWatermark } from "@/components/IRF/IRFFormFiller";
 
@@ -38,8 +40,9 @@ function Kpi({ icon: Icon, label, value, sub, color }: { icon: any; label: strin
 }
 
 export default function IRFDashboard({ projectId, onClose }: Props) {
+  const overrides = useAcsmDuplicateOverrides(projectId);
   const { rows, loading, reload, stats, sectionTotals, genderSplit, ncBreakdown, topLgas, trend, dataQuality, duplicates } =
-    useIrfDashboard(projectId);
+    useIrfDashboard(projectId, overrides.irfMap);
   const [exporting, setExporting] = useState(false);
 
   const exportCsv = () => {
@@ -95,6 +98,10 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
               <span>{fmt(duplicates.uniqueCount)} unique of {fmt(duplicates.totalCount)} total reports</span>
             </div>
           )}
+
+          {/* Admin duplicate review — decisions recompute counts on both dashboards */}
+          <DuplicateReviewPanel projectId={projectId} />
+
           {/* KPIs */}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Kpi icon={Users} label="People Reached" value={fmt(stats.peopleReached)} sub="Reach + attendance" color="#0891b2" />

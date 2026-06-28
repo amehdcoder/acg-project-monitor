@@ -7,7 +7,8 @@ import {
 import { generateAcsmSimulation } from "@/lib/acsm/simulation";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
 import {
-  mapIrfRowsToAcsmRows, flagDuplicates, irfSignature, irfOrder,
+  mapIrfRowsToAcsmRows, flagDuplicates, applyOverrides, irfSignature, irfOrder,
+  type OverrideMap,
 } from "@/lib/acsm/irfBridge";
 import type { IrfReport } from "@/lib/irf/definition";
 
@@ -99,7 +100,11 @@ export interface AcsmDuplicateInfo {
 const MONTHS = ["Nov 2024", "Dec 2024", "Jan 2025", "Feb 2025", "Mar 2025", "Apr 2025", "May 2025"];
 
 
-export const useAcsmDashboard = (projectId?: string | null, categoryFilter: AcsmCategory | "all" = "all") => {
+export const useAcsmDashboard = (
+  projectId?: string | null,
+  categoryFilter: AcsmCategory | "all" = "all",
+  overrides?: { acsmMap?: OverrideMap | null; irfMap?: OverrideMap | null },
+) => {
   const [allRows, setAllRows] = useState<AcsmRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [simulate, setSimulate] = useState(false);
@@ -110,6 +115,13 @@ export const useAcsmDashboard = (projectId?: string | null, categoryFilter: Acsm
   const reqIdRef = useRef(0);
   const simulateRef = useRef(simulate);
   simulateRef.current = simulate;
+  const overridesRef = useRef(overrides);
+  overridesRef.current = overrides;
+  const overrideSig = useMemo(() => {
+    const ser = (m?: OverrideMap | null) =>
+      m ? [...m.entries()].map(([k, v]) => `${k}:${v}`).sort().join(",") : "";
+    return `${ser(overrides?.acsmMap)}|${ser(overrides?.irfMap)}`;
+  }, [overrides?.acsmMap, overrides?.irfMap]);
 
   const reload = async () => {
     const myReq = ++reqIdRef.current;
@@ -118,14 +130,16 @@ export const useAcsmDashboard = (projectId?: string | null, categoryFilter: Acsm
       const [acsmRaw, irfRaw] = await Promise.all([fetchAll(projectId), fetchIrf(projectId)]);
       if (myReq !== reqIdRef.current || simulateRef.current) return;
 
-      // De-duplicate native ACSM reports.
-      const acsmDedup = flagDuplicates(
+      // De-duplicate native ACSM reports, then apply any admin overrides.
+      const acsmBase = flagDuplicates(
         acsmRaw, acsmSignature, (r) => r.id,
         (r) => new Date(r.created_at || 0).getTime(),
       );
+      const acsmDedup = applyOverrides(acsmBase, (r) => r.id, overridesRef.current?.acsmMap);
       // De-duplicate IRF submissions BEFORE mapping so duplicates can't inflate the
-      // Advocacy Dashboard contributions.
-      const irfDedup = flagDuplicates(irfRaw, irfSignature, (r) => r.id, irfOrder);
+      // Advocacy Dashboard contributions; admin overrides win here too.
+      const irfBase = flagDuplicates(irfRaw, irfSignature, (r) => r.id, irfOrder);
+      const irfDedup = applyOverrides(irfBase, (r) => r.id, overridesRef.current?.irfMap);
       const derived = mapIrfRowsToAcsmRows(irfDedup.unique);
 
       setAllRows([...acsmDedup.unique, ...derived]);
@@ -154,7 +168,7 @@ export const useAcsmDashboard = (projectId?: string | null, categoryFilter: Acsm
       if (myReq === reqIdRef.current) reqIdRef.current++;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simulate, projectId]);
+  }, [simulate, projectId, overrideSig]);
 
   // Realtime: refresh when either the ACSM IRF table or the IRF table changes.
   useEffect(() => {
