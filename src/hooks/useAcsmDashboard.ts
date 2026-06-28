@@ -67,7 +67,35 @@ async function fetchAll(projectId?: string | null): Promise<AcsmRow[]> {
   return all;
 }
 
+async function fetchIrf(projectId?: string | null): Promise<IrfReport[]> {
+  return fetchAllRowsKeyset<IrfReport>((limit, afterId) => {
+    let q = supabase.from("irf_reports" as any).select("*");
+    if (projectId) q = q.eq("project_id", projectId);
+    if (afterId) q = q.gt("id", afterId);
+    return q.order("id", { ascending: true }).limit(limit);
+  });
+}
+
+/** Signature for a native ACSM report (duplicate detection on the Advocacy Dashboard). */
+const norm = (v: any) => String(v ?? "").trim().toLowerCase();
+function acsmSignature(r: AcsmRow): string {
+  return [
+    norm(r.indicator), norm(r.category), norm(r.state), norm(r.lga), norm(r.ward),
+    norm(r.reporting_period), norm(r.responsible_officer),
+    Number(r.target_value) || 0, Number(r.actual_achieved) || 0,
+  ].join("|");
+}
+
+export interface AcsmDuplicateInfo {
+  acsmDuplicates: number;
+  irfDuplicates: number;
+  total: number;
+  irfReports: number;
+  irfUnique: number;
+}
+
 const MONTHS = ["Nov 2024", "Dec 2024", "Jan 2025", "Feb 2025", "Mar 2025", "Apr 2025", "May 2025"];
+
 
 export const useAcsmDashboard = (projectId?: string | null, categoryFilter: AcsmCategory | "all" = "all") => {
   const [allRows, setAllRows] = useState<AcsmRow[]>([]);
