@@ -291,6 +291,15 @@
     height: auto;
   }
 
+  .ces-survey-map {
+    touch-action: pan-y pinch-zoom;
+    overscroll-behavior: contain;
+  }
+
+  .ces-survey-map .leaflet-container {
+    touch-action: pan-y pinch-zoom;
+  }
+
   /* Long words/URLs wrap instead of overflowing */
   p, span, h1, h2, h3, h4, h5, h6, li, td, th, a {
     overflow-wrap: anywhere;
