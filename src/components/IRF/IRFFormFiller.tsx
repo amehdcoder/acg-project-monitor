@@ -281,10 +281,23 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
       </div>
 
       {/* Progress */}
-      <div className="relative z-10 flex gap-1.5 px-4 pt-3">
-        {Array.from({ length: totalSteps }).map((_, i) => (
-          <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i <= step ? "bg-primary" : "bg-muted"}`} />
-        ))}
+      <div className="relative z-10 space-y-2 px-4 pt-3 sm:px-6">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-semibold text-foreground">
+            {step === 0 ? "Report Identity" : IRF_SECTIONS[step - 1].short}
+          </span>
+          <span className="text-muted-foreground">Step {step + 1} of {totalSteps}</span>
+        </div>
+        <div className="flex gap-1.5">
+          {Array.from({ length: totalSteps }).map((_, i) => (
+            <div
+              key={i}
+              className={`h-1.5 flex-1 rounded-full transition-colors ${
+                i < step ? "bg-primary" : i === step ? "bg-primary/70" : "bg-muted"
+              }`}
+            />
+          ))}
+        </div>
       </div>
 
       <div className="relative z-10 px-4 py-4">
