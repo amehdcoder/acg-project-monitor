@@ -7465,6 +7465,10 @@ export type Database = {
       }
       owner_factory_reset: { Args: { _confirm: string }; Returns: Json }
       owner_mda_data_summary: { Args: { _form_id: string }; Returns: Json }
+      owner_permanent_delete_mda_submissions: {
+        Args: { _form_id: string; _from?: string; _to?: string }
+        Returns: Json
+      }
       owner_reset_bloomberg_validation_data: { Args: never; Returns: Json }
       owner_restore_mda_submissions: {
         Args: { _form_id: string; _from?: string; _to?: string }

@@ -35,6 +35,10 @@ interface Summary {
 interface ActionResult {
   archived?: number;
   restored?: number;
+  deleted?: number;
+  deleted_live?: number;
+  deleted_archived?: number;
+  deleted_versions?: number;
   error?: string;
   form_id?: string;
   consistency?: {
@@ -56,7 +60,7 @@ interface Props {
   onChanged?: () => void;
 }
 
-type Mode = "delete" | "restore";
+type Mode = "delete" | "restore" | "purge";
 
 const fmtDate = (v: string | null) => (v ? new Date(v).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" }) : "—");
 
@@ -105,23 +109,35 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
     setConfirmOpen(false);
     setBusy(true);
     try {
-      const fn = mode === "delete" ? "owner_archive_mda_submissions" : "owner_restore_mda_submissions";
+      const fn =
+        mode === "delete"
+          ? "owner_archive_mda_submissions"
+          : mode === "restore"
+            ? "owner_restore_mda_submissions"
+            : "owner_permanent_delete_mda_submissions";
       const { data, error } = await (supabase as any).rpc(fn, { _form_id: formId, ...rangeArgs() });
       if (error) throw error;
       const result = (data || {}) as ActionResult;
       if (result.error) throw new Error(result.error);
-      if (result.consistency && result.consistency.ok === false) {
+      if (mode !== "purge" && result.consistency && result.consistency.ok === false) {
         throw new Error("Consistency check failed. No dashboard refresh was applied; please contact support with the logged clear-submissions result.");
       }
-      const n = mode === "delete" ? (result.archived ?? 0) : (result.restored ?? 0);
+      const n =
+        mode === "delete"
+          ? (result.archived ?? 0)
+          : mode === "restore"
+            ? (result.restored ?? 0)
+            : (result.deleted ?? 0);
       toast.success(
         mode === "delete"
           ? `${n.toLocaleString()} submission(s) archived. Dashboard restored to live data.`
-          : `${n.toLocaleString()} submission(s) restored to the dashboard.`,
+          : mode === "restore"
+            ? `${n.toLocaleString()} submission(s) restored to the dashboard.`
+            : `${n.toLocaleString()} submission(s) permanently deleted. This cannot be undone.`,
       );
       const refreshed = await loadSummary();
       const c = result.consistency;
-      if (c) {
+      if (c && mode !== "purge") {
         console.info("MDA owner data-management consistency", c);
         const noOverlap = Number(c.live_archive_overlap || 0) === 0;
         const noOrphans = Number(c.submission_version_orphans || 0) === 0;
@@ -139,8 +155,16 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
     }
   };
 
-  const targetCount = mode === "delete" ? summary?.live_count ?? 0 : summary?.archived_count ?? 0;
-  const confirmPhrase = useMemo(() => `${mode === "delete" ? "CLEAR" : "RESTORE"} ${targetCount}`, [mode, targetCount]);
+  const targetCount =
+    mode === "delete"
+      ? summary?.live_count ?? 0
+      : mode === "restore"
+        ? summary?.archived_count ?? 0
+        : (summary?.live_count ?? 0) + (summary?.archived_count ?? 0);
+  const confirmPhrase = useMemo(
+    () => `${mode === "delete" ? "CLEAR" : mode === "restore" ? "RESTORE" : "DELETE"} ${targetCount}`,
+    [mode, targetCount],
+  );
   const canConfirm = confirmText.trim().toUpperCase() === confirmPhrase;
 
   const openConfirmation = async () => {
@@ -195,18 +219,24 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
             </div>
 
             {/* Mode toggle */}
-            <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted p-1">
+            <div className="grid grid-cols-3 gap-2 rounded-xl bg-muted p-1">
               <button
                 onClick={() => setMode("delete")}
-                className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition ${mode === "delete" ? "bg-background text-rose-700 shadow-sm" : "text-muted-foreground"}`}
+                className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium transition ${mode === "delete" ? "bg-background text-rose-700 shadow-sm" : "text-muted-foreground"}`}
               >
                 <Trash2 className="h-4 w-4" /> Archive
               </button>
               <button
                 onClick={() => setMode("restore")}
-                className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition ${mode === "restore" ? "bg-background text-emerald-700 shadow-sm" : "text-muted-foreground"}`}
+                className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium transition ${mode === "restore" ? "bg-background text-emerald-700 shadow-sm" : "text-muted-foreground"}`}
               >
                 <History className="h-4 w-4" /> Restore
+              </button>
+              <button
+                onClick={() => setMode("purge")}
+                className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium transition ${mode === "purge" ? "bg-background text-red-800 shadow-sm" : "text-muted-foreground"}`}
+              >
+                <Trash2 className="h-4 w-4" /> Delete
               </button>
             </div>
 
@@ -231,19 +261,23 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
                 </div>
               )}
               <p className="mt-2 text-[11px] text-muted-foreground">
-                {useRange
-                  ? `Only ${mode === "delete" ? "live" : "archived"} submissions in the selected period will be ${mode === "delete" ? "archived" : "restored"}.`
-                  : `All ${mode === "delete" ? "live" : "archived"} submissions will be ${mode === "delete" ? "archived" : "restored"}.`}
+                {mode === "purge"
+                  ? useRange
+                    ? "Live AND archived submissions in the selected period will be permanently deleted. This cannot be undone."
+                    : "ALL live AND archived submissions will be permanently deleted. This cannot be undone."
+                  : useRange
+                    ? `Only ${mode === "delete" ? "live" : "archived"} submissions in the selected period will be ${mode === "delete" ? "archived" : "restored"}.`
+                    : `All ${mode === "delete" ? "live" : "archived"} submissions will be ${mode === "delete" ? "archived" : "restored"}.`}
               </p>
             </div>
 
             <Button
-              className={`w-full ${mode === "delete" ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-600 hover:bg-emerald-700"}`}
+              className={`w-full ${mode === "delete" ? "bg-rose-600 hover:bg-rose-700" : mode === "restore" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-800 hover:bg-red-900"}`}
               disabled={busy || loading || targetCount === 0}
               onClick={openConfirmation}
             >
-              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : mode === "delete" ? <Trash2 className="mr-2 h-4 w-4" /> : <RotateCcw className="mr-2 h-4 w-4" />}
-              {mode === "delete" ? "Archive submissions" : "Restore submissions"}
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : mode === "restore" ? <RotateCcw className="mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              {mode === "delete" ? "Archive submissions" : mode === "restore" ? "Restore submissions" : "Permanently delete"}
             </Button>
           </div>
         </DialogContent>
@@ -253,13 +287,15 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className={mode === "delete" ? "h-5 w-5 text-rose-600" : "h-5 w-5 text-emerald-600"} />
-              {mode === "delete" ? "Archive submissions?" : "Restore submissions?"}
+              <AlertTriangle className={mode === "delete" ? "h-5 w-5 text-rose-600" : mode === "restore" ? "h-5 w-5 text-emerald-600" : "h-5 w-5 text-red-800"} />
+              {mode === "delete" ? "Archive submissions?" : mode === "restore" ? "Restore submissions?" : "Permanently delete submissions?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {mode === "delete"
                 ? `This will move ${useRange ? "the selected" : "all"} live submissions out of the dashboard into a protected archive. You can restore them at any time.`
-                : `This will move ${useRange ? "the selected" : "all"} archived submissions back into the live dashboard.`}
+                : mode === "restore"
+                  ? `This will move ${useRange ? "the selected" : "all"} archived submissions back into the live dashboard.`
+                  : `This will PERMANENTLY delete ${useRange ? "the selected" : "ALL"} live and archived submissions, including their edit history. This action CANNOT be undone.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3 rounded-lg border border-border bg-muted/40 p-3 text-sm">
@@ -284,11 +320,11 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className={mode === "delete" ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-600 hover:bg-emerald-700"}
+              className={mode === "delete" ? "bg-rose-600 hover:bg-rose-700" : mode === "restore" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-800 hover:bg-red-900"}
               disabled={!canConfirm || busy}
               onClick={run}
             >
-              {mode === "delete" ? "Yes, archive" : "Yes, restore"}
+              {mode === "delete" ? "Yes, archive" : mode === "restore" ? "Yes, restore" : "Yes, delete forever"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

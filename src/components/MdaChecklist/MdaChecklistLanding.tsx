@@ -318,12 +318,12 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
 
   // Build the FormFiller props for a focused sub-form / community checklist.
   const fillerProps = useCallback(
-    (focusGroupNames?: string[], initialResponses?: Record<string, any>) => ({
+    (focusGroupNames?: string[], initialResponses?: Record<string, any>, groupsOverride?: FormGroup[]) => ({
       formId: props.formId,
       formName: props.formName,
       formDescription: props.formDescription,
       questions: props.questions,
-      groups,
+      groups: groupsOverride ?? groups,
       geofence: props.geofence,
       userId: props.userId,
       projectId: props.projectId,
@@ -422,10 +422,49 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
     };
   };
 
-  // "Community Checklist" = all groups except the standalone follow-up subforms.
+  // "Community Checklist" = all groups except the standalone follow-up subforms,
+  // PLUS an inline "Status of MDA" question so every user records the MDA status
+  // at the main visit. This status drives which communities surface in the
+  // "Follow-up on MDA Completion" module (anything not "Completed").
+  const STATUS_OF_MDA_NAME = "status_of_mda";
+  const communityFillerGroups = useMemo<FormGroup[]>(() => {
+    const base = groups.filter((g) => !isMdaFollowUpGroup(g));
+    // Don't duplicate if the checklist already asks for the MDA status.
+    const alreadyHasStatus = base.some((g) =>
+      (g.questions || []).some(
+        (q) =>
+          q.name === STATUS_OF_MDA_NAME ||
+          /status of mda|current status of mda|completion status/i.test(String(q.label || "")),
+      ),
+    );
+    if (alreadyHasStatus) return base;
+    const statusGroup: FormGroup = {
+      id: "mda_status_inline_group",
+      name: "Status of MDA",
+      label: "Status of MDA",
+      questions: [
+        {
+          id: "status_of_mda_inline",
+          type: "select_one",
+          name: STATUS_OF_MDA_NAME,
+          label: "Status of MDA",
+          required: true,
+          hint: "Select the current MDA status for this community. Anything other than 'Completed' will appear in the Follow-up on MDA Completion module.",
+          options: [
+            { id: "status_not_started", label: "Not Started", value: "Not Started" },
+            { id: "status_ongoing", label: "Ongoing", value: "Ongoing" },
+            { id: "status_halted", label: "Halted", value: "Halted" },
+            { id: "status_completed", label: "Completed", value: "Completed" },
+          ],
+        },
+      ],
+    };
+    return [...base, statusGroup];
+  }, [groups]);
+
   const communityGroupNames = useMemo(
-    () => groups.filter((g) => !isMdaFollowUpGroup(g)).map((g) => g.name),
-    [groups],
+    () => communityFillerGroups.map((g) => g.name),
+    [communityFillerGroups],
   );
 
   // Lookup helpers for follow-up linking & community filtering.
@@ -485,7 +524,9 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
     const matchAny = (label: string, pats: RegExp[]) => pats.some((p) => p.test(label));
     const statusPats = [/current status of mda/i, /status of mda/i, /mda.*complet/i, /completion status/i];
     const saePats = [/complain.*side effect/i, /side effects during mda/i, /anybody complain/i, /adverse reaction/i, /\bsae\b/i];
-    const statusKeys: string[] = [];
+    // Always include the inline community-checklist status field so the status
+    // captured at the main visit drives follow-up eligibility.
+    const statusKeys: string[] = [STATUS_OF_MDA_NAME];
     const saeKeys: string[] = [];
     for (const q of flat) {
       const label = String(q.label || "");
@@ -514,7 +555,7 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
 
 
   if (view === "community") {
-    return <FormFiller {...fillerProps(communityGroupNames)} />;
+    return <FormFiller {...fillerProps(communityGroupNames, undefined, communityFillerGroups)} />;
   }
   if (view === "completion") {
     return <FormFiller {...fillerProps([GROUP_COMPLETION], linkedPrefill(GROUP_COMPLETION, selected))} />;
