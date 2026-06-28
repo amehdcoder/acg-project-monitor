@@ -14,6 +14,7 @@ describe("theme contrast checks", () => {
     expect(meetsWcagAA(p.success, p.panel)).toBe(true);
     expect(meetsWcagAA(p.warning, p.panel)).toBe(true);
     expect(meetsWcagAA(p.danger, p.panel)).toBe(true);
+    expect(meetsWcagAA(p.orange, p.panel)).toBe(true);
     expect(meetsWcagAA(p.blue, p.panel)).toBe(true);
 
     // Non-text UI elements such as chart gridlines and panel borders meet the 3:1 AA threshold.
@@ -32,6 +33,7 @@ describe("theme contrast checks", () => {
     expect(meetsWcagAA(p.success, p.panel)).toBe(true);
     expect(meetsWcagAA(p.warning, p.panel)).toBe(true);
     expect(meetsWcagAA(p.danger, p.panel)).toBe(true);
+    expect(meetsWcagAA(p.orange, p.panel)).toBe(true);
     expect(meetsWcagAA(p.blue, p.panel)).toBe(true);
   });
 });
