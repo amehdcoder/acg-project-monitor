@@ -56,11 +56,11 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   const setVal = (k: string, v: any) => setValues((p) => ({ ...p, [k]: v }));
 
   const totalSteps = IRF_SECTIONS.length + 1;
-  const canSubmit = !!state && !!lga && !!focalName && !!reportingMonth;
+  const canSubmit = !!state && !!lga && !!reportingMonth;
 
   const submit = async () => {
     if (!canSubmit) {
-      toast.error("Please complete the report identity (Month, State, LGA, Focal Person).");
+      toast.error("Please complete the report identity (Month, State, LGA).");
       setStep(0);
       return;
     }
