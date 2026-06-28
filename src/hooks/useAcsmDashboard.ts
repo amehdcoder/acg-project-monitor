@@ -58,7 +58,7 @@ const COLUMNS =
 
 async function fetchAll(projectId?: string | null): Promise<AcsmRow[]> {
   return fetchAllRowsKeyset<AcsmRow>((limit, afterId) => {
-    let q = supabase.from("acsm_reports" as any).select(COLUMNS).range(from, from + PAGE - 1);
+    let q = supabase.from("acsm_reports" as any).select(COLUMNS);
     if (projectId) q = q.eq("project_id", projectId);
     if (afterId) q = q.gt("id", afterId);
     return q.order("id", { ascending: true }).limit(limit);
