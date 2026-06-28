@@ -98,6 +98,10 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
               <span>{fmt(duplicates.uniqueCount)} unique of {fmt(duplicates.totalCount)} total reports</span>
             </div>
           )}
+
+          {/* Admin duplicate review — decisions recompute counts on both dashboards */}
+          <DuplicateReviewPanel projectId={projectId} />
+
           {/* KPIs */}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Kpi icon={Users} label="People Reached" value={fmt(stats.peopleReached)} sub="Reach + attendance" color="#0891b2" />
