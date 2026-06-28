@@ -278,11 +278,10 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   const SectionIcon = section ? ((Icons as any)[section.icon] || Icons.ClipboardList) : Icons.ClipboardList;
 
   return (
-    <div className="relative isolate min-h-screen w-full overflow-hidden bg-background text-foreground">
+    <div className="relative isolate flex h-[100dvh] min-h-[100dvh] w-full flex-col overflow-hidden bg-background text-foreground">
       <IrfWatermark />
-      <div className="relative z-10 mx-auto w-full max-w-3xl pb-28">
       {/* Header */}
-      <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/10 bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3 shadow-sm">
+      <div className="relative z-20 flex shrink-0 items-center gap-3 border-b border-white/10 bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3 shadow-sm">
         <Button variant="ghost" size="icon" aria-label="Back to forms" onClick={onClose} className="text-white hover:bg-white/10"><ArrowLeft className="h-5 w-5" /></Button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-base font-bold text-white sm:text-lg">{IRF_FORM_NAME}</h1>
@@ -308,6 +307,9 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
         </Button>
       </div>
 
+      {/* Scrollable content area — owns its own scroll so the footer nav is always visible on every device (incl. Android) */}
+      <div className="relative z-10 flex-1 overflow-y-auto overscroll-contain">
+        <div className="mx-auto w-full max-w-3xl">
       {/* Progress */}
       <div className="relative z-10 space-y-2 px-4 pt-3 sm:px-6">
         <div className="flex items-center justify-between text-xs">
@@ -327,6 +329,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
           ))}
         </div>
       </div>
+
 
       <div className="relative z-10 px-4 py-4 sm:px-6">
         {step === 0 ? (
@@ -400,9 +403,12 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
           </Card>
         ) : null}
       </div>
+        </div>
+      </div>
 
-      {/* Footer nav */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 px-4 py-3 backdrop-blur supports-[padding:max(0px)]:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+
+      {/* Footer nav — pinned in normal flex flow so it is always visible (Android-safe) */}
+      <div className="relative z-20 shrink-0 border-t bg-background/95 px-4 py-3 backdrop-blur pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 sm:px-2">
           <Button variant="outline" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))} className="min-w-[88px]">Back</Button>
           {step < totalSteps - 1 ? (
@@ -418,6 +424,6 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
         </div>
       </div>
     </div>
-    </div>
   );
 }
+

@@ -32,6 +32,7 @@ import type { SubmissionRecord } from "@/hooks/useDataAnalytics";
 import { cleanFieldKey } from "@/lib/formLabelUtils";
 import TablePagination from "@/components/ui/table-pagination";
 import { useIsMobile } from "@/hooks/use-mobile";
+import MediaAttachment, { isMediaValue } from "@/components/DataAnalytics/MediaAttachment";
 
 interface SubmissionsTableProps {
   submissions: SubmissionRecord[];
@@ -626,6 +627,8 @@ const SubmissionsTable = ({
                                       value={value === null || value === undefined ? "" : String(value)}
                                       onChange={(e) => handleFieldChange(key, e.target.value, originalValue)}
                                     />
+                                  ) : isMediaValue(value) ? (
+                                    <MediaAttachment value={value} compact />
                                   ) : isGPSValue(value) ? (
                                     <div className="flex items-center gap-1">
                                       <MapPin className="h-3 w-3 text-primary shrink-0" />
@@ -657,6 +660,8 @@ const SubmissionsTable = ({
                                       value={value === null || value === undefined ? "" : String(value)}
                                       onChange={(e) => handleFieldChange(key, e.target.value, originalValue)}
                                     />
+                                  ) : isMediaValue(value) ? (
+                                    <MediaAttachment value={value} compact />
                                   ) : isGPSValue(value) ? (
                                     <div className="flex items-center gap-1">
                                       <MapPin className="h-3 w-3 text-primary shrink-0" />
@@ -781,7 +786,9 @@ const SubmissionsTable = ({
 
                             return (
                               <TableCell key={key} className="text-sm max-w-[220px]">
-                                {isGPSValue(value) ? (
+                                {isMediaValue(value) ? (
+                                  <MediaAttachment value={value} compact />
+                                ) : isGPSValue(value) ? (
                                   <div className="flex items-center gap-1">
                                     <MapPin className="h-3 w-3 text-primary shrink-0" />
                                     <span className="font-mono text-xs truncate">{formatCellValue(value)}</span>
