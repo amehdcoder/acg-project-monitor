@@ -33,6 +33,7 @@ interface FlagItem {
 }
 
 const fmtWhen = (s?: string | null) => (s ? new Date(s).toLocaleDateString() : "—");
+const periodLabel = (value: unknown) => String(value ?? "").slice(0, 7) || "no period";
 
 export default function DuplicateReviewPanel({ projectId, dark }: Props) {
   const { isAdmin, isOwnerLevel } = useAuth();
@@ -85,7 +86,7 @@ export default function DuplicateReviewPanel({ projectId, dark }: Props) {
         id: r.id,
         signature: irfSignature(r),
         label: `${r.lga || "Unspecified LGA"}${r.ward ? " — " + r.ward : ""}`,
-        sub: `IRF • ${(r.reporting_month || r.reporting_period || "").slice(0, 7) || "no period"}`,
+        sub: `IRF • ${periodLabel(r.reporting_month || r.reporting_period)}`,
         who: r.focal_person_name || r.created_by || "—",
         when: fmtWhen(r.created_at),
         autoDuplicate: auto,
@@ -102,7 +103,7 @@ export default function DuplicateReviewPanel({ projectId, dark }: Props) {
         id: r.id,
         signature: acsmSignature(r),
         label: `${r.indicator || "indicator"} — ${r.lga || "Unspecified LGA"}`,
-        sub: `ACSM • ${(r.reporting_period || "").slice(0, 7) || "no period"}`,
+        sub: `ACSM • ${periodLabel(r.reporting_period)}`,
         who: r.responsible_officer || "—",
         when: fmtWhen(r.created_at),
         autoDuplicate: auto,

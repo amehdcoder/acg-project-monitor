@@ -55,8 +55,9 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
     navigate("/auth");
   };
 
+  const isDarkTheme = resolvedTheme === "dark";
   const toggleTheme = () => {
-    setTheme(resolvedTheme === "dark" ? "light" : "dark");
+    setTheme(isDarkTheme ? "light" : "dark");
   };
 
   const getInitials = () => {
@@ -141,6 +142,8 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
                     variant="ghost"
                     size="icon"
                     onClick={toggleTheme}
+                    aria-label={isDarkTheme ? "Switch to light mode" : "Switch to dark mode"}
+                    aria-pressed={isDarkTheme}
                     className="h-8 w-8"
                   >
                     <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />

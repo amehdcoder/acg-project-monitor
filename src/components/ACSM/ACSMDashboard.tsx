@@ -1,9 +1,10 @@
 import { useMemo, useState, useCallback, useEffect } from "react";
+import { useTheme } from "next-themes";
 import {
-  ArrowLeft, Megaphone, Bell, HelpCircle, Download, Filter, Calendar, MapPin,
-  Layers, Users, ListChecks, ChevronLeft, ChevronRight, Search, TrendingUp,
+  ArrowLeft, Megaphone, Download, Filter, Calendar, MapPin,
+  Layers, Users, ChevronLeft, ChevronRight, Search, TrendingUp,
   TrendingDown, CheckCircle2, AlertTriangle, Ban, CircleDashed, FileText,
-  RefreshCw, Sparkles, ShieldCheck, BarChart3, MessageSquare, Radio,
+  RefreshCw, Sparkles, ShieldCheck, BarChart3, Moon, Sun,
 } from "lucide-react";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -14,27 +15,50 @@ import { MapMarker } from "@/components/MapVisualization/types";
 import { useAcsmDashboard } from "@/hooks/useAcsmDashboard";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  ACSM_CATEGORIES, STATUS_META, achievementColor, formatByUnit, findIndicator,
+  ACSM_CATEGORIES, STATUS_META, formatByUnit,
   categoryLabel, indicatorLevelLabel, type AcsmCategory, type AcsmStatus,
 } from "@/lib/acsm/definition";
 import { useAcsmDuplicateOverrides } from "@/hooks/useAcsmDuplicateOverrides";
 import { useAcsmKpiSync, type AcsmKpiPayload } from "@/hooks/useAcsmKpiSync";
 import DuplicateReviewPanel from "@/components/ACSM/DuplicateReviewPanel";
 import AcsmKpiSyncPanel from "@/components/ACSM/AcsmKpiSyncPanel";
+import { ACSM_DASHBOARD_PALETTE, type AcsmDashboardPalette } from "@/lib/acsm/dashboardPalette";
 
 interface Props {
   projectId?: string | null;
   onClose: () => void;
 }
 
-const C = {
-  bg: "#0a1628", panel: "#0f1f38", panel2: "#11253f", border: "#1c3a5e",
-  borderSoft: "#16304f", text: "#e6eefb", sub: "#8aa2c4", primary: "#22d3ee", blue: "#3b82f6",
-};
+const PALETTE = ACSM_DASHBOARD_PALETTE;
+
+type Palette = AcsmDashboardPalette;
 
 const fmt = (n: number) => n.toLocaleString();
 
+const safeAchievement = (value: unknown): number => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+};
+
+const achievementTone = (pct: unknown, C: Palette): string => {
+  const value = safeAchievement(pct);
+  if (value >= 80) return C.success;
+  if (value >= 50) return C.warning;
+  if (value >= 30) return C.orange;
+  return C.danger;
+};
+
+const statusTone = (status: AcsmStatus, C: Palette): string => {
+  if (status === "on_track") return C.success;
+  if (status === "at_risk") return C.warning;
+  if (status === "behind_target") return C.danger;
+  return C.blue;
+};
+
 export default function ACSMDashboard({ projectId, onClose }: Props) {
+  const { resolvedTheme, setTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+  const C = isDark ? PALETTE.dark : PALETTE.light;
   const [category, setCategory] = useState<AcsmCategory | "all">("results_of_advocacy");
   const overrides = useAcsmDuplicateOverrides(projectId);
   const {
@@ -43,6 +67,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
   } = useAcsmDashboard(projectId, category, { acsmMap: overrides.acsmMap, irfMap: overrides.irfMap });
   const { isOwnerLevel, isAdmin } = useAuth();
   const kpiSync = useAcsmKpiSync(projectId);
+  const autoSync = kpiSync.autoSync;
 
   const buildKpiPayload = useCallback((): AcsmKpiPayload => ({
     generatedAt: new Date().toISOString(),
@@ -74,8 +99,8 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
   // deduplicated KPIs or admin duplicate decisions change.
   useEffect(() => {
     if (loading) return;
-    kpiSync.autoSync(buildKpiPayload());
-  }, [loading, buildKpiPayload, kpiSync]);
+    autoSync(buildKpiPayload());
+  }, [loading, buildKpiPayload, autoSync]);
 
 
   const [page, setPage] = useState(0);
@@ -89,10 +114,12 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
   const paged = filtered.slice(page * PER, page * PER + PER);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER));
 
-  const markers: MapMarker[] = points.map((p) => ({
-    id: p.id, lat: p.lat, lng: p.lng, title: p.label,
-    description: `${p.pct}% achievement`, markerColor: achievementColor(p.pct),
-  }));
+  const markers: MapMarker[] = points
+    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+    .map((p) => ({
+      id: p.id, lat: p.lat, lng: p.lng, title: p.label,
+      description: `${safeAchievement(p.pct)}% achievement`, markerColor: achievementTone(p.pct, C),
+    }));
 
   const navIcons: Record<string, any> = {
     results_of_advocacy: Megaphone,
@@ -109,7 +136,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
         {/* Sidebar */}
         <aside className="hidden w-60 shrink-0 lg:block" style={{ background: C.panel, borderRight: `1px solid ${C.borderSoft}`, minHeight: "100vh" }}>
           <div className="flex items-center gap-2 px-5 py-5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: "#13345a", color: C.primary }}>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: C.active, color: C.primary }}>
               <BarChart3 className="h-5 w-5" />
             </div>
             <div>
@@ -123,7 +150,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
               key={n.value}
               onClick={() => { setCategory(n.value as AcsmCategory); setPage(0); }}
               className="flex w-full items-center gap-3 px-5 py-2.5 text-[13.5px] font-medium transition-colors"
-              style={category === n.value ? { background: "#13345a", color: C.primary, borderLeft: `3px solid ${C.primary}` } : { color: C.sub }}
+              style={category === n.value ? { background: C.active, color: C.primary, borderLeft: `3px solid ${C.primary}` } : { color: C.sub }}
             >
               <n.icon className="h-4 w-4" /> {n.label}
             </button>
@@ -131,7 +158,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
           <button
             onClick={() => { setCategory("all"); setPage(0); }}
             className="flex w-full items-center gap-3 px-5 py-2.5 text-[13.5px] font-medium"
-            style={category === "all" ? { background: "#13345a", color: C.primary, borderLeft: `3px solid ${C.primary}` } : { color: C.sub }}
+            style={category === "all" ? { background: C.active, color: C.primary, borderLeft: `3px solid ${C.primary}` } : { color: C.sub }}
           >
             <Layers className="h-4 w-4" /> All Modules
           </button>
@@ -145,7 +172,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
               <ArrowLeft className="h-4 w-4" /> Back
             </button>
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: "#13345a", color: C.primary }}>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: C.active, color: C.primary }}>
                 <Megaphone className="h-5 w-5" />
               </div>
               <div>
@@ -165,11 +192,21 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                   <Sparkles className="h-4 w-4" /> {simulate ? "Simulating" : "Simulate"}
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => setTheme(isDark ? "light" : "dark")}
+                aria-label={isDark ? "Switch Advocacy dashboard to light mode" : "Switch Advocacy dashboard to dark mode"}
+                aria-pressed={isDark}
+                className="flex h-9 w-9 items-center justify-center rounded-lg"
+                style={{ border: `1px solid ${C.border}`, color: C.sub }}
+              >
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
               <button onClick={() => reload()} className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ border: `1px solid ${C.border}`, color: C.sub }}>
 
                 <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               </button>
-              <button className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold text-[#06121f]" style={{ background: `linear-gradient(135deg, ${C.primary}, ${C.blue})` }}>
+              <button className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold" style={{ background: `linear-gradient(135deg, ${C.primary}, ${C.blue})`, color: C.buttonText }}>
                 <Download className="h-4 w-4" /> Download
               </button>
             </div>
@@ -187,7 +224,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
               </span>
               {duplicateInfo.total > 0 && (
                 <span className="flex items-center gap-1.5 rounded-md px-2 py-1 font-semibold"
-                  style={{ background: "#f59e0b22", color: "#fbbf24", border: "1px solid #f59e0b55" }}>
+                  style={{ background: `${C.warning}22`, color: C.warning, border: `1px solid ${C.warning}66` }}>
                   <AlertTriangle className="h-3.5 w-3.5" />
                   {fmt(duplicateInfo.total)} duplicate submission(s) flagged & excluded from counts
                 </span>
@@ -197,16 +234,16 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
 
           {/* Realtime sync + duplicate review */}
           <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <AcsmKpiSyncPanel sync={kpiSync} getPayload={buildKpiPayload} canManage={isAdmin || isOwnerLevel} dark />
-            <DuplicateReviewPanel projectId={projectId} dark />
+            <AcsmKpiSyncPanel sync={kpiSync} getPayload={buildKpiPayload} canManage={isAdmin || isOwnerLevel} dark={isDark} />
+            <DuplicateReviewPanel projectId={projectId} dark={isDark} />
           </div>
 
           {/* Filters bar */}
           <div className="mb-5 flex flex-wrap gap-3">
-            <FilterChip icon={Calendar} label="Reporting Period" value="May 2025" />
-            <FilterChip icon={MapPin} label="Location" value="All Locations" />
-            <FilterChip icon={Layers} label="Category" value={category === "all" ? "All" : categoryLabel(category)} />
-            <FilterChip icon={Users} label="Responsible Officer" value="All Officers" />
+            <FilterChip icon={Calendar} label="Reporting Period" value="May 2025" palette={C} />
+            <FilterChip icon={MapPin} label="Location" value="All Locations" palette={C} />
+            <FilterChip icon={Layers} label="Category" value={category === "all" ? "All" : categoryLabel(category)} palette={C} />
+            <FilterChip icon={Users} label="Responsible Officer" value="All Officers" palette={C} />
             <div className="ml-auto flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px]" style={{ background: C.blue, color: "#fff" }}>
               <Filter className="h-4 w-4" /> Filters
             </div>
@@ -214,17 +251,17 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
 
           {/* KPI cards */}
           <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            <Kpi icon={Users} label="People Benefiting" value={fmt(stats.peopleBenefiting)} tint={C.primary} delta="+18.6%" up />
-            <Kpi icon={CheckCircle2} label="Indicators On Track" value={String(stats.onTrack)} tint="#22c55e" delta={`${pct(stats.onTrack, stats.total)}% of total`} up />
-            <Kpi icon={AlertTriangle} label="At Risk" value={String(stats.atRisk)} tint="#f59e0b" delta={`${pct(stats.atRisk, stats.total)}% of total`} />
-            <Kpi icon={Ban} label="Behind Target" value={String(stats.behind)} tint="#ef4444" delta={`${pct(stats.behind, stats.total)}% of total`} down />
-            <Kpi icon={CircleDashed} label="Draft / Pending" value={String(stats.draft)} tint={C.blue} delta={`${pct(stats.draft, stats.total)}% of total`} />
-            <Kpi icon={TrendingUp} label="Avg Achievement" value={`${stats.avgAchievement}%`} tint={achievementColor(stats.avgAchievement)} delta="this period" up />
+            <Kpi icon={Users} label="People Benefiting" value={fmt(stats.peopleBenefiting)} tint={C.primary} delta="+18.6%" up palette={C} />
+            <Kpi icon={CheckCircle2} label="Indicators On Track" value={String(stats.onTrack)} tint={C.success} delta={`${pct(stats.onTrack, stats.total)}% of total`} up palette={C} />
+            <Kpi icon={AlertTriangle} label="At Risk" value={String(stats.atRisk)} tint={C.warning} delta={`${pct(stats.atRisk, stats.total)}% of total`} palette={C} />
+            <Kpi icon={Ban} label="Behind Target" value={String(stats.behind)} tint={C.danger} delta={`${pct(stats.behind, stats.total)}% of total`} down palette={C} />
+            <Kpi icon={CircleDashed} label="Draft / Pending" value={String(stats.draft)} tint={C.blue} delta={`${pct(stats.draft, stats.total)}% of total`} palette={C} />
+            <Kpi icon={TrendingUp} label="Avg Achievement" value={`${stats.avgAchievement}%`} tint={achievementTone(stats.avgAchievement, C)} delta="this period" up palette={C} />
           </div>
 
           {/* Trend + Status + Top locations */}
           <div className="mb-5 grid grid-cols-1 gap-4 xl:grid-cols-[1.3fr_1fr_1fr]">
-            <Panel title="Achievement Trend" sub="This period vs previous 6 periods">
+            <Panel title="Achievement Trend" sub="This period vs previous 6 periods" palette={C}>
               <ResponsiveContainer width="100%" height={230}>
                 <LineChart data={trend} margin={{ top: 8, right: 12, bottom: 0, left: -18 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={C.borderSoft} vertical={false} />
@@ -237,7 +274,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
               </ResponsiveContainer>
             </Panel>
 
-            <Panel title="Status Distribution" sub={`${stats.total} indicators`}>
+            <Panel title="Status Distribution" sub={`${stats.total} indicators`} palette={C}>
               <div className="flex items-center gap-3">
                 <ResponsiveContainer width="55%" height={200}>
                   <PieChart>
@@ -251,7 +288,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                   {statusDistribution.map((d) => (
                     <div key={d.key} className="flex items-center justify-between text-[12.5px]">
                       <span className="flex items-center gap-2" style={{ color: C.text }}>
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: d.color }} /> {d.name}
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: statusTone(d.key, C) }} /> {d.name}
                       </span>
                       <span className="font-semibold">{d.value} ({pct(d.value, stats.total)}%)</span>
                     </div>
@@ -260,17 +297,17 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
               </div>
             </Panel>
 
-            <Panel title="Top Performing Locations">
+            <Panel title="Top Performing Locations" palette={C}>
               <div className="space-y-2.5">
                 {topLocations.length === 0 && <p className="text-[13px]" style={{ color: C.sub }}>No data yet.</p>}
                 {topLocations.map((l) => (
                   <div key={l.location} className="flex items-center gap-3">
                     <MapPin className="h-3.5 w-3.5 shrink-0" style={{ color: C.sub }} />
                     <span className="w-24 truncate text-[13px]">{l.location}</span>
-                    <div className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: "#0a1c33" }}>
-                      <div className="h-full rounded-full" style={{ width: `${Math.min(100, l.achievement)}%`, background: achievementColor(l.achievement) }} />
+                    <div className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: C.track }}>
+                        <div className="h-full rounded-full" style={{ width: `${Math.min(100, safeAchievement(l.achievement))}%`, background: achievementTone(l.achievement, C) }} />
                     </div>
-                    <span className="w-10 text-right text-[12.5px] font-semibold" style={{ color: achievementColor(l.achievement) }}>{l.achievement}%</span>
+                    <span className="w-10 text-right text-[12.5px] font-semibold" style={{ color: achievementTone(l.achievement, C) }}>{l.achievement}%</span>
                     <span className="w-10 text-right text-[11px]" style={{ color: C.sub }}>{l.onTrack}/{l.total}</span>
                   </div>
                 ))}
@@ -280,15 +317,15 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
 
           {/* Data quality + map */}
           <div className="mb-5 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.4fr]">
-            <Panel title="Data Quality Overview">
+            <Panel title="Data Quality Overview" palette={C}>
               <div className="flex items-center gap-5">
                 <div className="relative flex h-28 w-28 shrink-0 items-center justify-center">
                   <svg viewBox="0 0 36 36" className="h-28 w-28 -rotate-90">
                     <circle cx="18" cy="18" r="15.5" fill="none" stroke={C.borderSoft} strokeWidth="3.5" />
-                    <circle cx="18" cy="18" r="15.5" fill="none" stroke={achievementColor(dataQuality.overall)} strokeWidth="3.5" strokeLinecap="round" strokeDasharray={`${(dataQuality.overall / 100) * 97.4} 97.4`} />
+                    <circle cx="18" cy="18" r="15.5" fill="none" stroke={achievementTone(dataQuality.overall, C)} strokeWidth="3.5" strokeLinecap="round" strokeDasharray={`${(safeAchievement(dataQuality.overall) / 100) * 97.4} 97.4`} />
                   </svg>
                   <div className="absolute text-center">
-                    <p className="text-xl font-bold" style={{ color: achievementColor(dataQuality.overall) }}>{dataQuality.overall}%</p>
+                    <p className="text-xl font-bold" style={{ color: achievementTone(dataQuality.overall, C) }}>{dataQuality.overall}%</p>
                     <p className="text-[10px]" style={{ color: C.sub }}>Quality</p>
                   </div>
                 </div>
@@ -301,10 +338,10 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                     ["Validity", dataQuality.validity],
                   ] as [string, number][]).map(([k, v]) => (
                     <div key={k} className="flex items-center gap-2 text-[12.5px]">
-                      <CheckCircle2 className="h-3.5 w-3.5" style={{ color: achievementColor(v) }} />
+                      <CheckCircle2 className="h-3.5 w-3.5" style={{ color: achievementTone(v, C) }} />
                       <span className="w-24" style={{ color: C.text }}>{k}</span>
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: "#0a1c33" }}>
-                        <div className="h-full rounded-full" style={{ width: `${v}%`, background: achievementColor(v) }} />
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: C.track }}>
+                        <div className="h-full rounded-full" style={{ width: `${safeAchievement(v)}%`, background: achievementTone(v, C) }} />
                       </div>
                       <span className="w-9 text-right font-semibold">{v}%</span>
                     </div>
@@ -313,7 +350,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
               </div>
             </Panel>
 
-            <Panel title="Geospatial Distribution" sub={`${markers.length} reporting points`}>
+            <Panel title="Geospatial Distribution" sub={`${markers.length} reporting points`} palette={C}>
               <div className="overflow-hidden rounded-xl" style={{ border: `1px solid ${C.borderSoft}` }}>
                 <MapVisualization markers={markers} height="320px" showNigeriaBoundaries showLegend={false} />
               </div>
@@ -323,6 +360,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
           {/* Indicator table */}
           <Panel
             title={`${category === "all" ? "All" : categoryLabel(category)} Indicators (${filtered.length})`}
+            palette={C}
             right={
               <div className="flex items-center gap-2 rounded-lg px-2.5 py-1.5" style={{ background: C.panel2, border: `1px solid ${C.border}` }}>
                 <Search className="h-3.5 w-3.5" style={{ color: C.sub }} />
@@ -347,7 +385,9 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                 </thead>
                 <tbody>
                   {paged.map((r) => {
-                    const m = STATUS_META[r.status as AcsmStatus];
+                    const status = (r.status as AcsmStatus) || "draft_pending";
+                    const m = STATUS_META[status] ?? STATUS_META.draft_pending;
+                    const mColor = statusTone(status, C);
                     return (
                       <tr key={r.id} className="border-t" style={{ borderColor: C.borderSoft }}>
                         <td className="px-2 py-2.5 font-mono text-[11.5px]" style={{ color: C.sub }}>{r.code}</td>
@@ -359,15 +399,15 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
                         <td className="px-2 py-2.5 text-right font-medium">{formatByUnit(r.actual, r.unit)}</td>
                         <td className="px-2 py-2.5">
                           <div className="flex items-center gap-2">
-                            <span className="w-9 font-semibold" style={{ color: achievementColor(r.pct) }}>{r.pct}%</span>
-                            <div className="h-1.5 w-20 overflow-hidden rounded-full" style={{ background: "#0a1c33" }}>
-                              <div className="h-full rounded-full" style={{ width: `${Math.min(100, r.pct)}%`, background: achievementColor(r.pct) }} />
+                            <span className="w-9 font-semibold" style={{ color: achievementTone(r.pct, C) }}>{r.pct}%</span>
+                            <div className="h-1.5 w-20 overflow-hidden rounded-full" style={{ background: C.track }}>
+                              <div className="h-full rounded-full" style={{ width: `${Math.min(100, safeAchievement(r.pct))}%`, background: achievementTone(r.pct, C) }} />
                             </div>
                           </div>
                         </td>
                         <td className="px-2 py-2.5">
-                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${m.color}22`, color: m.color }}>
-                            <span className="h-1.5 w-1.5 rounded-full" style={{ background: m.color }} /> {m.label}
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${mColor}22`, color: mColor, border: `1px solid ${mColor}55` }}>
+                            <span className="h-1.5 w-1.5 rounded-full" style={{ background: mColor }} /> {m.label}
                           </span>
                         </td>
                         <td className="px-2 py-2.5" style={{ color: C.sub }}>{r.lastUpdated}</td>
@@ -401,7 +441,7 @@ export default function ACSMDashboard({ projectId, onClose }: Props) {
 /* ---------- helpers ---------- */
 const pct = (n: number, d: number) => (d ? Math.round((n / d) * 100) : 0);
 
-const Kpi = ({ icon: Icon, label, value, tint, delta, up, down }: { icon: any; label: string; value: string; tint: string; delta?: string; up?: boolean; down?: boolean }) => (
+const Kpi = ({ icon: Icon, label, value, tint, delta, up, down, palette: C }: { icon: any; label: string; value: string; tint: string; delta?: string; up?: boolean; down?: boolean; palette: Palette }) => (
   <div className="relative overflow-hidden rounded-2xl p-4" style={{ background: `linear-gradient(135deg, ${tint}14, ${C.panel} 60%)`, border: `1px solid ${C.borderSoft}` }}>
     <span className="absolute inset-y-0 left-0 w-1" style={{ background: tint }} />
     <div className="flex items-center justify-between">
@@ -410,14 +450,14 @@ const Kpi = ({ icon: Icon, label, value, tint, delta, up, down }: { icon: any; l
     </div>
     <p className="mt-2 text-2xl font-bold" style={{ color: tint }}>{value}</p>
     {delta && (
-      <p className="mt-0.5 flex items-center gap-1 text-[11px]" style={{ color: up ? "#22c55e" : down ? "#ef4444" : C.sub }}>
+      <p className="mt-0.5 flex items-center gap-1 text-[11px]" style={{ color: up ? C.success : down ? C.danger : C.sub }}>
         {up && <TrendingUp className="h-3 w-3" />}{down && <TrendingDown className="h-3 w-3" />}{delta}
       </p>
     )}
   </div>
 );
 
-const Panel = ({ title, sub, right, children }: { title: string; sub?: string; right?: React.ReactNode; children: React.ReactNode }) => (
+const Panel = ({ title, sub, right, children, palette: C }: { title: string; sub?: string; right?: React.ReactNode; children: React.ReactNode; palette: Palette }) => (
   <div className="rounded-2xl p-4 sm:p-5" style={{ background: C.panel, border: `1px solid ${C.borderSoft}` }}>
     <div className="mb-4 flex items-center justify-between gap-3">
       <div>
@@ -430,7 +470,7 @@ const Panel = ({ title, sub, right, children }: { title: string; sub?: string; r
   </div>
 );
 
-const FilterChip = ({ icon: Icon, label, value }: { icon: any; label: string; value: string }) => (
+const FilterChip = ({ icon: Icon, label, value, palette: C }: { icon: any; label: string; value: string; palette: Palette }) => (
   <div className="flex items-center gap-2 rounded-xl px-3 py-2.5" style={{ background: C.panel, border: `1px solid ${C.borderSoft}` }}>
     <Icon className="h-4 w-4" style={{ color: C.primary }} />
     <div>

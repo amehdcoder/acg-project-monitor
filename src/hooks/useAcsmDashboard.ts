@@ -57,17 +57,12 @@ const COLUMNS =
   "id,reporting_period,reporting_level,state,lga,ward,community,category,indicator,indicator_level,unit_of_measure,target_value,actual_achieved,achievement_pct,status,responsible_officer,data_source,date_reported,stakeholder_type,engagement_type,communication_channel,reach_type,female_count,male_count,age_under18,age_18_35,age_35_plus,narrative_progress,contribution_story,key_challenges,actions_next_steps,evidence,gps_lat,gps_lng,submission_status,created_at";
 
 async function fetchAll(projectId?: string | null): Promise<AcsmRow[]> {
-  const all: AcsmRow[] = [];
-  const PAGE = 1000;
-  for (let from = 0; ; from += PAGE) {
-    let q = supabase.from("acsm_reports" as any).select(COLUMNS).range(from, from + PAGE - 1);
+  return fetchAllRowsKeyset<AcsmRow>((limit, afterId) => {
+    let q = supabase.from("acsm_reports" as any).select(COLUMNS);
     if (projectId) q = q.eq("project_id", projectId);
-    const { data, error } = await q;
-    if (error || !data || data.length === 0) break;
-    all.push(...(data as any as AcsmRow[]));
-    if (data.length < PAGE) break;
-  }
-  return all;
+    if (afterId) q = q.gt("id", afterId);
+    return q.order("id", { ascending: true }).limit(limit);
+  });
 }
 
 async function fetchIrf(projectId?: string | null): Promise<IrfReport[]> {
@@ -98,6 +93,15 @@ export interface AcsmDuplicateInfo {
 }
 
 const MONTHS = ["Nov 2024", "Dec 2024", "Jan 2025", "Feb 2025", "Mar 2025", "Apr 2025", "May 2025"];
+
+function normalizeAcsmStatus(status: unknown, pct: number): AcsmStatus {
+  const raw = String(status ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (raw === "on_track" || raw === "ontrack" || raw === "complete" || raw === "completed") return "on_track";
+  if (raw === "at_risk" || raw === "risk" || raw === "warning") return "at_risk";
+  if (raw === "behind_target" || raw === "behind" || raw === "off_track" || raw === "delayed") return "behind_target";
+  if (raw === "draft_pending" || raw === "draft" || raw === "pending") return "draft_pending";
+  return statusFromAchievement(pct);
+}
 
 
 export const useAcsmDashboard = (
@@ -150,6 +154,14 @@ export const useAcsmDashboard = (
         irfReports: irfRaw.length,
         irfUnique: irfDedup.uniqueCount,
       });
+    } catch (error) {
+      console.error("Failed to load ACSM dashboard data", error);
+      if (myReq === reqIdRef.current) {
+        setAllRows([]);
+        setDuplicateInfo({
+          acsmDuplicates: 0, irfDuplicates: 0, total: 0, irfReports: 0, irfUnique: 0,
+        });
+      }
     } finally {
       if (myReq === reqIdRef.current) setLoading(false);
     }
@@ -198,8 +210,9 @@ export const useAcsmDashboard = (
         const actual = Number(r.actual_achieved) || 0;
         const pct =
           r.achievement_pct != null ? Number(r.achievement_pct) : computeAchievement(target, actual);
-        const status = (r.status as AcsmStatus) || statusFromAchievement(pct);
-        return { ...r, _pct: pct, _status: status };
+        const safePct = Number.isFinite(pct) ? pct : 0;
+        const status = normalizeAcsmStatus(r.status, safePct);
+        return { ...r, _pct: safePct, _status: status };
       }),
     [rows],
   );
@@ -272,9 +285,10 @@ export const useAcsmDashboard = (
     () =>
       enriched.map((r) => {
         const ind = findIndicator(r.indicator || "");
+        const rowId = String(r.id ?? `${r.indicator || "indicator"}-${r.created_at || "unknown"}`);
         return {
-          id: r.id,
-          code: (r.category || "").slice(0, 3).toUpperCase() + "-" + r.id.slice(-2).toUpperCase(),
+          id: rowId,
+          code: (r.category || "").slice(0, 3).toUpperCase() + "-" + rowId.slice(-2).toUpperCase(),
           name: ind?.label || r.indicator || "—",
           category: r.category || "",
           level: r.indicator_level || ind?.level || "",
@@ -297,7 +311,7 @@ export const useAcsmDashboard = (
       enriched
         .filter((r) => r.gps_lat != null && r.gps_lng != null)
         .map((r) => ({
-          id: r.id,
+          id: String(r.id ?? `${r.indicator || "indicator"}-${r.created_at || "unknown"}`),
           lat: Number(r.gps_lat),
           lng: Number(r.gps_lng),
           pct: r._pct,
