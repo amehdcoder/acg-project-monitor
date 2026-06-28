@@ -77,15 +77,15 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
       </div>
 
       {loading && !rows.length ? (
-        <div className="flex h-64 items-center justify-center text-muted-foreground">Loading reports…</div>
+        <div className="relative z-10 flex h-64 items-center justify-center text-muted-foreground">Loading reports…</div>
       ) : !rows.length ? (
-        <div className="flex h-64 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+        <div className="relative z-10 flex h-64 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
           <FileSpreadsheet className="h-10 w-10 opacity-40" />
           <p>No reports submitted yet.</p>
           <p className="text-xs">Submitted reports appear here instantly.</p>
         </div>
       ) : (
-        <div className="space-y-5 p-4">
+        <div className="relative z-10 space-y-5 p-4">
           {/* KPIs */}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Kpi icon={Users} label="People Reached" value={fmt(stats.peopleReached)} sub="Reach + attendance" color="#0891b2" />
