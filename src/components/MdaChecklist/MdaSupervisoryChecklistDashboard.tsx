@@ -687,8 +687,19 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         hasCompletion: !!completionSub,
         hasCommodities: !!commoditySub,
         hasAdverse: !!adverseSub,
-        commodityIssue: commoditySub ? !POSITIVE.has(norm(commoditySub.data?.commodities_available ?? "yes")) || !!commoditySub.data?.commodity_inadequate : false,
-        adverseManaged: adverseSub ? POSITIVE.has(norm(adverseSub.data?.ae_been_managed)) : null,
+        commodityIssue: commoditySub
+          ? (fuKeys.commodityAvailable
+              ? mdaModel.isNo(fuKeys.commodityAvailable, commoditySub.data?.[fuKeys.commodityAvailable.key])
+              : !POSITIVE.has(norm(commoditySub.data?.commodities_available ?? "yes"))) ||
+            (fuKeys.commodityInadequate
+              ? mdaModel.isYes(fuKeys.commodityInadequate, commoditySub.data?.[fuKeys.commodityInadequate.key])
+              : !!commoditySub.data?.commodity_inadequate)
+          : false,
+        adverseManaged: adverseSub
+          ? (fuKeys.adverseManaged
+              ? mdaModel.isYes(fuKeys.adverseManaged, adverseSub.data?.[fuKeys.adverseManaged.key])
+              : POSITIVE.has(norm(adverseSub.data?.ae_been_managed)))
+          : null,
       };
     });
     rows.sort((a, b) => b.visitTs - a.visitTs);
