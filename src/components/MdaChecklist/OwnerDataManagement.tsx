@@ -272,12 +272,12 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
             </div>
 
             <Button
-              className={`w-full ${mode === "delete" ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-600 hover:bg-emerald-700"}`}
+              className={`w-full ${mode === "delete" ? "bg-rose-600 hover:bg-rose-700" : mode === "restore" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-800 hover:bg-red-900"}`}
               disabled={busy || loading || targetCount === 0}
               onClick={openConfirmation}
             >
-              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : mode === "delete" ? <Trash2 className="mr-2 h-4 w-4" /> : <RotateCcw className="mr-2 h-4 w-4" />}
-              {mode === "delete" ? "Archive submissions" : "Restore submissions"}
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : mode === "restore" ? <RotateCcw className="mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              {mode === "delete" ? "Archive submissions" : mode === "restore" ? "Restore submissions" : "Permanently delete"}
             </Button>
           </div>
         </DialogContent>
