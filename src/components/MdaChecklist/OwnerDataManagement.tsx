@@ -287,13 +287,15 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className={mode === "delete" ? "h-5 w-5 text-rose-600" : "h-5 w-5 text-emerald-600"} />
-              {mode === "delete" ? "Archive submissions?" : "Restore submissions?"}
+              <AlertTriangle className={mode === "delete" ? "h-5 w-5 text-rose-600" : mode === "restore" ? "h-5 w-5 text-emerald-600" : "h-5 w-5 text-red-800"} />
+              {mode === "delete" ? "Archive submissions?" : mode === "restore" ? "Restore submissions?" : "Permanently delete submissions?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {mode === "delete"
                 ? `This will move ${useRange ? "the selected" : "all"} live submissions out of the dashboard into a protected archive. You can restore them at any time.`
-                : `This will move ${useRange ? "the selected" : "all"} archived submissions back into the live dashboard.`}
+                : mode === "restore"
+                  ? `This will move ${useRange ? "the selected" : "all"} archived submissions back into the live dashboard.`
+                  : `This will PERMANENTLY delete ${useRange ? "the selected" : "ALL"} live and archived submissions, including their edit history. This action CANNOT be undone.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3 rounded-lg border border-border bg-muted/40 p-3 text-sm">
