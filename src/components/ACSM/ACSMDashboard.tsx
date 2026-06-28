@@ -17,6 +17,10 @@ import {
   ACSM_CATEGORIES, STATUS_META, achievementColor, formatByUnit, findIndicator,
   categoryLabel, indicatorLevelLabel, type AcsmCategory, type AcsmStatus,
 } from "@/lib/acsm/definition";
+import { useAcsmDuplicateOverrides } from "@/hooks/useAcsmDuplicateOverrides";
+import { useAcsmKpiSync, type AcsmKpiPayload } from "@/hooks/useAcsmKpiSync";
+import DuplicateReviewPanel from "@/components/ACSM/DuplicateReviewPanel";
+import AcsmKpiSyncPanel from "@/components/ACSM/AcsmKpiSyncPanel";
 
 interface Props {
   projectId?: string | null;
