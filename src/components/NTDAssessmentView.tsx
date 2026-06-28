@@ -203,11 +203,19 @@ const NTDAssessmentView = () => {
           <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
             <Stethoscope className="h-8 w-8 text-primary" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="font-display text-xl sm:text-2xl font-bold text-foreground">NTD Guided Assessment</h1>
             <p className="text-sm text-muted-foreground">Clinical decision support for field workers</p>
           </div>
+          <OwnerSubmissionManager
+            table="ntd_assessments"
+            title="assessments"
+            labelColumns={["patient_name", "suspected_disease"]}
+            onChanged={fetchHistory}
+            compact
+          />
         </div>
+
       </div>
 
       {/* Main Tabs: New Assessment vs History */}
