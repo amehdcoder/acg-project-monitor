@@ -20,15 +20,15 @@ import irfBg from "@/assets/irf-bg.jpg";
 export function IrfWatermark() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-      {/* Full-bleed brand image, very low opacity so content stays legible */}
+      {/* Full-bleed brand image — slightly stronger in dark mode so it stays visible without obscuring content */}
       <img
         src={irfBg}
         alt=""
         loading="lazy"
-        className="absolute inset-0 h-full w-full object-cover opacity-[0.06]"
+        className="absolute inset-0 h-full w-full object-cover opacity-[0.06] dark:opacity-[0.14]"
       />
       {/* Soft wash to keep text crisp over the imagery */}
-      <div className="absolute inset-0 bg-background/55" />
+      <div className="absolute inset-0 bg-background/55 dark:bg-background/45" />
     </div>
   );
 }
@@ -176,7 +176,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
 
   if (done) {
     return (
-      <div className="relative flex min-h-[60vh] flex-col items-center justify-center gap-4 p-8 text-center">
+      <div className="dark relative flex min-h-[60vh] flex-col items-center justify-center gap-4 bg-background p-8 text-center text-foreground">
         <IrfWatermark />
         <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-[#E2F5EC]">
           <CheckCircle2 className="h-10 w-10 text-[#22A55A]" />
@@ -262,7 +262,8 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   const SectionIcon = section ? ((Icons as any)[section.icon] || Icons.ClipboardList) : Icons.ClipboardList;
 
   return (
-    <div className="relative mx-auto w-full max-w-3xl pb-28">
+    <div className="dark relative min-h-screen w-full bg-background text-foreground">
+      <div className="relative mx-auto w-full max-w-3xl pb-28">
       <IrfWatermark />
       {/* Header */}
       <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/10 bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3 shadow-sm">
@@ -389,6 +390,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 }

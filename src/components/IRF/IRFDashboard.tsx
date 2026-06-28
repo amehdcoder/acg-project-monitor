@@ -66,7 +66,8 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
   );
 
   return (
-    <div className="relative mx-auto w-full max-w-6xl pb-16">
+    <div className="dark relative min-h-screen w-full bg-background text-foreground">
+      <div className="relative mx-auto w-full max-w-6xl pb-16">
       <IrfWatermark />
       {/* Header */}
       <div className="sticky top-0 z-20 flex items-center gap-3 border-b bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3">
@@ -91,7 +92,7 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
         <div className="relative z-10 space-y-5 p-4">
           {/* Duplicate flagging + unique counts */}
           {duplicates && duplicates.duplicateCount > 0 && (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300">
               <ShieldCheck className="h-4 w-4" />
               <span className="font-semibold">{fmt(duplicates.duplicateCount)} duplicate submission(s) flagged</span>
               <span>·</span>
@@ -206,6 +207,7 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
           </Card>
         </div>
       )}
+    </div>
     </div>
   );
 }
