@@ -774,7 +774,22 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
 
         {/* ── Field-worker accountability ── */}
         {workers.length > 0 && (
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2" data-testid="sup-accountability-section">
+            {selectedSup && (
+              <div className="lg:col-span-2 flex items-center justify-between rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+                <span className="text-xs text-muted-foreground">
+                  Filtered by supervisor: <span className="font-semibold text-primary" data-testid="active-filter-name">{selectedSup}</span>
+                </span>
+                <button
+                  type="button"
+                  data-testid="reset-sup-filter"
+                  onClick={() => setSelectedSup(null)}
+                  className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-[11px] font-medium text-primary-foreground hover:opacity-90"
+                >
+                  <X className="h-3 w-3" /> Reset view
+                </button>
+              </div>
+            )}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="flex flex-wrap items-center gap-1.5 text-sm">
