@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/tooltip";
 import {
   CheckCircle2, AlertTriangle, Pill, TrendingUp, Users2, Sigma, ClipboardCheck,
-  HelpCircle, ChevronRight, ShieldCheck, ShieldAlert, Download, ListChecks, Ban,
+  HelpCircle, ChevronRight, ShieldCheck, ShieldAlert, Download, ListChecks, Ban, X,
 } from "lucide-react";
 import {
   MdaQuestionIndex, aggregateByCommunity, geo, visitTrendByLga, workerAccountability,
