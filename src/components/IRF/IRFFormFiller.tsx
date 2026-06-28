@@ -71,10 +71,55 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   const wards = useMemo(() => (state && lga ? getWardsForLGA(state, lga) : []), [state, lga]);
 
   const [values, setValues] = useState<Record<string, any>>({});
-  const setVal = (k: string, v: any) => setValues((p) => ({ ...p, [k]: v }));
+  const [errors, setErrors] = useState<Set<string>>(new Set());
+  const setVal = (k: string, v: any) =>
+    setValues((p) => ({ ...p, [k]: v }));
+
+  // Clear an "Other (specify)" error as soon as the user types something.
+  const setOtherVal = (k: string, v: any) => {
+    setVal(k, v);
+    if (String(v ?? "").trim()) {
+      setErrors((prev) => {
+        if (!prev.has(k)) return prev;
+        const next = new Set(prev);
+        next.delete(k);
+        return next;
+      });
+    }
+  };
 
   const totalSteps = IRF_SECTIONS.length + 1;
   const canSubmit = !!state && !!lga && !!reportingMonth;
+
+  /** Select fields with an "Other" choice selected but no specify text yet. */
+  const missingOtherForSection = (sec: typeof IRF_SECTIONS[number]) =>
+    sec.groups
+      .flatMap((g) => g.fields)
+      .filter(
+        (f) =>
+          f.type === "select" &&
+          f.allowOther &&
+          values[f.key] === OTHER_OPTION &&
+          !String(values[`${f.key}__other`] ?? "").trim(),
+      )
+      .map((f) => `${f.key}__other`);
+
+  /** Validate the current step; returns true if OK, else flags errors. */
+  const validateStep = (stepIndex: number): boolean => {
+    const sec = stepIndex > 0 ? IRF_SECTIONS[stepIndex - 1] : null;
+    const missing = sec ? missingOtherForSection(sec) : [];
+    if (missing.length) {
+      setErrors((prev) => new Set([...prev, ...missing]));
+      toast.error("Please specify a value for every “Other” selection.");
+      return false;
+    }
+    return true;
+  };
+
+  const goNext = () => {
+    if (!validateStep(step)) return;
+    setStep((s) => Math.min(totalSteps - 1, s + 1));
+  };
 
   const submit = async () => {
     if (!canSubmit) {
