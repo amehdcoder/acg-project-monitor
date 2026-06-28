@@ -19,6 +19,7 @@ import jsPDF from "jspdf";
 import handsLogo from "@/assets/logo-amehnities.png";
 import coatOfArms from "@/assets/nigeria-coat-of-arms.png.asset.json";
 import { pctTone, toneColor } from "@/lib/conditionalFormatting";
+import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 
 const NAVY = "#0c2340";
 const BLUE = "#2563eb";
