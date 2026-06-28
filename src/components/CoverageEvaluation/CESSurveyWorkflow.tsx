@@ -536,7 +536,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // Step 3 — Visits
   const [households, setHouseholds] = useState<SurveyHousehold[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pendingPin, setPendingPin] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const [pendingPin, setPendingPin] = useState<{ lat: number; lng: number; accuracy: number; source?: "gps" | "map" } | null>(null);
   const [editingHH, setEditingHH] = useState<SurveyHousehold | null>(null);
 
   // Settings & Upgrades
@@ -853,6 +853,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       finalize(null);
     }
   }, [applyFix]);
+
+  const getCurrentSurveyPosition = useCallback((): { lat: number; lng: number; accuracy: number | null; source: "gps" | "perimeter" | "handoff" | "last_known" } | null => {
+    if (gps) return { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy, source: "gps" };
+    if (perimeter.length >= 3) {
+      const center = polygonCenter(perimeter);
+      if (Number.isFinite(center.lat) && Number.isFinite(center.lng)) {
+        return { lat: center.lat, lng: center.lng, accuracy: null, source: "perimeter" };
+      }
+    }
+    if (mapSeed.source === "handoff" || mapSeed.source === "last_known") {
+      return { lat: mapSeed.lat, lng: mapSeed.lng, accuracy: mapSeed.accuracy, source: mapSeed.source };
+    }
+    return null;
+  }, [gps, perimeter, mapSeed]);
 
   // Mount-only: register watches exactly once, tear down on unmount.
   useEffect(() => {
@@ -1623,7 +1637,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // ---------- Sampling design (residential-aware) ----------
   const buildSegments = useCallback(async () => {
     const N = estHHUser ?? estHHAi ?? 0;
-    if (!gps || N <= 0 || targetN <= 0) {
+    if (N <= 0 || targetN <= 0) {
       toast({ title: "Need household estimate + target N", variant: "destructive" });
       return;
     }
@@ -1707,7 +1721,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         : `${segs.length} equal segment${segs.length === 1 ? "" : "s"} created from the walked perimeter. Selected segment ${segs[rIdx].label} highlighted.`,
     });
     setBuildingSegments(false);
-  }, [estHHUser, estHHAi, targetN, gps, perimeter, surveyId, residentialMask]);
+  }, [estHHUser, estHHAi, targetN, perimeter, surveyId, residentialMask]);
 
   // Reactive auto-resync: whenever the walked perimeter vertices change AFTER segments
   // have been built, re-cluster automatically (debounced, skipped while still recording).
@@ -1772,6 +1786,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       // Checklist), always source the geography from the immutable ref so the
       // submitted values cannot be overridden by tampered component state.
       const geo = getCurrentGeo();
+      const surveyPosition = getCurrentSurveyPosition();
       const payload: any = {
         project_id: projectId ?? null,
         form_id: formId ?? null,
@@ -1779,7 +1794,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         survey_date: new Date().toISOString().slice(0, 10),
         state: geo.state, lga: geo.lga, ward: geo.ward, flhf_name: geo.flhf_name,
         community_name: geo.community_name, settlement_name: geo.settlement_name,
-        center_lat: gps?.lat ?? null, center_lng: gps?.lng ?? null,
+        center_lat: surveyPosition?.lat ?? null, center_lng: surveyPosition?.lng ?? null,
         perimeter_coords: perimeter,
         est_hh_ai: estHHAi, est_hh_user: estHHUser,
         target_sample_n: targetN,
@@ -1872,7 +1887,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         }
       }
     },
-    [projectId, formId, getCurrentGeo, gps, perimeter,
+    [projectId, formId, getCurrentGeo, getCurrentSurveyPosition, perimeter,
      estHHAi, estHHUser, targetN, segments.length, selectedSegmentLabels, coverage, surveyId,
      outsideMicroplan, outsideMicroplanReason, featureSummary, locationLocked],
   );
@@ -1963,7 +1978,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   useEffect(() => {
     if (autoAdvancedRef.current) return;
     if (step !== 1) return;
-    if (!gps) return;
+    if (!getCurrentSurveyPosition()) return;
     if (!state || !lga || !ward || !communityName) return;
     if (perimeter.length < 3) return;
     if (recordingPerimeter) return;
@@ -1973,7 +1988,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       description: `${perimeter.length} live GPS vertices captured — continuing to Step 2.`,
     });
     persistSurvey("draft").finally(() => setStep(2));
-  }, [step, gps, state, lga, ward, communityName, perimeter.length, recordingPerimeter, persistSurvey]);
+  }, [step, getCurrentSurveyPosition, state, lga, ward, communityName, perimeter.length, recordingPerimeter, persistSurvey]);
 
   // autosave 30s & time-lapse gps (Upgrade 4)
   useEffect(() => {
@@ -2045,17 +2060,18 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const handleMapTap = useCallback(
     (lat: number, lng: number) => {
       if (step !== 3) return;
-      if (!gps) {
-        toast({ title: "GPS not ready", variant: "destructive" });
+      const surveyPosition = getCurrentSurveyPosition();
+      if (!gps && !surveyPosition) {
+        toast({ title: "Location not ready", description: "Wait for GPS or return to Step 1 and draw/load a boundary first.", variant: "destructive" });
         return;
       }
-      if (gps.accuracy > 50) {
+      if (gps && gps.accuracy > 50) {
         toast({ title: "Low GPS accuracy", description: `±${gps.accuracy.toFixed(0)} m — pin saved, but consider moving to a clearer spot.` });
       }
       // Strict physical geofence check — USER must be physically inside the selected segment polygon
       const selected = segments.filter((s) => selectedSegmentLabels.includes(s.label));
-      const userInside = selected.some((s) => pointInPolygon({ lat: gps.lat, lng: gps.lng }, s.polygon));
-      if (selected.length > 0 && !userInside) {
+      const userInside = gps ? selected.some((s) => pointInPolygon({ lat: gps.lat, lng: gps.lng }, s.polygon)) : true;
+      if (gps && selected.length > 0 && !userInside) {
         toast({
           title: "Physical Geofence Violation",
           description: "You are physically outside the highlighted segment. Move inside or sample another segment.",
@@ -2074,10 +2090,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         });
         return;
       }
-      setPendingPin({ lat, lng, accuracy: gps.accuracy });
+      if (!gps) {
+        toast({ title: "Map-only fallback", description: "GPS is still unavailable, so this visit will be tagged with the tapped map position for later review." });
+      }
+      setPendingPin({ lat, lng, accuracy: gps?.accuracy ?? surveyPosition?.accuracy ?? 999, source: gps ? "gps" : "map" });
       setPickerOpen(true);
     },
-    [step, gps, segments, selectedSegmentLabels],
+    [step, gps, getCurrentSurveyPosition, segments, selectedSegmentLabels],
   );
 
   const isDuplicatePin = useMemo(() => {
