@@ -14,6 +14,24 @@ import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import * as Icons from "lucide-react";
 import { IRF_SECTIONS, IRF_FORM_NAME, type IrfField } from "@/lib/irf/definition";
+import irfBg from "@/assets/irf-bg.jpg";
+
+/** Subtle, professional brand watermark used behind IRF screens. */
+export function IrfWatermark() {
+  return (
+    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+      <img
+        src={irfBg}
+        alt=""
+        loading="lazy"
+        width={1280}
+        height={1280}
+        className="absolute bottom-0 right-0 h-[60vh] w-auto max-w-none object-contain opacity-[0.07] sm:opacity-[0.09]"
+      />
+      <div className="absolute inset-0 bg-background/40" />
+    </div>
+  );
+}
 
 interface Props {
   projectId?: string | null;
