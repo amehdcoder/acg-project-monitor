@@ -2890,6 +2890,45 @@ export type Database = {
           },
         ]
       }
+      client_error_logs: {
+        Row: {
+          component: string
+          component_stack: string | null
+          created_at: string
+          id: string
+          message: string
+          metadata: Json
+          route: string | null
+          stack: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          component: string
+          component_stack?: string | null
+          created_at?: string
+          id?: string
+          message: string
+          metadata?: Json
+          route?: string | null
+          stack?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          component?: string
+          component_stack?: string | null
+          created_at?: string
+          id?: string
+          message?: string
+          metadata?: Json
+          route?: string | null
+          stack?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       custom_banks: {
         Row: {
           code: string | null
@@ -7367,6 +7406,18 @@ export type Database = {
           _resource_type: string
         }
         Returns: undefined
+      }
+      log_client_error: {
+        Args: {
+          _component: string
+          _component_stack?: string
+          _message: string
+          _metadata?: Json
+          _route?: string
+          _stack?: string
+          _user_agent?: string
+        }
+        Returns: string
       }
       microplan_distinct_geography:
         | {
