@@ -1269,6 +1269,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     return <SBCDashboard projectId={currentProjectId} onClose={() => setShowSbcDash(false)} />;
   }
 
+  if (showIrfForm) {
+    return <IRFFormFiller projectId={currentProjectId} onClose={() => setShowIrfForm(false)} />;
+  }
+
+  if (showIrfDash) {
+    return <IRFDashboard projectId={currentProjectId} onClose={() => setShowIrfDash(false)} />;
+  }
+
 
 
 
