@@ -2182,7 +2182,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       synced: false,
       retry_count: 0,
       segment_label: segLabel || null,
-      gps_snapshot: JSON.stringify(gps),
+      gps_snapshot: JSON.stringify(gps ?? { source: pendingPin.source ?? "map", accuracy: pendingPin.accuracy, captured_at: ts }),
       eligible_persons: parseInt(hhForm.eligiblePersons) || 0,
       treated_persons: parseInt(hhForm.treatedPersons) || 0,
     };
@@ -2215,7 +2215,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         eligible_persons: parseInt(hhForm.eligiblePersons) || 0,
         treated_persons: parseInt(hhForm.treatedPersons) || 0,
         segment_label: segLabel || null,
-        gps_snapshot: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy, captured_at: ts } : null,
+        gps_snapshot: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy, captured_at: ts } : { source: pendingPin.source ?? "map", accuracy: pendingPin.accuracy, captured_at: ts },
       };
 
       let data: any = null;
