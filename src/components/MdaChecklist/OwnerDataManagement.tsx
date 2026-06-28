@@ -105,23 +105,35 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
     setConfirmOpen(false);
     setBusy(true);
     try {
-      const fn = mode === "delete" ? "owner_archive_mda_submissions" : "owner_restore_mda_submissions";
+      const fn =
+        mode === "delete"
+          ? "owner_archive_mda_submissions"
+          : mode === "restore"
+            ? "owner_restore_mda_submissions"
+            : "owner_permanent_delete_mda_submissions";
       const { data, error } = await (supabase as any).rpc(fn, { _form_id: formId, ...rangeArgs() });
       if (error) throw error;
       const result = (data || {}) as ActionResult;
       if (result.error) throw new Error(result.error);
-      if (result.consistency && result.consistency.ok === false) {
+      if (mode !== "purge" && result.consistency && result.consistency.ok === false) {
         throw new Error("Consistency check failed. No dashboard refresh was applied; please contact support with the logged clear-submissions result.");
       }
-      const n = mode === "delete" ? (result.archived ?? 0) : (result.restored ?? 0);
+      const n =
+        mode === "delete"
+          ? (result.archived ?? 0)
+          : mode === "restore"
+            ? (result.restored ?? 0)
+            : (result.deleted ?? 0);
       toast.success(
         mode === "delete"
           ? `${n.toLocaleString()} submission(s) archived. Dashboard restored to live data.`
-          : `${n.toLocaleString()} submission(s) restored to the dashboard.`,
+          : mode === "restore"
+            ? `${n.toLocaleString()} submission(s) restored to the dashboard.`
+            : `${n.toLocaleString()} submission(s) permanently deleted. This cannot be undone.`,
       );
       const refreshed = await loadSummary();
       const c = result.consistency;
-      if (c) {
+      if (c && mode !== "purge") {
         console.info("MDA owner data-management consistency", c);
         const noOverlap = Number(c.live_archive_overlap || 0) === 0;
         const noOrphans = Number(c.submission_version_orphans || 0) === 0;
@@ -139,8 +151,16 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
     }
   };
 
-  const targetCount = mode === "delete" ? summary?.live_count ?? 0 : summary?.archived_count ?? 0;
-  const confirmPhrase = useMemo(() => `${mode === "delete" ? "CLEAR" : "RESTORE"} ${targetCount}`, [mode, targetCount]);
+  const targetCount =
+    mode === "delete"
+      ? summary?.live_count ?? 0
+      : mode === "restore"
+        ? summary?.archived_count ?? 0
+        : (summary?.live_count ?? 0) + (summary?.archived_count ?? 0);
+  const confirmPhrase = useMemo(
+    () => `${mode === "delete" ? "CLEAR" : mode === "restore" ? "RESTORE" : "DELETE"} ${targetCount}`,
+    [mode, targetCount],
+  );
   const canConfirm = confirmText.trim().toUpperCase() === confirmPhrase;
 
   const openConfirmation = async () => {
