@@ -94,6 +94,9 @@ export interface AcsmDuplicateInfo {
 
 const MONTHS = ["Nov 2024", "Dec 2024", "Jan 2025", "Feb 2025", "Mar 2025", "Apr 2025", "May 2025"];
 
+const mapSignature = (m?: OverrideMap | null) =>
+  m ? [...m.entries()].map(([k, v]) => `${k}:${v}`).sort().join(",") : "";
+
 function normalizeAcsmStatus(status: unknown, pct: number): AcsmStatus {
   const raw = String(status ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
   if (raw === "on_track" || raw === "ontrack" || raw === "complete" || raw === "completed") return "on_track";
@@ -121,11 +124,9 @@ export const useAcsmDashboard = (
   simulateRef.current = simulate;
   const overridesRef = useRef(overrides);
   overridesRef.current = overrides;
-  const overrideSig = useMemo(() => {
-    const ser = (m?: OverrideMap | null) =>
-      m ? [...m.entries()].map(([k, v]) => `${k}:${v}`).sort().join(",") : "";
-    return `${ser(overrides?.acsmMap)}|${ser(overrides?.irfMap)}`;
-  }, [overrides?.acsmMap, overrides?.irfMap]);
+  const acsmOverrideSig = mapSignature(overrides?.acsmMap);
+  const irfOverrideSig = mapSignature(overrides?.irfMap);
+  const overrideSig = `${acsmOverrideSig}|${irfOverrideSig}`;
 
   const reload = async () => {
     const myReq = ++reqIdRef.current;
@@ -224,7 +225,7 @@ export const useAcsmDashboard = (
     const behind = enriched.filter((r) => r._status === "behind_target").length;
     const draft = enriched.filter((r) => r.submission_status === "draft").length;
     const peopleBenefiting = enriched
-      .filter((r) => r.indicator === "people_benefiting")
+      .filter((r) => r.indicator === "people_benefiting" || r.indicator === "people_reached")
       .reduce((s, r) => s + (Number(r.actual_achieved) || 0), 0);
     const avgAchievement = total
       ? Math.round(enriched.reduce((s, r) => s + r._pct, 0) / total)
@@ -251,13 +252,14 @@ export const useAcsmDashboard = (
 
   // Achievement trend (synthetic ramp using avg as the latest point)
   const trend = useMemo(() => {
+    if (!stats.total) return MONTHS.map((m) => ({ month: m, achievement: 0, target: 75 }));
     const latest = stats.avgAchievement || 0;
-    const base = Math.max(40, latest - 22);
+    const base = Math.max(0, latest - 22);
     return MONTHS.map((m, i) => {
       const a = Math.round(base + ((latest - base) * i) / (MONTHS.length - 1));
       return { month: m, achievement: a, target: 75 };
     });
-  }, [stats.avgAchievement]);
+  }, [stats.avgAchievement, stats.total]);
 
   // Top performing locations
   const topLocations = useMemo(() => {

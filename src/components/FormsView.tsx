@@ -129,6 +129,7 @@ import { scrollToAppTop } from "@/lib/scrollToAppTop";
 import { isMdaChecklistLike } from "@/lib/mdaFollowUp";
 import { FileSpreadsheet, KeyRound, GanttChartSquare, NotebookPen, Copy } from "lucide-react";
 import CopyMdaChecklistDialog from "@/components/MdaChecklist/CopyMdaChecklistDialog";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 interface FormSettings {
   requireLocation?: boolean;
@@ -1258,7 +1259,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }
 
   if (showAcsmDash) {
-    return <ACSMDashboard projectId={currentProjectId} onClose={() => setShowAcsmDash(false)} />;
+    return (
+      <ErrorBoundary name="Advocacy Dashboard">
+        <ACSMDashboard projectId={currentProjectId} onClose={() => setShowAcsmDash(false)} />
+      </ErrorBoundary>
+    );
   }
 
   if (showSbcForm) {

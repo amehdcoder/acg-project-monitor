@@ -111,8 +111,9 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
     const el = containerRef.current;
     if (!el || mapRef.current) return;
     const map = L.map(el, { zoomControl: true, attributionControl: false });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      subdomains: "abcd", maxZoom: 19,
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 19,
+      attribution: "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
     }).addTo(map);
     map.setView([12.228, 9.5616], 8);
     mapRef.current = map;

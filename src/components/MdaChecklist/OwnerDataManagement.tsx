@@ -32,6 +32,13 @@ interface Summary {
   archived_count: number; archived_from: string | null; archived_to: string | null;
 }
 
+interface ActionResult {
+  archived?: number;
+  restored?: number;
+  error?: string;
+  form_id?: string;
+}
+
 interface Props {
   formId: string;
   onChanged?: () => void;
@@ -84,7 +91,9 @@ export default function OwnerDataManagement({ formId, onChanged }: Props) {
       const fn = mode === "delete" ? "owner_archive_mda_submissions" : "owner_restore_mda_submissions";
       const { data, error } = await (supabase as any).rpc(fn, { _form_id: formId, ...rangeArgs() });
       if (error) throw error;
-      const n = mode === "delete" ? (data?.archived ?? 0) : (data?.restored ?? 0);
+      const result = (data || {}) as ActionResult;
+      if (result.error) throw new Error(result.error);
+      const n = mode === "delete" ? (result.archived ?? 0) : (result.restored ?? 0);
       toast.success(
         mode === "delete"
           ? `${n.toLocaleString()} submission(s) archived. Dashboard restored to live data.`
