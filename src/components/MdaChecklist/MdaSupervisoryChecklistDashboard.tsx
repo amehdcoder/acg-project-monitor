@@ -896,10 +896,14 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
               <p className="text-sm text-white/70">Community Checklist with follow-up outcome linkage · {formName || "MDA Supervisory Checklist"}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" data-pdf-exclude="true">
             <Button size="sm" onClick={handleExport} disabled={exporting} className="h-9 border-0 bg-white/15 text-white hover:bg-white/25">
               {exporting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}
               Export Excel
+            </Button>
+            <Button size="sm" onClick={handleExportPdf} disabled={exportingPdf} className="h-9 border-0 bg-white/15 text-white hover:bg-white/25">
+              {exportingPdf ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileText className="mr-1.5 h-4 w-4" />}
+              Download PDF
             </Button>
           </div>
         </div>
