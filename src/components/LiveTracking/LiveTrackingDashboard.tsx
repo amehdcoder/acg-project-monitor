@@ -455,6 +455,14 @@ const LiveTrackingDashboard = () => {
           </p>
         </Card>
       )}
+
+      <StreetViewPanel
+        open={!!streetView}
+        onOpenChange={(o) => !o && setStreetView(null)}
+        lat={streetView?.lat ?? null}
+        lng={streetView?.lng ?? null}
+        title="Live Tracking Street View"
+      />
     </div>
   );
 };
