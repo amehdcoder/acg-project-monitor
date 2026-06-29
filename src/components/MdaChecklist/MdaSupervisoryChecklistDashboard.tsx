@@ -299,7 +299,7 @@ function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }
                 {heat.rows.map((row, ri) => (
                   <tr key={row.lga} role="row">
                     <td className="sticky left-0 z-10 bg-card px-2 py-1.5 font-medium text-foreground" scope="row">
-                      <span className="block max-w-[120px] truncate" title={row.lga}>{row.lga}</span>
+                      <span className="block max-w-[160px] whitespace-normal break-words leading-tight" title={row.lga}>{row.lga}</span>
                     </td>
                     {heat.categories.map((c, ci) => (
                       <td key={c} className="px-0.5 py-0.5 text-center">
@@ -490,7 +490,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     const m = new Map<string, string>();
     for (const c of mdaModel.allComs) {
       const st = mdaModel.latestStatus(c);
-      m.set(c.key, st ? mdaModel.statusTitle(st) : "");
+      m.set(c.key, mdaModel.statusTitle(st));
     }
     return m;
   }, [mdaModel]);
@@ -698,7 +698,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       const commoditySub = inner?.get(MDA_FOLLOWUP_COMMODITIES)?.[0];
       const adverseSub = inner?.get(MDA_FOLLOWUP_ADVERSE)?.[0];
       const mdaStatus =
-        authoritativeStatusByCom.get(ck) ??
+        authoritativeStatusByCom.get(ck) ||
         statusLabel(completionSub?.data?.status_of_mda ?? s.data?.status_of_mda);
       return {
         id: s.id,
@@ -858,8 +858,8 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
               <ShieldCheck className="h-7 w-7" />
             </span>
             <div className="min-w-0">
-              <h2 className="font-display text-xl font-bold tracking-tight">Integrated MDA Supervisory Dashboard</h2>
-              <p className="text-sm text-white/70">Community Checklist with longitudinal follow-up linkage · {formName || "MDA Supervisory Checklist"}</p>
+              <h2 className="font-display text-xl font-bold tracking-tight">Supervision Analytics &amp; Longitudinal Linkage</h2>
+              <p className="text-sm text-white/70">Community Checklist with follow-up outcome linkage · {formName || "MDA Supervisory Checklist"}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
