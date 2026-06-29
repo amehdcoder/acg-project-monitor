@@ -96,6 +96,8 @@ const App = () => (
               <ImpersonationProvider>
                 <ScrollToTop />
                 <GpsWarmer />
+                <AfterHoursGate />
+                <AfterHoursApprovalCenter />
 
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
