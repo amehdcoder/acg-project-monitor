@@ -3900,6 +3900,7 @@ export type Database = {
       }
       irf_reports: {
         Row: {
+          answers: Json
           attendance_men: number | null
           attendance_women: number | null
           cases_pending: number | null
@@ -3914,6 +3915,7 @@ export type Database = {
           focal_person_name: string | null
           focal_person_phone: string | null
           followup_date: string | null
+          form_category: string | null
           gps_lat: number | null
           gps_lng: number | null
           healthcare_facility_type: string | null
@@ -3927,12 +3929,14 @@ export type Database = {
           lga: string | null
           mdas_names: string | null
           mdas_visited_count: number | null
+          ministry_department: string | null
           mosque_announcements: number | null
           narrative: string | null
           noncompliance_area: string | null
           noncompliance_cases: number | null
           noncompliance_household_id: string | null
           noncompliance_type: string | null
+          outcome_level: string | null
           participation_level: string | null
           policy_makers_engaged: number | null
           policy_makers_names: string | null
@@ -3942,6 +3946,7 @@ export type Database = {
           radio_messages_aired: number | null
           religious_leaders_engaged: number | null
           religious_leaders_support_mode: string | null
+          reporting_level: string | null
           reporting_month: string | null
           reporting_period: string | null
           resolution_method: string | null
@@ -3954,9 +3959,11 @@ export type Database = {
           traditional_leaders_engaged: number | null
           traditional_leaders_support: string | null
           updated_at: string
+          visit_date: string | null
           ward: string | null
         }
         Insert: {
+          answers?: Json
           attendance_men?: number | null
           attendance_women?: number | null
           cases_pending?: number | null
@@ -3971,6 +3978,7 @@ export type Database = {
           focal_person_name?: string | null
           focal_person_phone?: string | null
           followup_date?: string | null
+          form_category?: string | null
           gps_lat?: number | null
           gps_lng?: number | null
           healthcare_facility_type?: string | null
@@ -3984,12 +3992,14 @@ export type Database = {
           lga?: string | null
           mdas_names?: string | null
           mdas_visited_count?: number | null
+          ministry_department?: string | null
           mosque_announcements?: number | null
           narrative?: string | null
           noncompliance_area?: string | null
           noncompliance_cases?: number | null
           noncompliance_household_id?: string | null
           noncompliance_type?: string | null
+          outcome_level?: string | null
           participation_level?: string | null
           policy_makers_engaged?: number | null
           policy_makers_names?: string | null
@@ -3999,6 +4009,7 @@ export type Database = {
           radio_messages_aired?: number | null
           religious_leaders_engaged?: number | null
           religious_leaders_support_mode?: string | null
+          reporting_level?: string | null
           reporting_month?: string | null
           reporting_period?: string | null
           resolution_method?: string | null
@@ -4011,9 +4022,11 @@ export type Database = {
           traditional_leaders_engaged?: number | null
           traditional_leaders_support?: string | null
           updated_at?: string
+          visit_date?: string | null
           ward?: string | null
         }
         Update: {
+          answers?: Json
           attendance_men?: number | null
           attendance_women?: number | null
           cases_pending?: number | null
@@ -4028,6 +4041,7 @@ export type Database = {
           focal_person_name?: string | null
           focal_person_phone?: string | null
           followup_date?: string | null
+          form_category?: string | null
           gps_lat?: number | null
           gps_lng?: number | null
           healthcare_facility_type?: string | null
@@ -4041,12 +4055,14 @@ export type Database = {
           lga?: string | null
           mdas_names?: string | null
           mdas_visited_count?: number | null
+          ministry_department?: string | null
           mosque_announcements?: number | null
           narrative?: string | null
           noncompliance_area?: string | null
           noncompliance_cases?: number | null
           noncompliance_household_id?: string | null
           noncompliance_type?: string | null
+          outcome_level?: string | null
           participation_level?: string | null
           policy_makers_engaged?: number | null
           policy_makers_names?: string | null
@@ -4056,6 +4072,7 @@ export type Database = {
           radio_messages_aired?: number | null
           religious_leaders_engaged?: number | null
           religious_leaders_support_mode?: string | null
+          reporting_level?: string | null
           reporting_month?: string | null
           reporting_period?: string | null
           resolution_method?: string | null
@@ -4068,6 +4085,7 @@ export type Database = {
           traditional_leaders_engaged?: number | null
           traditional_leaders_support?: string | null
           updated_at?: string
+          visit_date?: string | null
           ward?: string | null
         }
         Relationships: [

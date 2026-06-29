@@ -23,7 +23,7 @@ import { ALL_STANDARD_FORMS } from "@/lib/standardAssessments/allStandardForms";
 import ACSMFormFiller from "@/components/ACSM/ACSMFormFiller";
 import ACSMDashboard from "@/components/ACSM/ACSMDashboard";
 import { ACSM_FORM_NAME, ACSM_FORM_DESC, ACSM_DASH_NAME, ACSM_DASH_DESC } from "@/lib/acsm/definition";
-import IRFFormFiller from "@/components/IRF/IRFFormFiller";
+import IRFCategoryLauncher from "@/components/IRF/IRFCategoryLauncher";
 import IRFDashboard from "@/components/IRF/IRFDashboard";
 import { IRF_FORM_NAME, IRF_FORM_DESC, IRF_DASH_NAME, IRF_DASH_DESC } from "@/lib/irf/definition";
 import SBCFormFiller from "@/components/SBC/SBCFormFiller";
@@ -1275,7 +1275,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }
 
   if (showIrfForm) {
-    return <IRFFormFiller projectId={currentProjectId} onClose={() => setShowIrfForm(false)} />;
+    return <IRFCategoryLauncher projectId={currentProjectId} onClose={() => setShowIrfForm(false)} />;
   }
 
   if (showIrfDash) {
