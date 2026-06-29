@@ -43,6 +43,7 @@ import {
 import StreetViewPanel from "./StreetViewPanel";
 import {
   getResidentialMask,
+  getCachedResidentialMask,
   pointInPolygon as pointInPolygonGeo,
   isOnExcludedFeature,
   snapToNearestResidential,
@@ -624,7 +625,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const gpsStartedAtRef = useRef<number>(Date.now());
   const kalmanRef = useRef<{ lat: number; lng: number; variance: number; ts: number } | null>(null);
   const [gpsError, setGpsError] = useState<null | "denied" | "unavailable" | "timeout" | "insecure" | "unsupported">(null);
-  const [gpsElapsed, setGpsElapsed] = useState(0);
+  
   const [indoorMode, setIndoorMode] = useState(false);
   const [acceptingApprox, setAcceptingApprox] = useState(false);
 
@@ -884,24 +885,49 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   // Mount-only: register watches exactly once, tear down on unmount.
   useEffect(() => {
-    // INSTANT LOCK: the app-wide GPS warmer keeps an accurate, recent fix
-    // cached. Apply it immediately so the dot/lock appears with zero wait,
-    // then the live high-accuracy watch below refines it.
+    // INSTANT LOCK: apply the best instantly-available position so the lock
+    // indicator appears in milliseconds with ZERO wait — works fully offline.
+    // Priority: app-wide GPS warmer cache → cross-session LKG → checklist
+    // handoff seed. The live high-accuracy watch below then refines it.
     const warm = getFreshWarmFix() ?? getBestWarmFix();
-    if (warm) {
+    const instantSeed =
+      warm ??
+      (lkgRef.current
+        ? { lat: lkgRef.current.lat, lng: lkgRef.current.lng, accuracy: Math.max(lkgRef.current.accuracy, 25), timestamp: Date.now() }
+        : (mapSeed.source === "handoff" || mapSeed.source === "last_known")
+          ? { lat: mapSeed.lat, lng: mapSeed.lng, accuracy: Math.max(mapSeed.accuracy, 50), timestamp: Date.now() }
+          : null);
+    if (instantSeed) {
       applyFix(
         {
-          lat: warm.lat,
-          lng: warm.lng,
-          accuracy: Math.max(warm.accuracy, 3),
-          timestamp: warm.timestamp || Date.now(),
+          lat: instantSeed.lat,
+          lng: instantSeed.lng,
+          accuracy: Math.max(instantSeed.accuracy, 3),
+          timestamp: instantSeed.timestamp || Date.now(),
           speed: null,
           heading: null,
           source: Capacitor.isNativePlatform() ? "native" : "web",
         },
-        warm.accuracy <= 50 ? "high" : "low",
+        instantSeed.accuracy <= 50 ? "high" : "low",
       );
     }
+
+    // Grab the OS last-known fix immediately (returns in ms from cache, even
+    // offline) so the lock is never stuck "acquiring".
+    try {
+      if (Capacitor.isNativePlatform()) {
+        Geolocation.getCurrentPosition({ enableHighAccuracy: false, maximumAge: 600_000, timeout: 2000 })
+          .then((pos) => { const f = normalizeNativeFix(pos); if (f) applyFix(f, f.accuracy <= 50 ? "high" : "low"); })
+          .catch(() => { /* warmer/live watch will supply a fix */ });
+      } else if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => { const f = normalizeWebFix(pos); if (f) applyFix(f, f.accuracy <= 50 ? "high" : "low"); },
+          () => { /* warmer/live watch will supply a fix */ },
+          { enableHighAccuracy: false, maximumAge: 600_000, timeout: 2000 },
+        );
+      }
+    } catch { /* noop */ }
+
     // Keep ingesting shared warm fixes until the page's own watch takes over,
     // so even a cold start sharpens as soon as the warmer gets a fresh fix.
     const unsub = subscribeWarmFix((fix) => {
@@ -928,14 +954,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   }, []);
 
 
-  // Tick "acquiring..." elapsed seconds while waiting for first fix
-  useEffect(() => {
-    if (gps || gpsError) return;
-    const id = window.setInterval(() => {
-      setGpsElapsed(Math.floor((Date.now() - gpsStartedAtRef.current) / 1000));
-    }, 500);
-    return () => window.clearInterval(id);
-  }, [gps, gpsError]);
+
+
 
   // (auto-advance Step 1 → Step 2 effect declared after persistSurvey, below)
   const autoAdvancedRef = useRef(false);
@@ -1693,6 +1713,34 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   );
 
   // ---------- Sampling design (residential-aware) ----------
+  // Pure, synchronous segmentation math — no network, no awaits. Splits the
+  // walked perimeter into N equal-density slices using whatever building mask is
+  // available (may be empty offline) and re-anchors labels to real buildings.
+  const computeSegmentsFromMask = useCallback(
+    (peri: { lat: number; lng: number }[], mask: ResidentialMaskResult | null, numSegments: number) => {
+      const inside = (mask?.residentialBuildings ?? []).filter((p) => pointInPolygonGeo(p, peri));
+      const k = Math.max(1, numSegments);
+      let segs = equalPerimeterSegments(peri, k, inside);
+      segs = segs.filter((s) => s.polygon.length >= 3);
+      if (segs.length === 0 && inside.length > 0) {
+        segs = kmeansSegments(inside, Math.min(k, inside.length));
+      }
+      segs = segs.map((s) => {
+        const bag = s.members.length ? s.members : inside;
+        if (bag.length === 0) return s;
+        let best = bag[0];
+        let bestD = Infinity;
+        for (const b of bag) {
+          const d = (b.lat - s.centroid.lat) ** 2 + (b.lng - s.centroid.lng) ** 2;
+          if (d < bestD) { bestD = d; best = b; }
+        }
+        return { ...s, centroid: best };
+      });
+      return { segs, inside };
+    },
+    [],
+  );
+
   const buildSegments = useCallback(async () => {
     const N = estHHUser ?? estHHAi ?? 0;
     if (N <= 0 || targetN <= 0) {
@@ -1713,33 +1761,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     const peri = perimeter;
     setBuildingSegments(true);
 
-    // Pull (or refresh) residential mask — cached, so cheap on repeat clicks
-    let mask: ResidentialMaskResult | null = residentialMask;
-    try {
-      if (!mask || mask.residentialBuildings.length === 0) {
-        setMaskStatus("loading");
-        mask = await getResidentialMask(peri);
-        setResidentialMask(mask);
-        setMaskStatus("ok");
-      }
-    } catch {
-      setMaskStatus("error");
-      mask = null;
-    }
+    // INSTANT PATH: build immediately from any cached mask (or the perimeter
+    // alone). This is pure math — completes in milliseconds and works fully
+    // offline. The network mask is only a refinement fetched in the background.
+    const cached = getCachedResidentialMask(peri) ?? residentialMask;
+    const { segs, inside } = computeSegmentsFromMask(peri, cached, numSegments);
 
-    // Buildings are optional. As long as the community is fenced in Step 1, we
-    // split the walked perimeter into N equal pie-slices around its centroid so
-    // segmentation can proceed seamlessly even when OSM has no mapped buildings.
-    const inside = (mask?.residentialBuildings ?? []).filter((p) => pointInPolygonGeo(p, peri));
-    const k = Math.max(1, numSegments);
-    let segs = equalPerimeterSegments(peri, k, inside);
-
-    // Drop any degenerate slice
-    segs = segs.filter((s) => s.polygon.length >= 3);
-    if (segs.length === 0 && inside.length > 0) {
-      const kk = Math.min(k, inside.length);
-      segs = kmeansSegments(inside, kk);
-    }
     if (segs.length === 0) {
       toast({
         title: "Could not build segments",
@@ -1750,36 +1777,46 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       return;
     }
 
-    // Re-anchor each centroid to the nearest REAL residential building so labels
-    // never sit on a road or river.
-    segs = segs.map((s) => {
-      const bag = s.members.length ? s.members : inside;
-      if (bag.length === 0) return s;
-      let best = bag[0]; let bestD = Infinity;
-      for (const b of bag) {
-        const d = (b.lat - s.centroid.lat) ** 2 + (b.lng - s.centroid.lng) ** 2;
-        if (d < bestD) { bestD = d; best = b; }
-      }
-      return { ...s, centroid: best };
-    });
+    const rIdx = Math.floor(Math.random() * segs.length);
+    const selectedLabel = segs[rIdx].label;
+    setSegments(segs);
+    setSelectedSegmentLabels([selectedLabel]);
+    setBuildingSegments(false);
 
     const usedSource: "osm-buildings" | "perimeter-only" = inside.length > 0 ? "osm-buildings" : "perimeter-only";
-
-    const rIdx = Math.floor(Math.random() * segs.length);
-    setSegments(segs);
-    setSelectedSegmentLabels([segs[rIdx].label]);
     if (surveyId) logCESAction(surveyId, "build_segments", {
-      count: numSegments, selected: segs[rIdx].label, source: usedSource,
-      residential_buildings_found: mask?.residentialBuildings.length ?? 0,
+      count: numSegments, selected: selectedLabel, source: usedSource,
+      residential_buildings_found: cached?.residentialBuildings.length ?? 0,
     });
     toast({
       title: "Segments built",
       description: inside.length > 0
-        ? `${segs.length} segment${segs.length === 1 ? "" : "s"} from ${inside.length} mapped building${inside.length === 1 ? "" : "s"} inside the walked perimeter.`
-        : `${segs.length} equal segment${segs.length === 1 ? "" : "s"} created from the walked perimeter. Selected segment ${segs[rIdx].label} highlighted.`,
+        ? `${segs.length} segment${segs.length === 1 ? "" : "s"} from ${inside.length} mapped building${inside.length === 1 ? "" : "s"} inside the walked perimeter. Selected ${selectedLabel}.`
+        : `${segs.length} equal segment${segs.length === 1 ? "" : "s"} created from the walked perimeter. Selected segment ${selectedLabel}.`,
     });
-    setBuildingSegments(false);
-  }, [estHHUser, estHHAi, targetN, perimeter, surveyId, residentialMask]);
+
+    // BACKGROUND REFINEMENT: if we had no cached buildings, fetch the OSM mask
+    // (timeout-guarded) and silently re-cluster so future re-builds are sharper.
+    // Never blocks the UI and is a no-op offline.
+    if ((!cached || cached.residentialBuildings.length === 0) && (typeof navigator === "undefined" || navigator.onLine !== false)) {
+      setMaskStatus("loading");
+      getResidentialMask(peri)
+        .then((mask) => {
+          setResidentialMask(mask);
+          setMaskStatus("ok");
+          if (households.length > 0) return; // visits already saved — keep locked segments
+          const refined = computeSegmentsFromMask(peri, mask, numSegments);
+          if (refined.segs.length === 0) return;
+          setSegments(refined.segs);
+          setSelectedSegmentLabels((prev) => {
+            const keep = prev.find((l) => refined.segs.some((s) => s.label === l));
+            return keep ? [keep] : [refined.segs[Math.floor(Math.random() * refined.segs.length)].label];
+          });
+        })
+        .catch(() => setMaskStatus("error"));
+    }
+  }, [estHHUser, estHHAi, targetN, perimeter, surveyId, residentialMask, households.length, computeSegmentsFromMask]);
+
 
   // Reactive auto-resync: whenever the walked perimeter vertices change AFTER segments
   // have been built, re-cluster automatically (debounced, skipped while still recording).
@@ -3043,8 +3080,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   <div className="flex items-center justify-between gap-2">
                     <span>
                       {perimeter.length >= 3
-                        ? `GPS still acquiring (${gpsElapsed}s), but your drawn boundary is usable.`
-                        : `Acquiring GPS lock… ${gpsElapsed}s elapsed.`}
+                        ? "Sharpening GPS — your drawn boundary is already usable."
+                        : "Locking onto your location…"}
                     </span>
                     <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={retryGPSLock}>
                       <RefreshCw className="h-3 w-3" /> Lock GPS
@@ -3055,12 +3092,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                       You can proceed with the manual boundary now; the survey center will be saved from the polygon centre and GPS will keep refining in the background.
                     </div>
                   )}
-                  {gpsElapsed >= 10 && (
-                    <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={acceptApproximate} disabled={acceptingApprox}>
-                      {acceptingApprox ? <Loader2 className="h-3 w-3 animate-spin" /> : <MapPin className="h-3 w-3" />}
-                      I'm indoors — use approximate location
-                    </Button>
-                  )}
+                  <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={acceptApproximate} disabled={acceptingApprox}>
+                    {acceptingApprox ? <Loader2 className="h-3 w-3 animate-spin" /> : <MapPin className="h-3 w-3" />}
+                    I'm indoors — use approximate location
+                  </Button>
+
                 </AlertDescription>
               </Alert>
             ) : gps.accuracy > 50 ? (

@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { Maximize2, Minimize2 } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Segment, LatLng } from "@/lib/ces/kmeansSegments";
@@ -212,6 +213,8 @@ const CESSurveyMap = ({
 }: CESSurveyMapProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const tileRef = useRef<L.TileLayer | null>(null);
   const labelsRef = useRef<L.TileLayer | null>(null);
   const staticLayerGroupRef = useRef<L.LayerGroup | null>(null);
@@ -264,7 +267,7 @@ const CESSurveyMap = ({
 
     const commonTileOptions: L.TileLayerOptions = {
       attribution: tl.attribution,
-      maxZoom: 23,
+      maxZoom: 24,
       maxNativeZoom: nativeZoom,
       // Deterministic tile URLs are essential for offline: detectRetina silently
       // requests different z/x/y tiles on high-DPR phones, so prefetched imagery
@@ -300,7 +303,7 @@ const CESSurveyMap = ({
         };
         const fb = L.tileLayer(TILE_LAYERS.satellite.url, {
           attribution: TILE_LAYERS.satellite.attribution,
-          maxZoom: 23,
+          maxZoom: 24,
           maxNativeZoom: 19,
           detectRetina: false,
           crossOrigin: true,
@@ -318,7 +321,7 @@ const CESSurveyMap = ({
     // already includes its own labels so no overlay is needed there.
     if (mode === "satellite" || mode === "hybrid") {
       labelsRef.current = L.tileLayer(ESRI_LABELS_URL, {
-        maxZoom: 23,
+        maxZoom: 24,
         maxNativeZoom: 19,
         detectRetina: false,
         opacity: mode === "hybrid" ? 1 : 0.85,
@@ -345,7 +348,7 @@ const CESSurveyMap = ({
       zoomDelta: 0.25,
       wheelPxPerZoomLevel: 80,
       wheelDebounceTime: 80,
-      maxZoom: 23,
+      maxZoom: 24,
     }).setView([centerLat, centerLng], zoom);
     applyBasemap(map, basemap);
     staticLayerGroupRef.current = L.layerGroup().addTo(map);
@@ -439,6 +442,36 @@ const CESSurveyMap = ({
     };
     // eslint-disable-next-line
   }, [isNearViewport]);
+
+  // Fullscreen: re-flow the Leaflet canvas and enable full drag interaction so
+  // every tool (draw, zoom, pan) is responsive while expanded. Also lock body
+  // scroll so the immersive map never fights the page underneath.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (isFullscreen) {
+      map.dragging.enable();
+      map.scrollWheelZoom.enable();
+    } else {
+      if (isCoarsePointer()) map.dragging.disable();
+      map.scrollWheelZoom.disable();
+    }
+    const prevOverflow = document.body.style.overflow;
+    if (isFullscreen) document.body.style.overflow = "hidden";
+    const ids = [0, 80, 220, 400].map((d) =>
+      window.setTimeout(() => {
+        try { map.invalidateSize({ animate: false }); } catch { /* noop */ }
+      }, d),
+    );
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setIsFullscreen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      ids.forEach((id) => window.clearTimeout(id));
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isFullscreen]);
+
 
   // Pre-fetch all tiles covering the current map view across zoom levels so the
     // imagery is fully available offline. Caps total tile count to protect the
@@ -1008,7 +1041,40 @@ const CESSurveyMap = ({
     }
   }, [isNearViewport, centerLat, centerLng, centerLabel, livePosition, perimeter, lqas?.closureM, lqas?.ready, routeTo, gpsTrail]);
 
-  return <div ref={containerRef} style={{ height, width: "100%", contain: "layout paint", touchAction: isCoarsePointer() ? "pan-y pinch-zoom" : undefined }} className="ces-survey-map rounded-lg overflow-hidden border border-border" />;
+  return (
+    <div
+      ref={wrapperRef}
+      className={
+        isFullscreen
+          ? "fixed inset-0 z-[10000] bg-background"
+          : "relative w-full"
+      }
+    >
+      <div
+        ref={containerRef}
+        style={{
+          height: isFullscreen ? "100dvh" : height,
+          width: "100%",
+          contain: "layout paint",
+          touchAction: isFullscreen ? "none" : (isCoarsePointer() ? "pan-y pinch-zoom" : undefined),
+        }}
+        className={
+          isFullscreen
+            ? "ces-survey-map h-full w-full border-0"
+            : "ces-survey-map rounded-lg overflow-hidden border border-border"
+        }
+      />
+      <button
+        type="button"
+        onClick={() => setIsFullscreen((v) => !v)}
+        aria-label={isFullscreen ? "Exit full screen map" : "Open full screen map"}
+        className="absolute top-2 right-2 z-[1200] inline-flex items-center gap-1.5 rounded-md bg-background/90 px-2.5 py-1.5 text-xs font-semibold text-foreground shadow-md ring-1 ring-border backdrop-blur hover:bg-background"
+      >
+        {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+        {isFullscreen ? "Exit" : "Full screen"}
+      </button>
+    </div>
+  );
 };
 
 export default memo(CESSurveyMap);

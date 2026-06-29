@@ -180,12 +180,18 @@ out tags geom;`;
 async function fetchOverpass(query: string, signal?: AbortSignal): Promise<any> {
   let lastErr: unknown;
   for (const url of ENDPOINTS) {
+    // Per-endpoint hard timeout so a slow/blocked Overpass mirror never hangs
+    // the (background) refinement. Segments are already built from cache/perimeter.
+    const ctrl = new AbortController();
+    const onAbort = () => ctrl.abort();
+    if (signal) signal.addEventListener("abort", onAbort, { once: true });
+    const timer = setTimeout(() => ctrl.abort(), 12_000);
     try {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: `data=${encodeURIComponent(query)}`,
-        signal,
+        signal: ctrl.signal,
       });
       if (!res.ok) {
         lastErr = new Error(`Overpass ${url} returned ${res.status}`);
@@ -194,9 +200,31 @@ async function fetchOverpass(query: string, signal?: AbortSignal): Promise<any> 
       return await res.json();
     } catch (e) {
       lastErr = e;
+    } finally {
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener("abort", onAbort);
     }
   }
   throw lastErr ?? new Error("All Overpass endpoints failed");
+}
+
+/**
+ * Synchronous cached lookup — returns an instantly-available mask (in-memory or
+ * persisted to localStorage) or null. Lets callers build segments in
+ * milliseconds, even offline, without awaiting any network request.
+ */
+export function getCachedResidentialMask(perimeter: LatLng[]): ResidentialMaskResult | null {
+  if (perimeter.length < 3) return null;
+  const b = bbox(perimeter);
+  const key = cacheKey(b);
+  const mem = memCache.get(key);
+  if (mem && Date.now() - mem.fetchedAt < CACHE_TTL_MS) return mem;
+  const persisted = readPersisted(key);
+  if (persisted) {
+    memCache.set(key, persisted);
+    return persisted;
+  }
+  return null;
 }
 
 // ---------- Geometry helpers ----------
