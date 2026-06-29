@@ -53,6 +53,7 @@ const SatelliteImageryView = () => {
   const [microplanLocations, setMicroplanLocations] = useState<MicroplanLocation[]>([]);
   const [showMicroplan, setShowMicroplan] = useState(true);
   const [loadingMicroplan, setLoadingMicroplan] = useState(false);
+  const [streetView, setStreetView] = useState<{ lat: number; lng: number } | null>(null);
 
   // Fetch microplan locations
   useEffect(() => {
