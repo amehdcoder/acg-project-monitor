@@ -254,22 +254,30 @@ export function buildMdaModel(submissions: KSubmission[], questions: KQuestion[]
   };
 
   const latestStatus = (c: ModelCom): string => {
-    const candidates: { t: number; raw: any }[] = [];
-    const push = (s: KSubmission, raw: any) => {
-      if (raw !== undefined && raw !== null && String(raw).trim() !== "") candidates.push({ t: ts(s), raw });
+    const candidates: { t: number; raw: any; q: ResolvedQ | null }[] = [];
+    const push = (s: KSubmission, raw: any, q: ResolvedQ | null) => {
+      if (raw !== undefined && raw !== null && String(raw).trim() !== "") candidates.push({ t: ts(s), raw, q });
     };
-    for (const s of c.fu[MDA_FOLLOWUP_COMPLETION] || []) if (dq.status) push(s, s.data?.[dq.status.key]);
+    // Completion follow-up (most authoritative — captured latest), then the
+    // primary Community Checklist visit. Read EVERY status-of-mda question key
+    // plus legacy keys so re-keyed/copied forms still resolve.
+    for (const s of c.fu[MDA_FOLLOWUP_COMPLETION] || []) {
+      for (const q of statusAll) push(s, s.data?.[q.key], q);
+      if (dq.status) push(s, s.data?.[dq.status.key], dq.status);
+    }
     for (const s of c.checklist) {
-      if (dq.status) push(s, s.data?.[dq.status.key]);
-      for (const lk of LEGACY_STATUS_KEYS) push(s, s.data?.[lk]);
+      for (const q of statusAll) push(s, s.data?.[q.key], q);
+      if (dq.status) push(s, s.data?.[dq.status.key], dq.status);
+      for (const lk of LEGACY_STATUS_KEYS) push(s, s.data?.[lk], dq.status);
     }
     if (!candidates.length) return "";
     candidates.sort((a, b) => a.t - b.t);
-    const raw = candidates[candidates.length - 1].raw;
-    return norm(labelOf(dq.status, raw) || raw);
+    const last = candidates[candidates.length - 1];
+    return norm(labelOf(last.q, last.raw) || last.raw);
   };
   const statusTitle = (n: string) =>
     STATUS_ORDER.find((o) => norm(o) === n) || (n ? n.replace(/\b\w/g, (m) => m.toUpperCase()) : "Unknown");
+
 
   const hasFu = (c: ModelCom, canonical: string) => (c.fu[canonical]?.length || 0) > 0;
   const needsCompletion = (c: ModelCom) => latestStatus(c) !== "completed";
