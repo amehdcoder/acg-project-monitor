@@ -149,7 +149,7 @@ function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm, questions:
 
 export default function MdaDashboardView({ form, projects = [], onClose, embedded = false }: Props) {
   const { isOwner } = useAuth();
-  const { submissions, loading, refresh } = useDataAnalytics({ formId: form.id });
+  const { submissions, loading, loadFailed, refresh } = useDataAnalytics({ formId: form.id });
   const [refreshing, setRefreshing] = useState(false);
   const [cacheVersion, setCacheVersion] = useState(0);
   const [optimisticallyHiddenIds, setOptimisticallyHiddenIds] = useState<Set<string>>(new Set());
