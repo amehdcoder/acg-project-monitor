@@ -34,6 +34,7 @@ const NIGERIA_BOUNDS = L.latLngBounds([3.9, 2.6], [14.0, 14.8]);
 export default function SupervisionGapMap({ points, height = 360, className }: SupervisionGapMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const { attach: attachSv, panel: streetViewPanel } = useLeafletStreetView();
   const layerRef = useRef<L.LayerGroup | null>(null);
   const boundaryRef = useRef<L.GeoJSON | null>(null);
   const fullBoundsRef = useRef<L.LatLngBounds | null>(null);
