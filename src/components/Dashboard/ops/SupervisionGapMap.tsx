@@ -138,5 +138,10 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
     return () => { timers.forEach(clearTimeout); window.removeEventListener("resize", fix); };
   }, []);
 
-  return <div ref={containerRef} className={className} style={{ width: "100%", height }} />;
+  return (
+    <>
+      <div ref={containerRef} className={className} style={{ width: "100%", height }} />
+      {streetViewPanel}
+    </>
+  );
 }
