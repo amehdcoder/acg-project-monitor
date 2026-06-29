@@ -98,6 +98,7 @@ const App = () => (
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/auth/confirm" element={<ConfirmEmail />} />
                   <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                   <Route path="/install" element={<ProtectedRoute><Install /></ProtectedRoute>} />
                   <Route path="/witness/:surveyId/:hhId" element={<CESWitnessForm />} />
