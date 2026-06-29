@@ -2,6 +2,7 @@
 // - Geocoding / reverse geocoding use OpenStreetMap Nominatim (free, real data).
 // - IP geolocation uses ipfind.com with the IPFIND_API_KEY secret.
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { guardRequest } from "../_shared/authGuard.ts";
 
 const NOMINATIM = "https://nominatim.openstreetmap.org";
 const UA = "Amehnities-GeoTools/1.0 (https://www.amehnities.org)";
@@ -61,6 +62,8 @@ async function ipLookup(ip?: string) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const guard = await guardRequest(req, corsHeaders, { requireAdmin: false });
+  if (guard.response) return guard.response;
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
       status,

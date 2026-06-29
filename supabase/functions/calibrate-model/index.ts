@@ -2,6 +2,7 @@
 // Numerical methods only — no AI calls. Levenberg–Marquardt with box bounds,
 // multi-start global search, RK4 integration, weighted residuals, full diagnostics.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { guardRequest } from "../_shared/authGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -471,6 +472,8 @@ function validateInputs(body: any): string[] {
 // ── Handler ──
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const guard = await guardRequest(req, corsHeaders, { requireAdmin: false });
+  if (guard.response) return guard.response;
 
   let body: any;
   try { body = await req.json(); }
