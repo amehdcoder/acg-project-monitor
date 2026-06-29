@@ -10,6 +10,7 @@ import { Map, ZoomIn, BarChart3, Maximize2, Minimize2, FileText, Loader2, Settin
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { useLeafletStreetView } from "@/components/maps/LeafletStreetView";
 
 interface MicroplanEntry {
   id: string;
