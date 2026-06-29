@@ -9,6 +9,25 @@ import { supabase } from "@/integrations/supabase/client";
 let googleMapsPromise: Promise<void> | null = null;
 let cachedKey: string | null = null;
 
+/**
+ * Set to true when Google rejects the API key (billing disabled, referrer not
+ * allowed, API not enabled, etc). Google invokes `window.gm_authFailure` in
+ * these cases. Consumers (e.g. Street View panel) read this to fall back to
+ * Mapillary imagery instead of showing Google's broken "development only"
+ * overlay.
+ */
+export let googleMapsAuthFailed = false;
+
+export const GOOGLE_MAPS_AUTH_FAILED_EVENT = "google-maps-auth-failed";
+
+if (typeof window !== "undefined") {
+  // Google calls this global on any key/billing/referrer auth failure.
+  (window as unknown as { gm_authFailure?: () => void }).gm_authFailure = () => {
+    googleMapsAuthFailed = true;
+    window.dispatchEvent(new Event(GOOGLE_MAPS_AUTH_FAILED_EVENT));
+  };
+}
+
 async function fetchKey(): Promise<string> {
   if (cachedKey) return cachedKey;
   try {
