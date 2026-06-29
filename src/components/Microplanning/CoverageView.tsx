@@ -163,6 +163,7 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
       maxZoom: 19,
     }).addTo(map);
     mapRef.current = map;
+    attachSv(map);
 
     const geoEntries = filtered.filter(e => e.community_latitude && e.community_longitude);
     if (geoEntries.length === 0) {
