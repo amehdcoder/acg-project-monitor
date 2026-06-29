@@ -342,6 +342,7 @@ export default function MdaSupervisoryMap({ submissions, formName, monitoringPer
                 </CircleMarker>
               );
             })}
+            <StreetViewLayer />
           </MapContainer>
 
           {/* Legend */}
