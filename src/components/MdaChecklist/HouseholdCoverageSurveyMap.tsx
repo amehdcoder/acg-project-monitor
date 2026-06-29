@@ -16,7 +16,8 @@ import {
   Layers, Satellite, Eye, ShieldCheck, AlertTriangle,
 
 } from "lucide-react";
-import StreetViewPanel from "@/components/CoverageEvaluation/StreetViewPanel";
+import StreetViewPanel from "@/components/maps/GoogleStreetViewPanel";
+import { attachStreetViewControl } from "@/lib/maps/leafletStreetViewControl";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
