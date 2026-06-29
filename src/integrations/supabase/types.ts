@@ -7363,6 +7363,12 @@ export type Database = {
         Args: { p_obj: Json; p_table: string }
         Returns: undefined
       }
+      _after_hours_reviewers: {
+        Args: { p_project_id: string }
+        Returns: {
+          uid: string
+        }[]
+      }
       approve_after_hours_request: {
         Args: { p_id: string }
         Returns: undefined
