@@ -11,6 +11,7 @@ import { ThemeProvider } from "next-themes";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
+import ConfirmEmail from "./pages/ConfirmEmail";
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 import DataCleaner from "./pages/DataCleaner";
@@ -97,6 +98,7 @@ const App = () => (
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/auth/confirm" element={<ConfirmEmail />} />
                   <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                   <Route path="/install" element={<ProtectedRoute><Install /></ProtectedRoute>} />
                   <Route path="/witness/:surveyId/:hhId" element={<CESWitnessForm />} />
