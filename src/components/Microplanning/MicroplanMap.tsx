@@ -432,6 +432,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     if (!L) return;
     const map = L.map(mapRef.current, { zoomControl: true, zoomSnap: 0.5 }).setView([9.0, 8.0], 6);
     mapInstanceRef.current = map;
+    attachSv(map);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap",
       maxZoom: 18,
