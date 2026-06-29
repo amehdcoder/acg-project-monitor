@@ -1085,3 +1085,51 @@ select option {
   font-weight: 700; font-size: 12px;
 }
 
+
+/* ── Street View Leaflet control ───────────────────────────── */
+.leaflet-bar.sv-control {
+  border: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.sv-control-btn {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+  width: auto !important;
+  height: 34px !important;
+  padding: 0 12px 0 9px;
+  background: linear-gradient(135deg, #0b1f33, #123a5c);
+  color: #fff !important;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 34px !important;
+  white-space: nowrap;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+.sv-control-btn:hover { background: linear-gradient(135deg, #123a5c, #1a4f7a); }
+.sv-control-btn:active { transform: scale(0.97); }
+.sv-control-btn .sv-pegman {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: #FBBC05;
+  color: #0b1f33;
+}
+.sv-control.sv-active .sv-control-btn {
+  background: linear-gradient(135deg, #FBBC05, #f59e0b);
+  color: #0b1f33 !important;
+}
+.sv-control.sv-active .sv-control-btn .sv-pegman {
+  background: #0b1f33;
+  color: #FBBC05;
+}
+.leaflet-container.sv-picking { cursor: crosshair !important; }
+@media (max-width: 480px) {
+  .sv-control-btn .sv-label { display: none; }
+  .sv-control-btn { padding: 0 8px; }
+}

@@ -13,6 +13,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import StreetViewPanel from "@/components/maps/GoogleStreetViewPanel";
+import { attachStreetViewControl } from "@/lib/maps/leafletStreetViewControl";
 
 const SATELLITE_LAYERS = {
   esri: { url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", attribution: "&copy; Esri", label: "Esri World Imagery" },
@@ -51,6 +53,7 @@ const SatelliteImageryView = () => {
   const [microplanLocations, setMicroplanLocations] = useState<MicroplanLocation[]>([]);
   const [showMicroplan, setShowMicroplan] = useState(true);
   const [loadingMicroplan, setLoadingMicroplan] = useState(false);
+  const [streetView, setStreetView] = useState<{ lat: number; lng: number } | null>(null);
 
   // Fetch microplan locations
   useEffect(() => {
@@ -117,8 +120,11 @@ const SatelliteImageryView = () => {
 
     L.control.zoom({ position: "topright" }).addTo(map);
     mapRef.current = map;
+    const detachSv = attachStreetViewControl(map, {
+      onPick: (lat, lng) => setStreetView({ lat, lng }),
+    });
 
-    return () => { map.remove(); mapRef.current = null; };
+    return () => { detachSv(); map.remove(); mapRef.current = null; };
   }, []);
 
   // Update satellite layer
@@ -197,6 +203,14 @@ const SatelliteImageryView = () => {
   const flhfCount = microplanLocations.filter(l => l.type === "flhf").length;
 
   return (
+    <>
+    <StreetViewPanel
+      open={!!streetView}
+      onOpenChange={(o) => !o && setStreetView(null)}
+      lat={streetView?.lat ?? null}
+      lng={streetView?.lng ?? null}
+      title="Satellite Street View"
+    />
     <div className="space-y-4 p-4 lg:p-6 max-w-[1400px] mx-auto">
       <div>
         <h1 className="font-display text-2xl lg:text-3xl font-bold text-foreground flex items-center gap-3">
@@ -327,6 +341,7 @@ const SatelliteImageryView = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

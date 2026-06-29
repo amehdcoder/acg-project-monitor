@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Compass, MapPin } from "lucide-react";
+import StreetViewPanel from "@/components/maps/GoogleStreetViewPanel";
+import { attachStreetViewControl } from "@/lib/maps/leafletStreetViewControl";
 
 /**
  * FCT (Abuja) Area-Council choropleth for the Integrated MDA Supervisory
@@ -77,6 +79,7 @@ const fillFor = (visits: number, max: number) => {
 export default function FctSupervisoryMap({ submissions, formName }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const [streetView, setStreetView] = useState<{ lat: number; lng: number } | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
   const geoRef = useRef<any[] | null>(null);
   const sweepTimer = useRef<number | null>(null);
@@ -127,9 +130,13 @@ export default function FctSupervisoryMap({ submissions, formName }: Props) {
       .addTo(map);
     map.setView([8.95, 7.18], 9);
     mapRef.current = map;
+    const detachSv = attachStreetViewControl(map, {
+      onPick: (lat, lng) => setStreetView({ lat, lng }),
+    });
     setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 50);
     redraw();
     return () => {
+      detachSv();
       if (sweepTimer.current) { clearInterval(sweepTimer.current); sweepTimer.current = null; }
       try { map.remove(); } catch { /* noop */ } mapRef.current = null;
     };
@@ -258,6 +265,13 @@ export default function FctSupervisoryMap({ submissions, formName }: Props) {
           <p className="text-center text-xs text-muted-foreground">No GPS captured yet — submit checklists with location to populate the map.</p>
         )}
       </CardContent>
+      <StreetViewPanel
+        open={!!streetView}
+        onOpenChange={(o) => !o && setStreetView(null)}
+        lat={streetView?.lat ?? null}
+        lng={streetView?.lng ?? null}
+        title="FCT Street View"
+      />
     </Card>
   );
 }

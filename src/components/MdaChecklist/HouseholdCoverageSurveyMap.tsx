@@ -16,7 +16,8 @@ import {
   Layers, Satellite, Eye, ShieldCheck, AlertTriangle,
 
 } from "lucide-react";
-import StreetViewPanel from "@/components/CoverageEvaluation/StreetViewPanel";
+import StreetViewPanel from "@/components/maps/GoogleStreetViewPanel";
+import { attachStreetViewControl } from "@/lib/maps/leafletStreetViewControl";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -571,9 +572,12 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
     plainLayerRef.current = L.layerGroup();
 
     mapRef.current = map;
+    const detachSv = attachStreetViewControl(map, {
+      onPick: (lat, lng) => setStreetView({ lat, lng }),
+    });
     setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 60);
     redraw();
-    return () => { try { map.remove(); } catch { /* noop */ } mapRef.current = null; };
+    return () => { detachSv(); try { map.remove(); } catch { /* noop */ } mapRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
