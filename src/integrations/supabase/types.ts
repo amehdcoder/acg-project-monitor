@@ -528,6 +528,65 @@ export type Database = {
         }
         Relationships: []
       }
+      after_hours_submission_requests: {
+        Row: {
+          created_at: string
+          form_label: string | null
+          id: string
+          payload: Json
+          project_id: string | null
+          reason: string
+          requested_by: string
+          requested_by_name: string | null
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          target_table: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          form_label?: string | null
+          id?: string
+          payload: Json
+          project_id?: string | null
+          reason: string
+          requested_by: string
+          requested_by_name?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          target_table: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          form_label?: string | null
+          id?: string
+          payload?: Json
+          project_id?: string | null
+          reason?: string
+          requested_by?: string
+          requested_by_name?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          target_table?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "after_hours_submission_requests_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       antidepressant_stock: {
         Row: {
           created_at: string
@@ -7299,6 +7358,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _after_hours_allowed_tables: { Args: never; Returns: string[] }
+      _after_hours_insert_one: {
+        Args: { p_obj: Json; p_table: string }
+        Returns: undefined
+      }
+      approve_after_hours_request: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
       authorize_realtime_subscription: {
         Args: { _topic: string }
         Returns: Json
@@ -7344,6 +7412,10 @@ export type Database = {
           _user_id: string
           _ward: string
         }
+        Returns: boolean
+      }
+      can_review_after_hours: {
+        Args: { p_project_id: string }
         Returns: boolean
       }
       can_survey_households: {
@@ -7588,6 +7660,20 @@ export type Database = {
         Returns: Json
       }
       owner_restore_records: { Args: { _record_ids: string[] }; Returns: Json }
+      reject_after_hours_request: {
+        Args: { p_id: string; p_note?: string }
+        Returns: undefined
+      }
+      request_after_hours_submission: {
+        Args: {
+          p_form_label?: string
+          p_payload: Json
+          p_project_id?: string
+          p_reason: string
+          p_table: string
+        }
+        Returns: string
+      }
       set_proximity_conversation_flag: {
         Args: { _action: string; _conversation_id: string }
         Returns: undefined
