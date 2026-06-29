@@ -4,6 +4,7 @@ import "leaflet/dist/leaflet.css";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPinned } from "lucide-react";
+import { useLeafletStreetView } from "@/components/maps/LeafletStreetView";
 
 export interface GeoPoint {
   id: string;
