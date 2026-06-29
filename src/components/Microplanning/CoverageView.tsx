@@ -61,6 +61,7 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
   const [showMap, setShowMap] = useState(false);
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const { attach: attachSv, panel: streetViewPanel } = useLeafletStreetView();
 
   const { calcTargetPop, label: targetPopLabel } = useTargetPopFields();
 
