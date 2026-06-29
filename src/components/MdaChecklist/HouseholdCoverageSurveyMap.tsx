@@ -49,32 +49,39 @@ interface Outcome {
   color: string;
   /** Inline SVG glyph (white stroke/fill) drawn inside the coloured pin. */
   glyph: string;
+  /** Plain-language explanation of what this visit outcome means. */
+  desc: string;
 }
 
 const OUTCOMES: Record<string, Outcome> = {
   treated: {
     key: "treated", label: "Treated", color: "#16a34a",
     glyph: '<path d="M5 10.5l3.2 3.2L15 6.8" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>',
+    desc: "Household reached and eligible members received their medicine.",
   },
   not_treated: {
     key: "not_treated", label: "Not Treated", color: "#dc2626",
     glyph: '<circle cx="10" cy="10" r="6.2" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M7.6 7.6l4.8 4.8M12.4 7.6l-4.8 4.8" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/>',
+    desc: "Household reached but eligible members were not treated (e.g. sick, breastfeeding, away).",
   },
   absent: {
     key: "absent", label: "Absent", color: "#64748b",
     glyph: '<path d="M10 4.5c-2.6 0-4.7 2.1-4.7 4.7 0 3.3 4.7 7.3 4.7 7.3s4.7-4 4.7-7.3C14.7 6.6 12.6 4.5 10 4.5z" fill="none" stroke="#fff" stroke-width="1.6"/><circle cx="10" cy="9.2" r="1.7" fill="#fff"/>',
+    desc: "Nobody was home at the time of the visit — revisit required.",
   },
   refused: {
     key: "refused", label: "Refused", color: "#991b1b",
     glyph: '<path d="M10 4l4.5 1.8v3.4c0 3-2 5.3-4.5 6.3-2.5-1-4.5-3.3-4.5-6.3V5.8L10 4z" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>',
+    desc: "Household declined treatment.",
   },
   ineligible: {
     key: "ineligible", label: "Ineligible", color: "#f59e0b",
     glyph: '<path d="M10 4.5l5.5 9.6H4.5L10 4.5z" fill="none" stroke="#fff" stroke-width="1.7" stroke-linejoin="round"/><path d="M10 8.4v3.1M10 13.2v0.1" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>',
+    desc: "No one in the household met the eligibility criteria for treatment.",
   },
 };
 
-const OTHER: Outcome = { key: "other", label: "Other", color: "#7c3aed", glyph: '<circle cx="10" cy="10" r="3" fill="#fff"/>' };
+const OTHER: Outcome = { key: "other", label: "Other", color: "#7c3aed", glyph: '<circle cx="10" cy="10" r="3" fill="#fff"/>', desc: "Outcome recorded that does not match a standard category." };
 
 const OUTCOME_ALIASES: Record<string, Outcome> = Object.fromEntries(
   Object.values(OUTCOMES).flatMap((o) => [[norm(o.key), o], [norm(o.label), o]]),
