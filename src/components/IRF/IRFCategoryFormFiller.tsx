@@ -4,8 +4,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useGeolocation } from "@/hooks/useGeolocation";
 import { toast } from "sonner";
+import IrfGpsMap, { type IrfGpsValue } from "./IrfGpsMap";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
