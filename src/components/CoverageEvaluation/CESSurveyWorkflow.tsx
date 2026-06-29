@@ -2874,7 +2874,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 ]
               : []),
           ].map((s, i, arr) => (
-            <div key={s.n} className="flex items-center gap-1.5 shrink-0">test_unused
+            <div key={s.n} className="flex items-center gap-1.5 shrink-0">
               <Button
                 size="sm"
                 variant={step === s.n ? "default" : "ghost"}
