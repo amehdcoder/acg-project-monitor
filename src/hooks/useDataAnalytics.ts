@@ -140,6 +140,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
   const [projects, setProjects] = useState<any[]>([]);
   const [forms, setForms] = useState<FormAnalytics[]>([]);
   const [submissions, setSubmissions] = useState<SubmissionRecord[]>([]);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [kpis, setKpis] = useState<KPIData>({
     totalSubmissions: 0,
     totalSubmissionsChange: 0,
