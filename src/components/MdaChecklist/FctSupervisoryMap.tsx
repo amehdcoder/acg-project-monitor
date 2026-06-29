@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Compass, MapPin } from "lucide-react";
+import StreetViewPanel from "@/components/maps/GoogleStreetViewPanel";
+import { attachStreetViewControl } from "@/lib/maps/leafletStreetViewControl";
 
 /**
  * FCT (Abuja) Area-Council choropleth for the Integrated MDA Supervisory
