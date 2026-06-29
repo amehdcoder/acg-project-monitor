@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Home, MapPin, Loader2, Play, Pause, SkipForward, SkipBack,
   Flame, Download, FileImage, FileText, FileSpreadsheet, RotateCcw, X, ListFilter,
-  Layers, Satellite, Eye,
+  Layers, Satellite, Eye, ShieldCheck, AlertTriangle,
 
 } from "lucide-react";
 import StreetViewPanel from "@/components/CoverageEvaluation/StreetViewPanel";
