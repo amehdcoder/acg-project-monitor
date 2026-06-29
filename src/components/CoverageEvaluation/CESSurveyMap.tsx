@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, Gauge } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Segment, LatLng } from "@/lib/ces/kmeansSegments";
