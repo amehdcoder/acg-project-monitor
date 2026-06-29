@@ -173,7 +173,7 @@ const OwnerSubmissionManager = ({
 
   const loadArchived = useCallback(async () => {
     try {
-      let q = supabase
+      let q: any = supabase
         .from("owner_deleted_records" as any)
         .select("id, record_id, source_table, deleted_at, snapshot")
         .eq("source_table", table)
