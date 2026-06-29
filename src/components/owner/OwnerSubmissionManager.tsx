@@ -62,7 +62,8 @@ export interface OwnerSubmissionManagerProps {
   /** Optional scoping filter applied to listing + bulk delete. */
   filter?: { column: string; value: string } | null;
   /** Optional callback after any successful mutation. */
-  onChanged?: (mutation?: OwnerDataMutation) => void | Promise<void>;
+  onChanged?: () => void | Promise<void>;
+  onMutation?: (mutation: OwnerDataMutation) => void | Promise<void>;
   /** Compact trigger (icon only) for tight dashboard headers. */
   compact?: boolean;
   className?: string;
@@ -119,6 +120,7 @@ const OwnerSubmissionManager = ({
   labelColumns,
   filter,
   onChanged,
+  onMutation,
   compact,
   className,
 }: OwnerSubmissionManagerProps) => {
@@ -231,7 +233,8 @@ const OwnerSubmissionManager = ({
       setConfirmText("");
       await loadRows();
       await loadArchived();
-      onChanged?.({ table, title, type: "ids", mode, deleted, ids, filter });
+      onMutation?.({ table, title, type: "ids", mode, deleted, ids, filter });
+      onChanged?.();
     } catch (e) {
       toast.error(`Action failed: ${readableError(e)}`, { id: toastId });
     } finally {
@@ -270,7 +273,8 @@ const OwnerSubmissionManager = ({
       setConfirmText("");
       await loadRows();
       await loadArchived();
-      onChanged?.({ table, title, type: "bulk", mode, deleted: Number(n), from: fromIso, to: toIso, filter });
+      onMutation?.({ table, title, type: "bulk", mode, deleted: Number(n), from: fromIso, to: toIso, filter });
+      onChanged?.();
     } catch (e) {
       toast.error(`Bulk action failed: ${readableError(e)}`, { id: toastId });
     } finally {
