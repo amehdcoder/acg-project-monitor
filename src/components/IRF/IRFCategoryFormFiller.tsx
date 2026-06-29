@@ -418,6 +418,22 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
             </Card>
           ))}
 
+          {/* GPS capture + live satellite location */}
+          <Card className="mt-4 space-y-3 p-4 sm:p-6" style={{ borderTopWidth: 3, borderTopColor: form.color }}>
+            <div className="flex items-center gap-2">
+              <div className="rounded-lg bg-primary/10 p-2"><MapPin className="h-5 w-5 text-primary" /></div>
+              <div>
+                <h3 className="text-sm font-semibold" style={{ color: form.color }}>Activity Location (GPS) <span className="text-destructive">*</span></h3>
+                <p className="text-xs text-muted-foreground">Captured automatically — the satellite map shows exactly where you are standing.</p>
+              </div>
+            </div>
+            <div className={errors.has("__gps") ? "rounded-xl ring-2 ring-destructive" : ""}>
+              <IrfGpsMap value={gps} onChange={setGps} accent={form.color} />
+            </div>
+          </Card>
+
+
+
           {/* Evidence + per-photo consent */}
           <Card className="mt-4 space-y-4 p-4 sm:p-6">
             <div className="flex items-center justify-between gap-2">
