@@ -203,6 +203,14 @@ const SatelliteImageryView = () => {
   const flhfCount = microplanLocations.filter(l => l.type === "flhf").length;
 
   return (
+    <>
+    <StreetViewPanel
+      open={!!streetView}
+      onOpenChange={(o) => !o && setStreetView(null)}
+      lat={streetView?.lat ?? null}
+      lng={streetView?.lng ?? null}
+      title="Satellite Street View"
+    />
     <div className="space-y-4 p-4 lg:p-6 max-w-[1400px] mx-auto">
       <div>
         <h1 className="font-display text-2xl lg:text-3xl font-bold text-foreground flex items-center gap-3">
