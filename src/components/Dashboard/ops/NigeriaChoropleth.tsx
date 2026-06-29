@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { loadNigeriaGeo, resolveFromMap } from "./lgaGeo";
+import { useLeafletStreetView } from "@/components/maps/LeafletStreetView";
 
 export interface ChoroCell {
   fill: string;
