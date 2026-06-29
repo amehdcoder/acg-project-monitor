@@ -21,6 +21,10 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  openAfterHoursApprovals,
+  openAfterHoursStatus,
+} from "@/lib/afterHours/events";
 
 interface Notification {
   id: string;
@@ -101,6 +105,18 @@ const NotificationsPanel = () => {
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
     await supabase.from("notifications").update({ read: true }).eq("id", id);
+  };
+
+  const handleClick = (n: Notification) => {
+    markAsRead(n.id);
+    if (n.category === "after_hours") {
+      setOpen(false);
+      if (/approval needed/i.test(n.title)) {
+        openAfterHoursApprovals(n.related_id ?? undefined);
+      } else {
+        openAfterHoursStatus();
+      }
+    }
   };
 
   const markAllAsRead = async () => {
@@ -204,7 +220,7 @@ const NotificationsPanel = () => {
                     notification.type,
                     notification.read
                   )}`}
-                  onClick={() => markAsRead(notification.id)}
+                  onClick={() => handleClick(notification)}
                 >
                   <div className="flex gap-3">
                     <div className="mt-0.5 shrink-0">
