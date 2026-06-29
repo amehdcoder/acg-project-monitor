@@ -1,11 +1,14 @@
 import { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { PenLine, Search, Download, MapPin, CalendarClock, User2, ZoomIn } from "lucide-react";
+import {
+  Collapsible, CollapsibleContent, CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { PenLine, Search, Download, MapPin, CalendarClock, User2, ZoomIn, ChevronDown } from "lucide-react";
 
 const stripTags = (s?: string) => String(s || "").replace(/<[^>]*>/g, "").trim();
 
