@@ -21,6 +21,10 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  openAfterHoursApprovals,
+  openAfterHoursStatus,
+} from "@/lib/afterHours/events";
 
 interface Notification {
   id: string;
