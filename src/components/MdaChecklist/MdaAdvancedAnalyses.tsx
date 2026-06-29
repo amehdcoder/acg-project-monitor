@@ -233,7 +233,10 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
     setDrill({ title, subtitle, tint, rows: toDrillRows(subs) });
 
   // Resolve the questions that drive each analysis (by label).
-  const qStatus = useMemo(() => idx.find([/current.*status of mda/i, /status of mda/i]), [idx]);
+  // Use the Community Checklist "Status of MDA" question — explicitly NOT the
+  // Follow-up on MDA Completion module's "What is the CURRENT Status of MDA in
+  // the Community?" question.
+  const qStatus = useMemo(() => idx.findExcept([/status of mda/i], [/current/i]), [idx]);
   const qCdd = useMemo(() => idx.find([/are there cdds/i, /cdds in the community/i]), [idx]);
   const qNumCdd = useMemo(() => idx.find([/how many cdds/i, /number of cdds/i, /no\.? of cdds/i]), [idx]);
   const qSae = useMemo(() => idx.find([/complain.*side effect/i, /side effects during mda/i, /complain of side/i]), [idx]);
