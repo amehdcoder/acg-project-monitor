@@ -200,29 +200,36 @@ export default function IrfAccessManager({ open, onOpenChange, projectId, grants
 
           <TabsContent value="designations" className="min-h-0 flex-1">
             <ScrollArea className="h-[52vh] pr-3">
-              <div className="space-y-1.5">
-                {DESIGNATIONS.map((d) => {
-                  const granted = grantedDesignations.has(d.value);
-                  const grantRow = categoryGrants.find((g) => g.grant_type === "designation" && g.designation === d.value);
-                  return (
-                    <div key={d.value} className="flex items-center justify-between gap-2 rounded-lg border p-2.5">
-                      <p className="truncate text-sm font-medium">{d.label}</p>
-                      {granted ? (
-                        <Button size="sm" variant="ghost" className="text-destructive" disabled={busy === grantRow?.id}
-                          onClick={() => grantRow && removeGrant(grantRow.id)}>
-                          {busy === grantRow?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="outline" disabled={!!busy}
-                          onClick={() => addGrant({ grant_type: "designation", designation: d.value })}>
-                          <Plus className="mr-1 h-4 w-4" /> Grant
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              {loadingMembers ? (
+                <div className="flex h-32 items-center justify-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
+              ) : projectDesignations.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">No designations found among this project's members.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {projectDesignations.map((d) => {
+                    const granted = grantedDesignations.has(d.value);
+                    const grantRow = categoryGrants.find((g) => g.grant_type === "designation" && g.designation === d.value);
+                    return (
+                      <div key={d.value} className="flex items-center justify-between gap-2 rounded-lg border p-2.5">
+                        <p className="truncate text-sm font-medium">{d.label}</p>
+                        {granted ? (
+                          <Button size="sm" variant="ghost" className="text-destructive" disabled={busy === grantRow?.id}
+                            onClick={() => grantRow && removeGrant(grantRow.id)}>
+                            {busy === grantRow?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" disabled={!!busy}
+                            onClick={() => addGrant({ grant_type: "designation", designation: d.value })}>
+                            <Plus className="mr-1 h-4 w-4" /> Grant
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </ScrollArea>
+
           </TabsContent>
         </Tabs>
 
