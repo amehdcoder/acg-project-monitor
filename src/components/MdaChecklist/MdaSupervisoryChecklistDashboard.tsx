@@ -1189,43 +1189,51 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       </Card>
 
       {/* ── Coverage map ── */}
-      {isJigawa ? (
-        <JigawaSupervisoryMap submissions={mapSubs} formName={formName} />
-      ) : isFct ? (
-        <FctSupervisoryMap submissions={mapSubs} formName={formName} />
-      ) : (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="flex items-center gap-1.5 text-sm"><MapPin className="h-4 w-4 text-primary" />Supervision Coverage Map</CardTitle></CardHeader>
-          <CardContent><MdaSupervisoryMap submissions={mapSubs} formName={formName} /></CardContent>
-        </Card>
-      )}
+      <SectionErrorBoundary label="Supervision coverage map">
+        {isJigawa ? (
+          <JigawaSupervisoryMap submissions={mapSubs} formName={formName} />
+        ) : isFct ? (
+          <FctSupervisoryMap submissions={mapSubs} formName={formName} />
+        ) : (
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="flex items-center gap-1.5 text-sm"><MapPin className="h-4 w-4 text-primary" />Supervision Coverage Map</CardTitle></CardHeader>
+            <CardContent><MdaSupervisoryMap submissions={mapSubs} formName={formName} /></CardContent>
+          </Card>
+        )}
+      </SectionErrorBoundary>
 
       {/* ── Household coverage survey map (Coverage Evaluation 3D outcomes) ── */}
-      <HouseholdCoverageSurveyMap
-        key={hcaReloadKey}
-        projectId={projectId}
-        formName={formName}
-        linkedCommunityKeys={linkedCommunityKeys}
-        stateFilter={fState === ALL ? null : fState}
-        defaultState={householdMapDefaultState}
-        dateFrom={fFrom ? fFrom + "T00:00:00" : null}
-        dateTo={fTo ? fTo + "T23:59:59" : null}
-        onSelectCommunity={openMapCommunityDrill}
-        onSelectLga={openMapLgaDrill}
-        onPointsLoaded={handleHcaPoints}
-        onLoadStateChange={handleHcaLoadState}
-      />
+      <SectionErrorBoundary label="Household coverage survey map">
+        <HouseholdCoverageSurveyMap
+          key={hcaReloadKey}
+          projectId={projectId}
+          formName={formName}
+          linkedCommunityKeys={linkedCommunityKeys}
+          stateFilter={fState === ALL ? null : fState}
+          defaultState={householdMapDefaultState}
+          dateFrom={fFrom ? fFrom + "T00:00:00" : null}
+          dateTo={fTo ? fTo + "T23:59:59" : null}
+          onSelectCommunity={openMapCommunityDrill}
+          onSelectLga={openMapLgaDrill}
+          onPointsLoaded={handleHcaPoints}
+          onLoadStateChange={handleHcaLoadState}
+        />
+      </SectionErrorBoundary>
 
       {/* ── Robust household coverage statistical analysis ── */}
-      <HouseholdCoverageAnalysis
-        points={hcaPoints}
-        loading={hcaState.loading}
-        error={hcaState.error}
-        onRetry={() => setHcaReloadKey((k) => k + 1)}
-      />
+      <SectionErrorBoundary label="Household coverage analysis">
+        <HouseholdCoverageAnalysis
+          points={hcaPoints}
+          loading={hcaState.loading}
+          error={hcaState.error}
+          onRetry={() => setHcaReloadKey((k) => k + 1)}
+        />
+      </SectionErrorBoundary>
 
       {/* ── Supervisor signatures register ── */}
-      <SupervisorSignatureGallery submissions={filtered} />
+      <SectionErrorBoundary label="Supervisor signature gallery">
+        <SupervisorSignatureGallery submissions={filtered} />
+      </SectionErrorBoundary>
 
 
 
