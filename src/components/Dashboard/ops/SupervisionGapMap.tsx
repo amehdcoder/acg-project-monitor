@@ -49,6 +49,7 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
           subdomains: "abcd", maxZoom: 19, opacity: 0.9,
         }).addTo(map);
         mapRef.current = map;
+        attachSv(map);
         // Seed with the fixed Nigeria extent immediately so the whole country is
         // visible from the very first paint (before the boundary file loads).
         fullBoundsRef.current = NIGERIA_BOUNDS;
