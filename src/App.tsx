@@ -99,6 +99,7 @@ const App = () => (
                 <GpsWarmer />
                 <AfterHoursGate />
                 <AfterHoursApprovalCenter />
+                <MyAfterHoursRequests />
 
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
