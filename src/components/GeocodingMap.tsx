@@ -38,6 +38,7 @@ export default function GeocodingMap({ points }: { points: GeoPoint[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
+  const { attach: attachSv, panel: streetViewPanel } = useLeafletStreetView();
 
   const sources = useMemo(
     () => Array.from(new Set(points.map((p) => p.source || "Unknown"))),
