@@ -120,6 +120,7 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
     if (!reportingMonth) missing.push("__month");
     if (!state) missing.push("__state");
     if (requiresLga && !lga) missing.push("__lga");
+    if (!gps) missing.push("__gps");
     if (form.perMinistry && !ministry) missing.push("__ministry");
     if (form.perMinistry && ministry === OTHER_OPTION && !ministryOther.trim()) missing.push("__ministry_other");
     allFields.forEach((f) => {
