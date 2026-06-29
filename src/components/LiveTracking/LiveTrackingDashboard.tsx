@@ -323,6 +323,7 @@ const LiveTrackingDashboard = () => {
       window.clearTimeout(t1);
       ro.disconnect();
       window.removeEventListener("resize", fixSize);
+      detachSv();
       mapReadyRef.current = false;
       markersRef.current.clear();
       map.remove();
