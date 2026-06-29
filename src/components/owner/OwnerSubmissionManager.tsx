@@ -35,6 +35,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
+export type OwnerDataMutation = {
+  table: string;
+  title: string;
+  type: "ids" | "bulk";
+  mode: "archive" | "permanent";
+  deleted: number;
+  ids?: string[];
+  from?: string | null;
+  to?: string | null;
+  filter?: { column: string; value: string } | null;
+};
+
 /**
  * Owner-only submission deletion manager — drops onto any dashboard.
  * Supports per-row + bulk (date-range) actions, with Archive (restore later)
@@ -50,7 +62,7 @@ export interface OwnerSubmissionManagerProps {
   /** Optional scoping filter applied to listing + bulk delete. */
   filter?: { column: string; value: string } | null;
   /** Optional callback after any successful mutation. */
-  onChanged?: () => void;
+  onChanged?: (mutation?: OwnerDataMutation) => void | Promise<void>;
   /** Compact trigger (icon only) for tight dashboard headers. */
   compact?: boolean;
   className?: string;
@@ -87,6 +99,18 @@ const readableError = (e: unknown) => {
   const message = (e as Error)?.message || "Unknown error";
   if (message.includes("does not exist")) return "The dashboard data fields changed. Refresh and try again.";
   return message;
+};
+
+const getArchivedRecordIds = async (table: string, recordIds: string[]) => {
+  if (!recordIds.length) return [];
+  const { data, error } = await supabase
+    .from("owner_deleted_records" as any)
+    .select("id, record_id")
+    .eq("source_table", table)
+    .is("restored_at", null)
+    .in("record_id", recordIds);
+  if (error) return [];
+  return ((data as any[]) || []).map((row) => String(row.id)).filter(Boolean);
 };
 
 const OwnerSubmissionManager = ({
@@ -187,17 +211,27 @@ const OwnerSubmissionManager = ({
     setBusy(true);
     const toastId = toast.loading(`${mode === "archive" ? "Archiving" : "Deleting"} ${ids.length} ${title}…`);
     try {
-      const { error } = await (supabase as any).rpc("owner_delete_records", {
+      const { data, error } = await (supabase as any).rpc("owner_delete_records", {
         _table: table,
         _ids: ids,
         _archive: mode === "archive",
       });
       if (error) throw error;
-      toast.success(mode === "archive" ? `Archived ${ids.length} ${title}` : `Deleted ${ids.length} ${title}`, { id: toastId });
+      const deleted = Number((data as any)?.deleted ?? ids.length);
+      toast.success(mode === "archive" ? `Archived ${deleted} ${title}` : `Deleted ${deleted} ${title}`, {
+        id: toastId,
+        action: mode === "archive" ? {
+          label: "Undo",
+          onClick: async () => {
+            const archivedIds = await getArchivedRecordIds(table, ids);
+            if (archivedIds.length) void runRestore(archivedIds);
+          },
+        } : undefined,
+      });
       setConfirmText("");
       await loadRows();
       await loadArchived();
-      onChanged?.();
+      onChanged?.({ table, title, type: "ids", mode, deleted, ids, filter });
     } catch (e) {
       toast.error(`Action failed: ${readableError(e)}`, { id: toastId });
     } finally {
@@ -232,11 +266,11 @@ const OwnerSubmissionManager = ({
       });
       if (error) throw error;
       const n = (data as any)?.deleted ?? 0;
-      toast.success(mode === "archive" ? `Archived ${n} ${title}` : `Deleted ${n} ${title}`, { id: toastId });
+      toast.success(mode === "archive" ? `Archived ${n} ${title}. Use Archived → Restore all to undo.` : `Deleted ${n} ${title}`, { id: toastId });
       setConfirmText("");
       await loadRows();
       await loadArchived();
-      onChanged?.();
+      onChanged?.({ table, title, type: "bulk", mode, deleted: Number(n), from: fromIso, to: toIso, filter });
     } catch (e) {
       toast.error(`Bulk action failed: ${readableError(e)}`, { id: toastId });
     } finally {
