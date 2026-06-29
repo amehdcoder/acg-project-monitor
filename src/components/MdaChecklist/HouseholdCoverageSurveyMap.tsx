@@ -181,7 +181,7 @@ interface Props {
 
 const SPEEDS = [0.5, 1, 2, 4];
 
-export default function HouseholdCoverageSurveyMap({ projectId, formName, stateFilter, defaultState, dateFrom, dateTo, onSelectCommunity, onSelectLga }: Props) {
+export default function HouseholdCoverageSurveyMap({ projectId, formName, linkedCommunityKeys, stateFilter, defaultState, dateFrom, dateTo, onSelectCommunity, onSelectLga }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
