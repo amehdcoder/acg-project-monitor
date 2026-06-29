@@ -31,7 +31,7 @@ import {
   ArrowRight, ShieldCheck, Map as MapIcon, Building2, Layers, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
+import { prepareMdaData, communityKey, linkedCommunityKey } from "@/lib/mda/dashboardData";
 
 import { computeMdaKpis, buildMdaModel, type Heatmap as KHeatmap } from "@/lib/mda/kpis";
 import { exportKpiWorkbook, type KpiId } from "@/lib/mda/kpiExport";
@@ -493,6 +493,31 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     }
     return m;
   }, [mdaModel]);
+
+  // ── Communities actually supervised in the (filtered) checklist ──
+  // The Household Coverage Survey Map must ONLY plot Coverage Evaluation 3D
+  // household visits that belong to a community present in these checklist
+  // submissions. This prevents orphaned/stale CES data from lingering on the map
+  // after MDA submissions are cleared, and keeps the map in exact sync with the
+  // dashboard's data (delete the checklist → the linked households disappear).
+  const linkedCommunityKeys = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          checklist.map((s) =>
+            linkedCommunityKey(
+              pickGeo(s, "state"),
+              pickGeo(s, "lga"),
+              pickGeo(s, "ward"),
+              pickGeo(s, "community"),
+            ),
+          ),
+        ),
+      ),
+    [checklist],
+  );
+
+
 
 
   // ── KPI data export (#2): clicking a KPI downloads the underlying submissions ──
@@ -1140,6 +1165,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       <HouseholdCoverageSurveyMap
         projectId={projectId}
         formName={formName}
+        linkedCommunityKeys={linkedCommunityKeys}
         stateFilter={fState === ALL ? null : fState}
         defaultState={householdMapDefaultState}
         dateFrom={fFrom ? fFrom + "T00:00:00" : null}

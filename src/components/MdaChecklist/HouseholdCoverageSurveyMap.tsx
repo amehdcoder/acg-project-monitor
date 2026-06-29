@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
+import { linkedCommunityKey } from "@/lib/mda/dashboardData";
 
 /**
  * Household Coverage Survey Map
@@ -157,6 +158,15 @@ interface VisitPoint {
 interface Props {
   projectId?: string | null;
   formName?: string;
+  /**
+   * Community-identity keys (state|lga|ward|community, alnum-normalized via
+   * `linkedCommunityKey`) for the communities present in the dashboard's current
+   * checklist submissions. When provided, ONLY household visits belonging to one
+   * of these communities are plotted — so stale/orphaned Coverage Evaluation 3D
+   * data never lingers on the map after MDA submissions are cleared, and the map
+   * stays in exact sync with the dashboard data.
+   */
+  linkedCommunityKeys?: string[];
   /** Optional state filter coming from the dashboard filter bar. */
   stateFilter?: string | null;
   /** State to show when the dashboard is not actively filtered but the project is state-specific. */
@@ -172,7 +182,7 @@ interface Props {
 
 const SPEEDS = [0.5, 1, 2, 4];
 
-export default function HouseholdCoverageSurveyMap({ projectId, formName, stateFilter, defaultState, dateFrom, dateTo, onSelectCommunity, onSelectLga }: Props) {
+export default function HouseholdCoverageSurveyMap({ projectId, formName, linkedCommunityKeys, stateFilter, defaultState, dateFrom, dateTo, onSelectCommunity, onSelectLga }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -311,11 +321,24 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
     writeUrl({ [URL_KEYS.outcomes]: activeOutcomes.size ? [...activeOutcomes].sort().join(",") : null });
   }, [activeOutcomes]);
 
-  // Apply state + dashboard date filters + legend outcome filter
+  // Set of supervised-community keys to constrain the map to linked data only.
+  // `undefined` ⇒ no linkage constraint (legacy/standalone use). An EMPTY set
+  // (dashboard supplied it but there are no checklist communities) ⇒ show
+  // nothing, so deleting all submissions instantly clears the map.
+  const linkedKeySet = useMemo(
+    () => (linkedCommunityKeys ? new Set(linkedCommunityKeys) : null),
+    [linkedCommunityKeys],
+  );
+
+  // Apply linkage + state + dashboard date filters + legend outcome filter
   const filtered = useMemo(() => {
     const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
     const toTs = dateTo ? new Date(dateTo).getTime() : null;
     return points.filter((p) => {
+      if (linkedKeySet) {
+        const key = linkedCommunityKey(p.state, p.lga, p.ward, p.community);
+        if (!linkedKeySet.has(key)) return false;
+      }
       if (stateFilter && norm(p.state) !== norm(stateFilter)) return false;
       if (activeOutcomes.size && !activeOutcomes.has(outcomeFor(p.status).key)) return false;
       if (fromTs || toTs) {
@@ -326,7 +349,8 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, stateF
       }
       return true;
     });
-  }, [points, stateFilter, activeOutcomes, dateFrom, dateTo]);
+  }, [points, linkedKeySet, stateFilter, activeOutcomes, dateFrom, dateTo]);
+
 
   // Chronological sequence used by the sweep + time window slider
   const sequence = useMemo(
