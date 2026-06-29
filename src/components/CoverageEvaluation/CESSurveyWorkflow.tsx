@@ -285,6 +285,10 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // Completion receipt shown to regular users once their visits are saved & synced.
   const [showSyncReceipt, setShowSyncReceipt] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
+  // Clamp regular users back to Step 3 if a restored draft put them on 4/5.
+  useEffect(() => {
+    if (!rolesLoading && !canViewAnalysis && (step === 4 || step === 5)) setStep(3);
+  }, [rolesLoading, canViewAnalysis, step]);
   const fencedCommunityWrittenRef = useRef<string | null>(null);
 
   // Step 1 — Locate & boundaries
