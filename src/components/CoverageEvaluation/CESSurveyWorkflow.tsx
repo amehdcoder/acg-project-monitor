@@ -4281,6 +4281,38 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         </Card>
       )}
 
+      {/* Household-surveyor completion receipt — data recorded & synced */}
+      <Dialog open={showSyncReceipt} onOpenChange={(o) => { if (!o) { setShowSyncReceipt(false); onClose?.(); } }}>
+        <DialogContent className="max-w-md overflow-hidden p-0 text-center">
+          <div className="relative bg-gradient-to-br from-emerald-600 via-green-600 to-teal-700 px-6 pt-8 pb-10 text-white">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/15 ring-4 ring-white/25 backdrop-blur-sm">
+              <CheckCircle2 className="h-12 w-12 text-white" />
+            </div>
+            <DialogHeader className="mt-4">
+              <DialogTitle className="text-center text-xl font-bold text-white">Submission complete</DialogTitle>
+            </DialogHeader>
+            <p className="mt-2 text-sm text-white/90">
+              Your household coverage survey for{communityName ? ` ${communityName}` : " this community"} has been
+              <span className="font-semibold"> recorded and synced</span> to the server and the MDA Supervision Dashboard.
+            </p>
+          </div>
+          <div className="space-y-4 px-6 py-6">
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <Shield className="h-3.5 w-3.5 text-emerald-600" />
+              Saved securely · {isOnline ? "Synced now" : "Queued — will sync when back online"}
+            </div>
+            <Button
+              size="lg"
+              className="w-full bg-emerald-600 font-semibold hover:bg-emerald-700"
+              onClick={() => { setShowSyncReceipt(false); onClose?.(); }}
+            >
+              <Home className="h-4 w-4 mr-2" /> Close & return to Forms
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
       {/* Household pin dialog */}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
