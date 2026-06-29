@@ -168,9 +168,21 @@ const AfterHoursGate = () => {
               <div className="flex items-center justify-center gap-1.5 rounded-lg bg-muted/50 py-2 text-xs text-muted-foreground">
                 <ShieldCheck className="h-3.5 w-3.5" /> Awaiting administrator review
               </div>
-              <Button className="w-full" onClick={close}>
-                Done
-              </Button>
+              <div className="flex gap-2.5">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    close();
+                    openAfterHoursStatus();
+                  }}
+                >
+                  View status
+                </Button>
+                <Button className="flex-1" onClick={close}>
+                  Done
+                </Button>
+              </div>
             </div>
           )}
         </div>
