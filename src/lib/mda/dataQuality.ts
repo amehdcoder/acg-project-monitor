@@ -81,10 +81,15 @@ const hasValue = (c: CommunityAgg, q: ResolvedQ | null): boolean => {
 };
 
 export function buildQualityReport(
-  communities: CommunityAgg[],
+  allCommunities: CommunityAgg[],
   sectionDefs: QualitySectionDef[],
   projectName = "",
 ): QualityReport {
+  // Exclude communities without a resolved LGA / Area Council. These produce an
+  // "Unspecified" row that is not actionable, and such submissions should never
+  // appear on the dashboard.
+  const communities = allCommunities.filter((c) => String(c.lga || "").trim() !== "");
+
   const resolved = sectionDefs.filter((s) => s.q);
   const unresolved = sectionDefs.filter((s) => !s.q).map((s) => s.label);
 
@@ -95,6 +100,7 @@ export function buildQualityReport(
     if (!byLga.has(k)) byLga.set(k, []);
     byLga.get(k)!.push(c);
   }
+
 
   const lgas: LgaQuality[] = [...byLga.entries()]
     .map(([lga, list]) => {

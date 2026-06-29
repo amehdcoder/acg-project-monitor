@@ -68,6 +68,26 @@ export class MdaQuestionIndex {
     }
     return null;
   }
+  /**
+   * Find the first question matching any pattern while skipping questions whose
+   * label matches any exclude pattern. Lets us target the Community Checklist
+   * "Status of MDA" question and ignore the Follow-up module's
+   * "What is the CURRENT Status of MDA in the Community?" question.
+   */
+  findExcept(patterns: (string | RegExp)[], exclude: (string | RegExp)[]): ResolvedQ | null {
+    const isExcluded = (label: string) =>
+      exclude.some((e) =>
+        e instanceof RegExp ? e.test(label) : label.toLowerCase().includes(e.toLowerCase()),
+      );
+    for (const p of patterns) {
+      for (const q of this.qs) {
+        if (isExcluded(q.label)) continue;
+        const hit = p instanceof RegExp ? p.test(q.label) : q.label.toLowerCase().includes(p.toLowerCase());
+        if (hit) return q;
+      }
+    }
+    return null;
+  }
   /** Find ALL questions whose label matches any of the patterns (deduped). */
   findAll(patterns: (string | RegExp)[]): ResolvedQ[] {
     const out: ResolvedQ[] = [];
