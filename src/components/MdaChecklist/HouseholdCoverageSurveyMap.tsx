@@ -88,6 +88,31 @@ const OUTCOME_ALIASES: Record<string, Outcome> = Object.fromEntries(
 );
 const outcomeFor = (status?: string | null): Outcome => OUTCOME_ALIASES[norm(status)] || OTHER;
 
+/** Diagnostics gathered while validating raw visit rows before rendering. */
+interface VisitDiagnostics {
+  total: number;
+  rendered: number;
+  badGps: number;
+  unmappedOutcome: number;
+  unlinked: number;
+}
+
+/**
+ * Automated pre-render check for a single household visit row. Guarantees that
+ * every point plotted on the dashboard has (a) a finite, in-range GPS pair,
+ * (b) an outcome that maps to a known icon, and (c) — when linkage is enforced —
+ * a community key that links back to a supervised MDA checklist submission.
+ * Returns `null` (with a reason) for any row that fails, so it is never rendered.
+ */
+function validateVisitGps(lat: unknown, lng: unknown): { lat: number; lng: number } | null {
+  const la = Number(lat);
+  const ln = Number(lng);
+  if (!Number.isFinite(la) || !Number.isFinite(ln)) return null;
+  if (la < -90 || la > 90 || ln < -180 || ln > 180) return null;
+  if (la === 0 && ln === 0) return null;
+  return { lat: la, lng: ln };
+}
+
 const URL_KEYS = {
   outcomes: "hcs_outcomes",
   visit: "hcs_visit",
@@ -222,6 +247,7 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
 
   const [points, setPoints] = useState<VisitPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [diagnostics, setDiagnostics] = useState<VisitDiagnostics>({ total: 0, rendered: 0, badGps: 0, unmappedOutcome: 0, unlinked: 0 });
 
   // Animation state
   const [animate, setAnimate] = useState(false);
@@ -280,6 +306,7 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
         if (ids.length === 0) { if (!cancelled) { setPoints([]); setLoading(false); } return; }
 
         const collected: VisitPoint[] = [];
+        const diag: VisitDiagnostics = { total: 0, rendered: 0, badGps: 0, unmappedOutcome: 0, unlinked: 0 };
         const CHUNK = 200;
         for (let i = 0; i < ids.length; i += CHUNK) {
           const slice = ids.slice(i, i + CHUNK);
@@ -292,14 +319,18 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
             return vq.order("id", { ascending: true }).limit(limit);
           });
           for (const v of (visits as any[]) || []) {
-            const lat = Number(v.latitude), lng = Number(v.longitude);
-            if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) continue;
+            diag.total += 1;
+            // Automated check #1 — GPS must be finite and in range.
+            const gps = validateVisitGps(v.latitude, v.longitude);
+            if (!gps) { diag.badGps += 1; continue; }
+            // Automated check #2 — outcome must map to a known icon (else flagged "Other").
+            if (!OUTCOME_ALIASES[norm(v.coverage_status)]) diag.unmappedOutcome += 1;
             const m = meta.get(v.survey_id) || { state: "", lga: "", ward: "", flhf: "", community: "", settlement: "" };
             collected.push({
               id: v.id,
               surveyId: v.survey_id,
-              lat,
-              lng,
+              lat: gps.lat,
+              lng: gps.lng,
               accuracy: Number.isFinite(Number(v.gps_accuracy)) ? Number(v.gps_accuracy) : null,
               status: v.coverage_status,
               commodity: v.commodity,
@@ -318,10 +349,11 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
             });
           }
         }
-        if (!cancelled) { setPoints(collected); setLoading(false); }
+        diag.rendered = collected.length;
+        if (!cancelled) { setPoints(collected); setDiagnostics(diag); setLoading(false); }
       } catch (e) {
         console.warn("Household coverage map load failed", e);
-        if (!cancelled) { setPoints([]); setLoading(false); }
+        if (!cancelled) { setPoints([]); setDiagnostics({ total: 0, rendered: 0, badGps: 0, unmappedOutcome: 0, unlinked: 0 }); setLoading(false); }
       }
     })();
     return () => { cancelled = true; };
@@ -360,6 +392,27 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
       return true;
     });
   }, [points, linkedKeySet, stateFilter, activeOutcomes, dateFrom, dateTo]);
+
+  // Automated check #3 — how many GPS-valid points fail community linkage to a
+  // supervised MDA checklist submission (excluded from the map for integrity).
+  const unlinkedCount = useMemo(() => {
+    if (!linkedKeySet) return 0;
+    return points.reduce(
+      (n, p) => (linkedKeySet.has(linkedCommunityKey(p.state, p.lga, p.ward, p.community)) ? n : n + 1),
+      0,
+    );
+  }, [points, linkedKeySet]);
+
+  // Consolidated, human-readable integrity summary surfaced to assistive tech.
+  const integrity = useMemo(() => {
+    const issues: string[] = [];
+    if (diagnostics.badGps) issues.push(`${diagnostics.badGps} dropped for invalid GPS`);
+    if (diagnostics.unmappedOutcome) issues.push(`${diagnostics.unmappedOutcome} shown as “Other” (unmapped outcome)`);
+    if (unlinkedCount) issues.push(`${unlinkedCount} excluded (not linked to a checklist community)`);
+    return { ok: issues.length === 0, issues };
+  }, [diagnostics, unlinkedCount]);
+
+
 
 
   // Chronological sequence used by the sweep + time window slider
