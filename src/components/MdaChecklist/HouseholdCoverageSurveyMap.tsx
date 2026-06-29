@@ -212,6 +212,8 @@ interface Props {
   onSelectCommunity?: (community: string, state?: string | null) => void;
   /** Fired when an LGA polygon is clicked — filters the drilldown table to that LGA. */
   onSelectLga?: (lga: string, state?: string | null) => void;
+  /** Fired with the linkage/state/date-filtered visit points for downstream analysis. */
+  onPointsLoaded?: (points: VisitPoint[]) => void;
 }
 
 const SPEEDS = [0.5, 1, 2, 4];
