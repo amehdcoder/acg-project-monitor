@@ -7,7 +7,7 @@ import { useDataAnalytics, type SubmissionRecord } from "@/hooks/useDataAnalytic
 import { clearMdaCache, loadMdaCache, saveMdaCache, isOffline } from "@/lib/mda/offlineCache";
 import { canonicalizeSubmissionData } from "@/lib/mda/dashboardData";
 import MdaSupervisoryChecklistDashboard from "./MdaSupervisoryChecklistDashboard";
-import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
+import OwnerSubmissionManager, { type OwnerDataMutation } from "@/components/owner/OwnerSubmissionManager";
 
 interface MdaDashboardForm {
   id: string;
@@ -152,6 +152,8 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
   const { submissions, loading, refresh } = useDataAnalytics({ formId: form.id });
   const [refreshing, setRefreshing] = useState(false);
   const [cacheVersion, setCacheVersion] = useState(0);
+  const [optimisticallyHiddenIds, setOptimisticallyHiddenIds] = useState<Set<string>>(new Set());
+  const [optimisticallyEmpty, setOptimisticallyEmpty] = useState(false);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -172,19 +174,25 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
     [submissions, form, questions],
   );
 
+  const visibleRealRows = useMemo(() => {
+    if (optimisticallyEmpty) return [];
+    if (!optimisticallyHiddenIds.size) return realRows;
+    return realRows.filter((row) => !optimisticallyHiddenIds.has(row.id));
+  }, [realRows, optimisticallyHiddenIds, optimisticallyEmpty]);
+
   // ── Offline cache: keep the last synced rows + questions per form ──
   const cached = useMemo(() => loadMdaCache(form.id), [form.id, cacheVersion]);
   useEffect(() => {
     if (!loading && submissions.length > 0) {
-      saveMdaCache(form.id, realRows, questions);
+      saveMdaCache(form.id, visibleRealRows, questions);
     }
-  }, [loading, submissions.length, realRows, questions, form.id]);
+  }, [loading, submissions.length, visibleRealRows, questions, form.id]);
 
   const hasCache = !!cached && cached.rows.length > 0;
   // Use cached data only while offline; online zero rows must render a true empty state after deletion.
   const useCacheNow = hasCache && submissions.length === 0 && isOffline();
 
-  const dashboardRows = useCacheNow ? cached!.rows : realRows;
+  const dashboardRows = useCacheNow ? cached!.rows : visibleRealRows;
   const dashboardQuestions = useCacheNow ? cached!.questions : questions;
   const projectName = projects.find((p) => p.id === form.project_id)?.name;
   const showLoader = loading && !useCacheNow;
@@ -192,6 +200,27 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
     clearMdaCache(form.id);
     setCacheVersion((v) => v + 1);
     await refresh();
+    setOptimisticallyHiddenIds(new Set());
+    setOptimisticallyEmpty(false);
+  };
+
+  const handleOwnerMutation = (mutation: OwnerDataMutation) => {
+    clearMdaCache(form.id);
+    setCacheVersion((v) => v + 1);
+    if (mutation.type === "ids" && mutation.ids?.length) {
+      setOptimisticallyHiddenIds((prev) => {
+        const next = new Set(prev);
+        mutation.ids?.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+    const isCurrentFormBulkClear =
+      mutation.type === "bulk" &&
+      mutation.filter?.column === "form_id" &&
+      mutation.filter.value === form.id &&
+      !mutation.from &&
+      !mutation.to;
+    if (isCurrentFormBulkClear) setOptimisticallyEmpty(true);
   };
 
 
@@ -233,6 +262,7 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
                 title="MDA checklist submissions"
                 labelColumns={["data.state", "data.lga", "status"]}
                 filter={{ column: "form_id", value: form.id }}
+                onMutation={handleOwnerMutation}
                 onChanged={handleDataChanged}
               />
             )}
