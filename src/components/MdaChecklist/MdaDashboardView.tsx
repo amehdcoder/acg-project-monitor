@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useDataAnalytics, type SubmissionRecord } from "@/hooks/useDataAnalytics";
-import { loadMdaCache, saveMdaCache, isOffline } from "@/lib/mda/offlineCache";
+import { clearMdaCache, loadMdaCache, saveMdaCache, isOffline } from "@/lib/mda/offlineCache";
 import { canonicalizeSubmissionData } from "@/lib/mda/dashboardData";
 import MdaSupervisoryChecklistDashboard from "./MdaSupervisoryChecklistDashboard";
 import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
@@ -151,6 +151,7 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
   const { isOwner } = useAuth();
   const { submissions, loading, refresh } = useDataAnalytics({ formId: form.id });
   const [refreshing, setRefreshing] = useState(false);
+  const [cacheVersion, setCacheVersion] = useState(0);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -172,7 +173,7 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
   );
 
   // ── Offline cache: keep the last synced rows + questions per form ──
-  const cached = useMemo(() => loadMdaCache(form.id), [form.id]);
+  const cached = useMemo(() => loadMdaCache(form.id), [form.id, cacheVersion]);
   useEffect(() => {
     if (!loading && submissions.length > 0) {
       saveMdaCache(form.id, realRows, questions);
@@ -187,6 +188,11 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
   const dashboardQuestions = useCacheNow ? cached!.questions : questions;
   const projectName = projects.find((p) => p.id === form.project_id)?.name;
   const showLoader = loading && !useCacheNow;
+  const handleDataChanged = async () => {
+    clearMdaCache(form.id);
+    setCacheVersion((v) => v + 1);
+    await refresh();
+  };
 
 
   return (
@@ -225,9 +231,9 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
               <OwnerSubmissionManager
                 table="form_submissions"
                 title="MDA checklist submissions"
-                labelColumns={["state", "submitter_name"]}
+                labelColumns={["data.state", "data.lga", "status"]}
                 filter={{ column: "form_id", value: form.id }}
-                onChanged={() => refresh()}
+                onChanged={handleDataChanged}
               />
             )}
           </div>

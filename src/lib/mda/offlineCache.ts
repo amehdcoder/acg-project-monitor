@@ -44,6 +44,15 @@ export function loadMdaCache(formId: string): MdaCachePayload | null {
   }
 }
 
+export function clearMdaCache(formId: string): void {
+  if (!formId) return;
+  try {
+    localStorage.removeItem(PREFIX + formId);
+  } catch {
+    // storage unavailable — clearing is best-effort
+  }
+}
+
 export function isOffline(): boolean {
   return typeof navigator !== "undefined" && navigator.onLine === false;
 }
