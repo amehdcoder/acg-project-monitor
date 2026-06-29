@@ -47,7 +47,7 @@ const AfterHoursApprovalCenter = () => {
 
   const load = useCallback(async () => {
     if (!user || !canReview) return;
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("after_hours_submission_requests")
       .select(
         "id, requested_by, requested_by_name, target_table, form_label, reason, project_id, created_at",
@@ -82,7 +82,7 @@ const AfterHoursApprovalCenter = () => {
     async (id: string) => {
       setBusyId(id);
       try {
-        const { error } = await supabase.rpc("approve_after_hours_request", { p_id: id } as any);
+        const { error } = await (supabase as any).rpc("approve_after_hours_request", { p_id: id } as any);
         if (error) throw error;
         toast.success("Submission approved and saved.");
         setRequests((r) => r.filter((x) => x.id !== id));
@@ -99,7 +99,7 @@ const AfterHoursApprovalCenter = () => {
     async (id: string) => {
       setBusyId(id);
       try {
-        const { error } = await supabase.rpc("reject_after_hours_request", {
+        const { error } = await (supabase as any).rpc("reject_after_hours_request", {
           p_id: id,
           p_note: note.trim() || null,
         } as any);

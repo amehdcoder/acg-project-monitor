@@ -59,7 +59,7 @@ const AfterHoursGate = () => {
     }
     setSubmitting(true);
     try {
-      const { error } = await supabase.rpc("request_after_hours_submission", {
+      const { error } = await (supabase as any).rpc("request_after_hours_submission", {
         p_table: detail.table,
         p_payload: detail.payload,
         p_reason: reason.trim(),
