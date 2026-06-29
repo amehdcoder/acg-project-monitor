@@ -376,6 +376,7 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
       {showMap && (
         <Card className="border-border/50 overflow-hidden">
           <div ref={mapContainerRef} style={{ height: "500px", width: "100%" }} className="rounded-lg" />
+          {streetViewPanel}
           {/* Legend */}
           <div className="p-3 border-t border-border bg-muted/20">
             <p className="text-[10px] font-semibold text-muted-foreground mb-2">COVERAGE LEGEND</p>
