@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -24,6 +34,18 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+
+export type OwnerDataMutation = {
+  table: string;
+  title: string;
+  type: "ids" | "bulk";
+  mode: "archive" | "permanent";
+  deleted: number;
+  ids?: string[];
+  from?: string | null;
+  to?: string | null;
+  filter?: { column: string; value: string } | null;
+};
 
 /**
  * Owner-only submission deletion manager — drops onto any dashboard.
@@ -40,7 +62,8 @@ export interface OwnerSubmissionManagerProps {
   /** Optional scoping filter applied to listing + bulk delete. */
   filter?: { column: string; value: string } | null;
   /** Optional callback after any successful mutation. */
-  onChanged?: () => void;
+  onChanged?: () => void | Promise<void>;
+  onMutation?: (mutation: OwnerDataMutation) => void | Promise<void>;
   /** Compact trigger (icon only) for tight dashboard headers. */
   compact?: boolean;
   className?: string;
@@ -60,14 +83,35 @@ interface ArchivedRow {
   snapshot: Record<string, any>;
 }
 
+const getPathValue = (row: Record<string, any>, path: string) =>
+  path.split(".").reduce<any>((acc, key) => (acc && typeof acc === "object" ? acc[key] : undefined), row);
+
 const formatRowLabel = (row: Row, labelColumns?: string[]) => {
   if (labelColumns && labelColumns.length) {
     const parts = labelColumns
-      .map((c) => row[c])
+      .map((c) => getPathValue(row, c))
       .filter((v) => v !== null && v !== undefined && v !== "");
     if (parts.length) return parts.join(" • ");
   }
   return `Record ${String(row.id).slice(0, 8)}`;
+};
+
+const readableError = (e: unknown) => {
+  const message = (e as Error)?.message || "Unknown error";
+  if (message.includes("does not exist")) return "The dashboard data fields changed. Refresh and try again.";
+  return message;
+};
+
+const getArchivedRecordIds = async (table: string, recordIds: string[]) => {
+  if (!recordIds.length) return [];
+  const { data, error } = await supabase
+    .from("owner_deleted_records" as any)
+    .select("id, record_id")
+    .eq("source_table", table)
+    .is("restored_at", null)
+    .in("record_id", recordIds);
+  if (error) return [];
+  return ((data as any[]) || []).map((row) => String(row.id)).filter(Boolean);
 };
 
 const OwnerSubmissionManager = ({
@@ -76,6 +120,7 @@ const OwnerSubmissionManager = ({
   labelColumns,
   filter,
   onChanged,
+  onMutation,
   compact,
   className,
 }: OwnerSubmissionManagerProps) => {
@@ -90,39 +135,59 @@ const OwnerSubmissionManager = ({
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [confirmText, setConfirmText] = useState("");
+  const [pendingAction, setPendingAction] = useState<{ type: "ids"; ids: string[] } | { type: "bulk" } | null>(null);
+
+  const selectColumns = useMemo(() => {
+    const cols = new Set(["id", "created_at"]);
+    for (const column of labelColumns || []) {
+      const topLevel = column.split(".")[0];
+      if (/^[a-z_][a-z0-9_]*$/.test(topLevel)) cols.add(topLevel);
+    }
+    return Array.from(cols).join(", ");
+  }, [labelColumns]);
 
   const loadRows = useCallback(async () => {
     setLoading(true);
     try {
-      const cols = ["id", "created_at", ...(labelColumns || [])].join(", ");
-      let q = supabase.from(table as any).select(cols).order("created_at", { ascending: false }).limit(200);
+      let q: any = supabase.from(table as any).select(selectColumns).order("created_at", { ascending: false }).limit(200);
       if (filter?.column && filter?.value) q = q.eq(filter.column, filter.value);
-      const { data, error } = await q;
+      const result = await q;
+      let data: unknown = result.data;
+      let error = result.error;
+      if (error && /column .* does not exist/i.test(error.message)) {
+        let fallback: any = supabase.from(table as any).select("id, created_at").order("created_at", { ascending: false }).limit(200);
+        if (filter?.column && filter?.value) fallback = fallback.eq(filter.column, filter.value);
+        const retry = await fallback;
+        data = retry.data;
+        error = retry.error;
+      }
       if (error) throw error;
       setRows((data as unknown as Row[]) || []);
       setSelected({});
     } catch (e) {
-      toast.error(`Could not load ${title}: ${(e as Error).message}`);
+      toast.error(`Could not load ${title}: ${readableError(e)}`);
     } finally {
       setLoading(false);
     }
-  }, [table, labelColumns, filter, title]);
+  }, [table, selectColumns, filter, title]);
 
   const loadArchived = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      let q: any = supabase
         .from("owner_deleted_records" as any)
         .select("id, record_id, source_table, deleted_at, snapshot")
         .eq("source_table", table)
         .is("restored_at", null)
         .order("deleted_at", { ascending: false })
         .limit(200);
+      if (filter?.column && filter?.value) q = q.eq(`snapshot->>${filter.column}`, filter.value);
+      const { data, error } = await q;
       if (error) throw error;
       setArchived((data as unknown as ArchivedRow[]) || []);
     } catch {
       /* archive view is best-effort */
     }
-  }, [table]);
+  }, [table, filter]);
 
   const handleOpen = (v: boolean) => {
     setOpen(v);
@@ -135,56 +200,64 @@ const OwnerSubmissionManager = ({
 
   const selectedIds = Object.keys(selected).filter((k) => selected[k]);
 
-  const runDelete = async (ids: string[]) => {
+  const requestDelete = (ids: string[]) => {
     if (!ids.length) return;
     if (mode === "permanent" && confirmText.trim().toUpperCase() !== "DELETE") {
       toast.error('Type "DELETE" to confirm permanent removal');
       return;
     }
-    if (
-      !window.confirm(
-        mode === "permanent"
-          ? `Permanently delete ${ids.length} ${title}? This cannot be undone.`
-          : `Archive ${ids.length} ${title}? You can restore them later.`,
-      )
-    )
-      return;
+    setPendingAction({ type: "ids", ids });
+  };
+
+  const runDelete = async (ids: string[]) => {
     setBusy(true);
+    const toastId = toast.loading(`${mode === "archive" ? "Archiving" : "Deleting"} ${ids.length} ${title}…`);
     try {
-      const { error } = await (supabase as any).rpc("owner_delete_records", {
+      const { data, error } = await (supabase as any).rpc("owner_delete_records", {
         _table: table,
         _ids: ids,
         _archive: mode === "archive",
       });
       if (error) throw error;
-      toast.success(mode === "archive" ? `Archived ${ids.length} ${title}` : `Deleted ${ids.length} ${title}`);
+      const deleted = Number((data as any)?.deleted ?? ids.length);
+      toast.success(mode === "archive" ? `Archived ${deleted} ${title}` : `Deleted ${deleted} ${title}`, {
+        id: toastId,
+        action: mode === "archive" ? {
+          label: "Undo",
+          onClick: async () => {
+            const archivedIds = await getArchivedRecordIds(table, ids);
+            if (archivedIds.length) void runRestore(archivedIds);
+          },
+        } : undefined,
+      });
       setConfirmText("");
       await loadRows();
       await loadArchived();
-      onChanged?.();
+      await onMutation?.({ table, title, type: "ids", mode, deleted, ids, filter });
+      await onChanged?.();
     } catch (e) {
-      toast.error(`Action failed: ${(e as Error).message}`);
+      toast.error(`Action failed: ${readableError(e)}`, { id: toastId });
     } finally {
       setBusy(false);
+      setPendingAction(null);
     }
   };
 
-  const runBulkDelete = async () => {
+  const requestBulkDelete = () => {
     if (mode === "permanent" && confirmText.trim().toUpperCase() !== "DELETE") {
       toast.error('Type "DELETE" to confirm permanent removal');
       return;
     }
+    setPendingAction({ type: "bulk" });
+  };
+
+  const runBulkDelete = async () => {
     const fromIso = fromDate ? new Date(fromDate).toISOString() : null;
     const toIso = toDate ? new Date(`${toDate}T23:59:59`).toISOString() : null;
-    if (
-      !window.confirm(
-        `${mode === "permanent" ? "Permanently delete" : "Archive"} all ${title}` +
-          `${fromIso || toIso ? " in the selected date range" : " (ALL records)"}? ` +
-          (mode === "permanent" ? "This cannot be undone." : "You can restore them later."),
-      )
-    )
-      return;
     setBusy(true);
+    const toastId = toast.loading(
+      `${mode === "archive" ? "Archiving" : "Deleting"} ${fromIso || toIso ? "matching" : "all"} ${title}…`,
+    );
     try {
       const { data, error } = await (supabase as any).rpc("owner_bulk_delete_records", {
         _table: table,
@@ -196,32 +269,35 @@ const OwnerSubmissionManager = ({
       });
       if (error) throw error;
       const n = (data as any)?.deleted ?? 0;
-      toast.success(mode === "archive" ? `Archived ${n} ${title}` : `Deleted ${n} ${title}`);
+      toast.success(mode === "archive" ? `Archived ${n} ${title}. Use Archived → Restore all to undo.` : `Deleted ${n} ${title}`, { id: toastId });
       setConfirmText("");
       await loadRows();
       await loadArchived();
-      onChanged?.();
+      await onMutation?.({ table, title, type: "bulk", mode, deleted: Number(n), from: fromIso, to: toIso, filter });
+      await onChanged?.();
     } catch (e) {
-      toast.error(`Bulk action failed: ${(e as Error).message}`);
+      toast.error(`Bulk action failed: ${readableError(e)}`, { id: toastId });
     } finally {
       setBusy(false);
+      setPendingAction(null);
     }
   };
 
   const runRestore = async (recordIds: string[]) => {
     if (!recordIds.length) return;
     setBusy(true);
+    const toastId = toast.loading(`Restoring ${recordIds.length} record(s)…`);
     try {
       const { error } = await (supabase as any).rpc("owner_restore_records", {
         _record_ids: recordIds,
       });
       if (error) throw error;
-      toast.success(`Restored ${recordIds.length} record(s)`);
+      toast.success(`Restored ${recordIds.length} record(s)`, { id: toastId });
       await loadRows();
       await loadArchived();
-      onChanged?.();
+      await onChanged?.();
     } catch (e) {
-      toast.error(`Restore failed: ${(e as Error).message}`);
+      toast.error(`Restore failed: ${readableError(e)}`, { id: toastId });
     } finally {
       setBusy(false);
     }
@@ -235,14 +311,15 @@ const OwnerSubmissionManager = ({
         variant="outline"
         size={compact ? "icon" : "sm"}
         onClick={() => handleOpen(true)}
+        disabled={busy || loading}
         className={className}
         title="Owner data management"
       >
-        <ShieldAlert className="h-4 w-4 text-destructive" />
-        {!compact && <span className="ml-2">Manage Data</span>}
+        {busy || loading ? <Loader2 className="h-4 w-4 animate-spin text-destructive" /> : <ShieldAlert className="h-4 w-4 text-destructive" />}
+        {!compact && <span className="ml-2">{busy ? "Working…" : loading ? "Loading…" : "Manage Data"}</span>}
       </Button>
 
-      <Dialog open={open} onOpenChange={handleOpen}>
+      <Dialog open={open} onOpenChange={(next) => !busy && handleOpen(next)}>
         <DialogContent className="max-w-2xl w-[calc(100vw-1.5rem)] max-h-[90dvh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
@@ -261,6 +338,7 @@ const OwnerSubmissionManager = ({
               size="sm"
               variant={mode === "archive" ? "default" : "outline"}
               onClick={() => setMode("archive")}
+              disabled={busy}
             >
               <Archive className="h-4 w-4 mr-1" /> Archive
             </Button>
@@ -269,6 +347,7 @@ const OwnerSubmissionManager = ({
               size="sm"
               variant={mode === "permanent" ? "destructive" : "outline"}
               onClick={() => setMode("permanent")}
+              disabled={busy}
             >
               <Trash2 className="h-4 w-4 mr-1" /> Permanent
             </Button>
@@ -312,7 +391,7 @@ const OwnerSubmissionManager = ({
                   size="sm"
                   variant={mode === "permanent" ? "destructive" : "default"}
                   disabled={busy || !selectedIds.length}
-                  onClick={() => runDelete(selectedIds)}
+                  onClick={() => requestDelete(selectedIds)}
                 >
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === "archive" ? <Archive className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
                   <span className="ml-1">{mode === "archive" ? "Archive selected" : "Delete selected"}</span>
@@ -344,7 +423,7 @@ const OwnerSubmissionManager = ({
                           variant="ghost"
                           className="h-8 w-8 shrink-0 text-destructive"
                           disabled={busy}
-                          onClick={() => runDelete([r.id])}
+                          onClick={() => requestDelete([r.id])}
                           title={mode === "archive" ? "Archive" : "Delete"}
                         >
                           {mode === "archive" ? <Archive className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
@@ -376,7 +455,7 @@ const OwnerSubmissionManager = ({
                 className="w-full"
                 variant={mode === "permanent" ? "destructive" : "default"}
                 disabled={busy}
-                onClick={runBulkDelete}
+                onClick={requestBulkDelete}
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : mode === "archive" ? <Archive className="h-4 w-4 mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
                 {mode === "archive" ? "Archive matching records" : "Permanently delete matching records"}
@@ -429,6 +508,35 @@ const OwnerSubmissionManager = ({
           </Tabs>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!pendingAction} onOpenChange={(next) => !next && !busy && setPendingAction(null)}>
+        <AlertDialogContent className="w-[calc(100vw-1.5rem)] max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{mode === "archive" ? "Archive submissions?" : "Permanently delete submissions?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingAction?.type === "ids"
+                ? `${mode === "archive" ? "Archive" : "Delete"} ${pendingAction.ids.length} selected ${title}.`
+                : `${mode === "archive" ? "Archive" : "Delete"} ${fromDate || toDate ? "matching" : "all"} ${title}${filter?.value ? " in this dashboard scope" : ""}.`}
+              {mode === "archive" ? " Archived records can be restored from the Archived tab." : " This cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy}
+              className={mode === "permanent" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : undefined}
+              onClick={(event) => {
+                event.preventDefault();
+                if (pendingAction?.type === "ids") void runDelete(pendingAction.ids);
+                if (pendingAction?.type === "bulk") void runBulkDelete();
+              }}
+            >
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : mode === "archive" ? <Archive className="mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              {mode === "archive" ? "Archive" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
