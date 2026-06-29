@@ -1202,6 +1202,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
 
       {/* ── Household coverage survey map (Coverage Evaluation 3D outcomes) ── */}
       <HouseholdCoverageSurveyMap
+        key={hcaReloadKey}
         projectId={projectId}
         formName={formName}
         linkedCommunityKeys={linkedCommunityKeys}
@@ -1212,10 +1213,16 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         onSelectCommunity={openMapCommunityDrill}
         onSelectLga={openMapLgaDrill}
         onPointsLoaded={handleHcaPoints}
+        onLoadStateChange={handleHcaLoadState}
       />
 
       {/* ── Robust household coverage statistical analysis ── */}
-      <HouseholdCoverageAnalysis points={hcaPoints} />
+      <HouseholdCoverageAnalysis
+        points={hcaPoints}
+        loading={hcaState.loading}
+        error={hcaState.error}
+        onRetry={() => setHcaReloadKey((k) => k + 1)}
+      />
 
       {/* ── Supervisor signatures register ── */}
       <SupervisorSignatureGallery submissions={filtered} />
