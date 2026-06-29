@@ -6,18 +6,24 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
 import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
   Activity, ChevronDown, Home, Users2, Percent, Sigma, FileText,
   Search, TrendingDown, TrendingUp, CheckCircle2, AlertTriangle, Target,
+  SlidersHorizontal, RotateCcw, ChevronRight, X, AlertCircle, Loader2,
 } from "lucide-react";
 import { testAgainstBenchmark, type BenchmarkTest } from "@/lib/ces/coverageStats";
 
-// ── Benchmarks ──────────────────────────────────────────────────────────────
-const HH_BENCHMARK = 100; // Household reach target (%)
-const TX_BENCHMARK = 75;  // Therapeutic / treatment coverage target (%)
+// ── Default benchmarks (user-configurable in the UI) ─────────────────────────
+const DEFAULT_HH_BENCHMARK = 100; // Household reach target (%)
+const DEFAULT_TX_BENCHMARK = 75;  // Therapeutic / treatment coverage target (%)
 
 const EMERALD = "#10b981";
 const RED = "#ef4444";
@@ -52,9 +58,14 @@ interface CommunityRow {
   treated: number;
   hhReachPct: number;       // treated households / households
   txCoveragePct: number;    // treated persons / eligible persons
-  txTest: BenchmarkTest | null; // vs 75%
-  hhTest: BenchmarkTest | null; // vs 100%
+  txTest: BenchmarkTest | null;
+  hhTest: BenchmarkTest | null;
   notesCount: number;
+  /** households with missing/zero eligible persons (excluded from tx coverage). */
+  missingEligible: number;
+  /** households with missing/zero treated persons. */
+  missingTreated: number;
+  visits: HCAPoint[];
 }
 
 // ── Notes thematic analysis ──────────────────────────────────────────────────
@@ -98,6 +109,8 @@ function analyzeNotes(notes: string[]) {
 interface Props {
   points: HCAPoint[];
   loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 function Section({ title, icon: Icon, tint, defaultOpen = true, badge, children }: {
@@ -138,8 +151,189 @@ function Verdict({ test }: { test: BenchmarkTest | null }) {
   );
 }
 
-export default function HouseholdCoverageAnalysis({ points, loading }: Props) {
+function aggregate(visits: HCAPoint[], txBenchmark: number, hhBenchmark: number): CommunityRow[] {
+  const map = new Map<string, CommunityRow>();
+  for (const p of visits) {
+    const key = `${norm(p.state)}|${norm(p.lga)}|${norm(p.community)}`;
+    let r = map.get(key);
+    if (!r) {
+      r = {
+        key, community: p.community || "Unspecified", lga: p.lga || "—", state: p.state || "—",
+        households: 0, treatedHouseholds: 0, eligible: 0, treated: 0,
+        hhReachPct: 0, txCoveragePct: 0, txTest: null, hhTest: null, notesCount: 0,
+        missingEligible: 0, missingTreated: 0, visits: [],
+      };
+      map.set(key, r);
+    }
+    r.visits.push(p);
+    r.households += 1;
+    const treatedHH = norm(p.status) === "treated" || (p.treated ?? 0) > 0;
+    if (treatedHH) r.treatedHouseholds += 1;
+    r.eligible += Math.max(0, Number(p.eligible) || 0);
+    r.treated += Math.max(0, Number(p.treated) || 0);
+    if (!((p.eligible ?? 0) > 0)) r.missingEligible += 1;
+    if (!((p.treated ?? 0) > 0)) r.missingTreated += 1;
+    if (p.notes && p.notes.trim()) r.notesCount += 1;
+  }
+  const rows = [...map.values()].map((r) => {
+    r.hhReachPct = r.households > 0 ? (r.treatedHouseholds / r.households) * 100 : 0;
+    r.txCoveragePct = r.eligible > 0 ? (r.treated / r.eligible) * 100 : 0;
+    r.txTest = r.eligible > 0 ? testAgainstBenchmark(r.treated, r.eligible, txBenchmark) : null;
+    r.hhTest = r.households > 0 ? testAgainstBenchmark(r.treatedHouseholds, r.households, hhBenchmark) : null;
+    return r;
+  });
+  return rows.sort((a, b) => a.txCoveragePct - b.txCoveragePct);
+}
+
+// ── Community drill-down dialog ──────────────────────────────────────────────
+function CommunityDrillDown({ row, txBenchmark, hhBenchmark, onClose }: {
+  row: CommunityRow; txBenchmark: number; hhBenchmark: number; onClose: () => void;
+}) {
+  const notesInsight = useMemo(() => analyzeNotes(row.visits.map((p) => p.notes || "")), [row]);
+  const kpis = [
+    { label: "Households", value: row.households, icon: Home, tint: TEAL },
+    { label: "Treated households", value: row.treatedHouseholds, icon: CheckCircle2, tint: EMERALD },
+    { label: "Persons eligible", value: row.eligible, icon: Users2, tint: BLUE },
+    { label: "Persons treated", value: row.treated, icon: Percent, tint: AMBER },
+  ];
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-h-[90vh] w-[min(96vw,820px)] max-w-none overflow-y-auto p-0">
+        <DialogHeader className="sticky top-0 z-10 rounded-t-lg p-4 text-white"
+          style={{ background: "linear-gradient(135deg,#0c2340,#14b8a6)" }}>
+          <DialogTitle className="text-base font-bold text-white">{row.community}</DialogTitle>
+          <DialogDescription className="text-xs text-white/75">
+            {row.lga} · {row.state} — community-only drill-down ({row.households} household record{row.households === 1 ? "" : "s"})
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 p-4">
+          {/* KPIs */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {kpis.map((k) => (
+              <div key={k.label} className="rounded-lg border border-border p-3" style={{ background: `${k.tint}0d` }}>
+                <p className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground"><k.icon className="h-3 w-3" />{k.label}</p>
+                <p className="font-display text-xl font-bold" style={{ color: k.tint }}>{k.value.toLocaleString()}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Calculations */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[
+              { name: "Therapeutic coverage", obs: row.txCoveragePct, test: row.txTest, benchmark: txBenchmark,
+                formula: `${row.treated.toLocaleString()} treated ÷ ${row.eligible.toLocaleString()} eligible`, has: row.eligible > 0 },
+              { name: "Household reach", obs: row.hhReachPct, test: row.hhTest, benchmark: hhBenchmark,
+                formula: `${row.treatedHouseholds.toLocaleString()} ÷ ${row.households.toLocaleString()} households`, has: row.households > 0 },
+            ].map((b) => {
+              const tint = !b.test ? SLATE : b.test.ciBelow ? RED : b.test.ciAbove ? EMERALD : AMBER;
+              return (
+                <div key={b.name} className="rounded-xl border border-border p-3" style={{ background: `linear-gradient(135deg, ${tint}0d, transparent 70%)` }}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-foreground">{b.name}</span>
+                    <Verdict test={b.test} />
+                  </div>
+                  <p className="mt-1 font-display text-2xl font-bold" style={{ color: tint }}>{b.has ? `${b.obs.toFixed(1)}%` : "—"}</p>
+                  <p className="text-[11px] text-muted-foreground">{b.formula}</p>
+                  {b.test && (
+                    <>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        95% CI: <strong className="text-foreground">{b.test.ci95[0].toFixed(1)}–{b.test.ci95[1].toFixed(1)}%</strong> · {b.test.pValue < 0.001 ? "p < 0.001" : `p = ${b.test.pValue.toFixed(3)}`} · vs {b.benchmark}%
+                      </p>
+                      <p className="mt-1 text-[11px] leading-snug text-foreground/80">{b.test.interpretation}</p>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {(row.missingEligible > 0 || row.missingTreated > 0) && (
+            <p className="flex items-center gap-1.5 rounded-md bg-amber-500/10 px-3 py-2 text-[11px] text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              {row.missingEligible} record{row.missingEligible === 1 ? "" : "s"} with missing/zero Persons Eligible (excluded from coverage) · {row.missingTreated} with zero Persons Treated.
+            </p>
+          )}
+
+          {/* Households table */}
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold text-muted-foreground">Households in this community</p>
+            <div className="max-h-[280px] overflow-auto rounded-lg border border-border/60">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
+                  <tr className="text-left text-[11px] text-muted-foreground">
+                    <th className="px-3 py-2 font-semibold">#</th>
+                    <th className="px-3 py-2 font-semibold">Status</th>
+                    <th className="px-3 py-2 text-right font-semibold">Eligible</th>
+                    <th className="px-3 py-2 text-right font-semibold">Treated</th>
+                    <th className="px-3 py-2 font-semibold">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {row.visits.map((v, i) => {
+                    const badEl = !((v.eligible ?? 0) > 0);
+                    const badTx = !((v.treated ?? 0) > 0);
+                    return (
+                      <tr key={v.id} className="border-t border-border/60 hover:bg-muted/40">
+                        <td className="px-3 py-2 tabular-nums text-muted-foreground">{i + 1}</td>
+                        <td className="px-3 py-2 capitalize">{v.status || "—"}</td>
+                        <td className={`px-3 py-2 text-right tabular-nums ${badEl ? "bg-amber-500/10 font-semibold text-amber-600 dark:text-amber-400" : ""}`}>
+                          {v.eligible ?? "—"}
+                        </td>
+                        <td className={`px-3 py-2 text-right tabular-nums ${badTx ? "bg-amber-500/10 font-semibold text-amber-600 dark:text-amber-400" : ""}`}>
+                          {v.treated ?? "—"}
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground">{v.notes?.trim() ? v.notes : "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Notes analysis for this community */}
+          {notesInsight.total > 0 ? (
+            <div>
+              <p className="mb-1.5 text-[11px] font-semibold text-muted-foreground">Notes — thematic analysis ({notesInsight.total})</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {notesInsight.activeThemes.map((t) => (
+                  <div key={t.label} className="rounded-lg border border-border p-2.5" style={{ background: `${t.tint}0d` }}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-foreground">{t.label}</span>
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: `${t.tint}1a`, color: t.tint }}>
+                        {t.count} · {Math.round((t.count / notesInsight.total) * 100)}%
+                      </span>
+                    </div>
+                    <ul className="mt-1 space-y-1">
+                      {t.samples.map((s, i) => (
+                        <li key={i} className="border-l-2 pl-2 text-[10px] italic text-muted-foreground" style={{ borderColor: `${t.tint}55` }}>“{s}”</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-center text-[11px] text-muted-foreground">No free-text notes recorded for this community.</p>
+          )}
+
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={onClose}><X className="mr-1.5 h-3.5 w-3.5" />Close</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function HouseholdCoverageAnalysis({ points, loading, error, onRetry }: Props) {
   const [search, setSearch] = useState("");
+  const [txBenchmark, setTxBenchmark] = useState(DEFAULT_TX_BENCHMARK);
+  const [hhBenchmark, setHhBenchmark] = useState(DEFAULT_HH_BENCHMARK);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+
+  const clamp = (v: number) => Math.max(0, Math.min(100, v));
 
   // Deduplicate visits by id — guards against any double-counting upstream.
   const visits = useMemo(() => {
@@ -153,41 +347,26 @@ export default function HouseholdCoverageAnalysis({ points, loading }: Props) {
     return out;
   }, [points]);
 
-  const hasPersonData = useMemo(
-    () => visits.some((p) => (p.eligible ?? 0) > 0),
-    [visits],
-  );
+  const hasPersonData = useMemo(() => visits.some((p) => (p.eligible ?? 0) > 0), [visits]);
 
-  // ── Per-community aggregation ──────────────────────────────────────────────
-  const communities = useMemo<CommunityRow[]>(() => {
-    const map = new Map<string, CommunityRow>();
+  // ── Validation guards ───────────────────────────────────────────────────────
+  const dataQuality = useMemo(() => {
+    let missingEligible = 0, missingTreated = 0, bothMissing = 0;
     for (const p of visits) {
-      const key = `${norm(p.state)}|${norm(p.lga)}|${norm(p.community)}`;
-      let r = map.get(key);
-      if (!r) {
-        r = {
-          key, community: p.community || "Unspecified", lga: p.lga || "—", state: p.state || "—",
-          households: 0, treatedHouseholds: 0, eligible: 0, treated: 0,
-          hhReachPct: 0, txCoveragePct: 0, txTest: null, hhTest: null, notesCount: 0,
-        };
-        map.set(key, r);
-      }
-      r.households += 1;
-      const treatedHH = norm(p.status) === "treated" || (p.treated ?? 0) > 0;
-      if (treatedHH) r.treatedHouseholds += 1;
-      r.eligible += Math.max(0, Number(p.eligible) || 0);
-      r.treated += Math.max(0, Number(p.treated) || 0);
-      if (p.notes && p.notes.trim()) r.notesCount += 1;
+      const badEl = !((p.eligible ?? 0) > 0);
+      const badTx = !((p.treated ?? 0) > 0);
+      if (badEl) missingEligible += 1;
+      if (badTx) missingTreated += 1;
+      if (badEl && badTx) bothMissing += 1;
     }
-    const rows = [...map.values()].map((r) => {
-      r.hhReachPct = r.households > 0 ? (r.treatedHouseholds / r.households) * 100 : 0;
-      r.txCoveragePct = r.eligible > 0 ? (r.treated / r.eligible) * 100 : 0;
-      r.txTest = r.eligible > 0 ? testAgainstBenchmark(r.treated, r.eligible, TX_BENCHMARK) : null;
-      r.hhTest = r.households > 0 ? testAgainstBenchmark(r.treatedHouseholds, r.households, HH_BENCHMARK) : null;
-      return r;
-    });
-    return rows.sort((a, b) => a.txCoveragePct - b.txCoveragePct);
+    const usable = visits.length - missingEligible; // contribute to therapeutic coverage
+    return { missingEligible, missingTreated, bothMissing, usable, total: visits.length };
   }, [visits]);
+
+  const communities = useMemo<CommunityRow[]>(
+    () => aggregate(visits, txBenchmark, hhBenchmark),
+    [visits, txBenchmark, hhBenchmark],
+  );
 
   // ── Programme-wide totals + benchmark tests ────────────────────────────────
   const overall = useMemo(() => {
@@ -199,16 +378,12 @@ export default function HouseholdCoverageAnalysis({ points, loading }: Props) {
       households, treatedHH, eligible, treated,
       hhReachPct: households > 0 ? (treatedHH / households) * 100 : 0,
       txCoveragePct: eligible > 0 ? (treated / eligible) * 100 : 0,
-      hhTest: households > 0 ? testAgainstBenchmark(treatedHH, households, HH_BENCHMARK) : null,
-      txTest: eligible > 0 ? testAgainstBenchmark(treated, eligible, TX_BENCHMARK) : null,
+      hhTest: households > 0 ? testAgainstBenchmark(treatedHH, households, hhBenchmark) : null,
+      txTest: eligible > 0 ? testAgainstBenchmark(treated, eligible, txBenchmark) : null,
     };
-  }, [visits]);
+  }, [visits, txBenchmark, hhBenchmark]);
 
-  // ── Notes thematic analysis ────────────────────────────────────────────────
-  const notesInsight = useMemo(
-    () => analyzeNotes(visits.map((p) => p.notes || "")),
-    [visits],
-  );
+  const notesInsight = useMemo(() => analyzeNotes(visits.map((p) => p.notes || "")), [visits]);
 
   const filteredCommunities = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -216,7 +391,11 @@ export default function HouseholdCoverageAnalysis({ points, loading }: Props) {
     return communities.filter((c) => `${c.community} ${c.lga} ${c.state}`.toLowerCase().includes(q));
   }, [communities, search]);
 
-  // Chart: lowest 12 communities by therapeutic coverage.
+  const selectedRow = useMemo(
+    () => communities.find((c) => c.key === selectedKey) || null,
+    [communities, selectedKey],
+  );
+
   const chartData = useMemo(
     () => communities.filter((c) => c.eligible > 0).slice(0, 12).map((c) => ({
       name: c.community.length > 16 ? c.community.slice(0, 15) + "…" : c.community,
@@ -226,9 +405,31 @@ export default function HouseholdCoverageAnalysis({ points, loading }: Props) {
     [communities],
   );
 
+  // ── Loading / error states ──────────────────────────────────────────────────
   if (loading) {
     return (
-      <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Loading household coverage analysis…</CardContent></Card>
+      <Card>
+        <CardContent className="flex flex-col items-center gap-2 py-10 text-sm text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          Loading household coverage analysis…
+        </CardContent>
+      </Card>
+    );
+  }
+  if (error) {
+    return (
+      <Card className="border-destructive/40">
+        <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+          <AlertCircle className="h-8 w-8 text-destructive" />
+          <div>
+            <p className="text-sm font-semibold text-foreground">Couldn’t load household coverage data</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{error}</p>
+          </div>
+          {onRetry && (
+            <Button size="sm" variant="outline" onClick={onRetry}><RotateCcw className="mr-1.5 h-3.5 w-3.5" />Retry</Button>
+          )}
+        </CardContent>
+      </Card>
     );
   }
   if (visits.length === 0) {
@@ -252,7 +453,7 @@ export default function HouseholdCoverageAnalysis({ points, loading }: Props) {
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10"><Sigma className="h-6 w-6" /></span>
           <div>
             <h3 className="font-display text-lg font-bold">Household Coverage Survey — Robust Analysis</h3>
-            <p className="text-xs text-white/70">Coverage = (Persons Treated ÷ Persons Eligible) × 100% · benchmarked against {TX_BENCHMARK}% (treatment) &amp; {HH_BENCHMARK}% (household reach)</p>
+            <p className="text-xs text-white/70">Coverage = (Persons Treated ÷ Persons Eligible) × 100% · benchmarked against {txBenchmark}% (treatment) &amp; {hhBenchmark}% (household reach)</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-px bg-white/10 sm:grid-cols-4">
@@ -270,14 +471,68 @@ export default function HouseholdCoverageAnalysis({ points, loading }: Props) {
         </div>
       </div>
 
+      {/* ── Configurable benchmark thresholds ── */}
+      <Section title="Benchmark thresholds" icon={SlidersHorizontal} tint={VIOLET_OR_BLUE} badge="configurable">
+        <p className="mb-3 text-[11px] text-muted-foreground">
+          Set the targets the statistical tests are run against. All coverage verdicts, charts and significance results below recompute instantly.
+        </p>
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="space-y-1">
+            <Label htmlFor="tx-bm" className="text-[11px] text-muted-foreground">Therapeutic coverage benchmark (%)</Label>
+            <Input id="tx-bm" type="number" min={0} max={100} value={txBenchmark}
+              onChange={(e) => setTxBenchmark(clamp(Number(e.target.value)))}
+              className="h-9 w-40" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="hh-bm" className="text-[11px] text-muted-foreground">Household reach benchmark (%)</Label>
+            <Input id="hh-bm" type="number" min={0} max={100} value={hhBenchmark}
+              onChange={(e) => setHhBenchmark(clamp(Number(e.target.value)))}
+              className="h-9 w-40" />
+          </div>
+          <Button variant="outline" size="sm" className="h-9"
+            onClick={() => { setTxBenchmark(DEFAULT_TX_BENCHMARK); setHhBenchmark(DEFAULT_HH_BENCHMARK); }}>
+            <RotateCcw className="mr-1.5 h-3.5 w-3.5" />Reset to {DEFAULT_TX_BENCHMARK}% / {DEFAULT_HH_BENCHMARK}%
+          </Button>
+        </div>
+      </Section>
+
+      {/* ── Data validation guards ── */}
+      {(dataQuality.missingEligible > 0 || dataQuality.missingTreated > 0) && (
+        <Section title="Data validation guards" icon={AlertTriangle} tint={AMBER}
+          badge={`${dataQuality.missingEligible + dataQuality.missingTreated} flags`}>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              { label: "Missing / zero Persons Eligible", value: dataQuality.missingEligible,
+                hint: "Excluded from therapeutic coverage (cannot divide by zero)." },
+              { label: "Missing / zero Persons Treated", value: dataQuality.missingTreated,
+                hint: "Counted as 0 treated — lowers coverage where eligible > 0." },
+              { label: "Both values missing", value: dataQuality.bothMissing,
+                hint: "Contribute to household count only." },
+            ].map((g) => (
+              <div key={g.label} className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                <p className="font-display text-2xl font-bold text-amber-600 dark:text-amber-400">{g.value.toLocaleString()}</p>
+                <p className="text-[11px] font-semibold text-foreground">{g.label}</p>
+                <p className="mt-0.5 text-[10px] text-muted-foreground">{g.hint}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 rounded-md bg-muted/60 px-3 py-2 text-[11px] leading-snug text-foreground/80">
+            Therapeutic coverage is computed over <strong>{dataQuality.usable.toLocaleString()}</strong> of {dataQuality.total.toLocaleString()} household records
+            ({dataQuality.missingEligible.toLocaleString()} excluded for missing/zero eligibility). Excluded records do not affect the Coverage % or its
+            significance test, but they reduce the effective sample size — widening confidence intervals and lowering statistical power. Highlighted cells in the
+            register and drill-down mark exactly which records are affected.
+          </p>
+        </Section>
+      )}
+
       {/* ── Statistical significance vs benchmarks ── */}
       <Section title="Statistical Significance vs Benchmarks" icon={Target} tint={BLUE}
-        badge={`${TX_BENCHMARK}% & ${HH_BENCHMARK}%`}>
+        badge={`${txBenchmark}% & ${hhBenchmark}%`}>
         <div className="grid gap-3 sm:grid-cols-2">
           {[
-            { name: "Therapeutic coverage", test: overall.txTest, benchmark: TX_BENCHMARK,
+            { name: "Therapeutic coverage", test: overall.txTest, benchmark: txBenchmark,
               obs: overall.txCoveragePct, sub: `${overall.treated.toLocaleString()} treated of ${overall.eligible.toLocaleString()} eligible persons` },
-            { name: "Household reach", test: overall.hhTest, benchmark: HH_BENCHMARK,
+            { name: "Household reach", test: overall.hhTest, benchmark: hhBenchmark,
               obs: overall.hhReachPct, sub: `${overall.treatedHH.toLocaleString()} of ${overall.households.toLocaleString()} households treated` },
           ].map((b) => {
             const t = b.test;
@@ -313,16 +568,16 @@ export default function HouseholdCoverageAnalysis({ points, loading }: Props) {
 
       {/* ── Lowest coverage communities chart ── */}
       {chartData.length > 0 && (
-        <Section title="Lowest-coverage communities" icon={TrendingDown} tint={RED} badge={`${TX_BENCHMARK}% line`}>
+        <Section title="Lowest-coverage communities" icon={TrendingDown} tint={RED} badge={`${txBenchmark}% line`}>
           <ResponsiveContainer width="100%" height={Math.max(180, chartData.length * 26)}>
             <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 24, left: 8, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} unit="%" />
               <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={96} />
               <RTooltip formatter={(v: any) => [`${v}%`, "Coverage"]} labelFormatter={(_, p: any) => p?.[0]?.payload?.full || ""} />
-              <ReferenceLine x={TX_BENCHMARK} stroke={AMBER} strokeDasharray="4 4" label={{ value: `${TX_BENCHMARK}%`, fontSize: 10, fill: AMBER, position: "top" }} />
+              <ReferenceLine x={txBenchmark} stroke={AMBER} strokeDasharray="4 4" label={{ value: `${txBenchmark}%`, fontSize: 10, fill: AMBER, position: "top" }} />
               <Bar dataKey="coverage" radius={[0, 4, 4, 0]}>
-                {chartData.map((d, i) => <Cell key={i} fill={d.coverage < TX_BENCHMARK ? RED : EMERALD} />)}
+                {chartData.map((d, i) => <Cell key={i} fill={d.coverage < txBenchmark ? RED : EMERALD} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -331,6 +586,7 @@ export default function HouseholdCoverageAnalysis({ points, loading }: Props) {
 
       {/* ── Per-community coverage register ── */}
       <Section title="Per-community coverage register" icon={Home} tint={TEAL} badge={`${communities.length}`}>
+        <p className="mb-2 text-[11px] text-muted-foreground">Click any community to drill into its households, calculations and notes.</p>
         <div className="mb-2 flex justify-end">
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -346,30 +602,40 @@ export default function HouseholdCoverageAnalysis({ points, loading }: Props) {
                 <th className="px-3 py-2 text-right font-semibold">Eligible</th>
                 <th className="px-3 py-2 text-right font-semibold">Treated</th>
                 <th className="px-3 py-2 text-right font-semibold">Coverage</th>
-                <th className="px-3 py-2 font-semibold">vs {TX_BENCHMARK}%</th>
+                <th className="px-3 py-2 font-semibold">vs {txBenchmark}%</th>
                 <th className="px-3 py-2 text-right font-semibold">HH reach</th>
-                <th className="px-3 py-2 font-semibold">vs {HH_BENCHMARK}%</th>
+                <th className="px-3 py-2 font-semibold">vs {hhBenchmark}%</th>
+                <th className="px-3 py-2"></th>
               </tr>
             </thead>
             <tbody>
               {filteredCommunities.length === 0 ? (
-                <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No communities match “{search}”.</td></tr>
+                <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">No communities match “{search}”.</td></tr>
               ) : filteredCommunities.map((c) => (
-                <tr key={c.key} className="border-t border-border/60 hover:bg-muted/40">
+                <tr key={c.key} className="cursor-pointer border-t border-border/60 hover:bg-muted/40"
+                  onClick={() => setSelectedKey(c.key)}
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedKey(c.key); } }}>
                   <td className="px-3 py-2">
-                    <div className="font-semibold text-foreground">{c.community}</div>
+                    <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                      {c.community}
+                      {(c.missingEligible > 0 || c.missingTreated > 0) && (
+                        <AlertTriangle className="h-3 w-3 text-amber-500" aria-label="Has missing/zero values" />
+                      )}
+                    </div>
                     <div className="text-[10px] text-muted-foreground">{c.lga} · {c.state}</div>
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">{c.households}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{c.eligible}</td>
+                  <td className={`px-3 py-2 text-right tabular-nums ${c.missingEligible > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>{c.eligible}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{c.treated}</td>
                   <td className="px-3 py-2 text-right font-semibold tabular-nums"
-                    style={{ color: c.eligible === 0 ? SLATE : c.txCoveragePct < TX_BENCHMARK ? RED : EMERALD }}>
+                    style={{ color: c.eligible === 0 ? SLATE : c.txCoveragePct < txBenchmark ? RED : EMERALD }}>
                     {c.eligible > 0 ? `${c.txCoveragePct.toFixed(1)}%` : "—"}
                   </td>
                   <td className="px-3 py-2"><Verdict test={c.txTest} /></td>
                   <td className="px-3 py-2 text-right tabular-nums">{c.hhReachPct.toFixed(0)}%</td>
                   <td className="px-3 py-2"><Verdict test={c.hhTest} /></td>
+                  <td className="px-3 py-2 text-right"><ChevronRight className="h-4 w-4 text-muted-foreground" /></td>
                 </tr>
               ))}
             </tbody>
@@ -377,6 +643,7 @@ export default function HouseholdCoverageAnalysis({ points, loading }: Props) {
         </div>
         <p className="mt-2 text-[10px] italic text-muted-foreground">
           Verdicts use the Wilson 95% confidence interval: “Below”/“Above” means the entire interval falls under/over the benchmark (statistically significant at 95%).
+          Amber values flag missing/zero eligibility.
         </p>
       </Section>
 
@@ -420,6 +687,12 @@ export default function HouseholdCoverageAnalysis({ points, loading }: Props) {
           </div>
         )}
       </Section>
+
+      {selectedRow && (
+        <CommunityDrillDown row={selectedRow} txBenchmark={txBenchmark} hhBenchmark={hhBenchmark} onClose={() => setSelectedKey(null)} />
+      )}
     </div>
   );
 }
+
+const VIOLET_OR_BLUE = "#8b5cf6";
