@@ -147,19 +147,21 @@ const OwnerSubmissionManager = ({
 
   const loadArchived = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      let q = supabase
         .from("owner_deleted_records" as any)
         .select("id, record_id, source_table, deleted_at, snapshot")
         .eq("source_table", table)
         .is("restored_at", null)
         .order("deleted_at", { ascending: false })
         .limit(200);
+      if (filter?.column && filter?.value) q = q.eq(`snapshot->>${filter.column}`, filter.value);
+      const { data, error } = await q;
       if (error) throw error;
       setArchived((data as unknown as ArchivedRow[]) || []);
     } catch {
       /* archive view is best-effort */
     }
-  }, [table]);
+  }, [table, filter]);
 
   const handleOpen = (v: boolean) => {
     setOpen(v);
