@@ -1165,6 +1165,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       <HouseholdCoverageSurveyMap
         projectId={projectId}
         formName={formName}
+        linkedCommunityKeys={linkedCommunityKeys}
         stateFilter={fState === ALL ? null : fState}
         defaultState={householdMapDefaultState}
         dateFrom={fFrom ? fFrom + "T00:00:00" : null}
