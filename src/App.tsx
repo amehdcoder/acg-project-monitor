@@ -21,6 +21,7 @@ import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
 import OffGridSatelliteMessenger from "./components/SatelliteMessenger/OffGridSatelliteMessenger";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { scrollToAppTop } from "@/lib/scrollToAppTop";
+import { startGpsWarmer } from "@/lib/gps/gpsWarmer";
 
 // Scroll to top on every route change so forms and pages always start at the beginning
 const ScrollToTop = () => {
@@ -28,6 +29,17 @@ const ScrollToTop = () => {
   useEffect(() => {
     scrollToAppTop("auto");
   }, [pathname, search]);
+  return null;
+};
+
+// Keep a single shared GPS watch warm across the whole app so location-critical
+// pages (e.g. Coverage Evaluation 3D) lock onto an accurate, recent fix
+// instantly instead of cold-starting the GNSS chip on arrival.
+const GpsWarmer = () => {
+  useEffect(() => {
+    const stop = startGpsWarmer();
+    return stop;
+  }, []);
   return null;
 };
 
