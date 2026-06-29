@@ -622,6 +622,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
     formAnalytics,
     locationAnalytics,
     availableStates,
+    loadFailed,
     refresh,
   };
 };
