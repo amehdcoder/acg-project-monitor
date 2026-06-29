@@ -968,6 +968,27 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
               Filters: {[stateFilter, dateFrom && `from ${new Date(dateFrom).toLocaleDateString()}`, dateTo && `to ${new Date(dateTo).toLocaleDateString()}`].filter(Boolean).join(" · ")}
             </Badge>
           )}
+          {/* Automated data-integrity check result (accessible, live-updating) */}
+          <span role="status" aria-live="polite" className="sr-only">
+            {loading
+              ? "Validating household visit points."
+              : integrity.ok
+                ? `All ${diagnostics.rendered} household visit points passed GPS, outcome and linkage checks.`
+                : `Data integrity notes: ${integrity.issues.join("; ")}.`}
+          </span>
+          {!loading && (
+            integrity.ok ? (
+              diagnostics.rendered > 0 && (
+                <Badge variant="outline" className="gap-1 border-emerald-600/40 bg-emerald-600/10 text-[11px] text-emerald-800 dark:text-emerald-300" title="Every plotted point passed the GPS, outcome-icon and checklist-linkage checks.">
+                  <ShieldCheck className="h-3 w-3" /> Verified
+                </Badge>
+              )
+            ) : (
+              <Badge variant="outline" className="gap-1 border-amber-600/40 bg-amber-600/10 text-[11px] text-amber-800 dark:text-amber-300" title={integrity.issues.join(" · ")}>
+                <AlertTriangle className="h-3 w-3" /> {integrity.issues.length} data check{integrity.issues.length === 1 ? "" : "s"}
+              </Badge>
+            )
+          )}
           <div className="ml-auto flex items-center gap-1.5">
             <Button
               variant={clustered ? "default" : "outline"}
