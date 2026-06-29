@@ -311,7 +311,7 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
           });
         }
         const ids = [...meta.keys()];
-        if (ids.length === 0) { if (!cancelled) { setPoints([]); setLoading(false); } return; }
+        if (ids.length === 0) { if (!cancelled) { setPoints([]); setError(null); setLoading(false); } return; }
 
         const collected: VisitPoint[] = [];
         const diag: VisitDiagnostics = { total: 0, rendered: 0, badGps: 0, unmappedOutcome: 0, unlinked: 0 };
