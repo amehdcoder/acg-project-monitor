@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MapContainer, TileLayer, CircleMarker, Circle } from "react-leaflet";
+import { StreetViewLayer } from "@/components/maps/LeafletStreetView";
 import { BrainCircuit, MapPin, AlertTriangle, Users, Loader2, Save, RefreshCw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import "leaflet/dist/leaflet.css";
@@ -356,6 +357,7 @@ export default function CESGapIntelligence() {
                   </div>
                 );
               })}
+              <StreetViewLayer />
             </MapContainer>
           )}
         </CardContent>

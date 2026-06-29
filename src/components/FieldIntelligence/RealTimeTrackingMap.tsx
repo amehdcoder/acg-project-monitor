@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import L from "leaflet";
+import { useLeafletStreetView } from "@/components/maps/LeafletStreetView";
 import "leaflet/dist/leaflet.css";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +39,7 @@ const statusColors: Record<string, string> = {
 
 const RealTimeTrackingMap = ({ projectId, formId: _formId, realtimeKey }: Props) => {
   const mapRef = useRef<L.Map | null>(null);
+  const { attach: attachSv, panel: streetViewPanel } = useLeafletStreetView();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<Map<string, L.CircleMarker>>(new Map());
   const [collectors, setCollectors] = useState<CollectorPosition[]>([]);
@@ -55,6 +57,7 @@ const RealTimeTrackingMap = ({ projectId, formId: _formId, realtimeKey }: Props)
     }).addTo(map);
     L.control.zoom({ position: "topright" }).addTo(map);
     mapRef.current = map;
+    attachSv(map);
     return () => { map.remove(); mapRef.current = null; };
   }, []);
 
@@ -239,6 +242,7 @@ const RealTimeTrackingMap = ({ projectId, formId: _formId, realtimeKey }: Props)
         <div className="lg:col-span-3">
           <Card className="border-0 shadow-card overflow-hidden">
             <div ref={mapContainerRef} style={{ height: "550px", width: "100%" }} className="rounded-lg" />
+            {streetViewPanel}
           </Card>
         </div>
         <div>

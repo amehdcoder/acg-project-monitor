@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { loadNigeriaGeo } from "./lgaGeo";
+import { useLeafletStreetView } from "@/components/maps/LeafletStreetView";
 
 export interface GapPoint {
   lat: number;
@@ -33,6 +34,7 @@ const NIGERIA_BOUNDS = L.latLngBounds([3.9, 2.6], [14.0, 14.8]);
 export default function SupervisionGapMap({ points, height = 360, className }: SupervisionGapMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const { attach: attachSv, panel: streetViewPanel } = useLeafletStreetView();
   const layerRef = useRef<L.LayerGroup | null>(null);
   const boundaryRef = useRef<L.GeoJSON | null>(null);
   const fullBoundsRef = useRef<L.LatLngBounds | null>(null);
@@ -47,6 +49,7 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
           subdomains: "abcd", maxZoom: 19, opacity: 0.9,
         }).addTo(map);
         mapRef.current = map;
+        attachSv(map);
         // Seed with the fixed Nigeria extent immediately so the whole country is
         // visible from the very first paint (before the boundary file loads).
         fullBoundsRef.current = NIGERIA_BOUNDS;
@@ -135,5 +138,10 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
     return () => { timers.forEach(clearTimeout); window.removeEventListener("resize", fix); };
   }, []);
 
-  return <div ref={containerRef} className={className} style={{ width: "100%", height }} />;
+  return (
+    <>
+      <div ref={containerRef} className={className} style={{ width: "100%", height }} />
+      {streetViewPanel}
+    </>
+  );
 }

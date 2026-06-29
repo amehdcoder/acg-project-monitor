@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip, Popup, GeoJSON } from "react-leaflet";
+import { StreetViewLayer } from "@/components/maps/LeafletStreetView";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -342,6 +343,7 @@ export default function MdaSupervisoryMap({ submissions, formName, monitoringPer
                 </CircleMarker>
               );
             })}
+            <StreetViewLayer />
           </MapContainer>
 
           {/* Legend */}

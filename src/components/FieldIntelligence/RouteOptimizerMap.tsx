@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import L from "leaflet";
+import { useLeafletStreetView } from "@/components/maps/LeafletStreetView";
 import "leaflet/dist/leaflet.css";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ const trafficIcons: Record<string, string> = {
 
 const RouteOptimizerMap = ({ projectId, formId, forms }: Props) => {
   const mapRef = useRef<L.Map | null>(null);
+  const { attach: attachSv, panel: streetViewPanel } = useLeafletStreetView();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const routeLayerRef = useRef<L.LayerGroup | null>(null);
   const poiLayerRef = useRef<L.LayerGroup | null>(null);
@@ -62,6 +64,7 @@ const RouteOptimizerMap = ({ projectId, formId, forms }: Props) => {
     trafficLayerRef.current = L.layerGroup().addTo(map);
     speedLayerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
+    attachSv(map);
     return () => { map.remove(); mapRef.current = null; };
   }, []);
 
@@ -220,6 +223,7 @@ const RouteOptimizerMap = ({ projectId, formId, forms }: Props) => {
         <div className="lg:col-span-3">
           <Card className="border-0 shadow-card overflow-hidden">
             <div ref={mapContainerRef} style={{ height: "550px", width: "100%" }} className="rounded-lg" />
+            {streetViewPanel}
           </Card>
           {/* Active navigation banner */}
           {isNavigating && selectedRoute && selectedRoute.directions[nav.activeStep] && (

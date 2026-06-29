@@ -11,6 +11,7 @@ import { Save, MapPin, AlertTriangle, CheckCircle2, Target, TrendingUp, Eye } fr
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
+import { useLeafletStreetView } from "@/components/maps/LeafletStreetView";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isPersistedId = (id: string) => UUID_RE.test(id);
@@ -60,6 +61,7 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
   const [showMap, setShowMap] = useState(false);
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const { attach: attachSv, panel: streetViewPanel } = useLeafletStreetView();
 
   const { calcTargetPop, label: targetPopLabel } = useTargetPopFields();
 
@@ -161,6 +163,7 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
       maxZoom: 19,
     }).addTo(map);
     mapRef.current = map;
+    attachSv(map);
 
     const geoEntries = filtered.filter(e => e.community_latitude && e.community_longitude);
     if (geoEntries.length === 0) {
@@ -373,6 +376,7 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
       {showMap && (
         <Card className="border-border/50 overflow-hidden">
           <div ref={mapContainerRef} style={{ height: "500px", width: "100%" }} className="rounded-lg" />
+          {streetViewPanel}
           {/* Legend */}
           <div className="p-3 border-t border-border bg-muted/20">
             <p className="text-[10px] font-semibold text-muted-foreground mb-2">COVERAGE LEGEND</p>

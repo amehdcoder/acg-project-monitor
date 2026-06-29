@@ -32,6 +32,7 @@
  */
 import { useMemo, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip } from "react-leaflet";
+import { StreetViewLayer } from "@/components/maps/LeafletStreetView";
 import "leaflet/dist/leaflet.css";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -645,6 +646,7 @@ export default function SupervisoryGapAnalysisDashboard({
                   </Tooltip>
                 </CircleMarker>
               ))}
+              <StreetViewLayer />
             </MapContainer>
 
             {/* Legend */}

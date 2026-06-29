@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { loadNigeriaGeo, resolveFromMap } from "./lgaGeo";
+import { useLeafletStreetView } from "@/components/maps/LeafletStreetView";
 
 export interface ChoroCell {
   fill: string;
@@ -45,6 +46,7 @@ export default function NigeriaChoropleth({
 }: NigeriaChoroplethProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const { attach: attachSv, panel: streetViewPanel } = useLeafletStreetView();
   const layerRef = useRef<L.GeoJSON | null>(null);
   const [geo, setGeo] = useState<any | null>(null);
   const [tick, setTick] = useState(0);
@@ -74,6 +76,7 @@ export default function NigeriaChoropleth({
         }
         map.setView([9.082, 8.6753], 6);
         mapRef.current = map;
+        attachSv(map);
         setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 0);
         setTick((t) => t + 1);
       } catch (e) { console.warn("Choropleth init failed", e); }
@@ -183,5 +186,10 @@ export default function NigeriaChoropleth({
     return () => { timers.forEach(clearTimeout); window.removeEventListener("resize", fix); };
   }, [geo]);
 
-  return <div ref={containerRef} className={className} style={{ width: "100%", height }} />;
+  return (
+    <>
+      <div ref={containerRef} className={className} style={{ width: "100%", height }} />
+      {streetViewPanel}
+    </>
+  );
 }

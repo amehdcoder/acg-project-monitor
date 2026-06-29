@@ -10,6 +10,7 @@ import { Map, ZoomIn, BarChart3, Maximize2, Minimize2, FileText, Loader2, Settin
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { useLeafletStreetView } from "@/components/maps/LeafletStreetView";
 
 interface MicroplanEntry {
   id: string;
@@ -206,6 +207,7 @@ const MultiSelectDropdown = ({ values, onChange, options, placeholder, disabled 
 // ─── Component ───
 const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
+  const { attach: attachSv, panel: streetViewPanel } = useLeafletStreetView();
   const mapInstanceRef = useRef<any>(null);
   const layersRef = useRef<any>(null);
   const exportContainerRef = useRef<HTMLDivElement>(null);
@@ -430,6 +432,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     if (!L) return;
     const map = L.map(mapRef.current, { zoomControl: true, zoomSnap: 0.5 }).setView([9.0, 8.0], 6);
     mapInstanceRef.current = map;
+    attachSv(map);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap",
       maxZoom: 18,
@@ -1296,6 +1299,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
         {/* Map + Summary Panel */}
         <div className={`flex ${showSummaryPanel ? "flex-col lg:flex-row" : ""}`}>
           <div ref={mapRef} className={`${mapHeight} ${showSummaryPanel ? "lg:flex-1" : "w-full"} relative z-0`} />
+          {streetViewPanel}
 
           {/* Summary panel */}
           {showSummaryPanel && (
