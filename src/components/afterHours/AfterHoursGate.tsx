@@ -11,6 +11,7 @@ import {
   AfterHoursBlockDetail,
 } from "@/lib/afterHours/interceptor";
 import { AFTER_HOURS_WINDOW_LABEL } from "@/lib/afterHours/window";
+import { openAfterHoursStatus } from "@/lib/afterHours/events";
 
 type Phase = "notice" | "reason" | "sent";
 
