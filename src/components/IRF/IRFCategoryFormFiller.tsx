@@ -329,28 +329,44 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
               <div className="rounded-lg bg-primary/10 p-2"><Icons.FileSpreadsheet className="h-5 w-5 text-primary" /></div>
               <div>
                 <h2 className="text-lg font-bold">Reporting Identity</h2>
-                <p className="text-xs text-muted-foreground">Choose the reporting category and location for this visit.</p>
+                <p className="text-xs text-muted-foreground">
+                  {form.perMinistry ? "Choose the reporting category and location for this visit." : "Confirm the LGA-level location for this visit."}
+                </p>
               </div>
             </div>
 
-            {/* Reporting category */}
-            <div className="space-y-1.5">
-              <Label>Reporting category *</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {(["state", "lga"] as const).map((lv) => {
-                  const active = level === lv;
-                  return (
-                    <button key={lv} type="button" onClick={() => setLevel(lv)}
-                      className={`flex h-12 items-center justify-center gap-2 rounded-md border text-sm font-semibold transition ${active ? "border-primary bg-primary text-primary-foreground" : "border-input bg-background hover:bg-muted"}`}>
-                      <Building2 className="h-4 w-4" /> {lv === "state" ? "State level" : "LGA level"}
-                    </button>
-                  );
-                })}
+            {/* Reporting category — only the Advocacy Supervision form can report at State or LGA level */}
+            {form.perMinistry ? (
+              <div className="space-y-1.5">
+                <Label>Reporting category *</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["state", "lga"] as const).map((lv) => {
+                    const active = level === lv;
+                    return (
+                      <button key={lv} type="button" onClick={() => setLevel(lv)}
+                        className={`flex h-12 items-center justify-center gap-2 rounded-md border text-sm font-semibold transition ${active ? "border-primary bg-primary text-primary-foreground" : "border-input bg-background hover:bg-muted"}`}>
+                        <Building2 className="h-4 w-4" /> {lv === "state" ? "State level" : "LGA level"}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {level === "state" ? "State-level reporting does not require LGA or Ward." : "LGA-level reporting requires the LGA (Ward optional)."}
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {level === "state" ? "State-level reporting does not require LGA or Ward." : "LGA-level reporting requires the LGA (Ward optional)."}
-              </p>
-            </div>
+            ) : (
+              <div className="flex items-center gap-3 rounded-xl border px-4 py-3"
+                style={{ borderColor: `${form.color}55`, backgroundColor: `${form.color}12` }}>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: `${form.color}22` }}>
+                  <Building2 className="h-5 w-5" style={{ color: form.color }} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold" style={{ color: form.color }}>LGA-level activity</p>
+                  <p className="text-xs text-muted-foreground">This form is reported at the LGA level — select the State and LGA below (Ward optional).</p>
+                </div>
+              </div>
+            )}
+
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
