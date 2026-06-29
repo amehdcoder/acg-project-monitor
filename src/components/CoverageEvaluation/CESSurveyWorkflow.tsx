@@ -3744,7 +3744,26 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
             <div className="ml-auto flex gap-2">
               <Button variant="outline" onClick={() => setStep(2)}>← Back</Button>
-              <Button onClick={() => { computeAnalysis(); setStep(4); }}>Next: Analysis →</Button>
+              {canViewAnalysis ? (
+                <Button onClick={() => { computeAnalysis(); setStep(4); }}>Next: Analysis →</Button>
+              ) : (
+                <Button
+                  disabled={finalizing}
+                  onClick={async () => {
+                    setFinalizing(true);
+                    try {
+                      await persistSurvey("submitted");
+                      try { await syncCESOfflineQueue(); } catch { /* will retry in background */ }
+                    } catch { /* persisted locally; background sync will retry */ }
+                    finally {
+                      setFinalizing(false);
+                      setShowSyncReceipt(true);
+                    }
+                  }}
+                >
+                  {finalizing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving & syncing…</> : <><CheckCircle2 className="h-4 w-4 mr-2" />Finish & Submit</>}
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
