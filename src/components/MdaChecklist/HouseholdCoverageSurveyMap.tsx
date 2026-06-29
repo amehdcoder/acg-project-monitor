@@ -289,6 +289,7 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setError(null);
       try {
         const surveys = await fetchAllRowsKeyset<any>((limit, afterId) => {
           let sq = supabase
