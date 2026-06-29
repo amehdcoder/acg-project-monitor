@@ -243,7 +243,7 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
     if (isCurrentFormBulkClear) setOptimisticallyEmpty(true);
 
     // Only cascade on permanent deletes, never on archive.
-    if (mutation.mode === "delete") {
+    if (mutation.mode === "permanent") {
       if (isCurrentFormBulkClear) {
         void cascadeCesDelete(null); // full project clear
       } else if (mutation.type === "ids" && mutation.ids?.length) {
