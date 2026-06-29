@@ -951,7 +951,7 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
                 onClick={() => toggleOutcome(o.key)}
                 aria-pressed={activeOutcomes.has(o.key)}
                 aria-label={`${o.label}: ${n} household${n === 1 ? "" : "s"}. ${activeOutcomes.has(o.key) ? "Active filter, activate to remove." : "Activate to filter by this outcome."}`}
-                title={`${o.label} · ${n}`}
+                title={`${o.label} (${n}) — ${o.desc}${activeOutcomes.has(o.key) ? " · Click to remove filter." : " · Click to filter."}`}
                 className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${active ? "" : "opacity-40"}`}
                 style={{ borderColor: `${o.color}66`, color: o.color, background: `${o.color}12` }}
               >
