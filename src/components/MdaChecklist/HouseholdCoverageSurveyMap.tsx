@@ -1260,7 +1260,17 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
         </div>
 
 
-        {!loading && windowed.length === 0 && (
+        {error && !loading && (
+          <div className="flex flex-col items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/5 py-6 text-center" data-pdf-exclude="true">
+            <MapPin className="h-6 w-6 text-destructive" />
+            <p className="text-xs font-semibold text-foreground">Couldn’t load household visits</p>
+            <p className="max-w-md text-[11px] text-muted-foreground">{error}</p>
+            <Button size="sm" variant="outline" className="h-8" onClick={() => setReloadKey((k) => k + 1)}>
+              <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Retry
+            </Button>
+          </div>
+        )}
+        {!loading && !error && windowed.length === 0 && (
           <p className="text-center text-xs text-muted-foreground">
             No household visits captured yet for this project / filters. They appear here as soon as Coverage Evaluation 3D surveys are submitted.
           </p>
