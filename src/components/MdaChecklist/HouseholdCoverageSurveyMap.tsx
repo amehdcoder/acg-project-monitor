@@ -214,11 +214,13 @@ interface Props {
   onSelectLga?: (lga: string, state?: string | null) => void;
   /** Fired with the linkage/state/date-filtered visit points for downstream analysis. */
   onPointsLoaded?: (points: VisitPoint[]) => void;
+  /** Fired whenever the underlying data fetch state changes (loading / error). */
+  onLoadStateChange?: (state: { loading: boolean; error: string | null }) => void;
 }
 
 const SPEEDS = [0.5, 1, 2, 4];
 
-export default function HouseholdCoverageSurveyMap({ projectId, formName, linkedCommunityKeys, stateFilter, defaultState, dateFrom, dateTo, onSelectCommunity, onSelectLga, onPointsLoaded }: Props) {
+export default function HouseholdCoverageSurveyMap({ projectId, formName, linkedCommunityKeys, stateFilter, defaultState, dateFrom, dateTo, onSelectCommunity, onSelectLga, onPointsLoaded, onLoadStateChange }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -250,6 +252,8 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
 
   const [points, setPoints] = useState<VisitPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [diagnostics, setDiagnostics] = useState<VisitDiagnostics>({ total: 0, rendered: 0, badGps: 0, unmappedOutcome: 0, unlinked: 0 });
 
   // Animation state
@@ -285,6 +289,7 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setError(null);
       try {
         const surveys = await fetchAllRowsKeyset<any>((limit, afterId) => {
           let sq = supabase
@@ -306,7 +311,7 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
           });
         }
         const ids = [...meta.keys()];
-        if (ids.length === 0) { if (!cancelled) { setPoints([]); setLoading(false); } return; }
+        if (ids.length === 0) { if (!cancelled) { setPoints([]); setError(null); setLoading(false); } return; }
 
         const collected: VisitPoint[] = [];
         const diag: VisitDiagnostics = { total: 0, rendered: 0, badGps: 0, unmappedOutcome: 0, unlinked: 0 };
@@ -353,14 +358,23 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
           }
         }
         diag.rendered = collected.length;
-        if (!cancelled) { setPoints(collected); setDiagnostics(diag); setLoading(false); }
-      } catch (e) {
+        if (!cancelled) { setPoints(collected); setDiagnostics(diag); setError(null); setLoading(false); }
+      } catch (e: any) {
         console.warn("Household coverage map load failed", e);
-        if (!cancelled) { setPoints([]); setDiagnostics({ total: 0, rendered: 0, badGps: 0, unmappedOutcome: 0, unlinked: 0 }); setLoading(false); }
+        if (!cancelled) {
+          setPoints([]);
+          setDiagnostics({ total: 0, rendered: 0, badGps: 0, unmappedOutcome: 0, unlinked: 0 });
+          setError(e?.message || "Network error while loading household visits. Check your connection and retry.");
+          setLoading(false);
+        }
       }
     })();
     return () => { cancelled = true; };
-  }, [projectId]);
+  }, [projectId, reloadKey]);
+
+  // Surface fetch state to the parent dashboard.
+  useEffect(() => { onLoadStateChange?.({ loading, error }); }, [loading, error, onLoadStateChange]);
+
 
   useEffect(() => {
     writeUrl({ [URL_KEYS.outcomes]: activeOutcomes.size ? [...activeOutcomes].sort().join(",") : null });
@@ -1246,7 +1260,17 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
         </div>
 
 
-        {!loading && windowed.length === 0 && (
+        {error && !loading && (
+          <div className="flex flex-col items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/5 py-6 text-center" data-pdf-exclude="true">
+            <MapPin className="h-6 w-6 text-destructive" />
+            <p className="text-xs font-semibold text-foreground">Couldn’t load household visits</p>
+            <p className="max-w-md text-[11px] text-muted-foreground">{error}</p>
+            <Button size="sm" variant="outline" className="h-8" onClick={() => setReloadKey((k) => k + 1)}>
+              <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Retry
+            </Button>
+          </div>
+        )}
+        {!loading && !error && windowed.length === 0 && (
           <p className="text-center text-xs text-muted-foreground">
             No household visits captured yet for this project / filters. They appear here as soon as Coverage Evaluation 3D surveys are submitted.
           </p>

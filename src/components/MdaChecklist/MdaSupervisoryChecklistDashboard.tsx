@@ -28,7 +28,7 @@ import {
 import {
   ClipboardList, CheckCircle2, Pill, AlertTriangle, Flag, Activity,
   MapPin, CalendarClock, Users2, Search, RotateCcw, Download, Filter,
-  ArrowRight, ShieldCheck, Map as MapIcon, Building2, Layers, Loader2,
+  ArrowRight, ShieldCheck, Map as MapIcon, Building2, Layers, Loader2, FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { prepareMdaData, communityKey, linkedCommunityKey } from "@/lib/mda/dashboardData";
@@ -47,6 +47,7 @@ import FctSupervisoryMap from "./FctSupervisoryMap";
 import HouseholdCoverageSurveyMap from "./HouseholdCoverageSurveyMap";
 import HouseholdCoverageAnalysis, { type HCAPoint } from "./HouseholdCoverageAnalysis";
 import SupervisorSignatureGallery from "./SupervisorSignatureGallery";
+import SectionErrorBoundary from "./SectionErrorBoundary";
 import MdaAdvancedAnalyses from "./MdaAdvancedAnalyses";
 import MdaLongitudinalInsights from "./MdaLongitudinalInsights";
 import { useTablePagination } from "@/hooks/useTablePagination";
@@ -384,13 +385,18 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   const [fTo, setFTo] = useState("");
   const [search, setSearch] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const dashboardRef = useRef<HTMLDivElement>(null);
   const [hcaPoints, setHcaPoints] = useState<HCAPoint[]>([]);
+  const [hcaState, setHcaState] = useState<{ loading: boolean; error: string | null }>({ loading: true, error: null });
+  const [hcaReloadKey, setHcaReloadKey] = useState(0);
   const handleHcaPoints = useCallback((pts: any[]) => {
     setHcaPoints(pts.map((p) => ({
       id: p.id, community: p.community, state: p.state, lga: p.lga, ward: p.ward,
       status: p.status, eligible: p.eligible, treated: p.treated, notes: p.notes,
     })));
   }, []);
+  const handleHcaLoadState = useCallback((s: { loading: boolean; error: string | null }) => setHcaState(s), []);
 
   // Module → question-name set (for classifying follow-up submissions).
   const moduleQuestions = useMemo(() => {
@@ -843,6 +849,26 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     }
   };
 
+  // ── PDF export (multi-page, no overlap) ───────────────────────
+  const handleExportPdf = async () => {
+    if (!dashboardRef.current) return;
+    setExportingPdf(true);
+    const t = toast.loading("Building dashboard PDF…");
+    try {
+      const { exportDashboardPdf } = await import("@/lib/mda/dashboardPdf");
+      await exportDashboardPdf(dashboardRef.current, {
+        title: formName || "Integrated MDA Supervisory Checklist",
+        subtitle: projectName || "Supervision Analytics & Longitudinal Linkage",
+        fileName: formName || "mda-supervisory-dashboard",
+      });
+      toast.success("Dashboard PDF downloaded", { id: t });
+    } catch (e: any) {
+      toast.error(e?.message || "Could not export dashboard as PDF", { id: t });
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   // ── Empty state ───────────────────────────────────────────────
   if (submissions.length === 0) {
     return (
@@ -857,7 +883,8 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
 
 
   return (
-    <div className="space-y-4">
+    <div ref={dashboardRef} className="space-y-4">
+
       {/* ── Navy report header ── */}
       <div className="overflow-hidden rounded-2xl text-white shadow-sm" style={{ background: `linear-gradient(160deg, ${NAVY}, #163a63)` }}>
         <div className="flex flex-wrap items-start justify-between gap-4 p-5">
@@ -870,10 +897,14 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
               <p className="text-sm text-white/70">Community Checklist with follow-up outcome linkage · {formName || "MDA Supervisory Checklist"}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" data-pdf-exclude="true">
             <Button size="sm" onClick={handleExport} disabled={exporting} className="h-9 border-0 bg-white/15 text-white hover:bg-white/25">
               {exporting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}
               Export Excel
+            </Button>
+            <Button size="sm" onClick={handleExportPdf} disabled={exportingPdf} className="h-9 border-0 bg-white/15 text-white hover:bg-white/25">
+              {exportingPdf ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileText className="mr-1.5 h-4 w-4" />}
+              Download PDF
             </Button>
           </div>
         </div>
@@ -1159,36 +1190,51 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       </Card>
 
       {/* ── Coverage map ── */}
-      {isJigawa ? (
-        <JigawaSupervisoryMap submissions={mapSubs} formName={formName} />
-      ) : isFct ? (
-        <FctSupervisoryMap submissions={mapSubs} formName={formName} />
-      ) : (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="flex items-center gap-1.5 text-sm"><MapPin className="h-4 w-4 text-primary" />Supervision Coverage Map</CardTitle></CardHeader>
-          <CardContent><MdaSupervisoryMap submissions={mapSubs} formName={formName} /></CardContent>
-        </Card>
-      )}
+      <SectionErrorBoundary label="Supervision coverage map">
+        {isJigawa ? (
+          <JigawaSupervisoryMap submissions={mapSubs} formName={formName} />
+        ) : isFct ? (
+          <FctSupervisoryMap submissions={mapSubs} formName={formName} />
+        ) : (
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="flex items-center gap-1.5 text-sm"><MapPin className="h-4 w-4 text-primary" />Supervision Coverage Map</CardTitle></CardHeader>
+            <CardContent><MdaSupervisoryMap submissions={mapSubs} formName={formName} /></CardContent>
+          </Card>
+        )}
+      </SectionErrorBoundary>
 
       {/* ── Household coverage survey map (Coverage Evaluation 3D outcomes) ── */}
-      <HouseholdCoverageSurveyMap
-        projectId={projectId}
-        formName={formName}
-        linkedCommunityKeys={linkedCommunityKeys}
-        stateFilter={fState === ALL ? null : fState}
-        defaultState={householdMapDefaultState}
-        dateFrom={fFrom ? fFrom + "T00:00:00" : null}
-        dateTo={fTo ? fTo + "T23:59:59" : null}
-        onSelectCommunity={openMapCommunityDrill}
-        onSelectLga={openMapLgaDrill}
-        onPointsLoaded={handleHcaPoints}
-      />
+      <SectionErrorBoundary label="Household coverage survey map">
+        <HouseholdCoverageSurveyMap
+          key={hcaReloadKey}
+          projectId={projectId}
+          formName={formName}
+          linkedCommunityKeys={linkedCommunityKeys}
+          stateFilter={fState === ALL ? null : fState}
+          defaultState={householdMapDefaultState}
+          dateFrom={fFrom ? fFrom + "T00:00:00" : null}
+          dateTo={fTo ? fTo + "T23:59:59" : null}
+          onSelectCommunity={openMapCommunityDrill}
+          onSelectLga={openMapLgaDrill}
+          onPointsLoaded={handleHcaPoints}
+          onLoadStateChange={handleHcaLoadState}
+        />
+      </SectionErrorBoundary>
 
       {/* ── Robust household coverage statistical analysis ── */}
-      <HouseholdCoverageAnalysis points={hcaPoints} />
+      <SectionErrorBoundary label="Household coverage analysis">
+        <HouseholdCoverageAnalysis
+          points={hcaPoints}
+          loading={hcaState.loading}
+          error={hcaState.error}
+          onRetry={() => setHcaReloadKey((k) => k + 1)}
+        />
+      </SectionErrorBoundary>
 
       {/* ── Supervisor signatures register ── */}
-      <SupervisorSignatureGallery submissions={filtered} />
+      <SectionErrorBoundary label="Supervisor signature gallery">
+        <SupervisorSignatureGallery submissions={filtered} />
+      </SectionErrorBoundary>
 
 
 
