@@ -1175,6 +1175,11 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         onSelectLga={openMapLgaDrill}
       />
 
+      {/* ── Supervisor signatures register ── */}
+      <SupervisorSignatureGallery submissions={filtered} />
+
+
+
 
       {/* ── Field worker accountability ── */}
       <Card>
