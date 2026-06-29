@@ -25,6 +25,8 @@ import { toast } from "@/hooks/use-toast";
 import { cityContaining } from "@/lib/liveTracking/geofence";
 import { getAllPaths, cacheServerPaths, type StoredPath } from "@/lib/locationOfflineQueue";
 import { Satellite, Users, Battery, Gauge, X, MapPin, WifiOff } from "lucide-react";
+import StreetViewPanel from "@/components/maps/GoogleStreetViewPanel";
+import { attachStreetViewControl } from "@/lib/maps/leafletStreetViewControl";
 
 const ANIM_DURATION = 5000;
 const MAX_PATH = 500;
@@ -65,6 +67,7 @@ const LiveTrackingDashboard = () => {
   const [online, setOnline] = useState<boolean>(navigator.onLine);
   const [selected, setSelected] = useState<string | null>(null);
   const [, force] = useState(0); // re-render trigger for the profile panel
+  const [streetView, setStreetView] = useState<{ lat: number; lng: number } | null>(null);
 
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -296,6 +299,9 @@ const LiveTrackingDashboard = () => {
     L.tileLayer(SAT_URL, { attribution: "Tiles &copy; Esri — World Imagery", maxZoom: 23, maxNativeZoom: 19, detectRetina: true, crossOrigin: true }).addTo(map);
     L.tileLayer(LABELS_URL, { maxZoom: 23, maxNativeZoom: 19, opacity: 0.85, pane: "overlayPane" }).addTo(map);
     L.control.zoom({ position: "topright" }).addTo(map);
+    const detachSv = attachStreetViewControl(map, {
+      onPick: (lat, lng) => setStreetView({ lat, lng }),
+    });
     const group = L.layerGroup().addTo(map);
     layerGroupRef.current = group;
     mapRef.current = map;
@@ -317,6 +323,7 @@ const LiveTrackingDashboard = () => {
       window.clearTimeout(t1);
       ro.disconnect();
       window.removeEventListener("resize", fixSize);
+      detachSv();
       mapReadyRef.current = false;
       markersRef.current.clear();
       map.remove();
@@ -448,6 +455,14 @@ const LiveTrackingDashboard = () => {
           </p>
         </Card>
       )}
+
+      <StreetViewPanel
+        open={!!streetView}
+        onOpenChange={(o) => !o && setStreetView(null)}
+        lat={streetView?.lat ?? null}
+        lng={streetView?.lng ?? null}
+        title="Live Tracking Street View"
+      />
     </div>
   );
 };
