@@ -252,6 +252,8 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
 
   const [points, setPoints] = useState<VisitPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [diagnostics, setDiagnostics] = useState<VisitDiagnostics>({ total: 0, rendered: 0, badGps: 0, unmappedOutcome: 0, unlinked: 0 });
 
   // Animation state
