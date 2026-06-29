@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Moon, Clock, ShieldCheck, Send, X, Loader2, CheckCircle2 } from "lucide-react";
@@ -90,7 +90,7 @@ const AfterHoursGate = () => {
               <Moon className="h-5 w-5 text-indigo-200" />
             </div>
             <div>
-              <h2 className="text-base font-semibold tracking-tight">After-hours submission</h2>
+              <DialogTitle className="text-base font-semibold tracking-tight text-white">After-hours submission</DialogTitle>
               <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-300">
                 <Clock className="h-3 w-3" /> {AFTER_HOURS_WINDOW_LABEL}
               </p>
