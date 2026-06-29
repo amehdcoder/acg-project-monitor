@@ -1,4 +1,5 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { guardRequest } from "../_shared/authGuard.ts";
 
 const LOVABLE_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
@@ -10,6 +11,8 @@ interface Doc {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const guard = await guardRequest(req, corsHeaders, { requireAdmin: false });
+  if (guard.response) return guard.response;
 
   try {
     const { documents, focus } = await req.json() as { documents: Doc[]; focus?: string };
