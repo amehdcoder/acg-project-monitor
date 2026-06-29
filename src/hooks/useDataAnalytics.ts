@@ -563,7 +563,9 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
         calculateFormAnalytics(formsData, submissionsData);
         calculateLocationAnalytics(submissionsData);
       }
+      setLoadFailed(false);
     } catch (error: any) {
+      setLoadFailed(true);
       if (!silent) {
         toast({
           title: "Error loading analytics",
