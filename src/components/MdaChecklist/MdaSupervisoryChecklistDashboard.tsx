@@ -384,6 +384,13 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   const [fTo, setFTo] = useState("");
   const [search, setSearch] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [hcaPoints, setHcaPoints] = useState<HCAPoint[]>([]);
+  const handleHcaPoints = useCallback((pts: any[]) => {
+    setHcaPoints(pts.map((p) => ({
+      id: p.id, community: p.community, state: p.state, lga: p.lga, ward: p.ward,
+      status: p.status, eligible: p.eligible, treated: p.treated, notes: p.notes,
+    })));
+  }, []);
 
   // Module → question-name set (for classifying follow-up submissions).
   const moduleQuestions = useMemo(() => {
