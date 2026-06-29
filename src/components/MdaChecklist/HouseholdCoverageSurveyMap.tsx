@@ -1051,14 +1051,21 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
         <div ref={captureRef} className="relative rounded-xl overflow-hidden border border-border">
           <div ref={containerRef} style={{ height: 520, width: "100%" }} />
           {/* On-map legend overlay (always captured in export) */}
-          <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-lg border border-border bg-card/95 p-2 shadow-card backdrop-blur-sm">
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Outcomes</p>
-            <ul className="space-y-0.5">
+          <div className="absolute bottom-3 left-3 z-[500] max-w-[220px] rounded-lg border border-border bg-card/95 p-2 shadow-card backdrop-blur-sm">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Visit outcomes</p>
+            <ul className="space-y-1">
               {legendItems.map((o) => (
-                <li key={o.key} className="flex items-center gap-1.5 text-[11px]">
-                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: o.color }} />
-                  <span className="text-foreground">{o.label}</span>
-                  <span className="ml-auto font-semibold tabular-nums text-muted-foreground">{counts[o.key] || 0}</span>
+                <li key={o.key} title={`${o.label} — ${o.desc}`} className="flex items-start gap-1.5 text-[11px]">
+                  <span className="mt-0.5 inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full" style={{ background: o.color }}>
+                    <svg width="10" height="10" viewBox="2 2 16 16" aria-hidden="true">{<g dangerouslySetInnerHTML={{ __html: o.glyph }} />}</svg>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1">
+                      <span className="font-medium text-foreground">{o.label}</span>
+                      <span className="ml-auto font-semibold tabular-nums text-muted-foreground">{counts[o.key] || 0}</span>
+                    </span>
+                    <span className="block leading-tight text-[9.5px] text-muted-foreground">{o.desc}</span>
+                  </span>
                 </li>
               ))}
             </ul>
