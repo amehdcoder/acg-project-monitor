@@ -955,14 +955,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
 
 
-  // Tick "acquiring..." elapsed seconds while waiting for first fix
-  useEffect(() => {
-    if (gps || gpsError) return;
-    const id = window.setInterval(() => {
-      setGpsElapsed(Math.floor((Date.now() - gpsStartedAtRef.current) / 1000));
-    }, 500);
-    return () => window.clearInterval(id);
-  }, [gps, gpsError]);
+
 
   // (auto-advance Step 1 → Step 2 effect declared after persistSurvey, below)
   const autoAdvancedRef = useRef(false);
