@@ -67,6 +67,7 @@ const LiveTrackingDashboard = () => {
   const [online, setOnline] = useState<boolean>(navigator.onLine);
   const [selected, setSelected] = useState<string | null>(null);
   const [, force] = useState(0); // re-render trigger for the profile panel
+  const [streetView, setStreetView] = useState<{ lat: number; lng: number } | null>(null);
 
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
