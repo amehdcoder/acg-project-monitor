@@ -175,6 +175,30 @@ const isCoarsePointer = () =>
   typeof window.matchMedia === "function" &&
   window.matchMedia("(pointer: coarse)").matches;
 
+// Tile-quality presets. All keep the deepest zoom available (maxZoom 24) so a
+// "smooth" choice never loses the ability to zoom in — it only changes how many
+// tiles are kept resident and how aggressively they refresh, which is what
+// actually strains low-end devices.
+export type CesTileQuality = "high" | "balanced" | "smooth";
+const TILE_QUALITY_PRESETS: Record<CesTileQuality, {
+  keepBuffer: number; updateWhenZooming: boolean; updateWhenIdle: boolean; nativeZoomDelta: number; label: string;
+}> = {
+  high:     { keepBuffer: 8, updateWhenZooming: true,  updateWhenIdle: false, nativeZoomDelta: 0,  label: "High detail" },
+  balanced: { keepBuffer: 4, updateWhenZooming: true,  updateWhenIdle: false, nativeZoomDelta: 0,  label: "Balanced" },
+  smooth:   { keepBuffer: 2, updateWhenZooming: false, updateWhenIdle: true,  nativeZoomDelta: -2, label: "Smooth (low-end)" },
+};
+const TILE_QUALITY_KEY = "ces.tileQuality.v1";
+const readStoredTileQuality = (): CesTileQuality => {
+  try {
+    const v = localStorage.getItem(TILE_QUALITY_KEY);
+    if (v === "high" || v === "balanced" || v === "smooth") return v;
+  } catch { /* ignore */ }
+  // Auto-pick a lighter default on constrained devices.
+  const nav = typeof navigator !== "undefined" ? navigator as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean } } : null;
+  const lowPower = (nav?.hardwareConcurrency ?? 4) <= 4 || (nav?.deviceMemory ?? 4) <= 4 || nav?.connection?.saveData === true;
+  return lowPower ? "smooth" : "high";
+};
+
 const CESSurveyMap = ({
   centerLat,
   centerLng,
