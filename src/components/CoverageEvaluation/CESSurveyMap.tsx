@@ -278,7 +278,11 @@ const CESSurveyMap = ({
     if (labelsRef.current) { map.removeLayer(labelsRef.current); labelsRef.current = null; }
     const tl = TILE_LAYERS[mode] ?? TILE_LAYERS.satellite;
     const isGoogle = mode === "google" || mode === "google-sat";
-    const nativeZoom = mode === "google" || mode === "google-sat" ? 21 : 19;
+    const baseNativeZoom = mode === "google" || mode === "google-sat" ? 21 : 19;
+    const quality = TILE_QUALITY_PRESETS[tileQualityRef.current] ?? TILE_QUALITY_PRESETS.high;
+    // Lower native zoom on "smooth" → fewer/lighter tile fetches, while maxZoom
+    // stays 24 so the user can still zoom all the way in (overzoomed imagery).
+    const nativeZoom = Math.max(12, baseNativeZoom + quality.nativeZoomDelta);
     const sources: CesTileSource[] = [{
       url: tl.url,
       maxNativeZoom: nativeZoom,
