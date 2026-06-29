@@ -125,6 +125,7 @@ export default function GeocodingMap({ points }: { points: GeoPoint[] }) {
       <CardContent className="space-y-3">
         <div className="relative overflow-hidden rounded-xl border border-border">
           <div ref={containerRef} style={{ height: 460, width: "100%" }} />
+          {streetViewPanel}
           {points.length > 0 && (
             <Badge variant="secondary" className="absolute left-3 top-3 z-[1000] gap-1.5 shadow-lg">
               <MapPinned className="h-3.5 w-3.5" /> {points.length} point{points.length === 1 ? "" : "s"}
