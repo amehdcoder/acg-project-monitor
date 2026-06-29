@@ -157,6 +157,10 @@ export function buildMdaModel(submissions: KSubmission[], questions: KQuestion[]
     aeType: qIndex.find([/type\s*of\s*side\s*effect/i, /type\s*of\s*adverse/i]),
     managed: qIndex.find([/has\s*it\s*been\s*managed/i, /been\s*managed/i, /adverse.*manage/i]),
   };
+  // ALL questions that capture the "Status of MDA" (primary checklist question
+  // AND the follow-up "current status" question — copied projects key these
+  // differently, so we read whichever one actually holds a value).
+  const statusAll = qIndex.findAll([/current\s*status\s*of\s*mda/i, /status\s*of\s*mda/i, /mda\s*status/i]);
 
   // ── Module → follow-up question name sets (to classify follow-up rows) ──
   const moduleQuestions: Record<string, Set<string>> = {};
