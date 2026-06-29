@@ -52,6 +52,7 @@ import {
 } from "./utils/residentialMask";
 import { evaluateLqasCompliance, lqasPlanForThreshold } from "./utils/lqas";
 import LQASCompliancePanel from "./LQASCompliancePanel";
+import { getFreshWarmFix, getBestWarmFix, subscribeWarmFix } from "@/lib/gps/gpsWarmer";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -883,10 +884,49 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   // Mount-only: register watches exactly once, tear down on unmount.
   useEffect(() => {
+    // INSTANT LOCK: the app-wide GPS warmer keeps an accurate, recent fix
+    // cached. Apply it immediately so the dot/lock appears with zero wait,
+    // then the live high-accuracy watch below refines it.
+    const warm = getFreshWarmFix() ?? getBestWarmFix();
+    if (warm) {
+      applyFix(
+        {
+          lat: warm.lat,
+          lng: warm.lng,
+          accuracy: Math.max(warm.accuracy, 3),
+          timestamp: warm.timestamp || Date.now(),
+          speed: null,
+          heading: null,
+          source: Capacitor.isNativePlatform() ? "native" : "web",
+        },
+        warm.accuracy <= 50 ? "high" : "low",
+      );
+    }
+    // Keep ingesting shared warm fixes until the page's own watch takes over,
+    // so even a cold start sharpens as soon as the warmer gets a fresh fix.
+    const unsub = subscribeWarmFix((fix) => {
+      if (lastFixAtRef.current > 0) return; // page watch is live — stop seeding
+      applyFix(
+        {
+          lat: fix.lat,
+          lng: fix.lng,
+          accuracy: Math.max(fix.accuracy, 3),
+          timestamp: fix.timestamp || Date.now(),
+          speed: null,
+          heading: null,
+          source: Capacitor.isNativePlatform() ? "native" : "web",
+        },
+        fix.accuracy <= 50 ? "high" : "low",
+      );
+    });
     startGPSLock();
-    return () => stopGPSLock();
+    return () => {
+      unsub();
+      stopGPSLock();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
   // Tick "acquiring..." elapsed seconds while waiting for first fix
   useEffect(() => {
