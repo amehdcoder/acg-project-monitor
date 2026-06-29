@@ -341,6 +341,7 @@ const SatelliteImageryView = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 
