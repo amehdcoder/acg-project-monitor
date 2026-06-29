@@ -396,6 +396,28 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
     });
   }, [points, linkedKeySet, stateFilter, activeOutcomes, dateFrom, dateTo]);
 
+  // Points for downstream statistical analysis — linkage + state + date filters
+  // applied, but NOT the legend outcome filter (analysis must see all outcomes).
+  const analysisPoints = useMemo(() => {
+    const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
+    const toTs = dateTo ? new Date(dateTo).getTime() : null;
+    return points.filter((p) => {
+      if (linkedKeySet) {
+        if (!linkedKeySet.has(linkedCommunityKey(p.state, p.lga, p.ward, p.community))) return false;
+      }
+      if (stateFilter && norm(p.state) !== norm(stateFilter)) return false;
+      if (fromTs || toTs) {
+        const t = p.at ? new Date(p.at).getTime() : null;
+        if (t == null) return false;
+        if (fromTs && t < fromTs) return false;
+        if (toTs && t > toTs) return false;
+      }
+      return true;
+    });
+  }, [points, linkedKeySet, stateFilter, dateFrom, dateTo]);
+
+  useEffect(() => { onPointsLoaded?.(analysisPoints); }, [analysisPoints, onPointsLoaded]);
+
   // Automated check #3 — how many GPS-valid points fail community linkage to a
   // supervised MDA checklist submission (excluded from the map for integrity).
   const unlinkedCount = useMemo(() => {
