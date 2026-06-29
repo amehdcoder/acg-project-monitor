@@ -570,6 +570,13 @@ const CESSurveyMap = ({
     applyBasemap(mapRef.current, basemap);
   }, [basemap]);
 
+  // Re-apply tiles when the user changes the quality preset, and persist choice.
+  useEffect(() => {
+    try { localStorage.setItem(TILE_QUALITY_KEY, tileQuality); } catch { /* ignore */ }
+    if (mapRef.current) applyBasemap(mapRef.current, basemap);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tileQuality]);
+
   // keep tap handler fresh and toggle the crosshair cursor while drawing
   useEffect(() => {
     tapHandlerRef.current = onMapTap ?? null;
