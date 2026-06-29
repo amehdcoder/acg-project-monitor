@@ -120,16 +120,16 @@ const OwnerSubmissionManager = ({
     return Array.from(cols).join(", ");
   }, [labelColumns]);
 
-  const requestLabel = mode === "archive" ? "archive" : "delete";
-
   const loadRows = useCallback(async () => {
     setLoading(true);
     try {
-      let q = supabase.from(table as any).select(selectColumns).order("created_at", { ascending: false }).limit(200);
+      let q: any = supabase.from(table as any).select(selectColumns).order("created_at", { ascending: false }).limit(200);
       if (filter?.column && filter?.value) q = q.eq(filter.column, filter.value);
-      let { data, error } = await q;
+      const result = await q;
+      let data: unknown = result.data;
+      let error = result.error;
       if (error && /column .* does not exist/i.test(error.message)) {
-        let fallback = supabase.from(table as any).select("id, created_at").order("created_at", { ascending: false }).limit(200);
+        let fallback: any = supabase.from(table as any).select("id, created_at").order("created_at", { ascending: false }).limit(200);
         if (filter?.column && filter?.value) fallback = fallback.eq(filter.column, filter.value);
         const retry = await fallback;
         data = retry.data;
