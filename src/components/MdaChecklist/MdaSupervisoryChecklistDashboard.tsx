@@ -848,6 +848,26 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     }
   };
 
+  // ── PDF export (multi-page, no overlap) ───────────────────────
+  const handleExportPdf = async () => {
+    if (!dashboardRef.current) return;
+    setExportingPdf(true);
+    const t = toast.loading("Building dashboard PDF…");
+    try {
+      const { exportDashboardPdf } = await import("@/lib/mda/dashboardPdf");
+      await exportDashboardPdf(dashboardRef.current, {
+        title: formName || "Integrated MDA Supervisory Checklist",
+        subtitle: projectName || "Supervision Analytics & Longitudinal Linkage",
+        fileName: formName || "mda-supervisory-dashboard",
+      });
+      toast.success("Dashboard PDF downloaded", { id: t });
+    } catch (e: any) {
+      toast.error(e?.message || "Could not export dashboard as PDF", { id: t });
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   // ── Empty state ───────────────────────────────────────────────
   if (submissions.length === 0) {
     return (
