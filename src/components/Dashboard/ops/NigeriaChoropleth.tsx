@@ -186,5 +186,10 @@ export default function NigeriaChoropleth({
     return () => { timers.forEach(clearTimeout); window.removeEventListener("resize", fix); };
   }, [geo]);
 
-  return <div ref={containerRef} className={className} style={{ width: "100%", height }} />;
+  return (
+    <>
+      <div ref={containerRef} className={className} style={{ width: "100%", height }} />
+      {streetViewPanel}
+    </>
+  );
 }
