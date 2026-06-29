@@ -307,9 +307,9 @@ const CESSurveyMap = ({
       detectRetina: false,
       // Keep enough surrounding satellite imagery resident that first paint,
       // small pans, and GPS refinements do not reveal gray tile gaps.
-      keepBuffer: 8,
-      updateWhenIdle: false,
-      updateWhenZooming: true,
+      keepBuffer: quality.keepBuffer,
+      updateWhenIdle: quality.updateWhenIdle,
+      updateWhenZooming: quality.updateWhenZooming,
       ...(tl.subdomains ? { subdomains: tl.subdomains } : {}),
       ...(isGoogle ? {} : { crossOrigin: true as const }),
     };
