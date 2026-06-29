@@ -4,8 +4,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useGeolocation } from "@/hooks/useGeolocation";
 import { toast } from "sonner";
+import IrfGpsMap, { type IrfGpsValue } from "./IrfGpsMap";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,8 +50,7 @@ type PendingPhoto = {
 
 export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose }: Props) {
   const { user } = useAuth();
-  const { position, getCurrentPosition } = useGeolocation();
-  useEffect(() => { try { getCurrentPosition(); } catch { /* ignore */ } }, []);
+  const [gps, setGps] = useState<IrfGpsValue | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -121,6 +120,7 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
     if (!reportingMonth) missing.push("__month");
     if (!state) missing.push("__state");
     if (requiresLga && !lga) missing.push("__lga");
+    if (!gps) missing.push("__gps");
     if (form.perMinistry && !ministry) missing.push("__ministry");
     if (form.perMinistry && ministry === OTHER_OPTION && !ministryOther.trim()) missing.push("__ministry_other");
     allFields.forEach((f) => {
@@ -185,8 +185,8 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
         ward: requiresLga ? (ward || null) : null,
         focal_person_phone: focalPhone || null,
         narrative: narrative || null,
-        gps_lat: position?.lat ?? null,
-        gps_lng: position?.lng ?? null,
+        gps_lat: gps?.lat ?? null,
+        gps_lng: gps?.lng ?? null,
         submission_status: "submitted",
         evidence,
         answers,
@@ -314,7 +314,7 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
           <div className="min-w-0">
             <h1 className="truncate text-base font-bold text-white sm:text-lg">{form.name}</h1>
             <p className="truncate text-xs text-white/70">
-              {position ? <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> GPS locked</span> : "Acquiring GPS…"}
+              {gps ? <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> GPS locked</span> : "Acquiring GPS…"}
             </p>
           </div>
         </div>
@@ -418,6 +418,22 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
               <div className="grid gap-4 sm:grid-cols-2">{g.fields.map(renderField)}</div>
             </Card>
           ))}
+
+          {/* GPS capture + live satellite location */}
+          <Card className="mt-4 space-y-3 p-4 sm:p-6" style={{ borderTopWidth: 3, borderTopColor: form.color }}>
+            <div className="flex items-center gap-2">
+              <div className="rounded-lg bg-primary/10 p-2"><MapPin className="h-5 w-5 text-primary" /></div>
+              <div>
+                <h3 className="text-sm font-semibold" style={{ color: form.color }}>Activity Location (GPS) <span className="text-destructive">*</span></h3>
+                <p className="text-xs text-muted-foreground">Captured automatically — the satellite map shows exactly where you are standing.</p>
+              </div>
+            </div>
+            <div className={errors.has("__gps") ? "rounded-xl ring-2 ring-destructive" : ""}>
+              <IrfGpsMap value={gps} onChange={setGps} accent={form.color} />
+            </div>
+          </Card>
+
+
 
           {/* Evidence + per-photo consent */}
           <Card className="mt-4 space-y-4 p-4 sm:p-6">
