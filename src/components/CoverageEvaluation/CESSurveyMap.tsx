@@ -475,21 +475,34 @@ const CESSurveyMap = ({
     // eslint-disable-next-line
   }, [isNearViewport]);
 
-  // Fullscreen: re-flow the Leaflet canvas and enable full drag interaction so
-  // every tool (draw, zoom, pan) is responsive while expanded. Also lock body
-  // scroll so the immersive map never fights the page underneath.
+  // Fullscreen + draw interaction: re-flow the Leaflet canvas and tune touch
+  // handling so drawing taps never conflict with pan/zoom. Re-runs when drawMode
+  // toggles so the behaviour stays correct while a survey switches modes.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (isFullscreen) {
+    if (drawMode) {
+      // While drawing, a one-finger drag would be ambiguous with "place vertex".
+      // Disable map dragging so every tap reliably drops a vertex; pinch-zoom and
+      // the +/- controls still work. This is the key conflict-free draw fix.
+      map.dragging.disable();
+      map.scrollWheelZoom.disable();
+    } else if (isFullscreen) {
       map.dragging.enable();
       map.scrollWheelZoom.enable();
     } else {
       if (isCoarsePointer()) map.dragging.disable();
+      else map.dragging.enable();
       map.scrollWheelZoom.disable();
     }
     const prevOverflow = document.body.style.overflow;
     if (isFullscreen) document.body.style.overflow = "hidden";
+    // Keep the draw toolbar usable by keyboard: focus the map container so arrow
+    // keys / +/- pan & zoom, and Escape exits fullscreen, without losing focus.
+    if (isFullscreen && containerRef.current) {
+      containerRef.current.setAttribute("tabindex", "0");
+      try { containerRef.current.focus({ preventScroll: true }); } catch { /* noop */ }
+    }
     const ids = [0, 80, 220, 400].map((d) =>
       window.setTimeout(() => {
         try { map.invalidateSize({ animate: false }); } catch { /* noop */ }
@@ -502,7 +515,8 @@ const CESSurveyMap = ({
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [isFullscreen]);
+  }, [isFullscreen, drawMode]);
+
 
 
   // Pre-fetch all tiles covering the current map view across zoom levels so the
