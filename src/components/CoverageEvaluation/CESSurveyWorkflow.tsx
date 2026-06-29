@@ -278,7 +278,13 @@ async function startRealtimeGpsWatch(
 export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, onClose }: CESSurveyWorkflowProps) {
   const [step, setStep] = useState<Step>(1);
   const [surveyId, setSurveyId] = useState<string | null>(initialSurveyId ?? null);
-  const { canLocate, canSurvey, loading: rolesLoading } = useCESRoles(projectId);
+  const { canLocate, canSurvey, canValidate, loading: rolesLoading } = useCESRoles(projectId);
+  // Only supervisors / validators / admins may see the Analysis + QC sections.
+  // Regular field surveyors finish at Step 3 and get a "recorded & synced" receipt.
+  const canViewAnalysis = canValidate;
+  // Completion receipt shown to regular users once their visits are saved & synced.
+  const [showSyncReceipt, setShowSyncReceipt] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   const fencedCommunityWrittenRef = useRef<string | null>(null);
 
   // Step 1 — Locate & boundaries
