@@ -92,6 +92,8 @@ const App = () => (
             <AuthProvider>
               <ImpersonationProvider>
                 <ScrollToTop />
+                <GpsWarmer />
+
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
