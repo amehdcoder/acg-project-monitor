@@ -299,6 +299,9 @@ const LiveTrackingDashboard = () => {
     L.tileLayer(SAT_URL, { attribution: "Tiles &copy; Esri — World Imagery", maxZoom: 23, maxNativeZoom: 19, detectRetina: true, crossOrigin: true }).addTo(map);
     L.tileLayer(LABELS_URL, { maxZoom: 23, maxNativeZoom: 19, opacity: 0.85, pane: "overlayPane" }).addTo(map);
     L.control.zoom({ position: "topright" }).addTo(map);
+    const detachSv = attachStreetViewControl(map, {
+      onPick: (lat, lng) => setStreetView({ lat, lng }),
+    });
     const group = L.layerGroup().addTo(map);
     layerGroupRef.current = group;
     mapRef.current = map;
