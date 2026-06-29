@@ -1,11 +1,14 @@
 import { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { PenLine, Search, Download, MapPin, CalendarClock, User2, ZoomIn } from "lucide-react";
+import {
+  Collapsible, CollapsibleContent, CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { PenLine, Search, Download, MapPin, CalendarClock, User2, ZoomIn, ChevronDown } from "lucide-react";
 
 const stripTags = (s?: string) => String(s || "").replace(/<[^>]*>/g, "").trim();
 
@@ -89,8 +92,16 @@ export default function SupervisorSignatureGallery({ submissions }: Props) {
         });
       });
     }
-    // newest first
-    return list.sort((a, b) => (b.submittedAt || "").localeCompare(a.submittedAt || ""));
+    // Deduplicate: keep one signature per supervisor + community + image, newest first.
+    const seen = new Set<string>();
+    const deduped: SignatureEntry[] = [];
+    for (const e of list.sort((a, b) => (b.submittedAt || "").localeCompare(a.submittedAt || ""))) {
+      const k = [e.supervisor, e.state, e.lga, e.community, e.src].join("|").toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      deduped.push(e);
+    }
+    return deduped;
   }, [submissions]);
 
   const filtered = useMemo(() => {
@@ -110,17 +121,27 @@ export default function SupervisorSignatureGallery({ submissions }: Props) {
     a.remove();
   };
 
+  const [open, setOpen] = useState(true);
+
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-1.5 text-sm">
-            <PenLine className="h-4 w-4 text-primary" />
-            Supervisor Signatures
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-              {entries.length}
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <Card className="overflow-hidden">
+        <CollapsibleTrigger asChild>
+          <button type="button" className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/50">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <PenLine className="h-4 w-4" />
             </span>
-          </CardTitle>
+            <span className="text-sm font-semibold text-foreground">Supervisor Signatures</span>
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{entries.length}</span>
+            <ChevronDown className={`ml-auto h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+      <CardContent>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[11px] text-muted-foreground">
+            Authenticated ink signatures captured at the point of supervision (duplicates removed). Tap a card to enlarge or download.
+          </p>
           {entries.length > 0 && (
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -133,11 +154,6 @@ export default function SupervisorSignatureGallery({ submissions }: Props) {
             </div>
           )}
         </div>
-        <p className="text-[11px] text-muted-foreground">
-          Authenticated ink signatures captured at the point of supervision. Tap a card to enlarge or download.
-        </p>
-      </CardHeader>
-      <CardContent>
         {entries.length === 0 ? (
           <p className="py-8 text-center text-xs text-muted-foreground">
             No supervisor signatures captured yet. They appear here automatically as supervisors sign and submit the checklist.
@@ -195,6 +211,7 @@ export default function SupervisorSignatureGallery({ submissions }: Props) {
           </div>
         )}
       </CardContent>
+        </CollapsibleContent>
 
       <Dialog open={!!zoom} onOpenChange={(o) => !o && setZoom(null)}>
         <DialogContent className="max-w-2xl">
@@ -220,6 +237,7 @@ export default function SupervisorSignatureGallery({ submissions }: Props) {
           )}
         </DialogContent>
       </Dialog>
-    </Card>
+      </Card>
+    </Collapsible>
   );
 }

@@ -261,6 +261,90 @@ export function compareGeographicCoverage(
 }
 
 
+// ============================================================================
+// One-sample test of an observed coverage proportion against a fixed benchmark
+// (e.g. Household reach vs 100%, Therapeutic coverage vs 75%). Returns the
+// Wilson 95% CI plus a significance verdict.
+//  • For an interior benchmark (0<p0<1) we use the standard one-sample
+//    proportion z-test with the null standard error sqrt(p0(1-p0)/n).
+//  • For p0 = 1 (100%) the null SE is 0, so any observed shortfall is, by an
+//    exact binomial argument, impossible under H0 ⇒ significantly below.
+// ----------------------------------------------------------------------------
+export interface BenchmarkTest {
+  benchmarkPct: number;
+  observedPct: number;
+  n: number;
+  successes: number;
+  z: number;
+  pValue: number;
+  ci95: [number, number];
+  significant: boolean;
+  direction: "below" | "above" | "equal";
+  /** true when the whole 95% CI sits below the benchmark — robustly below. */
+  ciBelow: boolean;
+  ciAbove: boolean;
+  interpretation: string;
+}
+
+export function testAgainstBenchmark(
+  successes: number,
+  trials: number,
+  benchmarkPct: number,
+): BenchmarkTest | null {
+  if (!Number.isFinite(trials) || trials <= 0) return null;
+  const n = Math.round(trials);
+  const x = Math.max(0, Math.min(n, Math.round(successes)));
+  const p = x / n;
+  const p0 = Math.min(1, Math.max(0, benchmarkPct / 100));
+
+  // Wilson 95% CI on the observed proportion.
+  const z95 = 1.96;
+  const denom = 1 + (z95 * z95) / n;
+  const center = (p + (z95 * z95) / (2 * n)) / denom;
+  const half = (z95 / denom) * Math.sqrt((p * (1 - p)) / n + (z95 * z95) / (4 * n * n));
+  const ciLow = Math.max(0, (center - half) * 100);
+  const ciHigh = Math.min(100, (center + half) * 100);
+
+  let z: number;
+  let pValue: number;
+  if (p0 >= 1) {
+    // Exact: under H0 p=1 every unit is a success; any failure is impossible.
+    z = x === n ? 0 : -Infinity;
+    pValue = x === n ? 1 : 0;
+  } else if (p0 <= 0) {
+    z = x === 0 ? 0 : Infinity;
+    pValue = x === 0 ? 1 : 0;
+  } else {
+    const se0 = Math.sqrt((p0 * (1 - p0)) / n);
+    z = se0 > 0 ? (p - p0) / se0 : 0;
+    pValue = 2 * (1 - normalCdf(Math.abs(z)));
+  }
+
+  const direction: BenchmarkTest["direction"] =
+    p > p0 ? "above" : p < p0 ? "below" : "equal";
+  const significant = pValue < 0.05;
+  const ciBelow = ciHigh < benchmarkPct;
+  const ciAbove = ciLow > benchmarkPct;
+
+  let interpretation: string;
+  if (direction === "equal") {
+    interpretation = `Coverage is exactly at the ${benchmarkPct}% benchmark.`;
+  } else if (ciBelow) {
+    interpretation = `Coverage (${(p * 100).toFixed(1)}%) is statistically significantly BELOW the ${benchmarkPct}% benchmark — the entire 95% CI lies under it (${pValue < 0.001 ? "p < 0.001" : "p = " + pValue.toFixed(3)}).`;
+  } else if (ciAbove) {
+    interpretation = `Coverage (${(p * 100).toFixed(1)}%) is statistically significantly ABOVE the ${benchmarkPct}% benchmark (${pValue < 0.001 ? "p < 0.001" : "p = " + pValue.toFixed(3)}).`;
+  } else if (significant) {
+    interpretation = `Coverage (${(p * 100).toFixed(1)}%) differs from the ${benchmarkPct}% benchmark (${direction}, ${pValue < 0.001 ? "p < 0.001" : "p = " + pValue.toFixed(3)}), though the 95% CI still touches it.`;
+  } else {
+    interpretation = `Coverage (${(p * 100).toFixed(1)}%) is not statistically distinguishable from the ${benchmarkPct}% benchmark (p = ${pValue.toFixed(3)}).`;
+  }
+
+  return {
+    benchmarkPct, observedPct: p * 100, n, successes: x,
+    z, pValue, ci95: [ciLow, ciHigh], significant, direction, ciBelow, ciAbove, interpretation,
+  };
+}
+
 function normalCdf(z: number): number {
   // Abramowitz-Stegun approximation
   const t = 1 / (1 + 0.2316419 * Math.abs(z));

@@ -45,6 +45,7 @@ import MdaSupervisoryMap from "./MdaSupervisoryMap";
 import JigawaSupervisoryMap from "./JigawaSupervisoryMap";
 import FctSupervisoryMap from "./FctSupervisoryMap";
 import HouseholdCoverageSurveyMap from "./HouseholdCoverageSurveyMap";
+import HouseholdCoverageAnalysis, { type HCAPoint } from "./HouseholdCoverageAnalysis";
 import SupervisorSignatureGallery from "./SupervisorSignatureGallery";
 import MdaAdvancedAnalyses from "./MdaAdvancedAnalyses";
 import MdaLongitudinalInsights from "./MdaLongitudinalInsights";
@@ -383,6 +384,13 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   const [fTo, setFTo] = useState("");
   const [search, setSearch] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [hcaPoints, setHcaPoints] = useState<HCAPoint[]>([]);
+  const handleHcaPoints = useCallback((pts: any[]) => {
+    setHcaPoints(pts.map((p) => ({
+      id: p.id, community: p.community, state: p.state, lga: p.lga, ward: p.ward,
+      status: p.status, eligible: p.eligible, treated: p.treated, notes: p.notes,
+    })));
+  }, []);
 
   // Module → question-name set (for classifying follow-up submissions).
   const moduleQuestions = useMemo(() => {
@@ -1173,7 +1181,11 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         dateTo={fTo ? fTo + "T23:59:59" : null}
         onSelectCommunity={openMapCommunityDrill}
         onSelectLga={openMapLgaDrill}
+        onPointsLoaded={handleHcaPoints}
       />
+
+      {/* ── Robust household coverage statistical analysis ── */}
+      <HouseholdCoverageAnalysis points={hcaPoints} />
 
       {/* ── Supervisor signatures register ── */}
       <SupervisorSignatureGallery submissions={filtered} />
