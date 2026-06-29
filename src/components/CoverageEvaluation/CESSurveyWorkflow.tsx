@@ -4105,7 +4105,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       )}
 
       {/* STEP 5 */}
-      {step === 5 && (
+      {step === 5 && canViewAnalysis && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Download className="h-5 w-5" />Step 5 — Export & Supervisor QC</CardTitle>
