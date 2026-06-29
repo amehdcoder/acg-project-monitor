@@ -261,6 +261,13 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
           <p className="text-center text-xs text-muted-foreground">No GPS captured yet — submit checklists with location to populate the map.</p>
         )}
       </CardContent>
+      <StreetViewPanel
+        open={!!streetView}
+        onOpenChange={(o) => !o && setStreetView(null)}
+        lat={streetView?.lat ?? null}
+        lng={streetView?.lng ?? null}
+        title="Jigawa Street View"
+      />
     </Card>
   );
 }
