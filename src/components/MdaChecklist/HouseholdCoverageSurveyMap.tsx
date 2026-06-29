@@ -157,6 +157,15 @@ interface VisitPoint {
 interface Props {
   projectId?: string | null;
   formName?: string;
+  /**
+   * Community-identity keys (state|lga|ward|community, alnum-normalized via
+   * `linkedCommunityKey`) for the communities present in the dashboard's current
+   * checklist submissions. When provided, ONLY household visits belonging to one
+   * of these communities are plotted — so stale/orphaned Coverage Evaluation 3D
+   * data never lingers on the map after MDA submissions are cleared, and the map
+   * stays in exact sync with the dashboard data.
+   */
+  linkedCommunityKeys?: string[];
   /** Optional state filter coming from the dashboard filter bar. */
   stateFilter?: string | null;
   /** State to show when the dashboard is not actively filtered but the project is state-specific. */
