@@ -50,8 +50,7 @@ type PendingPhoto = {
 
 export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose }: Props) {
   const { user } = useAuth();
-  const { position, getCurrentPosition } = useGeolocation();
-  useEffect(() => { try { getCurrentPosition(); } catch { /* ignore */ } }, []);
+  const [gps, setGps] = useState<IrfGpsValue | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
