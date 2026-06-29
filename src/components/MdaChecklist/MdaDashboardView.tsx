@@ -208,6 +208,22 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
     setOptimisticallyEmpty(false);
   };
 
+  // Cascade-delete the Coverage Evaluation 3D (CES) data that was captured for
+  // the same communities so deleting MDA submissions clears EVERYTHING tied to
+  // those communities (household visits, segments, the coverage map, etc.).
+  const cascadeCesDelete = async (communities: string[] | null) => {
+    if (!form.project_id) return;
+    try {
+      await (supabase as any).rpc("owner_cascade_delete_ces", {
+        _project_id: form.project_id,
+        _communities: communities,
+      });
+    } catch (e) {
+      console.error("CES cascade delete failed", e);
+      toast.error("MDA data deleted, but linked Coverage Evaluation 3D data could not be cleared.");
+    }
+  };
+
   const handleOwnerMutation = (mutation: OwnerDataMutation) => {
     clearMdaCache(form.id);
     setCacheVersion((v) => v + 1);
@@ -225,6 +241,20 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
       !mutation.from &&
       !mutation.to;
     if (isCurrentFormBulkClear) setOptimisticallyEmpty(true);
+
+    // Only cascade on permanent deletes, never on archive.
+    if (mutation.mode === "delete") {
+      if (isCurrentFormBulkClear) {
+        void cascadeCesDelete(null); // full project clear
+      } else if (mutation.type === "ids" && mutation.ids?.length) {
+        const idSet = new Set(mutation.ids);
+        const communities = realRows
+          .filter((r) => idSet.has(r.id))
+          .map((r) => norm(pick(r.data as Record<string, unknown>, ["community", "community_name", "settlement", "settlement_name"])).toLowerCase())
+          .filter((c) => c.length > 0);
+        if (communities.length) void cascadeCesDelete(Array.from(new Set(communities)));
+      }
+    }
   };
 
 
