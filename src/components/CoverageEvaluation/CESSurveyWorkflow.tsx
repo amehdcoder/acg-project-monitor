@@ -861,6 +861,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     if (watchHighRef.current !== null) { void watchHighRef.current(); watchHighRef.current = null; }
     if (watchLowRef.current !== null) { void watchLowRef.current(); watchLowRef.current = null; }
     if (kickstartIvRef.current !== null) { window.clearInterval(kickstartIvRef.current); kickstartIvRef.current = null; }
+    if (autoCoarseTimerRef.current !== null) { window.clearTimeout(autoCoarseTimerRef.current); autoCoarseTimerRef.current = null; }
   }, []);
 
   const retryGPSLock = useCallback(() => {
