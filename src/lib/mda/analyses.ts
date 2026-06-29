@@ -68,6 +68,18 @@ export class MdaQuestionIndex {
     }
     return null;
   }
+  /** Find ALL questions whose label matches any of the patterns (deduped). */
+  findAll(patterns: (string | RegExp)[]): ResolvedQ[] {
+    const out: ResolvedQ[] = [];
+    const seen = new Set<string>();
+    for (const q of this.qs) {
+      const hit = patterns.some((p) =>
+        p instanceof RegExp ? p.test(q.label) : q.label.toLowerCase().includes(p.toLowerCase()),
+      );
+      if (hit && !seen.has(q.key)) { seen.add(q.key); out.push(q); }
+    }
+    return out;
+  }
   /** Translate a stored option value into its human label for a given question. */
   label(q: ResolvedQ | null, raw: any): string {
     if (raw === undefined || raw === null || raw === "") return "";
