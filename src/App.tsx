@@ -21,6 +21,8 @@ import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
 import OffGridSatelliteMessenger from "./components/SatelliteMessenger/OffGridSatelliteMessenger";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import AfterHoursGate from "./components/afterHours/AfterHoursGate";
+import AfterHoursApprovalCenter from "./components/afterHours/AfterHoursApprovalCenter";
 import { scrollToAppTop } from "@/lib/scrollToAppTop";
 import { startGpsWarmer } from "@/lib/gps/gpsWarmer";
 
