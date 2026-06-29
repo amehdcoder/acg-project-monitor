@@ -233,8 +233,8 @@ const OwnerSubmissionManager = ({
       setConfirmText("");
       await loadRows();
       await loadArchived();
-      onMutation?.({ table, title, type: "ids", mode, deleted, ids, filter });
-      onChanged?.();
+      await onMutation?.({ table, title, type: "ids", mode, deleted, ids, filter });
+      await onChanged?.();
     } catch (e) {
       toast.error(`Action failed: ${readableError(e)}`, { id: toastId });
     } finally {
@@ -273,8 +273,8 @@ const OwnerSubmissionManager = ({
       setConfirmText("");
       await loadRows();
       await loadArchived();
-      onMutation?.({ table, title, type: "bulk", mode, deleted: Number(n), from: fromIso, to: toIso, filter });
-      onChanged?.();
+      await onMutation?.({ table, title, type: "bulk", mode, deleted: Number(n), from: fromIso, to: toIso, filter });
+      await onChanged?.();
     } catch (e) {
       toast.error(`Bulk action failed: ${readableError(e)}`, { id: toastId });
     } finally {
@@ -295,7 +295,7 @@ const OwnerSubmissionManager = ({
       toast.success(`Restored ${recordIds.length} record(s)`, { id: toastId });
       await loadRows();
       await loadArchived();
-      onChanged?.();
+      await onChanged?.();
     } catch (e) {
       toast.error(`Restore failed: ${readableError(e)}`, { id: toastId });
     } finally {
