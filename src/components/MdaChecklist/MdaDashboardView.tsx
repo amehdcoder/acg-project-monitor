@@ -172,7 +172,12 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
   );
 
   const realRows = useMemo(
-    () => submissions.map((s) => toMdaSubmission(s, form, questions)),
+    // Drop submissions without an LGA / Area Council — these surface as an
+    // unactionable "Unspecified" row and must never reach the dashboard.
+    () =>
+      submissions
+        .map((s) => toMdaSubmission(s, form, questions))
+        .filter((r) => String(r.lga || "").trim() !== ""),
     [submissions, form, questions],
   );
 
