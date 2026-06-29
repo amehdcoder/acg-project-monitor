@@ -759,7 +759,59 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     // stale state from a previous session.
     kalmanRef.current = null;
 
-    const handleError = (err: unknown) => setGpsError((prev) => prev ?? gpsErrorKind(err));
+    // Error policy — the indoor-friendly part of the fix:
+    //  • PERMANENT problems (permission denied, insecure context, unsupported)
+    //    surface immediately so the user can act.
+    //  • TRANSIENT problems (timeout / position-unavailable) are NEVER allowed
+    //    to block the UI. Indoors the high-accuracy GNSS watch always times out
+    //    while the low-accuracy Wi-Fi/cell watch + coarse one-shot keep working,
+    //    so swallowing them here is what makes the lock feel instant indoors.
+    const handleError = (err: unknown) => {
+      const kind = gpsErrorKind(err);
+      if (kind === "denied" || kind === "insecure" || kind === "unsupported") {
+        setGpsError((prev) => prev ?? kind);
+      }
+      // timeout / unavailable → ignore; auto-coarse fallback handles it.
+    };
+
+    // Fire an immediate coarse one-shot (Wi-Fi / cell / fused) in parallel with
+    // the watches. This is what laptops and indoor phones answer fastest, so a
+    // location appears in well under a second without waiting on satellites.
+    const coarseOneShot = () => {
+      if (Capacitor.isNativePlatform()) {
+        Geolocation.getCurrentPosition({ enableHighAccuracy: false, maximumAge: 60_000, timeout: 30_000 })
+          .then((pos) => { const f = normalizeNativeFix(pos); if (f) applyFix(f, f.accuracy < 50 ? "high" : "low"); })
+          .catch(() => { /* watches / auto-coarse fallback still cover us */ });
+      } else if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => { const f = normalizeWebFix(pos); if (f) applyFix(f, f.accuracy < 50 ? "high" : "low"); },
+          () => { /* watches / auto-coarse fallback still cover us */ },
+          { enableHighAccuracy: false, maximumAge: 60_000, timeout: 30_000 },
+        );
+      }
+    };
+    coarseOneShot();
+
+    // Auto-coarse fallback: if still NO fix after the grace window, silently
+    // seed the last-known-good position so the user is never stuck indoors.
+    autoCoarseDoneRef.current = false;
+    if (autoCoarseTimerRef.current !== null) window.clearTimeout(autoCoarseTimerRef.current);
+    autoCoarseTimerRef.current = window.setTimeout(() => {
+      if (autoCoarseDoneRef.current) return;
+      if (lastFixAtRef.current > 0) return; // we already have a fix
+      autoCoarseDoneRef.current = true;
+      const lkg = lkgRef.current;
+      if (lkg) {
+        applyFix({
+          lat: lkg.lat, lng: lkg.lng, accuracy: Math.max(lkg.accuracy, 100),
+          timestamp: Date.now(), speed: null, heading: null,
+          source: Capacitor.isNativePlatform() ? "native" : "web",
+        }, "low");
+      } else {
+        coarseOneShot();
+      }
+    }, 9000);
+
 
     // High-accuracy stream: tight cadence (1s OS push + 1.5s safety poll)
     // so the dot moves continuously while walking — Google-Maps-equivalent.
