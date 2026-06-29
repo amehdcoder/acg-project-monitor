@@ -25,6 +25,8 @@ import { toast } from "@/hooks/use-toast";
 import { cityContaining } from "@/lib/liveTracking/geofence";
 import { getAllPaths, cacheServerPaths, type StoredPath } from "@/lib/locationOfflineQueue";
 import { Satellite, Users, Battery, Gauge, X, MapPin, WifiOff } from "lucide-react";
+import StreetViewPanel from "@/components/maps/GoogleStreetViewPanel";
+import { attachStreetViewControl } from "@/lib/maps/leafletStreetViewControl";
 
 const ANIM_DURATION = 5000;
 const MAX_PATH = 500;
