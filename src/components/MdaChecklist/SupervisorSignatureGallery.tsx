@@ -211,6 +211,7 @@ export default function SupervisorSignatureGallery({ submissions }: Props) {
           </div>
         )}
       </CardContent>
+        </CollapsibleContent>
 
       <Dialog open={!!zoom} onOpenChange={(o) => !o && setZoom(null)}>
         <DialogContent className="max-w-2xl">
@@ -236,6 +237,7 @@ export default function SupervisorSignatureGallery({ submissions }: Props) {
           )}
         </DialogContent>
       </Dialog>
-    </Card>
+      </Card>
+    </Collapsible>
   );
 }
