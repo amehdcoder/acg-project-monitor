@@ -79,6 +79,7 @@ const fillFor = (visits: number, max: number) => {
 export default function FctSupervisoryMap({ submissions, formName }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const [streetView, setStreetView] = useState<{ lat: number; lng: number } | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
   const geoRef = useRef<any[] | null>(null);
   const sweepTimer = useRef<number | null>(null);
