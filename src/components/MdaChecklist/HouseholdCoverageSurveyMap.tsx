@@ -1101,6 +1101,13 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
                 {selectedVisit.notes && <p className="mt-2 rounded-md bg-muted/50 p-2 text-[11px] text-muted-foreground">{selectedVisit.notes}</p>}
                 <Button
                   size="sm"
+                  className="mt-2.5 h-8 w-full text-[11px] font-semibold"
+                  onClick={() => setStreetView({ lat: selectedVisit.lat, lng: selectedVisit.lng, accuracy: selectedVisit.accuracy })}
+                >
+                  <Eye className="h-3.5 w-3.5 mr-1.5" /> Zoom to street view
+                </Button>
+                <Button
+                  size="sm"
                   variant="secondary"
                   className="mt-2.5 h-7 w-full text-[11px]"
                   onClick={() => copyText(`${selectedVisit.lat.toFixed(6)}, ${selectedVisit.lng.toFixed(6)}`, "GPS coordinate")}
