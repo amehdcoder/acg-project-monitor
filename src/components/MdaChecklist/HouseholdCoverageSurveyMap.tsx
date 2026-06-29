@@ -214,6 +214,8 @@ interface Props {
   onSelectLga?: (lga: string, state?: string | null) => void;
   /** Fired with the linkage/state/date-filtered visit points for downstream analysis. */
   onPointsLoaded?: (points: VisitPoint[]) => void;
+  /** Fired whenever the underlying data fetch state changes (loading / error). */
+  onLoadStateChange?: (state: { loading: boolean; error: string | null }) => void;
 }
 
 const SPEEDS = [0.5, 1, 2, 4];
