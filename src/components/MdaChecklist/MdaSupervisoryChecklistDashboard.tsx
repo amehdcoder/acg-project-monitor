@@ -31,7 +31,7 @@ import {
   ArrowRight, ShieldCheck, Map as MapIcon, Building2, Layers, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
+import { prepareMdaData, communityKey, linkedCommunityKey } from "@/lib/mda/dashboardData";
 
 import { computeMdaKpis, buildMdaModel, type Heatmap as KHeatmap } from "@/lib/mda/kpis";
 import { exportKpiWorkbook, type KpiId } from "@/lib/mda/kpiExport";
