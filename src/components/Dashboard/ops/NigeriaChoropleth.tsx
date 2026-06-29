@@ -76,6 +76,7 @@ export default function NigeriaChoropleth({
         }
         map.setView([9.082, 8.6753], 6);
         mapRef.current = map;
+        attachSv(map);
         setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 0);
         setTick((t) => t + 1);
       } catch (e) { console.warn("Choropleth init failed", e); }
