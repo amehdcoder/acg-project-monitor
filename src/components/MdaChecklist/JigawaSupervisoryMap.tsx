@@ -126,9 +126,13 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
       .addTo(map);
     map.setView([12.228, 9.5616], 8);
     mapRef.current = map;
+    const detachSv = attachStreetViewControl(map, {
+      onPick: (lat, lng) => setStreetView({ lat, lng }),
+    });
     setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 50);
     redraw();
     return () => {
+      detachSv();
       if (sweepTimer.current) { clearInterval(sweepTimer.current); sweepTimer.current = null; }
       try { map.remove(); } catch { /* noop */ } mapRef.current = null;
     };
