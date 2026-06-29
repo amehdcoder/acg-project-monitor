@@ -117,8 +117,11 @@ const SatelliteImageryView = () => {
 
     L.control.zoom({ position: "topright" }).addTo(map);
     mapRef.current = map;
+    const detachSv = attachStreetViewControl(map, {
+      onPick: (lat, lng) => setStreetView({ lat, lng }),
+    });
 
-    return () => { map.remove(); mapRef.current = null; };
+    return () => { detachSv(); map.remove(); mapRef.current = null; };
   }, []);
 
   // Update satellite layer
