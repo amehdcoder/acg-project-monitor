@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertTriangle, MapPin } from "lucide-react";
 import L from "leaflet";
+import { useLeafletStreetView } from "@/components/maps/LeafletStreetView";
 import "leaflet/dist/leaflet.css";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -28,6 +29,7 @@ const CoverageDiscrepancyWidget = () => {
   const [refreshTick, setRefreshTick] = useState(0);
   const mapRef = useRef<L.Map | null>(null);
   const mapEl = useRef<HTMLDivElement | null>(null);
+  const { attach: attachSv, panel: streetViewPanel } = useLeafletStreetView();
 
   // Realtime: refresh whenever a CES survey, segment, household visit, or
   // microplan entry changes anywhere in the project.
@@ -101,6 +103,7 @@ const CoverageDiscrepancyWidget = () => {
       attribution: '&copy; CARTO', maxZoom: 19,
     }).addTo(map);
     mapRef.current = map;
+    attachSv(map);
 
     const bounds: L.LatLngTuple[] = [];
     discrepancies.forEach((d) => {
@@ -143,6 +146,7 @@ const CoverageDiscrepancyWidget = () => {
       </CardHeader>
       <CardContent className="space-y-3">
         <div ref={mapEl} className="w-full rounded-md border border-border" style={{ height: 280 }} />
+        {streetViewPanel}
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
