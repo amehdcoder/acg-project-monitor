@@ -3770,7 +3770,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       )}
 
       {/* STEP 4 */}
-      {step === 4 && (
+      {step === 4 && canViewAnalysis && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5" />Step 4 — CES Coverage Map & Inference</CardTitle>
