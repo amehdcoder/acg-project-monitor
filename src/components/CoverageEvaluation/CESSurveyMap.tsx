@@ -1103,15 +1103,55 @@ const CESSurveyMap = ({
             : "ces-survey-map rounded-lg overflow-hidden border border-border"
         }
       />
-      <button
-        type="button"
-        onClick={() => setIsFullscreen((v) => !v)}
-        aria-label={isFullscreen ? "Exit full screen map" : "Open full screen map"}
-        className="absolute top-2 right-2 z-[1200] inline-flex items-center gap-1.5 rounded-md bg-background/90 px-2.5 py-1.5 text-xs font-semibold text-foreground shadow-md ring-1 ring-border backdrop-blur hover:bg-background"
-      >
-        {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-        {isFullscreen ? "Exit" : "Full screen"}
-      </button>
+      <div className="absolute top-2 right-2 z-[1200] flex items-center gap-1.5">
+        {/* Map quality (tile resolution / detail) selector */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowQualityMenu((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={showQualityMenu}
+            aria-label="Map quality settings"
+            title="Map quality — choose smoother performance on low-end devices"
+            className="inline-flex items-center gap-1.5 rounded-md bg-background/90 px-2.5 py-1.5 text-xs font-semibold text-foreground shadow-md ring-1 ring-border backdrop-blur hover:bg-background"
+          >
+            <Gauge className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{TILE_QUALITY_PRESETS[tileQuality].label}</span>
+          </button>
+          {showQualityMenu && (
+            <div
+              role="menu"
+              className="absolute right-0 mt-1 w-48 overflow-hidden rounded-md bg-background shadow-lg ring-1 ring-border"
+            >
+              {(Object.keys(TILE_QUALITY_PRESETS) as CesTileQuality[]).map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={tileQuality === q}
+                  onClick={() => { setTileQuality(q); setShowQualityMenu(false); }}
+                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs hover:bg-muted ${tileQuality === q ? "font-semibold text-primary" : "text-foreground"}`}
+                >
+                  {TILE_QUALITY_PRESETS[q].label}
+                  {tileQuality === q && <span aria-hidden>✓</span>}
+                </button>
+              ))}
+              <div className="border-t border-border px-3 py-1.5 text-[10px] leading-snug text-muted-foreground">
+                Deepest zoom stays available in every mode.
+              </div>
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsFullscreen((v) => !v)}
+          aria-label={isFullscreen ? "Exit full screen map" : "Open full screen map"}
+          className="inline-flex items-center gap-1.5 rounded-md bg-background/90 px-2.5 py-1.5 text-xs font-semibold text-foreground shadow-md ring-1 ring-border backdrop-blur hover:bg-background"
+        >
+          {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          {isFullscreen ? "Exit" : "Full screen"}
+        </button>
+      </div>
     </div>
   );
 };
