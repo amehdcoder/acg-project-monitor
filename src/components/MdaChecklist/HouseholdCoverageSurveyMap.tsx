@@ -241,6 +241,8 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
   // Marker details panel (GPS + outcome data for the clicked household visit)
   const [selectedVisit, setSelectedVisit] = useState<VisitPoint | null>(null);
   const [selectedLga, setSelectedLga] = useState(() => readUrl(URL_KEYS.lga));
+  // Street-level imagery (Mapillary — community-contributed, no external API key)
+  const [streetView, setStreetView] = useState<{ lat: number; lng: number; accuracy?: number | null } | null>(null);
 
   // ── Load household visits (project-scoped, joined to survey geography) ──
   useEffect(() => {
