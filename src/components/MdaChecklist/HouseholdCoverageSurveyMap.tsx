@@ -13,9 +13,10 @@ import { Switch } from "@/components/ui/switch";
 import {
   Home, MapPin, Loader2, Play, Pause, SkipForward, SkipBack,
   Flame, Download, FileImage, FileText, FileSpreadsheet, RotateCcw, X, ListFilter,
-  Layers, Satellite,
+  Layers, Satellite, Eye,
 
 } from "lucide-react";
+import StreetViewPanel from "@/components/CoverageEvaluation/StreetViewPanel";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
