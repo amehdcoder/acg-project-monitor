@@ -13,9 +13,10 @@ import { Switch } from "@/components/ui/switch";
 import {
   Home, MapPin, Loader2, Play, Pause, SkipForward, SkipBack,
   Flame, Download, FileImage, FileText, FileSpreadsheet, RotateCcw, X, ListFilter,
-  Layers, Satellite,
+  Layers, Satellite, Eye,
 
 } from "lucide-react";
+import StreetViewPanel from "@/components/CoverageEvaluation/StreetViewPanel";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -240,6 +241,8 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
   // Marker details panel (GPS + outcome data for the clicked household visit)
   const [selectedVisit, setSelectedVisit] = useState<VisitPoint | null>(null);
   const [selectedLga, setSelectedLga] = useState(() => readUrl(URL_KEYS.lga));
+  // Street-level imagery (Mapillary — community-contributed, no external API key)
+  const [streetView, setStreetView] = useState<{ lat: number; lng: number; accuracy?: number | null } | null>(null);
 
   // ── Load household visits (project-scoped, joined to survey geography) ──
   useEffect(() => {
@@ -1098,6 +1101,13 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
                 {selectedVisit.notes && <p className="mt-2 rounded-md bg-muted/50 p-2 text-[11px] text-muted-foreground">{selectedVisit.notes}</p>}
                 <Button
                   size="sm"
+                  className="mt-2.5 h-8 w-full text-[11px] font-semibold"
+                  onClick={() => setStreetView({ lat: selectedVisit.lat, lng: selectedVisit.lng, accuracy: selectedVisit.accuracy })}
+                >
+                  <Eye className="h-3.5 w-3.5 mr-1.5" /> Zoom to street view
+                </Button>
+                <Button
+                  size="sm"
                   variant="secondary"
                   className="mt-2.5 h-7 w-full text-[11px]"
                   onClick={() => copyText(`${selectedVisit.lat.toFixed(6)}, ${selectedVisit.lng.toFixed(6)}`, "GPS coordinate")}
@@ -1131,6 +1141,14 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
           </p>
         )}
       </CardContent>
+
+      <StreetViewPanel
+        open={!!streetView}
+        onOpenChange={(o) => !o && setStreetView(null)}
+        lat={streetView?.lat ?? null}
+        lng={streetView?.lng ?? null}
+        accuracy={streetView?.accuracy ?? null}
+      />
     </Card>
   );
 }

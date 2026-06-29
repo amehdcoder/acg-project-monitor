@@ -45,6 +45,7 @@ import MdaSupervisoryMap from "./MdaSupervisoryMap";
 import JigawaSupervisoryMap from "./JigawaSupervisoryMap";
 import FctSupervisoryMap from "./FctSupervisoryMap";
 import HouseholdCoverageSurveyMap from "./HouseholdCoverageSurveyMap";
+import SupervisorSignatureGallery from "./SupervisorSignatureGallery";
 import MdaAdvancedAnalyses from "./MdaAdvancedAnalyses";
 import MdaLongitudinalInsights from "./MdaLongitudinalInsights";
 import { useTablePagination } from "@/hooks/useTablePagination";
@@ -1173,6 +1174,11 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         onSelectCommunity={openMapCommunityDrill}
         onSelectLga={openMapLgaDrill}
       />
+
+      {/* ── Supervisor signatures register ── */}
+      <SupervisorSignatureGallery submissions={filtered} />
+
+
 
 
       {/* ── Field worker accountability ── */}
