@@ -92,8 +92,16 @@ export default function SupervisorSignatureGallery({ submissions }: Props) {
         });
       });
     }
-    // newest first
-    return list.sort((a, b) => (b.submittedAt || "").localeCompare(a.submittedAt || ""));
+    // Deduplicate: keep one signature per supervisor + community + image, newest first.
+    const seen = new Set<string>();
+    const deduped: SignatureEntry[] = [];
+    for (const e of list.sort((a, b) => (b.submittedAt || "").localeCompare(a.submittedAt || ""))) {
+      const k = [e.supervisor, e.state, e.lga, e.community, e.src].join("|").toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      deduped.push(e);
+    }
+    return deduped;
   }, [submissions]);
 
   const filtered = useMemo(() => {
