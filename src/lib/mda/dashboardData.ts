@@ -74,6 +74,23 @@ export function communityKey(s: RawSubmission): string {
   ].join("|");
 }
 
+/**
+ * A relaxed community-identity key (state|lga|ward|community) used to LINK
+ * Coverage Evaluation 3D household visits back to the Community Checklist
+ * communities that were actually supervised. Settlement & FLHF are intentionally
+ * excluded because the CES handoff may capture/omit them differently — the
+ * community identity is what binds the household survey to the checklist.
+ *
+ * Aggressive alnum-only normalization keeps "Batali Arewa" === "batali-arewa"
+ * across the two data sources.
+ */
+const normAlnum = (v: any) => String(v ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+export function linkedCommunityKey(
+  state?: any, lga?: any, ward?: any, community?: any,
+): string {
+  return [normAlnum(state), normAlnum(lga), normAlnum(ward), normAlnum(community)].join("|");
+}
+
 /** Flatten the question tree into leaf questions (keeping id + name). */
 function flattenLeafQuestions(questions: RawQuestion[]): RawQuestion[] {
   const out: RawQuestion[] = [];
