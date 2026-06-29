@@ -1275,7 +1275,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }
 
   if (showIrfForm) {
-    return <IRFFormFiller projectId={currentProjectId} onClose={() => setShowIrfForm(false)} />;
+    return <IRFCategoryLauncher projectId={currentProjectId} onClose={() => setShowIrfForm(false)} />;
   }
 
   if (showIrfDash) {
