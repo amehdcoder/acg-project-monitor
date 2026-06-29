@@ -857,7 +857,8 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
 
 
   return (
-    <div className="space-y-4">
+    <div ref={dashboardRef} className="space-y-4">
+
       {/* ── Navy report header ── */}
       <div className="overflow-hidden rounded-2xl text-white shadow-sm" style={{ background: `linear-gradient(160deg, ${NAVY}, #163a63)` }}>
         <div className="flex flex-wrap items-start justify-between gap-4 p-5">
