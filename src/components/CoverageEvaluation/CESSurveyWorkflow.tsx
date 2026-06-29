@@ -2867,10 +2867,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             { n: 1 as Step, label: "Locate", full: "1. Locate & Boundaries" },
             { n: 2 as Step, label: "Sample", full: "2. Estimate & Sample" },
             { n: 3 as Step, label: "Visit", full: "3. Visit Households" },
-            { n: 4 as Step, label: "Analyze", full: "4. Analysis" },
-            { n: 5 as Step, label: "Export", full: "5. Export & QC" },
+            ...(canViewAnalysis
+              ? [
+                  { n: 4 as Step, label: "Analyze", full: "4. Analysis" },
+                  { n: 5 as Step, label: "Export", full: "5. Export & QC" },
+                ]
+              : []),
           ].map((s, i, arr) => (
-            <div key={s.n} className="flex items-center gap-1.5 shrink-0">
+            <div key={s.n} className="flex items-center gap-1.5 shrink-0">test_unused
               <Button
                 size="sm"
                 variant={step === s.n ? "default" : "ghost"}
