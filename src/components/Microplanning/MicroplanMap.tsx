@@ -1299,6 +1299,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
         {/* Map + Summary Panel */}
         <div className={`flex ${showSummaryPanel ? "flex-col lg:flex-row" : ""}`}>
           <div ref={mapRef} className={`${mapHeight} ${showSummaryPanel ? "lg:flex-1" : "w-full"} relative z-0`} />
+          {streetViewPanel}
 
           {/* Summary panel */}
           {showSummaryPanel && (
