@@ -189,8 +189,10 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
   }, [loading, submissions.length, visibleRealRows, questions, form.id]);
 
   const hasCache = !!cached && cached.rows.length > 0;
-  // Use cached data only while offline; online zero rows must render a true empty state after deletion.
-  const useCacheNow = hasCache && submissions.length === 0 && isOffline();
+  // Only fall back to cached data when a live fetch actually FAILED while offline.
+  // A successful fetch that returns zero rows must render a true empty state
+  // (e.g. right after the owner clears/deletes submissions) — never the cache.
+  const useCacheNow = hasCache && loadFailed && isOffline() && submissions.length === 0;
 
   const dashboardRows = useCacheNow ? cached!.rows : visibleRealRows;
   const dashboardQuestions = useCacheNow ? cached!.questions : questions;
