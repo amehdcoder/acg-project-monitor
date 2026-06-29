@@ -2,9 +2,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  X, Maximize2, Minimize2, RotateCcw, Compass, MapPin, Loader2, ExternalLink, Navigation,
+  X, Maximize2, Minimize2, RotateCcw, Compass, MapPin, Loader2, ExternalLink, Navigation, Eye, Map as MapIcon,
 } from "lucide-react";
-import { loadGoogleMaps } from "@/lib/maps/googleMapsLoader";
+import {
+  loadGoogleMaps,
+  googleMapsAuthFailed,
+  GOOGLE_MAPS_AUTH_FAILED_EVENT,
+} from "@/lib/maps/googleMapsLoader";
 
 interface Props {
   open: boolean;
@@ -16,18 +20,25 @@ interface Props {
 }
 
 /**
- * Unified, beautiful Google Street View panel used across every satellite map.
- * Searches up to 5km for the nearest panorama and surfaces clear loading,
- * error and fallback states.
+ * Unified, beautiful Street View panel used across every satellite map.
+ *
+ * Primary provider: Google Street View (searches up to 5km for the nearest
+ * panorama). If the Google Maps key is rejected (billing disabled, referrer
+ * not allowed, API not enabled) or no panorama exists nearby, the panel
+ * automatically and seamlessly falls back to Mapillary community street
+ * imagery — so users NEVER see Google's broken "development purposes only"
+ * overlay or a dead end.
  */
 export default function GoogleStreetViewPanel({
   open, onOpenChange, lat, lng, accuracy, title = "Street View",
 }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [heading, setHeading] = useState(0);
   const [panoLocation, setPanoLocation] = useState("");
+  // When true, we render Mapillary instead of Google (auth/billing failure or no coverage).
+  const [useMapillary, setUseMapillary] = useState(false);
+  const [mapillaryLoading, setMapillaryLoading] = useState(true);
   const viewRef = useRef<HTMLDivElement>(null);
   const panoramaRef = useRef<google.maps.StreetViewPanorama | null>(null);
 
@@ -36,10 +47,26 @@ export default function GoogleStreetViewPanel({
   const init = useCallback(async () => {
     if (!viewRef.current || !hasCoords) return;
     setIsLoading(true);
-    setError(null);
     setPanoLocation("");
+
+    // Short-circuit straight to Mapillary if we already know Google's key is bad.
+    if (googleMapsAuthFailed) {
+      setUseMapillary(true);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       await loadGoogleMaps();
+
+      // The loader resolved, but the key may still be auth-rejected (gm_authFailure
+      // fires asynchronously). Re-check before continuing.
+      if (googleMapsAuthFailed) {
+        setUseMapillary(true);
+        setIsLoading(false);
+        return;
+      }
+
       const sv = new google.maps.StreetViewService();
       const find = (radius: number) =>
         new Promise<google.maps.StreetViewPanoramaData>((resolve, reject) => {
@@ -57,6 +84,14 @@ export default function GoogleStreetViewPanel({
       catch { panoData = await find(5000); }
 
       if (!viewRef.current) return;
+
+      // If auth failed while we were searching, fall back.
+      if (googleMapsAuthFailed) {
+        setUseMapillary(true);
+        setIsLoading(false);
+        return;
+      }
+
       if (panoData.location?.description) setPanoLocation(panoData.location.description);
 
       const panorama = new google.maps.StreetViewPanorama(viewRef.current, {
@@ -82,23 +117,36 @@ export default function GoogleStreetViewPanel({
       panorama.addListener("pov_changed", () => setHeading(Math.round(panorama.getPov().heading)));
       panorama.addListener("pano_changed", () => setIsLoading(false));
       panorama.addListener("status_changed", () => {
-        if (panorama.getStatus() === google.maps.StreetViewStatus.OK) { setIsLoading(false); setError(null); }
+        if (panorama.getStatus() === google.maps.StreetViewStatus.OK) setIsLoading(false);
       });
-      setTimeout(() => setIsLoading(false), 3000);
-    } catch (e: any) {
+      // Final safety net: if Google still hasn't rendered, fall back to Mapillary.
+      setTimeout(() => {
+        if (googleMapsAuthFailed) {
+          setUseMapillary(true);
+          setIsLoading(false);
+        } else {
+          setIsLoading(false);
+        }
+      }, 3000);
+    } catch (e: unknown) {
+      // No panorama nearby, key unavailable, or load failure → Mapillary fallback.
+      setUseMapillary(true);
       setIsLoading(false);
-      setError(
-        e?.message === "none"
-          ? "No Street View imagery found within 5 km of this point. This area may not have street-level coverage yet."
-          : "Couldn't load Street View. Check your connection and try again.",
-      );
     }
   }, [lat, lng, hasCoords]);
 
   useEffect(() => {
     if (!open) return;
+    setUseMapillary(false);
+    setMapillaryLoading(true);
     init();
+
+    // React to async auth failures that arrive after init().
+    const onAuthFail = () => { setUseMapillary(true); setIsLoading(false); };
+    window.addEventListener(GOOGLE_MAPS_AUTH_FAILED_EVENT, onAuthFail);
+
     return () => {
+      window.removeEventListener(GOOGLE_MAPS_AUTH_FAILED_EVENT, onAuthFail);
       if (panoramaRef.current) {
         google.maps.event.clearInstanceListeners(panoramaRef.current);
         panoramaRef.current = null;
@@ -128,6 +176,16 @@ export default function GoogleStreetViewPanel({
     ? `https://www.google.com/maps/@${lat},${lng},3a,75y,${heading}h,90t/data=!3m4!1e1!3m2!1s!2e0`
     : "#";
 
+  const mapillaryEmbed = hasCoords
+    ? `https://www.mapillary.com/embed?map_style=Mapillary+streets&x=${lng}&y=${lat}&z=17&style=photo`
+    : "";
+  const mapillaryAppLink = hasCoords
+    ? `https://www.mapillary.com/app/?lat=${lat}&lng=${lng}&z=17`
+    : "#";
+  const googleSatLink = hasCoords
+    ? `https://www.google.com/maps/@${lat},${lng},18z/data=!3m1!1e3`
+    : "#";
+
   return createPortal(
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
       <div
@@ -148,14 +206,19 @@ export default function GoogleStreetViewPanel({
                   <><MapPin className="h-3 w-3" />{(lat as number).toFixed(5)}, {(lng as number).toFixed(5)}
                   {typeof accuracy === "number" && Number.isFinite(accuracy) ? ` · ±${accuracy.toFixed(0)}m` : ""}</>
                 ) : "No location"}
-                <span className="ml-1 inline-flex items-center gap-0.5"><Compass className="h-3 w-3" />{heading}°</span>
+                {!useMapillary && (
+                  <span className="ml-1 inline-flex items-center gap-0.5"><Compass className="h-3 w-3" />{heading}°</span>
+                )}
+                {useMapillary && <span className="ml-1 text-[#FBBC05]">· Mapillary</span>}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <button onClick={resetView} title="Reset view" className="grid h-8 w-8 place-items-center rounded-lg transition-colors hover:bg-white/15">
-              <RotateCcw className="h-4 w-4" />
-            </button>
+            {!useMapillary && (
+              <button onClick={resetView} title="Reset view" className="grid h-8 w-8 place-items-center rounded-lg transition-colors hover:bg-white/15">
+                <RotateCcw className="h-4 w-4" />
+              </button>
+            )}
             <button onClick={() => setIsFullscreen((v) => !v)} title={isFullscreen ? "Exit fullscreen" : "Fullscreen"} className="grid h-8 w-8 place-items-center rounded-lg transition-colors hover:bg-white/15">
               {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </button>
@@ -167,9 +230,32 @@ export default function GoogleStreetViewPanel({
 
         {/* Body */}
         <div className="relative flex-1 min-h-0 bg-[#202124]">
-          <div ref={viewRef} className="h-full w-full" />
+          {/* Google Street View target (kept mounted only when not using Mapillary) */}
+          {!useMapillary && <div ref={viewRef} className="h-full w-full" />}
 
-          {isLoading && !error && (
+          {/* Mapillary fallback */}
+          {useMapillary && hasCoords && (
+            <>
+              <iframe
+                key={mapillaryEmbed}
+                title="Mapillary street view"
+                src={mapillaryEmbed}
+                className="h-full w-full border-0"
+                allow="geolocation; fullscreen"
+                onLoad={() => setMapillaryLoading(false)}
+              />
+              {mapillaryLoading && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#202124] text-white">
+                  <Loader2 className="h-8 w-8 animate-spin text-[#FBBC05]" />
+                  <p className="text-sm text-white/70">Loading street-level imagery…</p>
+                  <p className="text-xs text-white/40">Community photos near {(lat as number).toFixed(4)}, {(lng as number).toFixed(4)}</p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Loading (Google search phase) */}
+          {isLoading && !useMapillary && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#202124] text-white">
               <Loader2 className="h-8 w-8 animate-spin text-[#FBBC05]" />
               <p className="text-sm text-white/70">Finding nearest Street View…</p>
@@ -177,29 +263,38 @@ export default function GoogleStreetViewPanel({
             </div>
           )}
 
-          {error && (
+          {/* No coords at all */}
+          {!hasCoords && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center text-white">
               <div className="grid h-14 w-14 place-items-center rounded-full bg-white/10">
                 <MapPin className="h-7 w-7 text-[#FBBC05]" />
               </div>
-              <p className="max-w-sm text-sm text-white/80">{error}</p>
-              {hasCoords && (
-                <a href={gmapsLink} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs text-[#8ab4f8] hover:underline">
-                  <ExternalLink className="h-3 w-3" /> Try opening in Google Maps
-                </a>
-              )}
+              <p className="max-w-sm text-sm text-white/80">No GPS coordinate available for this point.</p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-2 bg-[#0b1f33] px-3 py-1.5 text-white shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-[#0b1f33] px-3 py-1.5 text-white shrink-0">
           {hasCoords ? (
-            <a href={gmapsLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-[#8ab4f8] hover:underline">
-              <ExternalLink className="h-3 w-3" /> Open in Google Maps
-            </a>
+            useMapillary ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <a href={mapillaryAppLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-[#8ab4f8] hover:underline">
+                  <Eye className="h-3 w-3" /> Open in Mapillary
+                </a>
+                <a href={googleSatLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-[#8ab4f8] hover:underline">
+                  <MapIcon className="h-3 w-3" /> Satellite
+                </a>
+              </div>
+            ) : (
+              <a href={gmapsLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-[#8ab4f8] hover:underline">
+                <ExternalLink className="h-3 w-3" /> Open in Google Maps
+              </a>
+            )
           ) : <span />}
-          <span className="text-[10px] text-white/40">Imagery © {new Date().getFullYear()} Google</span>
+          <span className="text-[10px] text-white/40">
+            {useMapillary ? "Imagery © Mapillary contributors" : `Imagery © ${new Date().getFullYear()} Google`}
+          </span>
         </div>
       </div>
     </div>,
