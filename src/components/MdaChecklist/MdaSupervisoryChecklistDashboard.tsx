@@ -28,7 +28,7 @@ import {
 import {
   ClipboardList, CheckCircle2, Pill, AlertTriangle, Flag, Activity,
   MapPin, CalendarClock, Users2, Search, RotateCcw, Download, Filter,
-  ArrowRight, ShieldCheck, Map as MapIcon, Building2, Layers, Loader2,
+  ArrowRight, ShieldCheck, Map as MapIcon, Building2, Layers, Loader2, FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { prepareMdaData, communityKey, linkedCommunityKey } from "@/lib/mda/dashboardData";
