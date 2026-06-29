@@ -1141,6 +1141,14 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
           </p>
         )}
       </CardContent>
+
+      <StreetViewPanel
+        open={!!streetView}
+        onOpenChange={(o) => !o && setStreetView(null)}
+        lat={streetView?.lat ?? null}
+        lng={streetView?.lng ?? null}
+        accuracy={streetView?.accuracy ?? null}
+      />
     </Card>
   );
 }
