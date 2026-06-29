@@ -7495,6 +7495,10 @@ export type Database = {
         }
         Returns: Json
       }
+      owner_cascade_delete_ces: {
+        Args: { _communities?: string[]; _project_id: string }
+        Returns: Json
+      }
       owner_clear_form_submissions: {
         Args: { _form_id: string }
         Returns: Json
