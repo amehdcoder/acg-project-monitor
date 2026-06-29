@@ -6,7 +6,11 @@ import { initOfflineMedia } from "./lib/offlineMedia";
 import { initOfflineSubmissions } from "./lib/offlineSubmissions";
 import { initSpecialFormReconcile } from "./lib/specialFormReconcile";
 import { prepareSilentFormRestoreForUpdate } from "./lib/formProgressPersistence";
+import { installAfterHoursInterceptor } from "./lib/afterHours/interceptor";
 import "./index.css";
+
+// Gate all form submissions during the locked evening window (7 PM–8 AM WAT).
+installAfterHoursInterceptor();
 
 // Drain any queued offline media + submissions as soon as the app boots /
 // regains connectivity.
