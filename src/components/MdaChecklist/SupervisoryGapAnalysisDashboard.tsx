@@ -645,6 +645,7 @@ export default function SupervisoryGapAnalysisDashboard({
                   </Tooltip>
                 </CircleMarker>
               ))}
+              <StreetViewLayer />
             </MapContainer>
 
             {/* Legend */}
