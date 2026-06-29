@@ -8,6 +8,8 @@ import { clearMdaCache, loadMdaCache, saveMdaCache, isOffline } from "@/lib/mda/
 import { canonicalizeSubmissionData } from "@/lib/mda/dashboardData";
 import MdaSupervisoryChecklistDashboard from "./MdaSupervisoryChecklistDashboard";
 import OwnerSubmissionManager, { type OwnerDataMutation } from "@/components/owner/OwnerSubmissionManager";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface MdaDashboardForm {
   id: string;
@@ -149,7 +151,7 @@ function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm, questions:
 
 export default function MdaDashboardView({ form, projects = [], onClose, embedded = false }: Props) {
   const { isOwner } = useAuth();
-  const { submissions, loading, refresh } = useDataAnalytics({ formId: form.id });
+  const { submissions, loading, loadFailed, refresh } = useDataAnalytics({ formId: form.id });
   const [refreshing, setRefreshing] = useState(false);
   const [cacheVersion, setCacheVersion] = useState(0);
   const [optimisticallyHiddenIds, setOptimisticallyHiddenIds] = useState<Set<string>>(new Set());
@@ -189,8 +191,10 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
   }, [loading, submissions.length, visibleRealRows, questions, form.id]);
 
   const hasCache = !!cached && cached.rows.length > 0;
-  // Use cached data only while offline; online zero rows must render a true empty state after deletion.
-  const useCacheNow = hasCache && submissions.length === 0 && isOffline();
+  // Only fall back to cached data when a live fetch actually FAILED while offline.
+  // A successful fetch that returns zero rows must render a true empty state
+  // (e.g. right after the owner clears/deletes submissions) — never the cache.
+  const useCacheNow = hasCache && loadFailed && isOffline() && submissions.length === 0;
 
   const dashboardRows = useCacheNow ? cached!.rows : visibleRealRows;
   const dashboardQuestions = useCacheNow ? cached!.questions : questions;
@@ -202,6 +206,22 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
     await refresh();
     setOptimisticallyHiddenIds(new Set());
     setOptimisticallyEmpty(false);
+  };
+
+  // Cascade-delete the Coverage Evaluation 3D (CES) data that was captured for
+  // the same communities so deleting MDA submissions clears EVERYTHING tied to
+  // those communities (household visits, segments, the coverage map, etc.).
+  const cascadeCesDelete = async (communities: string[] | null) => {
+    if (!form.project_id) return;
+    try {
+      await (supabase as any).rpc("owner_cascade_delete_ces", {
+        _project_id: form.project_id,
+        _communities: communities,
+      });
+    } catch (e) {
+      console.error("CES cascade delete failed", e);
+      toast.error("MDA data deleted, but linked Coverage Evaluation 3D data could not be cleared.");
+    }
   };
 
   const handleOwnerMutation = (mutation: OwnerDataMutation) => {
@@ -221,6 +241,20 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
       !mutation.from &&
       !mutation.to;
     if (isCurrentFormBulkClear) setOptimisticallyEmpty(true);
+
+    // Only cascade on permanent deletes, never on archive.
+    if (mutation.mode === "permanent") {
+      if (isCurrentFormBulkClear) {
+        void cascadeCesDelete(null); // full project clear
+      } else if (mutation.type === "ids" && mutation.ids?.length) {
+        const idSet = new Set(mutation.ids);
+        const communities = realRows
+          .filter((r) => idSet.has(r.id))
+          .map((r) => norm(pick(r.data as Record<string, unknown>, ["community", "community_name", "settlement", "settlement_name"])).toLowerCase())
+          .filter((c) => c.length > 0);
+        if (communities.length) void cascadeCesDelete(Array.from(new Set(communities)));
+      }
+    }
   };
 
 

@@ -140,6 +140,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
   const [projects, setProjects] = useState<any[]>([]);
   const [forms, setForms] = useState<FormAnalytics[]>([]);
   const [submissions, setSubmissions] = useState<SubmissionRecord[]>([]);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [kpis, setKpis] = useState<KPIData>({
     totalSubmissions: 0,
     totalSubmissionsChange: 0,
@@ -562,7 +563,9 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
         calculateFormAnalytics(formsData, submissionsData);
         calculateLocationAnalytics(submissionsData);
       }
+      setLoadFailed(false);
     } catch (error: any) {
+      setLoadFailed(true);
       if (!silent) {
         toast({
           title: "Error loading analytics",
@@ -619,6 +622,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
     formAnalytics,
     locationAnalytics,
     availableStates,
+    loadFailed,
     refresh,
   };
 };

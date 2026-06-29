@@ -287,9 +287,10 @@ function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }
                 <tr role="row">
                   <th className="sticky left-0 z-10 bg-card px-2 py-1.5 text-left font-semibold text-muted-foreground" scope="col">LGA / Area Council</th>
                   {heat.categories.map((c) => (
-                    <th key={c} className="px-1.5 py-1.5 text-center font-semibold text-muted-foreground" title={c} scope="col">
-                      <span className="block max-w-[72px] truncate mx-auto">{c}</span>
+                    <th key={c} className="px-1.5 py-1.5 text-center font-semibold text-muted-foreground align-bottom" title={c} scope="col">
+                      <span className="block min-w-[64px] max-w-[120px] whitespace-normal leading-tight mx-auto">{c}</span>
                     </th>
+
                   ))}
                 </tr>
               </thead>
