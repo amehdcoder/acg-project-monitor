@@ -107,6 +107,18 @@ const NotificationsPanel = () => {
     await supabase.from("notifications").update({ read: true }).eq("id", id);
   };
 
+  const handleClick = (n: Notification) => {
+    markAsRead(n.id);
+    if (n.category === "after_hours") {
+      setOpen(false);
+      if (/approval needed/i.test(n.title)) {
+        openAfterHoursApprovals(n.related_id ?? undefined);
+      } else {
+        openAfterHoursStatus();
+      }
+    }
+  };
+
   const markAllAsRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     if (user?.id) {
