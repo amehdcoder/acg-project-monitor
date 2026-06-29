@@ -46,6 +46,7 @@ export default function NigeriaChoropleth({
 }: NigeriaChoroplethProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const { attach: attachSv, panel: streetViewPanel } = useLeafletStreetView();
   const layerRef = useRef<L.GeoJSON | null>(null);
   const [geo, setGeo] = useState<any | null>(null);
   const [tick, setTick] = useState(0);
