@@ -358,10 +358,15 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
           }
         }
         diag.rendered = collected.length;
-        if (!cancelled) { setPoints(collected); setDiagnostics(diag); setLoading(false); }
-      } catch (e) {
+        if (!cancelled) { setPoints(collected); setDiagnostics(diag); setError(null); setLoading(false); }
+      } catch (e: any) {
         console.warn("Household coverage map load failed", e);
-        if (!cancelled) { setPoints([]); setDiagnostics({ total: 0, rendered: 0, badGps: 0, unmappedOutcome: 0, unlinked: 0 }); setLoading(false); }
+        if (!cancelled) {
+          setPoints([]);
+          setDiagnostics({ total: 0, rendered: 0, badGps: 0, unmappedOutcome: 0, unlinked: 0 });
+          setError(e?.message || "Network error while loading household visits. Check your connection and retry.");
+          setLoading(false);
+        }
       }
     })();
     return () => { cancelled = true; };
