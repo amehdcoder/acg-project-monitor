@@ -207,6 +207,7 @@ const MultiSelectDropdown = ({ values, onChange, options, placeholder, disabled 
 // ─── Component ───
 const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
+  const { attach: attachSv, panel: streetViewPanel } = useLeafletStreetView();
   const mapInstanceRef = useRef<any>(null);
   const layersRef = useRef<any>(null);
   const exportContainerRef = useRef<HTMLDivElement>(null);
