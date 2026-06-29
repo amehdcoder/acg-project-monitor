@@ -1024,16 +1024,16 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
                 type="button"
                 onClick={() => toggleOutcome(o.key)}
                 aria-pressed={activeOutcomes.has(o.key)}
-                aria-label={`${o.label}: ${n} household${n === 1 ? "" : "s"}. ${activeOutcomes.has(o.key) ? "Active filter, activate to remove." : "Activate to filter by this outcome."}`}
+                aria-label={`${o.label}: ${n} household${n === 1 ? "" : "s"}. ${o.desc} ${activeOutcomes.has(o.key) ? "Active filter, activate to remove." : "Activate to filter by this outcome."}`}
                 title={`${o.label} (${n}) — ${o.desc}${activeOutcomes.has(o.key) ? " · Click to remove filter." : " · Click to filter."}`}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${active ? "" : "opacity-40"}`}
-                style={{ borderColor: `${o.color}66`, color: o.color, background: `${o.color}12` }}
+                className={`inline-flex items-center gap-1.5 rounded-full border-2 bg-card px-2.5 py-1 text-[11px] font-semibold text-foreground transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${active ? "" : "opacity-50"} ${activeOutcomes.has(o.key) ? "ring-2 ring-offset-1 ring-foreground" : ""}`}
+                style={{ borderColor: o.color }}
               >
-                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full" style={{ background: o.color }}>
+                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full ring-1 ring-foreground/30" style={{ background: o.color }}>
                   <svg width="12" height="12" viewBox="2 2 16 16" aria-hidden="true">{<g dangerouslySetInnerHTML={{ __html: o.glyph }} />}</svg>
                 </span>
                 {o.label}
-                <span className="rounded-full bg-background/70 px-1.5 font-semibold tabular-nums">{n}</span>
+                <span className="rounded-full bg-muted px-1.5 font-bold tabular-nums text-foreground">{n}</span>
               </button>
             );
           })}
