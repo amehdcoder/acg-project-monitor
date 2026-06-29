@@ -1181,7 +1181,11 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         dateTo={fTo ? fTo + "T23:59:59" : null}
         onSelectCommunity={openMapCommunityDrill}
         onSelectLga={openMapLgaDrill}
+        onPointsLoaded={handleHcaPoints}
       />
+
+      {/* ── Robust household coverage statistical analysis ── */}
+      <HouseholdCoverageAnalysis points={hcaPoints} />
 
       {/* ── Supervisor signatures register ── */}
       <SupervisorSignatureGallery submissions={filtered} />
