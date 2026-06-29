@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, Gauge } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Segment, LatLng } from "@/lib/ces/kmeansSegments";
@@ -175,6 +175,30 @@ const isCoarsePointer = () =>
   typeof window.matchMedia === "function" &&
   window.matchMedia("(pointer: coarse)").matches;
 
+// Tile-quality presets. All keep the deepest zoom available (maxZoom 24) so a
+// "smooth" choice never loses the ability to zoom in — it only changes how many
+// tiles are kept resident and how aggressively they refresh, which is what
+// actually strains low-end devices.
+export type CesTileQuality = "high" | "balanced" | "smooth";
+const TILE_QUALITY_PRESETS: Record<CesTileQuality, {
+  keepBuffer: number; updateWhenZooming: boolean; updateWhenIdle: boolean; nativeZoomDelta: number; label: string;
+}> = {
+  high:     { keepBuffer: 8, updateWhenZooming: true,  updateWhenIdle: false, nativeZoomDelta: 0,  label: "High detail" },
+  balanced: { keepBuffer: 4, updateWhenZooming: true,  updateWhenIdle: false, nativeZoomDelta: 0,  label: "Balanced" },
+  smooth:   { keepBuffer: 2, updateWhenZooming: false, updateWhenIdle: true,  nativeZoomDelta: -2, label: "Smooth (low-end)" },
+};
+const TILE_QUALITY_KEY = "ces.tileQuality.v1";
+const readStoredTileQuality = (): CesTileQuality => {
+  try {
+    const v = localStorage.getItem(TILE_QUALITY_KEY);
+    if (v === "high" || v === "balanced" || v === "smooth") return v;
+  } catch { /* ignore */ }
+  // Auto-pick a lighter default on constrained devices.
+  const nav = typeof navigator !== "undefined" ? navigator as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean } } : null;
+  const lowPower = (nav?.hardwareConcurrency ?? 4) <= 4 || (nav?.deviceMemory ?? 4) <= 4 || nav?.connection?.saveData === true;
+  return lowPower ? "smooth" : "high";
+};
+
 const CESSurveyMap = ({
   centerLat,
   centerLng,
@@ -215,6 +239,10 @@ const CESSurveyMap = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [tileQuality, setTileQuality] = useState<CesTileQuality>(readStoredTileQuality);
+  const [showQualityMenu, setShowQualityMenu] = useState(false);
+  const tileQualityRef = useRef<CesTileQuality>(tileQuality);
+  tileQualityRef.current = tileQuality;
   const tileRef = useRef<L.TileLayer | null>(null);
   const labelsRef = useRef<L.TileLayer | null>(null);
   const staticLayerGroupRef = useRef<L.LayerGroup | null>(null);
@@ -250,7 +278,11 @@ const CESSurveyMap = ({
     if (labelsRef.current) { map.removeLayer(labelsRef.current); labelsRef.current = null; }
     const tl = TILE_LAYERS[mode] ?? TILE_LAYERS.satellite;
     const isGoogle = mode === "google" || mode === "google-sat";
-    const nativeZoom = mode === "google" || mode === "google-sat" ? 21 : 19;
+    const baseNativeZoom = mode === "google" || mode === "google-sat" ? 21 : 19;
+    const quality = TILE_QUALITY_PRESETS[tileQualityRef.current] ?? TILE_QUALITY_PRESETS.high;
+    // Lower native zoom on "smooth" → fewer/lighter tile fetches, while maxZoom
+    // stays 24 so the user can still zoom all the way in (overzoomed imagery).
+    const nativeZoom = Math.max(12, baseNativeZoom + quality.nativeZoomDelta);
     const sources: CesTileSource[] = [{
       url: tl.url,
       maxNativeZoom: nativeZoom,
@@ -275,9 +307,9 @@ const CESSurveyMap = ({
       detectRetina: false,
       // Keep enough surrounding satellite imagery resident that first paint,
       // small pans, and GPS refinements do not reveal gray tile gaps.
-      keepBuffer: 8,
-      updateWhenIdle: false,
-      updateWhenZooming: true,
+      keepBuffer: quality.keepBuffer,
+      updateWhenIdle: quality.updateWhenIdle,
+      updateWhenZooming: quality.updateWhenZooming,
       ...(tl.subdomains ? { subdomains: tl.subdomains } : {}),
       ...(isGoogle ? {} : { crossOrigin: true as const }),
     };
@@ -443,21 +475,34 @@ const CESSurveyMap = ({
     // eslint-disable-next-line
   }, [isNearViewport]);
 
-  // Fullscreen: re-flow the Leaflet canvas and enable full drag interaction so
-  // every tool (draw, zoom, pan) is responsive while expanded. Also lock body
-  // scroll so the immersive map never fights the page underneath.
+  // Fullscreen + draw interaction: re-flow the Leaflet canvas and tune touch
+  // handling so drawing taps never conflict with pan/zoom. Re-runs when drawMode
+  // toggles so the behaviour stays correct while a survey switches modes.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (isFullscreen) {
+    if (drawMode) {
+      // While drawing, a one-finger drag would be ambiguous with "place vertex".
+      // Disable map dragging so every tap reliably drops a vertex; pinch-zoom and
+      // the +/- controls still work. This is the key conflict-free draw fix.
+      map.dragging.disable();
+      map.scrollWheelZoom.disable();
+    } else if (isFullscreen) {
       map.dragging.enable();
       map.scrollWheelZoom.enable();
     } else {
       if (isCoarsePointer()) map.dragging.disable();
+      else map.dragging.enable();
       map.scrollWheelZoom.disable();
     }
     const prevOverflow = document.body.style.overflow;
     if (isFullscreen) document.body.style.overflow = "hidden";
+    // Keep the draw toolbar usable by keyboard: focus the map container so arrow
+    // keys / +/- pan & zoom, and Escape exits fullscreen, without losing focus.
+    if (isFullscreen && containerRef.current) {
+      containerRef.current.setAttribute("tabindex", "0");
+      try { containerRef.current.focus({ preventScroll: true }); } catch { /* noop */ }
+    }
     const ids = [0, 80, 220, 400].map((d) =>
       window.setTimeout(() => {
         try { map.invalidateSize({ animate: false }); } catch { /* noop */ }
@@ -470,7 +515,8 @@ const CESSurveyMap = ({
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [isFullscreen]);
+  }, [isFullscreen, drawMode]);
+
 
 
   // Pre-fetch all tiles covering the current map view across zoom levels so the
@@ -537,6 +583,13 @@ const CESSurveyMap = ({
     if (!mapRef.current) return;
     applyBasemap(mapRef.current, basemap);
   }, [basemap]);
+
+  // Re-apply tiles when the user changes the quality preset, and persist choice.
+  useEffect(() => {
+    try { localStorage.setItem(TILE_QUALITY_KEY, tileQuality); } catch { /* ignore */ }
+    if (mapRef.current) applyBasemap(mapRef.current, basemap);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tileQuality]);
 
   // keep tap handler fresh and toggle the crosshair cursor while drawing
   useEffect(() => {
@@ -1064,15 +1117,55 @@ const CESSurveyMap = ({
             : "ces-survey-map rounded-lg overflow-hidden border border-border"
         }
       />
-      <button
-        type="button"
-        onClick={() => setIsFullscreen((v) => !v)}
-        aria-label={isFullscreen ? "Exit full screen map" : "Open full screen map"}
-        className="absolute top-2 right-2 z-[1200] inline-flex items-center gap-1.5 rounded-md bg-background/90 px-2.5 py-1.5 text-xs font-semibold text-foreground shadow-md ring-1 ring-border backdrop-blur hover:bg-background"
-      >
-        {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-        {isFullscreen ? "Exit" : "Full screen"}
-      </button>
+      <div className="absolute top-2 right-2 z-[1200] flex items-center gap-1.5">
+        {/* Map quality (tile resolution / detail) selector */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowQualityMenu((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={showQualityMenu}
+            aria-label="Map quality settings"
+            title="Map quality — choose smoother performance on low-end devices"
+            className="inline-flex items-center gap-1.5 rounded-md bg-background/90 px-2.5 py-1.5 text-xs font-semibold text-foreground shadow-md ring-1 ring-border backdrop-blur hover:bg-background"
+          >
+            <Gauge className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{TILE_QUALITY_PRESETS[tileQuality].label}</span>
+          </button>
+          {showQualityMenu && (
+            <div
+              role="menu"
+              className="absolute right-0 mt-1 w-48 overflow-hidden rounded-md bg-background shadow-lg ring-1 ring-border"
+            >
+              {(Object.keys(TILE_QUALITY_PRESETS) as CesTileQuality[]).map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={tileQuality === q}
+                  onClick={() => { setTileQuality(q); setShowQualityMenu(false); }}
+                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs hover:bg-muted ${tileQuality === q ? "font-semibold text-primary" : "text-foreground"}`}
+                >
+                  {TILE_QUALITY_PRESETS[q].label}
+                  {tileQuality === q && <span aria-hidden>✓</span>}
+                </button>
+              ))}
+              <div className="border-t border-border px-3 py-1.5 text-[10px] leading-snug text-muted-foreground">
+                Deepest zoom stays available in every mode.
+              </div>
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsFullscreen((v) => !v)}
+          aria-label={isFullscreen ? "Exit full screen map" : "Open full screen map"}
+          className="inline-flex items-center gap-1.5 rounded-md bg-background/90 px-2.5 py-1.5 text-xs font-semibold text-foreground shadow-md ring-1 ring-border backdrop-blur hover:bg-background"
+        >
+          {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          {isFullscreen ? "Exit" : "Full screen"}
+        </button>
+      </div>
     </div>
   );
 };
