@@ -321,11 +321,24 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
     writeUrl({ [URL_KEYS.outcomes]: activeOutcomes.size ? [...activeOutcomes].sort().join(",") : null });
   }, [activeOutcomes]);
 
-  // Apply state + dashboard date filters + legend outcome filter
+  // Set of supervised-community keys to constrain the map to linked data only.
+  // `undefined` ⇒ no linkage constraint (legacy/standalone use). An EMPTY set
+  // (dashboard supplied it but there are no checklist communities) ⇒ show
+  // nothing, so deleting all submissions instantly clears the map.
+  const linkedKeySet = useMemo(
+    () => (linkedCommunityKeys ? new Set(linkedCommunityKeys) : null),
+    [linkedCommunityKeys],
+  );
+
+  // Apply linkage + state + dashboard date filters + legend outcome filter
   const filtered = useMemo(() => {
     const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
     const toTs = dateTo ? new Date(dateTo).getTime() : null;
     return points.filter((p) => {
+      if (linkedKeySet) {
+        const key = linkedCommunityKey(p.state, p.lga, p.ward, p.community);
+        if (!linkedKeySet.has(key)) return false;
+      }
       if (stateFilter && norm(p.state) !== norm(stateFilter)) return false;
       if (activeOutcomes.size && !activeOutcomes.has(outcomeFor(p.status).key)) return false;
       if (fromTs || toTs) {
@@ -336,7 +349,8 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
       }
       return true;
     });
-  }, [points, stateFilter, activeOutcomes, dateFrom, dateTo]);
+  }, [points, linkedKeySet, stateFilter, activeOutcomes, dateFrom, dateTo]);
+
 
   // Chronological sequence used by the sweep + time window slider
   const sequence = useMemo(
