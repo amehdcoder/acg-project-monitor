@@ -617,6 +617,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const watchHighRef = useRef<CesGpsStop | null>(null);
   const watchLowRef = useRef<CesGpsStop | null>(null);
   const kickstartIvRef = useRef<number | null>(null);
+  // Auto-fallback timer: if NO fix at all has landed within the grace window we
+  // silently force a coarse (Wi-Fi/cell/last-known) fix so the user is never
+  // blocked indoors — no manual tap required.
+  const autoCoarseTimerRef = useRef<number | null>(null);
+  const autoCoarseDoneRef = useRef<boolean>(false);
   const lkgRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
   const lastFixAtRef = useRef<number>(0);
   const lastGpsUiAtRef = useRef<number>(0);
