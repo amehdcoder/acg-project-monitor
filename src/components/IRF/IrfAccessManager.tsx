@@ -96,6 +96,12 @@ export default function IrfAccessManager({ open, onOpenChange, projectId, grants
       `${m.first_name ?? ""} ${m.last_name ?? ""} ${m.email ?? ""}`.toLowerCase().includes(s));
   }, [members, search]);
 
+  // Only designations actually held by members of this project may be granted.
+  const projectDesignations = useMemo(() => {
+    const present = new Set(members.map((m) => m.designation).filter(Boolean) as string[]);
+    return DESIGNATIONS.filter((d) => present.has(d.value));
+  }, [members]);
+
   const addGrant = async (row: Partial<IrfGrant>) => {
     setBusy(JSON.stringify(row));
     try {
