@@ -220,7 +220,7 @@ const NotificationsPanel = () => {
                     notification.type,
                     notification.read
                   )}`}
-                  onClick={() => markAsRead(notification.id)}
+                  onClick={() => handleClick(notification)}
                 >
                   <div className="flex gap-3">
                     <div className="mt-0.5 shrink-0">
