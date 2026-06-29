@@ -47,6 +47,7 @@ import FctSupervisoryMap from "./FctSupervisoryMap";
 import HouseholdCoverageSurveyMap from "./HouseholdCoverageSurveyMap";
 import HouseholdCoverageAnalysis, { type HCAPoint } from "./HouseholdCoverageAnalysis";
 import SupervisorSignatureGallery from "./SupervisorSignatureGallery";
+import SectionErrorBoundary from "./SectionErrorBoundary";
 import MdaAdvancedAnalyses from "./MdaAdvancedAnalyses";
 import MdaLongitudinalInsights from "./MdaLongitudinalInsights";
 import { useTablePagination } from "@/hooks/useTablePagination";
