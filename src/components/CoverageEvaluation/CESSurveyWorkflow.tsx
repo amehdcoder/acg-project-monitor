@@ -625,7 +625,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const gpsStartedAtRef = useRef<number>(Date.now());
   const kalmanRef = useRef<{ lat: number; lng: number; variance: number; ts: number } | null>(null);
   const [gpsError, setGpsError] = useState<null | "denied" | "unavailable" | "timeout" | "insecure" | "unsupported">(null);
-  const [gpsElapsed, setGpsElapsed] = useState(0);
+  
   const [indoorMode, setIndoorMode] = useState(false);
   const [acceptingApprox, setAcceptingApprox] = useState(false);
 
