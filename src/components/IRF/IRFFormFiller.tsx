@@ -38,7 +38,7 @@ export function IrfWatermark() {
         draggable={false}
         tabIndex={-1}
         decoding="async"
-        className="pointer-events-none absolute left-1/2 top-1/2 h-full w-full max-w-none -translate-x-1/2 -translate-y-1/2 select-none object-contain object-center opacity-70 dark:opacity-75 [image-rendering:auto] [backface-visibility:hidden] [transform:translate3d(-50%,-50%,0)]"
+        className="pointer-events-none absolute left-1/2 top-1/2 h-full w-full max-w-none -translate-x-1/2 -translate-y-1/2 select-none object-contain object-center opacity-90 dark:opacity-90 [image-rendering:auto] [backface-visibility:hidden] [transform:translate3d(-50%,-50%,0)]"
       />
       {/* Very light washes keep fields readable while the SARMAAN CDD and child faces stay bright and clear. */}
       <div className="absolute inset-0 bg-background/20 dark:bg-background/25" />
