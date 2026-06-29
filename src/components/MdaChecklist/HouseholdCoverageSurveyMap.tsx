@@ -370,7 +370,11 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
       }
     })();
     return () => { cancelled = true; };
-  }, [projectId]);
+  }, [projectId, reloadKey]);
+
+  // Surface fetch state to the parent dashboard.
+  useEffect(() => { onLoadStateChange?.({ loading, error }); }, [loading, error, onLoadStateChange]);
+
 
   useEffect(() => {
     writeUrl({ [URL_KEYS.outcomes]: activeOutcomes.size ? [...activeOutcomes].sort().join(",") : null });
