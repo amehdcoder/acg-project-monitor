@@ -49,32 +49,39 @@ interface Outcome {
   color: string;
   /** Inline SVG glyph (white stroke/fill) drawn inside the coloured pin. */
   glyph: string;
+  /** Plain-language explanation of what this visit outcome means. */
+  desc: string;
 }
 
 const OUTCOMES: Record<string, Outcome> = {
   treated: {
     key: "treated", label: "Treated", color: "#16a34a",
     glyph: '<path d="M5 10.5l3.2 3.2L15 6.8" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>',
+    desc: "Household reached and eligible members received their medicine.",
   },
   not_treated: {
     key: "not_treated", label: "Not Treated", color: "#dc2626",
     glyph: '<circle cx="10" cy="10" r="6.2" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M7.6 7.6l4.8 4.8M12.4 7.6l-4.8 4.8" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/>',
+    desc: "Household reached but eligible members were not treated (e.g. sick, breastfeeding, away).",
   },
   absent: {
     key: "absent", label: "Absent", color: "#64748b",
     glyph: '<path d="M10 4.5c-2.6 0-4.7 2.1-4.7 4.7 0 3.3 4.7 7.3 4.7 7.3s4.7-4 4.7-7.3C14.7 6.6 12.6 4.5 10 4.5z" fill="none" stroke="#fff" stroke-width="1.6"/><circle cx="10" cy="9.2" r="1.7" fill="#fff"/>',
+    desc: "Nobody was home at the time of the visit — revisit required.",
   },
   refused: {
     key: "refused", label: "Refused", color: "#991b1b",
     glyph: '<path d="M10 4l4.5 1.8v3.4c0 3-2 5.3-4.5 6.3-2.5-1-4.5-3.3-4.5-6.3V5.8L10 4z" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>',
+    desc: "Household declined treatment.",
   },
   ineligible: {
     key: "ineligible", label: "Ineligible", color: "#f59e0b",
     glyph: '<path d="M10 4.5l5.5 9.6H4.5L10 4.5z" fill="none" stroke="#fff" stroke-width="1.7" stroke-linejoin="round"/><path d="M10 8.4v3.1M10 13.2v0.1" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>',
+    desc: "No one in the household met the eligibility criteria for treatment.",
   },
 };
 
-const OTHER: Outcome = { key: "other", label: "Other", color: "#7c3aed", glyph: '<circle cx="10" cy="10" r="3" fill="#fff"/>' };
+const OTHER: Outcome = { key: "other", label: "Other", color: "#7c3aed", glyph: '<circle cx="10" cy="10" r="3" fill="#fff"/>', desc: "Outcome recorded that does not match a standard category." };
 
 const OUTCOME_ALIASES: Record<string, Outcome> = Object.fromEntries(
   Object.values(OUTCOMES).flatMap((o) => [[norm(o.key), o], [norm(o.label), o]]),
@@ -944,7 +951,7 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
                 onClick={() => toggleOutcome(o.key)}
                 aria-pressed={activeOutcomes.has(o.key)}
                 aria-label={`${o.label}: ${n} household${n === 1 ? "" : "s"}. ${activeOutcomes.has(o.key) ? "Active filter, activate to remove." : "Activate to filter by this outcome."}`}
-                title={`${o.label} · ${n}`}
+                title={`${o.label} (${n}) — ${o.desc}${activeOutcomes.has(o.key) ? " · Click to remove filter." : " · Click to filter."}`}
                 className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${active ? "" : "opacity-40"}`}
                 style={{ borderColor: `${o.color}66`, color: o.color, background: `${o.color}12` }}
               >
@@ -1044,14 +1051,21 @@ export default function HouseholdCoverageSurveyMap({ projectId, formName, linked
         <div ref={captureRef} className="relative rounded-xl overflow-hidden border border-border">
           <div ref={containerRef} style={{ height: 520, width: "100%" }} />
           {/* On-map legend overlay (always captured in export) */}
-          <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-lg border border-border bg-card/95 p-2 shadow-card backdrop-blur-sm">
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Outcomes</p>
-            <ul className="space-y-0.5">
+          <div className="absolute bottom-3 left-3 z-[500] max-w-[220px] rounded-lg border border-border bg-card/95 p-2 shadow-card backdrop-blur-sm">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Visit outcomes</p>
+            <ul className="space-y-1">
               {legendItems.map((o) => (
-                <li key={o.key} className="flex items-center gap-1.5 text-[11px]">
-                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: o.color }} />
-                  <span className="text-foreground">{o.label}</span>
-                  <span className="ml-auto font-semibold tabular-nums text-muted-foreground">{counts[o.key] || 0}</span>
+                <li key={o.key} title={`${o.label} — ${o.desc}`} className="flex items-start gap-1.5 text-[11px]">
+                  <span className="mt-0.5 inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full" style={{ background: o.color }}>
+                    <svg width="10" height="10" viewBox="2 2 16 16" aria-hidden="true">{<g dangerouslySetInnerHTML={{ __html: o.glyph }} />}</svg>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1">
+                      <span className="font-medium text-foreground">{o.label}</span>
+                      <span className="ml-auto font-semibold tabular-nums text-muted-foreground">{counts[o.key] || 0}</span>
+                    </span>
+                    <span className="block leading-tight text-[9.5px] text-muted-foreground">{o.desc}</span>
+                  </span>
                 </li>
               ))}
             </ul>
