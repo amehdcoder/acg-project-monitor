@@ -23,7 +23,7 @@ import {
   MapPin, Satellite, Map as MapIcon, Mountain, Loader2, Sparkles, Shuffle,
   Navigation, Target, Lock, Download, FileText, FileSpreadsheet, AlertTriangle,
   CheckCircle2, XCircle, Save, Crosshair, BarChart3, Shield, Building,
-  ThumbsUp, ThumbsDown, Wifi, WifiOff, RefreshCw, UserCheck, ClipboardCheck, Info, Eye, ShieldCheck,
+  ThumbsUp, ThumbsDown, Wifi, WifiOff, RefreshCw, UserCheck, ClipboardCheck, Info, Eye, ShieldCheck, Home,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -278,7 +278,17 @@ async function startRealtimeGpsWatch(
 export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, onClose }: CESSurveyWorkflowProps) {
   const [step, setStep] = useState<Step>(1);
   const [surveyId, setSurveyId] = useState<string | null>(initialSurveyId ?? null);
-  const { canLocate, canSurvey, loading: rolesLoading } = useCESRoles(projectId);
+  const { canLocate, canSurvey, canValidate, loading: rolesLoading } = useCESRoles(projectId);
+  // Only supervisors / validators / admins may see the Analysis + QC sections.
+  // Regular field surveyors finish at Step 3 and get a "recorded & synced" receipt.
+  const canViewAnalysis = canValidate;
+  // Completion receipt shown to regular users once their visits are saved & synced.
+  const [showSyncReceipt, setShowSyncReceipt] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  // Clamp regular users back to Step 3 if a restored draft put them on 4/5.
+  useEffect(() => {
+    if (!rolesLoading && !canViewAnalysis && (step === 4 || step === 5)) setStep(3);
+  }, [rolesLoading, canViewAnalysis, step]);
   const fencedCommunityWrittenRef = useRef<string | null>(null);
 
   // Step 1 — Locate & boundaries
@@ -2861,8 +2871,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             { n: 1 as Step, label: "Locate", full: "1. Locate & Boundaries" },
             { n: 2 as Step, label: "Sample", full: "2. Estimate & Sample" },
             { n: 3 as Step, label: "Visit", full: "3. Visit Households" },
-            { n: 4 as Step, label: "Analyze", full: "4. Analysis" },
-            { n: 5 as Step, label: "Export", full: "5. Export & QC" },
+            ...(canViewAnalysis
+              ? [
+                  { n: 4 as Step, label: "Analyze", full: "4. Analysis" },
+                  { n: 5 as Step, label: "Export", full: "5. Export & QC" },
+                ]
+              : []),
           ].map((s, i, arr) => (
             <div key={s.n} className="flex items-center gap-1.5 shrink-0">
               <Button
@@ -3734,14 +3748,33 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
             <div className="ml-auto flex gap-2">
               <Button variant="outline" onClick={() => setStep(2)}>← Back</Button>
-              <Button onClick={() => { computeAnalysis(); setStep(4); }}>Next: Analysis →</Button>
+              {canViewAnalysis ? (
+                <Button onClick={() => { computeAnalysis(); setStep(4); }}>Next: Analysis →</Button>
+              ) : (
+                <Button
+                  disabled={finalizing}
+                  onClick={async () => {
+                    setFinalizing(true);
+                    try {
+                      await persistSurvey("submitted");
+                      try { await syncCESOfflineQueue(); } catch { /* will retry in background */ }
+                    } catch { /* persisted locally; background sync will retry */ }
+                    finally {
+                      setFinalizing(false);
+                      setShowSyncReceipt(true);
+                    }
+                  }}
+                >
+                  {finalizing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving & syncing…</> : <><CheckCircle2 className="h-4 w-4 mr-2" />Finish & Submit</>}
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* STEP 4 */}
-      {step === 4 && (
+      {step === 4 && canViewAnalysis && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5" />Step 4 — CES Coverage Map & Inference</CardTitle>
@@ -4076,7 +4109,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       )}
 
       {/* STEP 5 */}
-      {step === 5 && (
+      {step === 5 && canViewAnalysis && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Download className="h-5 w-5" />Step 5 — Export & Supervisor QC</CardTitle>
@@ -4251,6 +4284,38 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
           </CardContent>
         </Card>
       )}
+
+      {/* Household-surveyor completion receipt — data recorded & synced */}
+      <Dialog open={showSyncReceipt} onOpenChange={(o) => { if (!o) { setShowSyncReceipt(false); onClose?.(); } }}>
+        <DialogContent className="max-w-md overflow-hidden p-0 text-center">
+          <div className="relative bg-gradient-to-br from-emerald-600 via-green-600 to-teal-700 px-6 pt-8 pb-10 text-white">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/15 ring-4 ring-white/25 backdrop-blur-sm">
+              <CheckCircle2 className="h-12 w-12 text-white" />
+            </div>
+            <DialogHeader className="mt-4">
+              <DialogTitle className="text-center text-xl font-bold text-white">Submission complete</DialogTitle>
+            </DialogHeader>
+            <p className="mt-2 text-sm text-white/90">
+              Your household coverage survey for{communityName ? ` ${communityName}` : " this community"} has been
+              <span className="font-semibold"> recorded and synced</span> to the server and the MDA Supervision Dashboard.
+            </p>
+          </div>
+          <div className="space-y-4 px-6 py-6">
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <Shield className="h-3.5 w-3.5 text-emerald-600" />
+              Saved securely · {isOnline ? "Synced now" : "Queued — will sync when back online"}
+            </div>
+            <Button
+              size="lg"
+              className="w-full bg-emerald-600 font-semibold hover:bg-emerald-700"
+              onClick={() => { setShowSyncReceipt(false); onClose?.(); }}
+            >
+              <Home className="h-4 w-4 mr-2" /> Close & return to Forms
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Household pin dialog */}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
