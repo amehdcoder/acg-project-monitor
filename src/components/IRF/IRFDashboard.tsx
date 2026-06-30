@@ -21,6 +21,9 @@ import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 import IrfEvidenceLibrary from "@/components/IRF/IrfEvidenceLibrary";
 import IrfTextInsights from "@/components/IRF/IrfTextInsights";
 import IrfStatisticalPanel from "@/components/IRF/IrfStatisticalPanel";
+import IrfFieldAnalysis from "@/components/IRF/IrfFieldAnalysis";
+import IrfInterpretation from "@/components/IRF/IrfInterpretation";
+import IrfSubmitterPanel from "@/components/IRF/IrfSubmitterPanel";
 
 interface Props {
   projectId?: string | null;
