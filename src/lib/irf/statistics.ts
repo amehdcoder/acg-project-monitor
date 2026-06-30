@@ -29,14 +29,17 @@ export interface IrfStatistics {
 }
 
 const INDICATORS: { key: string; label: string; color: string }[] = [
-  { key: "total_reach", label: "People reached / report", color: "#0891b2" },
+  { key: "total_reach", label: "Estimated reach / report", color: "#0891b2" },
   { key: "attendance_men", label: "Men in attendance", color: "#2563eb" },
   { key: "attendance_women", label: "Women in attendance", color: "#db2777" },
-  { key: "town_announcements", label: "Town announcements", color: "#ea580c" },
-  { key: "mosque_announcements", label: "Mosque announcements", color: "#f59e0b" },
+  { key: "persons_engaged", label: "Officials engaged (advocacy)", color: "#0ea5e9" },
+  { key: "announcers_supervised", label: "Town announcers supervised", color: "#ea580c" },
+  { key: "town_announcements", label: "Announcements made", color: "#f59e0b" },
+  { key: "meetings_held", label: "Compound meetings held", color: "#7c3aed" },
   { key: "community_dialogue_sessions", label: "Dialogue sessions", color: "#16a34a" },
-  { key: "iec_materials_distributed", label: "IEC materials distributed", color: "#7c3aed" },
-  { key: "policy_makers_engaged", label: "Policy makers engaged", color: "#0ea5e9" },
+  { key: "questions_asked", label: "Questions / contributions", color: "#a64d79" },
+  { key: "policy_makers_engaged", label: "Policy makers engaged", color: "#45818e" },
+  { key: "iec_materials_distributed", label: "IEC materials distributed", color: "#674ea7" },
 ];
 
 const num = (v: any) => (v == null || v === "" ? null : Number(v));
