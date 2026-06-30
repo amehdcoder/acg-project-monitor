@@ -21,6 +21,9 @@ import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 import IrfEvidenceLibrary from "@/components/IRF/IrfEvidenceLibrary";
 import IrfTextInsights from "@/components/IRF/IrfTextInsights";
 import IrfStatisticalPanel from "@/components/IRF/IrfStatisticalPanel";
+import IrfFieldAnalysis from "@/components/IRF/IrfFieldAnalysis";
+import IrfInterpretation from "@/components/IRF/IrfInterpretation";
+import IrfSubmitterPanel from "@/components/IRF/IrfSubmitterPanel";
 
 interface Props {
   projectId?: string | null;
@@ -252,8 +255,17 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
               </Card>
             </div>
 
+            {/* Dynamic executive interpretation of the dataset */}
+            <IrfInterpretation rows={rows} stats={stats} duplicateCount={duplicates?.duplicateCount || 0} />
+
             {/* Robust statistical analysis of indicators */}
             <IrfStatisticalPanel rows={rows} />
+
+            {/* McKinsey-style field-by-field response analysis */}
+            <IrfFieldAnalysis rows={rows} />
+
+            {/* Who is submitting: forms, counts, duplicates */}
+            <IrfSubmitterPanel rows={rows} duplicateIds={duplicates?.duplicateIds || new Set()} />
 
             {/* Narrative & free-text intelligence */}
             <IrfTextInsights rows={rows} />
