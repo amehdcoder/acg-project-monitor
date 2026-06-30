@@ -1,3 +1,9 @@
+// Compatibility polyfills MUST be the very first import so missing browser
+// APIs (e.g. crypto.randomUUID on old Android WebViews) are patched before any
+// component renders and crashes.
+import { installCompatPolyfills } from "./lib/compat/polyfills";
+installCompatPolyfills();
+
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import RootErrorBoundary from "./components/RootErrorBoundary";
