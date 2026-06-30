@@ -66,6 +66,7 @@ import { buildLabelMap, type QuestionLabelMap } from "@/lib/formLabelUtils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { exportFormDataToExcel } from "@/lib/formDataExport";
 import { useSwipeToDelete } from "@/hooks/useSwipeToDelete";
+import { fetchUserSpecialSubmissions } from "@/lib/specialSubmissions";
 
 interface Submission {
   id: string;
