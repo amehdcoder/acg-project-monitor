@@ -487,31 +487,89 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
       </div>
 
       {/* Search and Filter */}
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by form name or submission ID..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search latest entries — form, programme, location, ID or any answer…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Button variant="outline" onClick={fetchSubmissions}>
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </Button>
         </div>
-        <Select value={statusFilter} onValueChange={(val) => {
-          if (navigator.vibrate) navigator.vibrate(10);
-          setStatusFilter(val);
-        }}>
-          <SelectTrigger className="w-[180px]">
-            <Filter className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Submissions</SelectItem>
-            <SelectItem value="pending">Pending Sync</SelectItem>
-            <SelectItem value="synced">Synced</SelectItem>
-            <SelectItem value="sent">Sent</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Select value={statusFilter} onValueChange={(val) => { if (navigator.vibrate) navigator.vibrate(10); setStatusFilter(val); }}>
+            <SelectTrigger>
+              <Filter className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="pending">Pending Sync</SelectItem>
+              <SelectItem value="synced">Synced</SelectItem>
+              <SelectItem value="sent">Sent</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={programmeFilter} onValueChange={setProgrammeFilter}>
+            <SelectTrigger>
+              <FileText className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Programme" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All programmes</SelectItem>
+              {programmeOptions.map((p) => (
+                <SelectItem key={p} value={p}>{p}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={formFilter} onValueChange={setFormFilter}>
+            <SelectTrigger>
+              <FileText className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Form" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All forms</SelectItem>
+              {formOptions.map((f) => (
+                <SelectItem key={f} value={f}>{f}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger>
+              <Calendar className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="date-desc">Newest first</SelectItem>
+              <SelectItem value="date-asc">Oldest first</SelectItem>
+              <SelectItem value="form">Form (A–Z)</SelectItem>
+              <SelectItem value="programme">Programme (A–Z)</SelectItem>
+              <SelectItem value="status">Status</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {(statusFilter !== "all" || formFilter !== "all" || programmeFilter !== "all" || searchQuery) && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>{filteredSubmissions.length} of {submissions.length} submissions shown</span>
+            <button
+              className="font-medium text-primary hover:underline"
+              onClick={() => { setStatusFilter("all"); setFormFilter("all"); setProgrammeFilter("all"); setSearchQuery(""); }}
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
+      </div>
+
         <Button variant="outline" onClick={fetchSubmissions}>
           <RefreshCw className="h-4 w-4" />
           Refresh
