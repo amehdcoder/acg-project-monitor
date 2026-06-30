@@ -1950,26 +1950,30 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   const irfKind = (form.settings as any)?.irf_kind as ("form" | "dashboard" | undefined);
                   if (irfKind === "form" || irfKind === "dashboard") {
                     const isDash = irfKind === "dashboard";
-                    const IrfIcon = isDash ? BarChart3 : ClipboardCheck;
+                    const IrfIcon = isDash ? ChartNoAxesCombined : ClipboardPenLine;
+                    const displayName = isDash ? IRF_DASH_NAME : IRF_FORM_NAME;
+                    const accent = isDash ? "#0284c7" : "#e11d48";
                     return (
                       <div
                         key={form.id}
-                        className="group flex items-center gap-3 border-l-4 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
-                        style={{ borderLeftColor: "#0c2340" }}
+                        className="group flex items-center gap-3 border-l-4 p-3 transition-colors hover:bg-[#F4F6F8]/70 sm:p-4"
+                        style={{ borderLeftColor: accent }}
                       >
                         <button
                           onClick={() => (isDash ? setShowIrfDash(true) : setShowIrfForm(true))}
-                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#D7E3F0]"
-                          aria-label={`Open ${form.name}`}
+                          className={isDash
+                            ? "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-100 via-sky-100 to-indigo-100 shadow-sm ring-1 ring-sky-200/70"
+                            : "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-100 via-amber-50 to-emerald-100 shadow-sm ring-1 ring-rose-200/70"}
+                          aria-label={`Open ${displayName}`}
                         >
-                          <IrfIcon className="h-5 w-5 text-[#0c2340]" strokeWidth={2} />
+                          <IrfIcon className="h-6 w-6" style={{ color: accent }} strokeWidth={2.2} />
                         </button>
                         <button
                           onClick={() => (isDash ? setShowIrfDash(true) : setShowIrfForm(true))}
                           className="min-w-0 flex-1 text-left"
                         >
-                          <h4 className="truncate text-[15px] font-bold text-[#0c2340]">{form.name}</h4>
-                          <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">{form.description || "LGA ACSM Focal Person indicator tool"}</p>
+                          <h4 className="whitespace-normal break-words text-[15px] font-bold leading-snug" style={{ color: accent }}>{displayName}</h4>
+                          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground sm:text-sm">{form.description || "SARMAAN ACSM indicator reporting and executive tracking tool"}</p>
                         </button>
                         {!isDash && (
                           <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold bg-[#E2F5EC] text-[#22A55A]">
@@ -1979,7 +1983,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         {isAdmin && !isDash && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-[#0c2340]">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" style={{ color: accent }}>
                                 <ChevronRight className="h-5 w-5" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -2677,15 +2681,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 </div>
               </div>
 
-              {/* LGA ACSM Focal Person IRF — Independent Activity Tracker — addable to any project */}
+              {/* SARMAAN ACSM Indicator Reporting Form (SAIRF) — addable to any project */}
               <div className="px-3 sm:px-4 py-3 border-t border-border/60">
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-[#9db4d4] bg-gradient-to-r from-[#eaf0f8] to-transparent p-3">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-rose-200 bg-gradient-to-r from-rose-50 via-amber-50 to-sky-50 p-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="p-2 rounded-lg bg-[#d7e3f0] shrink-0">
-                      <BarChart3 className="h-5 w-5 text-[#0c2340]" />
+                    <div className="rounded-2xl bg-gradient-to-br from-rose-100 via-amber-50 to-emerald-100 p-2.5 shadow-sm ring-1 ring-rose-200/70 shrink-0">
+                      <ClipboardPenLine className="h-5 w-5 text-rose-600" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground truncate">SARMAAN ACSM Indicator Reporting Forms (SAIRF)</p>
+                      <p className="whitespace-normal break-words text-sm font-semibold leading-snug text-foreground">{IRF_FORM_NAME}</p>
                       <p className="text-xs text-muted-foreground">Sectioned indicator reporting forms + executive dashboard for advocacy, social mobilization, awareness creation &amp; non-compliance resolution.</p>
                     </div>
                   </div>
