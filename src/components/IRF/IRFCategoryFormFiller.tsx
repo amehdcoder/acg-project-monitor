@@ -141,13 +141,19 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
       if (f.type === "select" && f.allowOther && values[f.key] === OTHER_OPTION && !String(values[`${f.key}__other`] ?? "").trim())
         missing.push(`${f.key}__other`);
     });
-    // Per-photo consent is mandatory before submission.
-    const unconsented = photos.filter((p) => !p.consent);
-    if (unconsented.length) missing.push(...unconsented.map((p) => `photo_${p.id}`));
+    // Narrative / additional notes is mandatory.
+    if (!narrative.trim()) missing.push("__narrative");
+    // Each picture requires an uploaded consent form AND an informed-consent confirmation.
+    const missingConsentForm = photos.filter((p) => !p.consentFile);
+    const unconsented = photos.filter((p) => !p.informedConsent);
+    missingConsentForm.forEach((p) => missing.push(`consent_${p.id}`));
+    unconsented.forEach((p) => missing.push(`photo_${p.id}`));
 
     if (missing.length) {
       setErrors(new Set(missing));
-      if (unconsented.length) toast.error("Please confirm consent for every uploaded picture.");
+      if (missingConsentForm.length) toast.error("Please upload the signed consent form for every activity picture.");
+      else if (unconsented.length) toast.error("Please confirm INFORMED CONSENT for every activity picture.");
+      else if (missing.includes("__narrative")) toast.error("Please complete the Narrative / additional notes.");
       else toast.error("Please complete all required fields.");
       return false;
     }
