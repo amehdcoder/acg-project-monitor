@@ -7377,6 +7377,10 @@ export type Database = {
         Args: { _topic: string }
         Returns: Json
       }
+      bulk_grant_ces_roles: {
+        Args: { _project_id: string; _roles: string[]; _user_ids: string[] }
+        Returns: number
+      }
       can_access_case: {
         Args: { _case_id: string; _user_id: string }
         Returns: boolean
@@ -7433,6 +7437,10 @@ export type Database = {
       current_user_can_build_mda_followups_for_project: {
         Args: { p_project_id: string }
         Returns: boolean
+      }
+      ensure_ces_field_roles: {
+        Args: { _project_id: string }
+        Returns: undefined
       }
       ensure_hands_staff_group: {
         Args: { _project_id: string }
