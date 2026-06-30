@@ -86,16 +86,62 @@ export default function IrfEvidenceLibrary({ rows }: Props) {
     return { pictures, consents, activities: reportsWithEvidence.length };
   }, [reportsWithEvidence]);
 
-  const downloadAll = async (items: EvidenceItem[], key: string) => {
+  /** Zip every picture + consent form for a single activity report. */
+  const downloadAll = async (r: IrfReport, items: EvidenceItem[], key: string) => {
     setBusy(key);
     try {
-      const paths = items.flatMap((i) => [i.path, i.consent_form_path].filter(Boolean) as string[]);
-      for (const p of paths) {
+      const zip = new JSZip();
+      let added = 0;
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
         // eslint-disable-next-line no-await-in-loop
-        await openSigned(p);
+        const pic = await fetchBlob(it.path);
+        if (pic) { zip.file(`picture-${i + 1}-${baseName(it.path)}`, pic); added++; }
+        if (it.consent_form_path) {
+          // eslint-disable-next-line no-await-in-loop
+          const con = await fetchBlob(it.consent_form_path);
+          if (con) { zip.file(`consent-${i + 1}-${it.consent_form_name || baseName(it.consent_form_path)}`, con); added++; }
+        }
       }
+      if (!added) { toast.error("No files could be downloaded (access may be restricted)."); return; }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const label = `${safe(formName(r.form_category))}-${safe([r.lga, r.state].filter(Boolean).join("-") || "evidence")}`;
+      saveAs(blob, `${label}.zip`);
+      toast.success(`Downloaded ${added} file(s) as a ZIP.`);
+    } catch {
+      toast.error("Download failed. Please try again.");
     } finally { setBusy(null); }
   };
+
+  /** Zip the entire evidence library across all activities. */
+  const downloadEverything = async () => {
+    setBusy("__all__");
+    try {
+      const zip = new JSZip();
+      let added = 0;
+      for (const { r, items } of reportsWithEvidence) {
+        const folder = zip.folder(`${safe(formName(r.form_category))}-${safe([r.lga, r.state].filter(Boolean).join("-") || r.id.slice(0, 6))}`)!;
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i];
+          // eslint-disable-next-line no-await-in-loop
+          const pic = await fetchBlob(it.path);
+          if (pic) { folder.file(`picture-${i + 1}-${baseName(it.path)}`, pic); added++; }
+          if (it.consent_form_path) {
+            // eslint-disable-next-line no-await-in-loop
+            const con = await fetchBlob(it.consent_form_path);
+            if (con) { folder.file(`consent-${i + 1}-${it.consent_form_name || baseName(it.consent_form_path)}`, con); added++; }
+          }
+        }
+      }
+      if (!added) { toast.error("No files could be downloaded (access may be restricted)."); return; }
+      const blob = await zip.generateAsync({ type: "blob" });
+      saveAs(blob, `SAIRF-evidence-library-${new Date().toISOString().slice(0, 10)}.zip`);
+      toast.success(`Downloaded ${added} file(s) as a ZIP.`);
+    } catch {
+      toast.error("Download failed. Please try again.");
+    } finally { setBusy(null); }
+  };
+
 
   return (
     <Card className="overflow-hidden">
