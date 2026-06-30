@@ -195,7 +195,11 @@ const norm = (v: any) => String(v ?? "").trim().toLowerCase();
 
 /** Signature for an IRF report (used on the LGA ACSM Focal Person Dashboard). */
 export function irfSignature(r: IrfReport): string {
-  const metricSum = IRF_TO_ACSM_MAP.flatMap((m) => m.keys)
+  // Include the category-form metrics stored in `answers` (officials engaged,
+  // announcers supervised, compound meetings held) and the captured visit date /
+  // outcome so genuinely distinct activity visits are not collapsed as duplicates.
+  const extraKeys = ["persons_engaged", "announcers_supervised", "meetings_held"];
+  const metricSum = [...IRF_TO_ACSM_MAP.flatMap((m) => m.keys), ...extraKeys]
     .reduce((s, k) => s + num((r as any)[k]), 0);
   return [
     norm(r.created_by),
@@ -203,6 +207,9 @@ export function irfSignature(r: IrfReport): string {
     norm(r.state),
     norm(r.lga),
     norm(r.ward),
+    norm((r as any).form_category),
+    norm((r as any).visit_date),
+    norm((r as any).outcome_level),
     metricSum,
   ].join("|");
 }

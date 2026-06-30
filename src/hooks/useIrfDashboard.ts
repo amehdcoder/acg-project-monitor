@@ -3,14 +3,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
 import { flagDuplicates, applyOverrides, irfSignature, irfOrder, type OverrideMap } from "@/lib/acsm/irfBridge";
 import { IRF_METRIC_FIELDS, IRF_SECTIONS, type IrfReport } from "@/lib/irf/definition";
+import { normalizeIrfRows } from "@/lib/irf/normalize";
 
 async function fetchAll(projectId?: string | null): Promise<IrfReport[]> {
-  return fetchAllRowsKeyset<IrfReport>((limit, afterId) => {
+  const rows = await fetchAllRowsKeyset<IrfReport>((limit, afterId) => {
     let q = supabase.from("irf_reports" as any).select("*");
     if (projectId) q = q.eq("project_id", projectId);
     if (afterId) q = q.gt("id", afterId);
     return q.order("id", { ascending: true }).limit(limit);
   });
+  // Flatten the category-form `answers` JSON onto each row so every captured
+  // field (officials engaged, announcers supervised, meetings held, …) is
+  // reachable by the KPI / statistics / field-analysis computations below.
+  return normalizeIrfRows(rows);
 }
 
 const num = (v: any) => (v == null || v === "" ? 0 : Number(v) || 0);
@@ -73,22 +78,44 @@ export const useIrfDashboard = (projectId?: string | null, overrideMap?: Overrid
   }, [rows]);
 
   const stats = useMemo(() => {
+    const sum = (k: string) => rows.reduce((s, r) => s + num((r as any)[k]), 0);
     const totalReports = rows.length;
-    const lgas = new Set(rows.map((r) => r.lga).filter(Boolean)).size;
+    const lgas = new Set(rows.map((r) => (r.lga || "").trim()).filter(Boolean)).size;
+
+    // People reached = town-announcer estimated reach + radio reach + meeting/dialogue attendance.
     const peopleReached =
-      totals.total_reach + totals.radio_estimated_reach + totals.attendance_men + totals.attendance_women;
+      sum("total_reach") + sum("radio_estimated_reach") + sum("attendance_men") + sum("attendance_women");
+
+    // Stakeholders/officials engaged — advocacy officials (stored in `answers`)
+    // plus the legacy combined-form stakeholder columns when present.
     const stakeholdersEngaged =
-      totals.policy_makers_engaged + totals.traditional_leaders_engaged +
-      totals.healthcare_workers_engaged + totals.religious_leaders_engaged +
-      totals.mdas_visited_count;
-    const ncTotal = totals.noncompliance_cases;
-    const ncResolved = totals.cases_resolved;
+      sum("persons_engaged") + sum("policy_makers_engaged") + sum("traditional_leaders_engaged") +
+      sum("healthcare_workers_engaged") + sum("religious_leaders_engaged") + sum("mdas_visited_count");
+
+    const announcersSupervised = sum("announcers_supervised");
+
+    const ncTotal = sum("noncompliance_cases");
+    const ncResolved = sum("cases_resolved");
+    const ncPending = sum("cases_pending");
     const ncResolutionRate = ncTotal ? Math.round((ncResolved / ncTotal) * 100) : 0;
+    const hasNonCompliance = ncTotal > 0 || ncPending > 0;
+
+    // Awareness / mobilisation touch-points actually captured by the activity forms.
     const awarenessActivities =
-      totals.radio_messages_aired + totals.town_announcements + totals.mosque_announcements +
-      totals.iec_materials_distributed + totals.community_dialogue_sessions;
-    return { totalReports, lgas, peopleReached, stakeholdersEngaged, ncTotal, ncResolved, ncResolutionRate, awarenessActivities };
-  }, [rows, totals]);
+      sum("radio_messages_aired") + sum("town_announcements") + sum("mosque_announcements") +
+      sum("iec_materials_distributed") + sum("community_dialogue_sessions") + sum("meetings_held");
+
+    // Acceptance quality from the three-level outcome scale.
+    const acceptanceAnswered = rows.filter((r) => (r as any).outcome_level).length;
+    const acceptanceHigh = rows.filter((r) => (r as any).outcome_level === "High").length;
+    const acceptanceHighPct = acceptanceAnswered ? Math.round((acceptanceHigh / acceptanceAnswered) * 100) : 0;
+
+    return {
+      totalReports, lgas, peopleReached, stakeholdersEngaged, announcersSupervised,
+      ncTotal, ncResolved, ncResolutionRate, hasNonCompliance,
+      awarenessActivities, acceptanceAnswered, acceptanceHigh, acceptanceHighPct,
+    };
+  }, [rows]);
 
   // Per-section totals (sum of that section's metric fields).
   const sectionTotals = useMemo(
@@ -125,10 +152,11 @@ export const useIrfDashboard = (projectId?: string | null, overrideMap?: Overrid
     rows.forEach((r) => {
       const lga = r.lga || "Unspecified";
       (byLga[lga] ||= { reach: 0, reports: 0, stakeholders: 0 });
-      byLga[lga].reach += num(r.total_reach) + num(r.radio_estimated_reach);
+      byLga[lga].reach +=
+        num(r.total_reach) + num(r.radio_estimated_reach) + num(r.attendance_men) + num(r.attendance_women);
       byLga[lga].stakeholders +=
-        num(r.policy_makers_engaged) + num(r.traditional_leaders_engaged) +
-        num(r.healthcare_workers_engaged) + num(r.religious_leaders_engaged);
+        num((r as any).persons_engaged) + num(r.policy_makers_engaged) + num(r.traditional_leaders_engaged) +
+        num(r.healthcare_workers_engaged) + num(r.religious_leaders_engaged) + num(r.mdas_visited_count);
       byLga[lga].reports += 1;
     });
     return Object.entries(byLga)
@@ -144,7 +172,8 @@ export const useIrfDashboard = (projectId?: string | null, overrideMap?: Overrid
       const key = (r.reporting_month || r.created_at || "").slice(0, 7);
       if (!key) return;
       (byMonth[key] ||= { reach: 0, reports: 0 });
-      byMonth[key].reach += num(r.total_reach) + num(r.radio_estimated_reach);
+      byMonth[key].reach +=
+        num(r.total_reach) + num(r.radio_estimated_reach) + num(r.attendance_men) + num(r.attendance_women);
       byMonth[key].reports += 1;
     });
     return Object.entries(byMonth)

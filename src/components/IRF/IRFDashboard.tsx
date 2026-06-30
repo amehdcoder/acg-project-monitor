@@ -158,8 +158,12 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <Kpi icon={Users} label="People Reached" value={fmt(stats.peopleReached)} sub="Reach + attendance" color="#0891b2" />
               <Kpi icon={Landmark} label="Stakeholders Engaged" value={fmt(stats.stakeholdersEngaged)} sub="Advocacy contacts" color="#7c3aed" />
-              <Kpi icon={Megaphone} label="Awareness Activities" value={fmt(stats.awarenessActivities)} sub="Broadcasts, IEC, dialogues" color="#ea580c" />
-              <Kpi icon={ShieldCheck} label="Non-Compliance Resolved" value={`${stats.ncResolutionRate}%`} sub={`${fmt(stats.ncResolved)} of ${fmt(stats.ncTotal)} cases`} color="#dc2626" />
+              <Kpi icon={Megaphone} label="Awareness Activities" value={fmt(stats.awarenessActivities)} sub="Announcements, dialogues, meetings" color="#ea580c" />
+              {stats.hasNonCompliance ? (
+                <Kpi icon={ShieldCheck} label="Non-Compliance Resolved" value={`${stats.ncResolutionRate}%`} sub={`${fmt(stats.ncResolved)} of ${fmt(stats.ncTotal)} cases`} color="#dc2626" />
+              ) : (
+                <Kpi icon={Gauge} label="High Acceptance" value={`${stats.acceptanceHighPct}%`} sub={`${fmt(stats.acceptanceHigh)} of ${fmt(stats.acceptanceAnswered)} rated outcomes`} color="#16a34a" />
+              )}
             </div>
 
             {/* Kano State coverage map */}
@@ -235,11 +239,11 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
               </Card>
 
               <Card className="p-4">
-                <h3 className="mb-2 text-sm font-semibold text-foreground">Non-Compliance</h3>
+                <h3 className="mb-2 text-sm font-semibold text-foreground">{stats.hasNonCompliance ? "Non-Compliance" : "Outcome Acceptance"}</h3>
                 <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
-                    <Pie data={ncBreakdown} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={2}>
-                      {ncBreakdown.map((g) => <Cell key={g.name} fill={g.color} />)}
+                    <Pie data={stats.hasNonCompliance ? ncBreakdown : outcomeLevels} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={2}>
+                      {(stats.hasNonCompliance ? ncBreakdown : outcomeLevels).map((g) => <Cell key={g.name} fill={g.color} />)}
                     </Pie>
                     <Tooltip contentStyle={chartTooltipStyle} labelStyle={{ color: chartText }} /><Legend wrapperStyle={chartLegendStyle} />
                   </PieChart>
