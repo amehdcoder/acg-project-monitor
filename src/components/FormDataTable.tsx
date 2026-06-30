@@ -174,7 +174,7 @@ const FormDataTable = ({
                 {saving ? "Saving..." : "Save"}
               </Button>
             </>
-          ) : (
+          ) : readOnly ? null : (
             <Button variant="outline" size="sm" onClick={startEditing}>
               <Pencil className="h-4 w-4 mr-1" />
               Edit
