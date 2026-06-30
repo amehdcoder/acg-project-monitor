@@ -96,6 +96,9 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [formFilter, setFormFilter] = useState<string>("all");
+  const [programmeFilter, setProgrammeFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("date-desc");
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [formLabelMaps, setFormLabelMaps] = useState<Record<string, QuestionLabelMap>>({});
