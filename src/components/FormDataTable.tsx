@@ -26,6 +26,7 @@ interface FormDataTableProps {
   data: Record<string, any>;
   submissionId: string;
   isPending?: boolean;
+  readOnly?: boolean;
   questionLabels?: QuestionLabelMap;
   onDataUpdate?: (updatedData: Record<string, any>) => void;
 }
