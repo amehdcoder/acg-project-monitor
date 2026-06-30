@@ -173,7 +173,27 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
           contentType: p.file.type, upsert: false,
         });
         if (upErr) throw upErr;
-        evidence.push({ path, caption: p.caption || null, consent: true, consented_at: new Date().toISOString() });
+
+        // Upload the associated signed consent form.
+        let consentPath: string | null = null;
+        if (p.consentFile) {
+          const cext = p.consentFile.name.split(".").pop() || "jpg";
+          consentPath = `${user?.id}/${form.id}/consent-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${cext}`;
+          const { error: cErr } = await supabase.storage.from("irf-evidence").upload(consentPath, p.consentFile, {
+            contentType: p.consentFile.type, upsert: false,
+          });
+          if (cErr) throw cErr;
+        }
+
+        evidence.push({
+          path,
+          caption: p.caption || null,
+          consent: true,
+          informed_consent: true,
+          consent_form_path: consentPath,
+          consent_form_name: p.consentName || null,
+          consented_at: new Date().toISOString(),
+        });
       }
 
       // Split direct-column fields from free-form answers.
