@@ -98,6 +98,11 @@ export function analyzeFields(rows: IrfReport[]): { categorical: CategoricalFiel
   const numeric: NumericFieldAnalysis[] = [];
   const total = rows.length || 1;
 
+  const lgaOf = (r: IrfReport) => {
+    const v = (r.lga ?? "").toString().trim();
+    return v && v.toLowerCase() !== "unspecified" ? v : "Unspecified";
+  };
+
   for (const f of IRF_ALL_FIELDS) {
     const raw = rows.map((r) => (r as any)[f.key]).filter(isFilled);
     if (!raw.length) continue;
@@ -105,23 +110,41 @@ export function analyzeFields(rows: IrfReport[]): { categorical: CategoricalFiel
     if (f.type === "number") {
       const nums = raw.map(num).filter((v): v is number => v != null && Number.isFinite(v));
       if (nums.length < 1) continue;
+
+      // Per-LGA totals
+      const lgaMap = new Map<string, { sum: number; answered: number }>();
+      for (const r of rows) {
+        const val = num((r as any)[f.key]);
+        if (val == null || !Number.isFinite(val)) continue;
+        const k = lgaOf(r);
+        const cur = lgaMap.get(k) || { sum: 0, answered: 0 };
+        cur.sum += val;
+        cur.answered += 1;
+        lgaMap.set(k, cur);
+      }
+      const byLga = [...lgaMap.entries()]
+        .map(([lga, v]) => ({ lga, sum: Math.round(v.sum * 100) / 100, answered: v.answered }))
+        .sort((a, b) => b.sum - a.sum);
+
       numeric.push({
         kind: "numeric", key: f.key, label: f.label, activity: f.activity, section: f.sectionId,
         answered: nums.length, responseRate: Math.round((nums.length / total) * 100),
-        ...analyzeNumeric(nums),
+        ...analyzeNumeric(nums), byLga,
       });
       continue;
     }
 
     if (f.type === "select" || f.type === "boolean") {
       const counts = new Map<string, number>();
+      const norm = (it: any) =>
+        f.type === "boolean"
+          ? (it === true || it === "true" || it === "yes" ? "Yes" : "No")
+          : prettify(String(it));
       for (const v of raw) {
         const items = Array.isArray(v) ? v : [v];
         for (const it of items) {
           if (!isFilled(it)) continue;
-          const key = f.type === "boolean"
-            ? (it === true || it === "true" || it === "yes" ? "Yes" : "No")
-            : prettify(String(it));
+          const key = norm(it);
           counts.set(key, (counts.get(key) || 0) + 1);
         }
       }
@@ -131,13 +154,38 @@ export function analyzeFields(rows: IrfReport[]): { categorical: CategoricalFiel
         .map(([name, value], i) => ({ name, value, pct: Math.round((value / answered) * 1000) / 10, color: MCKINSEY_PALETTE[i % MCKINSEY_PALETTE.length] }))
         .sort((a, b) => b.value - a.value)
         .map((d, i) => ({ ...d, color: MCKINSEY_PALETTE[i % MCKINSEY_PALETTE.length] }));
+
+      // Per-LGA distribution across the categories
+      const lgaMap = new Map<string, Record<string, number>>();
+      for (const r of rows) {
+        const v = (r as any)[f.key];
+        if (!isFilled(v)) continue;
+        const items = Array.isArray(v) ? v : [v];
+        const k = lgaOf(r);
+        const seg = lgaMap.get(k) || {};
+        for (const it of items) {
+          if (!isFilled(it)) continue;
+          const cat = norm(it);
+          seg[cat] = (seg[cat] || 0) + 1;
+        }
+        lgaMap.set(k, seg);
+      }
+      const byLga = [...lgaMap.entries()]
+        .map(([lga, segments]) => ({
+          lga,
+          total: Object.values(segments).reduce((a, b) => a + b, 0),
+          segments,
+        }))
+        .sort((a, b) => b.total - a.total);
+
       categorical.push({
         kind: "categorical", key: f.key, label: f.label, activity: f.activity, section: f.sectionId,
         answered, responseRate: Math.round((answered / total) * 100), unique: counts.size,
-        top: data[0], data,
+        top: data[0], data, byLga,
       });
     }
   }
+
 
   return { categorical, numeric };
 }
