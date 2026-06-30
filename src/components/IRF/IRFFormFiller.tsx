@@ -336,7 +336,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
       <div className="relative z-20 flex shrink-0 items-center gap-3 border-b border-white/10 bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3 shadow-sm">
         <Button variant="ghost" size="icon" aria-label="Back to forms" onClick={onClose} className="text-white hover:bg-white/10"><ArrowLeft className="h-5 w-5" /></Button>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-base font-bold text-white sm:text-lg">{IRF_FORM_NAME}</h1>
+          <h1 className="text-sm font-bold leading-tight text-white sm:text-lg">{IRF_FORM_NAME}</h1>
           <p className="truncate text-xs text-white/70">
             {position
               ? <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> GPS locked · ready to report</span>
