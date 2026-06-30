@@ -673,7 +673,17 @@ export default function AdminCreateUsersDialog() {
               </div>
             ) : (
               /* ----- List view ----- */
-              <div className="flex-1 min-h-0 overflow-auto">
+              <div className="flex-1 min-h-0 flex flex-col">
+                <div className="relative mb-3 shrink-0">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    value={historyQuery}
+                    onChange={(e) => setHistoryQuery(e.target.value)}
+                    placeholder="Search by name or email…"
+                    className="pl-9"
+                  />
+                </div>
+                <div className="flex-1 min-h-0 overflow-auto">
                 {historyLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -683,23 +693,28 @@ export default function AdminCreateUsersDialog() {
                     <HistoryIcon className="h-8 w-8" />
                     <p className="text-sm">No accounts have been created yet.</p>
                   </div>
+                ) : filteredHistory.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground gap-2">
+                    <Search className="h-8 w-8" />
+                    <p className="text-sm">No results for “{historyQuery}”.</p>
+                  </div>
                 ) : (
                   <div className="space-y-1.5 pr-2">
-                    {history.map((h) => (
+                    {filteredHistory.map((h) => (
                       <button
                         key={h.id}
                         onClick={() => openDetail(h)}
-                        className="w-full text-left grid grid-cols-[1.6fr_1.2fr_auto] gap-2 items-center px-3 py-2.5 rounded-md border bg-background hover:bg-muted/50 transition-colors"
+                        className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md border bg-background hover:bg-muted/50 transition-colors"
                       >
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="font-medium truncate">{safeText(h.recipient_name, safeText(h.recipient_email, "Unknown recipient"))}</div>
                           <div className="text-xs text-muted-foreground truncate">{safeText(h.recipient_email)}</div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <Clock className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{fmt(h.created_at)}</span>
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-1 min-w-0">
-                          <Clock className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{fmt(h.created_at)}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 justify-end">
+                        <div className="flex items-center gap-1.5 justify-end shrink-0">
                           {h.account_created ? (
                             <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-0">Created</Badge>
                           ) : (
@@ -717,6 +732,7 @@ export default function AdminCreateUsersDialog() {
                     ))}
                   </div>
                 )}
+                </div>
               </div>
             )}
           </TabsContent>
