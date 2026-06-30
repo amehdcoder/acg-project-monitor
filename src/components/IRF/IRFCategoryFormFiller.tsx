@@ -21,6 +21,7 @@ import {
   ACCEPTANCE_LEVELS, MINISTRY_DEPARTMENTS, OTHER_OPTION,
   type IrfCategoryForm, type IrfCategoryField,
 } from "@/lib/irf/categoryForms";
+import { getReportingMonthOptions, getCurrentReportingMonth } from "@/lib/irf/reportingMonths";
 
 interface Props {
   form: IrfCategoryForm;
