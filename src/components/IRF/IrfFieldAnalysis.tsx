@@ -51,37 +51,40 @@ function InsightStrip({ insight }: { insight: FieldInsight }) {
 }
 
 function CategoricalCard({ a }: { a: CategoricalFieldAnalysis }) {
-  const data = useMemo(() => semanticColors(a), [a]);
-  const usePie = a.unique <= 5;
+  const colors = useMemo(() => semanticColors(a), [a]);
   const insight = useMemo(() => categoricalInsight(a), [a]);
+  // Category keys (ordered) and their colours for the stacked-by-LGA chart.
+  const cats = useMemo(() => colors.map((c) => ({ name: c.name, color: c.color })), [colors]);
+  const lgaData = useMemo(
+    () =>
+      a.byLga.slice(0, 10).map((row) => {
+        const o: Record<string, any> = { lga: row.lga };
+        for (const c of cats) o[c.name] = row.segments[c.name] || 0;
+        return o;
+      }),
+    [a.byLga, cats],
+  );
   return (
     <Card className="flex flex-col overflow-hidden">
       <div className="border-b bg-muted/30 px-3 py-2">
         <p className="truncate text-xs font-semibold text-foreground" title={a.label}>{a.label}</p>
-        <p className="truncate text-[11px] text-muted-foreground">{a.activity} · {a.answered} responses · {a.responseRate}% answered</p>
+        <p className="truncate text-[11px] text-muted-foreground">{a.activity} · {a.answered} responses · {a.byLga.length} LGA{a.byLga.length === 1 ? "" : "s"}</p>
+      </div>
+      <div className="flex items-center gap-1 px-3 pt-2 text-[10px] text-muted-foreground">
+        <MapPin className="h-3 w-3 text-primary" /> Response mix by LGA
       </div>
       <div className="p-2">
-        <ResponsiveContainer width="100%" height={200}>
-          {usePie ? (
-            <PieChart>
-              <Pie data={data} dataKey="value" nameKey="name" innerRadius={38} outerRadius={68} paddingAngle={2}>
-                {data.map((d) => <Cell key={d.name} fill={d.color} />)}
-              </Pie>
-              <Tooltip contentStyle={tooltipStyle} formatter={(v: any, n: any) => [`${fmt(v)}`, n]} />
-              <Legend wrapperStyle={{ fontSize: 11, color: chartText }} />
-            </PieChart>
-          ) : (
-            <BarChart data={data} layout="vertical" margin={{ left: 4, right: 28 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={chartBorder} opacity={0.6} horizontal={false} />
-              <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10, fill: chartMuted }} axisLine={{ stroke: chartBorder }} tickLine={{ stroke: chartBorder }} />
-              <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 10, fill: chartMuted }} axisLine={{ stroke: chartBorder }} tickLine={{ stroke: chartBorder }} />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v: any, _n: any, p: any) => [`${fmt(v)} (${p?.payload?.pct ?? 0}%)`, ""]} />
-              <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {data.map((d) => <Cell key={d.name} fill={d.color} />)}
-                <LabelList dataKey="pct" position="right" formatter={(v: any) => `${v}%`} style={{ fontSize: 10, fill: chartMuted }} />
-              </Bar>
-            </BarChart>
-          )}
+        <ResponsiveContainer width="100%" height={Math.max(160, lgaData.length * 26 + 40)}>
+          <BarChart data={lgaData} layout="vertical" margin={{ left: 4, right: 16 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={chartBorder} opacity={0.5} horizontal={false} />
+            <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10, fill: chartMuted }} axisLine={{ stroke: chartBorder }} tickLine={{ stroke: chartBorder }} />
+            <YAxis type="category" dataKey="lga" width={96} tick={{ fontSize: 10, fill: chartMuted }} axisLine={{ stroke: chartBorder }} tickLine={{ stroke: chartBorder }} />
+            <Tooltip contentStyle={tooltipStyle} formatter={(v: any, n: any) => [`${fmt(v)}`, n]} />
+            <Legend wrapperStyle={{ fontSize: 10, color: chartText }} />
+            {cats.map((c) => (
+              <Bar key={c.name} dataKey={c.name} stackId="lga" fill={c.color} radius={[0, 0, 0, 0]} />
+            ))}
+          </BarChart>
         </ResponsiveContainer>
       </div>
       <InsightStrip insight={insight} />
@@ -91,33 +94,41 @@ function CategoricalCard({ a }: { a: CategoricalFieldAnalysis }) {
 
 function NumericCard({ a }: { a: NumericFieldAnalysis }) {
   const insight = useMemo(() => numericInsight(a), [a]);
+  const lgaData = useMemo(() => a.byLga.slice(0, 12), [a.byLga]);
   return (
     <Card className="flex flex-col overflow-hidden">
       <div className="border-b bg-muted/30 px-3 py-2">
         <p className="truncate text-xs font-semibold text-foreground" title={a.label}>{a.label}</p>
-        <p className="truncate text-[11px] text-muted-foreground">{a.activity} · {a.answered} reports · {a.responseRate}% answered</p>
+        <p className="truncate text-[11px] text-muted-foreground">{a.activity} · {a.answered} reports · {a.byLga.length} LGA{a.byLga.length === 1 ? "" : "s"}</p>
       </div>
-      <div className="grid grid-cols-3 gap-1 px-3 py-2 text-center">
-        <div><p className="text-sm font-bold text-foreground">{fmt(a.sum)}</p><p className="text-[10px] text-muted-foreground">Total</p></div>
-        <div><p className="text-sm font-bold text-foreground">{fmt(a.mean)}</p><p className="text-[10px] text-muted-foreground">Mean</p></div>
-        <div><p className="text-sm font-bold text-foreground">{fmt(a.median)}</p><p className="text-[10px] text-muted-foreground">Median</p></div>
+      <div className="grid grid-cols-2 gap-1 px-3 py-2 text-center">
+        <div><p className="text-sm font-bold text-foreground">{fmt(a.sum)}</p><p className="text-[10px] text-muted-foreground">Total reported</p></div>
+        <div title={CV_MEANING}><p className="text-sm font-bold text-foreground">{a.cv}%</p><p className="text-[10px] text-muted-foreground">Variation (CV)</p></div>
       </div>
-      <div className="px-2">
-        <ResponsiveContainer width="100%" height={130}>
-          <BarChart data={a.histogram} margin={{ left: -18, right: 8, top: 6 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={chartBorder} opacity={0.5} vertical={false} />
-            <XAxis dataKey="name" tick={{ fontSize: 9, fill: chartMuted }} axisLine={{ stroke: chartBorder }} tickLine={false} interval={0} />
-            <YAxis allowDecimals={false} tick={{ fontSize: 9, fill: chartMuted }} axisLine={false} tickLine={false} />
-            <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => [`${fmt(v)} report(s)`, ""]} />
-
-            <Bar dataKey="value" fill="#0b5394" radius={[3, 3, 0, 0]} />
+      <div className="flex items-center gap-1 px-3 text-[10px] text-muted-foreground">
+        <MapPin className="h-3 w-3 text-primary" /> Total by LGA
+      </div>
+      <div className="px-2 pt-1">
+        <ResponsiveContainer width="100%" height={Math.max(140, lgaData.length * 22 + 30)}>
+          <BarChart data={lgaData} layout="vertical" margin={{ left: 4, right: 28 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={chartBorder} opacity={0.5} horizontal={false} />
+            <XAxis type="number" allowDecimals={false} tick={{ fontSize: 9, fill: chartMuted }} axisLine={{ stroke: chartBorder }} tickLine={false} />
+            <YAxis type="category" dataKey="lga" width={92} tick={{ fontSize: 9, fill: chartMuted }} axisLine={{ stroke: chartBorder }} tickLine={false} />
+            <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => [`${fmt(v)}`, "Total"]} />
+            <Bar dataKey="sum" fill="#0b5394" radius={[0, 3, 3, 0]}>
+              <LabelList dataKey="sum" position="right" formatter={(v: any) => fmt(v)} style={{ fontSize: 9, fill: chartMuted }} />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
+      </div>
+      <div className="px-3 pb-1 pt-1 text-[10px] leading-snug text-muted-foreground">
+        Spread: {cvLabel(a.cv)}.
       </div>
       <InsightStrip insight={insight} />
     </Card>
   );
 }
+
 
 export default function IrfFieldAnalysis({ rows }: { rows: IrfReport[] }) {
   const { categorical, numeric } = useMemo(() => analyzeFields(rows), [rows]);
