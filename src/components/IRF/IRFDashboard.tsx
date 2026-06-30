@@ -251,6 +251,15 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
                 </div>
               </Card>
             </div>
+
+            {/* Robust statistical analysis of indicators */}
+            <IrfStatisticalPanel rows={rows} />
+
+            {/* Narrative & free-text intelligence */}
+            <IrfTextInsights rows={rows} />
+
+            {/* Collapsible evidence library: activity pictures + consent forms */}
+            <IrfEvidenceLibrary rows={rows} />
           </div>
         )}
       </div>
