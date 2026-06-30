@@ -37,7 +37,12 @@ type PendingPhoto = {
   file: File;
   url: string;
   caption: string;
-  consent: boolean;
+  /** Uploaded consent form (image or PDF) backing this picture. */
+  consentFile: File | null;
+  consentUrl: string | null;
+  consentName: string | null;
+  /** Explicit confirmation that INFORMED CONSENT was obtained. */
+  informedConsent: boolean;
 };
 
 export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose }: Props) {
