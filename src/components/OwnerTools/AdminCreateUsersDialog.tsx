@@ -208,6 +208,16 @@ export default function AdminCreateUsersDialog() {
   const [selected, setSelected] = useState<HistoryRow | null>(null);
   const [emailDetail, setEmailDetail] = useState<EmailDetail | null>(null);
   const [emailLoading, setEmailLoading] = useState(false);
+  const [historyQuery, setHistoryQuery] = useState("");
+
+  const filteredHistory = useMemo(() => {
+    const q = historyQuery.trim().toLowerCase();
+    if (!q) return history;
+    return history.filter((h) =>
+      (h.recipient_name ?? "").toLowerCase().includes(q) ||
+      (h.recipient_email ?? "").toLowerCase().includes(q),
+    );
+  }, [history, historyQuery]);
 
   const labelFor = (v: string) => DESIGNATIONS.find((d) => d.value === v)?.label ?? v;
 
