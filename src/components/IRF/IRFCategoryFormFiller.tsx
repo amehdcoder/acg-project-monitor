@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import {
   ArrowLeft, Save, Loader2, MapPin, CheckCircle2, Building2, ImagePlus, X, ShieldCheck,
+  Flower2, Sparkles, Camera, FileCheck2, UploadCloud, FileText, Heart,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
