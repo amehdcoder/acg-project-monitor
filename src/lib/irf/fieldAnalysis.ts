@@ -1,4 +1,20 @@
 import { IRF_ALL_FIELDS, type IrfReport } from "./definition";
+import { IRF_EXTRA_FIELDS } from "./normalize";
+
+// Combined field universe analysed by the dashboard: the legacy combined-form
+// fields plus the standalone category-form fields (officials engaged, announcers
+// supervised, compound meetings held, outcome level, support mode, channel …).
+// De-duplicated by key so a field defined in both places is analysed once.
+const ANALYSED_FIELDS: { key: string; label: string; type: string; activity: string; sectionId: string }[] = (() => {
+  const seen = new Set<string>();
+  const out: { key: string; label: string; type: string; activity: string; sectionId: string }[] = [];
+  for (const f of [...IRF_ALL_FIELDS, ...IRF_EXTRA_FIELDS] as any[]) {
+    if (seen.has(f.key)) continue;
+    seen.add(f.key);
+    out.push({ key: f.key, label: f.label, type: f.type, activity: f.activity, sectionId: f.sectionId });
+  }
+  return out;
+})();
 
 // McKinsey-style categorical palette — calm, high-contrast, print-friendly.
 export const MCKINSEY_PALETTE = [
