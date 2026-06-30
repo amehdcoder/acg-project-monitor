@@ -312,7 +312,7 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
             <FormIcon className="h-5 w-5" style={{ color: "#fff" }} />
           </span>
           <div className="min-w-0">
-            <h1 className="truncate text-base font-bold text-white sm:text-lg">{form.name}</h1>
+            <h1 className="text-sm font-bold leading-tight text-white sm:text-lg">{form.name}</h1>
             <p className="truncate text-xs text-white/70">
               {gps ? <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> GPS locked</span> : "Acquiring GPS…"}
             </p>
