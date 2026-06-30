@@ -21,6 +21,8 @@ export interface CategoricalFieldAnalysis {
   unique: number;
   top: { name: string; value: number; pct: number; color: string };
   data: { name: string; value: number; pct: number; color: string }[];
+  /** Per-LGA distribution: one row per LGA with a count for every category. */
+  byLga: { lga: string; total: number; segments: Record<string, number> }[];
 }
 
 export interface NumericFieldAnalysis {
@@ -39,14 +41,29 @@ export interface NumericFieldAnalysis {
   sd: number;
   cv: number;
   histogram: { name: string; value: number }[];
+  /** Per-LGA totals so the field can be read geographically. */
+  byLga: { lga: string; sum: number; answered: number }[];
 }
+
+/** Plain-language meaning of the coefficient of variation (CV). */
+export const CV_MEANING =
+  "CV (coefficient of variation) = the spread of the numbers relative to their average. Lower means LGAs report consistently; higher means results are uneven across reports.";
+
+/** Short qualitative reading of a CV value, with its meaning attached. */
+export function cvLabel(cv: number): string {
+  if (cv <= 30) return `${cv}% — low variation (consistent across reports)`;
+  if (cv <= 60) return `${cv}% — moderate variation`;
+  if (cv <= 100) return `${cv}% — high variation (uneven effort)`;
+  return `${cv}% — very high variation (likely outliers or data-entry issues)`;
+}
+
 
 export type FieldAnalysis = CategoricalFieldAnalysis | NumericFieldAnalysis;
 
 const prettify = (s: string) =>
   String(s).replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 
-function analyzeNumeric(values: number[]): Omit<NumericFieldAnalysis, "kind" | "key" | "label" | "activity" | "section" | "answered" | "responseRate" | "histogram"> & { histogram: { name: string; value: number }[] } {
+function analyzeNumeric(values: number[]): Omit<NumericFieldAnalysis, "kind" | "key" | "label" | "activity" | "section" | "answered" | "responseRate" | "histogram" | "byLga"> & { histogram: { name: string; value: number }[] } {
   const sorted = [...values].sort((a, b) => a - b);
   const n = sorted.length;
   const sum = sorted.reduce((a, b) => a + b, 0);
@@ -81,6 +98,11 @@ export function analyzeFields(rows: IrfReport[]): { categorical: CategoricalFiel
   const numeric: NumericFieldAnalysis[] = [];
   const total = rows.length || 1;
 
+  const lgaOf = (r: IrfReport) => {
+    const v = (r.lga ?? "").toString().trim();
+    return v && v.toLowerCase() !== "unspecified" ? v : "Unspecified";
+  };
+
   for (const f of IRF_ALL_FIELDS) {
     const raw = rows.map((r) => (r as any)[f.key]).filter(isFilled);
     if (!raw.length) continue;
@@ -88,23 +110,41 @@ export function analyzeFields(rows: IrfReport[]): { categorical: CategoricalFiel
     if (f.type === "number") {
       const nums = raw.map(num).filter((v): v is number => v != null && Number.isFinite(v));
       if (nums.length < 1) continue;
+
+      // Per-LGA totals
+      const lgaMap = new Map<string, { sum: number; answered: number }>();
+      for (const r of rows) {
+        const val = num((r as any)[f.key]);
+        if (val == null || !Number.isFinite(val)) continue;
+        const k = lgaOf(r);
+        const cur = lgaMap.get(k) || { sum: 0, answered: 0 };
+        cur.sum += val;
+        cur.answered += 1;
+        lgaMap.set(k, cur);
+      }
+      const byLga = [...lgaMap.entries()]
+        .map(([lga, v]) => ({ lga, sum: Math.round(v.sum * 100) / 100, answered: v.answered }))
+        .sort((a, b) => b.sum - a.sum);
+
       numeric.push({
         kind: "numeric", key: f.key, label: f.label, activity: f.activity, section: f.sectionId,
         answered: nums.length, responseRate: Math.round((nums.length / total) * 100),
-        ...analyzeNumeric(nums),
+        ...analyzeNumeric(nums), byLga,
       });
       continue;
     }
 
     if (f.type === "select" || f.type === "boolean") {
       const counts = new Map<string, number>();
+      const norm = (it: any) =>
+        f.type === "boolean"
+          ? (it === true || it === "true" || it === "yes" ? "Yes" : "No")
+          : prettify(String(it));
       for (const v of raw) {
         const items = Array.isArray(v) ? v : [v];
         for (const it of items) {
           if (!isFilled(it)) continue;
-          const key = f.type === "boolean"
-            ? (it === true || it === "true" || it === "yes" ? "Yes" : "No")
-            : prettify(String(it));
+          const key = norm(it);
           counts.set(key, (counts.get(key) || 0) + 1);
         }
       }
@@ -114,13 +154,38 @@ export function analyzeFields(rows: IrfReport[]): { categorical: CategoricalFiel
         .map(([name, value], i) => ({ name, value, pct: Math.round((value / answered) * 1000) / 10, color: MCKINSEY_PALETTE[i % MCKINSEY_PALETTE.length] }))
         .sort((a, b) => b.value - a.value)
         .map((d, i) => ({ ...d, color: MCKINSEY_PALETTE[i % MCKINSEY_PALETTE.length] }));
+
+      // Per-LGA distribution across the categories
+      const lgaMap = new Map<string, Record<string, number>>();
+      for (const r of rows) {
+        const v = (r as any)[f.key];
+        if (!isFilled(v)) continue;
+        const items = Array.isArray(v) ? v : [v];
+        const k = lgaOf(r);
+        const seg = lgaMap.get(k) || {};
+        for (const it of items) {
+          if (!isFilled(it)) continue;
+          const cat = norm(it);
+          seg[cat] = (seg[cat] || 0) + 1;
+        }
+        lgaMap.set(k, seg);
+      }
+      const byLga = [...lgaMap.entries()]
+        .map(([lga, segments]) => ({
+          lga,
+          total: Object.values(segments).reduce((a, b) => a + b, 0),
+          segments,
+        }))
+        .sort((a, b) => b.total - a.total);
+
       categorical.push({
         kind: "categorical", key: f.key, label: f.label, activity: f.activity, section: f.sectionId,
         answered, responseRate: Math.round((answered / total) * 100), unique: counts.size,
-        top: data[0], data,
+        top: data[0], data, byLga,
       });
     }
   }
+
 
   return { categorical, numeric };
 }
@@ -227,8 +292,11 @@ export function categoricalInsight(a: CategoricalFieldAnalysis): FieldInsight {
  * outlier risk, coverage and a recommendation.
  */
 export function numericInsight(a: NumericFieldAnalysis): FieldInsight {
+  const topLga = a.byLga[0];
+  const lgaCount = a.byLga.length;
   if (a.responseRate < 50) return { tone: "warning", text: `Only ${a.responseRate}% of reports captured this — totals understate true effort.`, recommendation: "Make this field mandatory or coach teams to complete it." };
-  if (a.cv > 100) return { tone: "warning", text: `Highly uneven (CV ${a.cv}%): range ${nf(a.min)}–${nf(a.max)} around a mean of ${nf(a.mean)}.`, recommendation: "Validate the high/low outliers — likely data-entry or uneven field effort." };
-  if (Math.abs(a.mean - a.median) > a.mean * 0.5 && a.mean > 0) return { tone: "neutral", text: `Skewed distribution — a few large reports lift the mean (${nf(a.mean)}) above the median (${nf(a.median)}).`, recommendation: "Use the median as the typical value when target-setting." };
-  return { tone: "positive", text: `Consistent effort: ${nf(a.sum)} total, typically ${nf(a.median)} per report (CV ${a.cv}%).` };
+  if (a.cv > 100) return { tone: "warning", text: `Highly uneven across LGAs — ${cvLabel(a.cv)}. ${CV_MEANING}`, recommendation: "Validate the high/low LGAs — likely data-entry or uneven field effort." };
+  if (topLga && lgaCount > 1) return { tone: "neutral", text: `"${topLga.lga}" leads with ${nf(topLga.sum)} of ${nf(a.sum)} total across ${lgaCount} LGAs. Spread: ${cvLabel(a.cv)}. ${CV_MEANING}` };
+  return { tone: "positive", text: `${nf(a.sum)} total reported. Spread: ${cvLabel(a.cv)}. ${CV_MEANING}` };
 }
+
