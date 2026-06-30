@@ -2691,7 +2691,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         return;
                       }
                       if (forms.find((f) => (f.settings as any)?.irf_kind)) {
-                        toast({ title: "Already added", description: "The LGA ACSM Focal Person tools already exist in this project. Open them from the list above." });
+                        toast({ title: "Already added", description: "The SARMAAN ACSM (SAIRF) tools already exist in this project. Open them from the list above." });
                         return;
                       }
                       try {
