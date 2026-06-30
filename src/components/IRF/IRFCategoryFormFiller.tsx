@@ -171,22 +171,29 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
       // Upload photos to the private evidence bucket.
       const evidence: any[] = [];
       for (const p of photos) {
-        const ext = p.file.name.split(".").pop() || "jpg";
+        // Shrink oversized phone photos so the upload completes on slow links.
+        const photoFile = await compressImageFile(p.file);
+        const ext = (photoFile.type.startsWith("image/") ? "jpg" : (p.file.name.split(".").pop() || "jpg"));
         const path = `${user?.id}/${form.id}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
-        const { error: upErr } = await supabase.storage.from("irf-evidence").upload(path, p.file, {
-          contentType: p.file.type, upsert: false,
+        await withNetworkRetry(async () => {
+          const { error: upErr } = await supabase.storage.from("irf-evidence").upload(path, photoFile, {
+            contentType: photoFile.type, upsert: false,
+          });
+          if (upErr) throw upErr;
         });
-        if (upErr) throw upErr;
 
         // Upload the associated signed consent form.
         let consentPath: string | null = null;
         if (p.consentFile) {
-          const cext = p.consentFile.name.split(".").pop() || "jpg";
+          const consentFile = await compressImageFile(p.consentFile);
+          const cext = (consentFile.type.startsWith("image/") ? "jpg" : (p.consentFile.name.split(".").pop() || "jpg"));
           consentPath = `${user?.id}/${form.id}/consent-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${cext}`;
-          const { error: cErr } = await supabase.storage.from("irf-evidence").upload(consentPath, p.consentFile, {
-            contentType: p.consentFile.type, upsert: false,
+          await withNetworkRetry(async () => {
+            const { error: cErr } = await supabase.storage.from("irf-evidence").upload(consentPath!, consentFile, {
+              contentType: consentFile.type, upsert: false,
+            });
+            if (cErr) throw cErr;
           });
-          if (cErr) throw cErr;
         }
 
         evidence.push({
@@ -199,6 +206,7 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
           consented_at: new Date().toISOString(),
         });
       }
+
 
       // Split direct-column fields from free-form answers.
       const directCols: Record<string, any> = {};
