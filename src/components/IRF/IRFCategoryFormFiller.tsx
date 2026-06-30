@@ -84,24 +84,40 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
   // Photos
   const [photos, setPhotos] = useState<PendingPhoto[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const consentRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const addPhotos = (files: FileList | null) => {
     if (!files) return;
     const next: PendingPhoto[] = [];
     Array.from(files).forEach((file) => {
       if (!file.type.startsWith("image/")) return;
-      next.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, file, url: URL.createObjectURL(file), caption: "", consent: false });
+      next.push({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        file, url: URL.createObjectURL(file), caption: "",
+        consentFile: null, consentUrl: null, consentName: null, informedConsent: false,
+      });
     });
     if (next.length) setPhotos((p) => [...p, ...next]);
   };
+  const attachConsent = (id: string, file: File | null) => {
+    if (!file) return;
+    setPhotos((p) => p.map((x) => {
+      if (x.id !== id) return x;
+      if (x.consentUrl) URL.revokeObjectURL(x.consentUrl);
+      const isImg = file.type.startsWith("image/");
+      return { ...x, consentFile: file, consentName: file.name, consentUrl: isImg ? URL.createObjectURL(file) : null };
+    }));
+    setErrors((prev) => { const n = new Set(prev); n.delete(`consent_${id}`); return n; });
+  };
   const removePhoto = (id: string) => setPhotos((p) => {
     const found = p.find((x) => x.id === id);
-    if (found) URL.revokeObjectURL(found.url);
+    if (found) { URL.revokeObjectURL(found.url); if (found.consentUrl) URL.revokeObjectURL(found.consentUrl); }
     return p.filter((x) => x.id !== id);
   });
   const setPhoto = (id: string, patch: Partial<PendingPhoto>) =>
     setPhotos((p) => p.map((x) => (x.id === id ? { ...x, ...patch } : x)));
 
-  useEffect(() => () => { photos.forEach((p) => URL.revokeObjectURL(p.url)); }, []); // eslint-disable-line
+  useEffect(() => () => { photos.forEach((p) => { URL.revokeObjectURL(p.url); if (p.consentUrl) URL.revokeObjectURL(p.consentUrl); }); }, []); // eslint-disable-line
+
 
   const requiresLga = level === "lga";
   const allFields = form.groups.flatMap((g) => g.fields);
