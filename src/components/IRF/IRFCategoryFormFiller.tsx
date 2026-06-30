@@ -23,6 +23,7 @@ import {
   type IrfCategoryForm, type IrfCategoryField,
 } from "@/lib/irf/categoryForms";
 import { getReportingMonthOptions, getCurrentReportingMonth } from "@/lib/irf/reportingMonths";
+import { withNetworkRetry, compressImageFile, isTransientNetworkError } from "@/lib/net/resilientUpload";
 
 interface Props {
   form: IrfCategoryForm;
