@@ -1,6 +1,6 @@
 // Emails admins to follow up on an after-hours (night) form submission anomaly.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { sendMailRaw } from "../_shared/rawSmtp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
