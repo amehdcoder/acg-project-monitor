@@ -2678,8 +2678,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                       <BarChart3 className="h-5 w-5 text-[#0c2340]" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground truncate">LGA ACSM Focal Person IRF (Independent Activity Tracker)</p>
-                      <p className="text-xs text-muted-foreground">Sectioned indicator reporting form + real-time dashboard for advocacy, social mobilization, awareness creation &amp; non-compliance resolution.</p>
+                      <p className="text-sm font-semibold text-foreground truncate">SARMAAN ACSM Indicator Reporting Forms (SAIRF)</p>
+                      <p className="text-xs text-muted-foreground">Sectioned indicator reporting forms + executive dashboard for advocacy, social mobilization, awareness creation &amp; non-compliance resolution.</p>
                     </div>
                   </div>
                   <Button
