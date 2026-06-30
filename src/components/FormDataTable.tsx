@@ -66,6 +66,7 @@ const FormDataTable = ({
   data,
   submissionId,
   isPending = false,
+  readOnly = false,
   questionLabels,
   onDataUpdate,
 }: FormDataTableProps) => {
