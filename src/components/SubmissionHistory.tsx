@@ -66,6 +66,7 @@ import { buildLabelMap, type QuestionLabelMap } from "@/lib/formLabelUtils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { exportFormDataToExcel } from "@/lib/formDataExport";
 import { useSwipeToDelete } from "@/hooks/useSwipeToDelete";
+import { fetchUserSpecialSubmissions } from "@/lib/specialSubmissions";
 
 interface Submission {
   id: string;
@@ -81,6 +82,9 @@ interface Submission {
   isPending?: boolean;
   retryCount?: number;
   locationInfo?: LocationInfo;
+  isSpecial?: boolean;
+  sourceLabel?: string;
+  accent?: string;
 }
 
 interface SubmissionHistoryProps {
@@ -200,8 +204,42 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
         };
       });
 
+      // Fetch standalone special-form submissions (SAIRF, ACSM, SBC, CES, …)
+      // that live in their own tables and would otherwise be invisible here.
+      let specialMapped: Submission[] = [];
+      if (user?.id) {
+        try {
+          const special = await fetchUserSpecialSubmissions(user.id, { allUsers: isAdmin });
+          specialMapped = special.map((s) => {
+            const locationInfo = extractLocationInfo(
+              s.data,
+              s.lat != null && s.lng != null ? { lat: s.lat, lng: s.lng } : null,
+            );
+            return {
+              id: s.id,
+              form_id: s.form_id,
+              form_name: s.form_name,
+              data: s.data,
+              status: "submitted",
+              location: s.lat != null && s.lng != null ? { lat: s.lat, lng: s.lng } : null,
+              within_geofence: null,
+              created_at: s.created_at,
+              submitted_at: s.submitted_at,
+              synced_at: s.submitted_at,
+              isPending: false,
+              locationInfo,
+              isSpecial: true,
+              sourceLabel: s.sourceLabel,
+              accent: s.accent,
+            } as Submission;
+          });
+        } catch (e) {
+          console.error("Error loading special-form submissions:", e);
+        }
+      }
+
       // Combine and sort by created_at
-      const allSubmissions = [...pendingMapped, ...syncedSubmissions].sort(
+      const allSubmissions = [...pendingMapped, ...syncedSubmissions, ...specialMapped].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
@@ -485,13 +523,25 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
                           ? "border-yellow-200 bg-yellow-50/50"
                           : "border-border bg-card hover:border-acg-gold/30"
                       }`}
+                      style={
+                        submission.isSpecial && submission.accent
+                          ? { borderLeftWidth: 4, borderLeftColor: submission.accent }
+                          : undefined
+                      }
                     >
                       <div className="flex items-start gap-4">
-                        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
-                          submission.isPending ? "bg-yellow-100" : "bg-primary/10"
-                        }`}>
+                        <div
+                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+                          style={
+                            submission.isSpecial && submission.accent
+                              ? { backgroundColor: `${submission.accent}1f` }
+                              : undefined
+                          }
+                        >
                           {submission.isPending ? (
                             <Clock className="h-6 w-6 text-yellow-600" />
+                          ) : submission.isSpecial && submission.accent ? (
+                            <FileText className="h-6 w-6" style={{ color: submission.accent }} />
                           ) : (
                             <CheckCircle2 className="h-6 w-6 text-primary" />
                           )}
@@ -501,6 +551,14 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
                             <h4 className="font-medium text-foreground">
                               {submission.form_name}
                             </h4>
+                            {submission.isSpecial && submission.sourceLabel && (
+                              <span
+                                className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
+                                style={{ backgroundColor: submission.accent }}
+                              >
+                                {submission.sourceLabel}
+                              </span>
+                            )}
                             {getStatusBadge(submission)}
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground font-mono">
@@ -708,6 +766,7 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
                   data={selectedSubmission.data}
                   submissionId={selectedSubmission.id}
                   isPending={!!selectedSubmission.isPending}
+                  readOnly={!!selectedSubmission.isSpecial}
                   questionLabels={formLabelMaps[selectedSubmission.form_id]}
                   onDataUpdate={(updatedData) => {
                     setSelectedSubmission({ ...selectedSubmission, data: updatedData });

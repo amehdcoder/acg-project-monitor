@@ -214,8 +214,22 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
         ? (ministry === OTHER_OPTION ? ministryOther.trim() : ministry)
         : null;
 
+      // SAIRF is a SARMAAN-only form. If the launcher could not supply a
+      // project id (e.g. opened outside an active project context), resolve the
+      // SARMAAN project by name so the submission is never orphaned and always
+      // surfaces on the SARMAAN ACSM Indicator Tracking Dashboard.
+      let resolvedProjectId: string | null = projectId || null;
+      if (!resolvedProjectId) {
+        const { data: sarmaan } = await supabase
+          .from("projects")
+          .select("id")
+          .ilike("name", "SARMAAN")
+          .maybeSingle();
+        resolvedProjectId = (sarmaan as any)?.id ?? null;
+      }
+
       const payload: Record<string, any> = {
-        project_id: projectId || null,
+        project_id: resolvedProjectId,
         created_by: user?.id,
         form_category: form.id,
         reporting_level: level,

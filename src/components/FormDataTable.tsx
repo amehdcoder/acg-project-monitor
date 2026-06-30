@@ -26,6 +26,7 @@ interface FormDataTableProps {
   data: Record<string, any>;
   submissionId: string;
   isPending?: boolean;
+  readOnly?: boolean;
   questionLabels?: QuestionLabelMap;
   onDataUpdate?: (updatedData: Record<string, any>) => void;
 }
@@ -65,6 +66,7 @@ const FormDataTable = ({
   data,
   submissionId,
   isPending = false,
+  readOnly = false,
   questionLabels,
   onDataUpdate,
 }: FormDataTableProps) => {
@@ -172,7 +174,7 @@ const FormDataTable = ({
                 {saving ? "Saving..." : "Save"}
               </Button>
             </>
-          ) : (
+          ) : readOnly ? null : (
             <Button variant="outline" size="sm" onClick={startEditing}>
               <Pencil className="h-4 w-4 mr-1" />
               Edit
