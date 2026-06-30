@@ -113,10 +113,10 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
       <IrfWatermark />
       <div className="relative z-10 mx-auto w-full max-w-6xl pb-16">
         {/* Header */}
-        <div className="sticky top-0 z-20 flex items-center gap-3 border-b bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3">
+        <div className="sticky top-0 z-20 flex flex-wrap items-start gap-3 border-b bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3">
           <Button variant="ghost" size="icon" aria-label="Back to forms" onClick={onClose} className="text-white hover:bg-white/10"><ArrowLeft className="h-5 w-5" /></Button>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-bold leading-tight text-white sm:text-lg">{IRF_DASH_NAME}</h1>
+          <div className="min-w-0 flex-[1_1_240px]">
+            <h1 className="whitespace-normal break-words text-sm font-bold leading-tight text-white sm:text-lg">{IRF_DASH_NAME}</h1>
             <p className="truncate text-xs text-white/70">{stats.totalReports} reports · {stats.lgas} LGAs · Kano State · live updates on</p>
           </div>
           <Button variant="ghost" size="icon" aria-label={isDarkTheme ? "Light mode" : "Dark mode"} aria-pressed={isDarkTheme}

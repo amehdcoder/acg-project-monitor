@@ -6,6 +6,7 @@ import { IrfWatermark } from "./IRFFormFiller";
 import IRFCategoryFormFiller from "./IRFCategoryFormFiller";
 import IrfAccessManager from "./IrfAccessManager";
 import { IRF_CATEGORY_FORMS, type IrfCategoryForm } from "@/lib/irf/categoryForms";
+import { IRF_FORM_NAME } from "@/lib/irf/definition";
 import { useIrfFormAccess } from "@/hooks/useIrfFormAccess";
 
 interface Props {
@@ -44,10 +45,10 @@ export default function IRFCategoryLauncher({ projectId, onClose }: Props) {
     <div className="dark fixed inset-0 z-40 isolate flex h-[100dvh] min-h-[100dvh] w-full flex-col overflow-hidden bg-background text-foreground">
       <IrfWatermark />
       {/* Header */}
-      <div className="relative z-20 flex shrink-0 items-center gap-3 border-b border-white/10 bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3 shadow-sm">
+      <div className="relative z-20 flex shrink-0 flex-wrap items-center gap-3 border-b border-white/10 bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3 shadow-sm">
         <Button variant="ghost" size="icon" aria-label="Back to forms" onClick={onClose} className="text-white hover:bg-white/10"><ArrowLeft className="h-5 w-5" /></Button>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-sm font-bold leading-tight text-white sm:text-lg">SARMAAN ACSM Indicator Reporting Forms (SAIRF)</h1>
+        <div className="min-w-0 flex-[1_1_220px]">
+          <h1 className="whitespace-normal break-words text-sm font-bold leading-tight text-white sm:text-lg">{IRF_FORM_NAME}</h1>
           <p className="truncate text-xs text-white/70">Choose the activity you want to report on this visit.</p>
         </div>
         {isAdmin && (

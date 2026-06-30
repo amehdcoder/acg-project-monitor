@@ -85,7 +85,9 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
   // Photos
   const [photos, setPhotos] = useState<PendingPhoto[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const consentRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const consentCameraRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const addPhotos = (files: FileList | null) => {
     if (!files) return;
     const next: PendingPhoto[] = [];
@@ -507,25 +509,41 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
                     <p className="text-xs text-muted-foreground">Every picture must be backed by a signed <strong>consent form</strong> and an explicit <strong>informed-consent</strong> confirmation.</p>
                   </div>
                 </div>
-                <Button type="button" size="sm" onClick={() => fileRef.current?.click()}
-                  className="shrink-0 gap-1 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white hover:from-rose-600 hover:to-fuchsia-700">
-                  <ImagePlus className="h-4 w-4" /> Add
-                </Button>
+                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                  <Button type="button" size="sm" onClick={() => cameraRef.current?.click()}
+                    className="gap-1 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white hover:from-rose-600 hover:to-fuchsia-700">
+                    <Camera className="h-4 w-4" /> Capture
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => fileRef.current?.click()}
+                    className="gap-1 border-rose-300 bg-background/80 text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10">
+                    <ImagePlus className="h-4 w-4" /> Choose
+                  </Button>
+                </div>
               </div>
-              <input ref={fileRef} type="file" accept="image/*" multiple capture="environment" className="hidden"
+              <input ref={cameraRef} type="file" accept="image/*" multiple capture="environment" className="hidden"
+                onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
+              <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
                 onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
             </div>
 
             <div className="space-y-4 p-4 sm:p-6">
               {photos.length === 0 ? (
-                <button type="button" onClick={() => fileRef.current?.click()}
-                  className="group flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-rose-300/70 bg-gradient-to-b from-rose-50/60 to-transparent py-10 text-muted-foreground transition hover:border-rose-400 hover:from-rose-100/60 dark:border-rose-400/30 dark:from-rose-500/5">
+                <div
+                  className="group flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-rose-300/70 bg-gradient-to-b from-rose-50/60 to-transparent px-4 py-10 text-center text-muted-foreground transition hover:border-rose-400 hover:from-rose-100/60 dark:border-rose-400/30 dark:from-rose-500/5">
                   <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-rose-500/15 to-fuchsia-500/15 text-rose-500 transition group-hover:scale-105">
                     <ImagePlus className="h-7 w-7" />
                   </span>
-                  <span className="text-sm font-medium">Tap to add activity pictures</span>
-                  <span className="text-[11px]">Consent form &amp; confirmation requested for each picture</span>
-                </button>
+                  <span className="text-sm font-medium">Add activity pictures</span>
+                  <span className="text-[11px]">Capture live photos or choose pictures already saved on this Android device.</span>
+                  <div className="flex flex-wrap justify-center gap-2 pt-1">
+                    <Button type="button" size="sm" onClick={() => cameraRef.current?.click()} className="gap-1 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white">
+                      <Camera className="h-4 w-4" /> Capture now
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => fileRef.current?.click()} className="gap-1 border-rose-300 text-rose-600 dark:text-rose-300">
+                      <UploadCloud className="h-4 w-4" /> Choose from phone
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <div className="space-y-4">
                   {photos.map((p, idx) => {
@@ -562,10 +580,16 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
                                 <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                                   <FileCheck2 className="h-4 w-4 text-rose-500" /> Signed consent form *
                                 </span>
-                                <Button type="button" variant="outline" size="sm" className="h-7 gap-1 text-xs"
-                                  onClick={() => consentRefs.current[p.id]?.click()}>
-                                  <UploadCloud className="h-3.5 w-3.5" /> {p.consentFile ? "Replace" : "Upload"}
-                                </Button>
+                                <div className="flex flex-wrap justify-end gap-1.5">
+                                  <Button type="button" variant="outline" size="sm" className="h-7 gap-1 text-xs"
+                                    onClick={() => consentCameraRefs.current[p.id]?.click()}>
+                                    <Camera className="h-3.5 w-3.5" /> Snap
+                                  </Button>
+                                  <Button type="button" variant="outline" size="sm" className="h-7 gap-1 text-xs"
+                                    onClick={() => consentRefs.current[p.id]?.click()}>
+                                    <UploadCloud className="h-3.5 w-3.5" /> {p.consentFile ? "Replace" : "Upload"}
+                                  </Button>
+                                </div>
                               </div>
                               {p.consentFile ? (
                                 <div className="mt-2 flex items-center gap-2">
@@ -578,8 +602,10 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
                                   <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
                                 </div>
                               ) : (
-                                <p className="mt-1.5 text-[11px] text-muted-foreground">Upload a photo or PDF of the signed consent form for this picture.</p>
+                                <p className="mt-1.5 text-[11px] text-muted-foreground">Snap a new consent image, or upload an existing image/PDF from phone storage.</p>
                               )}
+                              <input ref={(el) => (consentCameraRefs.current[p.id] = el)} type="file" accept="image/*" capture="environment" className="hidden"
+                                onChange={(e) => { attachConsent(p.id, e.target.files?.[0] ?? null); e.target.value = ""; }} />
                               <input ref={(el) => (consentRefs.current[p.id] = el)} type="file" accept="image/*,application/pdf" className="hidden"
                                 onChange={(e) => { attachConsent(p.id, e.target.files?.[0] ?? null); e.target.value = ""; }} />
                             </div>
