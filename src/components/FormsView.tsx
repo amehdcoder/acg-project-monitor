@@ -36,7 +36,7 @@ import {
 } from "@/lib/treatmentDataForms";
 import { generateTreatmentRollupWorkbook } from "@/lib/treatmentRollup";
 import { ACTIVE_FORM_FILL_KEY, SILENT_UPDATE_RESTORE_KEY } from "@/lib/formProgressPersistence";
-import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck, BarChart3 } from "lucide-react";
+import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck, BarChart3, ClipboardPenLine, ChartNoAxesCombined } from "lucide-react";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
 import {
   FileText,
@@ -366,6 +366,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       { bg: "bg-[#FCE9E9]", fg: "text-[#E25555]", ring: "#E25555" },
     ];
     const iconFor = (code: string, group: string) => {
+      if (code === "irf_form") return ClipboardPenLine;
+      if (code === "irf_dash") return ChartNoAxesCombined;
       if (code === "srf" || code === "incident") return ShieldCheck;
       if (code === "uprp" || code === "attendance") return ClipboardCheck;
       if (code === "action_tracker") return ClipboardList;
@@ -396,6 +398,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         const def = (STANDARD_ASSESSMENTS as any)[f.code];
         // A form disabled at project level is "restricted" — assigned but locked.
         const restricted = disabledStandardCodes.has(f.code as StandardFormCode);
+        const irfStyle = f.code === "irf_form"
+          ? { bg: "bg-gradient-to-br from-rose-100 via-amber-50 to-emerald-100", fg: "text-rose-600", ring: "#e11d48" }
+          : f.code === "irf_dash"
+            ? { bg: "bg-gradient-to-br from-cyan-100 via-sky-100 to-indigo-100", fg: "text-sky-700", ring: "#0284c7" }
+            : null;
         return {
           code: f.code,
           name: def?.shortName || f.name,
@@ -404,7 +411,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           Icon: iconFor(f.code, f.group),
           status: (restricted ? "restricted" : "assigned") as "assigned" | "restricted",
           hasRequired: hasRequiredFor(f.code, f.group),
-          ...palette[i % palette.length],
+          ...(irfStyle || palette[i % palette.length]),
         };
       });
   }, [assignedStandardCodes, disabledStandardCodes]);
@@ -460,7 +467,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           <c.Icon className={`h-6 w-6 ${c.fg}`} strokeWidth={2} />
         </div>
         <div className="min-w-0 flex-1">
-          <h4 className="truncate text-[15px] font-bold text-foreground">{c.name}</h4>
+          <h4 className="whitespace-normal break-words text-[15px] font-bold leading-snug text-foreground">{c.name}</h4>
           <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{c.desc}</p>
           {/* Status indicators — consistent, intuitive colouring across all cards. */}
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
