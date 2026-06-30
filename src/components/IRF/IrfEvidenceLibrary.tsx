@@ -209,11 +209,15 @@ export default function IrfEvidenceLibrary({ rows }: Props) {
                             </div>
                           </div>
                           <div className="flex shrink-0 gap-1">
-                            <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Open picture" onClick={() => openSigned(it.path)}>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Preview picture" onClick={() => openSigned(it.path)}>
                               <ImageIcon className="h-4 w-4" />
                             </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" aria-label="Download picture" onClick={() => downloadOne(it.path)}>
+                              <Download className="h-4 w-4" />
+                            </Button>
                             {it.consent_form_path ? (
-                              <Button size="icon" variant="ghost" className="h-7 w-7 text-rose-500" aria-label="Open consent form" onClick={() => openSigned(it.consent_form_path!)}>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-rose-500" aria-label="Download consent form"
+                                onClick={() => downloadOne(it.consent_form_path!, it.consent_form_name || undefined)}>
                                 <FileCheck2 className="h-4 w-4" />
                               </Button>
                             ) : (
@@ -222,6 +226,7 @@ export default function IrfEvidenceLibrary({ rows }: Props) {
                               </span>
                             )}
                           </div>
+
                         </div>
                       ))}
                     </div>
