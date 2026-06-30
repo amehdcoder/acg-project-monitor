@@ -29,16 +29,7 @@ interface Props {
   onClose: () => void;
 }
 
-const monthOptions = (() => {
-  const out: { value: string; label: string }[] = [];
-  const now = new Date();
-  for (let i = 0; i < 18; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    out.push({ value, label: d.toLocaleString("default", { month: "long", year: "numeric" }) });
-  }
-  return out;
-})();
+const monthOptions = getReportingMonthOptions();
 
 type PendingPhoto = {
   id: string;
