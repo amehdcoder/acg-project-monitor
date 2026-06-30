@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import * as Icons from "lucide-react";
 import { IRF_SECTIONS, IRF_FORM_NAME, OTHER_OPTION, type IrfField } from "@/lib/irf/definition";
+import { getReportingMonthOptions, getCurrentReportingMonth } from "@/lib/irf/reportingMonths";
 import irfBg from "@/assets/irf-bg.jpg";
 
 /** Subtle, professional brand watermark that covers the entire IRF interface. */
@@ -52,16 +53,7 @@ interface Props {
   onClose: () => void;
 }
 
-const monthOptions = (() => {
-  const out: { value: string; label: string }[] = [];
-  const now = new Date();
-  for (let i = 0; i < 18; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    out.push({ value, label: d.toLocaleString("default", { month: "long", year: "numeric" }) });
-  }
-  return out;
-})();
+const monthOptions = getReportingMonthOptions();
 
 export default function IRFFormFiller({ projectId, onClose }: Props) {
   const { user } = useAuth();
@@ -78,7 +70,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   const [step, setStep] = useState(0); // 0 = identity, 1..N = sections
 
   // Identity
-  const [reportingMonth, setReportingMonth] = useState(monthOptions[0].value);
+  const [reportingMonth, setReportingMonth] = useState(getCurrentReportingMonth());
   const [state, setState] = useState("");
   const [lga, setLga] = useState("");
   const [ward, setWard] = useState("");
@@ -336,7 +328,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
       <div className="relative z-20 flex shrink-0 items-center gap-3 border-b border-white/10 bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3 shadow-sm">
         <Button variant="ghost" size="icon" aria-label="Back to forms" onClick={onClose} className="text-white hover:bg-white/10"><ArrowLeft className="h-5 w-5" /></Button>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-base font-bold text-white sm:text-lg">{IRF_FORM_NAME}</h1>
+          <h1 className="text-sm font-bold leading-tight text-white sm:text-lg">{IRF_FORM_NAME}</h1>
           <p className="truncate text-xs text-white/70">
             {position
               ? <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> GPS locked · ready to report</span>

@@ -18,6 +18,9 @@ import { IRF_CATEGORY_FORMS } from "@/lib/irf/categoryForms";
 import { IrfWatermark } from "@/components/IRF/IRFFormFiller";
 import IrfKanoMap from "@/components/IRF/IrfKanoMap";
 import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
+import IrfEvidenceLibrary from "@/components/IRF/IrfEvidenceLibrary";
+import IrfTextInsights from "@/components/IRF/IrfTextInsights";
+import IrfStatisticalPanel from "@/components/IRF/IrfStatisticalPanel";
 
 interface Props {
   projectId?: string | null;
@@ -113,7 +116,7 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
         <div className="sticky top-0 z-20 flex items-center gap-3 border-b bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3">
           <Button variant="ghost" size="icon" aria-label="Back to forms" onClick={onClose} className="text-white hover:bg-white/10"><ArrowLeft className="h-5 w-5" /></Button>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-base font-bold text-white sm:text-lg">{IRF_DASH_NAME}</h1>
+            <h1 className="text-sm font-bold leading-tight text-white sm:text-lg">{IRF_DASH_NAME}</h1>
             <p className="truncate text-xs text-white/70">{stats.totalReports} reports · {stats.lgas} LGAs · Kano State · live updates on</p>
           </div>
           <Button variant="ghost" size="icon" aria-label={isDarkTheme ? "Light mode" : "Dark mode"} aria-pressed={isDarkTheme}
@@ -248,6 +251,15 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
                 </div>
               </Card>
             </div>
+
+            {/* Robust statistical analysis of indicators */}
+            <IrfStatisticalPanel rows={rows} />
+
+            {/* Narrative & free-text intelligence */}
+            <IrfTextInsights rows={rows} />
+
+            {/* Collapsible evidence library: activity pictures + consent forms */}
+            <IrfEvidenceLibrary rows={rows} />
           </div>
         )}
       </div>

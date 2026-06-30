@@ -5,12 +5,12 @@
 // for LGA ACSM Focal Persons and a real-time analytics Dashboard wired to the
 // `irf_reports` table. Indicators are taken from the Independent Activity Tracker.
 
-export const IRF_FORM_NAME = "LGA ACSM Focal Person Indicator Reporting Form (IRF)";
+export const IRF_FORM_NAME = "SARMAAN ACSM Indicator Reporting Forms (SAIRF)";
 export const IRF_FORM_DESC =
-  "Independent Activity Tracker for LGA ACSM Focal Persons — advocacy, social mobilization, awareness creation & non-compliance resolution indicators with evidence (MOV).";
-export const IRF_DASH_NAME = "LGA ACSM Focal Person Dashboard";
+  "SARMAAN ACSM activity reporting — advocacy, social mobilization, awareness creation & non-compliance resolution indicators with evidence (MOV) and informed consent.";
+export const IRF_DASH_NAME = "SARMAAN ACSM Campaign Indicator Tracking Dashboard";
 export const IRF_DASH_DESC =
-  "Real-time analytics for the LGA ACSM Focal Person IRF — advocacy reach, social mobilization, awareness creation, non-compliance resolution, trends, top LGAs & data quality.";
+  "Executive analytics for the SARMAAN ACSM Indicator Reporting Forms (SAIRF) — advocacy reach, social mobilization, awareness creation, non-compliance resolution, statistical insights, narrative analysis, evidence library, trends & data quality.";
 
 export const PARTICIPATION_LEVELS = ["High", "Medium", "Low"] as const;
 

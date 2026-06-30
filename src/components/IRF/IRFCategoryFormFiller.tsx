@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import {
   ArrowLeft, Save, Loader2, MapPin, CheckCircle2, Building2, ImagePlus, X, ShieldCheck,
+  Flower2, Sparkles, Camera, FileCheck2, UploadCloud, FileText, Heart,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,6 +22,7 @@ import {
   ACCEPTANCE_LEVELS, MINISTRY_DEPARTMENTS, OTHER_OPTION,
   type IrfCategoryForm, type IrfCategoryField,
 } from "@/lib/irf/categoryForms";
+import { getReportingMonthOptions, getCurrentReportingMonth } from "@/lib/irf/reportingMonths";
 
 interface Props {
   form: IrfCategoryForm;
@@ -29,23 +31,19 @@ interface Props {
   onClose: () => void;
 }
 
-const monthOptions = (() => {
-  const out: { value: string; label: string }[] = [];
-  const now = new Date();
-  for (let i = 0; i < 18; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    out.push({ value, label: d.toLocaleString("default", { month: "long", year: "numeric" }) });
-  }
-  return out;
-})();
+const monthOptions = getReportingMonthOptions();
 
 type PendingPhoto = {
   id: string;
   file: File;
   url: string;
   caption: string;
-  consent: boolean;
+  /** Uploaded consent form (image or PDF) backing this picture. */
+  consentFile: File | null;
+  consentUrl: string | null;
+  consentName: string | null;
+  /** Explicit confirmation that INFORMED CONSENT was obtained. */
+  informedConsent: boolean;
 };
 
 export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose }: Props) {
@@ -57,7 +55,7 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
 
   // Reporting identity
   const [level, setLevel] = useState<"state" | "lga">("lga");
-  const [reportingMonth, setReportingMonth] = useState(monthOptions[0].value);
+  const [reportingMonth, setReportingMonth] = useState(getCurrentReportingMonth());
   const [state, setState] = useState("");
   const [lga, setLga] = useState("");
   const [ward, setWard] = useState("");
@@ -87,24 +85,40 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
   // Photos
   const [photos, setPhotos] = useState<PendingPhoto[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const consentRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const addPhotos = (files: FileList | null) => {
     if (!files) return;
     const next: PendingPhoto[] = [];
     Array.from(files).forEach((file) => {
       if (!file.type.startsWith("image/")) return;
-      next.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, file, url: URL.createObjectURL(file), caption: "", consent: false });
+      next.push({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        file, url: URL.createObjectURL(file), caption: "",
+        consentFile: null, consentUrl: null, consentName: null, informedConsent: false,
+      });
     });
     if (next.length) setPhotos((p) => [...p, ...next]);
   };
+  const attachConsent = (id: string, file: File | null) => {
+    if (!file) return;
+    setPhotos((p) => p.map((x) => {
+      if (x.id !== id) return x;
+      if (x.consentUrl) URL.revokeObjectURL(x.consentUrl);
+      const isImg = file.type.startsWith("image/");
+      return { ...x, consentFile: file, consentName: file.name, consentUrl: isImg ? URL.createObjectURL(file) : null };
+    }));
+    setErrors((prev) => { const n = new Set(prev); n.delete(`consent_${id}`); return n; });
+  };
   const removePhoto = (id: string) => setPhotos((p) => {
     const found = p.find((x) => x.id === id);
-    if (found) URL.revokeObjectURL(found.url);
+    if (found) { URL.revokeObjectURL(found.url); if (found.consentUrl) URL.revokeObjectURL(found.consentUrl); }
     return p.filter((x) => x.id !== id);
   });
   const setPhoto = (id: string, patch: Partial<PendingPhoto>) =>
     setPhotos((p) => p.map((x) => (x.id === id ? { ...x, ...patch } : x)));
 
-  useEffect(() => () => { photos.forEach((p) => URL.revokeObjectURL(p.url)); }, []); // eslint-disable-line
+  useEffect(() => () => { photos.forEach((p) => { URL.revokeObjectURL(p.url); if (p.consentUrl) URL.revokeObjectURL(p.consentUrl); }); }, []); // eslint-disable-line
+
 
   const requiresLga = level === "lga";
   const allFields = form.groups.flatMap((g) => g.fields);
@@ -128,13 +142,19 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
       if (f.type === "select" && f.allowOther && values[f.key] === OTHER_OPTION && !String(values[`${f.key}__other`] ?? "").trim())
         missing.push(`${f.key}__other`);
     });
-    // Per-photo consent is mandatory before submission.
-    const unconsented = photos.filter((p) => !p.consent);
-    if (unconsented.length) missing.push(...unconsented.map((p) => `photo_${p.id}`));
+    // Narrative / additional notes is mandatory.
+    if (!narrative.trim()) missing.push("__narrative");
+    // Each picture requires an uploaded consent form AND an informed-consent confirmation.
+    const missingConsentForm = photos.filter((p) => !p.consentFile);
+    const unconsented = photos.filter((p) => !p.informedConsent);
+    missingConsentForm.forEach((p) => missing.push(`consent_${p.id}`));
+    unconsented.forEach((p) => missing.push(`photo_${p.id}`));
 
     if (missing.length) {
       setErrors(new Set(missing));
-      if (unconsented.length) toast.error("Please confirm consent for every uploaded picture.");
+      if (missingConsentForm.length) toast.error("Please upload the signed consent form for every activity picture.");
+      else if (unconsented.length) toast.error("Please confirm INFORMED CONSENT for every activity picture.");
+      else if (missing.includes("__narrative")) toast.error("Please complete the Narrative / additional notes.");
       else toast.error("Please complete all required fields.");
       return false;
     }
@@ -154,7 +174,27 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
           contentType: p.file.type, upsert: false,
         });
         if (upErr) throw upErr;
-        evidence.push({ path, caption: p.caption || null, consent: true, consented_at: new Date().toISOString() });
+
+        // Upload the associated signed consent form.
+        let consentPath: string | null = null;
+        if (p.consentFile) {
+          const cext = p.consentFile.name.split(".").pop() || "jpg";
+          consentPath = `${user?.id}/${form.id}/consent-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${cext}`;
+          const { error: cErr } = await supabase.storage.from("irf-evidence").upload(consentPath, p.consentFile, {
+            contentType: p.consentFile.type, upsert: false,
+          });
+          if (cErr) throw cErr;
+        }
+
+        evidence.push({
+          path,
+          caption: p.caption || null,
+          consent: true,
+          informed_consent: true,
+          consent_form_path: consentPath,
+          consent_form_name: p.consentName || null,
+          consented_at: new Date().toISOString(),
+        });
       }
 
       // Split direct-column fields from free-form answers.
@@ -312,7 +352,7 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
             <FormIcon className="h-5 w-5" style={{ color: "#fff" }} />
           </span>
           <div className="min-w-0">
-            <h1 className="truncate text-base font-bold text-white sm:text-lg">{form.name}</h1>
+            <h1 className="text-sm font-bold leading-tight text-white sm:text-lg">{form.name}</h1>
             <p className="truncate text-xs text-white/70">
               {gps ? <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> GPS locked</span> : "Acquiring GPS…"}
             </p>
@@ -451,64 +491,128 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
 
 
 
-          {/* Evidence + per-photo consent */}
-          <Card className="mt-4 space-y-4 p-4 sm:p-6">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-semibold" style={{ color: form.color }}>Activity Pictures</h3>
-                <p className="text-xs text-muted-foreground">Upload pictures taken during the activity. Consent is required for each picture.</p>
+          {/* Activity Pictures + consent form + informed-consent confirmation */}
+          <Card className="mt-4 overflow-hidden border-0 p-0 shadow-lg ring-1 ring-rose-200/60 dark:ring-rose-400/20">
+            {/* Flowery banner */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-rose-500/15 via-fuchsia-500/10 to-amber-400/15 px-4 py-4 sm:px-6">
+              <Flower2 className="pointer-events-none absolute -right-3 -top-3 h-20 w-20 text-rose-400/20" />
+              <Sparkles className="pointer-events-none absolute right-16 top-6 h-5 w-5 text-amber-400/40" />
+              <div className="relative flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-fuchsia-600 text-white shadow-md">
+                    <Camera className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="text-base font-bold text-foreground">Activity Pictures &amp; Consent</h3>
+                    <p className="text-xs text-muted-foreground">Every picture must be backed by a signed <strong>consent form</strong> and an explicit <strong>informed-consent</strong> confirmation.</p>
+                  </div>
+                </div>
+                <Button type="button" size="sm" onClick={() => fileRef.current?.click()}
+                  className="shrink-0 gap-1 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white hover:from-rose-600 hover:to-fuchsia-700">
+                  <ImagePlus className="h-4 w-4" /> Add
+                </Button>
               </div>
-              <Button type="button" variant="outline" size="sm" className="gap-1" onClick={() => fileRef.current?.click()}>
-                <ImagePlus className="h-4 w-4" /> Add
-              </Button>
               <input ref={fileRef} type="file" accept="image/*" multiple capture="environment" className="hidden"
                 onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
             </div>
 
-            {photos.length === 0 ? (
-              <button type="button" onClick={() => fileRef.current?.click()}
-                className="flex w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-input py-8 text-muted-foreground hover:bg-muted/40">
-                <ImagePlus className="h-7 w-7" />
-                <span className="text-sm">Tap to add activity pictures</span>
-              </button>
-            ) : (
-              <div className="space-y-3">
-                {photos.map((p) => {
-                  const err = errors.has(`photo_${p.id}`);
-                  return (
-                    <div key={p.id} className={`flex gap-3 rounded-lg border p-3 ${err ? "border-destructive" : "border-input"}`}>
-                      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-muted">
-                        <img src={p.url} alt="Activity evidence preview" className="h-full w-full object-cover" />
-                        <button type="button" onClick={() => removePhoto(p.id)} aria-label="Remove picture"
-                          className="absolute right-0.5 top-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white">
-                          <X className="h-3.5 w-3.5" />
-                        </button>
+            <div className="space-y-4 p-4 sm:p-6">
+              {photos.length === 0 ? (
+                <button type="button" onClick={() => fileRef.current?.click()}
+                  className="group flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-rose-300/70 bg-gradient-to-b from-rose-50/60 to-transparent py-10 text-muted-foreground transition hover:border-rose-400 hover:from-rose-100/60 dark:border-rose-400/30 dark:from-rose-500/5">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-rose-500/15 to-fuchsia-500/15 text-rose-500 transition group-hover:scale-105">
+                    <ImagePlus className="h-7 w-7" />
+                  </span>
+                  <span className="text-sm font-medium">Tap to add activity pictures</span>
+                  <span className="text-[11px]">Consent form &amp; confirmation requested for each picture</span>
+                </button>
+              ) : (
+                <div className="space-y-4">
+                  {photos.map((p, idx) => {
+                    const consentMissing = errors.has(`consent_${p.id}`);
+                    const confirmMissing = errors.has(`photo_${p.id}`);
+                    const complete = !!p.consentFile && p.informedConsent;
+                    return (
+                      <div key={p.id}
+                        className={`relative overflow-hidden rounded-2xl border bg-card/80 p-3 transition sm:p-4 ${complete ? "border-emerald-300 ring-1 ring-emerald-200/60 dark:border-emerald-400/40" : (consentMissing || confirmMissing) ? "border-destructive" : "border-rose-200/70 dark:border-rose-400/20"}`}>
+                        <Flower2 className="pointer-events-none absolute -right-4 -bottom-4 h-16 w-16 text-rose-400/10" />
+                        <div className="relative flex flex-col gap-3 sm:flex-row">
+                          {/* Picture */}
+                          <div className="relative h-28 w-full shrink-0 overflow-hidden rounded-xl bg-muted sm:h-28 sm:w-28">
+                            <img src={p.url} alt="Activity evidence preview" className="h-full w-full object-cover" />
+                            <span className="absolute left-1.5 top-1.5 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white">Picture {idx + 1}</span>
+                            <button type="button" onClick={() => removePhoto(p.id)} aria-label="Remove picture"
+                              className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80">
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                            {complete && (
+                              <span className="absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white">
+                                <CheckCircle2 className="h-4 w-4" />
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+                            <Input value={p.caption} onChange={(e) => setPhoto(p.id, { caption: e.target.value })}
+                              placeholder="Caption (optional) — what is happening in this picture?" className="h-10 text-sm" />
+
+                            {/* Consent form upload */}
+                            <div className={`rounded-xl border p-2.5 ${p.consentFile ? "border-emerald-300 bg-emerald-500/5 dark:border-emerald-400/40" : consentMissing ? "border-destructive bg-destructive/5" : "border-input bg-muted/40"}`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                                  <FileCheck2 className="h-4 w-4 text-rose-500" /> Signed consent form *
+                                </span>
+                                <Button type="button" variant="outline" size="sm" className="h-7 gap-1 text-xs"
+                                  onClick={() => consentRefs.current[p.id]?.click()}>
+                                  <UploadCloud className="h-3.5 w-3.5" /> {p.consentFile ? "Replace" : "Upload"}
+                                </Button>
+                              </div>
+                              {p.consentFile ? (
+                                <div className="mt-2 flex items-center gap-2">
+                                  {p.consentUrl ? (
+                                    <img src={p.consentUrl} alt="Consent form preview" className="h-12 w-12 rounded-md object-cover" />
+                                  ) : (
+                                    <span className="flex h-12 w-12 items-center justify-center rounded-md bg-rose-500/10 text-rose-500"><FileText className="h-5 w-5" /></span>
+                                  )}
+                                  <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">{p.consentName}</span>
+                                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                                </div>
+                              ) : (
+                                <p className="mt-1.5 text-[11px] text-muted-foreground">Upload a photo or PDF of the signed consent form for this picture.</p>
+                              )}
+                              <input ref={(el) => (consentRefs.current[p.id] = el)} type="file" accept="image/*,application/pdf" className="hidden"
+                                onChange={(e) => { attachConsent(p.id, e.target.files?.[0] ?? null); e.target.value = ""; }} />
+                            </div>
+
+                            {/* Informed consent confirmation */}
+                            <label className={`flex items-start gap-2 rounded-xl border p-2.5 text-xs transition ${p.informedConsent ? "border-emerald-300 bg-emerald-500/10 dark:border-emerald-400/40" : confirmMissing ? "border-destructive bg-destructive/10" : "border-input bg-muted/40"}`}>
+                              <Checkbox checked={p.informedConsent} onCheckedChange={(c) => {
+                                setPhoto(p.id, { informedConsent: !!c });
+                                if (c) setErrors((prev) => { const n = new Set(prev); n.delete(`photo_${p.id}`); return n; });
+                              }} className="mt-0.5" />
+                              <span className="leading-snug">
+                                <Heart className="mr-1 inline h-3.5 w-3.5 align-text-bottom text-rose-500" />
+                                I confirm that <strong>INFORMED CONSENT</strong> was obtained from the people in this picture for it to be captured, stored and used for SARMAAN ACSM reporting. *
+                              </span>
+                            </label>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex min-w-0 flex-1 flex-col gap-2">
-                        <Input value={p.caption} onChange={(e) => setPhoto(p.id, { caption: e.target.value })}
-                          placeholder="Caption (optional)" className="h-9 text-sm" />
-                        <label className={`flex items-start gap-2 rounded-md p-2 text-xs ${p.consent ? "bg-emerald-500/10" : err ? "bg-destructive/10" : "bg-muted/50"}`}>
-                          <Checkbox checked={p.consent} onCheckedChange={(c) => {
-                            setPhoto(p.id, { consent: !!c });
-                            if (c) setErrors((prev) => { const n = new Set(prev); n.delete(`photo_${p.id}`); return n; });
-                          }} className="mt-0.5" />
-                          <span className="leading-snug">
-                            <ShieldCheck className="mr-1 inline h-3.5 w-3.5 align-text-bottom" />
-                            I confirm consent was obtained from the people in this picture for it to be captured and submitted. *
-                          </span>
-                        </label>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </Card>
 
-          {/* Narrative */}
-          <Card className="mt-4 space-y-1.5 p-4 sm:p-6">
-            <Label>Narrative / additional notes</Label>
-            <Textarea value={narrative} onChange={(e) => setNarrative(e.target.value)} rows={3}
+          {/* Narrative — mandatory */}
+          <Card className="mt-4 space-y-1.5 p-4 sm:p-6" style={{ borderTopWidth: 3, borderTopColor: form.color }}>
+            <Label>Narrative / additional notes <span className="text-destructive">*</span></Label>
+            <p className="text-xs text-muted-foreground">Summarise the activity — key reflections, means of verification and follow-up actions. This is required.</p>
+            <Textarea value={narrative}
+              onChange={(e) => { setNarrative(e.target.value); if (e.target.value.trim()) setErrors((prev) => { const n = new Set(prev); n.delete("__narrative"); return n; }); }}
+              rows={4} aria-invalid={errors.has("__narrative")}
+              className={errors.has("__narrative") ? "border-destructive focus-visible:ring-destructive" : ""}
               placeholder="Key reflections, means of verification, follow-up actions…" />
           </Card>
         </div>

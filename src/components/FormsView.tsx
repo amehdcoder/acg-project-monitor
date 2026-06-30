@@ -2678,8 +2678,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                       <BarChart3 className="h-5 w-5 text-[#0c2340]" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground truncate">LGA ACSM Focal Person IRF (Independent Activity Tracker)</p>
-                      <p className="text-xs text-muted-foreground">Sectioned indicator reporting form + real-time dashboard for advocacy, social mobilization, awareness creation &amp; non-compliance resolution.</p>
+                      <p className="text-sm font-semibold text-foreground truncate">SARMAAN ACSM Indicator Reporting Forms (SAIRF)</p>
+                      <p className="text-xs text-muted-foreground">Sectioned indicator reporting forms + executive dashboard for advocacy, social mobilization, awareness creation &amp; non-compliance resolution.</p>
                     </div>
                   </div>
                   <Button
@@ -2691,7 +2691,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         return;
                       }
                       if (forms.find((f) => (f.settings as any)?.irf_kind)) {
-                        toast({ title: "Already added", description: "The LGA ACSM Focal Person tools already exist in this project. Open them from the list above." });
+                        toast({ title: "Already added", description: "The SARMAAN ACSM (SAIRF) tools already exist in this project. Open them from the list above." });
                         return;
                       }
                       try {
