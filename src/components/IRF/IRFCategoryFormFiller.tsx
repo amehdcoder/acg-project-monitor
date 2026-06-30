@@ -567,7 +567,7 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
                 <p className="text-xs text-muted-foreground">Captured automatically — the satellite map shows exactly where you are standing.</p>
               </div>
             </div>
-            <div className={errors.has("__gps") ? "rounded-xl ring-2 ring-destructive" : ""}>
+            <div data-fkey="__gps" className={errors.has("__gps") ? "rounded-xl ring-2 ring-destructive" : ""}>
               <IrfGpsMap value={gps} onChange={setGps} accent={form.color} />
             </div>
           </Card>
