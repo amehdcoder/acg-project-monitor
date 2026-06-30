@@ -158,8 +158,12 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <Kpi icon={Users} label="People Reached" value={fmt(stats.peopleReached)} sub="Reach + attendance" color="#0891b2" />
               <Kpi icon={Landmark} label="Stakeholders Engaged" value={fmt(stats.stakeholdersEngaged)} sub="Advocacy contacts" color="#7c3aed" />
-              <Kpi icon={Megaphone} label="Awareness Activities" value={fmt(stats.awarenessActivities)} sub="Broadcasts, IEC, dialogues" color="#ea580c" />
-              <Kpi icon={ShieldCheck} label="Non-Compliance Resolved" value={`${stats.ncResolutionRate}%`} sub={`${fmt(stats.ncResolved)} of ${fmt(stats.ncTotal)} cases`} color="#dc2626" />
+              <Kpi icon={Megaphone} label="Awareness Activities" value={fmt(stats.awarenessActivities)} sub="Announcements, dialogues, meetings" color="#ea580c" />
+              {stats.hasNonCompliance ? (
+                <Kpi icon={ShieldCheck} label="Non-Compliance Resolved" value={`${stats.ncResolutionRate}%`} sub={`${fmt(stats.ncResolved)} of ${fmt(stats.ncTotal)} cases`} color="#dc2626" />
+              ) : (
+                <Kpi icon={Gauge} label="High Acceptance" value={`${stats.acceptanceHighPct}%`} sub={`${fmt(stats.acceptanceHigh)} of ${fmt(stats.acceptanceAnswered)} rated outcomes`} color="#16a34a" />
+              )}
             </div>
 
             {/* Kano State coverage map */}
