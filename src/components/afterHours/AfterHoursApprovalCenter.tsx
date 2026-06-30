@@ -82,24 +82,40 @@ const AfterHoursApprovalCenter = () => {
     const rows = (data ?? []) as RequestRow[];
     const pending = rows.filter((r) => r.status === "pending" && r.requested_by !== user.id);
     const reviewed = rows.filter((r) => r.status !== "pending");
+
+    // Resolve display names from profiles (auth id is stored in profiles.user_id).
+    // This covers both reviewers (audit log) and any requester whose stored
+    // name is missing, so the UI never falls back to "Unknown user".
+    const nameIds = Array.from(
+      new Set(
+        [
+          ...reviewed.map((r) => r.reviewed_by),
+          ...rows.filter((r) => !r.requested_by_name?.trim()).map((r) => r.requested_by),
+        ].filter(Boolean),
+      ),
+    ) as string[];
+    if (nameIds.length) {
+      const { data: profs } = await (supabase as any)
+        .from("profiles")
+        .select("user_id, first_name, last_name, email")
+        .in("user_id", nameIds);
+      const map: Record<string, string> = {};
+      (profs ?? []).forEach((p: any) => {
+        map[p.user_id] =
+          [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || p.email || "";
+      });
+      const fill = (r: RequestRow): RequestRow =>
+        r.requested_by_name?.trim()
+          ? r
+          : { ...r, requested_by_name: map[r.requested_by] || r.requested_by_name };
+      pending.forEach((r, i) => (pending[i] = fill(r)));
+      reviewed.forEach((r, i) => (reviewed[i] = fill(r)));
+      setReviewerNames(map);
+    }
+
     setRequests(pending);
     setHistory(reviewed);
     setOpen((prev) => prev || pending.length > 0);
-
-    // Resolve reviewer display names for the audit log
-    const ids = Array.from(new Set(reviewed.map((r) => r.reviewed_by).filter(Boolean))) as string[];
-    if (ids.length) {
-      const { data: profs } = await (supabase as any)
-        .from("profiles")
-        .select("id, first_name, last_name, email")
-        .in("id", ids);
-      const map: Record<string, string> = {};
-      (profs ?? []).forEach((p: any) => {
-        map[p.id] =
-          [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || p.email || "Unknown";
-      });
-      setReviewerNames(map);
-    }
   }, [user, canReview]);
 
   useEffect(() => {
