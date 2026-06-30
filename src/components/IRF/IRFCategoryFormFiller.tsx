@@ -71,6 +71,7 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
 
   const [values, setValues] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Set<string>>(new Set());
+  const scrollRef = useRef<HTMLDivElement>(null);
   const setVal = (k: string, v: any) => {
     setValues((p) => ({ ...p, [k]: v }));
     if (v !== undefined && v !== null && String(v).trim() !== "") {
@@ -132,12 +133,47 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
     return v === undefined || v === null || String(v).trim() === "";
   };
 
+  // Human-friendly name for any missing key, used in the toast + scroll target.
+  const friendlyName = (key: string): string => {
+    switch (key) {
+      case "__month": return "Reporting month";
+      case "__state": return "State";
+      case "__lga": return "LGA";
+      case "__gps": return "Activity Location (GPS)";
+      case "__ministry": return "Reporting category / ministry";
+      case "__ministry_other": return "Ministry / department name";
+      case "__narrative": return "Narrative / additional notes";
+      default: break;
+    }
+    if (key.startsWith("consent_")) return "Signed consent form for an activity picture";
+    if (key.startsWith("photo_")) return "Informed-consent confirmation for an activity picture";
+    const base = key.replace(/__other$/, "");
+    const f = allFields.find((x) => x.key === base);
+    if (f) return key.endsWith("__other") ? `${f.label} (please specify)` : f.label;
+    return "a required field";
+  };
+
+  const scrollToFirstError = (missing: string[]) => {
+    const first = missing[0];
+    if (!first) return;
+    // Defer so the destructive ring/aria-invalid classes are applied first.
+    requestAnimationFrame(() => {
+      const root = scrollRef.current ?? document;
+      const target =
+        root.querySelector(`[data-fkey="${first}"]`) ||
+        root.querySelector(`[data-fkey="${first.replace(/__other$/, "")}"]`) ||
+        root.querySelector('[aria-invalid="true"], .border-destructive, .ring-destructive');
+      if (target && "scrollIntoView" in target) {
+        (target as HTMLElement).scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+  };
+
   const validate = (): boolean => {
     const missing: string[] = [];
     if (!reportingMonth) missing.push("__month");
     if (!state) missing.push("__state");
     if (requiresLga && !lga) missing.push("__lga");
-    if (!gps) missing.push("__gps");
     if (form.perMinistry && !ministry) missing.push("__ministry");
     if (form.perMinistry && ministry === OTHER_OPTION && !ministryOther.trim()) missing.push("__ministry_other");
     allFields.forEach((f) => {
@@ -145,6 +181,9 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
       if (f.type === "select" && f.allowOther && values[f.key] === OTHER_OPTION && !String(values[`${f.key}__other`] ?? "").trim())
         missing.push(`${f.key}__other`);
     });
+    // GPS is checked LAST so a genuinely missing data field is reported first;
+    // GPS often lags indoors and would otherwise mask the real culprit.
+    if (!gps) missing.push("__gps");
     // Narrative / additional notes is mandatory.
     if (!narrative.trim()) missing.push("__narrative");
     // Each picture requires an uploaded consent form AND an informed-consent confirmation.
@@ -155,10 +194,18 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
 
     if (missing.length) {
       setErrors(new Set(missing));
-      if (missingConsentForm.length) toast.error("Please upload the signed consent form for every activity picture.");
-      else if (unconsented.length) toast.error("Please confirm INFORMED CONSENT for every activity picture.");
-      else if (missing.includes("__narrative")) toast.error("Please complete the Narrative / additional notes.");
-      else toast.error("Please complete all required fields.");
+      // Order the scroll/toast by visual position so we point at the first gap.
+      const onlyGps = missing.length === 1 && missing[0] === "__gps";
+      if (onlyGps) {
+        toast.error("Still capturing your GPS location. Wait for “GPS locked”, then submit. If it won’t lock, move outdoors or tap the map to set your point.");
+      } else if (missingConsentForm.length) {
+        toast.error("Please upload the signed consent form for every activity picture.");
+      } else if (unconsented.length) {
+        toast.error("Please confirm INFORMED CONSENT for every activity picture.");
+      } else {
+        toast.error(`Please complete: ${friendlyName(missing[0])}.`);
+      }
+      scrollToFirstError(missing);
       return false;
     }
     return true;
@@ -306,7 +353,9 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
     const fieldErr = errors.has(f.key);
     const errCls = fieldErr ? "border-destructive focus-visible:ring-destructive" : "";
     return (
-      <div key={f.key} className="space-y-1.5">
+      <div key={f.key} data-fkey={f.key} className="space-y-1.5">
+
+
         <div className="flex items-baseline justify-between gap-2">
           <Label className="text-sm font-medium">{f.label}{f.required && <span className="text-destructive"> *</span>}</Label>
           {f.example && <span className="text-[11px] text-muted-foreground">e.g. {f.example}</span>}
@@ -395,7 +444,7 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
       </div>
 
       {/* Scroll area */}
-      <div className="relative z-10 flex-1 overflow-y-auto overscroll-contain">
+      <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto overscroll-contain">
         <div className="mx-auto w-full max-w-3xl px-4 py-4 sm:px-6">
           {/* Reporting identity */}
           <Card className="space-y-4 p-4 sm:p-6" style={{ borderTopWidth: 3, borderTopColor: form.color }}>
@@ -443,14 +492,14 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
 
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
+              <div data-fkey="__month" className="space-y-1.5">
                 <Label>Reporting month *</Label>
                 <Select value={reportingMonth} onValueChange={setReportingMonth}>
                   <SelectTrigger className={`h-12 ${errors.has("__month") ? "border-destructive" : ""}`}><SelectValue /></SelectTrigger>
                   <SelectContent>{monthOptions.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
+              <div data-fkey="__state" className="space-y-1.5">
                 <Label>State *</Label>
                 <Select value={state || undefined} onValueChange={(v) => { setState(v); setLga(""); setWard(""); }}>
                   <SelectTrigger className={`h-12 ${errors.has("__state") ? "border-destructive" : ""}`}><SelectValue placeholder="Select state" /></SelectTrigger>
@@ -459,7 +508,7 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
               </div>
               {requiresLga && (
                 <>
-                  <div className="space-y-1.5">
+                  <div data-fkey="__lga" className="space-y-1.5">
                     <Label>LGA *</Label>
                     <Select value={lga || undefined} onValueChange={(v) => { setLga(v); setWard(""); }} disabled={!state}>
                       <SelectTrigger className={`h-12 ${errors.has("__lga") ? "border-destructive" : ""}`}><SelectValue placeholder="Select LGA" /></SelectTrigger>
