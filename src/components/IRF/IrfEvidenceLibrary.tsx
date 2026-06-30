@@ -243,6 +243,7 @@ export default function IrfEvidenceLibrary({ rows }: Props) {
                 );
               })}
             </div>
+            </>
           )}
         </CollapsibleContent>
       </Collapsible>
