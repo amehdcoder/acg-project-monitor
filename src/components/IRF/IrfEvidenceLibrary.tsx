@@ -186,10 +186,11 @@ export default function IrfEvidenceLibrary({ rows }: Props) {
                         </p>
                       </div>
                       <Button size="sm" variant="outline" className="h-8 gap-1 text-xs"
-                        disabled={busy === r.id} onClick={() => downloadAll(items, r.id)}>
-                        {busy === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                        Download all
+                        disabled={busy === r.id} onClick={() => downloadAll(r, items, r.id)}>
+                        {busy === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileArchive className="h-3.5 w-3.5" />}
+                        Download ZIP
                       </Button>
+
                     </div>
                     <div className="grid gap-2 p-3 sm:grid-cols-2">
                       {items.map((it, i) => (
