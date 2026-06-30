@@ -71,7 +71,7 @@ export function analyzeStatistics(rows: IrfReport[]): IrfStatistics {
   const indicators: IndicatorStat[] = INDICATORS.map((ind) => {
     const values = rows.map((r) => num((r as any)[ind.key])).filter((v): v is number => v != null && Number.isFinite(v));
     return { key: ind.key, label: ind.label, color: ind.color, ...describe(values) };
-  }).filter((s) => s.n > 0);
+  }).filter((s) => s.n > 0 && s.sum > 0);
 
   // Month-over-month reach growth.
   const byMonth = new Map<string, number>();
