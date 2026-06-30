@@ -204,8 +204,42 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
         };
       });
 
+      // Fetch standalone special-form submissions (SAIRF, ACSM, SBC, CES, …)
+      // that live in their own tables and would otherwise be invisible here.
+      let specialMapped: Submission[] = [];
+      if (user?.id) {
+        try {
+          const special = await fetchUserSpecialSubmissions(user.id, { allUsers: isAdmin });
+          specialMapped = special.map((s) => {
+            const locationInfo = extractLocationInfo(
+              s.data,
+              s.lat != null && s.lng != null ? { lat: s.lat, lng: s.lng } : null,
+            );
+            return {
+              id: s.id,
+              form_id: s.form_id,
+              form_name: s.form_name,
+              data: s.data,
+              status: "submitted",
+              location: s.lat != null && s.lng != null ? { lat: s.lat, lng: s.lng } : null,
+              within_geofence: null,
+              created_at: s.created_at,
+              submitted_at: s.submitted_at,
+              synced_at: s.submitted_at,
+              isPending: false,
+              locationInfo,
+              isSpecial: true,
+              sourceLabel: s.sourceLabel,
+              accent: s.accent,
+            } as Submission;
+          });
+        } catch (e) {
+          console.error("Error loading special-form submissions:", e);
+        }
+      }
+
       // Combine and sort by created_at
-      const allSubmissions = [...pendingMapped, ...syncedSubmissions].sort(
+      const allSubmissions = [...pendingMapped, ...syncedSubmissions, ...specialMapped].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
