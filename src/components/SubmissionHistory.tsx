@@ -81,6 +81,9 @@ interface Submission {
   isPending?: boolean;
   retryCount?: number;
   locationInfo?: LocationInfo;
+  isSpecial?: boolean;
+  sourceLabel?: string;
+  accent?: string;
 }
 
 interface SubmissionHistoryProps {
