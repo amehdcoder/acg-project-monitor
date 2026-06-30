@@ -333,20 +333,60 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
     );
   };
 
-  const filteredSubmissions = submissions.filter((sub) => {
-    const matchesSearch = sub.form_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sub.id.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    if (statusFilter === "all") return matchesSearch;
-    if (statusFilter === "pending") return matchesSearch && sub.isPending;
-    if (statusFilter === "synced") return matchesSearch && !sub.isPending && sub.synced_at;
-    if (statusFilter === "sent") return matchesSearch && sub.status === "sent";
-    
-    return matchesSearch;
-  });
+  const programmeOf = (sub: Submission) =>
+    sub.sourceLabel || (sub.isSpecial ? "Special form" : "Standard form");
+
+  const formOptions = useMemo(
+    () => Array.from(new Set(submissions.map((s) => s.form_name).filter(Boolean) as string[])).sort(),
+    [submissions],
+  );
+  const programmeOptions = useMemo(
+    () => Array.from(new Set(submissions.map(programmeOf))).sort(),
+    [submissions],
+  );
+
+  const statusRank = (sub: Submission) =>
+    sub.isPending ? "pending" : sub.synced_at ? "synced" : sub.status || "submitted";
+
+  const filteredSubmissions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const list = submissions.filter((sub) => {
+      const matchesSearch = !q ||
+        sub.form_name?.toLowerCase().includes(q) ||
+        sub.sourceLabel?.toLowerCase().includes(q) ||
+        sub.id.toLowerCase().includes(q) ||
+        sub.locationInfo?.displayLocation?.toLowerCase().includes(q) ||
+        Object.values(sub.data || {}).some((v) => String(v ?? "").toLowerCase().includes(q));
+      if (!matchesSearch) return false;
+
+      if (statusFilter === "pending" && !sub.isPending) return false;
+      if (statusFilter === "synced" && !(!sub.isPending && sub.synced_at)) return false;
+      if (statusFilter === "sent" && sub.status !== "sent") return false;
+
+      if (formFilter !== "all" && sub.form_name !== formFilter) return false;
+      if (programmeFilter !== "all" && programmeOf(sub) !== programmeFilter) return false;
+      return true;
+    });
+
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      const ta = new Date(a.created_at).getTime();
+      const tb = new Date(b.created_at).getTime();
+      switch (sortBy) {
+        case "date-asc": return ta - tb;
+        case "form": return (a.form_name || "").localeCompare(b.form_name || "");
+        case "programme": return programmeOf(a).localeCompare(programmeOf(b));
+        case "status": return statusRank(a).localeCompare(statusRank(b));
+        case "date-desc":
+        default: return tb - ta;
+      }
+    });
+    return sorted;
+  }, [submissions, searchQuery, statusFilter, formFilter, programmeFilter, sortBy]);
 
   const pendingSubmissions = submissions.filter(s => s.isPending);
   const syncedSubmissions = submissions.filter(s => !s.isPending);
+
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
