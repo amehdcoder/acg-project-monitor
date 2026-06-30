@@ -96,6 +96,9 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [formFilter, setFormFilter] = useState<string>("all");
+  const [programmeFilter, setProgrammeFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("date-desc");
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [formLabelMaps, setFormLabelMaps] = useState<Record<string, QuestionLabelMap>>({});
@@ -330,20 +333,60 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
     );
   };
 
-  const filteredSubmissions = submissions.filter((sub) => {
-    const matchesSearch = sub.form_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sub.id.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    if (statusFilter === "all") return matchesSearch;
-    if (statusFilter === "pending") return matchesSearch && sub.isPending;
-    if (statusFilter === "synced") return matchesSearch && !sub.isPending && sub.synced_at;
-    if (statusFilter === "sent") return matchesSearch && sub.status === "sent";
-    
-    return matchesSearch;
-  });
+  const programmeOf = (sub: Submission) =>
+    sub.sourceLabel || (sub.isSpecial ? "Special form" : "Standard form");
+
+  const formOptions = useMemo(
+    () => Array.from(new Set(submissions.map((s) => s.form_name).filter(Boolean) as string[])).sort(),
+    [submissions],
+  );
+  const programmeOptions = useMemo(
+    () => Array.from(new Set(submissions.map(programmeOf))).sort(),
+    [submissions],
+  );
+
+  const statusRank = (sub: Submission) =>
+    sub.isPending ? "pending" : sub.synced_at ? "synced" : sub.status || "submitted";
+
+  const filteredSubmissions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const list = submissions.filter((sub) => {
+      const matchesSearch = !q ||
+        sub.form_name?.toLowerCase().includes(q) ||
+        sub.sourceLabel?.toLowerCase().includes(q) ||
+        sub.id.toLowerCase().includes(q) ||
+        sub.locationInfo?.displayLocation?.toLowerCase().includes(q) ||
+        Object.values(sub.data || {}).some((v) => String(v ?? "").toLowerCase().includes(q));
+      if (!matchesSearch) return false;
+
+      if (statusFilter === "pending" && !sub.isPending) return false;
+      if (statusFilter === "synced" && !(!sub.isPending && sub.synced_at)) return false;
+      if (statusFilter === "sent" && sub.status !== "sent") return false;
+
+      if (formFilter !== "all" && sub.form_name !== formFilter) return false;
+      if (programmeFilter !== "all" && programmeOf(sub) !== programmeFilter) return false;
+      return true;
+    });
+
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      const ta = new Date(a.created_at).getTime();
+      const tb = new Date(b.created_at).getTime();
+      switch (sortBy) {
+        case "date-asc": return ta - tb;
+        case "form": return (a.form_name || "").localeCompare(b.form_name || "");
+        case "programme": return programmeOf(a).localeCompare(programmeOf(b));
+        case "status": return statusRank(a).localeCompare(statusRank(b));
+        case "date-desc":
+        default: return tb - ta;
+      }
+    });
+    return sorted;
+  }, [submissions, searchQuery, statusFilter, formFilter, programmeFilter, sortBy]);
 
   const pendingSubmissions = submissions.filter(s => s.isPending);
   const syncedSubmissions = submissions.filter(s => !s.isPending);
+
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
@@ -444,36 +487,89 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
       </div>
 
       {/* Search and Filter */}
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by form name or submission ID..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search latest entries — form, programme, location, ID or any answer…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Button variant="outline" onClick={fetchSubmissions}>
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </Button>
         </div>
-        <Select value={statusFilter} onValueChange={(val) => {
-          if (navigator.vibrate) navigator.vibrate(10);
-          setStatusFilter(val);
-        }}>
-          <SelectTrigger className="w-[180px]">
-            <Filter className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Submissions</SelectItem>
-            <SelectItem value="pending">Pending Sync</SelectItem>
-            <SelectItem value="synced">Synced</SelectItem>
-            <SelectItem value="sent">Sent</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button variant="outline" onClick={fetchSubmissions}>
-          <RefreshCw className="h-4 w-4" />
-          Refresh
-        </Button>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Select value={statusFilter} onValueChange={(val) => { if (navigator.vibrate) navigator.vibrate(10); setStatusFilter(val); }}>
+            <SelectTrigger>
+              <Filter className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="pending">Pending Sync</SelectItem>
+              <SelectItem value="synced">Synced</SelectItem>
+              <SelectItem value="sent">Sent</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={programmeFilter} onValueChange={setProgrammeFilter}>
+            <SelectTrigger>
+              <FileText className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Programme" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All programmes</SelectItem>
+              {programmeOptions.map((p) => (
+                <SelectItem key={p} value={p}>{p}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={formFilter} onValueChange={setFormFilter}>
+            <SelectTrigger>
+              <FileText className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Form" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All forms</SelectItem>
+              {formOptions.map((f) => (
+                <SelectItem key={f} value={f}>{f}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger>
+              <Calendar className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="date-desc">Newest first</SelectItem>
+              <SelectItem value="date-asc">Oldest first</SelectItem>
+              <SelectItem value="form">Form (A–Z)</SelectItem>
+              <SelectItem value="programme">Programme (A–Z)</SelectItem>
+              <SelectItem value="status">Status</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {(statusFilter !== "all" || formFilter !== "all" || programmeFilter !== "all" || searchQuery) && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>{filteredSubmissions.length} of {submissions.length} submissions shown</span>
+            <button
+              className="font-medium text-primary hover:underline"
+              onClick={() => { setStatusFilter("all"); setFormFilter("all"); setProgrammeFilter("all"); setSearchQuery(""); }}
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
       </div>
+
 
       {/* Loading State */}
       {loading && (

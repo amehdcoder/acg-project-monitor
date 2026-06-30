@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import {
-  ChevronDown, Images, FileCheck2, Download, ShieldCheck, Loader2, MapPin, ImageIcon, FileText,
+  ChevronDown, Images, FileCheck2, Download, ShieldCheck, Loader2, MapPin, ImageIcon, FileText, FileArchive,
 } from "lucide-react";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
@@ -25,14 +27,42 @@ interface EvidenceItem {
 const formName = (id?: string | null) => IRF_CATEGORY_FORMS.find((f) => f.id === id)?.short || "Activity";
 const formColor = (id?: string | null) => IRF_CATEGORY_FORMS.find((f) => f.id === id)?.color || "#0891b2";
 
+const safe = (s: string) => String(s || "").replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+const baseName = (p: string) => p.split("/").pop() || p;
+
+/** Resolve a signed URL and fetch the file as a Blob. */
+async function fetchBlob(path: string): Promise<Blob | null> {
+  const { data, error } = await supabase.storage.from("irf-evidence").createSignedUrl(path, 3600);
+  if (error || !data?.signedUrl) return null;
+  try {
+    const res = await fetch(data.signedUrl);
+    if (!res.ok) return null;
+    return await res.blob();
+  } catch {
+    return null;
+  }
+}
+
+/** Download a single stored file directly to the device. */
+async function downloadOne(path: string, filename?: string) {
+  const blob = await fetchBlob(path);
+  if (!blob) {
+    toast.error("Could not download file — it may have been removed or access is restricted.");
+    return false;
+  }
+  saveAs(blob, filename || baseName(path));
+  return true;
+}
+
 async function openSigned(path: string) {
   const { data, error } = await supabase.storage.from("irf-evidence").createSignedUrl(path, 3600);
   if (error || !data?.signedUrl) {
-    toast.error("Could not open file — it may have been removed.");
+    toast.error("Could not open file — it may have been removed or access is restricted.");
     return;
   }
   window.open(data.signedUrl, "_blank", "noopener,noreferrer");
 }
+
 
 export default function IrfEvidenceLibrary({ rows }: Props) {
   const [open, setOpen] = useState(false);
@@ -56,16 +86,62 @@ export default function IrfEvidenceLibrary({ rows }: Props) {
     return { pictures, consents, activities: reportsWithEvidence.length };
   }, [reportsWithEvidence]);
 
-  const downloadAll = async (items: EvidenceItem[], key: string) => {
+  /** Zip every picture + consent form for a single activity report. */
+  const downloadAll = async (r: IrfReport, items: EvidenceItem[], key: string) => {
     setBusy(key);
     try {
-      const paths = items.flatMap((i) => [i.path, i.consent_form_path].filter(Boolean) as string[]);
-      for (const p of paths) {
+      const zip = new JSZip();
+      let added = 0;
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
         // eslint-disable-next-line no-await-in-loop
-        await openSigned(p);
+        const pic = await fetchBlob(it.path);
+        if (pic) { zip.file(`picture-${i + 1}-${baseName(it.path)}`, pic); added++; }
+        if (it.consent_form_path) {
+          // eslint-disable-next-line no-await-in-loop
+          const con = await fetchBlob(it.consent_form_path);
+          if (con) { zip.file(`consent-${i + 1}-${it.consent_form_name || baseName(it.consent_form_path)}`, con); added++; }
+        }
       }
+      if (!added) { toast.error("No files could be downloaded (access may be restricted)."); return; }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const label = `${safe(formName(r.form_category))}-${safe([r.lga, r.state].filter(Boolean).join("-") || "evidence")}`;
+      saveAs(blob, `${label}.zip`);
+      toast.success(`Downloaded ${added} file(s) as a ZIP.`);
+    } catch {
+      toast.error("Download failed. Please try again.");
     } finally { setBusy(null); }
   };
+
+  /** Zip the entire evidence library across all activities. */
+  const downloadEverything = async () => {
+    setBusy("__all__");
+    try {
+      const zip = new JSZip();
+      let added = 0;
+      for (const { r, items } of reportsWithEvidence) {
+        const folder = zip.folder(`${safe(formName(r.form_category))}-${safe([r.lga, r.state].filter(Boolean).join("-") || r.id.slice(0, 6))}`)!;
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i];
+          // eslint-disable-next-line no-await-in-loop
+          const pic = await fetchBlob(it.path);
+          if (pic) { folder.file(`picture-${i + 1}-${baseName(it.path)}`, pic); added++; }
+          if (it.consent_form_path) {
+            // eslint-disable-next-line no-await-in-loop
+            const con = await fetchBlob(it.consent_form_path);
+            if (con) { folder.file(`consent-${i + 1}-${it.consent_form_name || baseName(it.consent_form_path)}`, con); added++; }
+          }
+        }
+      }
+      if (!added) { toast.error("No files could be downloaded (access may be restricted)."); return; }
+      const blob = await zip.generateAsync({ type: "blob" });
+      saveAs(blob, `SAIRF-evidence-library-${new Date().toISOString().slice(0, 10)}.zip`);
+      toast.success(`Downloaded ${added} file(s) as a ZIP.`);
+    } catch {
+      toast.error("Download failed. Please try again.");
+    } finally { setBusy(null); }
+  };
+
 
   return (
     <Card className="overflow-hidden">
@@ -92,7 +168,16 @@ export default function IrfEvidenceLibrary({ rows }: Props) {
               <p className="text-sm">No activity pictures have been uploaded yet.</p>
             </div>
           ) : (
+            <>
+            <div className="flex items-center justify-between gap-2 border-b bg-muted/20 px-4 py-2.5">
+              <p className="text-xs text-muted-foreground">Pictures &amp; signed consent forms grouped by activity.</p>
+              <Button size="sm" className="h-8 gap-1 text-xs" disabled={busy === "__all__"} onClick={downloadEverything}>
+                {busy === "__all__" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileArchive className="h-3.5 w-3.5" />}
+                Download entire library (ZIP)
+              </Button>
+            </div>
             <div className="max-h-[560px] space-y-3 overflow-y-auto p-4">
+
               {reportsWithEvidence.map(({ r, items }) => {
                 const color = formColor(r.form_category);
                 return (
@@ -110,10 +195,11 @@ export default function IrfEvidenceLibrary({ rows }: Props) {
                         </p>
                       </div>
                       <Button size="sm" variant="outline" className="h-8 gap-1 text-xs"
-                        disabled={busy === r.id} onClick={() => downloadAll(items, r.id)}>
-                        {busy === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                        Download all
+                        disabled={busy === r.id} onClick={() => downloadAll(r, items, r.id)}>
+                        {busy === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileArchive className="h-3.5 w-3.5" />}
+                        Download ZIP
                       </Button>
+
                     </div>
                     <div className="grid gap-2 p-3 sm:grid-cols-2">
                       {items.map((it, i) => (
@@ -132,11 +218,15 @@ export default function IrfEvidenceLibrary({ rows }: Props) {
                             </div>
                           </div>
                           <div className="flex shrink-0 gap-1">
-                            <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Open picture" onClick={() => openSigned(it.path)}>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Preview picture" onClick={() => openSigned(it.path)}>
                               <ImageIcon className="h-4 w-4" />
                             </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" aria-label="Download picture" onClick={() => downloadOne(it.path)}>
+                              <Download className="h-4 w-4" />
+                            </Button>
                             {it.consent_form_path ? (
-                              <Button size="icon" variant="ghost" className="h-7 w-7 text-rose-500" aria-label="Open consent form" onClick={() => openSigned(it.consent_form_path!)}>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-rose-500" aria-label="Download consent form"
+                                onClick={() => downloadOne(it.consent_form_path!, it.consent_form_name || undefined)}>
                                 <FileCheck2 className="h-4 w-4" />
                               </Button>
                             ) : (
@@ -145,6 +235,7 @@ export default function IrfEvidenceLibrary({ rows }: Props) {
                               </span>
                             )}
                           </div>
+
                         </div>
                       ))}
                     </div>
@@ -152,6 +243,7 @@ export default function IrfEvidenceLibrary({ rows }: Props) {
                 );
               })}
             </div>
+            </>
           )}
         </CollapsibleContent>
       </Collapsible>

@@ -189,3 +189,46 @@ export function interpretDataset(
 
   return { headline, bullets };
 }
+
+export type InsightTone = "positive" | "warning" | "neutral";
+export interface FieldInsight { tone: InsightTone; text: string; recommendation?: string; }
+
+const nf = (n: number) => new Intl.NumberFormat().format(Math.round(n || 0));
+
+/**
+ * Produce a decision-oriented insight for a categorical field: concentration,
+ * acceptance signals, data-coverage caveats and a concrete recommendation.
+ */
+export function categoricalInsight(a: CategoricalFieldAnalysis): FieldInsight {
+  // Acceptance-style fields (High/Medium/Low) get a tailored reading.
+  const high = a.data.find((d) => /^high$/i.test(d.name));
+  const low = a.data.find((d) => /^low$/i.test(d.name));
+  const yes = a.data.find((d) => /^yes$/i.test(d.name));
+  if (high || low) {
+    const h = high?.pct ?? 0;
+    const l = low?.pct ?? 0;
+    if (h >= 50) return { tone: "positive", text: `Strong field acceptance — ${h}% rated “High”.`, recommendation: "Document and replicate what is working in these high-performing engagements." };
+    if (l >= 40) return { tone: "warning", text: `${l}% rated “Low” — acceptance is lagging.`, recommendation: "Prioritise refresher training and community entry through trusted leaders here." };
+    return { tone: "neutral", text: `Mixed acceptance: ${h}% High vs ${l}% Low.`, recommendation: "Convert “Medium” engagements upward with targeted follow-up visits." };
+  }
+  if (yes && a.unique <= 2) {
+    if (yes.pct >= 80) return { tone: "positive", text: `${yes.pct}% answered “Yes” — near-universal compliance.` };
+    if (yes.pct <= 40) return { tone: "warning", text: `Only ${yes.pct}% answered “Yes”.`, recommendation: "Investigate the gap and reinforce the underlying activity." };
+    return { tone: "neutral", text: `${yes.pct}% answered “Yes”.` };
+  }
+  // Generic concentration insight.
+  if (a.top.pct >= 60) return { tone: "neutral", text: `Concentrated: “${a.top.name}” dominates at ${a.top.pct}% of responses.`, recommendation: a.responseRate < 60 ? "Improve coverage — fewer than 60% of reports answered this." : undefined };
+  if (a.unique >= 5) return { tone: "neutral", text: `Diverse mix across ${a.unique} categories; “${a.top.name}” leads (${a.top.pct}%).` };
+  return { tone: "neutral", text: `“${a.top.name}” is most common (${a.top.pct}%).`, recommendation: a.responseRate < 60 ? "Low coverage — encourage teams to complete this field." : undefined };
+}
+
+/**
+ * Produce a decision-oriented insight for a numeric indicator: spread,
+ * outlier risk, coverage and a recommendation.
+ */
+export function numericInsight(a: NumericFieldAnalysis): FieldInsight {
+  if (a.responseRate < 50) return { tone: "warning", text: `Only ${a.responseRate}% of reports captured this — totals understate true effort.`, recommendation: "Make this field mandatory or coach teams to complete it." };
+  if (a.cv > 100) return { tone: "warning", text: `Highly uneven (CV ${a.cv}%): range ${nf(a.min)}–${nf(a.max)} around a mean of ${nf(a.mean)}.`, recommendation: "Validate the high/low outliers — likely data-entry or uneven field effort." };
+  if (Math.abs(a.mean - a.median) > a.mean * 0.5 && a.mean > 0) return { tone: "neutral", text: `Skewed distribution — a few large reports lift the mean (${nf(a.mean)}) above the median (${nf(a.median)}).`, recommendation: "Use the median as the typical value when target-setting." };
+  return { tone: "positive", text: `Consistent effort: ${nf(a.sum)} total, typically ${nf(a.median)} per report (CV ${a.cv}%).` };
+}
