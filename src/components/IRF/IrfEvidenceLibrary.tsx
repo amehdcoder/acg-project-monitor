@@ -168,7 +168,16 @@ export default function IrfEvidenceLibrary({ rows }: Props) {
               <p className="text-sm">No activity pictures have been uploaded yet.</p>
             </div>
           ) : (
+            <>
+            <div className="flex items-center justify-between gap-2 border-b bg-muted/20 px-4 py-2.5">
+              <p className="text-xs text-muted-foreground">Pictures &amp; signed consent forms grouped by activity.</p>
+              <Button size="sm" className="h-8 gap-1 text-xs" disabled={busy === "__all__"} onClick={downloadEverything}>
+                {busy === "__all__" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileArchive className="h-3.5 w-3.5" />}
+                Download entire library (ZIP)
+              </Button>
+            </div>
             <div className="max-h-[560px] space-y-3 overflow-y-auto p-4">
+
               {reportsWithEvidence.map(({ r, items }) => {
                 const color = formColor(r.form_category);
                 return (
