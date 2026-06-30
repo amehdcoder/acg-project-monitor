@@ -108,7 +108,7 @@ function NumericCard({ a }: { a: NumericFieldAnalysis }) {
             <XAxis dataKey="name" tick={{ fontSize: 9, fill: chartMuted }} axisLine={{ stroke: chartBorder }} tickLine={false} interval={0} />
             <YAxis allowDecimals={false} tick={{ fontSize: 9, fill: chartMuted }} axisLine={false} tickLine={false} />
             <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => [`${fmt(v)} report(s)`, ""]} />
-            <ReferenceLine x={undefined} stroke="transparent" />
+
             <Bar dataKey="value" fill="#0b5394" radius={[3, 3, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
