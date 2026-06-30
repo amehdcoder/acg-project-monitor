@@ -523,13 +523,25 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
                           ? "border-yellow-200 bg-yellow-50/50"
                           : "border-border bg-card hover:border-acg-gold/30"
                       }`}
+                      style={
+                        submission.isSpecial && submission.accent
+                          ? { borderLeftWidth: 4, borderLeftColor: submission.accent }
+                          : undefined
+                      }
                     >
                       <div className="flex items-start gap-4">
-                        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
-                          submission.isPending ? "bg-yellow-100" : "bg-primary/10"
-                        }`}>
+                        <div
+                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+                          style={
+                            submission.isSpecial && submission.accent
+                              ? { backgroundColor: `${submission.accent}1f` }
+                              : undefined
+                          }
+                        >
                           {submission.isPending ? (
                             <Clock className="h-6 w-6 text-yellow-600" />
+                          ) : submission.isSpecial && submission.accent ? (
+                            <FileText className="h-6 w-6" style={{ color: submission.accent }} />
                           ) : (
                             <CheckCircle2 className="h-6 w-6 text-primary" />
                           )}
@@ -539,6 +551,14 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
                             <h4 className="font-medium text-foreground">
                               {submission.form_name}
                             </h4>
+                            {submission.isSpecial && submission.sourceLabel && (
+                              <span
+                                className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
+                                style={{ backgroundColor: submission.accent }}
+                              >
+                                {submission.sourceLabel}
+                              </span>
+                            )}
                             {getStatusBadge(submission)}
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground font-mono">
