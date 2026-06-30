@@ -60,9 +60,6 @@ Deno.serve(async (req) => {
 
     const password = Deno.env.get("HOSTINGER_SMTP_PASSWORD");
     if (!password) throw new Error("HOSTINGER_SMTP_PASSWORD is not configured");
-    const client = new SMTPClient({
-      connection: { hostname: SMTP_HOST, port: SMTP_PORT, tls: true, auth: { username: SMTP_USER, password } },
-    });
 
     const html = `
       <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden">
