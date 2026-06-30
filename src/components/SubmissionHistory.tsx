@@ -570,11 +570,6 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
         )}
       </div>
 
-        <Button variant="outline" onClick={fetchSubmissions}>
-          <RefreshCw className="h-4 w-4" />
-          Refresh
-        </Button>
-      </div>
 
       {/* Loading State */}
       {loading && (
