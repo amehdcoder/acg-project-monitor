@@ -3,14 +3,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
 import { flagDuplicates, applyOverrides, irfSignature, irfOrder, type OverrideMap } from "@/lib/acsm/irfBridge";
 import { IRF_METRIC_FIELDS, IRF_SECTIONS, type IrfReport } from "@/lib/irf/definition";
+import { normalizeIrfRows } from "@/lib/irf/normalize";
 
 async function fetchAll(projectId?: string | null): Promise<IrfReport[]> {
-  return fetchAllRowsKeyset<IrfReport>((limit, afterId) => {
+  const rows = await fetchAllRowsKeyset<IrfReport>((limit, afterId) => {
     let q = supabase.from("irf_reports" as any).select("*");
     if (projectId) q = q.eq("project_id", projectId);
     if (afterId) q = q.gt("id", afterId);
     return q.order("id", { ascending: true }).limit(limit);
   });
+  // Flatten the category-form `answers` JSON onto each row so every captured
+  // field (officials engaged, announcers supervised, meetings held, …) is
+  // reachable by the KPI / statistics / field-analysis computations below.
+  return normalizeIrfRows(rows);
 }
 
 const num = (v: any) => (v == null || v === "" ? 0 : Number(v) || 0);
