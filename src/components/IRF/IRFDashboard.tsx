@@ -255,8 +255,17 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
               </Card>
             </div>
 
+            {/* Dynamic executive interpretation of the dataset */}
+            <IrfInterpretation rows={rows} stats={stats} duplicateCount={duplicates?.duplicateCount || 0} />
+
             {/* Robust statistical analysis of indicators */}
             <IrfStatisticalPanel rows={rows} />
+
+            {/* McKinsey-style field-by-field response analysis */}
+            <IrfFieldAnalysis rows={rows} />
+
+            {/* Who is submitting: forms, counts, duplicates */}
+            <IrfSubmitterPanel rows={rows} duplicateIds={duplicates?.duplicateIds || new Set()} />
 
             {/* Narrative & free-text intelligence */}
             <IrfTextInsights rows={rows} />
