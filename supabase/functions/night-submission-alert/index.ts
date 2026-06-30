@@ -83,19 +83,23 @@ Deno.serve(async (req) => {
     let sent = 0;
     for (const to of recipients) {
       try {
-        await client.send({
-          from: `${FROM_NAME} <${SMTP_USER}>`,
-          to,
-          subject: `🌙 After-Hours Submission — ${anomaly.form_name || "Form"} (${anomaly.collector_name || "User"})`,
-          content: `An after-hours submission was flagged for ${anomaly.collector_name} on ${anomaly.form_name}. Open the Feedback page to follow up.`,
-          html,
-        });
+        await sendMailRaw(
+          { hostname: SMTP_HOST, port: SMTP_PORT, username: SMTP_USER, password },
+          {
+            from: `${FROM_NAME} <${SMTP_USER}>`,
+            fromAddress: SMTP_USER,
+            to,
+            subject: `🌙 After-Hours Submission — ${anomaly.form_name || "Form"} (${anomaly.collector_name || "User"})`,
+            text: `An after-hours submission was flagged for ${anomaly.collector_name} on ${anomaly.form_name}. Open the Feedback page to follow up.`,
+            html,
+          },
+        );
         sent++;
       } catch (e) {
         console.error("send failed for", to, e);
       }
     }
-    await client.close().catch(() => {});
+
 
     return new Response(JSON.stringify({ sent }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
