@@ -119,7 +119,7 @@ export function analyzeFields(rows: IrfReport[]): { categorical: CategoricalFiel
     return v && v.toLowerCase() !== "unspecified" ? v : "Unspecified";
   };
 
-  for (const f of IRF_ALL_FIELDS) {
+  for (const f of ANALYSED_FIELDS) {
     const raw = rows.map((r) => (r as any)[f.key]).filter(isFilled);
     if (!raw.length) continue;
 
