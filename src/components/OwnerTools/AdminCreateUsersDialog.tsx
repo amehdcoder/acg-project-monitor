@@ -30,7 +30,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import {
   UserPlus, Loader2, Plus, Trash2, Download, Upload, CheckCircle2, XCircle,
-  Mail, MailWarning, AlertCircle, History as HistoryIcon, ChevronLeft, Lock, Clock,
+  Mail, MailWarning, AlertCircle, History as HistoryIcon, ChevronLeft, Lock, Clock, Search,
 } from "lucide-react";
 import {
   exportAccountTemplate, importAccountTemplate, type AccountRow,
