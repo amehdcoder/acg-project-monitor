@@ -49,7 +49,7 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
 
   // Reporting identity
   const [level, setLevel] = useState<"state" | "lga">("lga");
-  const [reportingMonth, setReportingMonth] = useState(monthOptions[0].value);
+  const [reportingMonth, setReportingMonth] = useState(getCurrentReportingMonth());
   const [state, setState] = useState("");
   const [lga, setLga] = useState("");
   const [ward, setWard] = useState("");
