@@ -2,8 +2,9 @@ import { useMemo, useState } from "react";
 import { BarChart3, PieChart as PieIcon, LayoutGrid, TrendingUp, AlertTriangle, Minus, Lightbulb } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
-  PieChart, Pie, Legend, ReferenceLine, LabelList,
+  PieChart, Pie, Legend, LabelList,
 } from "recharts";
+
 import { Card } from "@/components/ui/card";
 import {
   analyzeFields, categoricalInsight, numericInsight,
