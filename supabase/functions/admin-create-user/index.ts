@@ -263,10 +263,22 @@ Deno.serve(async (req) => {
             body: { to: email, subject: emailSubject, html },
           });
           if (!mailErr) { emailSent = true; mailLastError = undefined; break; }
-          mailLastError = (mailErr as Error).message;
+          // Surface the real underlying error (the SMTP reply) instead of the
+          // opaque "Edge Function returned a non-2xx status code".
+          let detail = (mailErr as Error).message;
+          try {
+            const ctx = (mailErr as { context?: Response }).context;
+            if (ctx && typeof ctx.text === "function") {
+              const txt = await ctx.text();
+              const parsed = JSON.parse(txt);
+              if (parsed?.error) detail = parsed.error;
+            }
+          } catch (_) { /* keep generic message */ }
+          mailLastError = detail;
           if (attempt < 3) await new Promise((r) => setTimeout(r, 1000 * attempt));
         }
         if (!emailSent) throw new Error(mailLastError ?? "Email delivery failed");
+
       } catch (e) {
         emailError = (e as Error).message;
       }

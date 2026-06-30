@@ -1,13 +1,18 @@
 // Sends transactional emails from info@amehnities.org via Hostinger SMTP.
 //
 // Reliability hardening:
-//   - A fresh SMTP connection is opened per send and always closed afterwards.
-//     (A cached/singleton client becomes unusable once a connection drops or a
-//     send errors, which silently failed every subsequent email in a batch.)
+//   - Uses a hand-rolled SMTP-over-TLS client (../_shared/rawSmtp.ts) instead of
+//     denomailer. On the Supabase edge runtime denomailer 1.6.0 throws an
+//     UNCATCHABLE event-loop error during DATA mode ("invalid cmd" /
+//     "connection not recoverable") that crashes the isolate, so every failure
+//     surfaced to callers as an opaque non-2xx with no diagnosable reason.
+//     The raw client turns every failure into a clear, catchable Error
+//     (e.g. the exact SMTP reply such as "554 5.7.1 Disabled by user from hPanel").
+//   - A fresh connection is opened per send and always closed afterwards.
 //   - Each send is retried up to 3 times with exponential backoff to absorb
-//     transient SMTP/network hiccups.
-//   - A hard timeout prevents a stuck connection from hanging the request.
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+//     transient SMTP/network hiccups. Permanent SMTP rejections (5xx replies)
+//     are NOT retried, since retrying cannot help and only delays the response.
+import { sendMailRaw } from "../_shared/rawSmtp.ts";
 import { guardRequest } from "../_shared/authGuard.ts";
 
 const corsHeaders = {
@@ -20,51 +25,14 @@ const SMTP_HOST = "smtp.hostinger.com";
 const SMTP_PORT = 465;
 const SMTP_USER = "info@amehnities.org";
 const FROM_NAME = "The Amehnities Team";
-const SEND_TIMEOUT_MS = 25_000;
+const SEND_TIMEOUT_MS = 20_000;
 const MAX_ATTEMPTS = 3;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`SMTP send timed out after ${ms}ms`)),
-      ms,
-    );
-    promise.then(
-      (v) => { clearTimeout(timer); resolve(v); },
-      (e) => { clearTimeout(timer); reject(e); },
-    );
-  });
-}
-
-async function sendOnce(
-  password: string,
-  msg: { to: string; subject: string; html?: string; text?: string },
-): Promise<void> {
-  // Fresh client every attempt so a dropped connection never poisons the next send.
-  const client = new SMTPClient({
-    connection: {
-      hostname: SMTP_HOST,
-      port: SMTP_PORT,
-      tls: true,
-      auth: { username: SMTP_USER, password },
-    },
-  });
-  try {
-    await withTimeout(
-      client.send({
-        from: `${FROM_NAME} <${SMTP_USER}>`,
-        to: msg.to,
-        subject: msg.subject,
-        content: msg.text || "Please view this email in an HTML-capable client.",
-        html: msg.html,
-      }),
-      SEND_TIMEOUT_MS,
-    );
-  } finally {
-    try { await client.close(); } catch (_) { /* ignore close errors */ }
-  }
+// A permanent SMTP rejection (5xx) won't be cured by retrying.
+function isPermanent(msg: string): boolean {
+  return /got: 5\d{2}\b/.test(msg) || /Disabled by user/i.test(msg);
 }
 
 Deno.serve(async (req) => {
@@ -96,22 +64,33 @@ Deno.serve(async (req) => {
     let lastError: unknown = null;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
-        await sendOnce(password, { to: recipient, subject, html, text });
+        await sendMailRaw(
+          { hostname: SMTP_HOST, port: SMTP_PORT, username: SMTP_USER, password, timeoutMs: SEND_TIMEOUT_MS },
+          {
+            from: `${FROM_NAME} <${SMTP_USER}>`,
+            fromAddress: SMTP_USER,
+            to: recipient,
+            subject: String(subject),
+            html: html ? String(html) : undefined,
+            text: text ? String(text) : (html ? undefined : "Please view this email in an HTML-capable client."),
+          },
+        );
         return new Response(JSON.stringify({ success: true, attempts: attempt }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } catch (e) {
         lastError = e;
-        console.error(`send-email-smtp attempt ${attempt}/${MAX_ATTEMPTS} failed:`, (e as Error).message);
+        const m = (e as Error).message;
+        console.error(`send-email-smtp attempt ${attempt}/${MAX_ATTEMPTS} failed:`, m);
+        if (isPermanent(m)) break; // don't retry a permanent rejection
         if (attempt < MAX_ATTEMPTS) {
-          // Exponential backoff: 0.8s, 1.6s.
           await new Promise((r) => setTimeout(r, 800 * Math.pow(2, attempt - 1)));
         }
       }
     }
 
     throw new Error(
-      `Email delivery failed after ${MAX_ATTEMPTS} attempts: ${(lastError as Error)?.message ?? "unknown error"}`,
+      `Email delivery failed: ${(lastError as Error)?.message ?? "unknown error"}`,
     );
   } catch (err) {
     console.error("send-email-smtp error:", err);

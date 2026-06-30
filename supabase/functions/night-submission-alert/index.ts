@@ -1,6 +1,6 @@
 // Emails admins to follow up on an after-hours (night) form submission anomaly.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { sendMailRaw } from "../_shared/rawSmtp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -60,9 +60,6 @@ Deno.serve(async (req) => {
 
     const password = Deno.env.get("HOSTINGER_SMTP_PASSWORD");
     if (!password) throw new Error("HOSTINGER_SMTP_PASSWORD is not configured");
-    const client = new SMTPClient({
-      connection: { hostname: SMTP_HOST, port: SMTP_PORT, tls: true, auth: { username: SMTP_USER, password } },
-    });
 
     const html = `
       <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden">
@@ -86,19 +83,23 @@ Deno.serve(async (req) => {
     let sent = 0;
     for (const to of recipients) {
       try {
-        await client.send({
-          from: `${FROM_NAME} <${SMTP_USER}>`,
-          to,
-          subject: `🌙 After-Hours Submission — ${anomaly.form_name || "Form"} (${anomaly.collector_name || "User"})`,
-          content: `An after-hours submission was flagged for ${anomaly.collector_name} on ${anomaly.form_name}. Open the Feedback page to follow up.`,
-          html,
-        });
+        await sendMailRaw(
+          { hostname: SMTP_HOST, port: SMTP_PORT, username: SMTP_USER, password },
+          {
+            from: `${FROM_NAME} <${SMTP_USER}>`,
+            fromAddress: SMTP_USER,
+            to,
+            subject: `🌙 After-Hours Submission — ${anomaly.form_name || "Form"} (${anomaly.collector_name || "User"})`,
+            text: `An after-hours submission was flagged for ${anomaly.collector_name} on ${anomaly.form_name}. Open the Feedback page to follow up.`,
+            html,
+          },
+        );
         sent++;
       } catch (e) {
         console.error("send failed for", to, e);
       }
     }
-    await client.close().catch(() => {});
+
 
     return new Response(JSON.stringify({ sent }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
