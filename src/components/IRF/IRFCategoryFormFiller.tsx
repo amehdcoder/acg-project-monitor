@@ -713,7 +713,7 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
           </Card>
 
           {/* Narrative — mandatory */}
-          <Card className="mt-4 space-y-1.5 p-4 sm:p-6" style={{ borderTopWidth: 3, borderTopColor: form.color }}>
+          <Card data-fkey="__narrative" className="mt-4 space-y-1.5 p-4 sm:p-6" style={{ borderTopWidth: 3, borderTopColor: form.color }}>
             <Label>Narrative / additional notes <span className="text-destructive">*</span></Label>
             <p className="text-xs text-muted-foreground">Summarise the activity — key reflections, means of verification and follow-up actions. This is required.</p>
             <Textarea value={narrative}
