@@ -172,7 +172,8 @@ export const useIrfDashboard = (projectId?: string | null, overrideMap?: Overrid
       const key = (r.reporting_month || r.created_at || "").slice(0, 7);
       if (!key) return;
       (byMonth[key] ||= { reach: 0, reports: 0 });
-      byMonth[key].reach += num(r.total_reach) + num(r.radio_estimated_reach);
+      byMonth[key].reach +=
+        num(r.total_reach) + num(r.radio_estimated_reach) + num(r.attendance_men) + num(r.attendance_women);
       byMonth[key].reports += 1;
     });
     return Object.entries(byMonth)
