@@ -21,6 +21,8 @@ export interface CategoricalFieldAnalysis {
   unique: number;
   top: { name: string; value: number; pct: number; color: string };
   data: { name: string; value: number; pct: number; color: string }[];
+  /** Per-LGA distribution: one row per LGA with a count for every category. */
+  byLga: { lga: string; total: number; segments: Record<string, number> }[];
 }
 
 export interface NumericFieldAnalysis {
@@ -39,7 +41,22 @@ export interface NumericFieldAnalysis {
   sd: number;
   cv: number;
   histogram: { name: string; value: number }[];
+  /** Per-LGA totals so the field can be read geographically. */
+  byLga: { lga: string; sum: number; answered: number }[];
 }
+
+/** Plain-language meaning of the coefficient of variation (CV). */
+export const CV_MEANING =
+  "CV (coefficient of variation) = the spread of the numbers relative to their average. Lower means LGAs report consistently; higher means results are uneven across reports.";
+
+/** Short qualitative reading of a CV value, with its meaning attached. */
+export function cvLabel(cv: number): string {
+  if (cv <= 30) return `${cv}% — low variation (consistent across reports)`;
+  if (cv <= 60) return `${cv}% — moderate variation`;
+  if (cv <= 100) return `${cv}% — high variation (uneven effort)`;
+  return `${cv}% — very high variation (likely outliers or data-entry issues)`;
+}
+
 
 export type FieldAnalysis = CategoricalFieldAnalysis | NumericFieldAnalysis;
 
