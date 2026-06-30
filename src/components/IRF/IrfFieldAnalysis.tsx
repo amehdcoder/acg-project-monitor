@@ -1,16 +1,17 @@
 import { useMemo, useState } from "react";
-import { BarChart3, PieChart as PieIcon, LayoutGrid, TrendingUp, AlertTriangle, Minus, Lightbulb } from "lucide-react";
+import { BarChart3, PieChart as PieIcon, LayoutGrid, TrendingUp, AlertTriangle, Minus, Lightbulb, MapPin } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
-  PieChart, Pie, Legend, LabelList,
+  Legend, LabelList,
 } from "recharts";
 
 import { Card } from "@/components/ui/card";
 import {
-  analyzeFields, categoricalInsight, numericInsight,
+  analyzeFields, categoricalInsight, numericInsight, cvLabel, CV_MEANING,
   type CategoricalFieldAnalysis, type NumericFieldAnalysis, type FieldInsight,
 } from "@/lib/irf/fieldAnalysis";
 import type { IrfReport } from "@/lib/irf/definition";
+
 
 const chartText = "hsl(var(--foreground))";
 const chartMuted = "hsl(var(--muted-foreground))";
