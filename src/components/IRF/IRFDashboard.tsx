@@ -239,11 +239,11 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
               </Card>
 
               <Card className="p-4">
-                <h3 className="mb-2 text-sm font-semibold text-foreground">Non-Compliance</h3>
+                <h3 className="mb-2 text-sm font-semibold text-foreground">{stats.hasNonCompliance ? "Non-Compliance" : "Outcome Acceptance"}</h3>
                 <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
-                    <Pie data={ncBreakdown} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={2}>
-                      {ncBreakdown.map((g) => <Cell key={g.name} fill={g.color} />)}
+                    <Pie data={stats.hasNonCompliance ? ncBreakdown : outcomeLevels} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={2}>
+                      {(stats.hasNonCompliance ? ncBreakdown : outcomeLevels).map((g) => <Cell key={g.name} fill={g.color} />)}
                     </Pie>
                     <Tooltip contentStyle={chartTooltipStyle} labelStyle={{ color: chartText }} /><Legend wrapperStyle={chartLegendStyle} />
                   </PieChart>
