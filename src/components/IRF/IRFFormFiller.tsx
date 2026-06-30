@@ -70,7 +70,7 @@ export default function IRFFormFiller({ projectId, onClose }: Props) {
   const [step, setStep] = useState(0); // 0 = identity, 1..N = sections
 
   // Identity
-  const [reportingMonth, setReportingMonth] = useState(monthOptions[0].value);
+  const [reportingMonth, setReportingMonth] = useState(getCurrentReportingMonth());
   const [state, setState] = useState("");
   const [lga, setLga] = useState("");
   const [ward, setWard] = useState("");
