@@ -63,7 +63,7 @@ export type FieldAnalysis = CategoricalFieldAnalysis | NumericFieldAnalysis;
 const prettify = (s: string) =>
   String(s).replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 
-function analyzeNumeric(values: number[]): Omit<NumericFieldAnalysis, "kind" | "key" | "label" | "activity" | "section" | "answered" | "responseRate" | "histogram"> & { histogram: { name: string; value: number }[] } {
+function analyzeNumeric(values: number[]): Omit<NumericFieldAnalysis, "kind" | "key" | "label" | "activity" | "section" | "answered" | "responseRate" | "histogram" | "byLga"> & { histogram: { name: string; value: number }[] } {
   const sorted = [...values].sort((a, b) => a - b);
   const n = sorted.length;
   const sum = sorted.reduce((a, b) => a + b, 0);
