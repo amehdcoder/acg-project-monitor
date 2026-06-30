@@ -175,12 +175,15 @@ export default function IrfFieldAnalysis({ rows }: { rows: IrfReport[] }) {
               {t === "categorical" ? "Distributions" : t === "numeric" ? "Quantitative" : "All"}
             </button>
           ))}
+        </div>
       </div>
 
       <div className="flex items-start gap-1.5 border-b bg-sky-500/5 px-4 py-2 text-[11px] leading-snug text-muted-foreground">
         <Minus className="mt-0.5 h-3 w-3 shrink-0 text-sky-500" />
         <span>{CV_MEANING}</span>
       </div>
+
+
 
 
 
