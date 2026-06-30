@@ -254,11 +254,19 @@ Deno.serve(async (req) => {
         });
         emailHtml = html;
 
-        const { error: mailErr } = await admin.functions.invoke("send-email-smtp", {
-          body: { to: email, subject: emailSubject, html },
-        });
-        if (mailErr) throw mailErr;
-        emailSent = true;
+        // Retry the dispatch a few times so a transient SMTP/network blip does
+        // not leave a freshly created account without its credentials email.
+        // (send-email-smtp also retries the SMTP connection internally.)
+        let mailLastError: string | undefined;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          const { error: mailErr } = await admin.functions.invoke("send-email-smtp", {
+            body: { to: email, subject: emailSubject, html },
+          });
+          if (!mailErr) { emailSent = true; mailLastError = undefined; break; }
+          mailLastError = (mailErr as Error).message;
+          if (attempt < 3) await new Promise((r) => setTimeout(r, 1000 * attempt));
+        }
+        if (!emailSent) throw new Error(mailLastError ?? "Email delivery failed");
       } catch (e) {
         emailError = (e as Error).message;
       }
