@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import {
-  ChevronDown, Images, FileCheck2, Download, ShieldCheck, Loader2, MapPin, ImageIcon, FileText,
+  ChevronDown, Images, FileCheck2, Download, ShieldCheck, Loader2, MapPin, ImageIcon, FileText, FileArchive,
 } from "lucide-react";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
@@ -25,14 +27,42 @@ interface EvidenceItem {
 const formName = (id?: string | null) => IRF_CATEGORY_FORMS.find((f) => f.id === id)?.short || "Activity";
 const formColor = (id?: string | null) => IRF_CATEGORY_FORMS.find((f) => f.id === id)?.color || "#0891b2";
 
+const safe = (s: string) => String(s || "").replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+const baseName = (p: string) => p.split("/").pop() || p;
+
+/** Resolve a signed URL and fetch the file as a Blob. */
+async function fetchBlob(path: string): Promise<Blob | null> {
+  const { data, error } = await supabase.storage.from("irf-evidence").createSignedUrl(path, 3600);
+  if (error || !data?.signedUrl) return null;
+  try {
+    const res = await fetch(data.signedUrl);
+    if (!res.ok) return null;
+    return await res.blob();
+  } catch {
+    return null;
+  }
+}
+
+/** Download a single stored file directly to the device. */
+async function downloadOne(path: string, filename?: string) {
+  const blob = await fetchBlob(path);
+  if (!blob) {
+    toast.error("Could not download file — it may have been removed or access is restricted.");
+    return false;
+  }
+  saveAs(blob, filename || baseName(path));
+  return true;
+}
+
 async function openSigned(path: string) {
   const { data, error } = await supabase.storage.from("irf-evidence").createSignedUrl(path, 3600);
   if (error || !data?.signedUrl) {
-    toast.error("Could not open file — it may have been removed.");
+    toast.error("Could not open file — it may have been removed or access is restricted.");
     return;
   }
   window.open(data.signedUrl, "_blank", "noopener,noreferrer");
 }
+
 
 export default function IrfEvidenceLibrary({ rows }: Props) {
   const [open, setOpen] = useState(false);
