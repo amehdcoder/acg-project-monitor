@@ -154,9 +154,7 @@ export default function IrfGpsMap({ value, onChange, accent = "#0891b2" }: Props
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showMap, value?.lat, value?.lng, value?.accuracy, value?.manual, accent]);
 
-  // Keep a ref to manualMode for the (stable) map click handler.
-  const manualModeRef = useRef(manualMode);
-  manualModeRef.current = manualMode;
+
 
   useEffect(() => () => { mapRef.current?.remove(); mapRef.current = null; }, []);
 
