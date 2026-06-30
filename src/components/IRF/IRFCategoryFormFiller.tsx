@@ -258,13 +258,22 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
         ...directCols,
       };
 
-      const { error } = await supabase.from("irf_reports" as any).insert(payload);
-      if (error) throw error;
+      await withNetworkRetry(async () => {
+        const { error } = await supabase.from("irf_reports" as any).insert(payload);
+        if (error) throw error;
+      });
       setDone(true);
       toast.success("Visit recorded — dashboard updated.");
     } catch (e: any) {
       console.error("IRF category submit error", e);
-      toast.error(e?.message || "Could not submit. Please try again.");
+      if (isTransientNetworkError(e)) {
+        toast.error(
+          "Network connection lost while submitting. Your entries are kept on screen — move to better signal and tap Submit again.",
+          { duration: 8000 },
+        );
+      } else {
+        toast.error(e?.message || "Could not submit. Please try again.");
+      }
     } finally {
       setSaving(false);
     }
