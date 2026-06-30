@@ -531,7 +531,7 @@ export default function IRFCategoryFormFiller({ form, projectId, onBack, onClose
             </div>
 
             {form.perMinistry && (
-              <div className="space-y-1.5">
+              <div data-fkey="__ministry" className="space-y-1.5">
                 <Label>Ministry / Department visited *</Label>
                 <p className="-mt-1 text-xs text-muted-foreground">Each visit is one ministry or department. Add another visit for the next one.</p>
                 <Select value={ministry || undefined} onValueChange={setMinistry}>
