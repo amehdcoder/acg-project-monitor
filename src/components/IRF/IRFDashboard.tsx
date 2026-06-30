@@ -18,6 +18,9 @@ import { IRF_CATEGORY_FORMS } from "@/lib/irf/categoryForms";
 import { IrfWatermark } from "@/components/IRF/IRFFormFiller";
 import IrfKanoMap from "@/components/IRF/IrfKanoMap";
 import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
+import IrfEvidenceLibrary from "@/components/IRF/IrfEvidenceLibrary";
+import IrfTextInsights from "@/components/IRF/IrfTextInsights";
+import IrfStatisticalPanel from "@/components/IRF/IrfStatisticalPanel";
 
 interface Props {
   projectId?: string | null;
