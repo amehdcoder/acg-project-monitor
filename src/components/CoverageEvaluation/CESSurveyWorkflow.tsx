@@ -396,6 +396,22 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     return () => window.removeEventListener("amehnities:navigate-tab", onNav);
   }, [applyChecklistPrefill]);
 
+  // Persist the field roles for project members who reach this survey through a
+  // project-locked Community Checklist link, so they are never blocked next time.
+  // The RPC is a no-op unless the user is actually assigned to this project
+  // (owner/admin always allowed). It grants Locator + Surveyor idempotently.
+  const fieldRolesGrantedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!projectId || !locationLocked) return;
+    if (fieldRolesGrantedRef.current === projectId) return;
+    fieldRolesGrantedRef.current = projectId;
+    supabase
+      .rpc("ensure_ces_field_roles" as any, { _project_id: projectId })
+      .then(({ error }) => {
+        if (error) fieldRolesGrantedRef.current = null; // allow a retry
+      });
+  }, [projectId, locationLocked]);
+
 
   // Safe manual reselection from the fallback error: clears the locked state and
   // lets the supervisor pick the location through the normal cascade.
