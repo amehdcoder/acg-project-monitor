@@ -54,6 +54,9 @@ export default function IrfGpsMap({ value, onChange, accent = "#0891b2" }: Props
 
   const [manualMode, setManualMode] = useState(false);
   const [fallbackOffered, setFallbackOffered] = useState(false);
+  // Ref mirror of manualMode so the (once-built) map click handler reads fresh state.
+  const manualModeRef = useRef(manualMode);
+  manualModeRef.current = manualMode;
 
   // Auto-capture on mount.
   useEffect(() => {
