@@ -164,9 +164,10 @@ export default function IrfFieldAnalysis({ rows }: { rows: IrfReport[] }) {
       <div className="flex flex-wrap items-center gap-2 border-b bg-gradient-to-r from-[#0b5394]/10 to-[#1f9e89]/10 p-4">
         <BarChart3 className="h-4 w-4 text-primary" />
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-foreground">Field-by-Field Response Analysis</h3>
-          <p className="text-[11px] text-muted-foreground">{numeric.length} quantitative · {categorical.length} categorical indicators with decision insights</p>
+          <h3 className="text-sm font-semibold text-foreground">Field-by-Field Response Analysis (LGA-wise)</h3>
+          <p className="text-[11px] text-muted-foreground">{numeric.length} quantitative · {categorical.length} categorical indicators broken down by LGA with decision insights</p>
         </div>
+
         <div className="ml-auto flex items-center gap-1 rounded-lg bg-muted p-0.5 text-xs">
           {(["all", "categorical", "numeric"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)}
