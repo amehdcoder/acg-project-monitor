@@ -292,8 +292,11 @@ export function categoricalInsight(a: CategoricalFieldAnalysis): FieldInsight {
  * outlier risk, coverage and a recommendation.
  */
 export function numericInsight(a: NumericFieldAnalysis): FieldInsight {
+  const topLga = a.byLga[0];
+  const lgaCount = a.byLga.length;
   if (a.responseRate < 50) return { tone: "warning", text: `Only ${a.responseRate}% of reports captured this — totals understate true effort.`, recommendation: "Make this field mandatory or coach teams to complete it." };
-  if (a.cv > 100) return { tone: "warning", text: `Highly uneven (CV ${a.cv}%): range ${nf(a.min)}–${nf(a.max)} around a mean of ${nf(a.mean)}.`, recommendation: "Validate the high/low outliers — likely data-entry or uneven field effort." };
-  if (Math.abs(a.mean - a.median) > a.mean * 0.5 && a.mean > 0) return { tone: "neutral", text: `Skewed distribution — a few large reports lift the mean (${nf(a.mean)}) above the median (${nf(a.median)}).`, recommendation: "Use the median as the typical value when target-setting." };
-  return { tone: "positive", text: `Consistent effort: ${nf(a.sum)} total, typically ${nf(a.median)} per report (CV ${a.cv}%).` };
+  if (a.cv > 100) return { tone: "warning", text: `Highly uneven across LGAs — ${cvLabel(a.cv)}. ${CV_MEANING}`, recommendation: "Validate the high/low LGAs — likely data-entry or uneven field effort." };
+  if (topLga && lgaCount > 1) return { tone: "neutral", text: `"${topLga.lga}" leads with ${nf(topLga.sum)} of ${nf(a.sum)} total across ${lgaCount} LGAs. Spread: ${cvLabel(a.cv)}. ${CV_MEANING}` };
+  return { tone: "positive", text: `${nf(a.sum)} total reported. Spread: ${cvLabel(a.cv)}. ${CV_MEANING}` };
 }
+
