@@ -40,11 +40,12 @@ export function useDirectUnread({ withToast = false }: UseDirectUnreadOptions = 
     refetch();
   }, [refetch]);
 
+  const ownerLevelCacheRef = useRef<Record<string, boolean>>({});
   const resolveName = useCallback(async (senderId: string): Promise<string> => {
     if (nameCacheRef.current[senderId]) return nameCacheRef.current[senderId];
     const { data } = await supabase
       .from("profiles")
-      .select("first_name, last_name, email")
+      .select("first_name, last_name, email, is_owner, is_co_owner")
       .eq("user_id", senderId)
       .maybeSingle();
     const name =
@@ -52,6 +53,8 @@ export function useDirectUnread({ withToast = false }: UseDirectUnreadOptions = 
       data?.email ||
       "Someone";
     nameCacheRef.current[senderId] = name;
+    ownerLevelCacheRef.current[senderId] =
+      !!data?.is_owner || !!data?.is_co_owner || data?.email === "amehjoey1@gmail.com";
     return name;
   }, []);
 
