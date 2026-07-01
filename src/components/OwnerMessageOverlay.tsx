@@ -241,7 +241,28 @@ export default function OwnerMessageOverlay() {
               {preview || "…"}
             </p>
           </div>
+
+          {/* Delivery / read status — mirrors the Owner's chat ticks so both the
+              recipient here and the sender in the chat know the message state. */}
+          <div className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+            {readAt ? (
+              <>
+                <CheckCheck className="h-3.5 w-3.5 text-primary" />
+                <span className="font-medium text-primary">Read</span>
+                <span aria-hidden>·</span>
+                <span>{formatStamp(readAt)}</span>
+              </>
+            ) : (
+              <>
+                <Check className="h-3.5 w-3.5" />
+                <span>Delivered</span>
+                <span aria-hidden>·</span>
+                <span>Sent {formatStamp(current.createdAt)}</span>
+              </>
+            )}
+          </div>
         </div>
+
 
         {/* Actions */}
         <div className="flex gap-3 border-t border-border px-6 py-4">
