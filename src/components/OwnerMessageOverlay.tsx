@@ -40,7 +40,7 @@ const OWNER_EMAIL = "amehjoey1@gmail.com";
 function previewFor(body: string, messageType: string): string {
   if (messageType && messageType !== "text") {
     try {
-      const special = parseSpecial(body, messageType);
+      const special = parseSpecial(messageType, body);
       if (special?.kind === "poll") return "📊 Sent you a poll";
       if (special?.kind === "location") return "📍 Shared a location";
       if (special?.kind === "event") return "📅 Shared an event";
