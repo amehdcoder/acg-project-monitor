@@ -52,10 +52,25 @@ function previewFor(body: string, messageType: string): string {
   return body || "";
 }
 
+function formatStamp(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return sameDay ? time : `${d.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
+}
+
 export default function OwnerMessageOverlay() {
   const { user } = useAuth();
   const [queue, setQueue] = useState<IncomingOwnerMessage[]>([]);
+  // Per-message read timestamp so the recipient sees a clear "Read" confirmation
+  // the moment they view/acknowledge the message (the same read_at the Owner
+  // sees as double-blue ticks in the direct chat).
+  const [readMap, setReadMap] = useState<Record<string, string>>({});
   const metaCache = useRef<Record<string, SenderMeta>>({});
+
 
   const resolveSender = useCallback(async (senderId: string): Promise<SenderMeta> => {
     if (metaCache.current[senderId]) return metaCache.current[senderId];
