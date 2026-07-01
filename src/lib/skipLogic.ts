@@ -148,3 +148,86 @@ export function evaluateRelevant(
   }
   return evalSingleCondition(expr, responses, nameToIdMap);
 }
+
+// ---------------------------------------------------------------------------
+// Debugging: explain WHY a question is shown or hidden.
+//
+// Decomposes a `relevant` expression into its atomic conditions and evaluates
+// each one against the current answers, returning a human-readable trace. Used
+// by the in-form Skip-Logic Debug Panel so admins can instantly see which
+// condition failed (and what value it saw) instead of guessing.
+// ---------------------------------------------------------------------------
+export interface ConditionTrace {
+  /** The atomic sub-expression, e.g. `selected(${q1}, 'others')`. */
+  expression: string;
+  /** Whether this atomic condition currently evaluates true. */
+  passed: boolean;
+  /** Resolved answer value the condition compared against (for display). */
+  actualValue?: string;
+}
+
+export interface RelevantExplanation {
+  /** Whether the question is currently visible. */
+  visible: boolean;
+  /** The raw `relevant` expression (empty when the question is always shown). */
+  relevant: string;
+  /** How the atomic conditions are combined. */
+  combinator: "none" | "and" | "or" | "mixed";
+  /** Per-condition evaluation trace. */
+  conditions: ConditionTrace[];
+}
+
+function displayValue(
+  refName: string,
+  responses: Responses,
+  nameToIdMap: NameToIdMap,
+): string {
+  const qId = nameToIdMap[refName];
+  if (!qId) return "(unknown question)";
+  const val = responses[qId];
+  if (val === undefined || val === null || val === "") return "(no answer)";
+  if (Array.isArray(val)) return val.length ? val.map(String).join(", ") : "(none selected)";
+  return String(val);
+}
+
+export function explainRelevant(
+  relevant: string | undefined,
+  responses: Responses,
+  nameToIdMap: NameToIdMap,
+): RelevantExplanation {
+  const expr = (relevant ?? "").trim();
+  if (!expr) {
+    return { visible: true, relevant: "", combinator: "none", conditions: [] };
+  }
+
+  const hasOr = /\s+or\s+/i.test(expr);
+  const hasAnd = /\s+and\s+/i.test(expr);
+  const combinator: RelevantExplanation["combinator"] =
+    hasOr && hasAnd ? "mixed" : hasOr ? "or" : hasAnd ? "and" : "none";
+
+  // Flatten to atomic parts for a per-condition trace.
+  const parts = expr
+    .split(/\s+or\s+/i)
+    .flatMap((orPart) => orPart.split(/\s+and\s+/i))
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const refMatch = /\$\{(.+?)\}/;
+  const conditions: ConditionTrace[] = parts.map((part) => {
+    const passed = evalSingleCondition(part, responses, nameToIdMap);
+    const ref = part.match(refMatch)?.[1];
+    return {
+      expression: part,
+      passed,
+      actualValue: ref ? displayValue(ref, responses, nameToIdMap) : undefined,
+    };
+  });
+
+  return {
+    visible: evaluateRelevant(expr, responses, nameToIdMap),
+    relevant: expr,
+    combinator,
+    conditions,
+  };
+}
+
