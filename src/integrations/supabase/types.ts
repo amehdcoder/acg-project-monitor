@@ -4247,6 +4247,48 @@ export type Database = {
           },
         ]
       }
+      learning_log_entries: {
+        Row: {
+          author_name: string | null
+          category: string
+          created_at: string
+          created_by: string
+          description: string
+          feature: string
+          field_issue: string | null
+          id: string
+          resolution: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          author_name?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string
+          description?: string
+          feature: string
+          field_issue?: string | null
+          id?: string
+          resolution?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          author_name?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string
+          description?: string
+          feature?: string
+          field_issue?: string | null
+          id?: string
+          resolution?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       locations: {
         Row: {
           accuracy: number | null
