@@ -765,8 +765,25 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
       {editForm?.id && (
         <StudioHistoryPanel formId={editForm.id} open={showHistory} onOpenChange={setShowHistory} />
       )}
+      <VersionHistoryPanel
+        open={showVersions}
+        onOpenChange={setShowVersions}
+        versions={versions}
+        publishedVersion={publishedVersion}
+        onRestore={restoreVersion}
+        onRepublish={repVersion}
+        onPreview={(v) => { restoreVersion(v); setRightTab("preview"); }}
+      />
+      <XLSFormImportDialog open={showXlsImport} onOpenChange={setShowXlsImport} onImport={handleXlsImport} />
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".json,.amtemplate.json"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportTemplate(f); e.currentTarget.value = ""; }}
+      />
       {/* Top bar */}
-      <div className="flex items-center gap-3 border-b border-border bg-card px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-3">
         <Button variant="ghost" size="sm" onClick={onClose} className="gap-1">
           <ChevronLeft className="h-4 w-4" /> Exit
         </Button>
@@ -776,13 +793,35 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
           </div>
           <div>
             <div className="text-sm font-bold leading-tight">Special Form Studio</div>
-            <div className="text-[11px] text-muted-foreground">Drag &amp; drop builder</div>
+            <div className="text-[11px] text-muted-foreground">
+              {publishedVersion != null ? `Live: version ${publishedVersion}` : "Drag & drop builder"}
+            </div>
           </div>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          <Button variant="ghost" size="sm" onClick={() => setShowXlsImport(true)} className="gap-1">
+            <FileSpreadsheet className="h-4 w-4" /> Import XLSForm
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => downloadXlsForm(name.trim() || "special-form", sections)} className="gap-1">
+            <FileDown className="h-4 w-4" /> XLSForm
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => importInputRef.current?.click()} className="gap-1">
+            <Upload className="h-4 w-4" /> Import
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleExportTemplate} className="gap-1">
+            <Download className="h-4 w-4" /> Export
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setShowVersions(true)} className="gap-1">
+            <GitBranch className="h-4 w-4" /> Versions{versions.length ? ` (${versions.length})` : ""}
+          </Button>
           {editForm?.id && (
             <Button variant="ghost" size="sm" onClick={() => setShowHistory(true)} className="gap-1">
               <HistoryIcon className="h-4 w-4" /> History
+            </Button>
+          )}
+          {publishedVersion != null && (
+            <Button variant="outline" size="sm" disabled={saving} onClick={() => persist("unpublish")} className="gap-1">
+              <CloudOff className="h-4 w-4" /> Unpublish
             </Button>
           )}
           <Button variant="outline" size="sm" disabled={saving} onClick={() => save(false)}>
@@ -793,6 +832,7 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
           </Button>
         </div>
       </div>
+
 
       <div className="grid flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[240px_1fr_320px]">
         {/* Left: palette + form meta */}
