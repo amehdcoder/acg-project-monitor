@@ -357,6 +357,18 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
     editForm?.id ? { sections: initialSections, name: editForm.name || "", theme: editForm?.settings?.theme ? normalizeFormTheme(editForm.settings.theme) : PRESET_THEME } : null,
   );
 
+  // Keep the linked dashboard structure in sync as the form is edited:
+  // stale field references are dropped and empty slots auto-suggested.
+  useEffect(() => {
+    if (!dashboardEnabled) return;
+    setDashboardConfig((prev) => {
+      if (prev && !configNeedsSync(sections, prev)) return prev;
+      return reconcileDashboardConfig(sections, prev);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sections, dashboardEnabled]);
+
+
   const applyPreset = (preset: StudioPreset) => {
     if (preset.key !== "blank") {
       if (!name.trim()) setName(preset.title);
