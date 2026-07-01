@@ -29,6 +29,7 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import AppUpdateButton from "@/components/AppUpdateButton";
 import InstallAppButton from "@/components/InstallAppButton";
 import CollaboratorPresence from "@/components/CollaboratorPresence";
+import OwnerMessageOverlay from "@/components/OwnerMessageOverlay";
 
 interface Profile {
   first_name: string;
