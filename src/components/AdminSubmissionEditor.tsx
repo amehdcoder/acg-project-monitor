@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import FormDataTable, { type FieldDescriptor } from "@/components/FormDataTable";
+import SubmissionEditHistory from "@/components/SubmissionEditHistory";
 import { getFieldLabel, type QuestionLabelMap } from "@/lib/formLabelUtils";
 
 export interface EditableSubmission {
