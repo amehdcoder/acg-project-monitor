@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, RefreshCw, Download, Users, Megaphone, ShieldCheck, MapPin,
   Landmark, TrendingUp, FileSpreadsheet, Moon, Sun, Layers, Gauge, UserPlus,
