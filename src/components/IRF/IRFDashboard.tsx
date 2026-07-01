@@ -325,6 +325,28 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
 
             {/* Collapsible evidence library: activity pictures + consent forms */}
             <IrfEvidenceLibrary rows={rows} />
+
+            {/* Admin: full-field submission editor */}
+            {canManageAccess && (
+              <AdminSubmissionEditor
+                submissions={rows.map((r: any) => ({
+                  id: r.id,
+                  data: r.answers || {},
+                  submitter: r.focal_person_name || r.reporter_name || null,
+                  submittedAt: r.created_at,
+                  state: r.state,
+                  lga: r.lga,
+                  ward: r.ward,
+                }))}
+                questionLabels={irfLabels}
+                table="irf_reports"
+                dataColumn="answers"
+                duplicateIds={duplicates?.duplicateIds || new Set()}
+                title="SARMAAN ACSM Reports — Admin submission editor"
+                onChanged={reload}
+              />
+            )}
+
           </div>
         )}
       </div>
