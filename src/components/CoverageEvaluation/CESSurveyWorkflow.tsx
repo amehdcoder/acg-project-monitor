@@ -3798,12 +3798,26 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               </Field>
             </div>
 
-            {/* Smart Count — tap a roof/feature, ML aggregates similar features in perimeter */}
+            {/* Smart Count — analyze the drawn perimeter crop (AI rooftop vision) or tap-a-feature (ML) */}
             <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
-                <span className="font-semibold">Smart Count (ML)</span>
-                <span className="text-muted-foreground">Tap a feature on the map below — every similar feature inside the perimeter (any colour) is counted and aggregated as proxy households.</span>
+                <span className="font-semibold">Smart Count</span>
+                <span className="text-muted-foreground">Analyze the drawn perimeter of the satellite crop — every distinct building rooftop inside the perimeter is counted (roads, cars, shadows &amp; trees ignored). The estimate fills the Households box and can be overwritten.</span>
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-7 ml-auto"
+                  disabled={perimeterCountLoading || perimeter.length < 3}
+                  onClick={runPerimeterSmartCount}
+                >
+                  {perimeterCountLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}
+                  {perimeterCountLoading ? "Counting rooftops…" : "Smart Count (analyze perimeter)"}
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 border-t border-primary/20 pt-1">
+                <Target className="h-3.5 w-3.5 text-primary" />
+                <span className="text-muted-foreground">Or tap a single feature on the map and aggregate similar features as proxy households.</span>
                 <Button
                   size="sm"
                   variant={smartCountMode ? "default" : "outline"}
@@ -3811,20 +3825,23 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   onClick={() => setSmartCountMode((v) => !v)}
                 >
                   <Target className="h-3.5 w-3.5 mr-1" />
-                  {smartCountMode ? "Tap a feature on the map…" : "Enable Smart Count"}
+                  {smartCountMode ? "Tap a feature on the map…" : "Tap-a-feature count"}
                 </Button>
               </div>
               {smartCountResult && (
                 <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-primary/20">
                   <Badge variant="default" className="text-[10px]">
-                    {smartCountResult.count} similar feature{smartCountResult.count === 1 ? "" : "s"}
+                    {smartCountResult.count} rooftop{smartCountResult.count === 1 ? "" : "s"}
                   </Badge>
                   <span className="text-muted-foreground">
-                    Reference footprint ≈ {Math.round(smartCountResult.sampleAreaM2)} m². Adjust manually if needed.
+                    {smartCountResult.sampleAreaM2 > 0
+                      ? `Reference footprint ≈ ${Math.round(smartCountResult.sampleAreaM2)} m². Adjust manually if needed.`
+                      : "Counted inside the drawn perimeter. Adjust manually if needed."}
                   </span>
                 </div>
               )}
             </div>
+
 
             <div className="flex gap-2 flex-wrap items-center">
               <Button onClick={buildSegments} disabled={buildingSegments || households.length > 0}>
