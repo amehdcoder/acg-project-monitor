@@ -46,8 +46,9 @@ import {
   FileText,
   HandMetal,
   Languages,
-
+  Bug,
 } from "lucide-react";
+import SkipLogicDebugPanel from "@/components/FormFiller/SkipLogicDebugPanel";
 import { toast } from "@/hooks/use-toast";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import {
