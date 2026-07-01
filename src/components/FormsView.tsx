@@ -109,6 +109,7 @@ import { toast } from "@/hooks/use-toast";
 import { FormBuilder } from "@/components/FormBuilder";
 import SpecialFormStudio from "@/components/SpecialFormStudio/SpecialFormStudio";
 import SpecialFormDashboard from "@/components/SpecialFormStudio/SpecialFormDashboard";
+import { downloadXlsForm } from "@/lib/specialStudio/xlsformExport";
 import { FormFiller } from "@/components/FormFiller";
 import MdaChecklistLanding from "@/components/MdaChecklist/MdaChecklistLanding";
 import MdaDashboardView from "@/components/MdaChecklist/MdaDashboardView";
@@ -999,7 +1000,24 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     }
   };
 
+  const handleDownloadXlsForm = (form: any) => {
+    try {
+      const raw = form?.questions;
+      let sections: any[];
+      if (Array.isArray(raw) && raw.length && raw[0]?.questions) {
+        sections = raw;
+      } else {
+        sections = [{ id: "s1", name: "survey", label: "Survey", questions: Array.isArray(raw) ? raw : [] }];
+      }
+      downloadXlsForm(form?.title || form?.name || "form", sections);
+      toast({ title: "XLSForm downloaded" });
+    } catch (e: any) {
+      toast({ title: "Could not export XLSForm", description: e?.message, variant: "destructive" });
+    }
+  };
+
   const handleUpdateFormStatus = async (formId: string, newStatus: string) => {
+
     try {
       const { error } = await supabase
         .from("forms")
@@ -1825,11 +1843,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                   Set Draft
                                 </DropdownMenuItem>
                               )}
+                              <DropdownMenuItem onClick={() => handleDownloadXlsForm(form)}>
+                                <Download className="mr-2 h-4 w-4 text-[#2F6FE6]" />
+                                Download XLSForm
+                              </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => setFormToDelete(form)} className="text-destructive">
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Remove from project
                               </DropdownMenuItem>
+
                             </DropdownMenuContent>
                           </DropdownMenu>
                         )}

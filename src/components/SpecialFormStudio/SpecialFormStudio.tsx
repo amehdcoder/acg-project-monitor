@@ -58,6 +58,9 @@ import {
 import PresetPicker from "./PresetPicker";
 import FieldLogicEditor from "./FieldLogicEditor";
 import StudioHistoryPanel from "./StudioHistoryPanel";
+import DashboardDesigner from "./DashboardDesigner";
+import VersionHistoryPanel from "./VersionHistoryPanel";
+import XLSFormImportDialog from "@/components/FormBuilder/XLSFormImportDialog";
 import { type StudioPreset, type DashboardConfig } from "@/lib/specialStudio/presets";
 import { diffForms, recordStudioAudit } from "@/lib/specialStudio/audit";
 import {
@@ -69,7 +72,23 @@ import {
   isCategorical,
   isGeoLike,
 } from "@/lib/specialStudio/dashboardSync";
-import { History as HistoryIcon, LayoutDashboard, GitBranch, Gauge } from "lucide-react";
+import {
+  readVersions,
+  publishVersion,
+  unpublishVersions,
+  republishVersion,
+  type TemplateVersion,
+  type TemplateSnapshot,
+} from "@/lib/specialStudio/versioning";
+import {
+  buildTemplatePackage,
+  downloadTemplatePackage,
+  importTemplatePackage,
+} from "@/lib/specialStudio/templatePackage";
+import { downloadXlsForm } from "@/lib/specialStudio/xlsformExport";
+import { History as HistoryIcon, LayoutDashboard, GitBranch, Gauge, Download, Upload, FileSpreadsheet, FileDown, CloudOff } from "lucide-react";
+
+
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -487,6 +506,13 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
     (editForm?.settings?.dashboardConfig as DashboardConfig | undefined) ?? null,
   );
   const [showHistory, setShowHistory] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
+  const [showXlsImport, setShowXlsImport] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [versions, setVersions] = useState<TemplateVersion[]>(readVersions(editForm?.settings));
+  const [publishedVersion, setPublishedVersion] = useState<number | null>(
+    (editForm?.settings?.publishedVersion as number | undefined) ?? null,
+  );
 
   // Snapshot of the last-saved state, used to compute the edit-history diff.
   const prevSnapshotRef = useRef<{ sections: FormGroup[]; name: string; theme: FormTheme } | null>(
@@ -494,15 +520,18 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
   );
 
   // Keep the linked dashboard structure in sync as the form is edited:
-  // stale field references are dropped and empty slots auto-suggested.
+  // stale field references are dropped, empty slots auto-suggested, and any
+  // drag-and-drop widgets / saved layout preserved across reconciliation.
   useEffect(() => {
     if (!dashboardEnabled) return;
     setDashboardConfig((prev) => {
       if (prev && !configNeedsSync(sections, prev)) return prev;
-      return reconcileDashboardConfig(sections, prev);
+      const base = reconcileDashboardConfig(sections, prev);
+      return { ...base, widgets: prev?.widgets, layout: prev?.layout };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sections, dashboardEnabled]);
+
 
 
   const applyPreset = (preset: StudioPreset) => {
@@ -557,11 +586,36 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
     setSections((prev) => arrayMove(prev, oldI, newI));
   };
 
-  const save = async (publish: boolean) => {
-    if (!name.trim()) return toast.error("Give your form a name first.");
-    if (!projectId) return toast.error("Select a project before saving.");
+  const currentSnapshot = (): TemplateSnapshot => ({
+    sections,
+    theme,
+    description: description.trim() || null,
+    dashboardEnabled,
+    dashboardConfig: dashboardEnabled ? dashboardConfig : null,
+  });
+
+  // mode: "draft" saves working state; "publish" cuts a new version and goes
+  // live; "unpublish" archives every version and takes the form off-line.
+  const persist = async (mode: "draft" | "publish" | "unpublish", closeAfter = true) => {
+    if (!name.trim()) { toast.error("Give your form a name first."); return; }
+    if (!projectId) { toast.error("Select a project before saving."); return; }
     setSaving(true);
     try {
+      let nextVersions = versions;
+      let nextPublished = publishedVersion;
+
+      if (mode === "publish") {
+        const res = publishVersion(versions, currentSnapshot(), {
+          userId: profile?.user_id,
+          userName: [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || null,
+        });
+        nextVersions = res.versions;
+        nextPublished = res.publishedVersion;
+      } else if (mode === "unpublish") {
+        nextVersions = unpublishVersions(versions);
+        nextPublished = null;
+      }
+
       const payload: any = {
         name: name.trim(),
         description: description.trim() || null,
@@ -572,10 +626,12 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
           presetKey: presetKey && presetKey !== "custom" ? presetKey : (presetKey ?? "custom"),
           dashboardEnabled,
           dashboardConfig: dashboardEnabled ? dashboardConfig : null,
+          versions: nextVersions,
+          publishedVersion: nextPublished,
         } as any,
         project_id: projectId,
         created_by: profile?.user_id,
-        status: publish ? "active" : "draft",
+        status: mode === "publish" ? "active" : mode === "unpublish" ? "draft" : "draft",
       };
 
       const changes = diffForms(prevSnapshotRef.current, { sections, name: name.trim(), theme });
@@ -594,22 +650,110 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
         formId: savedId,
         projectId,
         formName: name.trim(),
-        action: editForm?.id ? (publish ? "published" : "updated") : "created",
+        action: editForm?.id ? (mode === "publish" ? "published" : "updated") : "created",
         changes,
         userId: profile?.user_id,
         userName: [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || null,
         userEmail: profile?.email || null,
       });
       prevSnapshotRef.current = { sections, name: name.trim(), theme };
+      setVersions(nextVersions);
+      setPublishedVersion(nextPublished);
 
-      toast.success(publish ? "Special form published." : "Draft saved.");
-      onClose();
+      toast.success(
+        mode === "publish" ? "Special form published." : mode === "unpublish" ? "Form unpublished — field users can no longer submit it." : "Draft saved.",
+      );
+      if (closeAfter) onClose();
     } catch (err: any) {
       toast.error(err?.message || "Could not save.");
     } finally {
       setSaving(false);
     }
   };
+
+  const save = (publish: boolean) => persist(publish ? "publish" : "draft");
+
+  // ---- Template export / import ----
+  const handleExportTemplate = () => {
+    const pkg = buildTemplatePackage({
+      name: name.trim() || "Special form",
+      description: description.trim() || null,
+      sections,
+      theme,
+      dashboardEnabled,
+      dashboardConfig: dashboardEnabled ? dashboardConfig : null,
+    });
+    downloadTemplatePackage(pkg);
+    toast.success("Template exported.");
+  };
+
+  const handleImportTemplate = async (file: File) => {
+    try {
+      const t = await importTemplatePackage(file);
+      setName(t.name);
+      setDescription(t.description || "");
+      setSections(t.sections);
+      setActiveSectionId(t.sections[0]?.id || "");
+      setTheme(t.theme);
+      setDashboardEnabled(t.dashboardEnabled);
+      setDashboardConfig(t.dashboardConfig);
+      setPresetKey("custom");
+      toast.success("Template imported — customize and publish it.");
+    } catch (e: any) {
+      toast.error(e?.message || "Could not import template.");
+    }
+  };
+
+  // ---- XLSForm import into the studio ----
+  const handleXlsImport = (questions: Question[], groups: FormGroup[], formName?: string) => {
+    const secs: FormGroup[] = [...groups];
+    if (questions.length) {
+      secs.unshift({ id: uid(), name: `sec_${uid()}`, label: "Imported questions", questions });
+    }
+    if (!secs.length) { toast.error("No questions found in that XLSForm."); return; }
+    setSections(secs);
+    setActiveSectionId(secs[0]?.id || "");
+    if (formName && !name.trim()) setName(formName);
+    setPresetKey("custom");
+    toast.success("XLSForm imported into the studio.");
+  };
+
+  // ---- Version actions ----
+  const restoreVersion = (v: TemplateVersion) => {
+    const s = v.snapshot;
+    setSections(s.sections);
+    setActiveSectionId(s.sections[0]?.id || "");
+    setTheme(normalizeFormTheme(s.theme));
+    setDescription(s.description || "");
+    setDashboardEnabled(s.dashboardEnabled);
+    setDashboardConfig(s.dashboardConfig);
+    setShowVersions(false);
+    toast.success(`Restored ${v.label} to the editor. Publish to make it live.`);
+  };
+
+  const repVersion = async (v: TemplateVersion) => {
+    if (!editForm?.id) { toast.error("Save the form once before re-publishing older versions."); return; }
+    const res = republishVersion(versions, v.v);
+    if (!res) return;
+    restoreVersion(v);
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("forms")
+        .update({ settings: { ...(editForm.settings || {}), theme: v.snapshot.theme, dashboardEnabled: v.snapshot.dashboardEnabled, dashboardConfig: v.snapshot.dashboardConfig, versions: res.versions, publishedVersion: res.publishedVersion, studio: true } as any, questions: v.snapshot.sections as any, status: "active" })
+        .eq("id", editForm.id);
+      if (error) throw error;
+      setVersions(res.versions);
+      setPublishedVersion(res.publishedVersion);
+      toast.success(`${v.label} is now live.`);
+    } catch (e: any) {
+      toast.error(e?.message || "Could not re-publish.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+
 
   // Brand-new form: choose a starter (with dashboard pre-wired) first.
   if (presetKey === null) {
@@ -621,8 +765,25 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
       {editForm?.id && (
         <StudioHistoryPanel formId={editForm.id} open={showHistory} onOpenChange={setShowHistory} />
       )}
+      <VersionHistoryPanel
+        open={showVersions}
+        onOpenChange={setShowVersions}
+        versions={versions}
+        publishedVersion={publishedVersion}
+        onRestore={restoreVersion}
+        onRepublish={repVersion}
+        onPreview={(v) => { restoreVersion(v); setRightTab("preview"); }}
+      />
+      <XLSFormImportDialog open={showXlsImport} onOpenChange={setShowXlsImport} onImport={handleXlsImport} />
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".json,.amtemplate.json"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportTemplate(f); e.currentTarget.value = ""; }}
+      />
       {/* Top bar */}
-      <div className="flex items-center gap-3 border-b border-border bg-card px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-3">
         <Button variant="ghost" size="sm" onClick={onClose} className="gap-1">
           <ChevronLeft className="h-4 w-4" /> Exit
         </Button>
@@ -632,13 +793,35 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
           </div>
           <div>
             <div className="text-sm font-bold leading-tight">Special Form Studio</div>
-            <div className="text-[11px] text-muted-foreground">Drag &amp; drop builder</div>
+            <div className="text-[11px] text-muted-foreground">
+              {publishedVersion != null ? `Live: version ${publishedVersion}` : "Drag & drop builder"}
+            </div>
           </div>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          <Button variant="ghost" size="sm" onClick={() => setShowXlsImport(true)} className="gap-1">
+            <FileSpreadsheet className="h-4 w-4" /> Import XLSForm
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => downloadXlsForm(name.trim() || "special-form", sections)} className="gap-1">
+            <FileDown className="h-4 w-4" /> XLSForm
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => importInputRef.current?.click()} className="gap-1">
+            <Upload className="h-4 w-4" /> Import
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleExportTemplate} className="gap-1">
+            <Download className="h-4 w-4" /> Export
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setShowVersions(true)} className="gap-1">
+            <GitBranch className="h-4 w-4" /> Versions{versions.length ? ` (${versions.length})` : ""}
+          </Button>
           {editForm?.id && (
             <Button variant="ghost" size="sm" onClick={() => setShowHistory(true)} className="gap-1">
               <HistoryIcon className="h-4 w-4" /> History
+            </Button>
+          )}
+          {publishedVersion != null && (
+            <Button variant="outline" size="sm" disabled={saving} onClick={() => persist("unpublish")} className="gap-1">
+              <CloudOff className="h-4 w-4" /> Unpublish
             </Button>
           )}
           <Button variant="outline" size="sm" disabled={saving} onClick={() => save(false)}>
@@ -649,6 +832,7 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
           </Button>
         </div>
       </div>
+
 
       <div className="grid flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[240px_1fr_320px]">
         {/* Left: palette + form meta */}
@@ -859,15 +1043,15 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
             </TabsContent>
 
             <TabsContent value="dashboard" className="mt-0 flex-1 overflow-auto p-4">
-              <DashboardStructureEditor
+              <DashboardDesigner
                 enabled={dashboardEnabled}
                 setEnabled={setDashboardEnabled}
                 sections={sections}
                 config={dashboardConfig}
                 onConfigChange={setDashboardConfig}
-                onSectionsChange={setSections}
               />
             </TabsContent>
+
 
 
 

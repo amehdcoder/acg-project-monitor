@@ -7,7 +7,7 @@
 // questions. These helpers keep both directions consistent.
 
 import type { FormGroup, Question, QuestionType } from "@/components/FormBuilder/types";
-import type { DashboardConfig } from "./presets";
+import type { DashboardConfig, DashboardWidget } from "./presets";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -151,4 +151,64 @@ export function applyConfigToForm(
     s.name === DASHBOARD_SECTION_NAME ? { ...s, questions: [...s.questions, ...toCreate] } : s,
   );
   return sections;
+}
+
+// ============================================================================
+// Widget model (drag-and-drop dashboard designer)
+// ============================================================================
+
+const widgetUid = () => `w_${Math.random().toString(36).slice(2, 10)}`;
+
+/**
+ * Build a default widget list from legacy config fields so pre-existing
+ * dashboards migrate seamlessly into the new drag-and-drop model.
+ */
+export function widgetsFromLegacy(config: DashboardConfig | null | undefined): DashboardWidget[] {
+  if (!config) return [];
+  const accent = config.accent || "#6366f1";
+  const widgets: DashboardWidget[] = [];
+  widgets.push({ id: widgetUid(), kind: "kpi", agg: "count", title: "Submissions", color: accent, span: 1 });
+  for (const name of config.kpiFields || []) {
+    widgets.push({ id: widgetUid(), kind: "kpi", field: name, agg: "sum", title: name, color: accent, span: 1 });
+  }
+  if (config.statusField) {
+    widgets.push({ id: widgetUid(), kind: "donut", field: config.statusField, agg: "count", title: "Status breakdown", color: accent, span: 1 });
+  }
+  if (config.geoField) {
+    widgets.push({ id: widgetUid(), kind: "bar", field: config.geoField, agg: "count", title: "By location", color: accent, span: 1 });
+  }
+  widgets.push({ id: widgetUid(), kind: "table", agg: "count", title: "Recent submissions", color: accent, span: 2 });
+  return widgets;
+}
+
+/** Ensure a config has a widgets[] array, migrating from legacy fields once. */
+export function ensureWidgets(config: DashboardConfig | null | undefined): DashboardWidget[] {
+  if (config?.widgets && config.widgets.length) return config.widgets;
+  return widgetsFromLegacy(config);
+}
+
+/**
+ * Drop widgets that reference questions which no longer exist. Widgets with no
+ * field (e.g. submission-count KPI, recent-submissions table) always survive.
+ */
+export function reconcileWidgets(
+  sections: FormGroup[],
+  widgets: DashboardWidget[] | undefined,
+): DashboardWidget[] {
+  if (!widgets || !widgets.length) return [];
+  const names = new Set(flatQuestions(sections).map((q) => q.name).filter(Boolean) as string[]);
+  return widgets.filter((w) => !w.field || names.has(w.field));
+}
+
+export function newWidget(kind: DashboardWidget["kind"], field: string | undefined, title: string, color: string): DashboardWidget {
+  const defaultAgg: DashboardWidget["agg"] = kind === "kpi" ? "sum" : "count";
+  return {
+    id: widgetUid(),
+    kind,
+    field,
+    agg: field ? defaultAgg : "count",
+    title,
+    color,
+    span: kind === "table" ? 2 : 1,
+  };
 }
