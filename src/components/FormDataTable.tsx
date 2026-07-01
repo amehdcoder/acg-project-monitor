@@ -179,10 +179,29 @@ const FormDataTable = ({
       const updatedColumns: Record<string, any> = { ...(columnData || {}) };
       const dbUpdate: Record<string, any> = {};
 
+      // Track per-field changes so we can write an audit trail.
+      const changes: {
+        field_key: string;
+        field_label: string;
+        old_value: any;
+        new_value: any;
+      }[] = [];
+      const labelFor = (key: string) =>
+        entries.find((e) => e.key === key)?.label || getFieldLabel(key, questionLabels);
+      const recordChange = (key: string, oldVal: any, newVal: any) => {
+        const a = oldVal ?? "";
+        const b = newVal ?? "";
+        if (String(a) !== String(b)) {
+          changes.push({ field_key: key, field_label: labelFor(key), old_value: oldVal, new_value: newVal });
+        }
+      };
+
       if (fieldSpec) {
         for (const f of fieldSpec) {
           if (!(f.key in editData)) continue;
           const val = editData[f.key];
+          const prev = f.column ? columnData?.[f.column] : data?.[f.key];
+          recordChange(f.key, prev, val);
           if (f.column) {
             dbUpdate[f.column] = val;
             updatedColumns[f.column] = val;
@@ -192,6 +211,9 @@ const FormDataTable = ({
         }
         dbUpdate[dataColumn] = answersObj;
       } else {
+        for (const [k, val] of Object.entries(editData)) {
+          recordChange(k, (data || {})[k], val);
+        }
         Object.assign(answersObj, editData);
         dbUpdate[dataColumn] = answersObj;
       }
@@ -203,6 +225,40 @@ const FormDataTable = ({
           .eq("id", submissionId);
 
         if (error) throw error;
+
+        // Persist a per-field audit trail (best-effort; never blocks the save).
+        if (changes.length > 0) {
+          try {
+            const { data: authData } = await supabase.auth.getUser();
+            const uid = authData?.user?.id;
+            const meta = authData?.user?.user_metadata as any;
+            const name =
+              meta?.full_name || meta?.name || authData?.user?.email || "Unknown user";
+            const stringify = (v: any) =>
+              v === null || v === undefined
+                ? null
+                : typeof v === "object"
+                ? JSON.stringify(v)
+                : String(v);
+            if (uid) {
+              await supabase.from("submission_edit_audit" as any).insert(
+                changes.map((c) => ({
+                  submission_id: submissionId,
+                  table_name: table,
+                  field_key: c.field_key,
+                  field_label: c.field_label,
+                  old_value: stringify(c.old_value),
+                  new_value: stringify(c.new_value),
+                  source: "admin_edit",
+                  changed_by: uid,
+                  changed_by_name: name,
+                })),
+              );
+            }
+          } catch (auditErr) {
+            console.warn("Audit log write failed:", auditErr);
+          }
+        }
       }
 
       onDataUpdate?.(answersObj);
