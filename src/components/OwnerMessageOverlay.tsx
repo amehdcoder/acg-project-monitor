@@ -151,6 +151,7 @@ export default function OwnerMessageOverlay() {
 
   const markReadOnServer = () => {
     const nowIso = new Date().toISOString();
+    setReadMap((prev) => (prev[current.id] ? prev : { ...prev, [current.id]: nowIso }));
     supabase
       .from("proximity_messages")
       .update({ delivered_at: nowIso, read_at: nowIso })
@@ -169,6 +170,8 @@ export default function OwnerMessageOverlay() {
 
   const initial = (current.senderName || "O").charAt(0).toUpperCase();
   const preview = previewFor(current.body, current.messageType);
+  const readAt = readMap[current.id];
+
 
   return (
     <div
