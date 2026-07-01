@@ -586,24 +586,14 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
   // dashboard refreshes silently (no loading flash) so data appears instantly.
   // A single debounced timer coalesces high-volume bursts so the UI stays
   // steady even under very large submission volumes.
-  const rtTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    const filter = filters.formId ? `form_id=eq.${filters.formId}` : undefined;
-    const channel = supabase
-      .channel(`analytics-submissions-${filters.formId ?? "all"}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "form_submissions", ...(filter ? { filter } : {}) },
-        () => {
-          if (rtTimer.current) clearTimeout(rtTimer.current);
-          rtTimer.current = setTimeout(() => refresh(true), 1200);
-        },
-      )
-      .subscribe();
-    return () => {
-      if (rtTimer.current) clearTimeout(rtTimer.current);
-      supabase.removeChannel(channel);
-    };
+    const unsubscribe = subscribeToFormSubmissionChanges({
+      formId: filters.formId ?? null,
+      debounceMs: 1200,
+      channelSuffix: "analytics",
+      onChange: () => refresh(true),
+    });
+    return unsubscribe;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.formId]);
 
