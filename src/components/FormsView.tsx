@@ -108,6 +108,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { FormBuilder } from "@/components/FormBuilder";
 import SpecialFormStudio from "@/components/SpecialFormStudio/SpecialFormStudio";
+import SpecialFormDashboard from "@/components/SpecialFormStudio/SpecialFormDashboard";
 import { FormFiller } from "@/components/FormFiller";
 import MdaChecklistLanding from "@/components/MdaChecklist/MdaChecklistLanding";
 import MdaDashboardView from "@/components/MdaChecklist/MdaDashboardView";
@@ -236,6 +237,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
   const [dashboardForm, setDashboardForm] = useState<Form | null>(null);
   const [mdaDashboardForm, setMdaDashboardForm] = useState<Form | null>(null);
+  const [specialDashForm, setSpecialDashForm] = useState<Form | null>(null);
   const [templateForm, setTemplateForm] = useState<{ templateId: string; name: string; description: string; questions: Question[]; settings: any; geofence?: GeofenceArea } | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
@@ -527,6 +529,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       microplanFillingActive ||
       dashboardForm ||
       mdaDashboardForm ||
+      specialDashForm ||
       geofenceManagerForm ||
       templateForm ||
       qrCodeForm ||
@@ -561,6 +564,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     microplanFillingActive,
     dashboardForm,
     mdaDashboardForm,
+    specialDashForm,
     geofenceManagerForm,
     templateForm,
     qrCodeForm,
@@ -1344,6 +1348,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
+  if (specialDashForm) {
+    return (
+      <SpecialFormDashboard
+        form={{
+          id: specialDashForm.id,
+          name: specialDashForm.name,
+          questions: (specialDashForm.questions as unknown) ?? specialDashForm.groups,
+          settings: specialDashForm.settings,
+        }}
+        onClose={() => setSpecialDashForm(null)}
+      />
+    );
+  }
+
 
 
 
@@ -2044,6 +2062,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
 
 
+                  // Special Form Studio forms with a linked dashboard get a dedicated
+                  // "Monitor" row so submissions can be watched live immediately.
+                  const studioSettings = form.settings as any;
+                  const isStudioForm = studioSettings?.studio === true;
+                  const studioDashOn = isStudioForm && studioSettings?.dashboardEnabled === true;
+                  const studioAccent = studioSettings?.dashboardConfig?.accent || "#6366f1";
+
                   // Shared accent color for this form's parent project — same
                   // palette used by the Project dropdown above, so the trigger
                   // border/text + form name + row left-border are all in sync.
@@ -2200,6 +2225,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 <DropdownMenuItem onClick={() => setMdaDashboardForm(form)}>
                                   <BarChart3 className="mr-2 h-4 w-4 text-emerald-600" />
                                   MDA Supervisory Dashboard
+                                </DropdownMenuItem>
+                              )}
+                              {studioDashOn && (
+                                <DropdownMenuItem onClick={() => setSpecialDashForm(form)}>
+                                  <LayoutDashboard className="mr-2 h-4 w-4" style={{ color: studioAccent }} />
+                                  Live Special Dashboard
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuItem onClick={() => setQrCodeForm(form)}>
