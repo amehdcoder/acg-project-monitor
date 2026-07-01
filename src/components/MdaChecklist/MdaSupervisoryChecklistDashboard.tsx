@@ -379,7 +379,10 @@ const writeDashboardUrl = (updates: Record<string, string | null | undefined>) =
 };
 
 // ───────────────────────── Main ─────────────────────────
-export default function MdaSupervisoryChecklistDashboard({ submissions, questions, formName, projectName, projectId, offline }: Props) {
+export default function MdaSupervisoryChecklistDashboard({ submissions, questions, formName, projectName, projectId, offline, onDataChanged }: Props) {
+  const { isAdmin, isOwnerLevel } = useAuth();
+  const canEditSubmissions = isAdmin || isOwnerLevel;
+  const questionLabels = useMemo(() => buildLabelMap(questions as any[]), [questions]);
   // ── Filter state ──────────────────────────────────────────────
   const [fState, setFState] = useState(ALL);
   const [fLga, setFLga] = useState(ALL);
