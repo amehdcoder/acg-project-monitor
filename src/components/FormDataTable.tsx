@@ -29,6 +29,10 @@ interface FormDataTableProps {
   readOnly?: boolean;
   questionLabels?: QuestionLabelMap;
   onDataUpdate?: (updatedData: Record<string, any>) => void;
+  /** Source table to persist edits to (defaults to form_submissions). */
+  table?: string;
+  /** JSON column that stores the answers on the table (defaults to "data"). */
+  dataColumn?: string;
 }
 
 // Format a value for display
