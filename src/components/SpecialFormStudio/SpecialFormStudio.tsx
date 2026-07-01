@@ -506,6 +506,13 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
     (editForm?.settings?.dashboardConfig as DashboardConfig | undefined) ?? null,
   );
   const [showHistory, setShowHistory] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
+  const [showXlsImport, setShowXlsImport] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [versions, setVersions] = useState<TemplateVersion[]>(readVersions(editForm?.settings));
+  const [publishedVersion, setPublishedVersion] = useState<number | null>(
+    (editForm?.settings?.publishedVersion as number | undefined) ?? null,
+  );
 
   // Snapshot of the last-saved state, used to compute the edit-history diff.
   const prevSnapshotRef = useRef<{ sections: FormGroup[]; name: string; theme: FormTheme } | null>(
@@ -513,15 +520,18 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
   );
 
   // Keep the linked dashboard structure in sync as the form is edited:
-  // stale field references are dropped and empty slots auto-suggested.
+  // stale field references are dropped, empty slots auto-suggested, and any
+  // drag-and-drop widgets / saved layout preserved across reconciliation.
   useEffect(() => {
     if (!dashboardEnabled) return;
     setDashboardConfig((prev) => {
       if (prev && !configNeedsSync(sections, prev)) return prev;
-      return reconcileDashboardConfig(sections, prev);
+      const base = reconcileDashboardConfig(sections, prev);
+      return { ...base, widgets: prev?.widgets, layout: prev?.layout };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sections, dashboardEnabled]);
+
 
 
   const applyPreset = (preset: StudioPreset) => {
