@@ -15,7 +15,7 @@ import { useIrfDashboard } from "@/hooks/useIrfDashboard";
 import { useAcsmDuplicateOverrides } from "@/hooks/useAcsmDuplicateOverrides";
 import DuplicateReviewPanel from "@/components/ACSM/DuplicateReviewPanel";
 import { IRF_DASH_NAME } from "@/lib/irf/definition";
-import { IRF_CATEGORY_FORMS } from "@/lib/irf/categoryForms";
+import { IRF_CATEGORY_FORMS, buildCategoryFieldSpec } from "@/lib/irf/categoryForms";
 import { IrfWatermark } from "@/components/IRF/IRFFormFiller";
 import IrfKanoMap from "@/components/IRF/IrfKanoMap";
 import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
