@@ -128,38 +128,58 @@ export default function SpecialFormDashboard({ form, onClose }: Props) {
     return id ? row.data?.[id] : undefined;
   };
 
-  const kpis = useMemo(() => {
-    return (config.kpiFields || []).map((name) => {
-      const q = questions.find((x) => x.name === name);
-      let sum = 0;
-      for (const r of rows) {
-        const v = Number(readVal(r, name));
-        if (!Number.isNaN(v)) sum += v;
-      }
-      return { label: q?.label || name, value: sum };
-    });
+  // Resolve the drag-and-drop widget layout (auto-migrating legacy configs).
+  const widgets = useMemo<DashboardWidget[]>(
+    () => reconcileWidgets(sections, ensureWidgets(config as DashboardConfig)),
+    [sections, config],
+  );
+
+  // Filter widgets drive interactive filtering of the submission rows.
+  const filterWidgets = useMemo(() => widgets.filter((w) => w.kind === "filter" && w.field), [widgets]);
+  const [filters, setFilters] = useState<Record<string, string>>({});
+
+  const filteredRows = useMemo(() => {
+    const active = Object.entries(filters).filter(([, v]) => v && v !== "__all__");
+    if (!active.length) return rows;
+    return rows.filter((r) => active.every(([field, val]) => String(readVal(r, field) ?? "—") === val));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.kpiFields, rows, questions]);
+  }, [rows, filters]);
 
-  const statusBreakdown = useMemo(() => {
-    if (!config.statusField) return [];
+  const aggregate = (w: DashboardWidget): number => {
+    if (!w.field || w.agg === "count") return filteredRows.length;
+    const nums: number[] = [];
+    const distinct = new Set<string>();
+    for (const r of filteredRows) {
+      const raw = readVal(r, w.field);
+      distinct.add(String(raw ?? "—"));
+      const n = Number(raw);
+      if (!Number.isNaN(n)) nums.push(n);
+    }
+    if (w.agg === "distinct") return distinct.size;
+    const sum = nums.reduce((a, b) => a + b, 0);
+    if (w.agg === "avg") return nums.length ? Math.round((sum / nums.length) * 100) / 100 : 0;
+    return sum;
+  };
+
+  const breakdown = (w: DashboardWidget): { name: string; value: number }[] => {
+    if (!w.field) return [];
     const counts = new Map<string, number>();
-    for (const r of rows) {
-      const v = String(readVal(r, config.statusField) ?? "—");
+    for (const r of filteredRows) {
+      const v = String(readVal(r, w.field) ?? "—");
       counts.set(v, (counts.get(v) || 0) + 1);
     }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
-  }, [config.statusField, rows]);
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([name, value]) => ({ name, value }));
+  };
 
-  const geoBreakdown = useMemo(() => {
-    if (!config.geoField) return [];
-    const counts = new Map<string, number>();
-    for (const r of rows) {
-      const v = String(readVal(r, config.geoField) ?? "—");
-      counts.set(v, (counts.get(v) || 0) + 1);
-    }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
-  }, [config.geoField, rows]);
+  const optionsFor = (field: string): string[] => {
+    const set = new Set<string>();
+    for (const r of rows) set.add(String(readVal(r, field) ?? "—"));
+    return [...set].sort();
+  };
+
 
   const columns = useMemo(() => questions.slice(0, 6), [questions]);
 
