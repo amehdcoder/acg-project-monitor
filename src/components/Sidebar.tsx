@@ -97,6 +97,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "projects", label: t("nav.projects"), icon: FolderOpen, adminOnly: true },
     { id: "data", label: t("nav.analytics"), icon: BarChart3, adminOnly: true },
     { id: "data-cleaner", label: "Data Cleaner", icon: Brush, adminOnly: true, route: "/data-cleaner" },
+    { id: "learning-log", label: "Learning Log", icon: BookOpen, adminOnly: false, showForUsers: true, route: "/learning-log" },
     { id: "ml", label: "Machine Learning", icon: Brain, adminOnly: true },
     { id: "math-modeling", label: "Math Modeling", icon: Calculator, adminOnly: true },
     { id: "integrations", label: t("nav.integrations"), icon: Upload, adminOnly: true },
