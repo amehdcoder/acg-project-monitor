@@ -73,6 +73,8 @@ const FormDataTable = ({
   readOnly = false,
   questionLabels,
   onDataUpdate,
+  table = "form_submissions",
+  dataColumn = "data",
 }: FormDataTableProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Record<string, any>>({});
