@@ -75,10 +75,10 @@ export default function LearningLog() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const authorName = useMemo(
-    () => profile?.full_name || (profile as any)?.name || user?.email || "Team member",
-    [profile, user],
-  );
+  const authorName = useMemo(() => {
+    const full = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim();
+    return full || user?.email || "Team member";
+  }, [profile, user]);
 
   const loadEntries = useCallback(async () => {
     setLoading(true);
