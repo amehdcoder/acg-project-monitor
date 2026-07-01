@@ -177,6 +177,12 @@ const AfterHoursApprovalCenter = () => {
         if (error) throw error;
         toast.success("Submission rejected and discarded.");
         setRequests((r) => r.filter((x) => x.id !== id));
+        const reviewNote = note.trim() || null;
+        supabase.functions
+          .invoke("send-after-hours-decision", {
+            body: { requestId: id, decision: "rejected", note: reviewNote },
+          })
+          .catch(() => {});
         setRejecting(null);
         setNote("");
         load();
