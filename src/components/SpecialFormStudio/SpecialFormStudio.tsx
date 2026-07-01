@@ -586,11 +586,36 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
     setSections((prev) => arrayMove(prev, oldI, newI));
   };
 
-  const save = async (publish: boolean) => {
-    if (!name.trim()) return toast.error("Give your form a name first.");
-    if (!projectId) return toast.error("Select a project before saving.");
+  const currentSnapshot = (): TemplateSnapshot => ({
+    sections,
+    theme,
+    description: description.trim() || null,
+    dashboardEnabled,
+    dashboardConfig: dashboardEnabled ? dashboardConfig : null,
+  });
+
+  // mode: "draft" saves working state; "publish" cuts a new version and goes
+  // live; "unpublish" archives every version and takes the form off-line.
+  const persist = async (mode: "draft" | "publish" | "unpublish", closeAfter = true) => {
+    if (!name.trim()) { toast.error("Give your form a name first."); return; }
+    if (!projectId) { toast.error("Select a project before saving."); return; }
     setSaving(true);
     try {
+      let nextVersions = versions;
+      let nextPublished = publishedVersion;
+
+      if (mode === "publish") {
+        const res = publishVersion(versions, currentSnapshot(), {
+          userId: profile?.user_id,
+          userName: [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || null,
+        });
+        nextVersions = res.versions;
+        nextPublished = res.publishedVersion;
+      } else if (mode === "unpublish") {
+        nextVersions = unpublishVersions(versions);
+        nextPublished = null;
+      }
+
       const payload: any = {
         name: name.trim(),
         description: description.trim() || null,
@@ -601,10 +626,12 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
           presetKey: presetKey && presetKey !== "custom" ? presetKey : (presetKey ?? "custom"),
           dashboardEnabled,
           dashboardConfig: dashboardEnabled ? dashboardConfig : null,
+          versions: nextVersions,
+          publishedVersion: nextPublished,
         } as any,
         project_id: projectId,
         created_by: profile?.user_id,
-        status: publish ? "active" : "draft",
+        status: mode === "publish" ? "active" : mode === "unpublish" ? "draft" : "draft",
       };
 
       const changes = diffForms(prevSnapshotRef.current, { sections, name: name.trim(), theme });
@@ -623,22 +650,97 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
         formId: savedId,
         projectId,
         formName: name.trim(),
-        action: editForm?.id ? (publish ? "published" : "updated") : "created",
+        action: editForm?.id ? (mode === "publish" ? "published" : "updated") : "created",
         changes,
         userId: profile?.user_id,
         userName: [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || null,
         userEmail: profile?.email || null,
       });
       prevSnapshotRef.current = { sections, name: name.trim(), theme };
+      setVersions(nextVersions);
+      setPublishedVersion(nextPublished);
 
-      toast.success(publish ? "Special form published." : "Draft saved.");
-      onClose();
+      toast.success(
+        mode === "publish" ? "Special form published." : mode === "unpublish" ? "Form unpublished — field users can no longer submit it." : "Draft saved.",
+      );
+      if (closeAfter) onClose();
     } catch (err: any) {
       toast.error(err?.message || "Could not save.");
     } finally {
       setSaving(false);
     }
   };
+
+  const save = (publish: boolean) => persist(publish ? "publish" : "draft");
+
+  // ---- Template export / import ----
+  const handleExportTemplate = () => {
+    const pkg = buildTemplatePackage({
+      name: name.trim() || "Special form",
+      description: description.trim() || null,
+      sections,
+      theme,
+      dashboardEnabled,
+      dashboardConfig: dashboardEnabled ? dashboardConfig : null,
+    });
+    downloadTemplatePackage(pkg);
+    toast.success("Template exported.");
+  };
+
+  const handleImportTemplate = async (file: File) => {
+    try {
+      const t = await importTemplatePackage(file);
+      setName(t.name);
+      setDescription(t.description || "");
+      setSections(t.sections);
+      setActiveSectionId(t.sections[0]?.id || "");
+      setTheme(t.theme);
+      setDashboardEnabled(t.dashboardEnabled);
+      setDashboardConfig(t.dashboardConfig);
+      setPresetKey("custom");
+      toast.success("Template imported — customize and publish it.");
+    } catch (e: any) {
+      toast.error(e?.message || "Could not import template.");
+    }
+  };
+
+  // ---- XLSForm import into the studio ----
+  const handleXlsImport = (questions: Question[], groups: FormGroup[], formName?: string) => {
+    const secs: FormGroup[] = [...groups];
+    if (questions.length) {
+      secs.unshift({ id: uid(), name: `sec_${uid()}`, label: "Imported questions", questions });
+    }
+    if (!secs.length) { toast.error("No questions found in that XLSForm."); return; }
+    setSections(secs);
+    setActiveSectionId(secs[0]?.id || "");
+    if (formName && !name.trim()) setName(formName);
+    setPresetKey("custom");
+    toast.success("XLSForm imported into the studio.");
+  };
+
+  // ---- Version actions ----
+  const restoreVersion = (v: TemplateVersion) => {
+    const s = v.snapshot;
+    setSections(s.sections);
+    setActiveSectionId(s.sections[0]?.id || "");
+    setTheme(normalizeFormTheme(s.theme));
+    setDescription(s.description || "");
+    setDashboardEnabled(s.dashboardEnabled);
+    setDashboardConfig(s.dashboardConfig);
+    setShowVersions(false);
+    toast.success(`Restored ${v.label} to the editor. Publish to make it live.`);
+  };
+
+  const repVersion = async (v: TemplateVersion) => {
+    const res = republishVersion(versions, v.v);
+    if (!res) return;
+    restoreVersion(v);
+    setVersions(res.versions);
+    setPublishedVersion(res.publishedVersion);
+    // Persist immediately without closing.
+    setTimeout(() => persist("publish", false), 0);
+  };
+
 
   // Brand-new form: choose a starter (with dashboard pre-wired) first.
   if (presetKey === null) {
