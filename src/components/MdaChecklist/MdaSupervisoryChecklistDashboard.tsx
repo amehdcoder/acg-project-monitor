@@ -49,6 +49,7 @@ import HouseholdCoverageAnalysis, { type HCAPoint } from "./HouseholdCoverageAna
 import SupervisorSignatureGallery from "./SupervisorSignatureGallery";
 import SectionErrorBoundary from "./SectionErrorBoundary";
 import MdaAdvancedAnalyses from "./MdaAdvancedAnalyses";
+import MdaCorrectiveActionsAnalysis from "./MdaCorrectiveActionsAnalysis";
 import MdaLongitudinalInsights from "./MdaLongitudinalInsights";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import { useAuth } from "@/hooks/useAuth";
