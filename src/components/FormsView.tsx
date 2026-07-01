@@ -226,6 +226,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [rollupExporting, setRollupExporting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showFormBuilder, setShowFormBuilder] = useState(false);
+  const [showStudio, setShowStudio] = useState(false);
   const [editingForm, setEditingForm] = useState<Form | null>(null);
   const [fillingForm, setFillingForm] = useState<Form | null>(null);
   const [showHistory, setShowHistory] = useState(false);
