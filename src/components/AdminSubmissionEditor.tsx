@@ -210,9 +210,16 @@ export default function AdminSubmissionEditor({
                 table={table}
                 dataColumn={dataColumn}
                 questionLabels={questionLabels}
+                fieldSpec={active.fieldSpec}
+                columnData={active.columns}
                 onDataUpdate={async (updated) => {
                   setActive((prev) => (prev ? { ...prev, data: updated } : prev));
                   await onChanged?.();
+                }}
+                onColumnsUpdate={(updatedColumns) => {
+                  setActive((prev) =>
+                    prev ? { ...prev, columns: updatedColumns } : prev,
+                  );
                 }}
               />
             )}
