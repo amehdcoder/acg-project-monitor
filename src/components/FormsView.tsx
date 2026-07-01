@@ -1162,8 +1162,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     isMdaChecklistLike({ settings: form.settings, formName: form.name, groups: form.groups })
   );
   // The MDA Supervisory Dashboard is NOT auto-granted with the checklist.
-  // Only Systems Admins, Super Admins, Owner and Co-owner may open it.
-  const canSeeMdaDashboard = isAdmin || isOwnerLevel;
+  // Systems Admins, Super Admins, Owner, Co-owner — or members the Owner/Admin
+  // has explicitly granted dashboard access — may open it.
+  const canSeeMdaDashboard = isAdmin || isOwnerLevel || hasDashboardAccess("mda_supervisory", currentProjectId);
+  const canSeeIrfDashboard = isAdmin || isOwnerLevel || hasDashboardAccess("sairf", currentProjectId);
   const primaryMdaDashboardForm = currentProjectId
     ? mdaChecklistForms.find((form) => form.project_id === currentProjectId) || null
     : mdaChecklistForms[0] || null;
