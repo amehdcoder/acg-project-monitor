@@ -73,6 +73,17 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
   const [exporting, setExporting] = useState(false);
   const [showAccess, setShowAccess] = useState(false);
 
+  // Human-readable labels for every category-form field (drives the editor).
+  const irfLabels = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const form of IRF_CATEGORY_FORMS) {
+      for (const g of form.groups) {
+        for (const f of g.fields) m[f.key] = f.label;
+      }
+    }
+    return m;
+  }, []);
+
   const refresh = async () => {
     await reload();
     toast.success("Dashboard refreshed.");
