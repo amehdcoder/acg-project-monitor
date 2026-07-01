@@ -859,15 +859,15 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
             </TabsContent>
 
             <TabsContent value="dashboard" className="mt-0 flex-1 overflow-auto p-4">
-              <DashboardStructureEditor
+              <DashboardDesigner
                 enabled={dashboardEnabled}
                 setEnabled={setDashboardEnabled}
                 sections={sections}
                 config={dashboardConfig}
                 onConfigChange={setDashboardConfig}
-                onSectionsChange={setSections}
               />
             </TabsContent>
+
 
 
 
