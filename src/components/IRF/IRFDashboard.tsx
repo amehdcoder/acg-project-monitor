@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, RefreshCw, Download, Users, Megaphone, ShieldCheck, MapPin,
   Landmark, TrendingUp, FileSpreadsheet, Moon, Sun, Layers, Gauge, UserPlus,
@@ -84,6 +84,30 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
     }
     return m;
   }, []);
+
+  // Resolve submitter display names from profiles so the admin editor never
+  // shows "Unknown submitter" (SAIRF reports don't store the name inline —
+  // only created_by). Falls back gracefully to email.
+  const [submitterNames, setSubmitterNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const ids = Array.from(new Set(rows.map((r: any) => r.created_by).filter(Boolean))) as string[];
+    if (!ids.length) return;
+    let active = true;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name, email")
+        .in("user_id", ids);
+      if (!active || !data) return;
+      const map: Record<string, string> = {};
+      data.forEach((p: any) => {
+        map[p.user_id] =
+          [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || p.email || "";
+      });
+      setSubmitterNames(map);
+    })();
+    return () => { active = false; };
+  }, [rows]);
 
   const refresh = async () => {
     await reload();
@@ -332,7 +356,10 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
                 submissions={rows.map((r: any) => ({
                   id: r.id,
                   data: r.answers || {},
-                  submitter: r.focal_person_name || r.reporter_name || null,
+                  submitter:
+                    r.focal_person_name ||
+                    submitterNames[r.created_by] ||
+                    (r.created_by ? "Unknown user" : null),
                   submittedAt: r.created_at,
                   state: r.state,
                   lga: r.lga,

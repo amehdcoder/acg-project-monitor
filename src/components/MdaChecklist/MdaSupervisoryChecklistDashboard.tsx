@@ -49,6 +49,7 @@ import HouseholdCoverageAnalysis, { type HCAPoint } from "./HouseholdCoverageAna
 import SupervisorSignatureGallery from "./SupervisorSignatureGallery";
 import SectionErrorBoundary from "./SectionErrorBoundary";
 import MdaAdvancedAnalyses from "./MdaAdvancedAnalyses";
+import MdaCorrectiveActionsAnalysis from "./MdaCorrectiveActionsAnalysis";
 import MdaLongitudinalInsights from "./MdaLongitudinalInsights";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import { useAuth } from "@/hooks/useAuth";
@@ -1100,6 +1101,11 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         followUpFields={new Set(Object.values(moduleQuestions).flatMap((s) => Array.from(s)))}
         offline={offline}
       />
+
+      {/* ── Corrective Actions section: themes, word cloud & accountability ── */}
+      <SectionErrorBoundary label="Corrective actions analysis">
+        <MdaCorrectiveActionsAnalysis submissions={filtered as any} />
+      </SectionErrorBoundary>
 
       {/* ── Longitudinal follow-up outcome trend + duplicate community flags ── */}
       <MdaLongitudinalInsights
