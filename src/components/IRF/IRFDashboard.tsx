@@ -26,6 +26,7 @@ import IrfFieldAnalysis from "@/components/IRF/IrfFieldAnalysis";
 import IrfInterpretation from "@/components/IRF/IrfInterpretation";
 import IrfSubmitterPanel from "@/components/IRF/IrfSubmitterPanel";
 import IrfDuplicateManager from "@/components/IRF/IrfDuplicateManager";
+import AdminSubmissionEditor from "@/components/AdminSubmissionEditor";
 import DashboardAccessManager from "@/components/dashboard/DashboardAccessManager";
 import { exportIrfToExcel } from "@/lib/irf/irfExcelExport";
 import { supabase } from "@/integrations/supabase/client";
