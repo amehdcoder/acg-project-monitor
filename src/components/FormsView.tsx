@@ -110,6 +110,7 @@ import { FormBuilder } from "@/components/FormBuilder";
 import { FormFiller } from "@/components/FormFiller";
 import MdaChecklistLanding from "@/components/MdaChecklist/MdaChecklistLanding";
 import MdaDashboardView from "@/components/MdaChecklist/MdaDashboardView";
+import { useDashboardAccess } from "@/hooks/useDashboardAccess";
 import SavedFormsManager, { type SavedFormsMode } from "@/components/FormFiller/SavedFormsManager";
 import { FormGroup } from "@/components/FormBuilder/types";
 import SubmissionHistory from "@/components/SubmissionHistory";
