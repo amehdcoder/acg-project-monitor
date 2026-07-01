@@ -732,14 +732,27 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
   };
 
   const repVersion = async (v: TemplateVersion) => {
+    if (!editForm?.id) { toast.error("Save the form once before re-publishing older versions."); return; }
     const res = republishVersion(versions, v.v);
     if (!res) return;
     restoreVersion(v);
-    setVersions(res.versions);
-    setPublishedVersion(res.publishedVersion);
-    // Persist immediately without closing.
-    setTimeout(() => persist("publish", false), 0);
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("forms")
+        .update({ settings: { ...(editForm.settings || {}), theme: v.snapshot.theme, dashboardEnabled: v.snapshot.dashboardEnabled, dashboardConfig: v.snapshot.dashboardConfig, versions: res.versions, publishedVersion: res.publishedVersion, studio: true } as any, questions: v.snapshot.sections as any, status: "active" })
+        .eq("id", editForm.id);
+      if (error) throw error;
+      setVersions(res.versions);
+      setPublishedVersion(res.publishedVersion);
+      toast.success(`${v.label} is now live.`);
+    } catch (e: any) {
+      toast.error(e?.message || "Could not re-publish.");
+    } finally {
+      setSaving(false);
+    }
   };
+
 
 
   // Brand-new form: choose a starter (with dashboard pre-wired) first.
