@@ -46,11 +46,16 @@ function sectionsFrom(questions: unknown): FormGroup[] {
 }
 
 export default function SpecialFormDashboard({ form, onClose }: Props) {
-  const settings = (form.settings || {}) as Record<string, unknown>;
+  // Live copy of the form structure/settings so the dashboard restructures
+  // itself the moment the linked form is edited in the Studio.
+  const [liveForm, setLiveForm] = useState(form);
+  useEffect(() => setLiveForm(form), [form]);
+
+  const settings = (liveForm.settings || {}) as Record<string, unknown>;
   const config = (settings.dashboardConfig || {}) as Partial<DashboardConfig>;
   const accent = config.accent || "#6366f1";
 
-  const sections = useMemo(() => sectionsFrom(form.questions), [form.questions]);
+  const sections = useMemo(() => sectionsFrom(liveForm.questions), [liveForm.questions]);
   const questions = useMemo(() => sections.flatMap((s) => s.questions), [sections]);
   const nameToId = useMemo(() => {
     const m = new Map<string, string>();
