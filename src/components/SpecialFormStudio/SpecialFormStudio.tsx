@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   closestCenter,
@@ -60,7 +60,16 @@ import FieldLogicEditor from "./FieldLogicEditor";
 import StudioHistoryPanel from "./StudioHistoryPanel";
 import { type StudioPreset, type DashboardConfig } from "@/lib/specialStudio/presets";
 import { diffForms, recordStudioAudit } from "@/lib/specialStudio/audit";
-import { History as HistoryIcon, LayoutDashboard, GitBranch } from "lucide-react";
+import {
+  reconcileDashboardConfig,
+  configNeedsSync,
+  applyConfigToForm,
+  flatQuestions,
+  isNumeric,
+  isCategorical,
+  isGeoLike,
+} from "@/lib/specialStudio/dashboardSync";
+import { History as HistoryIcon, LayoutDashboard, GitBranch, Gauge } from "lucide-react";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -300,6 +309,142 @@ function LivePreview({ sections, theme, isDark, name }: { sections: FormGroup[];
   );
 }
 
+/* ============ Dashboard structure editor (bidirectional sync) ============ */
+function DashboardStructureEditor({
+  enabled,
+  setEnabled,
+  sections,
+  config,
+  onConfigChange,
+  onSectionsChange,
+}: {
+  enabled: boolean;
+  setEnabled: (v: boolean) => void;
+  sections: FormGroup[];
+  config: DashboardConfig | null;
+  onConfigChange: (c: DashboardConfig | null) => void;
+  onSectionsChange: (updater: (prev: FormGroup[]) => FormGroup[]) => void;
+}) {
+  const questions = flatQuestions(sections).filter((q) => q.name);
+  const numeric = questions.filter(isNumeric);
+  const categorical = questions.filter(isCategorical);
+  const geoish = questions.filter(isGeoLike);
+  const cfg = config || { enabled: true as const, kpiFields: [], accent: "#6366f1" };
+  const labelFor = (name?: string) =>
+    questions.find((q) => q.name === name)?.label || name || "—";
+  const [newMetric, setNewMetric] = useState("");
+
+  const update = (patch: Partial<DashboardConfig>) =>
+    onConfigChange({ ...cfg, enabled: true, ...patch });
+
+  const toggleKpi = (name: string) => {
+    const set = new Set(cfg.kpiFields || []);
+    if (set.has(name)) set.delete(name);
+    else set.add(name);
+    update({ kpiFields: [...set] });
+  };
+
+  // Reverse sync: adding a metric here creates a matching number question.
+  const addMetricField = () => {
+    const label = newMetric.trim();
+    if (!label) return;
+    const name = `${label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 28)}_${uid().slice(0, 4)}`;
+    const nextCfg = { ...cfg, enabled: true as const, kpiFields: [...(cfg.kpiFields || []), name] };
+    onSectionsChange((prev) => applyConfigToForm(prev, nextCfg));
+    onConfigChange(nextCfg);
+    setNewMetric("");
+  };
+
+  if (!enabled) {
+    return (
+      <div className="space-y-3 pt-6 text-center">
+        <Gauge className="mx-auto h-8 w-8 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">The linked live dashboard is turned off for this form.</p>
+        <Button size="sm" onClick={() => setEnabled(true)} className="gap-1">
+          <LayoutDashboard className="h-4 w-4" /> Enable linked dashboard
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-border bg-muted/30 p-3 text-[11px] text-muted-foreground">
+        The dashboard is linked to this form. Editing questions updates it automatically; changes here that add
+        fields update the form structure too.
+      </div>
+
+      {/* KPI metrics */}
+      <div>
+        <Label className="text-xs font-semibold">KPI metric cards (summed numbers)</Label>
+        <div className="mt-1.5 space-y-1">
+          {numeric.length === 0 && <p className="text-[11px] text-muted-foreground">No number questions yet.</p>}
+          {numeric.map((q) => (
+            <label key={q.id} className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5 text-xs">
+              <input
+                type="checkbox"
+                checked={(cfg.kpiFields || []).includes(q.name!)}
+                onChange={() => toggleKpi(q.name!)}
+              />
+              <span className="truncate">{q.label}</span>
+            </label>
+          ))}
+        </div>
+        <div className="mt-2 flex items-center gap-1">
+          <Input
+            value={newMetric}
+            onChange={(e) => setNewMetric(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addMetricField())}
+            placeholder="Add a new metric (creates form field)"
+            className="h-8 text-xs"
+          />
+          <Button size="sm" variant="outline" onClick={addMetricField} className="shrink-0 gap-1">
+            <Plus className="h-3.5 w-3.5" /> Add
+          </Button>
+        </div>
+      </div>
+
+      {/* Status breakdown field */}
+      <div>
+        <Label className="text-xs font-semibold">Status breakdown field</Label>
+        <select
+          className="mt-1 h-8 w-full rounded-md border border-border bg-background px-2 text-xs"
+          value={cfg.statusField || ""}
+          onChange={(e) => update({ statusField: e.target.value || undefined })}
+        >
+          <option value="">None</option>
+          {categorical.map((q) => (
+            <option key={q.id} value={q.name}>{q.label}</option>
+          ))}
+        </select>
+        {cfg.statusField && <p className="mt-1 text-[10px] text-muted-foreground">Grouping by: {labelFor(cfg.statusField)}</p>}
+      </div>
+
+      {/* Geo field */}
+      <div>
+        <Label className="text-xs font-semibold">Location grouping field</Label>
+        <select
+          className="mt-1 h-8 w-full rounded-md border border-border bg-background px-2 text-xs"
+          value={cfg.geoField || ""}
+          onChange={(e) => update({ geoField: e.target.value || undefined })}
+        >
+          <option value="">None</option>
+          {geoish.map((q) => (
+            <option key={q.id} value={q.name}>{q.label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+        <Label className="text-xs">Linked dashboard enabled</Label>
+        <Switch checked={enabled} onCheckedChange={setEnabled} />
+      </div>
+    </div>
+  );
+}
+
+
+
 /* ================= Main studio ================= */
 interface Props {
   onClose: () => void;
@@ -347,6 +492,18 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
   const prevSnapshotRef = useRef<{ sections: FormGroup[]; name: string; theme: FormTheme } | null>(
     editForm?.id ? { sections: initialSections, name: editForm.name || "", theme: editForm?.settings?.theme ? normalizeFormTheme(editForm.settings.theme) : PRESET_THEME } : null,
   );
+
+  // Keep the linked dashboard structure in sync as the form is edited:
+  // stale field references are dropped and empty slots auto-suggested.
+  useEffect(() => {
+    if (!dashboardEnabled) return;
+    setDashboardConfig((prev) => {
+      if (prev && !configNeedsSync(sections, prev)) return prev;
+      return reconcileDashboardConfig(sections, prev);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sections, dashboardEnabled]);
+
 
   const applyPreset = (preset: StudioPreset) => {
     if (preset.key !== "blank") {
@@ -621,9 +778,10 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
         {/* Right: inspector */}
         <div className="hidden flex-col border-l border-border lg:flex">
           <Tabs value={rightTab} onValueChange={setRightTab} className="flex flex-1 flex-col overflow-hidden">
-            <TabsList className="mx-3 mt-3 grid grid-cols-4">
+            <TabsList className="mx-3 mt-3 grid grid-cols-5">
               <TabsTrigger value="field">Field</TabsTrigger>
               <TabsTrigger value="logic" className="gap-1"><GitBranch className="h-3.5 w-3.5" /> Logic</TabsTrigger>
+              <TabsTrigger value="dashboard" className="gap-1"><Gauge className="h-3.5 w-3.5" /> Dashboard</TabsTrigger>
               <TabsTrigger value="style" className="gap-1"><Palette className="h-3.5 w-3.5" /> Style</TabsTrigger>
               <TabsTrigger value="preview" className="gap-1"><Eye className="h-3.5 w-3.5" /> Preview</TabsTrigger>
             </TabsList>
@@ -699,6 +857,19 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
                 <FieldLogicEditor field={selectedField.q} sections={sections} onPatch={patchField} />
               )}
             </TabsContent>
+
+            <TabsContent value="dashboard" className="mt-0 flex-1 overflow-auto p-4">
+              <DashboardStructureEditor
+                enabled={dashboardEnabled}
+                setEnabled={setDashboardEnabled}
+                sections={sections}
+                config={dashboardConfig}
+                onConfigChange={setDashboardConfig}
+                onSectionsChange={setSections}
+              />
+            </TabsContent>
+
+
 
 
             <TabsContent value="style" className="mt-0 flex-1 overflow-auto">
