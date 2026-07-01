@@ -275,6 +275,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [bulkForm, setBulkForm] = useState<Form | null>(null);
   const [showBulkAccess, setShowBulkAccess] = useState(false);
   const { user, isAdmin, isSuperAdmin, isOwner, isOwnerLevel, role, isAdhoc, loading: authLoading } = useAuth();
+  const { hasDashboardAccess } = useDashboardAccess();
   const [assignedStandardCodes, setAssignedStandardCodes] = useState<Set<string>>(new Set());
   // Owner/Co-owner can hide the Standard forms folder from specific non-admins.
   const [standardRestricted, setStandardRestricted] = useState(false);
