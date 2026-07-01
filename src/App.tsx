@@ -25,6 +25,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import AfterHoursGate from "./components/afterHours/AfterHoursGate";
 import AfterHoursApprovalCenter from "./components/afterHours/AfterHoursApprovalCenter";
 import MyAfterHoursRequests from "./components/afterHours/MyAfterHoursRequests";
+import AfterHoursDecisionOverlay from "./components/afterHours/AfterHoursDecisionOverlay";
 import { scrollToAppTop } from "@/lib/scrollToAppTop";
 import { startGpsWarmer } from "@/lib/gps/gpsWarmer";
 
@@ -101,6 +102,7 @@ const App = () => (
                 <AfterHoursGate />
                 <AfterHoursApprovalCenter />
                 <MyAfterHoursRequests />
+                <AfterHoursDecisionOverlay />
 
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
