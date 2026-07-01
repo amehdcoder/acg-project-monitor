@@ -129,8 +129,8 @@ const FormDataTable = ({
 
       if (!isPending) {
         const { error } = await supabase
-          .from("form_submissions")
-          .update({ data: updatedData })
+          .from(table as any)
+          .update({ [dataColumn]: updatedData } as any)
           .eq("id", submissionId);
 
         if (error) throw error;
