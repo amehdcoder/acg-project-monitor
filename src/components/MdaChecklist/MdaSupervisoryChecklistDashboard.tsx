@@ -80,6 +80,8 @@ interface Props {
   projectId?: string | null;
   /** When true, data is served from the offline cache. */
   offline?: boolean;
+  /** Called after an admin edits a submission so live data can refresh. */
+  onDataChanged?: () => void;
 }
 
 // ───────────────────────── Palette ─────────────────────────
