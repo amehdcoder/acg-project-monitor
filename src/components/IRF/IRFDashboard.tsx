@@ -147,12 +147,22 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
             onClick={() => setTheme(isDarkTheme ? "light" : "dark")} className="text-white hover:bg-white/10">
             {isDarkTheme ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
-          <Button variant="ghost" size="icon" aria-label="Refresh dashboard" onClick={() => reload()} className="text-white hover:bg-white/10"><RefreshCw className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} /></Button>
-          <Button variant="ghost" size="icon" aria-label="Export reports as CSV" onClick={exportCsv} disabled={exporting || !rows.length} className="text-white hover:bg-white/10"><Download className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" aria-label="Refresh dashboard" onClick={refresh} disabled={loading} className="text-white hover:bg-white/10"><RefreshCw className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} /></Button>
+          <Button variant="ghost" size="icon" aria-label="Export submissions to Excel" onClick={exportExcel} disabled={exporting || !rows.length} className="text-white hover:bg-white/10">
+            {exporting ? <RefreshCw className="h-5 w-5 animate-spin" /> : <FileSpreadsheet className="h-5 w-5" />}
+          </Button>
+          {canManageAccess && (
+            <Button variant="ghost" size="icon" aria-label="Grant dashboard access" onClick={() => setShowAccess(true)} className="text-white hover:bg-white/10"><UserPlus className="h-5 w-5" /></Button>
+          )}
           <OwnerSubmissionManager table="irf_reports" title="IRF reports" labelColumns={["lga", "ward", "state"]}
             filter={projectId ? { column: "project_id", value: projectId } : null} onChanged={reload} compact
             className="text-white border-white/30 hover:bg-white/10" />
         </div>
+
+        {canManageAccess && (
+          <DashboardAccessManager open={showAccess} onOpenChange={setShowAccess} dashboardId="sairf" projectId={projectId} />
+        )}
+
 
         {loading && !rows.length ? (
           <div className="relative z-10 flex h-64 items-center justify-center text-muted-foreground">Loading reports…</div>
