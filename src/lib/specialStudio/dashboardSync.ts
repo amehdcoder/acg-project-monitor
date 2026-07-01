@@ -7,7 +7,7 @@
 // questions. These helpers keep both directions consistent.
 
 import type { FormGroup, Question, QuestionType } from "@/components/FormBuilder/types";
-import type { DashboardConfig } from "./presets";
+import type { DashboardConfig, DashboardWidget } from "./presets";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
