@@ -101,10 +101,14 @@ export default defineConfig(({ mode }) => {
       workbox: {
         // Pull in the Web Push handler so background notifications work.
         importScripts: ["/push-sw.js"],
-        // IMPORTANT: do NOT precache html — that locks users to a stale shell.
-        // HTML is fetched fresh via the NetworkFirst runtime handler below.
-        globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
-        globIgnores: ["**/index.html", "index.html"],
+        // Precache index.html (revisioned) so the app shell is GUARANTEED to be
+        // available offline. Without it, an installed PWA opened with no network
+        // has no shell to serve and Android shows its generic "You're offline"
+        // page. Freshness while online is still handled by the NetworkFirst
+        // navigation handler below (it always wins for navigations when the
+        // network is reachable), plus skipWaiting + cleanupOutdatedCaches and the
+        // in-app update manager — so users never get stuck on a stale shell.
+        globPatterns: ["**/*.{js,css,ico,png,svg,woff2,html}"],
         maximumFileSizeToCacheInBytes: 16 * 1024 * 1024, // 16 MiB
         navigateFallbackDenylist: [/^\/~oauth/],
         // Always activate the new service worker immediately and take control
