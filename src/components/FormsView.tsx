@@ -2227,6 +2227,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                   MDA Supervisory Dashboard
                                 </DropdownMenuItem>
                               )}
+                              {studioDashOn && (
+                                <DropdownMenuItem onClick={() => setSpecialDashForm(form)}>
+                                  <LayoutDashboard className="mr-2 h-4 w-4" style={{ color: studioAccent }} />
+                                  Live Special Dashboard
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => setQrCodeForm(form)}>
                                 <QrCode className="mr-2 h-4 w-4" />
                                 Generate QR Code
