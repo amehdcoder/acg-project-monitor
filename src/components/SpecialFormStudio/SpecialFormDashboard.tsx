@@ -97,11 +97,26 @@ export default function SpecialFormDashboard({ form, onClose }: Props) {
         { event: "*", schema: "public", table: "form_submissions", filter: `form_id=eq.${form.id}` },
         () => load(),
       )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "forms", filter: `id=eq.${form.id}` },
+        (payload) => {
+          const next = payload.new as { questions?: unknown; settings?: unknown } | null;
+          if (next) {
+            setLiveForm((prev) => ({
+              ...prev,
+              questions: next.questions ?? prev.questions,
+              settings: next.settings ?? prev.settings,
+            }));
+          }
+        },
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
   }, [form.id, load]);
+
 
   const readVal = (row: SubmissionRow, name?: string): unknown => {
     if (!name) return undefined;
