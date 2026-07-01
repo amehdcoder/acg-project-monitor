@@ -354,6 +354,7 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
             projectName={projectName}
             projectId={form.project_id || null}
             offline={useCacheNow}
+            onDataChanged={refresh}
           />
         )}
       </main>
