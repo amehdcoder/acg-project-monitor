@@ -51,6 +51,9 @@ import SectionErrorBoundary from "./SectionErrorBoundary";
 import MdaAdvancedAnalyses from "./MdaAdvancedAnalyses";
 import MdaLongitudinalInsights from "./MdaLongitudinalInsights";
 import { useTablePagination } from "@/hooks/useTablePagination";
+import { useAuth } from "@/hooks/useAuth";
+import { buildLabelMap } from "@/lib/formLabelUtils";
+import AdminSubmissionEditor from "@/components/AdminSubmissionEditor";
 import {
   Pagination, PaginationContent, PaginationItem, PaginationLink,
   PaginationNext, PaginationPrevious,
