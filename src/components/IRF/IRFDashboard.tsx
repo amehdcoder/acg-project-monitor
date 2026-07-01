@@ -185,6 +185,11 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
 
             <DuplicateReviewPanel projectId={projectId} />
 
+            {isOwner && duplicates && duplicates.duplicateCount > 0 && (
+              <IrfDuplicateManager projectId={projectId} duplicateIds={duplicates.duplicateIds} onChanged={reload} />
+            )}
+
+
             {/* KPIs */}
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <Kpi icon={Users} label="People Reached" value={fmt(stats.peopleReached)} sub="Reach + attendance" color="#0891b2" />
