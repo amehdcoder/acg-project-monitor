@@ -642,9 +642,10 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
         {/* Right: inspector */}
         <div className="hidden flex-col border-l border-border lg:flex">
           <Tabs value={rightTab} onValueChange={setRightTab} className="flex flex-1 flex-col overflow-hidden">
-            <TabsList className="mx-3 mt-3 grid grid-cols-4">
+            <TabsList className="mx-3 mt-3 grid grid-cols-5">
               <TabsTrigger value="field">Field</TabsTrigger>
               <TabsTrigger value="logic" className="gap-1"><GitBranch className="h-3.5 w-3.5" /> Logic</TabsTrigger>
+              <TabsTrigger value="dashboard" className="gap-1"><Gauge className="h-3.5 w-3.5" /> Dashboard</TabsTrigger>
               <TabsTrigger value="style" className="gap-1"><Palette className="h-3.5 w-3.5" /> Style</TabsTrigger>
               <TabsTrigger value="preview" className="gap-1"><Eye className="h-3.5 w-3.5" /> Preview</TabsTrigger>
             </TabsList>
