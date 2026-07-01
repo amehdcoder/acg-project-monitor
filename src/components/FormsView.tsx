@@ -2062,6 +2062,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
 
 
+                  // Special Form Studio forms with a linked dashboard get a dedicated
+                  // "Monitor" row so submissions can be watched live immediately.
+                  const studioSettings = form.settings as any;
+                  const isStudioForm = studioSettings?.studio === true;
+                  const studioDashOn = isStudioForm && studioSettings?.dashboardEnabled === true;
+                  const studioAccent = studioSettings?.dashboardConfig?.accent || "#6366f1";
+
                   // Shared accent color for this form's parent project — same
                   // palette used by the Project dropdown above, so the trigger
                   // border/text + form name + row left-border are all in sync.
