@@ -276,94 +276,122 @@ export default function SpecialFormDashboard({ form, onClose }: Props) {
 
       <ScrollArea className="flex-1">
         <div className="mx-auto max-w-5xl space-y-4 p-4">
-          {/* KPI cards */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-xl border border-border bg-card p-3">
-              <div className="flex items-center gap-1 text-[11px] text-muted-foreground"><Users className="h-3.5 w-3.5" /> Submissions</div>
-              <div className="mt-1 text-2xl font-bold" style={{ color: accent }}>{rows.length}</div>
-            </div>
-            {kpis.map((k) => (
-              <div key={k.label} className="rounded-xl border border-border bg-card p-3">
-                <div className="flex items-center gap-1 text-[11px] text-muted-foreground"><BarChart3 className="h-3.5 w-3.5" /> {k.label}</div>
-                <div className="mt-1 text-2xl font-bold" style={{ color: accent }}>{k.value.toLocaleString()}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Breakdown */}
-          <div className="grid gap-4 md:grid-cols-2">
-            {statusBreakdown.length > 0 && (
-              <div className="rounded-xl border border-border bg-card p-4">
-                <h3 className="mb-3 text-sm font-semibold">Status breakdown</h3>
-                <div className="space-y-2">
-                  {statusBreakdown.map(([label, count]) => {
-                    const pct = rows.length ? Math.round((count / rows.length) * 100) : 0;
-                    return (
-                      <div key={label}>
-                        <div className="mb-0.5 flex justify-between text-xs">
-                          <span className="truncate">{label}</span>
-                          <span className="text-muted-foreground">{count} ({pct}%)</span>
-                        </div>
-                        <div className="h-2 rounded-full bg-muted">
-                          <div className="h-2 rounded-full" style={{ width: `${pct}%`, background: accent }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            {geoBreakdown.length > 0 && (
-              <div className="rounded-xl border border-border bg-card p-4">
-                <h3 className="mb-3 flex items-center gap-1 text-sm font-semibold"><MapPin className="h-4 w-4" /> By location</h3>
-                <div className="space-y-1.5">
-                  {geoBreakdown.map(([label, count]) => (
-                    <div key={label} className="flex justify-between text-xs">
-                      <span className="truncate">{label}</span>
-                      <span className="font-semibold" style={{ color: accent }}>{count}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Recent submissions */}
-          <div className="rounded-xl border border-border bg-card">
-            <h3 className="border-b border-border p-3 text-sm font-semibold">Recent submissions</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground">
-                    <th className="p-2 font-medium">Date</th>
-                    {columns.map((c) => (
-                      <th key={c.id} className="p-2 font-medium">{idToLabel.get(c.id)}</th>
+          {/* Interactive filters */}
+          {filterWidgets.length > 0 && (
+            <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-3">
+              {filterWidgets.map((w) => (
+                <div key={w.id}>
+                  <label className="mb-0.5 block text-[11px] font-medium text-muted-foreground">{w.title}</label>
+                  <select
+                    className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+                    value={filters[w.field!] ?? "__all__"}
+                    onChange={(e) => setFilters((f) => ({ ...f, [w.field!]: e.target.value }))}
+                  >
+                    <option value="__all__">All</option>
+                    {optionsFor(w.field!).map((o) => (
+                      <option key={o} value={o}>{o}</option>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.slice(0, 50).map((r) => (
-                    <tr key={r.id} className="border-b border-border/50">
-                      <td className="whitespace-nowrap p-2 text-muted-foreground">
-                        {new Date(r.submitted_at || r.created_at).toLocaleDateString()}
-                      </td>
-                      {columns.map((c) => {
-                        const v = r.data?.[c.id];
-                        return (
-                          <td key={c.id} className="max-w-[160px] truncate p-2">
-                            {v == null ? "—" : Array.isArray(v) ? v.join(", ") : String(v)}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                  {rows.length === 0 && !loading && (
-                    <tr><td colSpan={columns.length + 1} className="p-6 text-center text-muted-foreground">No submissions yet.</td></tr>
-                  )}
-                </tbody>
-              </table>
+                  </select>
+                </div>
+              ))}
+              {Object.values(filters).some((v) => v && v !== "__all__") && (
+                <Button variant="ghost" size="sm" className="h-8" onClick={() => setFilters({})}>Clear filters</Button>
+              )}
             </div>
+          )}
+
+          {/* Widget grid (drag-and-drop order preserved) */}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {widgets.filter((w) => w.kind !== "filter").map((w) => {
+              const color = w.color || accent;
+              if (w.kind === "kpi") {
+                return (
+                  <div key={w.id} className={`rounded-xl border border-border bg-card p-3 ${w.span === 2 ? "col-span-2" : ""}`}>
+                    <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      {w.field ? <BarChart3 className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />} {w.title}
+                    </div>
+                    <div className="mt-1 text-2xl font-bold" style={{ color }}>{aggregate(w).toLocaleString()}</div>
+                  </div>
+                );
+              }
+              if (w.kind === "bar") {
+                const data = breakdown(w);
+                return (
+                  <div key={w.id} className="col-span-2 rounded-xl border border-border bg-card p-4 md:col-span-2">
+                    <h3 className="mb-3 flex items-center gap-1 text-sm font-semibold"><MapPin className="h-4 w-4" /> {w.title}</h3>
+                    {data.length ? (
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={data}>
+                          <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={50} />
+                          <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                          <Tooltip />
+                          <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : <p className="text-xs text-muted-foreground">No data yet.</p>}
+                  </div>
+                );
+              }
+              if (w.kind === "donut") {
+                const data = breakdown(w);
+                const palette = [color, "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899"];
+                return (
+                  <div key={w.id} className="col-span-2 rounded-xl border border-border bg-card p-4 md:col-span-2">
+                    <h3 className="mb-3 text-sm font-semibold">{w.title}</h3>
+                    {data.length ? (
+                      <ResponsiveContainer width="100%" height={200}>
+                        <PieChart>
+                          <Pie data={data} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={2}>
+                            {data.map((_, i) => <Cell key={i} fill={palette[i % palette.length]} />)}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : <p className="text-xs text-muted-foreground">No data yet.</p>}
+                  </div>
+                );
+              }
+              // table
+              return (
+                <div key={w.id} className="col-span-2 rounded-xl border border-border bg-card md:col-span-4">
+                  <h3 className="border-b border-border p-3 text-sm font-semibold">{w.title}</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border text-left text-muted-foreground">
+                          <th className="p-2 font-medium">Date</th>
+                          {columns.map((c) => (
+                            <th key={c.id} className="p-2 font-medium">{idToLabel.get(c.id)}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredRows.slice(0, 50).map((r) => (
+                          <tr key={r.id} className="border-b border-border/50">
+                            <td className="whitespace-nowrap p-2 text-muted-foreground">
+                              {new Date(r.submitted_at || r.created_at).toLocaleDateString()}
+                            </td>
+                            {columns.map((c) => {
+                              const v = r.data?.[c.id];
+                              return (
+                                <td key={c.id} className="max-w-[160px] truncate p-2">
+                                  {v == null ? "—" : Array.isArray(v) ? v.join(", ") : String(v)}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                        {filteredRows.length === 0 && !loading && (
+                          <tr><td colSpan={columns.length + 1} className="p-6 text-center text-muted-foreground">No submissions yet.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+
         </div>
       </ScrollArea>
     </div>
