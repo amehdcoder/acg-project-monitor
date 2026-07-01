@@ -1843,11 +1843,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                   Set Draft
                                 </DropdownMenuItem>
                               )}
+                              <DropdownMenuItem onClick={() => handleDownloadXlsForm(form)}>
+                                <Download className="mr-2 h-4 w-4 text-[#2F6FE6]" />
+                                Download XLSForm
+                              </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => setFormToDelete(form)} className="text-destructive">
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Remove from project
                               </DropdownMenuItem>
+
                             </DropdownMenuContent>
                           </DropdownMenu>
                         )}
