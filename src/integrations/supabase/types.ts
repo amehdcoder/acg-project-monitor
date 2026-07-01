@@ -6299,6 +6299,48 @@ export type Database = {
         }
         Relationships: []
       }
+      special_form_studio_audit: {
+        Row: {
+          action: string
+          changed_by: string | null
+          changed_by_email: string | null
+          changed_by_name: string | null
+          changes: Json
+          created_at: string
+          form_id: string | null
+          form_name: string | null
+          id: string
+          project_id: string | null
+          summary: string | null
+        }
+        Insert: {
+          action?: string
+          changed_by?: string | null
+          changed_by_email?: string | null
+          changed_by_name?: string | null
+          changes?: Json
+          created_at?: string
+          form_id?: string | null
+          form_name?: string | null
+          id?: string
+          project_id?: string | null
+          summary?: string | null
+        }
+        Update: {
+          action?: string
+          changed_by?: string | null
+          changed_by_email?: string | null
+          changed_by_name?: string | null
+          changes?: Json
+          created_at?: string
+          form_id?: string | null
+          form_name?: string | null
+          id?: string
+          project_id?: string | null
+          summary?: string | null
+        }
+        Relationships: []
+      }
       standard_assessment_submissions: {
         Row: {
           activity_description: string | null

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   DndContext,
   closestCenter,
@@ -55,6 +55,12 @@ import {
   normalizeFormTheme,
   type FormTheme,
 } from "@/lib/formTheme";
+import PresetPicker from "./PresetPicker";
+import FieldLogicEditor from "./FieldLogicEditor";
+import StudioHistoryPanel from "./StudioHistoryPanel";
+import { type StudioPreset, type DashboardConfig } from "@/lib/specialStudio/presets";
+import { diffForms, recordStudioAudit } from "@/lib/specialStudio/audit";
+import { History as HistoryIcon, LayoutDashboard, GitBranch } from "lucide-react";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -326,6 +332,35 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
   const [rightTab, setRightTab] = useState("field");
   const [saving, setSaving] = useState(false);
 
+  // Starter presets: show the picker for brand-new forms only.
+  const [presetKey, setPresetKey] = useState<string | null>(
+    editForm?.id ? (editForm.settings?.presetKey ?? "custom") : null,
+  );
+  // Linked dashboard config, pre-wired by presets.
+  const [dashboardEnabled, setDashboardEnabled] = useState<boolean>(!!editForm?.settings?.dashboardEnabled);
+  const [dashboardConfig, setDashboardConfig] = useState<DashboardConfig | null>(
+    (editForm?.settings?.dashboardConfig as DashboardConfig | undefined) ?? null,
+  );
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Snapshot of the last-saved state, used to compute the edit-history diff.
+  const prevSnapshotRef = useRef<{ sections: FormGroup[]; name: string; theme: FormTheme } | null>(
+    editForm?.id ? { sections: initialSections, name: editForm.name || "", theme: editForm?.settings?.theme ? normalizeFormTheme(editForm.settings.theme) : PRESET_THEME } : null,
+  );
+
+  const applyPreset = (preset: StudioPreset) => {
+    if (preset.key !== "blank") {
+      if (!name.trim()) setName(preset.title);
+      const secs = preset.sections();
+      setSections(secs);
+      setActiveSectionId(secs[0]?.id || "");
+      setTheme(preset.theme);
+      setDashboardEnabled(true);
+      setDashboardConfig(preset.dashboard());
+    }
+    setPresetKey(preset.key);
+  };
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const selectedField = useMemo(() => {
@@ -374,18 +409,42 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
         name: name.trim(),
         description: description.trim() || null,
         questions: sections as any,
-        settings: { theme, studio: true } as any,
+        settings: {
+          theme,
+          studio: true,
+          presetKey: presetKey && presetKey !== "custom" ? presetKey : (presetKey ?? "custom"),
+          dashboardEnabled,
+          dashboardConfig: dashboardEnabled ? dashboardConfig : null,
+        } as any,
         project_id: projectId,
         created_by: profile?.user_id,
         status: publish ? "active" : "draft",
       };
+
+      const changes = diffForms(prevSnapshotRef.current, { sections, name: name.trim(), theme });
+      let savedId = editForm?.id || null;
+
       if (editForm?.id) {
         const { error } = await supabase.from("forms").update(payload).eq("id", editForm.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("forms").insert(payload);
+        const { data, error } = await supabase.from("forms").insert(payload).select("id").single();
         if (error) throw error;
+        savedId = (data as { id: string } | null)?.id || null;
       }
+
+      await recordStudioAudit({
+        formId: savedId,
+        projectId,
+        formName: name.trim(),
+        action: editForm?.id ? (publish ? "published" : "updated") : "created",
+        changes,
+        userId: profile?.user_id,
+        userName: [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || null,
+        userEmail: profile?.email || null,
+      });
+      prevSnapshotRef.current = { sections, name: name.trim(), theme };
+
       toast.success(publish ? "Special form published." : "Draft saved.");
       onClose();
     } catch (err: any) {
@@ -395,8 +454,16 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
     }
   };
 
+  // Brand-new form: choose a starter (with dashboard pre-wired) first.
+  if (presetKey === null) {
+    return <PresetPicker onPick={applyPreset} onClose={onClose} />;
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
+      {editForm?.id && (
+        <StudioHistoryPanel formId={editForm.id} open={showHistory} onOpenChange={setShowHistory} />
+      )}
       {/* Top bar */}
       <div className="flex items-center gap-3 border-b border-border bg-card px-4 py-3">
         <Button variant="ghost" size="sm" onClick={onClose} className="gap-1">
@@ -412,6 +479,11 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
           </div>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {editForm?.id && (
+            <Button variant="ghost" size="sm" onClick={() => setShowHistory(true)} className="gap-1">
+              <HistoryIcon className="h-4 w-4" /> History
+            </Button>
+          )}
           <Button variant="outline" size="sm" disabled={saving} onClick={() => save(false)}>
             Save draft
           </Button>
@@ -466,6 +538,35 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
             >
               <Plus className="h-4 w-4" /> Add section
             </Button>
+
+            {/* Linked dashboard */}
+            <div className="rounded-lg border border-border p-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-semibold">
+                  <LayoutDashboard className="h-3.5 w-3.5 text-indigo-500" /> Linked dashboard
+                </div>
+                <Switch
+                  checked={dashboardEnabled}
+                  onCheckedChange={(v) => {
+                    setDashboardEnabled(v);
+                    if (v && !dashboardConfig) {
+                      setDashboardConfig({
+                        enabled: true,
+                        kpiFields: sections
+                          .flatMap((s) => s.questions)
+                          .filter((q) => q.type === "number" && q.name)
+                          .slice(0, 2)
+                          .map((q) => q.name!),
+                        accent: theme.light.primary,
+                      });
+                    }
+                  }}
+                />
+              </div>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Monitor submissions instantly in a live dashboard for this form.
+              </p>
+            </div>
           </div>
         </ScrollArea>
 
@@ -520,8 +621,9 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
         {/* Right: inspector */}
         <div className="hidden flex-col border-l border-border lg:flex">
           <Tabs value={rightTab} onValueChange={setRightTab} className="flex flex-1 flex-col overflow-hidden">
-            <TabsList className="mx-3 mt-3 grid grid-cols-3">
+            <TabsList className="mx-3 mt-3 grid grid-cols-4">
               <TabsTrigger value="field">Field</TabsTrigger>
+              <TabsTrigger value="logic" className="gap-1"><GitBranch className="h-3.5 w-3.5" /> Logic</TabsTrigger>
               <TabsTrigger value="style" className="gap-1"><Palette className="h-3.5 w-3.5" /> Style</TabsTrigger>
               <TabsTrigger value="preview" className="gap-1"><Eye className="h-3.5 w-3.5" /> Preview</TabsTrigger>
             </TabsList>
@@ -587,6 +689,17 @@ export default function SpecialFormStudio({ onClose, projectId, editForm }: Prop
                 </div>
               )}
             </TabsContent>
+
+            <TabsContent value="logic" className="mt-0 flex-1 overflow-auto p-4">
+              {!selectedField ? (
+                <p className="pt-10 text-center text-sm text-muted-foreground">
+                  Select a field to add visibility &amp; validation rules.
+                </p>
+              ) : (
+                <FieldLogicEditor field={selectedField.q} sections={sections} onPatch={patchField} />
+              )}
+            </TabsContent>
+
 
             <TabsContent value="style" className="mt-0 flex-1 overflow-auto">
               <ThemeEditor theme={theme} onChange={setTheme} />

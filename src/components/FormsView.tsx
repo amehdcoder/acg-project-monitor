@@ -108,6 +108,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { FormBuilder } from "@/components/FormBuilder";
 import SpecialFormStudio from "@/components/SpecialFormStudio/SpecialFormStudio";
+import SpecialFormDashboard from "@/components/SpecialFormStudio/SpecialFormDashboard";
 import { FormFiller } from "@/components/FormFiller";
 import MdaChecklistLanding from "@/components/MdaChecklist/MdaChecklistLanding";
 import MdaDashboardView from "@/components/MdaChecklist/MdaDashboardView";
@@ -236,6 +237,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
   const [dashboardForm, setDashboardForm] = useState<Form | null>(null);
   const [mdaDashboardForm, setMdaDashboardForm] = useState<Form | null>(null);
+  const [specialDashForm, setSpecialDashForm] = useState<Form | null>(null);
   const [templateForm, setTemplateForm] = useState<{ templateId: string; name: string; description: string; questions: Question[]; settings: any; geofence?: GeofenceArea } | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
@@ -527,6 +529,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       microplanFillingActive ||
       dashboardForm ||
       mdaDashboardForm ||
+      specialDashForm ||
       geofenceManagerForm ||
       templateForm ||
       qrCodeForm ||
@@ -561,6 +564,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     microplanFillingActive,
     dashboardForm,
     mdaDashboardForm,
+    specialDashForm,
     geofenceManagerForm,
     templateForm,
     qrCodeForm,
@@ -1340,6 +1344,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         formName={dashboardForm.name}
         isAdmin={isAdmin}
         onBack={() => setDashboardForm(null)}
+      />
+    );
+  }
+
+  if (specialDashForm) {
+    return (
+      <SpecialFormDashboard
+        form={{
+          id: specialDashForm.id,
+          name: specialDashForm.name,
+          questions: (specialDashForm.questions as unknown) ?? specialDashForm.groups,
+          settings: specialDashForm.settings,
+        }}
+        onClose={() => setSpecialDashForm(null)}
       />
     );
   }
