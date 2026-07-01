@@ -186,13 +186,19 @@ export default defineConfig(({ mode }) => {
 
           {
             // Always fetch fresh HTML so new builds (e.g. without the old
-            // green background) display immediately on next navigation.
+            // green background) display immediately on next navigation. When
+            // offline (or the network times out) and this handler's own
+            // runtime cache has no copy yet — e.g. the app icon is tapped
+            // offline right after install — precacheFallback serves the
+            // precached index.html shell so the REAL app loads instead of the
+            // browser's generic "You're offline" page.
             urlPattern: ({ request }: any) => request.mode === "navigate",
             handler: "NetworkFirst",
             options: {
               cacheName: "html-cache",
               networkTimeoutSeconds: 3,
               expiration: { maxEntries: 10 },
+              precacheFallback: { fallbackURL: "index.html" },
             },
           },
           {
