@@ -58,6 +58,9 @@ import {
 import PresetPicker from "./PresetPicker";
 import FieldLogicEditor from "./FieldLogicEditor";
 import StudioHistoryPanel from "./StudioHistoryPanel";
+import DashboardDesigner from "./DashboardDesigner";
+import VersionHistoryPanel from "./VersionHistoryPanel";
+import XLSFormImportDialog from "@/components/FormBuilder/XLSFormImportDialog";
 import { type StudioPreset, type DashboardConfig } from "@/lib/specialStudio/presets";
 import { diffForms, recordStudioAudit } from "@/lib/specialStudio/audit";
 import {
@@ -69,7 +72,23 @@ import {
   isCategorical,
   isGeoLike,
 } from "@/lib/specialStudio/dashboardSync";
-import { History as HistoryIcon, LayoutDashboard, GitBranch, Gauge } from "lucide-react";
+import {
+  readVersions,
+  publishVersion,
+  unpublishVersions,
+  republishVersion,
+  type TemplateVersion,
+  type TemplateSnapshot,
+} from "@/lib/specialStudio/versioning";
+import {
+  buildTemplatePackage,
+  downloadTemplatePackage,
+  importTemplatePackage,
+} from "@/lib/specialStudio/templatePackage";
+import { downloadXlsForm } from "@/lib/specialStudio/xlsformExport";
+import { History as HistoryIcon, LayoutDashboard, GitBranch, Gauge, Download, Upload, FileSpreadsheet, FileDown, CloudOff } from "lucide-react";
+import type { Question as QType } from "@/components/FormBuilder/types";
+
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
