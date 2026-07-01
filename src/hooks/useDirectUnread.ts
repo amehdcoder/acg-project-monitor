@@ -75,6 +75,9 @@ export function useDirectUnread({ withToast = false }: UseDirectUnreadOptions = 
           refetch();
           if (withToast && msg.sender_id !== user.id) {
             const name = await resolveName(msg.sender_id);
+            // Owner / Co-owner messages get the centered OwnerMessageOverlay
+            // treatment instead of a toast, so don't double-notify here.
+            if (ownerLevelCacheRef.current[msg.sender_id]) return;
             const preview =
               msg.message_type && msg.message_type !== "text"
                 ? `Sent a ${msg.message_type}`
