@@ -87,7 +87,7 @@ import {
 } from "@/lib/specialStudio/templatePackage";
 import { downloadXlsForm } from "@/lib/specialStudio/xlsformExport";
 import { History as HistoryIcon, LayoutDashboard, GitBranch, Gauge, Download, Upload, FileSpreadsheet, FileDown, CloudOff } from "lucide-react";
-import type { Question as QType } from "@/components/FormBuilder/types";
+
 
 
 const uid = () => Math.random().toString(36).slice(2, 10);
