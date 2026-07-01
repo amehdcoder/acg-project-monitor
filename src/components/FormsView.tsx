@@ -107,6 +107,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { FormBuilder } from "@/components/FormBuilder";
+import SpecialFormStudio from "@/components/SpecialFormStudio/SpecialFormStudio";
 import { FormFiller } from "@/components/FormFiller";
 import MdaChecklistLanding from "@/components/MdaChecklist/MdaChecklistLanding";
 import MdaDashboardView from "@/components/MdaChecklist/MdaDashboardView";
@@ -225,6 +226,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [rollupExporting, setRollupExporting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showFormBuilder, setShowFormBuilder] = useState(false);
+  const [showStudio, setShowStudio] = useState(false);
   const [editingForm, setEditingForm] = useState<Form | null>(null);
   const [fillingForm, setFillingForm] = useState<Form | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -1394,6 +1396,24 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
+
+  const canBuildStudio = isOwnerLevel || role === "super_admin" || role === "systems_admin";
+
+  if (showStudio && canBuildStudio) {
+    return (
+      <SpecialFormStudio
+        projectId={currentProjectId || undefined}
+        onClose={() => {
+          setShowStudio(false);
+          if (currentProjectId) {
+            fetchForms(currentProjectId);
+          } else {
+            fetchAllForms();
+          }
+        }}
+      />
+    );
+  }
 
   if (showFormBuilder) {
     const prePopulate = editingForm
@@ -3386,6 +3406,25 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             >
               <Plus className="h-6 w-6" strokeWidth={2.5} />
               New Form
+            </button>
+          )}
+          {canBuildStudio && (
+            <button
+              onClick={() => {
+                if (!currentProjectId && projects.length > 0) {
+                  toast({
+                    title: "Select a Project",
+                    description: "Please select a project first to build a special form.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                setShowStudio(true);
+              }}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-700 px-5 py-4 text-base font-semibold text-white shadow-[0_4px_14px_rgba(99,102,241,0.35)] transition-all hover:shadow-[0_6px_20px_rgba(99,102,241,0.45)] hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2"
+            >
+              <Plus className="h-6 w-6" strokeWidth={2.5} />
+              Special Form Studio
             </button>
           )}
           </>
