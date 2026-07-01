@@ -11,7 +11,7 @@
  * useDirectUnread) so this centered treatment stays reserved for leadership.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Crown, MessageCircleHeart, Reply, X } from "lucide-react";
+import { Check, CheckCheck, Crown, MessageCircleHeart, Reply, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -52,10 +52,25 @@ function previewFor(body: string, messageType: string): string {
   return body || "";
 }
 
+function formatStamp(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return sameDay ? time : `${d.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
+}
+
 export default function OwnerMessageOverlay() {
   const { user } = useAuth();
   const [queue, setQueue] = useState<IncomingOwnerMessage[]>([]);
+  // Per-message read timestamp so the recipient sees a clear "Read" confirmation
+  // the moment they view/acknowledge the message (the same read_at the Owner
+  // sees as double-blue ticks in the direct chat).
+  const [readMap, setReadMap] = useState<Record<string, string>>({});
   const metaCache = useRef<Record<string, SenderMeta>>({});
+
 
   const resolveSender = useCallback(async (senderId: string): Promise<SenderMeta> => {
     if (metaCache.current[senderId]) return metaCache.current[senderId];
@@ -136,6 +151,7 @@ export default function OwnerMessageOverlay() {
 
   const markReadOnServer = () => {
     const nowIso = new Date().toISOString();
+    setReadMap((prev) => (prev[current.id] ? prev : { ...prev, [current.id]: nowIso }));
     supabase
       .from("proximity_messages")
       .update({ delivered_at: nowIso, read_at: nowIso })
@@ -154,6 +170,8 @@ export default function OwnerMessageOverlay() {
 
   const initial = (current.senderName || "O").charAt(0).toUpperCase();
   const preview = previewFor(current.body, current.messageType);
+  const readAt = readMap[current.id];
+
 
   return (
     <div
@@ -223,7 +241,28 @@ export default function OwnerMessageOverlay() {
               {preview || "…"}
             </p>
           </div>
+
+          {/* Delivery / read status — mirrors the Owner's chat ticks so both the
+              recipient here and the sender in the chat know the message state. */}
+          <div className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+            {readAt ? (
+              <>
+                <CheckCheck className="h-3.5 w-3.5 text-primary" />
+                <span className="font-medium text-primary">Read</span>
+                <span aria-hidden>·</span>
+                <span>{formatStamp(readAt)}</span>
+              </>
+            ) : (
+              <>
+                <Check className="h-3.5 w-3.5" />
+                <span>Delivered</span>
+                <span aria-hidden>·</span>
+                <span>Sent {formatStamp(current.createdAt)}</span>
+              </>
+            )}
+          </div>
         </div>
+
 
         {/* Actions */}
         <div className="flex gap-3 border-t border-border px-6 py-4">

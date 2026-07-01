@@ -46,8 +46,9 @@ import {
   FileText,
   HandMetal,
   Languages,
-
+  Bug,
 } from "lucide-react";
+import SkipLogicDebugPanel from "@/components/FormFiller/SkipLogicDebugPanel";
 import { toast } from "@/hooks/use-toast";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import {
@@ -595,7 +596,8 @@ const FormFiller = ({
   }, [formId, gpsPosition, onClose, responses]);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
-  const { profile } = useAuth();
+  const { profile, isAdmin } = useAuth();
+  const [showSkipDebug, setShowSkipDebug] = useState(false);
 
   // Form tracking hooks
   const tracking = useFormTracking({ formId, userId });
@@ -3004,6 +3006,26 @@ const FormFiller = ({
     <div data-mda-scroll data-mda-mode={isMdaChecklist ? "true" : undefined} style={formThemeStyle} className={isMdaChecklist
       ? "fixed inset-0 z-[70] isolate flex flex-col overflow-y-auto bg-background lg:pl-64"
       : "flex min-h-full flex-col bg-background relative"}>
+      {/* Skip-logic debug panel (admins/owners only) — confirm at a glance why
+          any question is shown or hidden given the current answers. */}
+      {isAdmin && (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowSkipDebug((v) => !v)}
+            aria-label="Toggle skip logic debug panel"
+            className="fixed bottom-24 right-4 z-[150] flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card text-primary shadow-lg transition-transform hover:scale-105"
+          >
+            <Bug className="h-5 w-5" />
+          </button>
+          <SkipLogicDebugPanel
+            questions={allFormQuestions}
+            responses={responses}
+            open={showSkipDebug}
+            onClose={() => setShowSkipDebug(false)}
+          />
+        </>
+      )}
       {/* Apply optional custom form theme as scoped CSS variable overrides. */}
       {/* Location enforcement runs SILENTLY in the background.
           No gate modal, no header bar, no toasts — capture happens invisibly

@@ -167,6 +167,9 @@ export function DirectChatView({ chat, onBack, onArchive, onDelete }: DirectChat
                           <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>
                         )}
                         <span className="flex items-center gap-1 justify-end text-[10px] mt-0.5" style={{ color: "hsl(var(--wa-secondary-text))" }}>
+                          {mine && m.read_at && (
+                            <span className="mr-0.5">Seen {new Date(m.read_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                          )}
                           {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                           {mine && <Tick m={m} />}
                         </span>
