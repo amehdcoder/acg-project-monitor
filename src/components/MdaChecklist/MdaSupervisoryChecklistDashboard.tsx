@@ -1101,6 +1101,11 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         offline={offline}
       />
 
+      {/* ── Corrective Actions section: themes, word cloud & accountability ── */}
+      <SectionErrorBoundary label="Corrective actions analysis">
+        <MdaCorrectiveActionsAnalysis submissions={filtered as any} />
+      </SectionErrorBoundary>
+
       {/* ── Longitudinal follow-up outcome trend + duplicate community flags ── */}
       <MdaLongitudinalInsights
         checklist={checklist as any}
