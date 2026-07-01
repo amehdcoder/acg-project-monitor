@@ -60,7 +60,16 @@ import FieldLogicEditor from "./FieldLogicEditor";
 import StudioHistoryPanel from "./StudioHistoryPanel";
 import { type StudioPreset, type DashboardConfig } from "@/lib/specialStudio/presets";
 import { diffForms, recordStudioAudit } from "@/lib/specialStudio/audit";
-import { History as HistoryIcon, LayoutDashboard, GitBranch } from "lucide-react";
+import {
+  reconcileDashboardConfig,
+  configNeedsSync,
+  applyConfigToForm,
+  flatQuestions,
+  isNumeric,
+  isCategorical,
+  isGeoLike,
+} from "@/lib/specialStudio/dashboardSync";
+import { History as HistoryIcon, LayoutDashboard, GitBranch, Gauge } from "lucide-react";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
