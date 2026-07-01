@@ -3059,6 +3059,33 @@ export type Database = {
           },
         ]
       }
+      dashboard_access: {
+        Row: {
+          created_at: string
+          dashboard_id: string
+          granted_by: string | null
+          id: string
+          project_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dashboard_id: string
+          granted_by?: string | null
+          id?: string
+          project_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dashboard_id?: string
+          granted_by?: string | null
+          id?: string
+          project_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       dashboard_widgets: {
         Row: {
           config: Json
@@ -3954,6 +3981,36 @@ export type Database = {
           mode?: string
           reason?: string
           user_agent?: string | null
+        }
+        Relationships: []
+      }
+      irf_archived_reports: {
+        Row: {
+          archived_by: string | null
+          created_at: string
+          id: string
+          payload: Json
+          project_id: string | null
+          reason: string | null
+          report_id: string
+        }
+        Insert: {
+          archived_by?: string | null
+          created_at?: string
+          id?: string
+          payload: Json
+          project_id?: string | null
+          reason?: string | null
+          report_id: string
+        }
+        Update: {
+          archived_by?: string | null
+          created_at?: string
+          id?: string
+          payload?: Json
+          project_id?: string | null
+          reason?: string | null
+          report_id?: string
         }
         Relationships: []
       }
@@ -7403,6 +7460,7 @@ export type Database = {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
       }
+      can_manage_dashboards: { Args: { _user_id: string }; Returns: boolean }
       can_manage_form: {
         Args: { _form_id: string; _user_id: string }
         Returns: boolean
@@ -7622,6 +7680,10 @@ export type Database = {
         Args: { _form_code: string }
         Returns: string
       }
+      owner_archive_irf_duplicates: {
+        Args: { _ids: string[]; _reason?: string }
+        Returns: number
+      }
       owner_archive_mda_submissions: {
         Args: { _form_id: string; _from?: string; _to?: string }
         Returns: Json
@@ -7658,6 +7720,7 @@ export type Database = {
         Args: { _table: string }
         Returns: undefined
       }
+      owner_delete_irf_duplicates: { Args: { _ids: string[] }; Returns: number }
       owner_delete_records: {
         Args: { _archive?: boolean; _ids: string[]; _table: string }
         Returns: Json
@@ -7669,6 +7732,10 @@ export type Database = {
         Returns: Json
       }
       owner_reset_bloomberg_validation_data: { Args: never; Returns: Json }
+      owner_restore_irf_report: {
+        Args: { _archive_id: string }
+        Returns: string
+      }
       owner_restore_mda_submissions: {
         Args: { _form_id: string; _from?: string; _to?: string }
         Returns: Json
