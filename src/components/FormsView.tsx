@@ -1290,8 +1290,23 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }
 
   if (showIrfDash) {
+    if (!canSeeIrfDashboard) {
+      return (
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-6 text-center">
+          <ShieldCheck className="h-10 w-10 text-muted-foreground opacity-50" />
+          <h2 className="text-lg font-semibold">Dashboard access required</h2>
+          <p className="max-w-md text-sm text-muted-foreground">
+            You don't yet have access to the SARMAAN ACSM Indicator Tracking Dashboard. Please ask the project Owner or an Admin to grant you access.
+          </p>
+          <Button variant="outline" onClick={() => setShowIrfDash(false)}>
+            <ArrowLeft className="mr-1 h-4 w-4" /> Back to Forms
+          </Button>
+        </div>
+      );
+    }
     return <IRFDashboard projectId={currentProjectId} onClose={() => setShowIrfDash(false)} />;
   }
+
 
 
 
