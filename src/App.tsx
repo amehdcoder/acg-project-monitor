@@ -101,6 +101,7 @@ const App = () => (
                 <AfterHoursGate />
                 <AfterHoursApprovalCenter />
                 <MyAfterHoursRequests />
+                <AfterHoursDecisionOverlay />
 
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
