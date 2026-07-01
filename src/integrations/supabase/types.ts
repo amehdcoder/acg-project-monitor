@@ -6657,6 +6657,48 @@ export type Database = {
         }
         Relationships: []
       }
+      submission_edit_audit: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          changed_by_name: string | null
+          field_key: string
+          field_label: string | null
+          id: string
+          new_value: string | null
+          old_value: string | null
+          source: string
+          submission_id: string
+          table_name: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_name?: string | null
+          field_key: string
+          field_label?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          source?: string
+          submission_id: string
+          table_name?: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_name?: string | null
+          field_key?: string
+          field_label?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          source?: string
+          submission_id?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
       submission_versions: {
         Row: {
           change_summary: string | null
