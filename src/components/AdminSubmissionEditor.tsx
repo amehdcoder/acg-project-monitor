@@ -224,6 +224,9 @@ export default function AdminSubmissionEditor({
                 }}
               />
             )}
+            {active && (
+              <SubmissionEditHistory submissionId={active.id} tableName={table} />
+            )}
           </ScrollArea>
         </DialogContent>
       </Dialog>
