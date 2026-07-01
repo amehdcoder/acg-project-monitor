@@ -356,7 +356,10 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
                 submissions={rows.map((r: any) => ({
                   id: r.id,
                   data: r.answers || {},
-                  submitter: r.focal_person_name || r.reporter_name || null,
+                  submitter:
+                    r.focal_person_name ||
+                    submitterNames[r.created_by] ||
+                    (r.created_by ? "Unknown user" : null),
                   submittedAt: r.created_at,
                   state: r.state,
                   lga: r.lga,
