@@ -22,14 +22,13 @@ const config: CapacitorConfig = {
     cleartext: true,
   },
   plugins: {
+    // Splash screen disabled: launching the app icon opens straight to the
+    // authentication page with no intermediate splash/loading screen.
     SplashScreen: {
-      launchShowDuration: 1200,
+      launchShowDuration: 0,
+      launchAutoHide: true,
       backgroundColor: '#1E3A8A',
-      androidSplashResourceName: 'splash',
-      androidScaleType: 'CENTER_CROP',
       showSpinner: false,
-      splashFullScreen: true,
-      splashImmersive: true,
     },
   },
 };
