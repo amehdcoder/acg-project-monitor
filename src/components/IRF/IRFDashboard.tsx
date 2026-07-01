@@ -353,18 +353,28 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
             {/* Admin: full-field submission editor */}
             {canManageAccess && (
               <AdminSubmissionEditor
-                submissions={rows.map((r: any) => ({
-                  id: r.id,
-                  data: r.answers || {},
-                  submitter:
-                    r.focal_person_name ||
-                    submitterNames[r.created_by] ||
-                    (r.created_by ? "Unknown user" : null),
-                  submittedAt: r.created_at,
-                  state: r.state,
-                  lga: r.lga,
-                  ward: r.ward,
-                }))}
+                submissions={rows.map((r: any) => {
+                  const form = IRF_CATEGORY_FORMS.find((f) => f.id === r.form_category);
+                  const fieldSpec = buildCategoryFieldSpec(form);
+                  const columns: Record<string, any> = {};
+                  for (const f of fieldSpec) {
+                    if (f.column) columns[f.column] = r[f.column];
+                  }
+                  return {
+                    id: r.id,
+                    data: r.answers || {},
+                    fieldSpec,
+                    columns,
+                    submitter:
+                      r.focal_person_name ||
+                      submitterNames[r.created_by] ||
+                      (r.created_by ? "Unknown user" : null),
+                    submittedAt: r.created_at,
+                    state: r.state,
+                    lga: r.lga,
+                    ward: r.ward,
+                  };
+                })}
                 questionLabels={irfLabels}
                 table="irf_reports"
                 dataColumn="answers"
