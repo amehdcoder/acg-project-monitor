@@ -153,6 +153,11 @@ const AfterHoursApprovalCenter = () => {
       if (error) throw error;
       toast.success("Submission approved and saved.");
       setRequests((r) => r.filter((x) => x.id !== id));
+      // Notify the requester by email (best-effort; in-app centered overlay is
+      // driven by the realtime status change on their side).
+      supabase.functions
+        .invoke("send-after-hours-decision", { body: { requestId: id, decision: "approved" } })
+        .catch(() => {});
       load();
     } catch (err: any) {
       toast.error(err?.message || "Could not approve.");
