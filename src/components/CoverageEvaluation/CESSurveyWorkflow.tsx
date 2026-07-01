@@ -1730,6 +1730,60 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
   }, [gps, featureSummary]);
 
+  // ---------- Perimeter Smart Count: analyze the drawn satellite crop with AI vision ----------
+  // Counts every distinct building rooftop STRICTLY inside the drawn perimeter (ignoring roads,
+  // cars, shadows and trees) and writes the estimate into the Households input (still overwritable).
+  const [perimeterCountLoading, setPerimeterCountLoading] = useState(false);
+  const runPerimeterSmartCount = useCallback(async () => {
+    if (perimeter.length < 3) {
+      toast({
+        title: "Draw a perimeter first",
+        description: "Walk, draw or auto-fence a perimeter, then run Smart Count.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setPerimeterCountLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ces-rooftop-count", {
+        body: { polygon: perimeter.map((p) => ({ lat: p.lat, lng: p.lng })) },
+      });
+      if (error) throw error;
+      const d = data as any;
+      if (d?.error) throw new Error(d.error);
+      const count = d?.estimated_households ?? 0;
+      const conf = d?.confidence ?? "low";
+      const ciLow = typeof d?.ci_low === "number" ? d.ci_low : null;
+      const ciHigh = typeof d?.ci_high === "number" ? d.ci_high : null;
+      setEstHHAi(count);
+      if (ciLow !== null && ciHigh !== null) {
+        setEstHHAiCI({ low: ciLow, high: ciHigh, confidence: conf });
+      }
+      setSmartCountResult({ count, sampleAreaM2: 0 });
+      // Overwrite the Households input with the perimeter estimate (still editable).
+      setEstHHUser(count);
+      toast({
+        title: "Smart Count complete",
+        description: `${count} distinct rooftop${count === 1 ? "" : "s"} counted inside the perimeter (${conf} confidence). You can adjust the number manually.`,
+      });
+    } catch (e: any) {
+      const msg = String(e?.message ?? e);
+      toast({
+        title: "Smart Count failed",
+        description:
+          msg.includes("rate_limited")
+            ? "AI is busy — please try again in a moment."
+            : msg.includes("credits_exhausted")
+            ? "AI credits exhausted — enter the household count manually."
+            : msg,
+        variant: "destructive",
+      });
+    } finally {
+      setPerimeterCountLoading(false);
+    }
+  }, [perimeter]);
+
+
   // ---------- Smart Count: tap-a-feature → ML counts similar features inside perimeter ----------
   // Uses the already-detected building footprints from the residential mask classifier as the
   // ML feature bank. We treat the tapped feature as a *prototype*: its area defines a similarity
