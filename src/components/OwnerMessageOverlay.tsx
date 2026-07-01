@@ -11,7 +11,7 @@
  * useDirectUnread) so this centered treatment stays reserved for leadership.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Crown, MessageCircleHeart, Reply, X } from "lucide-react";
+import { Check, CheckCheck, Crown, MessageCircleHeart, Reply, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
