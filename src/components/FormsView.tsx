@@ -1397,6 +1397,24 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }
 
 
+  const canBuildStudio = isOwnerLevel || role === "super_admin" || role === "systems_admin";
+
+  if (showStudio && canBuildStudio) {
+    return (
+      <SpecialFormStudio
+        projectId={currentProjectId || undefined}
+        onClose={() => {
+          setShowStudio(false);
+          if (currentProjectId) {
+            fetchForms(currentProjectId);
+          } else {
+            fetchAllForms();
+          }
+        }}
+      />
+    );
+  }
+
   if (showFormBuilder) {
     const prePopulate = editingForm
       ? {
