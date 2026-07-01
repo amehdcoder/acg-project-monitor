@@ -11,7 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import FormDataTable from "@/components/FormDataTable";
+import FormDataTable, { type FieldDescriptor } from "@/components/FormDataTable";
 import { getFieldLabel, type QuestionLabelMap } from "@/lib/formLabelUtils";
 
 export interface EditableSubmission {
@@ -22,6 +22,10 @@ export interface EditableSubmission {
   state?: string | null;
   lga?: string | null;
   ward?: string | null;
+  /** Ordered list of every form field so the editor can render all questions. */
+  fieldSpec?: FieldDescriptor[];
+  /** Current values for column-mapped fields (keyed by column name). */
+  columns?: Record<string, any>;
   [k: string]: any;
 }
 
@@ -206,9 +210,16 @@ export default function AdminSubmissionEditor({
                 table={table}
                 dataColumn={dataColumn}
                 questionLabels={questionLabels}
+                fieldSpec={active.fieldSpec}
+                columnData={active.columns}
                 onDataUpdate={async (updated) => {
                   setActive((prev) => (prev ? { ...prev, data: updated } : prev));
                   await onChanged?.();
+                }}
+                onColumnsUpdate={(updatedColumns) => {
+                  setActive((prev) =>
+                    prev ? { ...prev, columns: updatedColumns } : prev,
+                  );
                 }}
               />
             )}

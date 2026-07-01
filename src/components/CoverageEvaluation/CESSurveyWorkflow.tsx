@@ -1730,6 +1730,60 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
   }, [gps, featureSummary]);
 
+  // ---------- Perimeter Smart Count: analyze the drawn satellite crop with AI vision ----------
+  // Counts every distinct building rooftop STRICTLY inside the drawn perimeter (ignoring roads,
+  // cars, shadows and trees) and writes the estimate into the Households input (still overwritable).
+  const [perimeterCountLoading, setPerimeterCountLoading] = useState(false);
+  const runPerimeterSmartCount = useCallback(async () => {
+    if (perimeter.length < 3) {
+      toast({
+        title: "Draw a perimeter first",
+        description: "Walk, draw or auto-fence a perimeter, then run Smart Count.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setPerimeterCountLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ces-rooftop-count", {
+        body: { polygon: perimeter.map((p) => ({ lat: p.lat, lng: p.lng })) },
+      });
+      if (error) throw error;
+      const d = data as any;
+      if (d?.error) throw new Error(d.error);
+      const count = d?.estimated_households ?? 0;
+      const conf = d?.confidence ?? "low";
+      const ciLow = typeof d?.ci_low === "number" ? d.ci_low : null;
+      const ciHigh = typeof d?.ci_high === "number" ? d.ci_high : null;
+      setEstHHAi(count);
+      if (ciLow !== null && ciHigh !== null) {
+        setEstHHAiCI({ low: ciLow, high: ciHigh, confidence: conf });
+      }
+      setSmartCountResult({ count, sampleAreaM2: 0 });
+      // Overwrite the Households input with the perimeter estimate (still editable).
+      setEstHHUser(count);
+      toast({
+        title: "Smart Count complete",
+        description: `${count} distinct rooftop${count === 1 ? "" : "s"} counted inside the perimeter (${conf} confidence). You can adjust the number manually.`,
+      });
+    } catch (e: any) {
+      const msg = String(e?.message ?? e);
+      toast({
+        title: "Smart Count failed",
+        description:
+          msg.includes("rate_limited")
+            ? "AI is busy — please try again in a moment."
+            : msg.includes("credits_exhausted")
+            ? "AI credits exhausted — enter the household count manually."
+            : msg,
+        variant: "destructive",
+      });
+    } finally {
+      setPerimeterCountLoading(false);
+    }
+  }, [perimeter]);
+
+
   // ---------- Smart Count: tap-a-feature → ML counts similar features inside perimeter ----------
   // Uses the already-detected building footprints from the residential mask classifier as the
   // ML feature bank. We treat the tapped feature as a *prototype*: its area defines a similarity
@@ -3744,12 +3798,26 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               </Field>
             </div>
 
-            {/* Smart Count — tap a roof/feature, ML aggregates similar features in perimeter */}
+            {/* Smart Count — analyze the drawn perimeter crop (AI rooftop vision) or tap-a-feature (ML) */}
             <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
-                <span className="font-semibold">Smart Count (ML)</span>
-                <span className="text-muted-foreground">Tap a feature on the map below — every similar feature inside the perimeter (any colour) is counted and aggregated as proxy households.</span>
+                <span className="font-semibold">Smart Count</span>
+                <span className="text-muted-foreground">Analyze the drawn perimeter of the satellite crop — every distinct building rooftop inside the perimeter is counted (roads, cars, shadows &amp; trees ignored). The estimate fills the Households box and can be overwritten.</span>
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-7 ml-auto"
+                  disabled={perimeterCountLoading || perimeter.length < 3}
+                  onClick={runPerimeterSmartCount}
+                >
+                  {perimeterCountLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}
+                  {perimeterCountLoading ? "Counting rooftops…" : "Smart Count (analyze perimeter)"}
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 border-t border-primary/20 pt-1">
+                <Target className="h-3.5 w-3.5 text-primary" />
+                <span className="text-muted-foreground">Or tap a single feature on the map and aggregate similar features as proxy households.</span>
                 <Button
                   size="sm"
                   variant={smartCountMode ? "default" : "outline"}
@@ -3757,20 +3825,23 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   onClick={() => setSmartCountMode((v) => !v)}
                 >
                   <Target className="h-3.5 w-3.5 mr-1" />
-                  {smartCountMode ? "Tap a feature on the map…" : "Enable Smart Count"}
+                  {smartCountMode ? "Tap a feature on the map…" : "Tap-a-feature count"}
                 </Button>
               </div>
               {smartCountResult && (
                 <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-primary/20">
                   <Badge variant="default" className="text-[10px]">
-                    {smartCountResult.count} similar feature{smartCountResult.count === 1 ? "" : "s"}
+                    {smartCountResult.count} rooftop{smartCountResult.count === 1 ? "" : "s"}
                   </Badge>
                   <span className="text-muted-foreground">
-                    Reference footprint ≈ {Math.round(smartCountResult.sampleAreaM2)} m². Adjust manually if needed.
+                    {smartCountResult.sampleAreaM2 > 0
+                      ? `Reference footprint ≈ ${Math.round(smartCountResult.sampleAreaM2)} m². Adjust manually if needed.`
+                      : "Counted inside the drawn perimeter. Adjust manually if needed."}
                   </span>
                 </div>
               )}
             </div>
+
 
             <div className="flex gap-2 flex-wrap items-center">
               <Button onClick={buildSegments} disabled={buildingSegments || households.length > 0}>

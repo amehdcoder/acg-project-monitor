@@ -210,3 +210,63 @@ export type IrfEvidencePhoto = {
   consent: true;
   consented_at: string;
 };
+
+/** A flat field descriptor consumed by the admin submission editor. */
+export interface IrfFieldSpecItem {
+  key: string;
+  label: string;
+  column?: string;
+  type?: "text" | "number" | "boolean" | "select" | "date" | "longtext";
+  options?: string[];
+}
+
+/**
+ * Build the complete, ordered list of every editable field for a category
+ * form (identity + reporting context + all activity questions). This drives
+ * the Admin submission editor so all questions render even when unanswered.
+ */
+export const buildCategoryFieldSpec = (form?: IrfCategoryForm): IrfFieldSpecItem[] => {
+  const spec: IrfFieldSpecItem[] = [
+    { key: "state", label: "State", column: "state", type: "text" },
+    { key: "lga", label: "LGA", column: "lga", type: "text" },
+    { key: "ward", label: "Ward", column: "ward", type: "text" },
+    { key: "reporting_month", label: "Reporting month", column: "reporting_month", type: "date" },
+    { key: "reporting_level", label: "Reporting level", column: "reporting_level", type: "select", options: ["State", "LGA"] },
+    { key: "focal_person_name", label: "Focal person name", column: "focal_person_name", type: "text" },
+    { key: "focal_person_phone", label: "Focal person phone", column: "focal_person_phone", type: "text" },
+  ];
+
+  if (!form) return spec;
+
+  if (form.perMinistry) {
+    spec.push({
+      key: "ministry_department",
+      label: "Ministry / department",
+      column: "ministry_department",
+      type: "text",
+    });
+  }
+
+  for (const group of form.groups) {
+    for (const f of group.fields) {
+      spec.push({
+        key: f.key,
+        label: f.label,
+        column: f.column,
+        type:
+          f.type === "acceptance"
+            ? "select"
+            : (f.type as IrfFieldSpecItem["type"]),
+        options:
+          f.type === "acceptance"
+            ? [...ACCEPTANCE_LEVELS]
+            : f.options
+            ? [...f.options]
+            : undefined,
+      });
+    }
+  }
+
+  spec.push({ key: "narrative", label: "Narrative / notes", column: "narrative", type: "longtext" });
+  return spec;
+};
