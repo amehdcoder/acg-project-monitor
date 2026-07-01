@@ -298,6 +298,17 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
               {refreshing ? "Refreshing" : "Refresh"}
             </Button>
 
+            {canManageAccess && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAccess(true)}
+                className="gap-1.5"
+              >
+                <UserPlus className="h-4 w-4" /> Grant access
+              </Button>
+            )}
+
             {isOwner && (
               <OwnerSubmissionManager
                 table="form_submissions"
@@ -310,6 +321,10 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
             )}
           </div>
         </div>
+        {canManageAccess && (
+          <DashboardAccessManager open={showAccess} onOpenChange={setShowAccess} dashboardId="mda_supervisory" projectId={form.project_id} />
+        )}
+
       </div>
 
       <main className={`space-y-6 px-4 py-6 ${embedded ? "" : "container mx-auto"}`}>
