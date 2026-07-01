@@ -6,8 +6,10 @@
  * Users with no profile photo get a stable, friendly animal avatar so they stay
  * pseudonymous yet visually distinct.
  */
-import { useMemo } from "react";
-import { Users, MessageCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Search, Users, MessageCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Popover,
