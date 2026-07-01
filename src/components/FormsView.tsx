@@ -1000,7 +1000,24 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     }
   };
 
+  const handleDownloadXlsForm = (form: any) => {
+    try {
+      const raw = form?.questions;
+      let sections: any[];
+      if (Array.isArray(raw) && raw.length && raw[0]?.questions) {
+        sections = raw;
+      } else {
+        sections = [{ id: "s1", name: "survey", label: "Survey", questions: Array.isArray(raw) ? raw : [] }];
+      }
+      downloadXlsForm(form?.title || form?.name || "form", sections);
+      toast({ title: "XLSForm downloaded" });
+    } catch (e: any) {
+      toast({ title: "Could not export XLSForm", description: e?.message, variant: "destructive" });
+    }
+  };
+
   const handleUpdateFormStatus = async (formId: string, newStatus: string) => {
+
     try {
       const { error } = await supabase
         .from("forms")
