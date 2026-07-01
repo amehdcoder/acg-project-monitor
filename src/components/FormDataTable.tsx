@@ -29,6 +29,10 @@ interface FormDataTableProps {
   readOnly?: boolean;
   questionLabels?: QuestionLabelMap;
   onDataUpdate?: (updatedData: Record<string, any>) => void;
+  /** Source table to persist edits to (defaults to form_submissions). */
+  table?: string;
+  /** JSON column that stores the answers on the table (defaults to "data"). */
+  dataColumn?: string;
 }
 
 // Format a value for display
@@ -69,6 +73,8 @@ const FormDataTable = ({
   readOnly = false,
   questionLabels,
   onDataUpdate,
+  table = "form_submissions",
+  dataColumn = "data",
 }: FormDataTableProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Record<string, any>>({});
@@ -123,8 +129,8 @@ const FormDataTable = ({
 
       if (!isPending) {
         const { error } = await supabase
-          .from("form_submissions")
-          .update({ data: updatedData })
+          .from(table as any)
+          .update({ [dataColumn]: updatedData } as any)
           .eq("id", submissionId);
 
         if (error) throw error;

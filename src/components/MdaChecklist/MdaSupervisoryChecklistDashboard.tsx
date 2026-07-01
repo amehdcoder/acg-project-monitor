@@ -51,6 +51,9 @@ import SectionErrorBoundary from "./SectionErrorBoundary";
 import MdaAdvancedAnalyses from "./MdaAdvancedAnalyses";
 import MdaLongitudinalInsights from "./MdaLongitudinalInsights";
 import { useTablePagination } from "@/hooks/useTablePagination";
+import { useAuth } from "@/hooks/useAuth";
+import { buildLabelMap } from "@/lib/formLabelUtils";
+import AdminSubmissionEditor from "@/components/AdminSubmissionEditor";
 import {
   Pagination, PaginationContent, PaginationItem, PaginationLink,
   PaginationNext, PaginationPrevious,
@@ -77,6 +80,8 @@ interface Props {
   projectId?: string | null;
   /** When true, data is served from the offline cache. */
   offline?: boolean;
+  /** Called after an admin edits a submission so live data can refresh. */
+  onDataChanged?: () => void;
 }
 
 // ───────────────────────── Palette ─────────────────────────
@@ -374,7 +379,10 @@ const writeDashboardUrl = (updates: Record<string, string | null | undefined>) =
 };
 
 // ───────────────────────── Main ─────────────────────────
-export default function MdaSupervisoryChecklistDashboard({ submissions, questions, formName, projectName, projectId, offline }: Props) {
+export default function MdaSupervisoryChecklistDashboard({ submissions, questions, formName, projectName, projectId, offline, onDataChanged }: Props) {
+  const { isAdmin, isOwnerLevel } = useAuth();
+  const canEditSubmissions = isAdmin || isOwnerLevel;
+  const questionLabels = useMemo(() => buildLabelMap(questions as any[]), [questions]);
   // ── Filter state ──────────────────────────────────────────────
   const [fState, setFState] = useState(ALL);
   const [fLga, setFLga] = useState(ALL);
@@ -1293,7 +1301,28 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       </Card>
 
 
+      {/* ── Admin: full-field submission editor ── */}
+      {canEditSubmissions && (
+        <AdminSubmissionEditor
+          submissions={filtered.map((s) => ({
+            id: s.id,
+            data: s.data || {},
+            submitter: s.submitter || (s.data as any)?.supervisor_name || null,
+            submittedAt: s.submittedAt,
+            state: pickGeo(s, "state"),
+            lga: pickGeo(s, "lga"),
+            ward: pickGeo(s, "ward"),
+          }))}
+          questionLabels={questionLabels}
+          table="form_submissions"
+          dataColumn="data"
+          title="Integrated MDA Checklist — Admin submission editor"
+          onChanged={onDataChanged}
+        />
+      )}
+
       {/* ── Heatmap cell drill-down ── */}
+
       <MdaDrillDownSheet
         data={drill}
         questions={questions as any}

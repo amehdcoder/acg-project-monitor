@@ -26,6 +26,7 @@ import IrfFieldAnalysis from "@/components/IRF/IrfFieldAnalysis";
 import IrfInterpretation from "@/components/IRF/IrfInterpretation";
 import IrfSubmitterPanel from "@/components/IRF/IrfSubmitterPanel";
 import IrfDuplicateManager from "@/components/IRF/IrfDuplicateManager";
+import AdminSubmissionEditor from "@/components/AdminSubmissionEditor";
 import DashboardAccessManager from "@/components/dashboard/DashboardAccessManager";
 import { exportIrfToExcel } from "@/lib/irf/irfExcelExport";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,6 +73,17 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
     useIrfDashboard(projectId, overrides.irfMap);
   const [exporting, setExporting] = useState(false);
   const [showAccess, setShowAccess] = useState(false);
+
+  // Human-readable labels for every category-form field (drives the editor).
+  const irfLabels = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const form of IRF_CATEGORY_FORMS) {
+      for (const g of form.groups) {
+        for (const f of g.fields) m[f.key] = f.label;
+      }
+    }
+    return m;
+  }, []);
 
   const refresh = async () => {
     await reload();
@@ -185,8 +197,9 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
 
             <DuplicateReviewPanel projectId={projectId} />
 
-            {isOwner && duplicates && duplicates.duplicateCount > 0 && (
+            {isOwnerLevel && duplicates && duplicates.duplicateCount > 0 && (
               <IrfDuplicateManager projectId={projectId} duplicateIds={duplicates.duplicateIds} onChanged={reload} />
+
             )}
 
 
@@ -312,6 +325,28 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
 
             {/* Collapsible evidence library: activity pictures + consent forms */}
             <IrfEvidenceLibrary rows={rows} />
+
+            {/* Admin: full-field submission editor */}
+            {canManageAccess && (
+              <AdminSubmissionEditor
+                submissions={rows.map((r: any) => ({
+                  id: r.id,
+                  data: r.answers || {},
+                  submitter: r.focal_person_name || r.reporter_name || null,
+                  submittedAt: r.created_at,
+                  state: r.state,
+                  lga: r.lga,
+                  ward: r.ward,
+                }))}
+                questionLabels={irfLabels}
+                table="irf_reports"
+                dataColumn="answers"
+                duplicateIds={duplicates?.duplicateIds || new Set()}
+                title="SARMAAN ACSM Reports — Admin submission editor"
+                onChanged={reload}
+              />
+            )}
+
           </div>
         )}
       </div>
