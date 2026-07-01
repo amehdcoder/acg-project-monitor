@@ -97,6 +97,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "projects", label: t("nav.projects"), icon: FolderOpen, adminOnly: true },
     { id: "data", label: t("nav.analytics"), icon: BarChart3, adminOnly: true },
     { id: "data-cleaner", label: "Data Cleaner", icon: Brush, adminOnly: true, route: "/data-cleaner" },
+    { id: "learning-log", label: "Learning Log", icon: BookOpen, adminOnly: false, showForUsers: true, route: "/learning-log" },
     { id: "ml", label: "Machine Learning", icon: Brain, adminOnly: true },
     { id: "math-modeling", label: "Math Modeling", icon: Calculator, adminOnly: true },
     { id: "integrations", label: t("nav.integrations"), icon: Upload, adminOnly: true },
@@ -178,7 +179,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     const btn = (
       <button
         data-active={isActive ? "true" : undefined}
-        onClick={() => { playNavigate(); if (id === "data-cleaner") { navigate("/data-cleaner"); } else { onTabChange(id); } onClose(); }}
+        onClick={() => { playNavigate(); if (id === "data-cleaner") { navigate("/data-cleaner"); } else if (id === "learning-log") { navigate("/learning-log"); } else { onTabChange(id); } onClose(); }}
         className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13px] font-medium transition-all duration-100 ${
           isActive
             ? "bg-sidebar-primary text-sidebar-primary-foreground"

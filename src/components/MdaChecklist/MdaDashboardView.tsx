@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, ChevronUp, Loader2, RefreshCw, WifiOff } from "lucide-react";
+import { ArrowLeft, BarChart3, ChevronUp, Loader2, RefreshCw, WifiOff, UserPlus } from "lucide-react";
+import DashboardAccessManager from "@/components/dashboard/DashboardAccessManager";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
@@ -150,7 +151,9 @@ function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm, questions:
 }
 
 export default function MdaDashboardView({ form, projects = [], onClose, embedded = false }: Props) {
-  const { isOwner } = useAuth();
+  const { isOwner, isAdmin, isOwnerLevel } = useAuth();
+  const canManageAccess = isAdmin || isOwnerLevel;
+  const [showAccess, setShowAccess] = useState(false);
   const { submissions, loading, loadFailed, refresh } = useDataAnalytics({ formId: form.id });
   const [refreshing, setRefreshing] = useState(false);
   const [cacheVersion, setCacheVersion] = useState(0);
@@ -295,6 +298,17 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
               {refreshing ? "Refreshing" : "Refresh"}
             </Button>
 
+            {canManageAccess && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAccess(true)}
+                className="gap-1.5"
+              >
+                <UserPlus className="h-4 w-4" /> Grant access
+              </Button>
+            )}
+
             {isOwner && (
               <OwnerSubmissionManager
                 table="form_submissions"
@@ -307,6 +321,10 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
             )}
           </div>
         </div>
+        {canManageAccess && (
+          <DashboardAccessManager open={showAccess} onOpenChange={setShowAccess} dashboardId="mda_supervisory" projectId={form.project_id} />
+        )}
+
       </div>
 
       <main className={`space-y-6 px-4 py-6 ${embedded ? "" : "container mx-auto"}`}>

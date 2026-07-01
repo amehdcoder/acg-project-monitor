@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 import DataCleaner from "./pages/DataCleaner";
 import MdaAnalysesHarness from "./pages/MdaAnalysesHarness";
+import LearningLog from "./pages/LearningLog";
 import InstallBanner from "./components/InstallBanner";
 import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
@@ -109,7 +110,8 @@ const App = () => (
                   <Route path="/install" element={<ProtectedRoute><Install /></ProtectedRoute>} />
                   <Route path="/witness/:surveyId/:hhId" element={<CESWitnessForm />} />
                   <Route path="/satellite-messenger" element={<ProtectedRoute><OffGridSatelliteMessenger /></ProtectedRoute>} />
-                  <Route path="/data-cleaner" element={<ProtectedRoute><DataCleaner /></ProtectedRoute>} />
+                 <Route path="/data-cleaner" element={<ProtectedRoute><DataCleaner /></ProtectedRoute>} />
+                 <Route path="/learning-log" element={<ProtectedRoute><LearningLog /></ProtectedRoute>} />
                   <Route path="/__test/mda-analyses" element={<MdaAnalysesHarness />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>

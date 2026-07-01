@@ -110,6 +110,7 @@ import { FormBuilder } from "@/components/FormBuilder";
 import { FormFiller } from "@/components/FormFiller";
 import MdaChecklistLanding from "@/components/MdaChecklist/MdaChecklistLanding";
 import MdaDashboardView from "@/components/MdaChecklist/MdaDashboardView";
+import { useDashboardAccess } from "@/hooks/useDashboardAccess";
 import SavedFormsManager, { type SavedFormsMode } from "@/components/FormFiller/SavedFormsManager";
 import { FormGroup } from "@/components/FormBuilder/types";
 import SubmissionHistory from "@/components/SubmissionHistory";
@@ -275,6 +276,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [bulkForm, setBulkForm] = useState<Form | null>(null);
   const [showBulkAccess, setShowBulkAccess] = useState(false);
   const { user, isAdmin, isSuperAdmin, isOwner, isOwnerLevel, role, isAdhoc, loading: authLoading } = useAuth();
+  const { hasDashboardAccess } = useDashboardAccess();
   const [assignedStandardCodes, setAssignedStandardCodes] = useState<Set<string>>(new Set());
   // Owner/Co-owner can hide the Standard forms folder from specific non-admins.
   const [standardRestricted, setStandardRestricted] = useState(false);
@@ -1162,8 +1164,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     isMdaChecklistLike({ settings: form.settings, formName: form.name, groups: form.groups })
   );
   // The MDA Supervisory Dashboard is NOT auto-granted with the checklist.
-  // Only Systems Admins, Super Admins, Owner and Co-owner may open it.
-  const canSeeMdaDashboard = isAdmin || isOwnerLevel;
+  // Systems Admins, Super Admins, Owner, Co-owner — or members the Owner/Admin
+  // has explicitly granted dashboard access — may open it.
+  const canSeeMdaDashboard = isAdmin || isOwnerLevel || hasDashboardAccess("mda_supervisory", currentProjectId);
+  const canSeeIrfDashboard = isAdmin || isOwnerLevel || hasDashboardAccess("sairf", currentProjectId);
   const primaryMdaDashboardForm = currentProjectId
     ? mdaChecklistForms.find((form) => form.project_id === currentProjectId) || null
     : mdaChecklistForms[0] || null;
@@ -1286,8 +1290,23 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }
 
   if (showIrfDash) {
+    if (!canSeeIrfDashboard) {
+      return (
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-6 text-center">
+          <ShieldCheck className="h-10 w-10 text-muted-foreground opacity-50" />
+          <h2 className="text-lg font-semibold">Dashboard access required</h2>
+          <p className="max-w-md text-sm text-muted-foreground">
+            You don't yet have access to the SARMAAN ACSM Indicator Tracking Dashboard. Please ask the project Owner or an Admin to grant you access.
+          </p>
+          <Button variant="outline" onClick={() => setShowIrfDash(false)}>
+            <ArrowLeft className="mr-1 h-4 w-4" /> Back to Forms
+          </Button>
+        </div>
+      );
+    }
     return <IRFDashboard projectId={currentProjectId} onClose={() => setShowIrfDash(false)} />;
   }
+
 
 
 
