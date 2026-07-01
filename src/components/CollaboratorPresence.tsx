@@ -6,8 +6,10 @@
  * Users with no profile photo get a stable, friendly animal avatar so they stay
  * pseudonymous yet visually distinct.
  */
-import { useMemo } from "react";
-import { Users, MessageCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Search, Users, MessageCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Popover,
@@ -223,9 +225,152 @@ const CollaboratorPresence = () => {
             </ul>
           )}
         </div>
+
+        {/* Owner/Super-admin can message ANY member, even those offline. */}
+        <MessageAnyone
+          onSelect={(m) => startDirectChat({ user_id: m.user_id, name: m.name } as ActiveCollaborator)}
+          activeIds={new Set(others.map((o) => o.user_id))}
+          selfId={user?.id}
+        />
       </PopoverContent>
     </Popover>
   );
 };
+
+interface DirectoryMember {
+  user_id: string;
+  name: string;
+  avatar_url: string | null;
+  designation: string | null;
+}
+
+function MessageAnyone({
+  onSelect,
+  activeIds,
+  selfId,
+}: {
+  onSelect: (m: DirectoryMember) => void;
+  activeIds: Set<string>;
+  selfId?: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [query, setQuery] = useState("");
+  const [members, setMembers] = useState<DirectoryMember[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!expanded || members.length > 0) return;
+    let active = true;
+    (async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name, email, avatar_url, designation")
+        .order("first_name", { ascending: true });
+      if (!active) return;
+      const list: DirectoryMember[] = (data || [])
+        .map((p: any) => ({
+          user_id: p.user_id,
+          name:
+            [p.first_name, p.last_name].filter(Boolean).join(" ").trim() ||
+            p.email ||
+            "Member",
+          avatar_url: p.avatar_url ?? null,
+          designation: p.designation ?? null,
+        }))
+        .filter((m) => m.user_id && m.user_id !== selfId);
+      setMembers(list);
+      setLoading(false);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [expanded, members.length, selfId]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return members;
+    return members.filter((m) => m.name.toLowerCase().includes(q));
+  }, [members, query]);
+
+  return (
+    <div className="border-t border-border">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent/40"
+      >
+        <span className="flex items-center gap-2">
+          <MessageCircle className="h-4 w-4 text-primary" />
+          Message anyone
+        </span>
+        <span className="text-xs font-normal text-muted-foreground">
+          {expanded ? "Hide" : "Includes offline"}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="px-3 pb-3">
+          <div className="relative mb-2">
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search members by name…"
+              className="h-9 pl-8"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            {loading ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">Loading members…</p>
+            ) : filtered.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">No members found</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {filtered.map((m) => {
+                  const online = activeIds.has(m.user_id);
+                  return (
+                    <li key={m.user_id}>
+                      <button
+                        type="button"
+                        onClick={() => onSelect(m)}
+                        className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-accent/50"
+                      >
+                        <div className="relative">
+                          <Avatar className="h-8 w-8">
+                            {m.avatar_url ? (
+                              <AvatarImage src={m.avatar_url} alt={m.name} className="object-cover" />
+                            ) : null}
+                            <AvatarFallback className={cn("text-sm", animalFor(m.user_id).color)}>
+                              {animalFor(m.user_id).emoji}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span
+                            className={cn(
+                              "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card",
+                              online ? "bg-emerald-500" : "bg-muted-foreground/40",
+                            )}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-foreground">{m.name}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {online ? "Active now" : m.designation ? m.designation.replace(/[-_]/g, " ") : "Offline"}
+                          </p>
+                        </div>
+                        <MessageCircle className="h-4 w-4 shrink-0 text-primary" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 export default CollaboratorPresence;

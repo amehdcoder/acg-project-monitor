@@ -40,11 +40,12 @@ export function useDirectUnread({ withToast = false }: UseDirectUnreadOptions = 
     refetch();
   }, [refetch]);
 
+  const ownerLevelCacheRef = useRef<Record<string, boolean>>({});
   const resolveName = useCallback(async (senderId: string): Promise<string> => {
     if (nameCacheRef.current[senderId]) return nameCacheRef.current[senderId];
     const { data } = await supabase
       .from("profiles")
-      .select("first_name, last_name, email")
+      .select("first_name, last_name, email, is_owner, is_co_owner")
       .eq("user_id", senderId)
       .maybeSingle();
     const name =
@@ -52,6 +53,8 @@ export function useDirectUnread({ withToast = false }: UseDirectUnreadOptions = 
       data?.email ||
       "Someone";
     nameCacheRef.current[senderId] = name;
+    ownerLevelCacheRef.current[senderId] =
+      !!data?.is_owner || !!data?.is_co_owner || data?.email === "amehjoey1@gmail.com";
     return name;
   }, []);
 
@@ -72,6 +75,9 @@ export function useDirectUnread({ withToast = false }: UseDirectUnreadOptions = 
           refetch();
           if (withToast && msg.sender_id !== user.id) {
             const name = await resolveName(msg.sender_id);
+            // Owner / Co-owner messages get the centered OwnerMessageOverlay
+            // treatment instead of a toast, so don't double-notify here.
+            if (ownerLevelCacheRef.current[msg.sender_id]) return;
             const preview =
               msg.message_type && msg.message_type !== "text"
                 ? `Sent a ${msg.message_type}`
