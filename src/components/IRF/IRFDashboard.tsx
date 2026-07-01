@@ -65,27 +65,42 @@ function Kpi({ icon: Icon, label, value, sub, color }: { icon: any; label: strin
 export default function IRFDashboard({ projectId, onClose }: Props) {
   const { resolvedTheme, setTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
+  const { isOwner, isAdmin, isOwnerLevel } = useAuth();
+  const canManageAccess = isAdmin || isOwnerLevel;
   const overrides = useAcsmDuplicateOverrides(projectId);
   const { rows, loading, reload, stats, genderSplit, ncBreakdown, trend, dataQuality, duplicates, points } =
     useIrfDashboard(projectId, overrides.irfMap);
   const [exporting, setExporting] = useState(false);
+  const [showAccess, setShowAccess] = useState(false);
 
-  const exportCsv = () => {
+  const refresh = async () => {
+    await reload();
+    toast.success("Dashboard refreshed.");
+  };
+
+  const exportExcel = async () => {
+    if (!rows.length) return;
     setExporting(true);
     try {
-      if (!rows.length) return;
-      const cols = Object.keys(rows[0]);
-      const esc = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-      const csv = [cols.join(","), ...rows.map((r) => cols.map((c) => esc((r as any)[c])).join(","))].join("\n");
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = `irf-reports-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click(); URL.revokeObjectURL(url);
+      // Resolve submitter names so each submission is captured professionally.
+      const ids = Array.from(new Set(rows.map((r) => (r as any).created_by).filter(Boolean))) as string[];
+      const names: Record<string, string> = {};
+      if (ids.length) {
+        const { data } = await supabase
+          .from("profiles").select("user_id, first_name, last_name, email").in("user_id", ids);
+        (data || []).forEach((p: any) => {
+          names[p.user_id] = [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || p.email || "Unknown user";
+        });
+      }
+      const count = await exportIrfToExcel(rows, names);
+      toast.success(`Exported ${count} submission(s) to Excel.`);
+    } catch (e: any) {
+      toast.error(e?.message || "Excel export failed.");
     } finally { setExporting(false); }
   };
 
   const monthlyData = useMemo(() => trend.map((t) => ({ ...t, label: t.month })), [trend]);
+
 
   // People reached per LGA (drives the Kano choropleth).
   const lgaValues = useMemo(() => {
