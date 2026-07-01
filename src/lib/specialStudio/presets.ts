@@ -73,16 +73,43 @@ function section(label: string, questions: Question[]): FormGroup {
   return { id: uid(), name: `sec_${uid()}`, label, questions };
 }
 
+export type WidgetKind = "kpi" | "bar" | "donut" | "table" | "filter";
+export type WidgetAgg = "sum" | "count" | "avg" | "distinct";
+
+export interface DashboardWidget {
+  id: string;
+  kind: WidgetKind;
+  /** Question `name` this widget reads. Optional for count-of-submissions cards. */
+  field?: string;
+  agg: WidgetAgg;
+  title: string;
+  color?: string;
+  /** Grid span (1 = half width, 2 = full width). */
+  span?: 1 | 2;
+}
+
+export interface DashboardLayout {
+  accent: string;
+  background?: string;
+  columns?: number;
+  density?: "compact" | "comfortable";
+}
+
 export interface DashboardConfig {
   enabled: true;
-  /** Primary metric fields (question names) surfaced as KPI cards. */
+  /** Primary metric fields (question names) surfaced as KPI cards. Legacy. */
   kpiFields: string[];
-  /** Field used for status/completion breakdown, if any. */
+  /** Field used for status/completion breakdown, if any. Legacy. */
   statusField?: string;
-  /** Field used for geography/location grouping, if any. */
+  /** Field used for geography/location grouping, if any. Legacy. */
   geoField?: string;
   accent: string;
+  /** Drag-and-drop widget layout. Supersedes legacy fields when present. */
+  widgets?: DashboardWidget[];
+  /** Saved dashboard theming/layout. */
+  layout?: DashboardLayout;
 }
+
 
 export interface StudioPreset {
   key: string;
