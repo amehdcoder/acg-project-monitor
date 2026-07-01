@@ -85,6 +85,30 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
     return m;
   }, []);
 
+  // Resolve submitter display names from profiles so the admin editor never
+  // shows "Unknown submitter" (SAIRF reports don't store the name inline —
+  // only created_by). Falls back gracefully to email.
+  const [submitterNames, setSubmitterNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const ids = Array.from(new Set(rows.map((r: any) => r.created_by).filter(Boolean))) as string[];
+    if (!ids.length) return;
+    let active = true;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name, email")
+        .in("user_id", ids);
+      if (!active || !data) return;
+      const map: Record<string, string> = {};
+      data.forEach((p: any) => {
+        map[p.user_id] =
+          [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || p.email || "";
+      });
+      setSubmitterNames(map);
+    })();
+    return () => { active = false; };
+  }, [rows]);
+
   const refresh = async () => {
     await reload();
     toast.success("Dashboard refreshed.");
