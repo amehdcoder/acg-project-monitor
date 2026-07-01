@@ -197,8 +197,9 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
 
             <DuplicateReviewPanel projectId={projectId} />
 
-            {isOwner && duplicates && duplicates.duplicateCount > 0 && (
+            {isOwnerLevel && duplicates && duplicates.duplicateCount > 0 && (
               <IrfDuplicateManager projectId={projectId} duplicateIds={duplicates.duplicateIds} onChanged={reload} />
+
             )}
 
 
