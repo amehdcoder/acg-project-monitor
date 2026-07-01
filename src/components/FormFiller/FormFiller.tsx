@@ -595,7 +595,8 @@ const FormFiller = ({
   }, [formId, gpsPosition, onClose, responses]);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
-  const { profile } = useAuth();
+  const { profile, isAdmin } = useAuth();
+  const [showSkipDebug, setShowSkipDebug] = useState(false);
 
   // Form tracking hooks
   const tracking = useFormTracking({ formId, userId });
