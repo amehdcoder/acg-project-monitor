@@ -23,7 +23,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { FormGroup, Question } from "@/components/FormBuilder/types";
-import type { DashboardConfig } from "@/lib/specialStudio/presets";
+import type { DashboardConfig, DashboardWidget } from "@/lib/specialStudio/presets";
+import { ensureWidgets, reconcileWidgets } from "@/lib/specialStudio/dashboardSync";
+import {
+  BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer,
+} from "recharts";
 
 interface Props {
   form: { id: string; name: string; questions: unknown; settings: unknown };
