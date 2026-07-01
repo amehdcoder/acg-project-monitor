@@ -101,10 +101,14 @@ export default defineConfig(({ mode }) => {
       workbox: {
         // Pull in the Web Push handler so background notifications work.
         importScripts: ["/push-sw.js"],
-        // IMPORTANT: do NOT precache html — that locks users to a stale shell.
-        // HTML is fetched fresh via the NetworkFirst runtime handler below.
-        globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
-        globIgnores: ["**/index.html", "index.html"],
+        // Precache index.html (revisioned) so the app shell is GUARANTEED to be
+        // available offline. Without it, an installed PWA opened with no network
+        // has no shell to serve and Android shows its generic "You're offline"
+        // page. Freshness while online is still handled by the NetworkFirst
+        // navigation handler below (it always wins for navigations when the
+        // network is reachable), plus skipWaiting + cleanupOutdatedCaches and the
+        // in-app update manager — so users never get stuck on a stale shell.
+        globPatterns: ["**/*.{js,css,ico,png,svg,woff2,html}"],
         maximumFileSizeToCacheInBytes: 16 * 1024 * 1024, // 16 MiB
         navigateFallbackDenylist: [/^\/~oauth/],
         // Always activate the new service worker immediately and take control
@@ -182,13 +186,19 @@ export default defineConfig(({ mode }) => {
 
           {
             // Always fetch fresh HTML so new builds (e.g. without the old
-            // green background) display immediately on next navigation.
+            // green background) display immediately on next navigation. When
+            // offline (or the network times out) and this handler's own
+            // runtime cache has no copy yet — e.g. the app icon is tapped
+            // offline right after install — precacheFallback serves the
+            // precached index.html shell so the REAL app loads instead of the
+            // browser's generic "You're offline" page.
             urlPattern: ({ request }: any) => request.mode === "navigate",
             handler: "NetworkFirst",
             options: {
               cacheName: "html-cache",
               networkTimeoutSeconds: 3,
               expiration: { maxEntries: 10 },
+              precacheFallback: { fallbackURL: "index.html" },
             },
           },
           {
