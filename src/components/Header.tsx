@@ -71,6 +71,7 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
   return (
     <TooltipProvider>
       <>
+        <OwnerMessageOverlay />
         {/* Impersonation Banner */}
         {isImpersonating && (
           <div className="sticky top-0 z-50 flex items-center justify-between bg-accent px-4 py-1.5 text-accent-foreground">
