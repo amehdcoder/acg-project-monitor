@@ -6058,6 +6058,36 @@ export type Database = {
           },
         ]
       }
+      sarmaan_form_access: {
+        Row: {
+          created_at: string
+          form_id: string
+          granted_by: string | null
+          id: string
+          project_id: string | null
+          section_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          form_id: string
+          granted_by?: string | null
+          id?: string
+          project_id?: string | null
+          section_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          form_id?: string
+          granted_by?: string | null
+          id?: string
+          project_id?: string | null
+          section_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sbc_reports: {
         Row: {
           achievement_pct: number | null
