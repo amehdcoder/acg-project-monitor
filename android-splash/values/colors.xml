@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#1E3A8A</color>
+    <color name="colorPrimaryDark">#1E3A8A</color>
+    <color name="colorAccent">#1E3A8A</color>
+    <!-- Must match index.html / manifest background_color so launch → app is seamless. -->
+    <color name="launchBackground">#f5f7fa</color>
+</resources>

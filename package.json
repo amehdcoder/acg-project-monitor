@@ -11,7 +11,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "android:splash": "bash scripts/apply-android-splash.sh"
   },
   "dependencies": {
     "@capacitor/cli": "^8.3.0",

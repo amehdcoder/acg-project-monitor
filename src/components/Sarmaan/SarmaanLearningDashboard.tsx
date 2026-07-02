@@ -73,10 +73,16 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [nav, setNav] = useState<string>(DASHBOARD_NAV[0]);
+  // Realtime feedback: connection state, last refresh time, and a transient
+  // "flash" pulse whenever a live change is applied so updates feel instant.
+  const [live, setLive] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<number>(0);
+  const [flash, setFlash] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { live?: boolean }) => {
+    if (!opts?.live) setLoading(true);
     const { data } = await supabase
       .from("form_submissions")
       .select("id,data,submitted_at,created_at,user_id")
@@ -100,6 +106,12 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
       setProfiles(map);
     }
     setLoading(false);
+    setHasLoadedOnce(true);
+    setLastUpdated(Date.now());
+    if (opts?.live) {
+      setFlash(true);
+      window.setTimeout(() => setFlash(false), 1200);
+    }
   }, [form.id]);
 
   useEffect(() => {
@@ -109,11 +121,18 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "form_submissions", filter: `form_id=eq.${form.id}` },
-        () => load(),
+        () => load({ live: true }),
       )
-      .subscribe();
+      .subscribe((status) => setLive(status === "SUBSCRIBED"));
     return () => { supabase.removeChannel(ch); };
   }, [form.id, load]);
+
+  // "Updated Ns ago" ticker.
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => forceTick((n) => n + 1), 15000);
+    return () => window.clearInterval(t);
+  }, []);
 
   const val = (r: Row, name: string): unknown => {
     const id = nameToId.get(name);
@@ -370,17 +389,23 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
             <button onClick={() => window.print()} className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:bg-black/5" style={{ borderColor: NAVY.line }}>
               <Printer className="h-4 w-4" /> Print
             </button>
+            <LiveIndicator live={live} lastUpdated={lastUpdated} flash={flash} />
             <div className="relative">
               <Bell className="h-5 w-5" style={{ color: NAVY.inkSoft }} />
               <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white" style={{ background: NAVY.bad }}>{agg.pendingCritical || 0}</span>
             </div>
-            <button onClick={load} className="inline-flex items-center justify-center rounded-full p-2 transition hover:bg-black/5" aria-label="Refresh">
+            <button onClick={() => load()} className="inline-flex items-center justify-center rounded-full p-2 transition hover:bg-black/5" aria-label="Refresh">
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} style={{ color: NAVY.inkSoft }} />
             </button>
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className={`min-h-0 flex-1 overflow-y-auto p-4 transition-shadow duration-700 ${flash ? "ring-2 ring-inset" : ""}`} style={flash ? { boxShadow: `inset 0 0 0 2px ${NAVY.teal}` } : undefined}>
+          {/* first-load skeleton */}
+          {loading && !hasLoadedOnce ? (
+            <DashboardSkeleton />
+          ) : (
+          <>
           {/* KPI row */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
             {kpis.map((k) => (
@@ -540,6 +565,8 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
           <div className="py-4 text-center text-[11px]" style={{ color: NAVY.inkSoft }}>
             SARMAAN Programme · Integrated Supervisory Checklist & Learning Dashboard · {agg.n} live submissions
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>
@@ -547,6 +574,74 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
 }
 
 /* ---------- helpers ---------- */
+
+function timeAgo(ts: number): string {
+  if (!ts) return "—";
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 5) return "just now";
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  return `${h}h ago`;
+}
+
+function LiveIndicator({ live, lastUpdated, flash }: { live: boolean; lastUpdated: number; flash: boolean }) {
+  return (
+    <div
+      className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide transition"
+      style={{
+        borderColor: live ? "rgba(16,185,129,0.35)" : NAVY.line,
+        background: live ? "rgba(16,185,129,0.10)" : "transparent",
+        color: live ? NAVY.good : NAVY.inkSoft,
+      }}
+      title={live ? "Realtime connected — updates apply instantly" : "Connecting to realtime…"}
+    >
+      <span className="relative flex h-2 w-2">
+        {live && <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" style={{ background: NAVY.good }} />}
+        <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: live ? NAVY.good : NAVY.inkSoft }} />
+      </span>
+      <span>{live ? "Live" : "Offline"}</span>
+      <span className="font-medium normal-case tracking-normal" style={{ color: NAVY.inkSoft }}>· {flash ? "updating…" : timeAgo(lastUpdated)}</span>
+    </div>
+  );
+}
+
+function SkeletonBlock({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return <div className={`animate-pulse rounded-lg ${className ?? ""}`} style={{ background: "rgba(15,23,42,0.06)", ...style }} />;
+}
+
+function DashboardSkeleton() {
+  return (
+    <div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="rounded-2xl border p-3.5 shadow-sm" style={{ borderColor: NAVY.line, background: NAVY.panel }}>
+            <div className="flex items-center gap-2">
+              <SkeletonBlock className="h-8 w-8" />
+              <SkeletonBlock className="h-3 flex-1" />
+            </div>
+            <SkeletonBlock className="mt-3 h-7 w-2/3" />
+            <SkeletonBlock className="mt-2 h-2 w-1/2" />
+            <SkeletonBlock className="mt-3 h-6 w-full" />
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-5">
+        <SkeletonBlock className="h-[260px] xl:col-span-2" />
+        <SkeletonBlock className="h-[260px] xl:col-span-2" />
+        <SkeletonBlock className="h-[260px]" />
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <SkeletonBlock className="h-[220px]" />
+        <SkeletonBlock className="h-[220px]" />
+      </div>
+      <p className="mt-6 text-center text-xs" style={{ color: NAVY.inkSoft }}>Loading live SARMAAN submissions…</p>
+    </div>
+  );
+}
+
+
 
 function Empty({ loading, label }: { loading: boolean; label: string }) {
   return <p className="flex h-[180px] items-center justify-center text-center text-xs" style={{ color: NAVY.inkSoft }}>{loading ? "Loading…" : label}</p>;
