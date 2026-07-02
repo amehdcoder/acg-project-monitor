@@ -35,6 +35,7 @@ import type { FormGroup } from "@/components/FormBuilder/types";
 import {
   getStateChoices,
   buildChecklistCopyPayload,
+  makeUniqueChecklistName,
   type MdaCopySettings,
 } from "@/lib/mda/copyChecklist";
 
