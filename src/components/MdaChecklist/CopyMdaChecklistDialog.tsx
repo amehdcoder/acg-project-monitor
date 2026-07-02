@@ -35,6 +35,7 @@ import type { FormGroup } from "@/components/FormBuilder/types";
 import {
   getStateChoices,
   buildChecklistCopyPayload,
+  makeUniqueChecklistName,
   type MdaCopySettings,
 } from "@/lib/mda/copyChecklist";
 
@@ -56,6 +57,8 @@ interface Props {
   projects: { id: string; name: string }[];
   /** Whether the destination already has an MDA checklist. */
   destinationHasChecklist: boolean;
+  /** Names of forms already in the destination project (for conflict handling). */
+  existingFormNames?: string[];
   userId?: string;
   onCopied: () => void;
 }
@@ -83,6 +86,7 @@ export default function CopyMdaChecklistDialog({
   currentProjectId,
   projects,
   destinationHasChecklist,
+  existingFormNames = [],
   userId,
   onCopied,
 }: Props) {
@@ -131,6 +135,14 @@ export default function CopyMdaChecklistDialog({
   const selected = sources.find((s) => s.id === sourceId);
   const counts = selected ? summarize(selected.questions) : null;
 
+  // Resolve the destination name up front so the admin sees exactly what will
+  // be created, and so same-name copies never collide.
+  const finalName = useMemo(
+    () => (selected ? makeUniqueChecklistName(selected.name, existingFormNames) : ""),
+    [selected, existingFormNames],
+  );
+  const nameWasAdjusted = !!selected && finalName !== selected.name;
+
   const handleCopy = async () => {
     if (!currentProjectId || !selected) return;
     setCopying(true);
@@ -142,7 +154,7 @@ export default function CopyMdaChecklistDialog({
         sourceProjectName: projectName(selected.project_id),
       });
       const { error } = await supabase.from("forms").insert({
-        name: payload.name,
+        name: finalName || payload.name,
         description: payload.description,
         questions: payload.questions as any,
         settings: payload.settings as any,
@@ -192,8 +204,9 @@ export default function CopyMdaChecklistDialog({
         <div className="space-y-4 py-1">
           {destinationHasChecklist && (
             <p className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
-              This project already has an MDA checklist. Copying adds another one
-              — remove the existing checklist first if you want to replace it.
+              This project already has a checklist with the same name. Don't
+              worry — the copy is saved under a new, unique name automatically so
+              nothing is overwritten.
             </p>
           )}
 
@@ -254,6 +267,20 @@ export default function CopyMdaChecklistDialog({
                   The complete linked supervisory dashboard
                 </li>
               </ul>
+              <Separator className="my-3" />
+              <div className="flex items-start gap-2 text-xs">
+                <ClipboardCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                <div>
+                  <span className="text-muted-foreground">Will be saved as </span>
+                  <span className="font-semibold text-foreground">"{finalName}"</span>
+                  {nameWasAdjusted && (
+                    <span className="mt-0.5 block text-[11px] text-amber-700">
+                      Renamed automatically to avoid a clash with an existing
+                      checklist in this project.
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 

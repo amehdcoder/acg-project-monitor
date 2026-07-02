@@ -147,6 +147,31 @@ export function buildChecklistCopyPayload(
   };
 }
 
+/**
+ * Given a desired base name and the list of names that already exist in the
+ * destination project, return a unique, human-friendly name. The first copy
+ * becomes "<name> (Copy)", subsequent ones "<name> (Copy 2)", "(Copy 3)", …
+ * If the base name is free it is returned unchanged.
+ */
+export function makeUniqueChecklistName(base: string, existingNames: string[]): string {
+  const taken = new Set(
+    (existingNames ?? []).map((n) => (n ?? "").trim().toLowerCase()),
+  );
+  const clean = (base ?? "").trim() || "Checklist";
+  if (!taken.has(clean.toLowerCase())) return clean;
+
+  // Strip any trailing "(Copy)" / "(Copy N)" so re-copies don't stack suffixes.
+  const root = clean.replace(/\s*\(Copy(?:\s+\d+)?\)\s*$/i, "").trim() || clean;
+
+  let candidate = `${root} (Copy)`;
+  let n = 2;
+  while (taken.has(candidate.toLowerCase())) {
+    candidate = `${root} (Copy ${n})`;
+    n += 1;
+  }
+  return candidate;
+}
+
 /** True when the form's linked dashboard should be visible to a given viewer. */
 export function isDashboardPublished(settings: MdaCopySettings | null | undefined): boolean {
   // Backward-compat: forms created before this flag existed are treated as
