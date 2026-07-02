@@ -73,6 +73,13 @@ const initDB = (): Promise<IDBDatabase> => {
         draftStore.createIndex("form_id", "form_id", { unique: false });
         draftStore.createIndex("updated_at", "updated_at", { unique: false });
       }
+      // NEW (v3): Conflict log for offline edits that lost to newer server data.
+      if (!db.objectStoreNames.contains(CONFLICT_STORE)) {
+        const conflictStore = db.createObjectStore(CONFLICT_STORE, { keyPath: "id" });
+        conflictStore.createIndex("submission_id", "submission_id", { unique: false });
+        conflictStore.createIndex("detected_at", "detected_at", { unique: false });
+      }
+
     };
 
   });
