@@ -212,6 +212,16 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     const controller = new AbortController();
     (async () => {
       setLoading(true);
+      // Microplan disabled: run as a pure GRID3/admin-hierarchy cascade with no
+      // microplan rows loaded at all.
+      if (disableMicroplan) {
+        try {
+          const pScope = projectId ? await fetchProjectScope(projectId) : { ...EMPTY_SCOPE };
+          if (!cancelled) setProjectStates(pScope.states || []);
+        } catch { /* ignore */ }
+        if (!cancelled) { setRows([]); setLoading(false); }
+        return;
+      }
       try {
         const pScope = projectId ? await fetchProjectScope(projectId) : { ...EMPTY_SCOPE };
         const pStates = pScope.states || [];
