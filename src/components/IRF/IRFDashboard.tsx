@@ -346,6 +346,9 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
             {/* Who is submitting: forms, counts, duplicates */}
             <IrfSubmitterPanel rows={rows} duplicateIds={duplicates?.duplicateIds || new Set()} />
 
+            {/* Participation coverage: submitted vs not-yet-submitted (downloadable) */}
+            <IrfParticipationPanel rows={rows} duplicateIds={duplicates?.duplicateIds || new Set()} projectId={projectId} />
+
             {/* Narrative & free-text intelligence */}
             <IrfTextInsights rows={rows} />
 
