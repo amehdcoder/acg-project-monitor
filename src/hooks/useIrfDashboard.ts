@@ -152,8 +152,7 @@ export const useIrfDashboard = (projectId?: string | null, overrideMap?: Overrid
     rows.forEach((r) => {
       const lga = r.lga || "Unspecified";
       (byLga[lga] ||= { reach: 0, reports: 0, stakeholders: 0 });
-      byLga[lga].reach +=
-        num(r.total_reach) + num(r.radio_estimated_reach) + num(r.attendance_men) + num(r.attendance_women);
+      byLga[lga].reach += computeIrfReach(r);
       byLga[lga].stakeholders +=
         num((r as any).persons_engaged) + num(r.policy_makers_engaged) + num(r.traditional_leaders_engaged) +
         num(r.healthcare_workers_engaged) + num(r.religious_leaders_engaged) + num(r.mdas_visited_count);
