@@ -838,7 +838,7 @@ function GuidancePanel({ onStart }: { onStart: () => void }) {
         </div>
         <ul className="mt-2 space-y-1.5 text-[13px]" style={{ color: NAVY.ink }}>
           <li>• Click any module on the left to answer its questions right here — the checklist adapts and hides questions that don't apply.</li>
-          <li>• Capture GPS on site and let the microplan drive State → LGA → Ward → FLHF → Community → Settlement.</li>
+          <li>• Capture GPS on site and pick State → LGA → Ward → FLHF → Community → Settlement from the location cascade.</li>
           <li>• Score quality items honestly against evidence: 2 = Yes, 1 = Partly, 0 = No.</li>
           <li>• Complete all required questions, then submit — offline submissions sync automatically once you're back online.</li>
         </ul>
