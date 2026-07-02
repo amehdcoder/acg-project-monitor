@@ -315,6 +315,42 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     return () => { cancelled = true; };
   }, [user?.id]);
 
+  // Owner-controlled per-project hiding of the MDA checklist copy feature card.
+  const [copyFeatureHidden, setCopyFeatureHidden] = useState(false);
+  const [copyHideBusy, setCopyHideBusy] = useState(false);
+  useEffect(() => {
+    if (!currentProjectId) { setCopyFeatureHidden(false); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("mda_checklist_copy_hidden")
+        .select("hidden")
+        .eq("project_id", currentProjectId)
+        .maybeSingle();
+      if (!cancelled) setCopyFeatureHidden(!!(data as any)?.hidden);
+    })();
+    return () => { cancelled = true; };
+  }, [currentProjectId]);
+
+  const toggleCopyFeatureHidden = useCallback(async (hide: boolean) => {
+    if (!currentProjectId) return;
+    setCopyHideBusy(true);
+    try {
+      const { error } = await (supabase as any)
+        .from("mda_checklist_copy_hidden")
+        .upsert({ project_id: currentProjectId, hidden: hide, updated_by: user?.id, updated_at: new Date().toISOString() }, { onConflict: "project_id" });
+      if (error) throw error;
+      setCopyFeatureHidden(hide);
+      toast({ title: hide ? "Feature hidden" : "Feature visible", description: hide ? "The checklist copy card is now hidden for this project." : "The checklist copy card is now visible for admins in this project." });
+    } catch (e: any) {
+      toast({ title: "Could not update", description: e?.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setCopyHideBusy(false);
+    }
+  }, [currentProjectId, user?.id]);
+
+
+
   // Launch the correct experience for an assigned standard-form code.
   const launchStandardForm = useCallback((code: string) => {
     // Hard guard: an adhoc user may only open forms explicitly assigned to them,
