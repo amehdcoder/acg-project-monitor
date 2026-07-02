@@ -1113,8 +1113,8 @@ function ModuleHint({ section, hue }: { section: ChapterSection; hue: string }) 
 function HintCol({ title, text, hue }: { title: string; text: string; hue: string }) {
   return (
     <div>
-      <div className="mb-1 text-[12px] font-bold" style={{ color: hue }}>{title}</div>
-      <div className="text-[11.5px] leading-snug" style={{ color: NAVY.inkSoft }}>{text}</div>
+      <div className="mb-1.5 text-[13.5px] font-bold" style={{ color: hue }}>{title}</div>
+      <div className="text-[14px] leading-relaxed" style={{ color: NAVY.inkSoft }}>{text}</div>
     </div>
   );
 }
