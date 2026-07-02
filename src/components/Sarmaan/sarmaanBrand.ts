@@ -145,3 +145,202 @@ export const SUPERVISORY_SECTIONS: {
   { code: "L", title: "Action Plan & Follow-Up", blurb: "Concrete action points, owners, priority and due dates." },
   { code: "M", title: "Supervisor Final Judgement", blurb: "Eight category scores, /80 total and signature." },
 ];
+
+/**
+ * Per-section accent hues. Each checklist section is themed with its own
+ * distinct colour, used for the rose-flower backdrop and section accents so
+ * every module feels visually unique while staying within one design system.
+ */
+export const SECTION_HUES: string[] = [
+  "#0F7B6C", // jade
+  "#3AA0B8", // sky
+  "#7C4D8F", // plum
+  "#0B5CAB", // blue
+  "#EF6C4D", // coral
+  "#C0392B", // deep red
+  "#F4B12B", // gold
+  "#12B5A5", // teal
+  "#2E8B57", // sea green
+  "#8E44AD", // violet
+  "#D35400", // pumpkin
+  "#16A085", // green teal
+  "#B5179E", // magenta
+];
+
+/** Names of legacy identity questions removed from the checklist body. */
+export const REMOVED_CHECKLIST_QUESTIONS = new Set<string>([
+  "supervisor_name",
+  "date_of_supervision",
+  "supervisor_designation",
+]);
+
+export interface ModuleGuidance {
+  code: string;
+  title: string;
+  purpose: string;
+  whoToAsk: string;
+  whatToCheck: string;
+  howToCollect: string;
+  scoring?: string;
+  tips: string[];
+}
+
+/**
+ * Detailed builder / supervisor guidance for every module, distilled from the
+ * Integrated Supervisory Checklist & Learning Dashboard reference document.
+ * Surfaced inside the "Checklist Guidance & Resources" panel at the top of the
+ * module navigator.
+ */
+export const MODULE_GUIDANCE: ModuleGuidance[] = [
+  {
+    code: "A",
+    title: "Supervisor & Visit Information",
+    purpose:
+      "Establish exactly what was supervised, where, and how it was verified so every downstream score is anchored to a real, located visit.",
+    whoToAsk: "Implementing team lead, facility in-charge, community entry point (CHW / volunteer).",
+    whatToCheck:
+      "Geography is set from the microplan cascade (State → LGA → Ward → FLHF → Community → Settlement). Confirm the GPS is captured on site and the visit type matches what actually happened.",
+    howToCollect: "Direct observation, GPS capture on arrival, and the microplan-driven location cascade.",
+    tips: [
+      "Capture GPS while physically at the activity location — not in the vehicle or afterwards.",
+      "Select every activity actually supervised; leave out those you only heard about.",
+      "Record persons interviewed by role, not just by name.",
+    ],
+  },
+  {
+    code: "B",
+    title: "Activity Planning & Preparedness",
+    purpose: "Judge whether the activity was deliberately planned, resourced and de-risked before implementation.",
+    whoToAsk: "Team lead and the officer responsible for the workplan / microplan.",
+    whatToCheck: "Workplan inclusion, clear objective, defined target, assigned roles, tools ready and anticipated barriers with mitigation.",
+    howToCollect: "Review workplan / microplan, activity plan, and pre-activity checklists.",
+    scoring: "Each preparedness item scores 2 (Yes) / 1 (Partly) / 0 (No).",
+    tips: [
+      "A plan that only exists verbally is not a plan — look for a written or digital record.",
+      "Ask what could have gone wrong and whether a mitigation was ready.",
+    ],
+  },
+  {
+    code: "C",
+    title: "Stakeholder Advocacy",
+    purpose: "Verify that the right decision-makers were reached and that commitments were recorded and followed up.",
+    whoToAsk: "Advocacy lead, and where possible a stakeholder who was engaged.",
+    whatToCheck: "Right level of decision-maker, inclusion, use of data, recorded commitments, assigned responsibilities and agreed follow-up.",
+    howToCollect: "Meeting minutes, attendance / sign-in sheets, commitment registers, photos.",
+    scoring: "Quality items score 2 / 1 / 0. Courtesy visits do not count as high-level advocacy.",
+    tips: [
+      "A commitment with no named owner and deadline is not actionable — flag it.",
+      "Probe for at least one concrete implementation advantage the advocacy produced.",
+    ],
+  },
+  {
+    code: "D",
+    title: "LGA-Level Advocacy",
+    purpose: "Assess engagement of policy, traditional, religious and facility actors at LGA level and whether it translated into support.",
+    whoToAsk: "LGA focal person, traditional / religious leaders, facility staff.",
+    whatToCheck: "Whether LGA actors understood their role, committed to named actions, activated community entry structures and supported mobilization.",
+    howToCollect: "Minutes, action-point registers, direct interviews and observation of support during implementation.",
+    tips: [
+      "Distinguish promised support from delivered support — record unmet commitments.",
+      "Identify the single most useful and least responsive stakeholder group and why.",
+    ],
+  },
+  {
+    code: "E",
+    title: "Community Dialogue & Social Mobilization",
+    purpose: "Evaluate turnout, inclusion, genuine participation and how misconceptions were handled.",
+    whoToAsk: "Facilitator, community leaders and a sample of participants.",
+    whatToCheck: "Venue accessibility, gender / youth / PWD representation, active vs passive participation, misconceptions identified and correctly addressed.",
+    howToCollect: "Observation, attendance disaggregated by sex / age, and post-session interviews.",
+    scoring: "Facilitation quality items score 2 / 1 / 0.",
+    tips: [
+      "Count participation, not just attendance — questions and contributions matter.",
+      "Record what the community taught the team that was not obvious before.",
+    ],
+  },
+  {
+    code: "F",
+    title: "Non-Compliance Resolution",
+    purpose: "Track refusal / non-compliance cases from identification through root cause to resolution or escalation.",
+    whoToAsk: "CDDs, supervisors, and where appropriate the affected household or leader.",
+    whatToCheck: "Cases documented, true root cause (not simply 'refused'), resolution method, satisfaction, follow-up date and escalation of pending cases.",
+    howToCollect: "Line lists / registers, direct conversation, and resolution logs.",
+    scoring: "Resolution quality items score 2 / 1 / 0; resolution must be respectful and non-coercive.",
+    tips: [
+      "'Refused' is a symptom, not a root cause — dig for fear, rumour, religious or trust drivers.",
+      "Confirm whether the issue is individual, household or community-wide.",
+    ],
+  },
+  {
+    code: "G",
+    title: "Awareness & IEC Materials",
+    purpose: "Verify awareness channels used (radio, town / religious announcements), estimated reach and material quality.",
+    whoToAsk: "Communications / IEC focal person and community members.",
+    whatToCheck: "Broadcasts aired, station, language, estimated reach, and the accuracy / appropriateness of IEC materials.",
+    howToCollect: "Broadcast logs, sample recordings, physical IEC materials and community recall.",
+    tips: [
+      "Estimate reach conservatively and note the basis for the estimate.",
+      "Check that materials are in the correct local language and culturally appropriate.",
+    ],
+  },
+  {
+    code: "H",
+    title: "Means of Verification & Data Quality",
+    purpose: "Confirm that records exist, are consistent, and are backed by verifiable evidence.",
+    whoToAsk: "Records / M&E focal person and team lead.",
+    whatToCheck: "Availability and legibility of records, internal consistency, presence of photos / attendance, and overall MOV rating.",
+    howToCollect: "Register review, cross-checking numbers across documents, and photo evidence.",
+    scoring: "Rate overall evidence quality; inconsistent numbers lower the MOV score.",
+    tips: [
+      "Cross-check the same figure across two documents — mismatches signal data-quality risk.",
+      "Ensure names / designations on sign-in sheets are legible.",
+    ],
+  },
+  {
+    code: "I",
+    title: "Implementation Success",
+    purpose: "Capture the biggest wins and the strongest practices worth scaling.",
+    whoToAsk: "Team lead and community stakeholders.",
+    whatToCheck: "The single most successful activity and the practice most worth replicating elsewhere.",
+    howToCollect: "Structured interview and observation.",
+    tips: ["Be specific — describe the practice concretely enough that another team could copy it."],
+  },
+  {
+    code: "J",
+    title: "Challenges, Bottlenecks & Risks",
+    purpose: "Document what went wrong, the underlying cause, how it was handled and how to prevent recurrence.",
+    whoToAsk: "Team lead and affected implementers.",
+    whatToCheck: "The main bottleneck, its category, whether it was resolved, and the prevention measure identified.",
+    howToCollect: "Interview and review of any incident notes.",
+    tips: ["Separate the visible problem from its underlying cause — prevention targets the cause."],
+  },
+  {
+    code: "K",
+    title: "Learning & Adaptive Management",
+    purpose: "Turn the visit into an explicit lesson with stop / start / continue actions and named owners.",
+    whoToAsk: "Team lead and supervisor jointly.",
+    whatToCheck: "Clear lessons, evidence behind them, and concrete stop / start / continue decisions with owners.",
+    howToCollect: "Reflective discussion documented on the spot.",
+    scoring: "Learning quality items score 2 / 1 / 0.",
+    tips: ["A lesson without an owner and an action is just an observation — assign both."],
+  },
+  {
+    code: "L",
+    title: "Action Plan & Follow-Up",
+    purpose: "Convert findings into concrete, owned, prioritized and time-bound action points.",
+    whoToAsk: "Supervisor with the implementing team.",
+    whatToCheck: "Each action has an owner, a priority and a due date, and the status of prior actions is updated.",
+    howToCollect: "Action-point register.",
+    tips: ["Every action point must be SMART — vague actions never get done."],
+  },
+  {
+    code: "M",
+    title: "Supervisor Final Judgement",
+    purpose: "Consolidate the eight category scores into an overall / 80 judgement and sign off.",
+    whoToAsk: "Supervisor (self-completed).",
+    whatToCheck: "That each category score reflects the evidence gathered and that the total is honest.",
+    howToCollect: "Aggregate section scores and provide a signature.",
+    scoring: "Eight categories, each scored, summed to a maximum of 80.",
+    tips: ["Score against evidence, not impressions — the signature attests to the whole visit."],
+  },
+];
