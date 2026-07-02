@@ -911,7 +911,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
 
 
       {/* Selection confirmation */}
-      {sel.community_name && (
+      {(sel.community_name || sel.ward || sel.lga) && (
         <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
           <CheckCircle2 className="h-3.5 w-3.5" />
           {[sel.state, sel.lga, sel.ward, sel.flhf_name, sel.community_name, sel.settlement_name]
