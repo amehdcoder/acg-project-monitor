@@ -1526,17 +1526,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     return (
       <SarmaanChecklistLauncher
         formName={launch.name}
+        formId={launch.id}
+        userId={user?.id || ""}
+        projectId={launch.project_id || currentProjectId || ""}
+        questions={launch.questions}
+        groups={launch.groups}
         requiresGps={launch.settings?.requireLocation !== false}
-        onBegin={() => {
-          setSarmaanLaunchForm(null);
-          setFillingForm(launch);
-        }}
         onOpenDashboard={() => {
           setSarmaanLaunchForm(null);
           setSarmaanDashForm(launch);
         }}
+        onSubmitted={() => currentProjectId && fetchForms(currentProjectId)}
         onClose={() => setSarmaanLaunchForm(null)}
       />
+
     );
   }
 
