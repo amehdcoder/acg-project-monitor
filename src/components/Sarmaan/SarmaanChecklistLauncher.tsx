@@ -31,6 +31,10 @@ import {
   SECTION_HUES,
   MODULE_GUIDANCE,
   REMOVED_CHECKLIST_QUESTIONS,
+  SUPERVISORY_CHAPTERS,
+  chapterCodeFromLabel,
+  chapterGuidance,
+  type ModuleGuidance,
 } from "./sarmaanBrand";
 import type { Question, FormGroup } from "@/components/FormBuilder/types";
 import { buildNameToIdMap, evaluateRelevant } from "@/lib/skipLogic";
