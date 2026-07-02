@@ -105,7 +105,8 @@ export default function SarmaanChecklistLauncher({
   }, [allQuestions]);
 
   const [responses, setResponses] = useState<Record<string, any>>({});
-  const [active, setActive] = useState<number | typeof GUIDANCE>(0);
+  const MENU = "menu" as const;
+  const [active, setActive] = useState<number | typeof GUIDANCE | typeof MENU>(MENU);
   const [submitting, setSubmitting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
