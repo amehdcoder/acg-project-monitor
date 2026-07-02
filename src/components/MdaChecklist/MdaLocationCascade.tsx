@@ -685,7 +685,9 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
           {/* GRID3 vs microplan switch — ENABLED BY DEFAULT (GRID3 national
               cascade). Placed BEFORE the location fields so the supervisor first
               decides the data source, then picks the area. Turn OFF to drive the
-              cascade from this project's locked-in microplan data. */}
+              cascade from this project's locked-in microplan data. Hidden
+              entirely when microplan sourcing is disabled for this form. */}
+          {!disableMicroplan && (
           <div
             className={cn(
               "overflow-hidden rounded-2xl border transition-colors",
