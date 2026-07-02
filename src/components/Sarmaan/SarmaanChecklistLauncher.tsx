@@ -59,8 +59,10 @@ interface Props {
   onSubmitted?: () => void;
 }
 
-const GEO_NAMES = new Set(["state", "lga", "ward", "flhf_name", "community", "settlement_name"]);
-const GEO_ORDER = ["state", "lga", "ward", "flhf_name", "community", "settlement_name"];
+// SARMAAN supervision is locked to State → LGA → Ward only (Ward optional).
+// FLHF / Community / Settlement are intentionally excluded from this checklist.
+const GEO_NAMES = new Set(["state", "lga", "ward"]);
+const GEO_ORDER = ["state", "lga", "ward"];
 const GUIDANCE = "guidance"; // sentinel for the guidance nav entry
 
 /**
