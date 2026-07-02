@@ -249,7 +249,7 @@ function buildMergedByDateSheet(
   const num = (v: any) => (v == null || v === "" ? 0 : Number(v) || 0);
 
   sorted.forEach((r: any, idx) => {
-    const reached = num(r.total_reach) + num(r.radio_estimated_reach) + num(r.attendance_men) + num(r.attendance_women);
+    const reached = computeIrfReach(r);
     const narrative = [r.purpose, r.commitments, r.key_messages, r.issues, r.issues_raised, r.narrative]
       .map((x) => (x ? String(x) : "")).filter(Boolean).join(" — ");
     const values: (string | number | null)[] = [
