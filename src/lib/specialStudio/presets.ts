@@ -371,11 +371,18 @@ function supervisoryLearningSections(): FormGroup[] {
       qn("date", "date_of_supervision", "Date of supervision", { required: true }),
       qn("text", "supervisor_name", "Name of supervisor", { required: true }),
       qn("text", "supervisor_designation", "Supervisor designation / organization", { hint: "State / LGA / partner supervisor" }),
+      // Geography is driven by the microplan via the shared MDA location
+      // cascade (State → LGA → Ward → FLHF → Community → Settlement). These
+      // question names are the cascade write targets and are rendered by the
+      // cascade instead of as free-text fields.
       stateField(),
       qn("text", "lga", "LGA", { required: true }),
-      qn("text", "ward", "Ward"),
+      qn("text", "ward", "Ward", { required: true }),
+      qn("text", "flhf_name", "Front-Line Health Facility (FLHF)"),
       qn("text", "community", "Community / settlement / facility visited", { required: true }),
+      qn("text", "settlement_name", "Settlement"),
       qn("geopoint", "gps", "GPS coordinate of supervision location", { required: true }),
+
       qn("select_one", "type_of_visit", "Type of visit", {
         required: true,
         options: opts("Routine", "Spot check", "Follow-up", "Verification", "Problem-solving"),

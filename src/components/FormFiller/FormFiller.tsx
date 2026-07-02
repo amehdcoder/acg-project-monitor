@@ -490,8 +490,19 @@ const FormFiller = ({
   // Also detect by name so older/offline saved copies that missed the settings
   // flag still use the MDA chrome and never render the generic duplicate header.
   const normalizedFormName = (formName || "").toLowerCase();
-  const isMdaChecklist = isMdaChecklistLike({ settings, formName, groups: groupsProp });
-  const offerCoverageEvaluation = isMdaChecklist && !!settings.coverageEvaluation && !previewMode;
+  // SARMAAN Integrated Supervisory Checklist reuses the exact ODK-style MDA
+  // chrome + microplan location cascade (State → LGA → Ward → FLHF → Community
+  // → Settlement) so its sections render under the same beautiful interface.
+  const isSupervisoryChecklist =
+    !!(settings as any)?.supervisoryChecklistStyle ||
+    !!(settings as any)?.sarmaan_supervisory ||
+    (settings as any)?.presetKey === "supervisory_learning";
+  const isMdaChecklist =
+    isMdaChecklistLike({ settings, formName, groups: groupsProp }) || isSupervisoryChecklist;
+  // Coverage Evaluation linkage is MDA-only; the supervisory checklist opts out.
+  const offerCoverageEvaluation =
+    isMdaChecklist && !isSupervisoryChecklist && !!settings.coverageEvaluation && !previewMode;
+
   // Treatment Data Reporting Tools drive their geography from the microplan via
   // <MdaLocationCascade> (with the off-microplan provision), without the full
   // MDA branded/paginated experience.
