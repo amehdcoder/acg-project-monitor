@@ -509,18 +509,47 @@ export default function SarmaanChecklistLauncher({
           </div>
         </header>
 
+        {/* shared supervision context — carried across every module */}
+        {active !== GUIDANCE && (
+          <SharedContextBar
+            shared={shared}
+            setShared={setShared}
+            open={contextOpen}
+            setOpen={setContextOpen}
+            geoSummary={geoSummary}
+            gps={geo.position ? { lat: geo.position.lat, lng: geo.position.lng } : null}
+            gpsCapturedAt={gpsCapturedAt}
+            hasContext={hasContext}
+          />
+        )}
+
         {/* body */}
         <div ref={scrollRef} className="relative flex min-h-0 flex-1 overflow-y-auto">
           {active === GUIDANCE ? (
             <GuidancePanel onStart={() => setActive(MENU)} />
           ) : active === MENU ? (
-            <FormMenu
-              sections={sections}
-              responses={responses}
-              visibleQuestions={visibleQuestions}
-              onOpenGuidance={() => setActive(GUIDANCE)}
-              onPick={(i) => setActive(i)}
-            />
+            <div className="min-w-0 flex-1">
+              {handoff && (
+                <HandoffCard
+                  sections={sections}
+                  fromIdx={handoff.fromIdx}
+                  nextIdx={nextIncompleteAfter(handoff.fromIdx)}
+                  completedCount={completedCount}
+                  onContinue={(i) => { setHandoff(null); setActive(i); }}
+                  onChooseAnother={() => setHandoff(null)}
+                  onFinish={() => { setHandoff(null); setJourneyMode(false); }}
+                />
+              )}
+              <FormMenu
+                sections={sections}
+                responses={responses}
+                visibleQuestions={visibleQuestions}
+                onOpenGuidance={() => setActive(GUIDANCE)}
+                onPick={(i) => setActive(i)}
+                onStartJourney={sections.length > 1 ? startJourney : undefined}
+                completedCount={completedCount}
+              />
+            </div>
           ) : currentSection ? (
             <main className="relative min-w-0 flex-1 p-5 lg:p-6">
               <RoseBackground hue={hue} />
