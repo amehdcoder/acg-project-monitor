@@ -374,9 +374,9 @@ export const useOfflineStorage = () => {
       }
 
 
-      for (let i = 0; i < pending.length; i += CHUNK) {
+      for (let i = 0; i < inserts.length; i += CHUNK) {
         if (!navigator.onLine) break;
-        const slice = pending.slice(i, i + CHUNK);
+        const slice = inserts.slice(i, i + CHUNK);
         const { error } = await supabase
           .from("form_submissions")
           .upsert(slice.map(toRow), { onConflict: "id", ignoreDuplicates: true });
