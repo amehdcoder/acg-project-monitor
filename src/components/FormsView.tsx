@@ -1248,6 +1248,54 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     : mdaChecklistForms[0] || null;
 
   const currentProject = projects.find(p => p.id === currentProjectId);
+  const sarmaanSupervisoryForms = useMemo(
+    () => mergedForms.filter((form) => isSupervisoryLearningForm({ settings: form.settings, name: form.name })),
+    [mergedForms],
+  );
+  const primarySarmaanSupervisoryForm = currentProjectId
+    ? sarmaanSupervisoryForms.find((form) => form.project_id === currentProjectId) || null
+    : sarmaanSupervisoryForms[0] || null;
+
+  const createSarmaanSupervisoryTool = async () => {
+    if (!currentProjectId) {
+      toast({ title: "Select a project", description: "Choose the SARMAAN project before adding the checklist.", variant: "destructive" });
+      return;
+    }
+    const existing = sarmaanSupervisoryForms.find((form) => form.project_id === currentProjectId);
+    if (existing) {
+      toast({ title: "Already visible", description: "The SARMAAN Supervisory Checklist and Supervision Dashboard are already shown under this project." });
+      return;
+    }
+    try {
+      const preset = getPreset("supervisory_learning");
+      if (!preset) throw new Error("SARMAAN supervisory template is unavailable.");
+      const sections = preset.sections();
+      const dashboardConfig = preset.dashboard();
+      const { error } = await supabase.from("forms").insert({
+        name: SARMAAN_SUPERVISORY_FORM_NAME,
+        description: SARMAAN_SUPERVISORY_DESC,
+        questions: sections as any,
+        settings: {
+          theme: preset.theme,
+          studio: true,
+          presetKey: "supervisory_learning",
+          dashboardEnabled: true,
+          dashboardConfig,
+          requireLocation: true,
+          sarmaan_supervisory: true,
+        } as any,
+        project_id: currentProjectId,
+        created_by: user?.id,
+        status: "active",
+      } as any);
+      if (error) throw error;
+      toast({ title: "Added to SARMAAN forms", description: "The checklist and dashboard are now visible as separate entries." });
+      fetchForms(currentProjectId);
+    } catch (e: any) {
+      console.error("SARMAAN supervisory add error", e);
+      toast({ title: "Could not add", description: e?.message || "Please try again.", variant: "destructive" });
+    }
+  };
 
   if (showMentalHealth) {
     return (
