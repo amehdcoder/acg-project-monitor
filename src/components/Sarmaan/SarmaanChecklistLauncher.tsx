@@ -1044,20 +1044,57 @@ function RoseBackground({ hue }: { hue: string }) {
   );
 }
 
-function ModuleHint({ idx, hue }: { idx: number; hue: string }) {
-  const g = MODULE_GUIDANCE[idx];
-  if (!g) return null;
+function ModuleHint({ section, hue }: { section: ChapterSection; hue: string }) {
+  const guides = section.guidance;
+  const hasNarrative = !!section.narrative;
+  if (!hasNarrative && guides.length === 0) return null;
   return (
-    <div className="relative mb-5 mt-2 rounded-2xl border bg-white/75 backdrop-blur" style={{ borderColor: tint(hue, 0.4) }}>
-      <div className="flex items-center gap-2 border-b px-4 py-2.5" style={{ borderColor: tint(hue, 0.25) }}>
-        <Lightbulb className="h-4 w-4" style={{ color: hue }} />
-        <span className="text-sm font-bold" style={{ color: hue }}>Supervisor guidance</span>
-      </div>
-      <div className="grid gap-4 p-4 sm:grid-cols-3">
-        <HintCol title="Who to ask" text={g.whoToAsk} hue={hue} />
-        <HintCol title="What to check" text={g.whatToCheck} hue={hue} />
-        <HintCol title="How to collect" text={g.howToCollect} hue={hue} />
-      </div>
+    <div className="mb-5 mt-2 space-y-3">
+      {/* Conversational chapter opening — sets the human scene before the questions. */}
+      {hasNarrative && (
+        <div
+          className="relative overflow-hidden rounded-2xl border p-4"
+          style={{ borderColor: tint(hue, 0.4), background: tint(hue, 0.08) }}
+        >
+          <div className="mb-1.5 flex items-center gap-2">
+            <MessageCircle className="h-4 w-4" style={{ color: hue }} />
+            <span className="text-[12px] font-extrabold uppercase tracking-wide" style={{ color: hue }}>
+              Setting the scene
+            </span>
+          </div>
+          <p className="text-[13.5px] font-medium leading-relaxed" style={{ color: NAVY.ink }}>
+            {section.narrative}
+          </p>
+        </div>
+      )}
+
+      {/* Combined supervisor guidance for every module folded into this chapter. */}
+      {guides.length > 0 && (
+        <div className="rounded-2xl border bg-white/75 backdrop-blur" style={{ borderColor: tint(hue, 0.4) }}>
+          <div className="flex items-center gap-2 border-b px-4 py-2.5" style={{ borderColor: tint(hue, 0.25) }}>
+            <Lightbulb className="h-4 w-4" style={{ color: hue }} />
+            <span className="text-sm font-bold" style={{ color: hue }}>
+              Supervisor guidance{guides.length > 1 ? ` · ${guides.length} areas in this chapter` : ""}
+            </span>
+          </div>
+          <div className="divide-y" style={{ borderColor: tint(hue, 0.18) }}>
+            {guides.map((g) => (
+              <div key={g.code} className="p-4">
+                {guides.length > 1 && (
+                  <div className="mb-2 text-[12.5px] font-extrabold" style={{ color: NAVY.ink }}>
+                    {g.title}
+                  </div>
+                )}
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <HintCol title="Who to ask" text={g.whoToAsk} hue={hue} />
+                  <HintCol title="What to check" text={g.whatToCheck} hue={hue} />
+                  <HintCol title="How to collect" text={g.howToCollect} hue={hue} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
