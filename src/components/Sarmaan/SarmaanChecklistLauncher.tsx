@@ -1153,7 +1153,7 @@ function QuestionField({ q, hue, value, onChange }: { q: Question; hue: string; 
       case "select_one": {
         const options = (q.options || []).filter((o) => o.label && o.value);
         return (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
             {options.map((o) => {
               const selected = value === o.value;
               return (
@@ -1161,13 +1161,19 @@ function QuestionField({ q, hue, value, onChange }: { q: Question; hue: string; 
                   key={o.id || o.value}
                   type="button"
                   onClick={() => onChange(selected ? "" : o.value)}
-                  className="rounded-xl border px-4 py-2 text-[13px] font-semibold transition"
+                  className="flex min-h-[52px] items-center gap-2.5 rounded-2xl border px-4 py-3 text-left text-[16px] font-semibold transition active:scale-[0.99] sm:min-h-0 sm:text-[14px]"
                   style={{
                     borderColor: selected ? hue : NAVY.line,
                     background: selected ? tint(hue, 0.14) : "#fff",
                     color: selected ? hue : NAVY.ink,
                   }}
                 >
+                  <span
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2"
+                    style={{ borderColor: selected ? hue : NAVY.line, background: selected ? hue : "transparent" }}
+                  >
+                    {selected && <span className="h-2 w-2 rounded-full bg-white" />}
+                  </span>
                   {o.label}
                 </button>
               );
@@ -1179,7 +1185,7 @@ function QuestionField({ q, hue, value, onChange }: { q: Question; hue: string; 
         const options = (q.options || []).filter((o) => o.label && o.value);
         const arr: string[] = Array.isArray(value) ? value : [];
         return (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
             {options.map((o) => {
               const selected = arr.includes(o.value);
               return (
@@ -1187,14 +1193,20 @@ function QuestionField({ q, hue, value, onChange }: { q: Question; hue: string; 
                   key={o.id || o.value}
                   type="button"
                   onClick={() => onChange(selected ? arr.filter((v) => v !== o.value) : [...arr, o.value])}
-                  className="rounded-xl border px-4 py-2 text-[13px] font-semibold transition"
+                  className="flex min-h-[52px] items-center gap-2.5 rounded-2xl border px-4 py-3 text-left text-[16px] font-semibold transition active:scale-[0.99] sm:min-h-0 sm:text-[14px]"
                   style={{
                     borderColor: selected ? hue : NAVY.line,
                     background: selected ? tint(hue, 0.14) : "#fff",
                     color: selected ? hue : NAVY.ink,
                   }}
                 >
-                  {selected ? "✓ " : ""}{o.label}
+                  <span
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2"
+                    style={{ borderColor: selected ? hue : NAVY.line, background: selected ? hue : "transparent" }}
+                  >
+                    {selected && <span className="text-[11px] font-black text-white">✓</span>}
+                  </span>
+                  {o.label}
                 </button>
               );
             })}
@@ -1209,7 +1221,7 @@ function QuestionField({ q, hue, value, onChange }: { q: Question; hue: string; 
             inputMode="decimal"
             value={value ?? ""}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full rounded-xl border bg-white px-3 py-2.5 text-[14px] outline-none focus:ring-2"
+            className="w-full rounded-2xl border bg-white px-4 py-3.5 text-[16px] outline-none focus:ring-2 sm:py-2.5 sm:text-[14px]"
             style={{ borderColor: NAVY.line }}
           />
         );
@@ -1219,17 +1231,17 @@ function QuestionField({ q, hue, value, onChange }: { q: Question; hue: string; 
             type="date"
             value={value ?? ""}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full rounded-xl border bg-white px-3 py-2.5 text-[14px] outline-none focus:ring-2"
+            className="w-full rounded-2xl border bg-white px-4 py-3.5 text-[16px] outline-none focus:ring-2 sm:py-2.5 sm:text-[14px]"
             style={{ borderColor: NAVY.line }}
           />
         );
       default:
         return multiline ? (
           <textarea
-            rows={3}
+            rows={4}
             value={value ?? ""}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full rounded-xl border bg-white px-3 py-2.5 text-[14px] outline-none focus:ring-2"
+            className="w-full rounded-2xl border bg-white px-4 py-3.5 text-[16px] leading-relaxed outline-none focus:ring-2 sm:py-2.5 sm:text-[14px]"
             style={{ borderColor: NAVY.line }}
           />
         ) : (
@@ -1237,7 +1249,7 @@ function QuestionField({ q, hue, value, onChange }: { q: Question; hue: string; 
             type="text"
             value={value ?? ""}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full rounded-xl border bg-white px-3 py-2.5 text-[14px] outline-none focus:ring-2"
+            className="w-full rounded-2xl border bg-white px-4 py-3.5 text-[16px] outline-none focus:ring-2 sm:py-2.5 sm:text-[14px]"
             style={{ borderColor: NAVY.line }}
           />
         );
@@ -1245,16 +1257,17 @@ function QuestionField({ q, hue, value, onChange }: { q: Question; hue: string; 
   };
 
   return (
-    <div className="rounded-2xl border bg-white/85 p-4 backdrop-blur" style={{ borderColor: NAVY.line }}>
-      <label className="mb-2 block text-[14px] font-semibold leading-snug" style={{ color: NAVY.ink }}>
+    <div className="rounded-2xl border bg-white/90 p-4 backdrop-blur sm:p-5" style={{ borderColor: NAVY.line }}>
+      <label className="mb-2.5 block text-[16.5px] font-bold leading-snug sm:text-[15px]" style={{ color: NAVY.ink }}>
         {label}
         {q.required && <span className="ml-1" style={{ color: NAVY.bad }}>*</span>}
       </label>
-      {q.hint && <p className="mb-2 text-[12px]" style={{ color: NAVY.inkSoft }}>{q.hint}</p>}
+      {q.hint && <p className="mb-3 text-[13.5px] leading-relaxed sm:text-[12px]" style={{ color: NAVY.inkSoft }}>{q.hint}</p>}
       {renderControl()}
     </div>
   );
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Shared supervision context bar — carried across every module        */
