@@ -113,8 +113,8 @@ const shade = (hex: string, factor: number) => {
  * SARMAAN ACSM Integrated Supervisory Checklist — an interactive, section-by-
  * section data-collection surface. Every sidebar module is clickable and
  * renders its own questions inline (answerable right here), each on a unique
- * rose-flower backdrop. Geography is driven by the microplan cascade and GPS
- * is captured on device; submissions save through the offline-capable store.
+ * rose-flower backdrop. Geography is driven by a standalone State cascade and
+ * GPS is captured on device; submissions save through the offline-capable store.
  */
 export default function SarmaanChecklistLauncher({
   formName,
