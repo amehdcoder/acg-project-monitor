@@ -204,8 +204,9 @@ export default function CopyMdaChecklistDialog({
         <div className="space-y-4 py-1">
           {destinationHasChecklist && (
             <p className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
-              This project already has an MDA checklist. Copying adds another one
-              — remove the existing checklist first if you want to replace it.
+              This project already has a checklist with the same name. Don't
+              worry — the copy is saved under a new, unique name automatically so
+              nothing is overwritten.
             </p>
           )}
 
