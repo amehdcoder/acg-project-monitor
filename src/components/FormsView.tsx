@@ -1827,6 +1827,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 {isOwner && (
                   <>
                     <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      disabled={copyHideBusy || !currentProjectId}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        toggleCopyFeatureHidden(!copyFeatureHidden);
+                      }}
+                    >
+                      {copyFeatureHidden ? (
+                        <Eye className="mr-2 h-4 w-4 text-blue-600" />
+                      ) : (
+                        <EyeOff className="mr-2 h-4 w-4 text-blue-600" />
+                      )}
+                      {copyFeatureHidden ? "Show MDA Checklist Setup" : "Hide MDA Checklist Setup"}
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setShowBulkAccess(true)}>
                       <KeyRound className="mr-2 h-4 w-4 text-emerald-600" />
                       Bulk Upload Access
