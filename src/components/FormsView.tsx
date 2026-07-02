@@ -1291,6 +1291,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           dashboardConfig,
           requireLocation: true,
           sarmaan_supervisory: true,
+          // Render sections under the beautiful ODK-style MDA interface and
+          // drive geography from the microplan location cascade.
+          supervisoryChecklistStyle: true,
+          microplanLocationCascade: true,
+
         } as any,
         project_id: currentProjectId,
         created_by: user?.id,
