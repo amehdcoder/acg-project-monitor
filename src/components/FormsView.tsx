@@ -2091,21 +2091,57 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         </button>
                       </div>
                     ) : (
-                      <div className="rounded-2xl border border-dashed bg-white p-4 shadow-sm" style={{ borderColor: "#12B5A566" }}>
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex min-w-0 items-start gap-3">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: "#E8F7F5" }}>
-                              <ClipboardList className="h-6 w-6" style={{ color: "#0E8D80" }} />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="whitespace-normal break-words text-sm font-extrabold" style={{ color: "#0A2540" }}>SARMAAN Supervisory Checklist & Dashboard</p>
-                              <p className="mt-1 text-xs text-muted-foreground">Add the standalone checklist and linked supervision dashboard directly under SARMAAN forms.</p>
-                            </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const created = await createSarmaanSupervisoryTool();
+                            if (created) setSarmaanLaunchForm(created);
+                          }}
+                          className="group relative overflow-hidden rounded-2xl border border-dashed p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                          style={{ borderColor: "#0A254066", background: "linear-gradient(135deg, #0A2540 0%, #123E68 58%, #12B5A5 140%)" }}
+                        >
+                          <div className="relative flex items-start gap-3">
+                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: "#12B5A5" }}>
+                              <ClipboardCheck className="h-6 w-6 text-white" strokeWidth={2.2} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "rgba(18,181,165,0.18)", color: "#BFFAF2" }}>
+                                Add Checklist
+                              </span>
+                              <span className="mt-2 block whitespace-normal break-words text-[15px] font-extrabold leading-snug text-white">
+                                {SARMAAN_SUPERVISORY_FORM_NAME}
+                              </span>
+                              <span className="mt-1 line-clamp-2 block text-xs text-white/80">{SARMAAN_SUPERVISORY_DESC}</span>
+                            </span>
+                            <Sparkles className="mt-1 h-5 w-5 shrink-0 text-white/75" />
                           </div>
-                          <Button size="sm" className="shrink-0 bg-[#0E8D80] text-white hover:bg-[#0A766C]" onClick={createSarmaanSupervisoryTool}>
-                            <Sparkles className="mr-1.5 h-4 w-4" /> Add now
-                          </Button>
-                        </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const created = await createSarmaanSupervisoryTool();
+                            if (created) setSarmaanDashForm(created);
+                          }}
+                          className="group relative overflow-hidden rounded-2xl border border-dashed bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                          style={{ borderColor: "#12B5A566" }}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: "#E8F7F5" }}>
+                              <BarChart3 className="h-6 w-6" style={{ color: "#0E8D80" }} strokeWidth={2.2} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "#E8F7F5", color: "#0E8D80" }}>
+                                Add Dashboard
+                              </span>
+                              <span className="mt-2 block whitespace-normal break-words text-[15px] font-extrabold leading-snug" style={{ color: "#0A2540" }}>
+                                {SARMAAN_SUPERVISORY_DASH_NAME}
+                              </span>
+                              <span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">{SARMAAN_DASH_DESC}</span>
+                            </span>
+                            <Sparkles className="mt-1 h-5 w-5 shrink-0" style={{ color: "#0E8D80" }} />
+                          </div>
+                        </button>
                       </div>
                     )}
                   </div>
