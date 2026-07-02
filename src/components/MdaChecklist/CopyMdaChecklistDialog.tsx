@@ -86,6 +86,7 @@ export default function CopyMdaChecklistDialog({
   currentProjectId,
   projects,
   destinationHasChecklist,
+  existingFormNames = [],
   userId,
   onCopied,
 }: Props) {
