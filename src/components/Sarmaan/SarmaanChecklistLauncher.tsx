@@ -56,7 +56,40 @@ interface Props {
 }
 
 const GEO_NAMES = new Set(["state", "lga", "ward", "flhf_name", "community", "settlement_name"]);
+const GEO_ORDER = ["state", "lga", "ward", "flhf_name", "community", "settlement_name"];
 const GUIDANCE = "guidance"; // sentinel for the guidance nav entry
+
+/**
+ * Shared supervision context carried across every module in a guided journey.
+ * Captured once, reused on each independent form submission so the supervisor
+ * never re-enters who they spoke with, the reporting period, or the round.
+ */
+interface SharedContext {
+  respondentName: string;
+  respondentRole: string;
+  reportingMonth: string; // YYYY-MM
+  round: string;
+}
+
+/**
+ * Natural-language connectors used when handing a supervisor from one module to
+ * the next — chosen to mimic how a person eases from one topic to another in a
+ * real supervision conversation. Varied so consecutive prompts never feel robotic.
+ */
+const TRANSITION_OPENERS = [
+  "Naturally,",
+  "While we're still here,",
+  "Following on from that,",
+  "Building on what you just noted,",
+  "That leads us nicely into",
+  "With that fresh in mind,",
+  "Now that the ground is set,",
+  "Keeping the same visit going,",
+  "It makes sense to now",
+  "Before we wrap up,",
+  "As the conversation flows,",
+  "Rounding things out,",
+];
 
 /** Hexcolor helper — translucent tint. */
 const tint = (hex: string, alpha: number) => {
