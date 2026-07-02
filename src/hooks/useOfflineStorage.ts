@@ -633,6 +633,81 @@ export const useOfflineStorage = () => {
     [updatePendingCount]
   );
 
+  /**
+   * Conflict-safe edit of an existing submission.
+   *
+   * When online it applies the last-write-wins rule immediately (never
+   * overwriting a newer server row). When offline it queues an EDIT record
+   * that the sync engine resolves with the same rule.
+   */
+  const saveEdit = useCallback(
+    async (
+      submissionId: string,
+      formId: string,
+      userId: string,
+      data: Record<string, any>,
+      location: { lat: number; lng: number } | null = null,
+      withinGeofence: boolean | null = null,
+    ): Promise<{ success: boolean; offline: boolean; conflict: boolean; id: string }> => {
+      const clientUpdatedAt = new Date().toISOString();
+      const editRecord: PendingSubmission = {
+        id: submissionId,
+        form_id: formId,
+        user_id: userId,
+        data,
+        location,
+        within_geofence: withinGeofence,
+        submission_type: "regular",
+        created_at: clientUpdatedAt,
+        retryCount: 0,
+        is_edit: true,
+        client_updated_at: clientUpdatedAt,
+      };
+
+      if (navigator.onLine) {
+        try {
+          const outcome = await syncEditWithConflictRule(editRecord);
+          if (outcome === "missing") {
+            // Row not on server — insert it fresh so nothing is lost.
+            await supabase.from("form_submissions").insert({
+              id: submissionId,
+              form_id: formId,
+              user_id: userId,
+              data,
+              location,
+              within_geofence: withinGeofence,
+              status: "sent",
+              submitted_at: clientUpdatedAt,
+              synced_at: clientUpdatedAt,
+              submission_type: "regular",
+            });
+            return { success: true, offline: false, conflict: false, id: submissionId };
+          }
+          if (outcome === "conflict") {
+            toast({
+              title: "Edit Conflict",
+              description: "The server has a newer version. Your change was saved for review instead of overwriting it.",
+            });
+            await updatePendingCount();
+            return { success: true, offline: false, conflict: true, id: submissionId };
+          }
+          return { success: true, offline: false, conflict: false, id: submissionId };
+        } catch {
+          await addToOfflineStorage(editRecord);
+          await updatePendingCount();
+          return { success: true, offline: true, conflict: false, id: submissionId };
+        }
+      }
+
+      await addToOfflineStorage(editRecord);
+      await updatePendingCount();
+      return { success: true, offline: true, conflict: false, id: submissionId };
+    },
+    [updatePendingCount],
+  );
+
+
+
   // Public sync function wrapping doSync
   const syncPendingSubmissions = useCallback(async () => {
     if (!navigator.onLine) {
