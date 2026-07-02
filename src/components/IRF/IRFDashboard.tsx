@@ -144,7 +144,7 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
     rows.forEach((r) => {
       const lga = (r.lga || "").trim();
       if (!lga) return;
-      out[lga] = (out[lga] || 0) + num(r.total_reach) + num(r.radio_estimated_reach) + num(r.attendance_men) + num(r.attendance_women);
+      out[lga] = (out[lga] || 0) + computeIrfReach(r);
     });
     return out;
   }, [rows]);
