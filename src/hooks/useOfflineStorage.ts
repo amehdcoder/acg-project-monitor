@@ -249,6 +249,9 @@ const syncEditWithConflictRule = async (
 
   if (updErr) throw updErr;
   return "applied";
+};
+
+
 
 export const useOfflineStorage = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
