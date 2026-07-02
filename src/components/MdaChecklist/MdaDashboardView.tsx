@@ -22,6 +22,7 @@ interface MdaDashboardForm {
   questions?: unknown[];
   groups?: unknown[];
   settings?: unknown;
+  status?: string | null;
 }
 
 interface DashboardOption {
