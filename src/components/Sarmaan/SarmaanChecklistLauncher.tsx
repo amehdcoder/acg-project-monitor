@@ -324,6 +324,39 @@ export default function SarmaanChecklistLauncher({
     }
   };
 
+  // ---- Journey completion helpers ----
+  const isSectionComplete = (i: number) => {
+    const vq = visibleQuestions(i).filter((q) => !GEO_NAMES.has(q.name || "") && q.type !== "geopoint");
+    if (vq.length === 0) return false;
+    return vq.every((q) => {
+      if (!q.required) {
+        const v = responses[q.id];
+        return v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
+      }
+      const v = responses[q.id];
+      return v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
+    });
+  };
+  const firstIncompleteIdx = () => {
+    for (let i = 0; i < sections.length; i++) if (!isSectionComplete(i)) return i;
+    return sections.length ? 0 : -1;
+  };
+  const nextIncompleteAfter = (from: number) => {
+    for (let i = from + 1; i < sections.length; i++) if (!isSectionComplete(i)) return i;
+    for (let i = 0; i < from; i++) if (!isSectionComplete(i)) return i;
+    return -1;
+  };
+  const startJourney = () => {
+    setJourneyMode(true);
+    setHandoff(null);
+    const idx = firstIncompleteIdx();
+    if (idx >= 0) setActive(idx);
+  };
+  const completedCount = useMemo(
+    () => sections.reduce((n, _s, i) => n + (isSectionComplete(i) ? 1 : 0), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sections, responses, nameToId],
+  );
 
   const currentIdx = typeof active === "number" ? active : -1;
   const hue = currentIdx >= 0 ? SECTION_HUES[currentIdx % SECTION_HUES.length] : NAVY.teal;
