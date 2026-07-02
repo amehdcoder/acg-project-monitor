@@ -57,6 +57,8 @@ interface Props {
   projects: { id: string; name: string }[];
   /** Whether the destination already has an MDA checklist. */
   destinationHasChecklist: boolean;
+  /** Names of forms already in the destination project (for conflict handling). */
+  existingFormNames?: string[];
   userId?: string;
   onCopied: () => void;
 }
