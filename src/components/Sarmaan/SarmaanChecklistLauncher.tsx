@@ -1369,7 +1369,7 @@ function JourneyRail({
   isSectionComplete,
   onJump,
 }: {
-  sections: { id: string; label: string }[];
+  sections: ChapterSection[];
   currentIdx: number;
   isSectionComplete: (i: number) => boolean;
   onJump: (i: number) => void;
