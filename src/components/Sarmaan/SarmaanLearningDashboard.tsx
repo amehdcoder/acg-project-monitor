@@ -565,6 +565,8 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
           <div className="py-4 text-center text-[11px]" style={{ color: NAVY.inkSoft }}>
             SARMAAN Programme · Integrated Supervisory Checklist & Learning Dashboard · {agg.n} live submissions
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>
