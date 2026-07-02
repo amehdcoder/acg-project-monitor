@@ -14,7 +14,9 @@ const config: CapacitorConfig = {
     allowMixedContent: true,
     captureInput: true,
     webContentsDebuggingEnabled: false,
-    backgroundColor: '#1E3A8A',
+    // Match the web first-paint background (manifest background_color) so the
+    // launch window → WebView transition is seamless with no color flash.
+    backgroundColor: '#f5f7fa',
   },
   server: {
     androidScheme: 'https',
@@ -22,12 +24,15 @@ const config: CapacitorConfig = {
     cleartext: true,
   },
   plugins: {
-    // Splash screen disabled: launching the app icon opens straight to the
-    // authentication page with no intermediate splash/loading screen.
+    // Splash screen fully disabled. In addition to this plugin config, run
+    // `scripts/apply-android-splash.sh` after `npx cap add/sync android` to
+    // strip the native launch-theme artwork (Android 12+ draws an icon splash
+    // from the theme regardless of this plugin) so the app opens straight to
+    // the auth page with no intermediate splash/loading screen.
     SplashScreen: {
       launchShowDuration: 0,
       launchAutoHide: true,
-      backgroundColor: '#1E3A8A',
+      backgroundColor: '#f5f7fa',
       showSpinner: false,
     },
   },
