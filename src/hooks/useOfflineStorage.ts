@@ -4,8 +4,9 @@ import { toast } from "@/hooks/use-toast";
 import { sealRecord, unsealRecord, unsealAll } from "@/lib/deviceCrypto";
 
 const DB_NAME = "acg_monitor_offline";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_NAME = "pending_submissions";
+const CONFLICT_STORE = "edit_conflicts";
 
 interface PendingSubmission {
   id: string;
@@ -17,7 +18,32 @@ interface PendingSubmission {
   submission_type: string;
   created_at: string;
   retryCount: number;
+  /**
+   * When true this queued row is an EDIT of an existing server submission,
+   * not a brand-new capture. Edits are synced with a conflict-safe rule
+   * (see doSync) instead of a blind insert.
+   */
+  is_edit?: boolean;
+  /**
+   * On-device moment the change was made. Used as the last-write-wins clock
+   * so an offline edit never overwrites a NEWER server record.
+   */
+  client_updated_at?: string;
 }
+
+/** Recorded when an offline edit is rejected because the server was newer. */
+export interface EditConflict {
+  id: string;               // conflict record id
+  submission_id: string;    // the form_submissions row
+  form_id: string;
+  user_id: string;
+  offline_data: Record<string, any>;
+  server_data: Record<string, any>;
+  offline_updated_at: string;
+  server_updated_at: string;
+  detected_at: string;
+}
+
 
 
 // Initialize IndexedDB
