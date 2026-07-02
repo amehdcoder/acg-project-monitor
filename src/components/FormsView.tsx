@@ -1256,6 +1256,19 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     ? sarmaanSupervisoryForms.find((form) => form.project_id === currentProjectId) || null
     : sarmaanSupervisoryForms[0] || null;
   const currentProjectIsSarmaan = /sarmaan/i.test(currentProject?.name || "");
+
+  // SARMAAN checklist/dashboard access control
+  const sarmaanIsManager = isAdmin || isOwnerLevel;
+  const canSeeSarmaanDashboard = sarmaanIsManager || hasDashboardAccess("sarmaan_supervisory", currentProjectId);
+  const { grants: sarmaanGrants, hasAnyGrant: hasAnySarmaanGrant } = useSarmaanFormAccess(
+    primarySarmaanSupervisoryForm?.id,
+    sarmaanIsManager,
+  );
+  const sarmaanAllowedSectionIds = sarmaanIsManager
+    ? null
+    : sarmaanGrants.filter((g) => g.user_id === user?.id).map((g) => g.section_id);
+  const canSeeSarmaanChecklist = sarmaanIsManager || hasAnySarmaanGrant;
+
   const filteredNonSarmaanForms = filteredForms.filter(
     (form) => !(currentProjectIsSarmaan && isSupervisoryLearningForm({ settings: form.settings, name: form.name })),
   );
