@@ -732,6 +732,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
               </div>
             </div>
           </div>
+          )}
 
           {/* Offline prefetch — save the GRID3 location data for the relevant
               states so the cascade works instantly with no network. */}
