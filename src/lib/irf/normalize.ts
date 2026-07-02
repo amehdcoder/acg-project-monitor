@@ -27,6 +27,29 @@ export function normalizeIrfRow(r: IrfReport): IrfReport {
 export const normalizeIrfRows = (rows: IrfReport[]): IrfReport[] => rows.map(normalizeIrfRow);
 
 /**
+ * Single source of truth for "estimated number of people reached" for one report.
+ * Every dashboard KPI, chart, map and export MUST use this so the headline total,
+ * per-LGA choropleth, monthly trend and Excel/Word/PDF exports never diverge.
+ *
+ * Reach = town-announcer / activity estimated reach (`total_reach`) +
+ *         radio estimated audience (`radio_estimated_reach`) +
+ *         community-dialogue attendance (men + women).
+ */
+const numVal = (v: any) => (v == null || v === "" ? 0 : Number(v) || 0);
+
+export function computeIrfReach(r: IrfReport): number {
+  return (
+    numVal((r as any).total_reach) +
+    numVal((r as any).radio_estimated_reach) +
+    numVal((r as any).attendance_men) +
+    numVal((r as any).attendance_women)
+  );
+}
+
+export const sumIrfReach = (rows: IrfReport[]): number =>
+  rows.reduce((s, r) => s + computeIrfReach(r), 0);
+
+/**
  * Category-form fields that live in `answers` (or are new columns) and are NOT
  * part of the legacy IRF_ALL_FIELDS definition. They are appended to the
  * field-by-field analysis so the standalone activity forms are fully covered.
