@@ -372,10 +372,10 @@ function supervisoryLearningSections(): FormGroup[] {
       // omitted here — they are captured from the authenticated session and
       // visit metadata rather than as manual questions.
 
-      // Geography is driven by the microplan via the shared MDA location
-      // cascade (State → LGA → Ward → FLHF → Community → Settlement). These
-      // question names are the cascade write targets and are rendered by the
-      // cascade instead of as free-text fields.
+      // Geography is driven by the shared location cascade (State → LGA →
+      // Ward → FLHF → Community → Settlement) with no microplan dependency.
+      // These question names are the cascade write targets and are rendered by
+      // the cascade instead of as free-text fields.
       stateField(),
       qn("text", "lga", "LGA", { required: true }),
       qn("text", "ward", "Ward", { required: true }),
