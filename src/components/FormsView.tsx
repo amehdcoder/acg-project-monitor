@@ -1812,11 +1812,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 )}
               </div>
               {!copyFeatureHidden && (
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <div className="flex-1 min-w-0">
                 <Button
                   size="sm"
                   variant="outline"
-                  className="w-full justify-center border-emerald-300 text-emerald-800 hover:bg-emerald-100"
+                  className="w-full justify-center whitespace-nowrap border-emerald-300 text-emerald-800 hover:bg-emerald-100"
                   onClick={async () => {
                     if (!currentProjectId) {
                       toast({ title: "Select a project", description: "Choose a project before creating the checklist.", variant: "destructive" });
