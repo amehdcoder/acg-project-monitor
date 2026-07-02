@@ -368,9 +368,10 @@ function supervisoryLearningSections(): FormGroup[] {
   return [
     // ---- Section A ----
     section("A. Supervisor & Visit Information", [
-      qn("date", "date_of_supervision", "Date of supervision", { required: true }),
-      qn("text", "supervisor_name", "Name of supervisor", { required: true }),
-      qn("text", "supervisor_designation", "Supervisor designation / organization", { hint: "State / LGA / partner supervisor" }),
+      // Supervisor identity fields (name, date, designation) are intentionally
+      // omitted here — they are captured from the authenticated session and
+      // visit metadata rather than as manual questions.
+
       // Geography is driven by the microplan via the shared MDA location
       // cascade (State → LGA → Ward → FLHF → Community → Settlement). These
       // question names are the cascade write targets and are rendered by the
