@@ -345,6 +345,37 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
               {refreshing ? "Refreshing" : "Refresh"}
             </Button>
 
+            {canManageLifecycle && !finalized && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={finalizeChecklist}
+                disabled={savingLifecycle}
+                className="gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              >
+                <CheckCircle2 className="h-4 w-4" /> Finalize checklist
+              </Button>
+            )}
+
+            {canManageLifecycle && (
+              <Button
+                variant={published ? "outline" : "default"}
+                size="sm"
+                onClick={togglePublish}
+                disabled={savingLifecycle}
+                className="gap-1.5"
+              >
+                {savingLifecycle ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : published ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+                {published ? "Unpublish dashboard" : "Publish dashboard"}
+              </Button>
+            )}
+
             {canManageAccess && (
               <Button
                 variant="outline"
@@ -355,6 +386,7 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
                 <UserPlus className="h-4 w-4" /> Grant access
               </Button>
             )}
+
 
             {isOwner && (
               <OwnerSubmissionManager
