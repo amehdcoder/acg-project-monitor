@@ -1234,6 +1234,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const filteredForms = mergedForms.filter((form) =>
     form.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const currentProjectIsSarmaan = /sarmaan/i.test(currentProject?.name || "");
+  const filteredNonSarmaanForms = filteredForms.filter(
+    (form) => !isSupervisoryLearningForm({ settings: form.settings, name: form.name }),
+  );
+  const sarmaanSearchMatches = !searchQuery.trim() || /sarmaan|supervisory|supervision|checklist|dashboard|learning/i.test(searchQuery);
+  const sarmaanVisibleRowCount = primarySarmaanSupervisoryForm && sarmaanSearchMatches ? 2 : 0;
+  const visibleMyFormsCount = filteredNonSarmaanForms.length + sarmaanVisibleRowCount;
 
   const mdaChecklistForms = mergedForms.filter((form) =>
     isMdaChecklistLike({ settings: form.settings, formName: form.name, groups: form.groups })
