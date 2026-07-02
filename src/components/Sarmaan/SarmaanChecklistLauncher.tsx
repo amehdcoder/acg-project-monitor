@@ -85,6 +85,7 @@ export default function SarmaanChecklistLauncher({
   groups = [],
   requiresGps = true,
   stateScope,
+  allowedSectionIds,
   onOpenDashboard,
   onClose,
   onSubmitted,
@@ -95,14 +96,21 @@ export default function SarmaanChecklistLauncher({
   // ---- Build the answerable section model from the form's groups ----
   const sections = useMemo(() => {
     const src = groups.length > 0 ? groups : [{ id: "all", name: "all", label: formName, questions } as FormGroup];
-    return src.map((g) => ({
+    const built = src.map((g) => ({
       id: g.id,
       label: g.label || g.name,
       questions: (g.questions || []).filter(
         (q) => q.type !== "calculate" && q.type !== "note" && !REMOVED_CHECKLIST_QUESTIONS.has(q.name || ""),
       ),
     }));
-  }, [groups, questions, formName]);
+    // Per-module access: when an allow-list is supplied, only expose granted modules.
+    if (allowedSectionIds && allowedSectionIds.length >= 0 && !(built.length === 1 && built[0].id === "all")) {
+      const allow = new Set(allowedSectionIds);
+      const restricted = built.filter((s) => allow.has(s.id));
+      return restricted.length ? restricted : built.filter(() => false);
+    }
+    return built;
+  }, [groups, questions, formName, allowedSectionIds]);
 
   const allQuestions = useMemo(
     () => sections.flatMap((s) => s.questions),
