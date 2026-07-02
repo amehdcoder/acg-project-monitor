@@ -84,7 +84,7 @@ export default function LocationCombobox({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn("w-full justify-between bg-background font-normal", !value && "text-muted-foreground")}
+          className={cn("w-full justify-between bg-background font-normal", !value && "text-muted-foreground", triggerClassName)}
         >
           <span className="truncate">{value || placeholder}</span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
