@@ -253,6 +253,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [specialDashForm, setSpecialDashForm] = useState<Form | null>(null);
   const [sarmaanDashForm, setSarmaanDashForm] = useState<Form | null>(null);
   const [sarmaanLaunchForm, setSarmaanLaunchForm] = useState<Form | null>(null);
+  const [sarmaanChecklistAccessOpen, setSarmaanChecklistAccessOpen] = useState(false);
+  const [sarmaanDashAccessOpen, setSarmaanDashAccessOpen] = useState(false);
   const [templateForm, setTemplateForm] = useState<{ templateId: string; name: string; description: string; questions: Question[]; settings: any; geofence?: GeofenceArea } | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
