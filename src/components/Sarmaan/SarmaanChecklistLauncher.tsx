@@ -138,22 +138,81 @@ export default function SarmaanChecklistLauncher({
   const geo = useGeolocation();
 
   // ---- Build the answerable section model from the form's groups ----
-  const sections = useMemo(() => {
+  //
+  // The raw form ships 13 modules (A–M), but a real supervisor experiences the
+  // visit as six connected chapters. We merge the closely-related modules into
+  // an immersive narrative arc (Arrival → Rooms of Power → Community Encounter →
+  // Proof → Reflection → Verdict). Each chapter concatenates the questions of
+  // its member modules yet still submits independently, so the dashboard,
+  // offline store and per-module access grants keep working unchanged.
+  const sections = useMemo<ChapterSection[]>(() => {
     const src = groups.length > 0 ? groups : [{ id: "all", name: "all", label: formName, questions } as FormGroup];
-    const built = src.map((g) => ({
+    const raw = src.map((g) => ({
       id: g.id,
       label: g.label || g.name,
+      code: chapterCodeFromLabel(g.label || g.name),
       questions: (g.questions || []).filter(
         (q) => q.type !== "calculate" && q.type !== "note" && !REMOVED_CHECKLIST_QUESTIONS.has(q.name || ""),
       ),
     }));
-    // Per-module access: when an allow-list is supplied, only expose granted modules.
-    if (allowedSectionIds && allowedSectionIds.length >= 0 && !(built.length === 1 && built[0].id === "all")) {
+
+    // Per-module access: when an allow-list is supplied, only expose granted raw
+    // modules. A chapter later becomes visible if any of its members are granted.
+    const singleAll = raw.length === 1 && raw[0].id === "all";
+    let accessible = raw;
+    if (allowedSectionIds && !singleAll) {
       const allow = new Set(allowedSectionIds);
-      const restricted = built.filter((s) => allow.has(s.id));
-      return restricted.length ? restricted : built.filter(() => false);
+      accessible = raw.filter((s) => allow.has(s.id));
     }
-    return built;
+
+    // A form without recognizable A–M codes (e.g. a custom copy) can't be
+    // merged safely — present its groups as-is so nothing is ever lost.
+    const anyCoded = accessible.some((s) => s.code);
+    if (singleAll || !anyCoded) {
+      return accessible.map((s) => ({
+        id: s.id,
+        label: s.label,
+        subtitle: "",
+        narrative: "",
+        closing: "",
+        memberIds: [s.id],
+        guidance: [],
+        questions: s.questions,
+      }));
+    }
+
+    const used = new Set<string>();
+    const chapters: ChapterSection[] = [];
+    for (const ch of SUPERVISORY_CHAPTERS) {
+      const members = accessible.filter((s) => s.code && ch.members.includes(s.code));
+      if (members.length === 0) continue;
+      members.forEach((m) => used.add(m.id));
+      chapters.push({
+        id: ch.id,
+        label: ch.title,
+        subtitle: ch.subtitle,
+        narrative: ch.narrative,
+        closing: ch.closing,
+        memberIds: members.map((m) => m.id),
+        guidance: chapterGuidance(ch),
+        questions: members.flatMap((m) => m.questions),
+      });
+    }
+    // Append any leftover groups that didn't map to a chapter so they remain fillable.
+    for (const s of accessible) {
+      if (used.has(s.id)) continue;
+      chapters.push({
+        id: s.id,
+        label: s.label,
+        subtitle: "",
+        narrative: "",
+        closing: "",
+        memberIds: [s.id],
+        guidance: [],
+        questions: s.questions,
+      });
+    }
+    return chapters;
   }, [groups, questions, formName, allowedSectionIds]);
 
   const allQuestions = useMemo(
