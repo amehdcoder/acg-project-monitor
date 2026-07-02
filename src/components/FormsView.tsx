@@ -1257,7 +1257,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     : sarmaanSupervisoryForms[0] || null;
   const currentProjectIsSarmaan = /sarmaan/i.test(currentProject?.name || "");
   const filteredNonSarmaanForms = filteredForms.filter(
-    (form) => !isSupervisoryLearningForm({ settings: form.settings, name: form.name }),
+    (form) => !(currentProjectIsSarmaan && isSupervisoryLearningForm({ settings: form.settings, name: form.name })),
   );
   const sarmaanSearchMatches = !searchQuery.trim() || /sarmaan|supervisory|supervision|checklist|dashboard|learning/i.test(searchQuery);
   const shouldShowSarmaanSupervisoryBlock = currentProjectIsSarmaan && sarmaanSearchMatches && (!!primarySarmaanSupervisoryForm || isAdmin);
