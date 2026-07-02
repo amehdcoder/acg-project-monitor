@@ -112,6 +112,7 @@ import SpecialFormDashboard from "@/components/SpecialFormStudio/SpecialFormDash
 import SarmaanLearningDashboard from "@/components/Sarmaan/SarmaanLearningDashboard";
 import SarmaanChecklistLauncher from "@/components/Sarmaan/SarmaanChecklistLauncher";
 import { isSupervisoryLearningForm } from "@/components/Sarmaan/sarmaanBrand";
+import { getPreset } from "@/lib/specialStudio/presets";
 import { downloadXlsForm } from "@/lib/specialStudio/xlsformExport";
 import { FormFiller } from "@/components/FormFiller";
 import MdaChecklistLanding from "@/components/MdaChecklist/MdaChecklistLanding";
@@ -218,6 +219,11 @@ export const getProjectAccent = (
   const i = projects.findIndex((p) => p.id === projectId);
   return PROJECT_ACCENT_COLORS[(i >= 0 ? i : fallbackIdx) % PROJECT_ACCENT_COLORS.length];
 };
+
+const SARMAAN_SUPERVISORY_FORM_NAME = "SARMAAN Supervisory Checklist";
+const SARMAAN_SUPERVISORY_DASH_NAME = "SARMAAN Supervision Dashboard";
+const SARMAAN_SUPERVISORY_DESC = "12-module supportive supervision checklist with GPS, evidence capture, scoring and learning actions.";
+const SARMAAN_DASH_DESC = "Executive supervision dashboard with live KPIs, learning funnels, quality bands and corrective-action insights.";
 
 interface FormsViewProps {
   selectedProjectId?: string | null;
@@ -1242,6 +1248,77 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     : mdaChecklistForms[0] || null;
 
   const currentProject = projects.find(p => p.id === currentProjectId);
+  const sarmaanSupervisoryForms = useMemo(
+    () => mergedForms.filter((form) => isSupervisoryLearningForm({ settings: form.settings, name: form.name })),
+    [mergedForms],
+  );
+  const primarySarmaanSupervisoryForm = currentProjectId
+    ? sarmaanSupervisoryForms.find((form) => form.project_id === currentProjectId) || null
+    : sarmaanSupervisoryForms[0] || null;
+  const currentProjectIsSarmaan = /sarmaan/i.test(currentProject?.name || "");
+  const filteredNonSarmaanForms = filteredForms.filter(
+    (form) => !(currentProjectIsSarmaan && isSupervisoryLearningForm({ settings: form.settings, name: form.name })),
+  );
+  const sarmaanSearchMatches = !searchQuery.trim() || /sarmaan|supervisory|supervision|checklist|dashboard|learning/i.test(searchQuery);
+  const shouldShowSarmaanSupervisoryBlock = currentProjectIsSarmaan && sarmaanSearchMatches && (!!primarySarmaanSupervisoryForm || isAdmin);
+  const sarmaanVisibleRowCount = shouldShowSarmaanSupervisoryBlock ? 2 : 0;
+  const visibleMyFormsCount = filteredNonSarmaanForms.length + sarmaanVisibleRowCount;
+
+  const createSarmaanSupervisoryTool = async (): Promise<Form | null> => {
+    if (!currentProjectId) {
+      toast({ title: "Select a project", description: "Choose the SARMAAN project before adding the checklist.", variant: "destructive" });
+      return null;
+    }
+    const existing = sarmaanSupervisoryForms.find((form) => form.project_id === currentProjectId);
+    if (existing) {
+      toast({ title: "Already visible", description: "The SARMAAN Supervisory Checklist and Supervision Dashboard are already shown under this project." });
+      return existing;
+    }
+    try {
+      const preset = getPreset("supervisory_learning");
+      if (!preset) throw new Error("SARMAAN supervisory template is unavailable.");
+      const sections = preset.sections();
+      const dashboardConfig = preset.dashboard();
+      const { data, error } = await supabase.from("forms").insert({
+        name: SARMAAN_SUPERVISORY_FORM_NAME,
+        description: SARMAAN_SUPERVISORY_DESC,
+        questions: sections as any,
+        settings: {
+          theme: preset.theme,
+          studio: true,
+          presetKey: "supervisory_learning",
+          dashboardEnabled: true,
+          dashboardConfig,
+          requireLocation: true,
+          sarmaan_supervisory: true,
+        } as any,
+        project_id: currentProjectId,
+        created_by: user?.id,
+        status: "active",
+      } as any).select("*").single();
+      if (error) throw error;
+      const allItems = ((data as any)?.questions as unknown as any[]) || [];
+      const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
+      const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
+      const createdForm = {
+        ...(data as any),
+        questions: ungroupedQuestions,
+        groups: groupItems,
+        geofence: ((data as any)?.geofence as unknown as GeofenceArea) || null,
+        settings: ((data as any)?.settings as unknown as FormSettings) || {},
+        submissions_count: 0,
+      } as Form;
+      setForms((prev) => (prev.some((f) => f.id === createdForm.id) ? prev : [createdForm, ...prev]));
+      cacheFormsForOffline([createdForm]);
+      toast({ title: "Added to SARMAAN forms", description: "The checklist and dashboard are now visible as separate entries." });
+      fetchForms(currentProjectId);
+      return createdForm;
+    } catch (e: any) {
+      console.error("SARMAAN supervisory add error", e);
+      toast({ title: "Could not add", description: e?.message || "Please try again.", variant: "destructive" });
+      return null;
+    }
+  };
 
   if (showMentalHealth) {
     return (
@@ -1929,7 +2006,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   <h3 className="font-display text-base font-bold text-foreground">My Forms</h3>
                   <p className="truncate text-xs text-muted-foreground">Custom forms your team built</p>
                 </div>
-                <span className="shrink-0 rounded-full bg-[#E3ECFB] px-2.5 py-1 text-xs font-semibold text-[#1656BA]">{filteredForms.length}</span>
+                <span className="shrink-0 rounded-full bg-[#E3ECFB] px-2.5 py-1 text-xs font-semibold text-[#1656BA]">{visibleMyFormsCount}</span>
                 <ChevronRight className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${openTopFolder === "custom" ? "rotate-90" : ""}`} />
               </button>
               {openTopFolder === "custom" && (
@@ -1946,7 +2023,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         </div>
                       ))}
                     </div>
-                  ) : filteredForms.length === 0 ? (
+                  ) : visibleMyFormsCount === 0 && !(currentProjectIsSarmaan && isAdmin) ? (
                     <div className="flex h-40 flex-col items-center justify-center text-center px-4">
                       <FileText className="h-10 w-10 text-muted-foreground/50" />
                       <h3 className="mt-3 font-display text-base font-semibold text-foreground">No forms found</h3>
@@ -1960,7 +2037,117 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     </div>
                   ) : (
                     <>
-                {filteredForms.map((form, idx) => {
+                {shouldShowSarmaanSupervisoryBlock && (
+                  <div className="border-b border-border/60 bg-[#F8FAFD] p-3 sm:p-4">
+                    {primarySarmaanSupervisoryForm ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={() => setSarmaanLaunchForm(primarySarmaanSupervisoryForm)}
+                          className="group relative overflow-hidden rounded-2xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                          style={{ borderColor: "#0A254033", background: "linear-gradient(135deg, #0A2540 0%, #123E68 58%, #12B5A5 140%)" }}
+                        >
+                          <div className="relative flex items-start gap-3">
+                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: "#12B5A5" }}>
+                              <ClipboardCheck className="h-6 w-6 text-white" strokeWidth={2.2} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "rgba(18,181,165,0.18)", color: "#BFFAF2" }}>
+                                SARMAAN Forms
+                              </span>
+                              <span className="mt-2 block whitespace-normal break-words text-[15px] font-extrabold leading-snug text-white">
+                                {SARMAAN_SUPERVISORY_FORM_NAME}
+                              </span>
+                              <span className="mt-1 line-clamp-2 block text-xs text-white/80">
+                                {primarySarmaanSupervisoryForm.description || SARMAAN_SUPERVISORY_DESC}
+                              </span>
+                            </span>
+                            <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-white/70 transition group-hover:translate-x-0.5" />
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSarmaanDashForm(primarySarmaanSupervisoryForm)}
+                          className="group relative overflow-hidden rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                          style={{ borderColor: "#12B5A54D" }}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: "#E8F7F5" }}>
+                              <BarChart3 className="h-6 w-6" style={{ color: "#0E8D80" }} strokeWidth={2.2} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "#E8F7F5", color: "#0E8D80" }}>
+                                Live Dashboard
+                              </span>
+                              <span className="mt-2 block whitespace-normal break-words text-[15px] font-extrabold leading-snug" style={{ color: "#0A2540" }}>
+                                {SARMAAN_SUPERVISORY_DASH_NAME}
+                              </span>
+                              <span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">
+                                {SARMAAN_DASH_DESC}
+                              </span>
+                            </span>
+                            <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5" />
+                          </div>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const created = await createSarmaanSupervisoryTool();
+                            if (created) setSarmaanLaunchForm(created);
+                          }}
+                          className="group relative overflow-hidden rounded-2xl border border-dashed p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                          style={{ borderColor: "#0A254066", background: "linear-gradient(135deg, #0A2540 0%, #123E68 58%, #12B5A5 140%)" }}
+                        >
+                          <div className="relative flex items-start gap-3">
+                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: "#12B5A5" }}>
+                              <ClipboardCheck className="h-6 w-6 text-white" strokeWidth={2.2} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "rgba(18,181,165,0.18)", color: "#BFFAF2" }}>
+                                Add Checklist
+                              </span>
+                              <span className="mt-2 block whitespace-normal break-words text-[15px] font-extrabold leading-snug text-white">
+                                {SARMAAN_SUPERVISORY_FORM_NAME}
+                              </span>
+                              <span className="mt-1 line-clamp-2 block text-xs text-white/80">{SARMAAN_SUPERVISORY_DESC}</span>
+                            </span>
+                            <Sparkles className="mt-1 h-5 w-5 shrink-0 text-white/75" />
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const created = await createSarmaanSupervisoryTool();
+                            if (created) setSarmaanDashForm(created);
+                          }}
+                          className="group relative overflow-hidden rounded-2xl border border-dashed bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                          style={{ borderColor: "#12B5A566" }}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: "#E8F7F5" }}>
+                              <BarChart3 className="h-6 w-6" style={{ color: "#0E8D80" }} strokeWidth={2.2} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "#E8F7F5", color: "#0E8D80" }}>
+                                Add Dashboard
+                              </span>
+                              <span className="mt-2 block whitespace-normal break-words text-[15px] font-extrabold leading-snug" style={{ color: "#0A2540" }}>
+                                {SARMAAN_SUPERVISORY_DASH_NAME}
+                              </span>
+                              <span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">{SARMAAN_DASH_DESC}</span>
+                            </span>
+                            <Sparkles className="mt-1 h-5 w-5 shrink-0" style={{ color: "#0E8D80" }} />
+                          </div>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {filteredNonSarmaanForms.map((form, idx) => {
                   // Vary the row icon by index to feel like the mockup (home, group, clipboard...)
                   const rowIconSet = [
                     { Icon: Home,          bg: "bg-[#E3ECFB]", fg: "text-[#2F6FE6]" },
