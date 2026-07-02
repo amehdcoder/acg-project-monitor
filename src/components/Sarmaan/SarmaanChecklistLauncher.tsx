@@ -551,25 +551,54 @@ function GuideRow({ icon, label, text }: { icon: React.ReactNode; label: string;
 /* Section decor + hints                                               */
 /* ------------------------------------------------------------------ */
 function RoseBackground({ hue }: { hue: string }) {
-  // Repeating rose-flower motif, tinted to the section hue, sitting softly
-  // behind the questions.
+  // Bold, high-contrast rose-flower motif tinted to the section hue.
+  // Uses saturated fills + dark outlines so the pattern is clearly visible,
+  // including for low-vision users.
+  const stroke = shade(hue, 0.45);
   const rose = (cx: number, cy: number, r: number, opacity: number) => (
     <g transform={`translate(${cx} ${cy})`} opacity={opacity}>
-      {[0, 60, 120, 180, 240, 300].map((a) => (
-        <ellipse key={a} rx={r} ry={r * 0.55} fill={hue} transform={`rotate(${a}) translate(0 ${-r * 0.7})`} />
+      {/* outer petals */}
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
+        <ellipse
+          key={`o${a}`}
+          rx={r}
+          ry={r * 0.5}
+          fill={hue}
+          stroke={stroke}
+          strokeWidth={2}
+          transform={`rotate(${a}) translate(0 ${-r * 0.75})`}
+        />
       ))}
-      <circle r={r * 0.5} fill={hue} />
-      <circle r={r * 0.22} fill="#fff" opacity={0.5} />
+      {/* inner petals */}
+      {[22, 67, 112, 157, 202, 247, 292, 337].map((a) => (
+        <ellipse
+          key={`i${a}`}
+          rx={r * 0.6}
+          ry={r * 0.32}
+          fill={tint(hue, 0.35)}
+          stroke={stroke}
+          strokeWidth={1.5}
+          transform={`rotate(${a}) translate(0 ${-r * 0.45})`}
+        />
+      ))}
+      <circle r={r * 0.42} fill={shade(hue, 0.15)} stroke={stroke} strokeWidth={2} />
+      <circle r={r * 0.18} fill={NAVY.gold} />
     </g>
   );
   return (
-    <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
-      {rose(60, 80, 46, 0.06)}
-      {rose(320, 40, 30, 0.05)}
-      {rose(90, 360, 34, 0.05)}
-      {rose(280, 300, 52, 0.05)}
-      {rose(180, 180, 24, 0.04)}
-      {rose(360, 480, 40, 0.05)}
+    <svg
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      aria-hidden="true"
+      preserveAspectRatio="xMidYMid slice"
+      viewBox="0 0 420 560"
+    >
+      {rose(60, 80, 52, 0.3)}
+      {rose(340, 60, 40, 0.26)}
+      {rose(100, 380, 44, 0.26)}
+      {rose(300, 320, 58, 0.24)}
+      {rose(200, 200, 30, 0.22)}
+      {rose(380, 500, 46, 0.26)}
+      {rose(30, 260, 26, 0.22)}
     </svg>
   );
 }
