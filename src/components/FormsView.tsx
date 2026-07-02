@@ -1850,9 +1850,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 >
                   <Sparkles className="h-4 w-4 mr-1.5" /> Add fresh checklist
                 </Button>
+                </div>
+                <div className="flex-1 min-w-0">
                 <Button
                   size="sm"
-                  className="w-full justify-center bg-emerald-600 text-white shadow-sm hover:bg-emerald-700"
+                  className="w-full justify-center whitespace-nowrap bg-emerald-600 text-white shadow-sm hover:bg-emerald-700"
                   onClick={() => {
                     if (!currentProjectId) {
                       toast({ title: "Select a project", description: "Choose a destination project first.", variant: "destructive" });
@@ -1863,9 +1865,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 >
                   <Copy className="h-4 w-4 mr-1.5" /> Copy from another project
                 </Button>
+                </div>
               </div>
+              )}
             </div>
           )}
+
 
           {showFormsExplorer && (
           <div className="space-y-3">
