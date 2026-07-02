@@ -131,7 +131,7 @@ import BulkUploadAccessManager from "@/components/OwnerTools/BulkUploadAccessMan
 import { useBulkDataAccess } from "@/hooks/useBulkDataAccess";
 import { scrollToAppTop } from "@/lib/scrollToAppTop";
 import { isMdaChecklistLike } from "@/lib/mdaFollowUp";
-import { FileSpreadsheet, KeyRound, GanttChartSquare, NotebookPen, Copy } from "lucide-react";
+import { FileSpreadsheet, KeyRound, GanttChartSquare, NotebookPen, Copy, EyeOff } from "lucide-react";
 import CopyMdaChecklistDialog from "@/components/MdaChecklist/CopyMdaChecklistDialog";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
@@ -314,6 +314,42 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     })();
     return () => { cancelled = true; };
   }, [user?.id]);
+
+  // Owner-controlled per-project hiding of the MDA checklist copy feature card.
+  const [copyFeatureHidden, setCopyFeatureHidden] = useState(false);
+  const [copyHideBusy, setCopyHideBusy] = useState(false);
+  useEffect(() => {
+    if (!currentProjectId) { setCopyFeatureHidden(false); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("mda_checklist_copy_hidden")
+        .select("hidden")
+        .eq("project_id", currentProjectId)
+        .maybeSingle();
+      if (!cancelled) setCopyFeatureHidden(!!(data as any)?.hidden);
+    })();
+    return () => { cancelled = true; };
+  }, [currentProjectId]);
+
+  const toggleCopyFeatureHidden = useCallback(async (hide: boolean) => {
+    if (!currentProjectId) return;
+    setCopyHideBusy(true);
+    try {
+      const { error } = await (supabase as any)
+        .from("mda_checklist_copy_hidden")
+        .upsert({ project_id: currentProjectId, hidden: hide, updated_by: user?.id, updated_at: new Date().toISOString() }, { onConflict: "project_id" });
+      if (error) throw error;
+      setCopyFeatureHidden(hide);
+      toast({ title: hide ? "Feature hidden" : "Feature visible", description: hide ? "The checklist copy card is now hidden for this project." : "The checklist copy card is now visible for admins in this project." });
+    } catch (e: any) {
+      toast({ title: "Could not update", description: e?.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setCopyHideBusy(false);
+    }
+  }, [currentProjectId, user?.id]);
+
+
 
   // Launch the correct experience for an assigned standard-form code.
   const launchStandardForm = useCallback((code: string) => {
@@ -1733,16 +1769,23 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               Checklist copy feature. Previously this lived two collapsed levels
               deep (Open your form → Standard Forms), so admins couldn't find it.
               Now it's surfaced at the top of the Forms view for any admin. */}
-          {isAdmin && !isAdhoc && (
-            <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-emerald-50/70 to-transparent p-4 shadow-sm">
+          {isAdmin && !isAdhoc && (!copyFeatureHidden || isOwnerLevel) && (
+            <div className={`rounded-2xl border p-4 shadow-sm ${copyFeatureHidden ? "border-slate-200 bg-slate-50" : "border-emerald-200 bg-gradient-to-br from-emerald-50 via-emerald-50/70 to-transparent"}`}>
               <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100">
-                  <Copy className="h-5 w-5 text-emerald-700" />
+                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${copyFeatureHidden ? "bg-slate-200" : "bg-emerald-100"}`}>
+                  <Copy className={`h-5 w-5 ${copyFeatureHidden ? "text-slate-500" : "text-emerald-700"}`} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-display text-base font-bold text-foreground">
-                    Integrated MDA Supervisory Checklist
-                  </h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-display text-base font-bold text-foreground">
+                      Integrated MDA Supervisory Checklist
+                    </h3>
+                    {copyFeatureHidden && (
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                        Hidden from admins
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     Add a fresh checklist or copy the complete checklist{" "}
                     <span className="font-medium">and its linked dashboard</span> from another
@@ -1753,12 +1796,28 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     . Name clashes are resolved automatically and everything stays editable.
                   </p>
                 </div>
+                {/* Owner-only per-project visibility toggle. Sits in its own column so
+                    it never overlaps the action buttons below. */}
+                {isOwnerLevel && currentProjectId && (
+                  <button
+                    type="button"
+                    disabled={copyHideBusy}
+                    onClick={() => toggleCopyFeatureHidden(!copyFeatureHidden)}
+                    className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted disabled:opacity-60"
+                    title={copyFeatureHidden ? "Show this feature to admins" : "Hide this feature from admins"}
+                  >
+                    {copyFeatureHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                    {copyFeatureHidden ? "Show" : "Hide"}
+                  </button>
+                )}
               </div>
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {!copyFeatureHidden && (
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <div className="flex-1 min-w-0">
                 <Button
                   size="sm"
                   variant="outline"
-                  className="w-full justify-center border-emerald-300 text-emerald-800 hover:bg-emerald-100"
+                  className="w-full justify-center whitespace-nowrap border-emerald-300 text-emerald-800 hover:bg-emerald-100"
                   onClick={async () => {
                     if (!currentProjectId) {
                       toast({ title: "Select a project", description: "Choose a project before creating the checklist.", variant: "destructive" });
@@ -1791,9 +1850,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 >
                   <Sparkles className="h-4 w-4 mr-1.5" /> Add fresh checklist
                 </Button>
+                </div>
+                <div className="flex-1 min-w-0">
                 <Button
                   size="sm"
-                  className="w-full justify-center bg-emerald-600 text-white shadow-sm hover:bg-emerald-700"
+                  className="w-full justify-center whitespace-nowrap bg-emerald-600 text-white shadow-sm hover:bg-emerald-700"
                   onClick={() => {
                     if (!currentProjectId) {
                       toast({ title: "Select a project", description: "Choose a destination project first.", variant: "destructive" });
@@ -1804,9 +1865,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 >
                   <Copy className="h-4 w-4 mr-1.5" /> Copy from another project
                 </Button>
+                </div>
               </div>
+              )}
             </div>
           )}
+
 
           {showFormsExplorer && (
           <div className="space-y-3">

@@ -16,6 +16,7 @@ import { useAcsmDuplicateOverrides } from "@/hooks/useAcsmDuplicateOverrides";
 import DuplicateReviewPanel from "@/components/ACSM/DuplicateReviewPanel";
 import { IRF_DASH_NAME } from "@/lib/irf/definition";
 import { IRF_CATEGORY_FORMS, buildCategoryFieldSpec } from "@/lib/irf/categoryForms";
+import { computeIrfReach } from "@/lib/irf/normalize";
 import { IrfWatermark } from "@/components/IRF/IRFFormFiller";
 import IrfKanoMap from "@/components/IRF/IrfKanoMap";
 import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
@@ -25,6 +26,7 @@ import IrfStatisticalPanel from "@/components/IRF/IrfStatisticalPanel";
 import IrfFieldAnalysis from "@/components/IRF/IrfFieldAnalysis";
 import IrfInterpretation from "@/components/IRF/IrfInterpretation";
 import IrfSubmitterPanel from "@/components/IRF/IrfSubmitterPanel";
+import IrfParticipationPanel from "@/components/IRF/IrfParticipationPanel";
 import IrfDuplicateManager from "@/components/IRF/IrfDuplicateManager";
 import AdminSubmissionEditor from "@/components/AdminSubmissionEditor";
 import DashboardAccessManager from "@/components/dashboard/DashboardAccessManager";
@@ -144,7 +146,7 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
     rows.forEach((r) => {
       const lga = (r.lga || "").trim();
       if (!lga) return;
-      out[lga] = (out[lga] || 0) + num(r.total_reach) + num(r.radio_estimated_reach) + num(r.attendance_men) + num(r.attendance_women);
+      out[lga] = (out[lga] || 0) + computeIrfReach(r);
     });
     return out;
   }, [rows]);
@@ -343,6 +345,9 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
 
             {/* Who is submitting: forms, counts, duplicates */}
             <IrfSubmitterPanel rows={rows} duplicateIds={duplicates?.duplicateIds || new Set()} />
+
+            {/* Participation coverage: submitted vs not-yet-submitted (downloadable) */}
+            <IrfParticipationPanel rows={rows} duplicateIds={duplicates?.duplicateIds || new Set()} projectId={projectId} />
 
             {/* Narrative & free-text intelligence */}
             <IrfTextInsights rows={rows} />

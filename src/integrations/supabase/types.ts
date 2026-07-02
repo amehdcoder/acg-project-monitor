@@ -4382,6 +4382,35 @@ export type Database = {
         }
         Relationships: []
       }
+      mda_checklist_copy_hidden: {
+        Row: {
+          hidden: boolean
+          project_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          hidden?: boolean
+          project_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          hidden?: boolean
+          project_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mda_checklist_copy_hidden_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mda_tile_icons: {
         Row: {
           form_id: string

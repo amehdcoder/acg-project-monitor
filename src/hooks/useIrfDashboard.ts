@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
 import { flagDuplicates, applyOverrides, irfSignature, irfOrder, type OverrideMap } from "@/lib/acsm/irfBridge";
 import { IRF_METRIC_FIELDS, IRF_SECTIONS, type IrfReport } from "@/lib/irf/definition";
-import { normalizeIrfRows } from "@/lib/irf/normalize";
+import { normalizeIrfRows, computeIrfReach } from "@/lib/irf/normalize";
 
 async function fetchAll(projectId?: string | null): Promise<IrfReport[]> {
   const rows = await fetchAllRowsKeyset<IrfReport>((limit, afterId) => {
@@ -83,8 +83,8 @@ export const useIrfDashboard = (projectId?: string | null, overrideMap?: Overrid
     const lgas = new Set(rows.map((r) => (r.lga || "").trim()).filter(Boolean)).size;
 
     // People reached = town-announcer estimated reach + radio reach + meeting/dialogue attendance.
-    const peopleReached =
-      sum("total_reach") + sum("radio_estimated_reach") + sum("attendance_men") + sum("attendance_women");
+    // Uses the shared computeIrfReach helper so every reference stays reconciled.
+    const peopleReached = rows.reduce((s, r) => s + computeIrfReach(r), 0);
 
     // Stakeholders/officials engaged — advocacy officials (stored in `answers`)
     // plus the legacy combined-form stakeholder columns when present.
@@ -152,8 +152,7 @@ export const useIrfDashboard = (projectId?: string | null, overrideMap?: Overrid
     rows.forEach((r) => {
       const lga = r.lga || "Unspecified";
       (byLga[lga] ||= { reach: 0, reports: 0, stakeholders: 0 });
-      byLga[lga].reach +=
-        num(r.total_reach) + num(r.radio_estimated_reach) + num(r.attendance_men) + num(r.attendance_women);
+      byLga[lga].reach += computeIrfReach(r);
       byLga[lga].stakeholders +=
         num((r as any).persons_engaged) + num(r.policy_makers_engaged) + num(r.traditional_leaders_engaged) +
         num(r.healthcare_workers_engaged) + num(r.religious_leaders_engaged) + num(r.mdas_visited_count);
@@ -172,8 +171,7 @@ export const useIrfDashboard = (projectId?: string | null, overrideMap?: Overrid
       const key = (r.reporting_month || r.created_at || "").slice(0, 7);
       if (!key) return;
       (byMonth[key] ||= { reach: 0, reports: 0 });
-      byMonth[key].reach +=
-        num(r.total_reach) + num(r.radio_estimated_reach) + num(r.attendance_men) + num(r.attendance_women);
+      byMonth[key].reach += computeIrfReach(r);
       byMonth[key].reports += 1;
     });
     return Object.entries(byMonth)

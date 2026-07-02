@@ -5,6 +5,7 @@
 // robust to small samples and missing values.
 
 import type { IrfReport } from "@/lib/irf/definition";
+import { computeIrfReach } from "@/lib/irf/normalize";
 
 export interface IndicatorStat {
   key: string;
@@ -78,7 +79,7 @@ export function analyzeStatistics(rows: IrfReport[]): IrfStatistics {
   rows.forEach((r) => {
     const key = (r.reporting_month || r.created_at || "").slice(0, 7);
     if (!key) return;
-    byMonth.set(key, (byMonth.get(key) || 0) + (Number((r as any).total_reach) || 0) + (Number((r as any).radio_estimated_reach) || 0));
+    byMonth.set(key, (byMonth.get(key) || 0) + computeIrfReach(r));
   });
   const months = [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b));
   let momGrowthPct: number | null = null;
