@@ -169,6 +169,32 @@ export default function SarmaanChecklistLauncher({
   const [submitting, setSubmitting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // ---- Shared context carried across every module (captured once) ----
+  const [shared, setShared] = useState<SharedContext>(() => {
+    try {
+      const raw = sessionStorage.getItem(`sarmaan_shared_${formId}`);
+      if (raw) return JSON.parse(raw) as SharedContext;
+    } catch { /* ignore */ }
+    const d = new Date();
+    return {
+      respondentName: "",
+      respondentRole: "",
+      reportingMonth: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      round: "",
+    };
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem(`sarmaan_shared_${formId}`, JSON.stringify(shared)); } catch { /* ignore */ }
+  }, [shared, formId]);
+  const [contextOpen, setContextOpen] = useState(false);
+
+  // ---- Guided journey (conversational chaining across modules) ----
+  const [journeyMode, setJourneyMode] = useState(false);
+  const [handoff, setHandoff] = useState<{ fromIdx: number } | null>(null);
+
+  // GPS captured timestamp (shared context reused across every module).
+  const [gpsCapturedAt, setGpsCapturedAt] = useState<string | null>(null);
+
   const setValue = (id: string, value: any) =>
     setResponses((r) => ({ ...r, [id]: value }));
 
