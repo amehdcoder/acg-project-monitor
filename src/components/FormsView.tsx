@@ -2137,9 +2137,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                               <BarChart3 className="h-6 w-6" style={{ color: "#0E8D80" }} strokeWidth={2.2} />
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "#E8F7F5", color: "#0E8D80" }}>
-                                Add Dashboard
+                              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "#E8F7F5", color: "#0E8D80" }}>
+                                Template not created · Tap to create
                               </span>
+
                               <span className="mt-2 block whitespace-normal break-words text-[15px] font-extrabold leading-snug" style={{ color: "#0A2540" }}>
                                 {SARMAAN_SUPERVISORY_DASH_NAME}
                               </span>
