@@ -400,7 +400,12 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className={`min-h-0 flex-1 overflow-y-auto p-4 transition-shadow duration-700 ${flash ? "ring-2 ring-inset" : ""}`} style={flash ? { boxShadow: `inset 0 0 0 2px ${NAVY.teal}` } : undefined}>
+          {/* first-load skeleton */}
+          {loading && !hasLoadedOnce ? (
+            <DashboardSkeleton />
+          ) : (
+          <>
           {/* KPI row */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
             {kpis.map((k) => (
