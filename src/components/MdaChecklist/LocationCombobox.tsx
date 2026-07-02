@@ -26,6 +26,8 @@ interface Props {
   /** Allow typing & adding values that are not in the option list. */
   allowAdd?: boolean;
   emptyLabel?: string;
+  /** Extra classes for the trigger button (e.g. larger Kobo-style sizing). */
+  triggerClassName?: string;
 }
 
 const ROW_HEIGHT = 34;       // px per option row
