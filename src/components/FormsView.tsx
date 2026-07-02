@@ -2198,6 +2198,24 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         </button>
                       </div>
                     )}
+                    {sarmaanIsManager && primarySarmaanSupervisoryForm && (
+                      <>
+                        <SarmaanChecklistAccessManager
+                          open={sarmaanChecklistAccessOpen}
+                          onOpenChange={setSarmaanChecklistAccessOpen}
+                          formId={primarySarmaanSupervisoryForm.id}
+                          formName={primarySarmaanSupervisoryForm.name}
+                          projectId={primarySarmaanSupervisoryForm.project_id || currentProjectId}
+                          sections={((primarySarmaanSupervisoryForm.groups as any[] | undefined) || []).map((g: any) => ({ id: g.id, label: g.label || g.name }))}
+                        />
+                        <DashboardAccessManager
+                          open={sarmaanDashAccessOpen}
+                          onOpenChange={setSarmaanDashAccessOpen}
+                          dashboardId="sarmaan_supervisory"
+                          projectId={primarySarmaanSupervisoryForm.project_id || currentProjectId}
+                        />
+                      </>
+                    )}
                   </div>
                 )}
 
