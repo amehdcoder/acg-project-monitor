@@ -3523,6 +3523,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         currentProjectId={currentProjectId}
         projects={projects}
         destinationHasChecklist={forms.some((f) => f.name === MDA_CHECKLIST_NAME)}
+        existingFormNames={forms.map((f) => f.name)}
         userId={user?.id}
         onCopied={() => currentProjectId && fetchForms(currentProjectId)}
       />
