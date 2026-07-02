@@ -788,10 +788,14 @@ export const useOfflineStorage = () => {
     pendingCount,
     isSyncing,
     saveSubmission,
+    saveEdit,
     syncPendingSubmissions,
     getPending,
     clearPending,
     updatePendingCount,
+    // Conflict-safe offline edits
+    getEditConflicts,
+    clearEditConflict,
     // Drafts
     saveDraft,
     getDraft,
