@@ -1260,7 +1260,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     (form) => !isSupervisoryLearningForm({ settings: form.settings, name: form.name }),
   );
   const sarmaanSearchMatches = !searchQuery.trim() || /sarmaan|supervisory|supervision|checklist|dashboard|learning/i.test(searchQuery);
-  const sarmaanVisibleRowCount = primarySarmaanSupervisoryForm && sarmaanSearchMatches ? 2 : 0;
+  const shouldShowSarmaanSupervisoryBlock = currentProjectIsSarmaan && sarmaanSearchMatches && (!!primarySarmaanSupervisoryForm || isAdmin);
+  const sarmaanVisibleRowCount = shouldShowSarmaanSupervisoryBlock ? (primarySarmaanSupervisoryForm ? 2 : 1) : 0;
   const visibleMyFormsCount = filteredNonSarmaanForms.length + sarmaanVisibleRowCount;
 
   const createSarmaanSupervisoryTool = async () => {
@@ -2021,7 +2022,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     </div>
                   ) : (
                     <>
-                {currentProjectIsSarmaan && sarmaanSearchMatches && (
+                {shouldShowSarmaanSupervisoryBlock && (
                   <div className="border-b border-border/60 bg-[#F8FAFD] p-3 sm:p-4">
                     {primarySarmaanSupervisoryForm ? (
                       <div className="grid gap-3 sm:grid-cols-2">
