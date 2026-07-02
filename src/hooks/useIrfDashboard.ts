@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
 import { flagDuplicates, applyOverrides, irfSignature, irfOrder, type OverrideMap } from "@/lib/acsm/irfBridge";
 import { IRF_METRIC_FIELDS, IRF_SECTIONS, type IrfReport } from "@/lib/irf/definition";
-import { normalizeIrfRows } from "@/lib/irf/normalize";
+import { normalizeIrfRows, computeIrfReach } from "@/lib/irf/normalize";
 
 async function fetchAll(projectId?: string | null): Promise<IrfReport[]> {
   const rows = await fetchAllRowsKeyset<IrfReport>((limit, afterId) => {
