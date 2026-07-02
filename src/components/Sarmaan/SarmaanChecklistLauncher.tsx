@@ -144,32 +144,33 @@ export default function SarmaanChecklistLauncher({
     return { done, total };
   }, [allQuestions, responses, nameToId]);
 
-  const progress = active === GUIDANCE
-    ? 0
-    : Math.round(((typeof active === "number" ? active + 1 : 0) / Math.max(sections.length, 1)) * 100);
+  const progress = typeof active === "number"
+    ? Math.round((visibleQuestions(active).filter((q) => {
+        const v = responses[q.id];
+        return v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
+      }).length / Math.max(visibleQuestions(active).length, 1)) * 100)
+    : 0;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   }, [active]);
 
-  // ---- Submission ----
-  const missingRequired = () =>
-    allQuestions.filter((q) => {
+  // ---- Per-section submission (each section is an independent form) ----
+  const missingInSection = (idx: number) =>
+    visibleQuestions(idx).filter((q) => {
       if (!q.required) return false;
-      if (!evaluateRelevant(q.relevant, responses, nameToId)) return false;
       const v = responses[q.id];
       return v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
     });
 
-  const handleSubmit = async () => {
-    const missing = missingRequired();
+  const handleSubmit = async (idx: number) => {
+    const section = sections[idx];
+    if (!section) return;
+    const missing = missingInSection(idx);
     if (missing.length > 0) {
-      const first = missing[0];
-      const idx = sections.findIndex((s) => s.questions.some((q) => q.id === first.id));
-      if (idx >= 0) setActive(idx);
       toast({
         title: "Complete required questions",
-        description: `${missing.length} required question(s) still need an answer.`,
+        description: `${missing.length} required question(s) still need an answer in this form.`,
         variant: "destructive",
       });
       return;
@@ -177,16 +178,28 @@ export default function SarmaanChecklistLauncher({
     setSubmitting(true);
     try {
       const location = geo.position ? { lat: geo.position.lat, lng: geo.position.lng } : null;
-      const result = await saveSubmission(formId, userId, { ...responses }, location, null, "regular");
+      // Build a self-contained payload: this section's answers + shared geography/GPS context.
+      const geoIds = new Set(
+        allQuestions.filter((q) => GEO_NAMES.has(q.name || "") || q.type === "geopoint").map((q) => q.id),
+      );
+      const sectionIds = new Set(section.questions.map((q) => q.id));
+      const payload: Record<string, any> = {};
+      Object.entries(responses).forEach(([k, v]) => {
+        if (sectionIds.has(k) || geoIds.has(k)) payload[k] = v;
+      });
+      payload.__section_id = section.id;
+      payload.__section_label = section.label;
+      payload.__section_index = idx + 1;
+      const result = await saveSubmission(formId, userId, payload, location, null, "regular");
       if (result.success) {
         toast({
-          title: result.offline ? "Saved offline" : "Checklist submitted",
+          title: result.offline ? "Saved offline" : `“${section.label}” submitted`,
           description: result.offline
-            ? "Your submission is stored on device and will sync when you're online."
-            : "Thank you — the supervisory checklist has been recorded.",
+            ? "Your form is stored on device and will sync when you're online."
+            : "This supervision form has been recorded to the dashboard.",
         });
         onSubmitted?.();
-        onClose();
+        setActive(MENU);
       } else {
         toast({ title: "Submission failed", description: "Please try again.", variant: "destructive" });
       }
@@ -196,6 +209,7 @@ export default function SarmaanChecklistLauncher({
       setSubmitting(false);
     }
   };
+
 
   const currentIdx = typeof active === "number" ? active : -1;
   const hue = currentIdx >= 0 ? SECTION_HUES[currentIdx % SECTION_HUES.length] : NAVY.teal;
