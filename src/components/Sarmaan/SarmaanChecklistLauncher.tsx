@@ -344,35 +344,29 @@ export default function SarmaanChecklistLauncher({
           </div>
         </header>
 
-        {/* step chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto border-b px-5 py-3" style={{ borderColor: NAVY.line, background: NAVY.panel2 }}>
-          {sections.map((s, i) => (
-            <div key={s.id} className="flex shrink-0 items-center">
-              <button
-                onClick={() => setActive(i)}
-                className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold transition"
-                style={{
-                  background: currentIdx >= i ? SECTION_HUES[i % SECTION_HUES.length] : NAVY.line,
-                  color: currentIdx >= i ? "#fff" : NAVY.inkSoft,
-                }}
-              >
-                {currentIdx > i ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
-              </button>
-              {i < sections.length - 1 && (
-                <span className="h-0.5 w-6" style={{ background: currentIdx > i ? SECTION_HUES[i % SECTION_HUES.length] : NAVY.line }} />
-              )}
-            </div>
-          ))}
-        </div>
-
         {/* body */}
         <div ref={scrollRef} className="relative flex min-h-0 flex-1 overflow-y-auto">
           {active === GUIDANCE ? (
-            <GuidancePanel onStart={() => setActive(0)} />
+            <GuidancePanel onStart={() => setActive(MENU)} />
+          ) : active === MENU ? (
+            <FormMenu
+              sections={sections}
+              responses={responses}
+              visibleQuestions={visibleQuestions}
+              onOpenGuidance={() => setActive(GUIDANCE)}
+              onPick={(i) => setActive(i)}
+            />
           ) : currentSection ? (
             <main className="relative min-w-0 flex-1 p-5 lg:p-6">
               <RoseBackground hue={hue} />
               <div className="relative">
+                <button
+                  onClick={() => setActive(MENU)}
+                  className="mb-3 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[12px] font-semibold transition hover:bg-black/5"
+                  style={{ color: hue }}
+                >
+                  <ChevronLeft className="h-4 w-4" /> All supervision forms
+                </button>
                 <div className="mb-1 flex items-center gap-2">
                   <span
                     className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-extrabold text-white shadow"
@@ -388,8 +382,8 @@ export default function SarmaanChecklistLauncher({
                 {/* module hint pulled from guidance */}
                 <ModuleHint idx={currentIdx} hue={hue} />
 
-                {/* GPS strip for the visit-information section */}
-                {(isGeoSection(currentIdx) || currentSection.questions.some((q) => q.type === "geopoint")) && requiresGps && (
+                {/* GPS strip — every form is self-contained */}
+                {requiresGps && (
                   <GpsStrip
                     hue={hue}
                     position={geo.position}
@@ -398,8 +392,8 @@ export default function SarmaanChecklistLauncher({
                   />
                 )}
 
-                {/* Location cascade for the geography section */}
-                {isGeoSection(currentIdx) && projectId && (
+                {/* Location cascade — captured on every independent form for context */}
+                {projectId && (
                   <div className="mb-5 rounded-2xl border bg-white/70 p-4 backdrop-blur" style={{ borderColor: tint(hue, 0.35) }}>
                     <div className="mb-3 flex items-center gap-2 text-sm font-bold" style={{ color: hue }}>
                       <Compass className="h-4 w-4" /> Supervision location (from microplan)
@@ -417,7 +411,7 @@ export default function SarmaanChecklistLauncher({
                 {/* Questions */}
                 <div className="space-y-4">
                   {visibleQuestions(currentIdx)
-                    .filter((q) => !(isGeoSection(currentIdx) && GEO_NAMES.has(q.name || "")))
+                    .filter((q) => !GEO_NAMES.has(q.name || ""))
                     .filter((q) => q.type !== "geopoint")
                     .map((q) => (
                       <QuestionField
@@ -428,9 +422,9 @@ export default function SarmaanChecklistLauncher({
                         onChange={(v) => setValue(q.id, v)}
                       />
                     ))}
-                  {visibleQuestions(currentIdx).length === 0 && !isGeoSection(currentIdx) && (
+                  {visibleQuestions(currentIdx).filter((q) => !GEO_NAMES.has(q.name || "") && q.type !== "geopoint").length === 0 && (
                     <div className="rounded-2xl border bg-white/70 p-6 text-center text-sm" style={{ borderColor: tint(hue, 0.3), color: NAVY.inkSoft }}>
-                      No questions apply to this section based on your answers so far.
+                      Fill the supervision location above, then submit this form.
                     </div>
                   )}
                 </div>
@@ -443,57 +437,35 @@ export default function SarmaanChecklistLauncher({
           )}
         </div>
 
-        {/* bottom action bar */}
-        <footer
-          className="flex items-center gap-2 border-t px-4 py-3"
-          style={{ borderColor: NAVY.line, background: NAVY.panel, paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-        >
-          <button
-            onClick={() => {
-              if (active === GUIDANCE) return;
-              if (currentIdx <= 0) setActive(GUIDANCE);
-              else setActive(currentIdx - 1);
-            }}
-            disabled={active === GUIDANCE}
-            className="inline-flex items-center gap-1 rounded-xl border px-4 py-2.5 text-sm font-semibold transition hover:bg-black/5 disabled:opacity-40"
-            style={{ borderColor: NAVY.line, color: NAVY.inkSoft }}
+        {/* bottom action bar — only when filling an individual form */}
+        {typeof active === "number" && currentSection && (
+          <footer
+            className="flex items-center gap-2 border-t px-4 py-3"
+            style={{ borderColor: NAVY.line, background: NAVY.panel, paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
           >
-            <ChevronLeft className="h-4 w-4" /> Previous
-          </button>
-          <div className="ml-auto flex items-center gap-2">
-            {active !== GUIDANCE && currentIdx < sections.length - 1 ? (
-              <button
-                onClick={() => setActive(currentIdx + 1)}
-                className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition active:scale-[0.98]"
-                style={{ background: hue }}
-              >
-                Next Section <ChevronRight className="h-4 w-4" />
-              </button>
-            ) : active !== GUIDANCE ? (
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition active:scale-[0.98] disabled:opacity-60"
-                style={{ background: NAVY.primary }}
-              >
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Submit Checklist
-              </button>
-            ) : (
-              <button
-                onClick={() => setActive(0)}
-                className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition active:scale-[0.98]"
-                style={{ background: NAVY.teal }}
-              >
-                Start checklist <ChevronRight className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </footer>
+            <button
+              onClick={() => setActive(MENU)}
+              className="inline-flex items-center gap-1 rounded-xl border px-4 py-2.5 text-sm font-semibold transition hover:bg-black/5"
+              style={{ borderColor: NAVY.line, color: NAVY.inkSoft }}
+            >
+              <ChevronLeft className="h-4 w-4" /> Cancel
+            </button>
+            <button
+              onClick={() => handleSubmit(currentIdx)}
+              disabled={submitting}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition active:scale-[0.98] disabled:opacity-60"
+              style={{ background: hue }}
+            >
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Submit “{currentSection.label}”
+            </button>
+          </footer>
+        )}
       </div>
     </div>
   );
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Guidance panel                                                      */
