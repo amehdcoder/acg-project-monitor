@@ -656,10 +656,21 @@ export default function SarmaanChecklistLauncher({
                   >
                     {currentIdx + 1}
                   </span>
-                  <h2 className="text-2xl font-extrabold" style={{ fontFamily: NAVY.headingFont }}>
-                    {currentSection.label}
-                  </h2>
+                  <div className="min-w-0">
+                    <p className="text-[10.5px] font-bold uppercase tracking-wider" style={{ color: hue }}>
+                      Chapter {currentIdx + 1} of {sections.length}
+                    </p>
+                    <h2 className="text-2xl font-extrabold leading-tight" style={{ fontFamily: NAVY.headingFont }}>
+                      {currentSection.label}
+                    </h2>
+                  </div>
                 </div>
+                {currentSection.subtitle && (
+                  <p className="mb-1 text-[13.5px] font-semibold" style={{ color: NAVY.inkSoft }}>
+                    {currentSection.subtitle}
+                  </p>
+                )}
+
 
                 {/* chapter narrative + guidance pulled from merged modules */}
                 <ModuleHint section={currentSection} hue={hue} />
