@@ -41,6 +41,8 @@ interface Props {
   groups?: FormGroup[];
   requiresGps?: boolean;
   stateScope?: string[];
+  /** When provided, restricts the visible modules to these section ids (per-module access). Null/undefined = all modules. */
+  allowedSectionIds?: string[] | null;
   onOpenDashboard?: () => void;
   onClose: () => void;
   onSubmitted?: () => void;
@@ -83,6 +85,7 @@ export default function SarmaanChecklistLauncher({
   groups = [],
   requiresGps = true,
   stateScope,
+  allowedSectionIds,
   onOpenDashboard,
   onClose,
   onSubmitted,
@@ -93,14 +96,21 @@ export default function SarmaanChecklistLauncher({
   // ---- Build the answerable section model from the form's groups ----
   const sections = useMemo(() => {
     const src = groups.length > 0 ? groups : [{ id: "all", name: "all", label: formName, questions } as FormGroup];
-    return src.map((g) => ({
+    const built = src.map((g) => ({
       id: g.id,
       label: g.label || g.name,
       questions: (g.questions || []).filter(
         (q) => q.type !== "calculate" && q.type !== "note" && !REMOVED_CHECKLIST_QUESTIONS.has(q.name || ""),
       ),
     }));
-  }, [groups, questions, formName]);
+    // Per-module access: when an allow-list is supplied, only expose granted modules.
+    if (allowedSectionIds && allowedSectionIds.length >= 0 && !(built.length === 1 && built[0].id === "all")) {
+      const allow = new Set(allowedSectionIds);
+      const restricted = built.filter((s) => allow.has(s.id));
+      return restricted.length ? restricted : built.filter(() => false);
+    }
+    return built;
+  }, [groups, questions, formName, allowedSectionIds]);
 
   const allQuestions = useMemo(
     () => sections.flatMap((s) => s.questions),
@@ -513,7 +523,17 @@ function FormMenu({
         </button>
       </div>
 
+      {sections.length === 0 && (
+        <div className="mt-6 rounded-2xl border p-8 text-center" style={{ borderColor: NAVY.line, background: NAVY.panel }}>
+          <p className="text-sm font-semibold" style={{ color: NAVY.ink }}>No modules assigned to you yet</p>
+          <p className="mt-1 text-[13px]" style={{ color: NAVY.inkSoft }}>
+            Ask an Owner or Admin to grant you access to one or more checklist modules.
+          </p>
+        </div>
+      )}
+
       <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+
         {sections.map((s, i) => {
           const h = SECTION_HUES[i % SECTION_HUES.length];
           const total = visibleQuestions(i).filter((q) => q.type !== "geopoint" && !GEO_NAMES.has(q.name || "")).length;

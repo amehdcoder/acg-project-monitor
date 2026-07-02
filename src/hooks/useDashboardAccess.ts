@@ -29,6 +29,12 @@ export const DASHBOARDS: Record<string, DashboardMeta> = {
     blurb:
       "Live supervisory coverage, treatment status, adverse-reaction and community-visit analytics for the Integrated MDA.",
   },
+  sarmaan_supervisory: {
+    id: "sarmaan_supervisory",
+    name: "SARMAAN Integrated Supervisory Learning Dashboard",
+    blurb:
+      "Real-time programme implementation supervision — coverage, quality scores, community engagement, non-compliance resolution and learning-to-action analytics.",
+  },
 };
 
 interface Grant {

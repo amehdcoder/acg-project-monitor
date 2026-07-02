@@ -111,6 +111,9 @@ import SpecialFormStudio from "@/components/SpecialFormStudio/SpecialFormStudio"
 import SpecialFormDashboard from "@/components/SpecialFormStudio/SpecialFormDashboard";
 import SarmaanLearningDashboard from "@/components/Sarmaan/SarmaanLearningDashboard";
 import SarmaanChecklistLauncher from "@/components/Sarmaan/SarmaanChecklistLauncher";
+import SarmaanChecklistAccessManager from "@/components/Sarmaan/SarmaanChecklistAccessManager";
+import DashboardAccessManager from "@/components/dashboard/DashboardAccessManager";
+import { useSarmaanFormAccess } from "@/hooks/useSarmaanFormAccess";
 import { isSupervisoryLearningForm } from "@/components/Sarmaan/sarmaanBrand";
 import { getPreset } from "@/lib/specialStudio/presets";
 import { downloadXlsForm } from "@/lib/specialStudio/xlsformExport";
@@ -250,6 +253,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [specialDashForm, setSpecialDashForm] = useState<Form | null>(null);
   const [sarmaanDashForm, setSarmaanDashForm] = useState<Form | null>(null);
   const [sarmaanLaunchForm, setSarmaanLaunchForm] = useState<Form | null>(null);
+  const [sarmaanChecklistAccessOpen, setSarmaanChecklistAccessOpen] = useState(false);
+  const [sarmaanDashAccessOpen, setSarmaanDashAccessOpen] = useState(false);
   const [templateForm, setTemplateForm] = useState<{ templateId: string; name: string; description: string; questions: Question[]; settings: any; geofence?: GeofenceArea } | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
@@ -1256,6 +1261,19 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     ? sarmaanSupervisoryForms.find((form) => form.project_id === currentProjectId) || null
     : sarmaanSupervisoryForms[0] || null;
   const currentProjectIsSarmaan = /sarmaan/i.test(currentProject?.name || "");
+
+  // SARMAAN checklist/dashboard access control
+  const sarmaanIsManager = isAdmin || isOwnerLevel;
+  const canSeeSarmaanDashboard = sarmaanIsManager || hasDashboardAccess("sarmaan_supervisory", currentProjectId);
+  const { grants: sarmaanGrants, hasAnyGrant: hasAnySarmaanGrant } = useSarmaanFormAccess(
+    primarySarmaanSupervisoryForm?.id,
+    sarmaanIsManager,
+  );
+  const sarmaanAllowedSectionIds = sarmaanIsManager
+    ? null
+    : sarmaanGrants.filter((g) => g.user_id === user?.id).map((g) => g.section_id);
+  const canSeeSarmaanChecklist = sarmaanIsManager || hasAnySarmaanGrant;
+
   const filteredNonSarmaanForms = filteredForms.filter(
     (form) => !(currentProjectIsSarmaan && isSupervisoryLearningForm({ settings: form.settings, name: form.name })),
   );
@@ -1532,6 +1550,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         questions={launch.questions}
         groups={launch.groups}
         requiresGps={launch.settings?.requireLocation !== false}
+        allowedSectionIds={sarmaanAllowedSectionIds}
         onOpenDashboard={() => {
           setSarmaanLaunchForm(null);
           setSarmaanDashForm(launch);
@@ -2049,6 +2068,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   <div className="border-b border-border/60 bg-[#F8FAFD] p-3 sm:p-4">
                     {primarySarmaanSupervisoryForm ? (
                       <div className="grid gap-3 sm:grid-cols-2">
+                        {canSeeSarmaanChecklist && (
                         <button
                           type="button"
                           onClick={() => setSarmaanLaunchForm(primarySarmaanSupervisoryForm)}
@@ -2073,9 +2093,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-white/70 transition group-hover:translate-x-0.5" />
                           </div>
                         </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() => setSarmaanDashForm(primarySarmaanSupervisoryForm)}
+                          onClick={() => {
+                            if (canSeeSarmaanDashboard) setSarmaanDashForm(primarySarmaanSupervisoryForm);
+                            else toast({ title: "Dashboard locked", description: "You don't have access to this dashboard. Ask an Owner to grant access.", variant: "destructive" });
+                          }}
                           className="group relative overflow-hidden rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                           style={{ borderColor: "#12B5A54D" }}
                         >
@@ -2097,6 +2121,26 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5" />
                           </div>
                         </button>
+                        {sarmaanIsManager && (
+                          <div className="sm:col-span-2 flex flex-wrap gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setSarmaanChecklistAccessOpen(true)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-muted"
+                              style={{ borderColor: "#12B5A54D", color: "#0A2540" }}
+                            >
+                              <ShieldCheck className="h-3.5 w-3.5" style={{ color: "#0E8D80" }} /> Manage checklist access
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSarmaanDashAccessOpen(true)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-muted"
+                              style={{ borderColor: "#12B5A54D", color: "#0A2540" }}
+                            >
+                              <ShieldCheck className="h-3.5 w-3.5" style={{ color: "#0E8D80" }} /> Manage dashboard access
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="grid gap-3 sm:grid-cols-2">
@@ -2153,6 +2197,24 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                           </div>
                         </button>
                       </div>
+                    )}
+                    {sarmaanIsManager && primarySarmaanSupervisoryForm && (
+                      <>
+                        <SarmaanChecklistAccessManager
+                          open={sarmaanChecklistAccessOpen}
+                          onOpenChange={setSarmaanChecklistAccessOpen}
+                          formId={primarySarmaanSupervisoryForm.id}
+                          formName={primarySarmaanSupervisoryForm.name}
+                          projectId={primarySarmaanSupervisoryForm.project_id || currentProjectId}
+                          sections={((primarySarmaanSupervisoryForm.groups as any[] | undefined) || []).map((g: any) => ({ id: g.id, label: g.label || g.name }))}
+                        />
+                        <DashboardAccessManager
+                          open={sarmaanDashAccessOpen}
+                          onOpenChange={setSarmaanDashAccessOpen}
+                          dashboardId="sarmaan_supervisory"
+                          projectId={primarySarmaanSupervisoryForm.project_id || currentProjectId}
+                        />
+                      </>
                     )}
                   </div>
                 )}

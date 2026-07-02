@@ -50,6 +50,7 @@ interface Row {
   data: Record<string, unknown>;
   submitted_at: string | null;
   created_at: string;
+  user_id: string | null;
 }
 
 function sectionsFrom(questions: unknown): FormGroup[] {
@@ -70,6 +71,7 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
   }, [questions]);
 
   const [rows, setRows] = useState<Row[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [nav, setNav] = useState<string>(DASHBOARD_NAV[0]);
 
@@ -77,11 +79,26 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
     setLoading(true);
     const { data } = await supabase
       .from("form_submissions")
-      .select("id,data,submitted_at,created_at")
+      .select("id,data,submitted_at,created_at,user_id")
       .eq("form_id", form.id)
       .order("created_at", { ascending: false })
-      .limit(2000);
-    setRows((data || []) as unknown as Row[]);
+      .limit(4000);
+    const list = (data || []) as unknown as Row[];
+    setRows(list);
+    // Resolve submitter names (supervisor identity is captured from the session,
+    // not as a manual question) so the visits table shows the real supervisor.
+    const ids = [...new Set(list.map((r) => r.user_id).filter(Boolean))] as string[];
+    if (ids.length) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name, email")
+        .in("user_id", ids);
+      const map: Record<string, string> = {};
+      (profs as any[] | null)?.forEach((p) => {
+        map[p.user_id] = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.email || "";
+      });
+      setProfiles(map);
+    }
     setLoading(false);
   }, [form.id]);
 
@@ -111,36 +128,60 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
     if (v == null || v === "") return "";
     return Array.isArray(v) ? v.join(", ") : String(v);
   };
+  // Meta fields (e.g. __section_label) live directly on the submission payload.
+  const meta = (r: Row, key: string): string => {
+    const v = r.data?.[key];
+    return v == null ? "" : String(v);
+  };
 
-  // ---- Filters ----
+  // ---- Filters (mapped to real checklist questions + module meta) ----
   const [filters, setFilters] = useState<Record<string, string>>({});
   const filterDefs = [
     { field: "state", label: "State" },
     { field: "lga", label: "LGA" },
     { field: "ward", label: "Ward" },
-    { field: "type_of_visit", label: "Activity Type" },
-    { field: "supervisor_name", label: "Supervisor" },
-    { field: "risk_level", label: "Risk Level" },
+    { field: "type_of_visit", label: "Visit Type" },
+    { field: "__section_label", label: "Module", isMeta: true },
+    { field: "overall_implementation_quality", label: "Quality" },
   ];
-  const optionsFor = (field: string) => {
+  const readField = (r: Row, field: string, isMeta?: boolean) => (isMeta ? meta(r, field) : str(r, field));
+  const optionsFor = (field: string, isMeta?: boolean) => {
     const s = new Set<string>();
-    for (const r of rows) { const v = str(r, field); if (v) s.add(v); }
+    for (const r of rows) { const v = readField(r, field, isMeta); if (v) s.add(v); }
     return [...s].sort();
   };
   const filtered = useMemo(() => {
-    const active = Object.entries(filters).filter(([, v]) => v && v !== "__all__");
+    const active = filterDefs
+      .map((d) => [d.field, filters[d.field], d.isMeta] as const)
+      .filter(([, v]) => v && v !== "__all__");
     if (!active.length) return rows;
-    return rows.filter((r) => active.every(([f, v]) => str(r, f) === v));
+    return rows.filter((r) => active.every(([f, v, m]) => readField(r, f, m) === v));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, filters]);
 
-  // ---- Aggregations ----
+  // ---- Quality helpers (ynp questions store yes / partly / no → 2 / 1 / 0) ----
+  const yesCount = (name: string) => filtered.filter((r) => /^yes$/i.test(str(r, name))).length;
+  const qualPct = (names: string[]) => {
+    let sum = 0, n = 0;
+    for (const r of filtered) for (const nm of names) {
+      const v = str(r, nm).toLowerCase();
+      if (v === "yes") { sum += 2; n++; }
+      else if (v === "partly") { sum += 1; n++; }
+      else if (v === "no") { n++; }
+    }
+    return n ? Math.round((sum / (n * 2)) * 100) : 0;
+  };
+  const mapPct = (name: string, table: Record<string, number>) => {
+    let sum = 0, n = 0;
+    for (const r of filtered) {
+      const key = str(r, name).toLowerCase();
+      if (key && key in table) { sum += table[key]; n++; }
+    }
+    return n ? Math.round(sum / n) : 0;
+  };
+
+  // ---- Aggregations (all derived from live submissions) ----
   const agg = useMemo(() => {
-    const n = filtered.length || 1;
-    const avg = (name: string) => {
-      const v = filtered.map((r) => num(r, name)).filter((x) => x > 0);
-      return v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length)) : 0;
-    };
     const scores = filtered.map((r) => num(r, "total_score")).filter((x) => x > 0);
     const avgScorePct = scores.length ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length / 80) * 100) : 0;
     const reach = filtered.reduce((a, r) => a + num(r, "estimated_total_reached"), 0);
@@ -148,22 +189,90 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
     const casesResolved = filtered.reduce((a, r) => a + num(r, "cases_resolved"), 0);
     const casesPending = filtered.reduce((a, r) => a + num(r, "cases_pending"), 0);
     const resRate = casesId ? Math.round((casesResolved / casesId) * 100) : 0;
-    // representative KPI pcts derived from data, with sensible fallbacks
-    const completed = filtered.filter((r) => /complete|done|submitted/i.test(str(r, "action_status"))).length;
-    const activitiesPct = filtered.length ? Math.round((completed / filtered.length) * 100) : 0;
+
+    // Activities completed — from Section L action status.
+    const actionRows = filtered.filter((r) => str(r, "action_status"));
+    const completed = actionRows.filter((r) => /complete/i.test(str(r, "action_status"))).length;
+    const activitiesPct = actionRows.length ? Math.round((completed / actionRows.length) * 100) : 0;
+
+    // MOV completeness — Section H overall MOV rating (fallback to score_evidence).
+    let movPct = mapPct("mov_quality", { good: 100, fair: 50, poor: 0 });
+    if (!movPct) {
+      const ev = filtered.map((r) => num(r, "score_evidence")).filter((x) => x > 0);
+      movPct = ev.length ? Math.min(100, Math.round((ev.reduce((a, b) => a + b, 0) / ev.length) * 10)) : 0;
+    }
+
+    // Community engagement — Section E engagement level + participation type.
+    const engLevel = mapPct("engagement_level", { high: 100, medium: 60, low: 20 });
+    const partType = mapPct("participation_type", { active: 100, moderate: 60, passive: 20 });
+    const engParts = [engLevel, partType].filter((x) => x > 0);
+    const engagementPct = engParts.length ? Math.round(engParts.reduce((a, b) => a + b, 0) / engParts.length) : 0;
+
+    // Overdue action points — due date passed, status not completed.
+    const today = new Date().toISOString().slice(0, 10);
+    const overdue = filtered.filter((r) => {
+      const due = str(r, "action_due_date");
+      return due && due < today && !/complete/i.test(str(r, "action_status"));
+    }).length;
+    const dataQualityIssues = filtered.filter((r) => /poor/i.test(str(r, "mov_quality"))).length;
+
     return {
       n: filtered.length,
-      avgScorePct,
-      movPct: avg("score_evidence") ? Math.min(100, avg("score_evidence") * 10) : 0,
-      reach,
+      avgScorePct, movPct, reach, engagementPct,
       casesId, casesResolved, casesPending, resRate,
-      activitiesPct,
+      activitiesPct, overdue, dataQualityIssues,
       pendingCritical: casesPending,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered]);
 
-  const breakdown = (field: string, limit = 10) => {
+  // ---- Per-LGA aggregates (coverage + scatter) ----
+  const lgaAgg = useMemo(() => {
+    const m = new Map<string, { count: number; scoreSum: number; scoreN: number; completeSum: number; completeN: number }>();
+    for (const r of filtered) {
+      const lga = str(r, "lga") || "Unspecified";
+      const e = m.get(lga) ?? { count: 0, scoreSum: 0, scoreN: 0, completeSum: 0, completeN: 0 };
+      e.count++;
+      const s = num(r, "total_score");
+      if (s > 0) { e.scoreSum += (s / 80) * 100; e.scoreN++; }
+      const st = str(r, "action_status");
+      if (st) { e.completeSum += /complete/i.test(st) ? 100 : 0; e.completeN++; }
+      m.set(lga, e);
+    }
+    return [...m.entries()].map(([lga, e]) => ({
+      lga,
+      count: e.count,
+      scoreN: e.scoreN,
+      quality: e.scoreN ? Math.round(e.scoreSum / e.scoreN) : 0,
+      completion: e.completeN ? Math.round(e.completeSum / e.completeN) : 0,
+    }));
+  }, [filtered]);
+
+  const coverageData = useMemo(
+    () => [...lgaAgg].sort((a, b) => b.count - a.count).slice(0, 10).map((l) => ({ name: l.lga, value: l.count })),
+    [lgaAgg],
+  );
+
+  const scatter = useMemo(
+    () => lgaAgg.filter((l) => l.scoreN !== 0 || l.completion > 0 || l.quality > 0)
+      .map((l) => ({ x: l.completion, y: l.quality, z: Math.max(40, Math.min(200, l.count * 20)), name: l.lga })),
+    [lgaAgg],
+  );
+
+  // ---- Submissions-over-time trend (real sparkline series) ----
+  const trend = useMemo(() => {
+    const days = 14;
+    const buckets = new Array(days).fill(0);
+    const now = Date.now();
+    for (const r of filtered) {
+      const t = new Date(r.submitted_at || r.created_at).getTime();
+      const diff = Math.floor((now - t) / 86400000);
+      if (diff >= 0 && diff < days) buckets[days - 1 - diff]++;
+    }
+    return buckets;
+  }, [filtered]);
+
+  const breakdown = (field: string, limit = 8) => {
     const m = new Map<string, number>();
     for (const r of filtered) {
       const raw = val(r, field);
@@ -173,15 +282,20 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
     return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([name, value]) => ({ name, value }));
   };
 
-  const scatter = useMemo(
-    () => filtered.slice(0, 120).map((r) => ({
-      x: Math.min(100, num(r, "action_status") ? 60 : 50 + (r.id.charCodeAt(0) % 40)),
-      y: Math.min(100, (num(r, "total_score") / 80) * 100 || 40 + (r.id.charCodeAt(1) % 45)),
-      z: 60,
-    })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filtered],
-  );
+  // ---- MOV data-quality distribution (real) ----
+  const movDist = useMemo(() => {
+    const t: Record<string, number> = { Good: 0, Fair: 0, Poor: 0 };
+    for (const r of filtered) {
+      const v = str(r, "mov_quality").toLowerCase();
+      if (v === "good") t.Good++;
+      else if (v === "fair") t.Fair++;
+      else if (v === "poor") t.Poor++;
+    }
+    const total = t.Good + t.Fair + t.Poor;
+    return { total, data: [{ name: "Good", value: t.Good }, { name: "Fair", value: t.Fair }, { name: "Poor", value: t.Poor }] };
+  }, [filtered]);
+
+  const lowQualityLgas = lgaAgg.filter((l) => l.scoreN !== 0 && l.quality < 50).length;
 
   const hasFilters = Object.values(filters).some((v) => v && v !== "__all__");
   const dq = qualityBand(agg.avgScorePct || 0);
@@ -191,7 +305,7 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
     { icon: <ShieldCheck className="h-5 w-5" />, label: "Implementation Quality Score", value: `${agg.avgScorePct}%`, sub: dq.label, color: NAVY.teal, band: dq.label },
     { icon: <FileCheck2 className="h-5 w-5" />, label: "MOV Completeness", value: `${agg.movPct}%`, sub: qualityBand(agg.movPct).label, color: NAVY.good, band: qualityBand(agg.movPct).label },
     { icon: <Users className="h-5 w-5" />, label: "People Reached", value: agg.reach.toLocaleString(), sub: "estimated", color: NAVY.violet, band: "" },
-    { icon: <MessageSquare className="h-5 w-5" />, label: "Community Engagement", value: `${Math.min(100, agg.activitiesPct + 6)}%`, sub: "Moderate", color: "#0EA5A0", band: "Moderate" },
+    { icon: <MessageSquare className="h-5 w-5" />, label: "Community Engagement", value: `${agg.engagementPct}%`, sub: qualityBand(agg.engagementPct).label, color: "#0EA5A0", band: qualityBand(agg.engagementPct).label },
     { icon: <Scale className="h-5 w-5" />, label: "Non-Compliance Resolution", value: `${agg.resRate}%`, sub: qualityBand(agg.resRate).label, color: NAVY.warn, band: qualityBand(agg.resRate).label },
     { icon: <ClipboardList className="h-5 w-5" />, label: "Cases Resolved", value: agg.casesResolved.toLocaleString(), sub: `${agg.casesId} identified`, color: NAVY.good, band: "" },
     { icon: <AlertOctagon className="h-5 w-5" />, label: "Pending Critical Issues", value: agg.pendingCritical.toLocaleString(), sub: "High priority", color: NAVY.bad, band: "" },
@@ -247,7 +361,7 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
               <select className="h-8 w-full rounded-lg border bg-white px-2 text-xs" style={{ borderColor: NAVY.line }}
                 value={filters[f.field] ?? "__all__"} onChange={(e) => setFilters((s) => ({ ...s, [f.field]: e.target.value }))}>
                 <option value="__all__">All {f.label}s</option>
-                {optionsFor(f.field).map((o) => <option key={o} value={o}>{o}</option>)}
+                {optionsFor(f.field, f.isMeta).map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
           ))}
@@ -280,35 +394,43 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
                   {k.band && <span className="mb-0.5 text-[11px] font-bold" style={{ color: qualityBand(k.band === "Good" ? 80 : k.band === "Moderate" ? 60 : 40).color }}>{k.band}</span>}
                 </div>
                 <div className="mt-1 text-[11px]" style={{ color: NAVY.inkSoft }}>{k.sub}</div>
-                <Sparkline color={k.color} seed={k.label.length} />
+                <Sparkline color={k.color} series={trend} />
               </div>
             ))}
           </div>
 
           {/* charts row 1 */}
           <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-5">
-            <Panel title="Implementation Coverage" className="xl:col-span-2">
-              <ChoroplethLegend />
+            <Panel title="Implementation Coverage by LGA" className="xl:col-span-2">
+              {coverageData.length ? (
+                <HBar data={coverageData} color={NAVY.teal} suffix=" submissions" />
+              ) : (
+                <Empty loading={loading} label="No submissions to map yet." />
+              )}
             </Panel>
-            <Panel title="Quality vs Quantity (Activities)" className="xl:col-span-2">
-              <ResponsiveContainer width="100%" height={230}>
-                <ScatterChart margin={{ top: 8, right: 8, bottom: 16, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={NAVY.line} />
-                  <XAxis type="number" dataKey="x" name="Activity completion" domain={[0, 100]} tick={{ fontSize: 10, fill: NAVY.inkSoft }} label={{ value: "Activity Completion (%)", position: "bottom", fontSize: 10, fill: NAVY.inkSoft }} />
-                  <YAxis type="number" dataKey="y" name="Quality" domain={[0, 100]} tick={{ fontSize: 10, fill: NAVY.inkSoft }} />
-                  <ZAxis type="number" dataKey="z" range={[40, 80]} />
-                  <ReferenceLine x={50} stroke={NAVY.line} /><ReferenceLine y={50} stroke={NAVY.line} />
-                  <Tooltip cursor={{ strokeDasharray: "3 3" }} />
-                  <Scatter data={scatter.length ? scatter : [{ x: 60, y: 70, z: 60 }]} fill={NAVY.teal} fillOpacity={0.7} />
-                </ScatterChart>
-              </ResponsiveContainer>
+            <Panel title="Quality vs Completion (by LGA)" className="xl:col-span-2">
+              {scatter.length ? (
+                <ResponsiveContainer width="100%" height={230}>
+                  <ScatterChart margin={{ top: 8, right: 8, bottom: 16, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={NAVY.line} />
+                    <XAxis type="number" dataKey="x" name="Completion" domain={[0, 100]} tick={{ fontSize: 10, fill: NAVY.inkSoft }} label={{ value: "Activity Completion (%)", position: "bottom", fontSize: 10, fill: NAVY.inkSoft }} />
+                    <YAxis type="number" dataKey="y" name="Quality" domain={[0, 100]} tick={{ fontSize: 10, fill: NAVY.inkSoft }} />
+                    <ZAxis type="number" dataKey="z" range={[40, 200]} />
+                    <ReferenceLine x={50} stroke={NAVY.line} /><ReferenceLine y={50} stroke={NAVY.line} />
+                    <Tooltip cursor={{ strokeDasharray: "3 3" }} formatter={(v: any, n: any) => [`${v}%`, n]} labelFormatter={() => ""} />
+                    <Scatter data={scatter} fill={NAVY.teal} fillOpacity={0.7} />
+                  </ScatterChart>
+                </ResponsiveContainer>
+              ) : (
+                <Empty loading={loading} label="Quality scores appear once Section M is submitted." />
+              )}
             </Panel>
             <Panel title="Critical Alerts" badge={String(agg.pendingCritical || 0)}>
               <ul className="space-y-2.5">
-                <Alert color={NAVY.bad} title={`${agg.pendingCritical || 0} critical issues pending`} sub="Require immediate attention" />
-                <Alert color={NAVY.warn} title="LGAs with low quality scores" sub="Quality below 50%" />
-                <Alert color={NAVY.warn} title="Overdue action points" sub="Past due date" />
-                <Alert color={NAVY.primary} title="Data quality issues detected" sub={`${agg.n} records reviewed`} />
+                <Alert color={NAVY.bad} title={`${agg.pendingCritical || 0} non-compliance cases pending`} sub="Require immediate attention" />
+                <Alert color={NAVY.warn} title={`${lowQualityLgas} LGA(s) with low quality`} sub="Quality below 50%" />
+                <Alert color={NAVY.warn} title={`${agg.overdue} overdue action point(s)`} sub="Past due date, not completed" />
+                <Alert color={NAVY.primary} title={`${agg.dataQualityIssues} data quality issue(s)`} sub={`${agg.n} records reviewed`} />
               </ul>
             </Panel>
           </div>
@@ -317,110 +439,106 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
             <Panel title="Non-Compliance Resolution Funnel">
               <Funnel steps={[
-                { label: "Reported", value: agg.casesId },
-                { label: "Under Review", value: Math.round(agg.casesId * 0.72) },
-                { label: "Action Initiated", value: Math.round(agg.casesId * 0.54) },
-                { label: "Resolved", value: agg.casesResolved },
-                { label: "Closed", value: Math.round(agg.casesResolved * 0.62) },
+                { label: "Cases Identified", value: agg.casesId },
+                { label: "Cases Resolved", value: agg.casesResolved },
+                { label: "Cases Pending", value: agg.casesPending },
               ]} colorFrom="#F59E0B" colorTo="#B45309" footer={`Resolution rate: ${agg.resRate}%`} />
             </Panel>
-            <Panel title="Stakeholder Commitment Funnel">
+            <Panel title="Stakeholder Advocacy Funnel">
               <Funnel steps={[
-                { label: "Reached", value: Math.max(agg.reach, agg.n * 100) },
-                { label: "Engaged", value: Math.round(Math.max(agg.reach, agg.n * 100) * 0.69) },
-                { label: "Committed", value: Math.round(Math.max(agg.reach, agg.n * 100) * 0.48) },
-                { label: "Actively Participating", value: Math.round(Math.max(agg.reach, agg.n * 100) * 0.35) },
-                { label: "Follow through", value: Math.round(Math.max(agg.reach, agg.n * 100) * 0.25) },
-              ]} colorFrom="#A78BFA" colorTo="#6D28D9" footer="Follow-through rate: 24%" />
+                { label: "Advocacy Conducted", value: yesCount("advocacy_conducted") },
+                { label: "Right Decision-Maker", value: yesCount("right_decision_maker") },
+                { label: "Commitments Recorded", value: yesCount("commitments_recorded") },
+                { label: "Responsibilities Assigned", value: yesCount("responsibilities_assigned") },
+                { label: "Commitment Acted Upon", value: yesCount("commitment_acted") },
+              ]} colorFrom="#A78BFA" colorTo="#6D28D9" footer={`Advocacy quality: ${qualPct(["right_decision_maker", "commitments_recorded", "responsibilities_assigned", "followup_agreed"])}%`} />
             </Panel>
           </div>
 
           {/* analysis row */}
           <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-            <Panel title="Top Bottlenecks (Pareto)">
-              <HBar data={breakdownOrDemo(breakdown("challenge_category"), [
-                { name: "Community availability", value: 42 },
-                { name: "Transport & logistics", value: 24 },
-                { name: "Low community engagement", value: 16 },
-                { name: "Data quality issues", value: 10 },
-                { name: "Stakeholder resistance", value: 8 },
-              ])} color={NAVY.primary} />
+            <Panel title="Top Bottlenecks (Section J)">
+              {breakdown("challenge_category").length
+                ? <HBar data={breakdown("challenge_category")} color={NAVY.primary} />
+                : <Empty loading={loading} label="No challenge data submitted yet." />}
             </Panel>
-            <Panel title="Top Community Issues (root cause)">
-              <HBar data={breakdownOrDemo(breakdown("main_reason"), [
-                { name: "Requests for support", value: 30 },
-                { name: "Lack of transport", value: 22 },
-                { name: "Youth unemployment", value: 18 },
-                { name: "Healthcare access", value: 15 },
-                { name: "Water supply", value: 11 },
-              ])} color={NAVY.violet} />
+            <Panel title="Non-Compliance Root Causes (Section F)">
+              {breakdown("main_reason").length
+                ? <HBar data={breakdown("main_reason")} color={NAVY.violet} />
+                : <Empty loading={loading} label="No non-compliance cases submitted yet." />}
             </Panel>
             <Panel title="Learning to Action Funnel">
               <Funnel steps={[
-                { label: "Findings Identified", value: agg.n * 8 || 80 },
-                { label: "Validated", value: Math.round((agg.n * 8 || 80) * 0.71) },
-                { label: "Actions Agreed", value: Math.round((agg.n * 8 || 80) * 0.4) },
-                { label: "Implemented", value: Math.round((agg.n * 8 || 80) * 0.26) },
-                { label: "Results Monitored", value: Math.round((agg.n * 8 || 80) * 0.18) },
-              ]} colorFrom={NAVY.teal} colorTo={NAVY.tealDeep} footer="Conversion rate: 35%" />
+                { label: "Lessons Captured", value: filtered.filter((r) => str(r, "most_important_lesson")).length },
+                { label: "Evidence-Based", value: filtered.filter((r) => /evidence/i.test(str(r, "lesson_type"))).length },
+                { label: "Actionable", value: yesCount("lesson_actionable") },
+                { label: "Action Points Defined", value: filtered.filter((r) => str(r, "action_point")).length },
+                { label: "Actions Completed", value: filtered.filter((r) => /complete/i.test(str(r, "action_status"))).length },
+              ]} colorFrom={NAVY.teal} colorTo={NAVY.tealDeep} footer={`Learning quality: ${qualPct(["lesson_actionable"])}%`} />
             </Panel>
           </div>
 
-          {/* bottom row: overdue tracker + data quality */}
+          {/* bottom row: visits + data quality */}
           <div className="mt-4 grid gap-3 lg:grid-cols-3">
-            <Panel title="Supervision Visits" className="lg:col-span-2">
+            <Panel title="Supervision Submissions" className="lg:col-span-2">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-left" style={{ color: NAVY.inkSoft }}>
                       <th className="p-2 font-semibold">Date</th>
                       <th className="p-2 font-semibold">Supervisor</th>
+                      <th className="p-2 font-semibold">Module</th>
                       <th className="p-2 font-semibold">LGA</th>
                       <th className="p-2 font-semibold">Community</th>
-                      <th className="p-2 font-semibold">Visit</th>
                       <th className="p-2 text-right font-semibold">Score</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.slice(0, 30).map((r) => {
+                    {filtered.slice(0, 40).map((r) => {
                       const score = num(r, "total_score");
                       return (
                         <tr key={r.id} className="border-t" style={{ borderColor: NAVY.line }}>
                           <td className="whitespace-nowrap p-2" style={{ color: NAVY.inkSoft }}>{new Date(r.submitted_at || r.created_at).toLocaleDateString()}</td>
-                          <td className="p-2 font-medium">{str(r, "supervisor_name") || "—"}</td>
+                          <td className="p-2 font-medium">{(r.user_id && profiles[r.user_id]) || "—"}</td>
+                          <td className="max-w-[150px] truncate p-2">{meta(r, "__section_label") || "—"}</td>
                           <td className="p-2">{str(r, "lga") || "—"}</td>
-                          <td className="max-w-[160px] truncate p-2">{str(r, "community") || "—"}</td>
-                          <td className="p-2">{str(r, "type_of_visit") || "—"}</td>
+                          <td className="max-w-[140px] truncate p-2">{str(r, "community") || "—"}</td>
                           <td className="p-2 text-right">{score > 0 ? <span className="rounded-full px-2 py-0.5 font-bold text-white" style={{ background: qualityBand((score / 80) * 100).color }}>{score}</span> : "—"}</td>
                         </tr>
                       );
                     })}
                     {filtered.length === 0 && (
-                      <tr><td colSpan={6} className="p-8 text-center" style={{ color: NAVY.inkSoft }}>{loading ? "Loading submissions…" : "No supervision visits recorded yet."}</td></tr>
+                      <tr><td colSpan={6} className="p-8 text-center" style={{ color: NAVY.inkSoft }}>{loading ? "Loading submissions…" : "No supervision submissions recorded yet."}</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
             </Panel>
-            <Panel title="Data Quality Overview">
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie data={[{ name: "Good", value: 85 }, { name: "Fair", value: 10 }, { name: "Poor", value: 5 }]} dataKey="value" innerRadius={48} outerRadius={78} paddingAngle={2}>
-                    <Cell fill={NAVY.good} /><Cell fill={NAVY.gold} /><Cell fill={NAVY.bad} />
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="mt-1 flex flex-wrap justify-center gap-3 text-[11px]" style={{ color: NAVY.inkSoft }}>
-                <Legend color={NAVY.good} label="Good (85%)" />
-                <Legend color={NAVY.gold} label="Fair (10%)" />
-                <Legend color={NAVY.bad} label="Poor (5%)" />
-              </div>
+            <Panel title="MOV Data Quality (Section H)">
+              {movDist.total ? (
+                <>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie data={movDist.data} dataKey="value" innerRadius={48} outerRadius={78} paddingAngle={2}>
+                        <Cell fill={NAVY.good} /><Cell fill={NAVY.gold} /><Cell fill={NAVY.bad} />
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="mt-1 flex flex-wrap justify-center gap-3 text-[11px]" style={{ color: NAVY.inkSoft }}>
+                    <Legend color={NAVY.good} label={`Good (${Math.round((movDist.data[0].value / movDist.total) * 100)}%)`} />
+                    <Legend color={NAVY.gold} label={`Fair (${Math.round((movDist.data[1].value / movDist.total) * 100)}%)`} />
+                    <Legend color={NAVY.bad} label={`Poor (${Math.round((movDist.data[2].value / movDist.total) * 100)}%)`} />
+                  </div>
+                </>
+              ) : (
+                <Empty loading={loading} label="MOV ratings appear once Section H is submitted." />
+              )}
             </Panel>
           </div>
 
           <div className="py-4 text-center text-[11px]" style={{ color: NAVY.inkSoft }}>
-            SARMAAN Programme · Integrated Supervisory Checklist & Learning Dashboard · {nav}
+            SARMAAN Programme · Integrated Supervisory Checklist & Learning Dashboard · {agg.n} live submissions
           </div>
         </div>
       </div>
@@ -430,8 +548,8 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
 
 /* ---------- helpers ---------- */
 
-function breakdownOrDemo(data: { name: string; value: number }[], demo: { name: string; value: number }[]) {
-  return data.length ? data : demo;
+function Empty({ loading, label }: { loading: boolean; label: string }) {
+  return <p className="flex h-[180px] items-center justify-center text-center text-xs" style={{ color: NAVY.inkSoft }}>{loading ? "Loading…" : label}</p>;
 }
 
 function Panel({ title, badge, className, children }: { title: string; badge?: string; className?: string; children: React.ReactNode }) {
@@ -447,14 +565,12 @@ function Panel({ title, badge, className, children }: { title: string; badge?: s
   );
 }
 
-function Sparkline({ color, seed }: { color: string; seed: number }) {
-  const pts = Array.from({ length: 14 }, (_, i) => {
-    const y = 12 + ((Math.sin(i * 0.9 + seed) + 1) / 2) * 14;
-    return `${(i / 13) * 100},${y}`;
-  }).join(" ");
+function Sparkline({ color, series }: { color: string; series: number[] }) {
+  const max = Math.max(1, ...series);
+  const pts = series.map((v, i) => `${(i / Math.max(1, series.length - 1)) * 100},${28 - (v / max) * 24}`).join(" ");
   return (
     <svg viewBox="0 0 100 30" preserveAspectRatio="none" className="mt-2 h-6 w-full">
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
     </svg>
   );
 }
@@ -474,6 +590,8 @@ function Alert({ color, title, sub }: { color: string; title: string; sub: strin
 
 function Funnel({ steps, colorFrom, colorTo, footer }: { steps: { label: string; value: number }[]; colorFrom: string; colorTo: string; footer: string }) {
   const max = Math.max(1, ...steps.map((s) => s.value));
+  const allZero = steps.every((s) => !s.value);
+  if (allZero) return <Empty loading={false} label="No data submitted for this funnel yet." />;
   return (
     <div>
       <div className="space-y-1.5">
@@ -481,7 +599,7 @@ function Funnel({ steps, colorFrom, colorTo, footer }: { steps: { label: string;
           const w = 40 + (s.value / max) * 60;
           const t = i / Math.max(1, steps.length - 1);
           const color = mix(colorFrom, colorTo, t);
-          const pct = i === 0 ? 100 : Math.round((s.value / steps[0].value) * 100) || 0;
+          const pct = i === 0 ? 100 : Math.round((s.value / (steps[0].value || 1)) * 100) || 0;
           return (
             <div key={s.label} className="flex items-center gap-2">
               <div className="mx-auto flex h-9 items-center justify-between rounded-md px-3 text-[12px] font-semibold text-white" style={{ width: `${w}%`, background: color }}>
@@ -498,45 +616,18 @@ function Funnel({ steps, colorFrom, colorTo, footer }: { steps: { label: string;
   );
 }
 
-function HBar({ data, color }: { data: { name: string; value: number }[]; color: string }) {
+function HBar({ data, color, suffix }: { data: { name: string; value: number }[]; color: string; suffix?: string }) {
   if (!data.length) return <p className="py-8 text-center text-xs" style={{ color: NAVY.inkSoft }}>No data yet.</p>;
   return (
-    <ResponsiveContainer width="100%" height={Math.max(160, data.length * 36)}>
+    <ResponsiveContainer width="100%" height={Math.max(160, data.length * 34)}>
       <BarChart data={data} layout="vertical" margin={{ left: 8, right: 24 }}>
         <CartesianGrid strokeDasharray="3 3" stroke={NAVY.line} horizontal={false} />
         <XAxis type="number" tick={{ fontSize: 10, fill: NAVY.inkSoft }} allowDecimals={false} />
         <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 10, fill: NAVY.inkSoft }} />
-        <Tooltip />
+        <Tooltip formatter={(v: any) => [`${v}${suffix ?? ""}`, "Count"]} />
         <Bar dataKey="value" fill={color} radius={[0, 6, 6, 0]} barSize={16} />
       </BarChart>
     </ResponsiveContainer>
-  );
-}
-
-function ChoroplethLegend() {
-  const bands = [
-    { label: "> 90%", color: "#0E8D80" },
-    { label: "75 – 90%", color: "#3AA0B8" },
-    { label: "50 – 75%", color: "#7FC6BD" },
-    { label: "25 – 50%", color: "#BFE0D9" },
-    { label: "< 25%", color: "#F4B12B" },
-  ];
-  return (
-    <div className="flex items-center gap-4">
-      <div className="flex h-[200px] flex-1 items-center justify-center rounded-xl border" style={{ borderColor: NAVY.line, background: "linear-gradient(135deg,#eef4fb,#dceee9)" }}>
-        <div className="text-center">
-          <div className="text-2xl font-extrabold" style={{ fontFamily: NAVY.headingFont, color: NAVY.tealDeep }}>Coverage map</div>
-          <div className="text-[11px]" style={{ color: NAVY.inkSoft }}>By LGA · updates with filters</div>
-        </div>
-      </div>
-      <div className="space-y-1.5">
-        {bands.map((b) => (
-          <div key={b.label} className="flex items-center gap-2 text-[11px]" style={{ color: NAVY.inkSoft }}>
-            <span className="h-3 w-4 rounded-sm" style={{ background: b.color }} /> {b.label}
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }
 
