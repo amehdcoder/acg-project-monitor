@@ -890,6 +890,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
                     options={opts}
                     disabled={!parentOk || opts.length === 0}
                     allowAdd={false}
+                    triggerClassName={big ? "h-12 text-base" : undefined}
                     placeholder={
                       !parentOk
                         ? "Select the level above first"
