@@ -2111,9 +2111,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                               <ClipboardCheck className="h-6 w-6 text-white" strokeWidth={2.2} />
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "rgba(18,181,165,0.18)", color: "#BFFAF2" }}>
-                                Add Checklist
+                              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "rgba(18,181,165,0.18)", color: "#BFFAF2" }}>
+                                Template not created · Tap to create
                               </span>
+
                               <span className="mt-2 block whitespace-normal break-words text-[15px] font-extrabold leading-snug text-white">
                                 {SARMAAN_SUPERVISORY_FORM_NAME}
                               </span>
