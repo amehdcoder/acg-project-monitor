@@ -817,8 +817,11 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {LEVELS.map(({ key, label, optional }) => {
+          <div className={cn("grid grid-cols-1 gap-3 sm:grid-cols-2", big && "gap-4")}>
+          {LEVELS
+            .filter(({ key }) => !visibleLevels || visibleLevels.includes(key))
+            .map(({ key, label, optional }) => {
+            const isOptional = optional || (optionalLevels?.includes(key) ?? false);
             const isLeafGeo =
               key === "flhf_name" || key === "community_name" || key === "settlement_name";
             // FLHF / Community / Settlement become free-text when there is no
