@@ -775,7 +775,7 @@ function FormMenu({
   onStartJourney,
   completedCount = 0,
 }: {
-  sections: { id: string; label: string; questions: Question[] }[];
+  sections: ChapterSection[];
   responses: Record<string, any>;
   visibleQuestions: (idx: number) => Question[];
   onOpenGuidance: () => void;
