@@ -2290,32 +2290,32 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         <div
                           className="group relative overflow-hidden rounded-2xl border p-4 sm:p-5"
                           style={{
-                            borderColor: "#0F7B6C33",
-                            background: "linear-gradient(120% 140% at 100% 0%, #0F7B6C 0%, #0A574C 55%, #073B33 100%)",
+                            borderColor: "#0A254033",
+                            background: "linear-gradient(120% 140% at 100% 0%, #0E2E52 0%, #0A2540 55%, #071A30 100%)",
                           }}
                         >
                           <div
                             aria-hidden
                             className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full opacity-30"
-                            style={{ background: "radial-gradient(circle, #F4B12B66 0%, transparent 65%)" }}
+                            style={{ background: "radial-gradient(circle, #12B5A566 0%, transparent 65%)" }}
                           />
                           <div className="relative flex flex-wrap items-center gap-3">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: "#F4B12B" }}>
-                              <ClipboardList className="h-6 w-6" style={{ color: "#073B33" }} strokeWidth={2.2} />
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: "#12B5A5" }}>
+                              <ClipboardList className="h-6 w-6 text-white" strokeWidth={2.2} />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "#F4B12B", color: "#073B33" }}>
-                                SARMAAN
+                              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "#12B5A5", color: "#071A30" }}>
+                                SARMAAN ACSM
                               </span>
                               <h4 className="mt-1 truncate text-[16px] font-extrabold text-white">Integrated Supervisory Checklist</h4>
-                              <p className="truncate text-xs text-white/80">13-section supervision journey · auto-scored /80 · live learning dashboard</p>
+                              <p className="truncate text-xs text-white/80">12 guided modules · auto-scored /80 · live learning dashboard</p>
                             </div>
                           </div>
                           <div className="relative mt-4 flex flex-wrap gap-2">
                             <button
                               onClick={() => setSarmaanLaunchForm(form)}
-                              className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-md transition active:scale-[0.98]"
-                              style={{ background: "#F4B12B", color: "#073B33" }}
+                              className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-md transition active:scale-[0.98]"
+                              style={{ background: "#12B5A5" }}
                             >
                               <ClipboardCheck className="h-4 w-4" /> Begin supervision
                             </button>
@@ -2324,7 +2324,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                               className="inline-flex items-center gap-2 rounded-xl border-2 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
                               style={{ borderColor: "rgba(255,255,255,0.4)" }}
                             >
-                              <BarChart3 className="h-4 w-4" /> Learning dashboard
+                              <BarChart3 className="h-4 w-4" /> Supervision dashboard
                             </button>
                           </div>
                         </div>
