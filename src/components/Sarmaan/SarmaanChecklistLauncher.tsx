@@ -554,12 +554,20 @@ export default function SarmaanChecklistLauncher({
             <main className="relative min-w-0 flex-1 p-5 lg:p-6">
               <RoseBackground hue={hue} />
               <div className="relative">
+                {journeyMode && (
+                  <JourneyRail
+                    sections={sections}
+                    currentIdx={currentIdx}
+                    isSectionComplete={isSectionComplete}
+                    onJump={(i) => setActive(i)}
+                  />
+                )}
                 <button
                   onClick={() => setActive(MENU)}
                   className="mb-3 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[12px] font-semibold transition hover:bg-black/5"
                   style={{ color: hue }}
                 >
-                  <ChevronLeft className="h-4 w-4" /> All supervision forms
+                  <ChevronLeft className="h-4 w-4" /> {journeyMode ? "Pause journey · all forms" : "All supervision forms"}
                 </button>
                 <div className="mb-1 flex items-center gap-2">
                   <span
