@@ -26,6 +26,8 @@ interface Props {
   /** Allow typing & adding values that are not in the option list. */
   allowAdd?: boolean;
   emptyLabel?: string;
+  /** Extra classes for the trigger button (e.g. larger Kobo-style sizing). */
+  triggerClassName?: string;
 }
 
 const ROW_HEIGHT = 34;       // px per option row
@@ -40,6 +42,7 @@ export default function LocationCombobox({
   disabled,
   allowAdd = true,
   emptyLabel = "No matches",
+  triggerClassName,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -81,7 +84,7 @@ export default function LocationCombobox({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn("w-full justify-between bg-background font-normal", !value && "text-muted-foreground")}
+          className={cn("w-full justify-between bg-background font-normal", !value && "text-muted-foreground", triggerClassName)}
         >
           <span className="truncate">{value || placeholder}</span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

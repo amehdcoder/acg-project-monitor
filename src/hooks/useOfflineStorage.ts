@@ -4,8 +4,9 @@ import { toast } from "@/hooks/use-toast";
 import { sealRecord, unsealRecord, unsealAll } from "@/lib/deviceCrypto";
 
 const DB_NAME = "acg_monitor_offline";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_NAME = "pending_submissions";
+const CONFLICT_STORE = "edit_conflicts";
 
 interface PendingSubmission {
   id: string;
@@ -17,7 +18,32 @@ interface PendingSubmission {
   submission_type: string;
   created_at: string;
   retryCount: number;
+  /**
+   * When true this queued row is an EDIT of an existing server submission,
+   * not a brand-new capture. Edits are synced with a conflict-safe rule
+   * (see doSync) instead of a blind insert.
+   */
+  is_edit?: boolean;
+  /**
+   * On-device moment the change was made. Used as the last-write-wins clock
+   * so an offline edit never overwrites a NEWER server record.
+   */
+  client_updated_at?: string;
 }
+
+/** Recorded when an offline edit is rejected because the server was newer. */
+export interface EditConflict {
+  id: string;               // conflict record id
+  submission_id: string;    // the form_submissions row
+  form_id: string;
+  user_id: string;
+  offline_data: Record<string, any>;
+  server_data: Record<string, any>;
+  offline_updated_at: string;
+  server_updated_at: string;
+  detected_at: string;
+}
+
 
 
 // Initialize IndexedDB
@@ -47,6 +73,13 @@ const initDB = (): Promise<IDBDatabase> => {
         draftStore.createIndex("form_id", "form_id", { unique: false });
         draftStore.createIndex("updated_at", "updated_at", { unique: false });
       }
+      // NEW (v3): Conflict log for offline edits that lost to newer server data.
+      if (!db.objectStoreNames.contains(CONFLICT_STORE)) {
+        const conflictStore = db.createObjectStore(CONFLICT_STORE, { keyPath: "id" });
+        conflictStore.createIndex("submission_id", "submission_id", { unique: false });
+        conflictStore.createIndex("detected_at", "detected_at", { unique: false });
+      }
+
     };
 
   });
@@ -115,6 +148,110 @@ const updateRetryCount = async (id: string, retryCount: number): Promise<void> =
     putReq.onerror = () => reject(putReq.error);
   });
 };
+
+// --- Conflict log helpers (offline edits that lost to newer server data) ---
+const CONFLICT_PLAIN_FIELDS = ["id", "submission_id", "form_id", "detected_at"];
+
+const recordEditConflict = async (conflict: EditConflict): Promise<void> => {
+  const db = await initDB();
+  const sealed = await sealRecord(conflict as any, CONFLICT_PLAIN_FIELDS);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(CONFLICT_STORE, "readwrite");
+    const req = tx.objectStore(CONFLICT_STORE).put(sealed);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+};
+
+const getEditConflicts = async (): Promise<EditConflict[]> => {
+  const db = await initDB();
+  const rows: any[] = await new Promise((resolve, reject) => {
+    const tx = db.transaction(CONFLICT_STORE, "readonly");
+    const req = tx.objectStore(CONFLICT_STORE).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return unsealAll<EditConflict>(rows);
+};
+
+const clearEditConflict = async (id: string): Promise<void> => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(CONFLICT_STORE, "readwrite");
+    const req = tx.objectStore(CONFLICT_STORE).delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+};
+
+/**
+ * Conflict-safe write of a single offline EDIT.
+ *
+ * Rule — LAST-WRITE-WINS BY CAPTURE TIME:
+ *  • We compare the moment the change was made on-device (client_updated_at)
+ *    with the server row's updated_at.
+ *  • If the offline edit is newer, it is applied (merged field-by-field so
+ *    fields the user did not touch keep the freshest server value).
+ *  • If the server row is newer, the server data is authoritative — the edit
+ *    is NOT applied. Instead the conflict is logged locally for review so no
+ *    newer server data is ever silently overwritten.
+ *
+ * Returns "applied" | "conflict" | "missing".
+ */
+const syncEditWithConflictRule = async (
+  s: PendingSubmission,
+): Promise<"applied" | "conflict" | "missing"> => {
+  const clientTs = s.client_updated_at || s.created_at;
+
+  const { data: serverRow, error: fetchErr } = await supabase
+    .from("form_submissions")
+    .select("id, data, updated_at, synced_at, submitted_at")
+    .eq("id", s.id)
+    .maybeSingle();
+
+  if (fetchErr) throw fetchErr;
+
+  // The row does not exist on the server yet → treat the edit as a fresh insert.
+  if (!serverRow) return "missing";
+
+  const serverTs =
+    serverRow.updated_at || serverRow.synced_at || serverRow.submitted_at || "";
+
+  // Server has a strictly newer version → do NOT overwrite. Log the conflict.
+  if (serverTs && new Date(serverTs).getTime() > new Date(clientTs).getTime()) {
+    await recordEditConflict({
+      id: `conflict_${s.id}_${Date.now()}`,
+      submission_id: s.id,
+      form_id: s.form_id,
+      user_id: s.user_id,
+      offline_data: s.data,
+      server_data: (serverRow.data as Record<string, any>) || {},
+      offline_updated_at: clientTs,
+      server_updated_at: serverTs,
+      detected_at: new Date().toISOString(),
+    });
+    return "conflict";
+  }
+
+  // Offline edit is newer (or server has no timestamp) → merge & apply.
+  // Field-by-field merge keeps any server field the user never touched.
+  const merged = { ...(serverRow.data as Record<string, any> || {}), ...s.data };
+  const { error: updErr } = await supabase
+    .from("form_submissions")
+    .update({
+      data: merged,
+      location: s.location,
+      within_geofence: s.within_geofence,
+      updated_at: new Date().toISOString(),
+      synced_at: new Date().toISOString(),
+    })
+    .eq("id", s.id);
+
+  if (updErr) throw updErr;
+  return "applied";
+};
+
+
 
 export const useOfflineStorage = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -207,10 +344,39 @@ export const useOfflineStorage = () => {
         synced_at: new Date().toISOString(),
       });
       const touchedFormIds = new Set<string>();
+      let conflicts = 0;
 
-      for (let i = 0; i < pending.length; i += CHUNK) {
+      // ---- Conflict-safe drain of offline EDITS first ----
+      // Edits are applied with the last-write-wins rule so they never clobber a
+      // newer server record. A "missing" edit (row not on server) is demoted to
+      // a normal insert below.
+      const edits = pending.filter((s) => s.is_edit);
+      const inserts: PendingSubmission[] = pending.filter((s) => !s.is_edit);
+
+      for (const edit of edits) {
         if (!navigator.onLine) break;
-        const slice = pending.slice(i, i + CHUNK);
+        try {
+          const outcome = await syncEditWithConflictRule(edit);
+          if (outcome === "missing") {
+            // Not on server yet — send it through the insert path instead.
+            inserts.push({ ...edit, is_edit: false });
+            continue;
+          }
+          await removeFromOfflineStorage(edit.id);
+          touchedFormIds.add(edit.form_id);
+          if (outcome === "applied") synced++;
+          else conflicts++;
+        } catch (editErr: any) {
+          console.error("Error syncing offline edit:", edit.id, editErr);
+          await updateRetryCount(edit.id, edit.retryCount + 1);
+          failed++;
+        }
+      }
+
+
+      for (let i = 0; i < inserts.length; i += CHUNK) {
+        if (!navigator.onLine) break;
+        const slice = inserts.slice(i, i + CHUNK);
         const { error } = await supabase
           .from("form_submissions")
           .upsert(slice.map(toRow), { onConflict: "id", ignoreDuplicates: true });
@@ -262,6 +428,13 @@ export const useOfflineStorage = () => {
         toast({
           title: "Sync Complete",
           description: `Successfully synced ${synced} submission${synced > 1 ? "s" : ""}.`,
+        });
+      }
+
+      if (conflicts > 0) {
+        toast({
+          title: "Edit Conflicts Kept Safe",
+          description: `${conflicts} offline edit${conflicts > 1 ? "s were" : " was"} not applied because the server had newer data. Review them under conflicts.`,
         });
       }
 
@@ -460,6 +633,81 @@ export const useOfflineStorage = () => {
     [updatePendingCount]
   );
 
+  /**
+   * Conflict-safe edit of an existing submission.
+   *
+   * When online it applies the last-write-wins rule immediately (never
+   * overwriting a newer server row). When offline it queues an EDIT record
+   * that the sync engine resolves with the same rule.
+   */
+  const saveEdit = useCallback(
+    async (
+      submissionId: string,
+      formId: string,
+      userId: string,
+      data: Record<string, any>,
+      location: { lat: number; lng: number } | null = null,
+      withinGeofence: boolean | null = null,
+    ): Promise<{ success: boolean; offline: boolean; conflict: boolean; id: string }> => {
+      const clientUpdatedAt = new Date().toISOString();
+      const editRecord: PendingSubmission = {
+        id: submissionId,
+        form_id: formId,
+        user_id: userId,
+        data,
+        location,
+        within_geofence: withinGeofence,
+        submission_type: "regular",
+        created_at: clientUpdatedAt,
+        retryCount: 0,
+        is_edit: true,
+        client_updated_at: clientUpdatedAt,
+      };
+
+      if (navigator.onLine) {
+        try {
+          const outcome = await syncEditWithConflictRule(editRecord);
+          if (outcome === "missing") {
+            // Row not on server — insert it fresh so nothing is lost.
+            await supabase.from("form_submissions").insert({
+              id: submissionId,
+              form_id: formId,
+              user_id: userId,
+              data,
+              location,
+              within_geofence: withinGeofence,
+              status: "sent",
+              submitted_at: clientUpdatedAt,
+              synced_at: clientUpdatedAt,
+              submission_type: "regular",
+            });
+            return { success: true, offline: false, conflict: false, id: submissionId };
+          }
+          if (outcome === "conflict") {
+            toast({
+              title: "Edit Conflict",
+              description: "The server has a newer version. Your change was saved for review instead of overwriting it.",
+            });
+            await updatePendingCount();
+            return { success: true, offline: false, conflict: true, id: submissionId };
+          }
+          return { success: true, offline: false, conflict: false, id: submissionId };
+        } catch {
+          await addToOfflineStorage(editRecord);
+          await updatePendingCount();
+          return { success: true, offline: true, conflict: false, id: submissionId };
+        }
+      }
+
+      await addToOfflineStorage(editRecord);
+      await updatePendingCount();
+      return { success: true, offline: true, conflict: false, id: submissionId };
+    },
+    [updatePendingCount],
+  );
+
+
+
   // Public sync function wrapping doSync
   const syncPendingSubmissions = useCallback(async () => {
     if (!navigator.onLine) {
@@ -540,10 +788,14 @@ export const useOfflineStorage = () => {
     pendingCount,
     isSyncing,
     saveSubmission,
+    saveEdit,
     syncPendingSubmissions,
     getPending,
     clearPending,
     updatePendingCount,
+    // Conflict-safe offline edits
+    getEditConflicts,
+    clearEditConflict,
     // Drafts
     saveDraft,
     getDraft,
