@@ -409,6 +409,16 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
       <main className={`space-y-6 px-4 py-6 ${embedded ? "" : "container mx-auto"}`}>
 
 
+        {!published && canManageLifecycle && (
+          <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+            <EyeOff className="h-4 w-4 shrink-0" />
+            <span>
+              <strong>Unpublished:</strong> only admins & owners can see this dashboard.
+              Use <em>Publish dashboard</em> to make it visible to members.
+            </span>
+          </div>
+        )}
+
         {useCacheNow && (
           <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
             <WifiOff className="h-4 w-4 shrink-0" />
@@ -419,7 +429,15 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
           </div>
         )}
 
-        {showLoader ? (
+        {!published && !canManageLifecycle ? (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
+              <Lock className="h-8 w-8 text-muted-foreground/60" />
+              <p className="text-sm font-medium text-foreground">Dashboard not yet published</p>
+              <p className="text-xs">An administrator will publish this dashboard when it's ready.</p>
+            </CardContent>
+          </Card>
+        ) : showLoader ? (
           <Card className="border-dashed">
             <CardContent className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading MDA dashboard data…
@@ -438,5 +456,6 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
         )}
       </main>
     </div>
+
   );
 }
