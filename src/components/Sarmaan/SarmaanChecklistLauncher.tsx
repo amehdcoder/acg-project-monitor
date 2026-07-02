@@ -1411,7 +1411,7 @@ function HandoffCard({
   onChooseAnother,
   onFinish,
 }: {
-  sections: { id: string; label: string }[];
+  sections: ChapterSection[];
   fromIdx: number;
   nextIdx: number;
   completedCount: number;
@@ -1419,14 +1419,19 @@ function HandoffCard({
   onChooseAnother: () => void;
   onFinish: () => void;
 }) {
-  const fromLabel = sections[fromIdx]?.label || "that form";
+  const fromSection = sections[fromIdx];
+  const fromLabel = fromSection?.label || "that chapter";
   const hasNext = nextIdx >= 0 && nextIdx < sections.length;
-  const nextLabel = hasNext ? sections[nextIdx].label : "";
+  const nextSection = hasNext ? sections[nextIdx] : null;
+  const nextLabel = nextSection?.label || "";
   const opener = TRANSITION_OPENERS[fromIdx % TRANSITION_OPENERS.length];
-  const nextGuide = hasNext ? MODULE_GUIDANCE[nextIdx] : null;
+  // Prefer the chapter's own closing line — it's written as a natural bridge to
+  // whatever comes next; fall back to a generated sentence otherwise.
   const bridge = hasNext
-    ? `We've captured “${fromLabel}”. ${opener} let's talk about ${nextLabel.toLowerCase()}${nextGuide?.purpose ? ` — ${nextGuide.purpose}` : "."}`
-    : `You've captured “${fromLabel}”, and every module in this visit is now complete. Nice work.`;
+    ? fromSection?.closing
+      ? `${fromSection.closing} ${opener} “${nextLabel}”${nextSection?.subtitle ? ` — ${nextSection.subtitle.toLowerCase()}` : "."}`
+      : `We've captured “${fromLabel}”. ${opener} let's move to “${nextLabel}”.`
+    : `You've captured “${fromLabel}”, and every chapter in this visit is now complete. Nice work.`;
   return (
     <div className="p-4 lg:p-5">
       <div className="relative overflow-hidden rounded-2xl border p-5 shadow-sm" style={{ borderColor: "rgba(129,140,248,0.5)", background: "linear-gradient(120deg, rgba(99,102,241,0.12), rgba(56,189,248,0.08))" }}>
