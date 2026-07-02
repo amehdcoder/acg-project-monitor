@@ -402,6 +402,24 @@ export default function SarmaanChecklistLauncher({
             </span>
             <span className="min-w-0 flex-1 text-[13px] font-semibold leading-snug">All supervision forms</span>
           </button>
+          {/* Guided journey — chain modules with shared context + conversational hand-offs */}
+          {sections.length > 1 && (
+            <button
+              onClick={startJourney}
+              className="mb-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition"
+              style={{ background: journeyMode ? NAVY.sidebarActive : "rgba(99,102,241,0.12)", border: `1px solid ${journeyMode ? NAVY.teal : "rgba(129,140,248,0.4)"}` }}
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ background: "#6366F1" }}>
+                <Route className="h-4 w-4 text-white" />
+              </span>
+              <span className="min-w-0 flex-1 text-[13px] font-semibold leading-snug">
+                Guided supervision journey
+                <span className="mt-0.5 block text-[10.5px] font-medium" style={{ color: NAVY.sidebarSub }}>
+                  {completedCount}/{sections.length} forms complete
+                </span>
+              </span>
+            </button>
+          )}
           {/* Guidance entry */}
           <button
             onClick={() => setActive(GUIDANCE)}
