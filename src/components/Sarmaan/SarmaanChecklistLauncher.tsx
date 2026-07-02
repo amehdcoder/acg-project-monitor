@@ -31,6 +31,10 @@ import {
   SECTION_HUES,
   MODULE_GUIDANCE,
   REMOVED_CHECKLIST_QUESTIONS,
+  SUPERVISORY_CHAPTERS,
+  chapterCodeFromLabel,
+  chapterGuidance,
+  type ModuleGuidance,
 } from "./sarmaanBrand";
 import type { Question, FormGroup } from "@/components/FormBuilder/types";
 import { buildNameToIdMap, evaluateRelevant } from "@/lib/skipLogic";
@@ -58,6 +62,23 @@ interface Props {
 const GEO_NAMES = new Set(["state", "lga", "ward", "flhf_name", "community", "settlement_name"]);
 const GEO_ORDER = ["state", "lga", "ward", "flhf_name", "community", "settlement_name"];
 const GUIDANCE = "guidance"; // sentinel for the guidance nav entry
+
+/**
+ * A merged, immersive chapter built from one or more raw form modules (A–M).
+ * Carries the concatenated questions plus the narrative framing used to make
+ * the supervision journey feel like one continuous human conversation.
+ */
+interface ChapterSection {
+  id: string;
+  label: string;
+  subtitle: string;
+  narrative: string;
+  closing: string;
+  /** Raw module group ids merged into this chapter (for access + submission). */
+  memberIds: string[];
+  guidance: ModuleGuidance[];
+  questions: Question[];
+}
 
 /**
  * Shared supervision context carried across every module in a guided journey.
@@ -134,22 +155,81 @@ export default function SarmaanChecklistLauncher({
   const geo = useGeolocation();
 
   // ---- Build the answerable section model from the form's groups ----
-  const sections = useMemo(() => {
+  //
+  // The raw form ships 13 modules (A–M), but a real supervisor experiences the
+  // visit as six connected chapters. We merge the closely-related modules into
+  // an immersive narrative arc (Arrival → Rooms of Power → Community Encounter →
+  // Proof → Reflection → Verdict). Each chapter concatenates the questions of
+  // its member modules yet still submits independently, so the dashboard,
+  // offline store and per-module access grants keep working unchanged.
+  const sections = useMemo<ChapterSection[]>(() => {
     const src = groups.length > 0 ? groups : [{ id: "all", name: "all", label: formName, questions } as FormGroup];
-    const built = src.map((g) => ({
+    const raw = src.map((g) => ({
       id: g.id,
       label: g.label || g.name,
+      code: chapterCodeFromLabel(g.label || g.name),
       questions: (g.questions || []).filter(
         (q) => q.type !== "calculate" && q.type !== "note" && !REMOVED_CHECKLIST_QUESTIONS.has(q.name || ""),
       ),
     }));
-    // Per-module access: when an allow-list is supplied, only expose granted modules.
-    if (allowedSectionIds && allowedSectionIds.length >= 0 && !(built.length === 1 && built[0].id === "all")) {
+
+    // Per-module access: when an allow-list is supplied, only expose granted raw
+    // modules. A chapter later becomes visible if any of its members are granted.
+    const singleAll = raw.length === 1 && raw[0].id === "all";
+    let accessible = raw;
+    if (allowedSectionIds && !singleAll) {
       const allow = new Set(allowedSectionIds);
-      const restricted = built.filter((s) => allow.has(s.id));
-      return restricted.length ? restricted : built.filter(() => false);
+      accessible = raw.filter((s) => allow.has(s.id));
     }
-    return built;
+
+    // A form without recognizable A–M codes (e.g. a custom copy) can't be
+    // merged safely — present its groups as-is so nothing is ever lost.
+    const anyCoded = accessible.some((s) => s.code);
+    if (singleAll || !anyCoded) {
+      return accessible.map((s) => ({
+        id: s.id,
+        label: s.label,
+        subtitle: "",
+        narrative: "",
+        closing: "",
+        memberIds: [s.id],
+        guidance: [],
+        questions: s.questions,
+      }));
+    }
+
+    const used = new Set<string>();
+    const chapters: ChapterSection[] = [];
+    for (const ch of SUPERVISORY_CHAPTERS) {
+      const members = accessible.filter((s) => s.code && ch.members.includes(s.code));
+      if (members.length === 0) continue;
+      members.forEach((m) => used.add(m.id));
+      chapters.push({
+        id: ch.id,
+        label: ch.title,
+        subtitle: ch.subtitle,
+        narrative: ch.narrative,
+        closing: ch.closing,
+        memberIds: members.map((m) => m.id),
+        guidance: chapterGuidance(ch),
+        questions: members.flatMap((m) => m.questions),
+      });
+    }
+    // Append any leftover groups that didn't map to a chapter so they remain fillable.
+    for (const s of accessible) {
+      if (used.has(s.id)) continue;
+      chapters.push({
+        id: s.id,
+        label: s.label,
+        subtitle: "",
+        narrative: "",
+        closing: "",
+        memberIds: [s.id],
+        guidance: [],
+        questions: s.questions,
+      });
+    }
+    return chapters;
   }, [groups, questions, formName, allowedSectionIds]);
 
   const allQuestions = useMemo(
@@ -289,6 +369,7 @@ export default function SarmaanChecklistLauncher({
       });
       payload.__section_id = section.id;
       payload.__section_label = section.label;
+      payload.__member_section_ids = section.memberIds;
       payload.__section_index = idx + 1;
       // Shared supervision context — carried forward across every module so the
       // dashboard can stitch a complete picture of one supervision visit.
@@ -576,13 +657,25 @@ export default function SarmaanChecklistLauncher({
                   >
                     {currentIdx + 1}
                   </span>
-                  <h2 className="text-2xl font-extrabold" style={{ fontFamily: NAVY.headingFont }}>
-                    {currentSection.label}
-                  </h2>
+                  <div className="min-w-0">
+                    <p className="text-[10.5px] font-bold uppercase tracking-wider" style={{ color: hue }}>
+                      Chapter {currentIdx + 1} of {sections.length}
+                    </p>
+                    <h2 className="text-2xl font-extrabold leading-tight" style={{ fontFamily: NAVY.headingFont }}>
+                      {currentSection.label}
+                    </h2>
+                  </div>
                 </div>
+                {currentSection.subtitle && (
+                  <p className="mb-1 text-[13.5px] font-semibold" style={{ color: NAVY.inkSoft }}>
+                    {currentSection.subtitle}
+                  </p>
+                )}
 
-                {/* module hint pulled from guidance */}
-                <ModuleHint idx={currentIdx} hue={hue} />
+
+                {/* chapter narrative + guidance pulled from merged modules */}
+                <ModuleHint section={currentSection} hue={hue} />
+
 
                 {/* GPS strip — every form is self-contained */}
                 {requiresGps && (
@@ -683,7 +776,7 @@ function FormMenu({
   onStartJourney,
   completedCount = 0,
 }: {
-  sections: { id: string; label: string; questions: Question[] }[];
+  sections: ChapterSection[];
   responses: Record<string, any>;
   visibleQuestions: (idx: number) => Question[];
   onOpenGuidance: () => void;
@@ -696,10 +789,10 @@ function FormMenu({
       <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-extrabold" style={{ fontFamily: NAVY.headingFont }}>
-            Choose a supervision form
+            Choose a supervision chapter
           </h2>
           <p className="mt-0.5 text-[13px]" style={{ color: NAVY.inkSoft }}>
-            Each module is an independent form — fill and submit only what you are supervising right now.
+            The visit is told in six connected chapters — open the one you're supervising now; each submits on its own.
           </p>
         </div>
         <button
@@ -776,6 +869,11 @@ function FormMenu({
                 <h3 className="mt-3 text-[15px] font-extrabold leading-snug" style={{ fontFamily: NAVY.headingFont, color: NAVY.ink }}>
                   {s.label}
                 </h3>
+                {s.subtitle && (
+                  <p className="mt-1 text-[12px] leading-snug" style={{ color: NAVY.inkSoft }}>
+                    {s.subtitle}
+                  </p>
+                )}
                 <div className="mt-3 flex items-center gap-2">
                   <span
                     className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold"
@@ -789,7 +887,7 @@ function FormMenu({
                   </span>
                 </div>
                 <div className="mt-4 inline-flex items-center gap-1 text-[13px] font-bold" style={{ color: h }}>
-                  {started ? "Continue form" : "Open form"} <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+                  {started ? "Continue chapter" : "Open chapter"} <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
                 </div>
               </div>
             </button>
@@ -952,20 +1050,57 @@ function RoseBackground({ hue }: { hue: string }) {
   );
 }
 
-function ModuleHint({ idx, hue }: { idx: number; hue: string }) {
-  const g = MODULE_GUIDANCE[idx];
-  if (!g) return null;
+function ModuleHint({ section, hue }: { section: ChapterSection; hue: string }) {
+  const guides = section.guidance;
+  const hasNarrative = !!section.narrative;
+  if (!hasNarrative && guides.length === 0) return null;
   return (
-    <div className="relative mb-5 mt-2 rounded-2xl border bg-white/75 backdrop-blur" style={{ borderColor: tint(hue, 0.4) }}>
-      <div className="flex items-center gap-2 border-b px-4 py-2.5" style={{ borderColor: tint(hue, 0.25) }}>
-        <Lightbulb className="h-4 w-4" style={{ color: hue }} />
-        <span className="text-sm font-bold" style={{ color: hue }}>Supervisor guidance</span>
-      </div>
-      <div className="grid gap-4 p-4 sm:grid-cols-3">
-        <HintCol title="Who to ask" text={g.whoToAsk} hue={hue} />
-        <HintCol title="What to check" text={g.whatToCheck} hue={hue} />
-        <HintCol title="How to collect" text={g.howToCollect} hue={hue} />
-      </div>
+    <div className="mb-5 mt-2 space-y-3">
+      {/* Conversational chapter opening — sets the human scene before the questions. */}
+      {hasNarrative && (
+        <div
+          className="relative overflow-hidden rounded-2xl border p-4"
+          style={{ borderColor: tint(hue, 0.4), background: tint(hue, 0.08) }}
+        >
+          <div className="mb-1.5 flex items-center gap-2">
+            <MessageCircle className="h-4 w-4" style={{ color: hue }} />
+            <span className="text-[12px] font-extrabold uppercase tracking-wide" style={{ color: hue }}>
+              Setting the scene
+            </span>
+          </div>
+          <p className="text-[13.5px] font-medium leading-relaxed" style={{ color: NAVY.ink }}>
+            {section.narrative}
+          </p>
+        </div>
+      )}
+
+      {/* Combined supervisor guidance for every module folded into this chapter. */}
+      {guides.length > 0 && (
+        <div className="rounded-2xl border bg-white/75 backdrop-blur" style={{ borderColor: tint(hue, 0.4) }}>
+          <div className="flex items-center gap-2 border-b px-4 py-2.5" style={{ borderColor: tint(hue, 0.25) }}>
+            <Lightbulb className="h-4 w-4" style={{ color: hue }} />
+            <span className="text-sm font-bold" style={{ color: hue }}>
+              Supervisor guidance{guides.length > 1 ? ` · ${guides.length} areas in this chapter` : ""}
+            </span>
+          </div>
+          <div className="divide-y" style={{ borderColor: tint(hue, 0.18) }}>
+            {guides.map((g) => (
+              <div key={g.code} className="p-4">
+                {guides.length > 1 && (
+                  <div className="mb-2 text-[12.5px] font-extrabold" style={{ color: NAVY.ink }}>
+                    {g.title}
+                  </div>
+                )}
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <HintCol title="Who to ask" text={g.whoToAsk} hue={hue} />
+                  <HintCol title="What to check" text={g.whatToCheck} hue={hue} />
+                  <HintCol title="How to collect" text={g.howToCollect} hue={hue} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1234,7 +1369,7 @@ function JourneyRail({
   isSectionComplete,
   onJump,
 }: {
-  sections: { id: string; label: string }[];
+  sections: ChapterSection[];
   currentIdx: number;
   isSectionComplete: (i: number) => boolean;
   onJump: (i: number) => void;
@@ -1282,7 +1417,7 @@ function HandoffCard({
   onChooseAnother,
   onFinish,
 }: {
-  sections: { id: string; label: string }[];
+  sections: ChapterSection[];
   fromIdx: number;
   nextIdx: number;
   completedCount: number;
@@ -1290,14 +1425,19 @@ function HandoffCard({
   onChooseAnother: () => void;
   onFinish: () => void;
 }) {
-  const fromLabel = sections[fromIdx]?.label || "that form";
+  const fromSection = sections[fromIdx];
+  const fromLabel = fromSection?.label || "that chapter";
   const hasNext = nextIdx >= 0 && nextIdx < sections.length;
-  const nextLabel = hasNext ? sections[nextIdx].label : "";
+  const nextSection = hasNext ? sections[nextIdx] : null;
+  const nextLabel = nextSection?.label || "";
   const opener = TRANSITION_OPENERS[fromIdx % TRANSITION_OPENERS.length];
-  const nextGuide = hasNext ? MODULE_GUIDANCE[nextIdx] : null;
+  // Prefer the chapter's own closing line — it's written as a natural bridge to
+  // whatever comes next; fall back to a generated sentence otherwise.
   const bridge = hasNext
-    ? `We've captured “${fromLabel}”. ${opener} let's talk about ${nextLabel.toLowerCase()}${nextGuide?.purpose ? ` — ${nextGuide.purpose}` : "."}`
-    : `You've captured “${fromLabel}”, and every module in this visit is now complete. Nice work.`;
+    ? fromSection?.closing
+      ? `${fromSection.closing} ${opener} “${nextLabel}”${nextSection?.subtitle ? ` — ${nextSection.subtitle.toLowerCase()}` : "."}`
+      : `We've captured “${fromLabel}”. ${opener} let's move to “${nextLabel}”.`
+    : `You've captured “${fromLabel}”, and every chapter in this visit is now complete. Nice work.`;
   return (
     <div className="p-4 lg:p-5">
       <div className="relative overflow-hidden rounded-2xl border p-5 shadow-sm" style={{ borderColor: "rgba(129,140,248,0.5)", background: "linear-gradient(120deg, rgba(99,102,241,0.12), rgba(56,189,248,0.08))" }}>
