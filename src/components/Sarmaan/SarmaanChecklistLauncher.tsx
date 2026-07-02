@@ -41,6 +41,8 @@ interface Props {
   groups?: FormGroup[];
   requiresGps?: boolean;
   stateScope?: string[];
+  /** When provided, restricts the visible modules to these section ids (per-module access). Null/undefined = all modules. */
+  allowedSectionIds?: string[] | null;
   onOpenDashboard?: () => void;
   onClose: () => void;
   onSubmitted?: () => void;
