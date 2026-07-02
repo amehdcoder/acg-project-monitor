@@ -671,7 +671,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
             </Badge>
           )}
           <Badge variant="outline" className="gap-1 border-primary/40 text-primary">
-            <Lock className="h-3 w-3" /> {microplanIsEmpty ? "State cascade" : "Microplan-locked"}
+            <Lock className="h-3 w-3" /> {(disableMicroplan || microplanIsEmpty) ? "State cascade" : "Microplan-locked"}
           </Badge>
         </div>
       </div>
