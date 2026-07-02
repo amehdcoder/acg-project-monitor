@@ -18,6 +18,13 @@ import {
   Users,
   ClipboardList,
   Compass,
+  MessageCircle,
+  CalendarDays,
+  UserRound,
+  ArrowRight,
+  Route,
+  X,
+  ChevronDown,
 } from "lucide-react";
 import {
   NAVY,
@@ -49,7 +56,40 @@ interface Props {
 }
 
 const GEO_NAMES = new Set(["state", "lga", "ward", "flhf_name", "community", "settlement_name"]);
+const GEO_ORDER = ["state", "lga", "ward", "flhf_name", "community", "settlement_name"];
 const GUIDANCE = "guidance"; // sentinel for the guidance nav entry
+
+/**
+ * Shared supervision context carried across every module in a guided journey.
+ * Captured once, reused on each independent form submission so the supervisor
+ * never re-enters who they spoke with, the reporting period, or the round.
+ */
+interface SharedContext {
+  respondentName: string;
+  respondentRole: string;
+  reportingMonth: string; // YYYY-MM
+  round: string;
+}
+
+/**
+ * Natural-language connectors used when handing a supervisor from one module to
+ * the next — chosen to mimic how a person eases from one topic to another in a
+ * real supervision conversation. Varied so consecutive prompts never feel robotic.
+ */
+const TRANSITION_OPENERS = [
+  "Naturally,",
+  "While we're still here,",
+  "Following on from that,",
+  "Building on what you just noted,",
+  "That leads us nicely into",
+  "With that fresh in mind,",
+  "Now that the ground is set,",
+  "Keeping the same visit going,",
+  "It makes sense to now",
+  "Before we wrap up,",
+  "As the conversation flows,",
+  "Rounding things out,",
+];
 
 /** Hexcolor helper — translucent tint. */
 const tint = (hex: string, alpha: number) => {
@@ -129,19 +169,60 @@ export default function SarmaanChecklistLauncher({
   const [submitting, setSubmitting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // ---- Shared context carried across every module (captured once) ----
+  const [shared, setShared] = useState<SharedContext>(() => {
+    try {
+      const raw = sessionStorage.getItem(`sarmaan_shared_${formId}`);
+      if (raw) return JSON.parse(raw) as SharedContext;
+    } catch { /* ignore */ }
+    const d = new Date();
+    return {
+      respondentName: "",
+      respondentRole: "",
+      reportingMonth: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      round: "",
+    };
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem(`sarmaan_shared_${formId}`, JSON.stringify(shared)); } catch { /* ignore */ }
+  }, [shared, formId]);
+  const [contextOpen, setContextOpen] = useState(false);
+
+  // ---- Guided journey (conversational chaining across modules) ----
+  const [journeyMode, setJourneyMode] = useState(false);
+  const [handoff, setHandoff] = useState<{ fromIdx: number } | null>(null);
+
+  // GPS captured timestamp (shared context reused across every module).
+  const [gpsCapturedAt, setGpsCapturedAt] = useState<string | null>(null);
+
   const setValue = (id: string, value: any) =>
     setResponses((r) => ({ ...r, [id]: value }));
 
   // GPS question (geopoint) — capture the device fix into responses.
   const gpsQuestion = allQuestions.find((q) => q.type === "geopoint");
   useEffect(() => {
-    if (gpsQuestion && geo.position) {
-      setResponses((r) => ({
-        ...r,
-        [gpsQuestion.id]: `${geo.position!.lat},${geo.position!.lng}`,
-      }));
+    if (geo.position) {
+      setGpsCapturedAt((prev) => prev ?? new Date().toISOString());
+      if (gpsQuestion) {
+        setResponses((r) => ({
+          ...r,
+          [gpsQuestion.id]: `${geo.position!.lat},${geo.position!.lng}`,
+        }));
+      }
     }
   }, [geo.position, gpsQuestion]);
+
+  // Geography summary derived from the shared responses (carried across modules).
+  const geoSummary = useMemo(() => {
+    const parts: string[] = [];
+    for (const name of GEO_ORDER) {
+      const id = mdaNameToId[name];
+      const v = id ? responses[id] : undefined;
+      if (v) parts.push(String(v));
+    }
+    return parts;
+  }, [responses, mdaNameToId]);
+  const hasContext = geoSummary.length > 0 || !!geo.position || !!shared.respondentName;
 
   const isGeoSection = (i: number) =>
     sections[i]?.questions.some((q) => GEO_NAMES.has(q.name || ""));
@@ -209,6 +290,15 @@ export default function SarmaanChecklistLauncher({
       payload.__section_id = section.id;
       payload.__section_label = section.label;
       payload.__section_index = idx + 1;
+      // Shared supervision context — carried forward across every module so the
+      // dashboard can stitch a complete picture of one supervision visit.
+      payload.__respondent_name = shared.respondentName || null;
+      payload.__respondent_role = shared.respondentRole || null;
+      payload.__reporting_month = shared.reportingMonth || null;
+      payload.__round = shared.round || null;
+      payload.__project_id = projectId || null;
+      payload.__captured_at = gpsCapturedAt || new Date().toISOString();
+      payload.__submitted_at = new Date().toISOString();
       const result = await saveSubmission(formId, userId, payload, location, null, "regular");
       if (result.success) {
         toast({
@@ -218,7 +308,12 @@ export default function SarmaanChecklistLauncher({
             : "This supervision form has been recorded to the dashboard.",
         });
         onSubmitted?.();
-        setActive(MENU);
+        if (journeyMode) {
+          setHandoff({ fromIdx: idx });
+          setActive(MENU);
+        } else {
+          setActive(MENU);
+        }
       } else {
         toast({ title: "Submission failed", description: "Please try again.", variant: "destructive" });
       }
@@ -229,6 +324,39 @@ export default function SarmaanChecklistLauncher({
     }
   };
 
+  // ---- Journey completion helpers ----
+  const isSectionComplete = (i: number) => {
+    const vq = visibleQuestions(i).filter((q) => !GEO_NAMES.has(q.name || "") && q.type !== "geopoint");
+    if (vq.length === 0) return false;
+    return vq.every((q) => {
+      if (!q.required) {
+        const v = responses[q.id];
+        return v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
+      }
+      const v = responses[q.id];
+      return v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
+    });
+  };
+  const firstIncompleteIdx = () => {
+    for (let i = 0; i < sections.length; i++) if (!isSectionComplete(i)) return i;
+    return sections.length ? 0 : -1;
+  };
+  const nextIncompleteAfter = (from: number) => {
+    for (let i = from + 1; i < sections.length; i++) if (!isSectionComplete(i)) return i;
+    for (let i = 0; i < from; i++) if (!isSectionComplete(i)) return i;
+    return -1;
+  };
+  const startJourney = () => {
+    setJourneyMode(true);
+    setHandoff(null);
+    const idx = firstIncompleteIdx();
+    if (idx >= 0) setActive(idx);
+  };
+  const completedCount = useMemo(
+    () => sections.reduce((n, _s, i) => n + (isSectionComplete(i) ? 1 : 0), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sections, responses, nameToId],
+  );
 
   const currentIdx = typeof active === "number" ? active : -1;
   const hue = currentIdx >= 0 ? SECTION_HUES[currentIdx % SECTION_HUES.length] : NAVY.teal;
@@ -274,6 +402,24 @@ export default function SarmaanChecklistLauncher({
             </span>
             <span className="min-w-0 flex-1 text-[13px] font-semibold leading-snug">All supervision forms</span>
           </button>
+          {/* Guided journey — chain modules with shared context + conversational hand-offs */}
+          {sections.length > 1 && (
+            <button
+              onClick={startJourney}
+              className="mb-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition"
+              style={{ background: journeyMode ? NAVY.sidebarActive : "rgba(99,102,241,0.12)", border: `1px solid ${journeyMode ? NAVY.teal : "rgba(129,140,248,0.4)"}` }}
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ background: "#6366F1" }}>
+                <Route className="h-4 w-4 text-white" />
+              </span>
+              <span className="min-w-0 flex-1 text-[13px] font-semibold leading-snug">
+                Guided supervision journey
+                <span className="mt-0.5 block text-[10.5px] font-medium" style={{ color: NAVY.sidebarSub }}>
+                  {completedCount}/{sections.length} forms complete
+                </span>
+              </span>
+            </button>
+          )}
           {/* Guidance entry */}
           <button
             onClick={() => setActive(GUIDANCE)}
@@ -363,28 +509,65 @@ export default function SarmaanChecklistLauncher({
           </div>
         </header>
 
+        {/* shared supervision context — carried across every module */}
+        {active !== GUIDANCE && (
+          <SharedContextBar
+            shared={shared}
+            setShared={setShared}
+            open={contextOpen}
+            setOpen={setContextOpen}
+            geoSummary={geoSummary}
+            gps={geo.position ? { lat: geo.position.lat, lng: geo.position.lng } : null}
+            gpsCapturedAt={gpsCapturedAt}
+            hasContext={hasContext}
+          />
+        )}
+
         {/* body */}
         <div ref={scrollRef} className="relative flex min-h-0 flex-1 overflow-y-auto">
           {active === GUIDANCE ? (
             <GuidancePanel onStart={() => setActive(MENU)} />
           ) : active === MENU ? (
-            <FormMenu
-              sections={sections}
-              responses={responses}
-              visibleQuestions={visibleQuestions}
-              onOpenGuidance={() => setActive(GUIDANCE)}
-              onPick={(i) => setActive(i)}
-            />
+            <div className="min-w-0 flex-1">
+              {handoff && (
+                <HandoffCard
+                  sections={sections}
+                  fromIdx={handoff.fromIdx}
+                  nextIdx={nextIncompleteAfter(handoff.fromIdx)}
+                  completedCount={completedCount}
+                  onContinue={(i) => { setHandoff(null); setActive(i); }}
+                  onChooseAnother={() => setHandoff(null)}
+                  onFinish={() => { setHandoff(null); setJourneyMode(false); }}
+                />
+              )}
+              <FormMenu
+                sections={sections}
+                responses={responses}
+                visibleQuestions={visibleQuestions}
+                onOpenGuidance={() => setActive(GUIDANCE)}
+                onPick={(i) => setActive(i)}
+                onStartJourney={sections.length > 1 ? startJourney : undefined}
+                completedCount={completedCount}
+              />
+            </div>
           ) : currentSection ? (
             <main className="relative min-w-0 flex-1 p-5 lg:p-6">
               <RoseBackground hue={hue} />
               <div className="relative">
+                {journeyMode && (
+                  <JourneyRail
+                    sections={sections}
+                    currentIdx={currentIdx}
+                    isSectionComplete={isSectionComplete}
+                    onJump={(i) => setActive(i)}
+                  />
+                )}
                 <button
                   onClick={() => setActive(MENU)}
                   className="mb-3 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[12px] font-semibold transition hover:bg-black/5"
                   style={{ color: hue }}
                 >
-                  <ChevronLeft className="h-4 w-4" /> All supervision forms
+                  <ChevronLeft className="h-4 w-4" /> {journeyMode ? "Pause journey · all forms" : "All supervision forms"}
                 </button>
                 <div className="mb-1 flex items-center gap-2">
                   <span
@@ -496,12 +679,16 @@ function FormMenu({
   visibleQuestions,
   onOpenGuidance,
   onPick,
+  onStartJourney,
+  completedCount = 0,
 }: {
   sections: { id: string; label: string; questions: Question[] }[];
   responses: Record<string, any>;
   visibleQuestions: (idx: number) => Question[];
   onOpenGuidance: () => void;
   onPick: (idx: number) => void;
+  onStartJourney?: () => void;
+  completedCount?: number;
 }) {
   return (
     <main className="min-w-0 flex-1 p-5 lg:p-7" style={{ background: NAVY.canvas }}>
@@ -522,6 +709,27 @@ function FormMenu({
           <BookOpen className="h-4 w-4" style={{ color: NAVY.gold }} /> Guidance &amp; Resources
         </button>
       </div>
+
+      {onStartJourney && sections.length > 1 && (
+        <button
+          onClick={onStartJourney}
+          className="mt-4 flex w-full items-center gap-3 overflow-hidden rounded-2xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+          style={{ borderColor: "rgba(129,140,248,0.5)", background: "linear-gradient(100deg, rgba(99,102,241,0.14), rgba(56,189,248,0.10))" }}
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow" style={{ background: "#6366F1" }}>
+            <Route className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-extrabold" style={{ fontFamily: NAVY.headingFont, color: NAVY.ink }}>
+              Start a guided supervision journey
+            </span>
+            <span className="mt-0.5 block text-[12.5px]" style={{ color: NAVY.inkSoft }}>
+              Walk the modules in a natural order — your location, GPS &amp; respondent carry over, with a friendly nudge to the next form after each submission. {completedCount}/{sections.length} done.
+            </span>
+          </span>
+          <ArrowRight className="hidden h-5 w-5 shrink-0 sm:block" style={{ color: "#6366F1" }} />
+        </button>
+      )}
 
       {sections.length === 0 && (
         <div className="mt-6 rounded-2xl border p-8 text-center" style={{ borderColor: NAVY.line, background: NAVY.panel }}>
@@ -911,6 +1119,230 @@ function QuestionField({ q, hue, value, onChange }: { q: Question; hue: string; 
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* Shared supervision context bar — carried across every module        */
+function SharedContextBar({
+  shared,
+  setShared,
+  open,
+  setOpen,
+  geoSummary,
+  gps,
+  gpsCapturedAt,
+  hasContext,
+}: {
+  shared: SharedContext;
+  setShared: React.Dispatch<React.SetStateAction<SharedContext>>;
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  geoSummary: string[];
+  gps: { lat: number; lng: number } | null;
+  gpsCapturedAt: string | null;
+  hasContext: boolean;
+}) {
+  const monthLabel = shared.reportingMonth
+    ? new Date(shared.reportingMonth + "-01").toLocaleDateString(undefined, { month: "short", year: "numeric" })
+    : "Set period";
+  const chip = (icon: React.ReactNode, label: string, active: boolean) => (
+    <span
+      className="inline-flex max-w-[46vw] items-center gap-1.5 truncate rounded-full px-2.5 py-1 text-[11.5px] font-semibold sm:max-w-none"
+      style={{ background: active ? tint(NAVY.teal, 0.14) : NAVY.panel2, color: active ? shade(NAVY.teal, 0.15) : NAVY.inkSoft, border: `1px solid ${active ? tint(NAVY.teal, 0.4) : NAVY.line}` }}
+    >
+      {icon}
+      <span className="truncate">{label}</span>
+    </span>
+  );
+  return (
+    <div className="border-b px-4 py-2" style={{ borderColor: NAVY.line, background: NAVY.canvas }}>
+      <div className="flex items-center gap-2 overflow-x-auto">
+        <span className="shrink-0 text-[10.5px] font-bold uppercase tracking-wide" style={{ color: NAVY.inkSoft }}>
+          Shared context
+        </span>
+        <div className="flex flex-1 flex-wrap items-center gap-1.5">
+          {chip(<MapPin className="h-3.5 w-3.5" />, geoSummary.length ? geoSummary.slice(-3).join(" › ") : "Set location", geoSummary.length > 0)}
+          {chip(<Crosshair className="h-3.5 w-3.5" />, gps ? `${gps.lat.toFixed(4)}, ${gps.lng.toFixed(4)}` : "Awaiting GPS", !!gps)}
+          {chip(<UserRound className="h-3.5 w-3.5" />, shared.respondentName ? `${shared.respondentName}${shared.respondentRole ? ` · ${shared.respondentRole}` : ""}` : "Add respondent", !!shared.respondentName)}
+          {chip(<CalendarDays className="h-3.5 w-3.5" />, `${monthLabel}${shared.round ? ` · ${shared.round}` : ""}`, !!shared.reportingMonth)}
+        </div>
+        <button
+          onClick={() => setOpen(!open)}
+          className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-bold transition hover:bg-black/5"
+          style={{ color: NAVY.teal }}
+        >
+          {open ? "Done" : "Edit context"}
+          <ChevronDown className={`h-3.5 w-3.5 transition ${open ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+      {open && (
+        <div className="mt-2 grid gap-2 rounded-xl border p-3 sm:grid-cols-2 lg:grid-cols-4" style={{ borderColor: NAVY.line, background: NAVY.panel }}>
+          <label className="text-[11px] font-semibold" style={{ color: NAVY.inkSoft }}>
+            Person spoken to
+            <input
+              value={shared.respondentName}
+              onChange={(e) => setShared((s) => ({ ...s, respondentName: e.target.value }))}
+              placeholder="e.g. Hajiya A. (in-charge)"
+              className="mt-1 w-full rounded-lg border px-2.5 py-1.5 text-[13px] font-medium"
+              style={{ borderColor: NAVY.line, color: NAVY.ink }}
+            />
+          </label>
+          <label className="text-[11px] font-semibold" style={{ color: NAVY.inkSoft }}>
+            Their role
+            <input
+              value={shared.respondentRole}
+              onChange={(e) => setShared((s) => ({ ...s, respondentRole: e.target.value }))}
+              placeholder="e.g. Facility in-charge"
+              className="mt-1 w-full rounded-lg border px-2.5 py-1.5 text-[13px] font-medium"
+              style={{ borderColor: NAVY.line, color: NAVY.ink }}
+            />
+          </label>
+          <label className="text-[11px] font-semibold" style={{ color: NAVY.inkSoft }}>
+            Reporting month
+            <input
+              type="month"
+              value={shared.reportingMonth}
+              onChange={(e) => setShared((s) => ({ ...s, reportingMonth: e.target.value }))}
+              className="mt-1 w-full rounded-lg border px-2.5 py-1.5 text-[13px] font-medium"
+              style={{ borderColor: NAVY.line, color: NAVY.ink }}
+            />
+          </label>
+          <label className="text-[11px] font-semibold" style={{ color: NAVY.inkSoft }}>
+            Round / phase
+            <input
+              value={shared.round}
+              onChange={(e) => setShared((s) => ({ ...s, round: e.target.value }))}
+              placeholder="e.g. Round 2"
+              className="mt-1 w-full rounded-lg border px-2.5 py-1.5 text-[13px] font-medium"
+              style={{ borderColor: NAVY.line, color: NAVY.ink }}
+            />
+          </label>
+          <p className="sm:col-span-2 lg:col-span-4 text-[11px]" style={{ color: NAVY.inkSoft }}>
+            This context is captured once and attached to every form you submit in this visit{gpsCapturedAt ? ` · GPS fixed at ${new Date(gpsCapturedAt).toLocaleTimeString()}` : ""}.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Journey rail — persistent stepper shown while chaining modules      */
+function JourneyRail({
+  sections,
+  currentIdx,
+  isSectionComplete,
+  onJump,
+}: {
+  sections: { id: string; label: string }[];
+  currentIdx: number;
+  isSectionComplete: (i: number) => boolean;
+  onJump: (i: number) => void;
+}) {
+  return (
+    <div className="mb-3 rounded-xl border p-2.5" style={{ borderColor: "rgba(129,140,248,0.4)", background: "linear-gradient(100deg, rgba(99,102,241,0.10), rgba(56,189,248,0.06))" }}>
+      <div className="mb-1.5 flex items-center gap-1.5 px-1">
+        <Route className="h-3.5 w-3.5" style={{ color: "#6366F1" }} />
+        <span className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color: "#4f46e5" }}>Guided journey</span>
+      </div>
+      <div className="flex items-center gap-1 overflow-x-auto pb-1">
+        {sections.map((s, i) => {
+          const done = isSectionComplete(i);
+          const isActive = i === currentIdx;
+          return (
+            <button
+              key={s.id}
+              onClick={() => onJump(i)}
+              title={s.label}
+              className="flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold transition"
+              style={{
+                background: isActive ? "#6366F1" : done ? tint(NAVY.good, 0.18) : NAVY.panel,
+                color: isActive ? "#fff" : done ? shade(NAVY.good, 0.2) : NAVY.inkSoft,
+                border: `1px solid ${isActive ? "#6366F1" : done ? tint(NAVY.good, 0.4) : NAVY.line}`,
+              }}
+            >
+              {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
+              <span className="max-w-[120px] truncate">{i + 1}. {s.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Conversational hand-off after a module is submitted in the journey  */
+function HandoffCard({
+  sections,
+  fromIdx,
+  nextIdx,
+  completedCount,
+  onContinue,
+  onChooseAnother,
+  onFinish,
+}: {
+  sections: { id: string; label: string }[];
+  fromIdx: number;
+  nextIdx: number;
+  completedCount: number;
+  onContinue: (i: number) => void;
+  onChooseAnother: () => void;
+  onFinish: () => void;
+}) {
+  const fromLabel = sections[fromIdx]?.label || "that form";
+  const hasNext = nextIdx >= 0 && nextIdx < sections.length;
+  const nextLabel = hasNext ? sections[nextIdx].label : "";
+  const opener = TRANSITION_OPENERS[fromIdx % TRANSITION_OPENERS.length];
+  const nextGuide = hasNext ? MODULE_GUIDANCE[nextIdx] : null;
+  const bridge = hasNext
+    ? `We've captured “${fromLabel}”. ${opener} let's talk about ${nextLabel.toLowerCase()}${nextGuide?.purpose ? ` — ${nextGuide.purpose}` : "."}`
+    : `You've captured “${fromLabel}”, and every module in this visit is now complete. Nice work.`;
+  return (
+    <div className="p-4 lg:p-5">
+      <div className="relative overflow-hidden rounded-2xl border p-5 shadow-sm" style={{ borderColor: "rgba(129,140,248,0.5)", background: "linear-gradient(120deg, rgba(99,102,241,0.12), rgba(56,189,248,0.08))" }}>
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white shadow" style={{ background: hasNext ? "#6366F1" : NAVY.good }}>
+            {hasNext ? <MessageCircle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "#4f46e5" }}>
+              {hasNext ? "Continuing the conversation" : "Journey complete"} · {completedCount}/{sections.length} forms
+            </p>
+            <p className="mt-1 text-[14px] font-semibold leading-snug" style={{ color: NAVY.ink }}>
+              {bridge}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {hasNext && (
+                <button
+                  onClick={() => onContinue(nextIdx)}
+                  className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-[13px] font-bold text-white shadow transition hover:brightness-105"
+                  style={{ background: "#6366F1" }}
+                >
+                  Continue to “{nextLabel}” <ArrowRight className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                onClick={onChooseAnother}
+                className="inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-[13px] font-bold transition hover:bg-black/5"
+                style={{ borderColor: NAVY.line, color: NAVY.ink }}
+              >
+                Choose another form
+              </button>
+              <button
+                onClick={onFinish}
+                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-semibold transition hover:bg-black/5"
+                style={{ color: NAVY.inkSoft }}
+              >
+                <X className="h-4 w-4" /> {hasNext ? "End journey" : "Done"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 /* ------------------------------------------------------------------ */
 function ProgressRing({ pct, color }: { pct: number; color: string }) {
