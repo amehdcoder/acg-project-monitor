@@ -109,6 +109,9 @@ import { toast } from "@/hooks/use-toast";
 import { FormBuilder } from "@/components/FormBuilder";
 import SpecialFormStudio from "@/components/SpecialFormStudio/SpecialFormStudio";
 import SpecialFormDashboard from "@/components/SpecialFormStudio/SpecialFormDashboard";
+import SarmaanLearningDashboard from "@/components/Sarmaan/SarmaanLearningDashboard";
+import SarmaanChecklistLauncher from "@/components/Sarmaan/SarmaanChecklistLauncher";
+import { isSupervisoryLearningForm } from "@/components/Sarmaan/sarmaanBrand";
 import { downloadXlsForm } from "@/lib/specialStudio/xlsformExport";
 import { FormFiller } from "@/components/FormFiller";
 import MdaChecklistLanding from "@/components/MdaChecklist/MdaChecklistLanding";
@@ -239,6 +242,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [dashboardForm, setDashboardForm] = useState<Form | null>(null);
   const [mdaDashboardForm, setMdaDashboardForm] = useState<Form | null>(null);
   const [specialDashForm, setSpecialDashForm] = useState<Form | null>(null);
+  const [sarmaanDashForm, setSarmaanDashForm] = useState<Form | null>(null);
+  const [sarmaanLaunchForm, setSarmaanLaunchForm] = useState<Form | null>(null);
   const [templateForm, setTemplateForm] = useState<{ templateId: string; name: string; description: string; questions: Question[]; settings: any; geofence?: GeofenceArea } | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
@@ -567,6 +572,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       dashboardForm ||
       mdaDashboardForm ||
       specialDashForm ||
+      sarmaanDashForm ||
+      sarmaanLaunchForm ||
       geofenceManagerForm ||
       templateForm ||
       qrCodeForm ||
@@ -602,6 +609,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     dashboardForm,
     mdaDashboardForm,
     specialDashForm,
+    sarmaanDashForm,
+    sarmaanLaunchForm,
     geofenceManagerForm,
     templateForm,
     qrCodeForm,
@@ -1412,6 +1421,39 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           settings: specialDashForm.settings,
         }}
         onClose={() => setSpecialDashForm(null)}
+      />
+    );
+  }
+
+  if (sarmaanDashForm) {
+    return (
+      <SarmaanLearningDashboard
+        form={{
+          id: sarmaanDashForm.id,
+          name: sarmaanDashForm.name,
+          questions: (sarmaanDashForm.questions as unknown) ?? sarmaanDashForm.groups,
+          settings: sarmaanDashForm.settings,
+        }}
+        onClose={() => setSarmaanDashForm(null)}
+      />
+    );
+  }
+
+  if (sarmaanLaunchForm) {
+    const launch = sarmaanLaunchForm;
+    return (
+      <SarmaanChecklistLauncher
+        formName={launch.name}
+        requiresGps={launch.settings?.requireLocation !== false}
+        onBegin={() => {
+          setSarmaanLaunchForm(null);
+          setFillingForm(launch);
+        }}
+        onOpenDashboard={() => {
+          setSarmaanLaunchForm(null);
+          setSarmaanDashForm(launch);
+        }}
+        onClose={() => setSarmaanLaunchForm(null)}
       />
     );
   }
@@ -2240,9 +2282,53 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   // border/text + form name + row left-border are all in sync.
                   const accent = getProjectAccent(form.project_id, projects, idx);
                   const isMdaChecklistForm = isMdaChecklistLike({ settings: form.settings, formName: form.name, groups: form.groups });
+                  const isSarmaanSupervisory = isSupervisoryLearningForm({ settings: form.settings, name: form.name });
 
                   return (
                     <div key={form.id} className="contents">
+                      {isSarmaanSupervisory && (
+                        <div
+                          className="group relative overflow-hidden rounded-2xl border p-4 sm:p-5"
+                          style={{
+                            borderColor: "#0F7B6C33",
+                            background: "linear-gradient(120% 140% at 100% 0%, #0F7B6C 0%, #0A574C 55%, #073B33 100%)",
+                          }}
+                        >
+                          <div
+                            aria-hidden
+                            className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full opacity-30"
+                            style={{ background: "radial-gradient(circle, #F4B12B66 0%, transparent 65%)" }}
+                          />
+                          <div className="relative flex flex-wrap items-center gap-3">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: "#F4B12B" }}>
+                              <ClipboardList className="h-6 w-6" style={{ color: "#073B33" }} strokeWidth={2.2} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "#F4B12B", color: "#073B33" }}>
+                                SARMAAN
+                              </span>
+                              <h4 className="mt-1 truncate text-[16px] font-extrabold text-white">Integrated Supervisory Checklist</h4>
+                              <p className="truncate text-xs text-white/80">13-section supervision journey · auto-scored /80 · live learning dashboard</p>
+                            </div>
+                          </div>
+                          <div className="relative mt-4 flex flex-wrap gap-2">
+                            <button
+                              onClick={() => setSarmaanLaunchForm(form)}
+                              className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-md transition active:scale-[0.98]"
+                              style={{ background: "#F4B12B", color: "#073B33" }}
+                            >
+                              <ClipboardCheck className="h-4 w-4" /> Begin supervision
+                            </button>
+                            <button
+                              onClick={() => setSarmaanDashForm(form)}
+                              className="inline-flex items-center gap-2 rounded-xl border-2 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
+                              style={{ borderColor: "rgba(255,255,255,0.4)" }}
+                            >
+                              <BarChart3 className="h-4 w-4" /> Learning dashboard
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       {isMdaChecklistForm && canSeeMdaDashboard && (
                         <div
                           className="group flex items-center gap-3 border-l-4 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
