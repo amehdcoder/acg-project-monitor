@@ -149,6 +149,107 @@ const updateRetryCount = async (id: string, retryCount: number): Promise<void> =
   });
 };
 
+// --- Conflict log helpers (offline edits that lost to newer server data) ---
+const CONFLICT_PLAIN_FIELDS = ["id", "submission_id", "form_id", "detected_at"];
+
+const recordEditConflict = async (conflict: EditConflict): Promise<void> => {
+  const db = await initDB();
+  const sealed = await sealRecord(conflict as any, CONFLICT_PLAIN_FIELDS);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(CONFLICT_STORE, "readwrite");
+    const req = tx.objectStore(CONFLICT_STORE).put(sealed);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+};
+
+const getEditConflicts = async (): Promise<EditConflict[]> => {
+  const db = await initDB();
+  const rows: any[] = await new Promise((resolve, reject) => {
+    const tx = db.transaction(CONFLICT_STORE, "readonly");
+    const req = tx.objectStore(CONFLICT_STORE).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return unsealAll<EditConflict>(rows);
+};
+
+const clearEditConflict = async (id: string): Promise<void> => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(CONFLICT_STORE, "readwrite");
+    const req = tx.objectStore(CONFLICT_STORE).delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+};
+
+/**
+ * Conflict-safe write of a single offline EDIT.
+ *
+ * Rule — LAST-WRITE-WINS BY CAPTURE TIME:
+ *  • We compare the moment the change was made on-device (client_updated_at)
+ *    with the server row's updated_at.
+ *  • If the offline edit is newer, it is applied (merged field-by-field so
+ *    fields the user did not touch keep the freshest server value).
+ *  • If the server row is newer, the server data is authoritative — the edit
+ *    is NOT applied. Instead the conflict is logged locally for review so no
+ *    newer server data is ever silently overwritten.
+ *
+ * Returns "applied" | "conflict" | "missing".
+ */
+const syncEditWithConflictRule = async (
+  s: PendingSubmission,
+): Promise<"applied" | "conflict" | "missing"> => {
+  const clientTs = s.client_updated_at || s.created_at;
+
+  const { data: serverRow, error: fetchErr } = await supabase
+    .from("form_submissions")
+    .select("id, data, updated_at, synced_at, submitted_at")
+    .eq("id", s.id)
+    .maybeSingle();
+
+  if (fetchErr) throw fetchErr;
+
+  // The row does not exist on the server yet → treat the edit as a fresh insert.
+  if (!serverRow) return "missing";
+
+  const serverTs =
+    serverRow.updated_at || serverRow.synced_at || serverRow.submitted_at || "";
+
+  // Server has a strictly newer version → do NOT overwrite. Log the conflict.
+  if (serverTs && new Date(serverTs).getTime() > new Date(clientTs).getTime()) {
+    await recordEditConflict({
+      id: `conflict_${s.id}_${Date.now()}`,
+      submission_id: s.id,
+      form_id: s.form_id,
+      user_id: s.user_id,
+      offline_data: s.data,
+      server_data: (serverRow.data as Record<string, any>) || {},
+      offline_updated_at: clientTs,
+      server_updated_at: serverTs,
+      detected_at: new Date().toISOString(),
+    });
+    return "conflict";
+  }
+
+  // Offline edit is newer (or server has no timestamp) → merge & apply.
+  // Field-by-field merge keeps any server field the user never touched.
+  const merged = { ...(serverRow.data as Record<string, any> || {}), ...s.data };
+  const { error: updErr } = await supabase
+    .from("form_submissions")
+    .update({
+      data: merged,
+      location: s.location,
+      within_geofence: s.within_geofence,
+      updated_at: new Date().toISOString(),
+      synced_at: new Date().toISOString(),
+    })
+    .eq("id", s.id);
+
+  if (updErr) throw updErr;
+  return "applied";
+
 export const useOfflineStorage = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
