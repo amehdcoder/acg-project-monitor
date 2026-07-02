@@ -199,8 +199,8 @@ export const MODULE_GUIDANCE: ModuleGuidance[] = [
       "Establish exactly what was supervised, where, and how it was verified so every downstream score is anchored to a real, located visit.",
     whoToAsk: "Implementing team lead, facility in-charge, community entry point (CHW / volunteer).",
     whatToCheck:
-      "Geography is set from the microplan cascade (State → LGA → Ward → FLHF → Community → Settlement). Confirm the GPS is captured on site and the visit type matches what actually happened.",
-    howToCollect: "Direct observation, GPS capture on arrival, and the microplan-driven location cascade.",
+      "Geography is set from the location cascade (State → LGA → Ward → FLHF → Community → Settlement). Confirm the GPS is captured on site and the visit type matches what actually happened.",
+    howToCollect: "Direct observation, GPS capture on arrival, and the State-driven location cascade.",
     tips: [
       "Capture GPS while physically at the activity location — not in the vehicle or afterwards.",
       "Select every activity actually supervised; leave out those you only heard about.",
