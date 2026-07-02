@@ -836,8 +836,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
 
             return (
               <div key={key} className={cn("space-y-1.5", key === "settlement_name" && "sm:col-span-2")}>
-                <Label className="text-xs font-semibold text-foreground">
-                  {label}{!optional && <span className="ml-0.5 text-destructive">*</span>}
+                <Label className={cn("font-semibold text-foreground", big ? "text-sm sm:text-base" : "text-xs")}>
+                  {label}{!isOptional && <span className="ml-0.5 text-destructive">*</span>}
                 </Label>
 
                 {isLeafGeo ? (
