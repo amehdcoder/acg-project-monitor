@@ -655,7 +655,9 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
           <div>
             <h4 className="text-sm font-bold text-foreground sm:text-base">Supervision Location</h4>
             <p className="text-xs text-muted-foreground">
-              {microplanIsEmpty
+              {disableMicroplan
+                ? "Pick the area you are supervising from the State cascade"
+                : microplanIsEmpty
                 ? "No microplan linked — pick the area from the State cascade"
                 : "Driven by the microplan — pick the area you are supervising"}
             </p>
