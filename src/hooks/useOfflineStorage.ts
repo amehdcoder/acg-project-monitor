@@ -431,6 +431,13 @@ export const useOfflineStorage = () => {
         });
       }
 
+      if (conflicts > 0) {
+        toast({
+          title: "Edit Conflicts Kept Safe",
+          description: `${conflicts} offline edit${conflicts > 1 ? "s were" : " was"} not applied because the server had newer data. Review them under conflicts.`,
+        });
+      }
+
       if (failed > 0) {
         toast({
           title: "Some Submissions Failed",
