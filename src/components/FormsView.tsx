@@ -131,7 +131,7 @@ import BulkUploadAccessManager from "@/components/OwnerTools/BulkUploadAccessMan
 import { useBulkDataAccess } from "@/hooks/useBulkDataAccess";
 import { scrollToAppTop } from "@/lib/scrollToAppTop";
 import { isMdaChecklistLike } from "@/lib/mdaFollowUp";
-import { FileSpreadsheet, KeyRound, GanttChartSquare, NotebookPen, Copy, Eye, EyeOff } from "lucide-react";
+import { FileSpreadsheet, KeyRound, GanttChartSquare, NotebookPen, Copy, EyeOff } from "lucide-react";
 import CopyMdaChecklistDialog from "@/components/MdaChecklist/CopyMdaChecklistDialog";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
