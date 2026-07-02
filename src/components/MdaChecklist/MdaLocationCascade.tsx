@@ -167,7 +167,7 @@ const uniqueSorted = (values: string[]) =>
 
 
 
-export default function MdaLocationCascade({ projectId, responses, nameToId, onSet, stateScope, disableMicroplan }: Props) {
+export default function MdaLocationCascade({ projectId, responses, nameToId, onSet, stateScope, disableMicroplan, visibleLevels, optionalLevels, big }: Props) {
   const { user, isOwner, isAdmin } = useAuth();
   const scope = useMicroplanScope(isOwner || isAdmin);
 
