@@ -78,6 +78,19 @@ interface Props {
    * that must not be tied to microplanning data at all.
    */
   disableMicroplan?: boolean;
+  /**
+   * Restrict which cascade levels are shown. When set, only these levels are
+   * rendered (e.g. ["state","lga","ward"] for the SARMAAN checklist which drops
+   * FLHF / Community / Settlement). Defaults to all six levels.
+   */
+  visibleLevels?: Array<keyof GeoRow>;
+  /**
+   * Levels that should NOT be marked required (no red asterisk, not enforced).
+   * Merged with the built-in optional set (Settlement).
+   */
+  optionalLevels?: Array<keyof GeoRow>;
+  /** Bigger, Kobo/CommCare-style labels & inputs for Android field use. */
+  big?: boolean;
 }
 
 // Maps a cascade level to the FormFiller question `name` it should populate.
