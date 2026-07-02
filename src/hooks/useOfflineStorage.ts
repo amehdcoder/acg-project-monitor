@@ -344,6 +344,35 @@ export const useOfflineStorage = () => {
         synced_at: new Date().toISOString(),
       });
       const touchedFormIds = new Set<string>();
+      let conflicts = 0;
+
+      // ---- Conflict-safe drain of offline EDITS first ----
+      // Edits are applied with the last-write-wins rule so they never clobber a
+      // newer server record. A "missing" edit (row not on server) is demoted to
+      // a normal insert below.
+      const edits = pending.filter((s) => s.is_edit);
+      const inserts: PendingSubmission[] = pending.filter((s) => !s.is_edit);
+
+      for (const edit of edits) {
+        if (!navigator.onLine) break;
+        try {
+          const outcome = await syncEditWithConflictRule(edit);
+          if (outcome === "missing") {
+            // Not on server yet — send it through the insert path instead.
+            inserts.push({ ...edit, is_edit: false });
+            continue;
+          }
+          await removeFromOfflineStorage(edit.id);
+          touchedFormIds.add(edit.form_id);
+          if (outcome === "applied") synced++;
+          else conflicts++;
+        } catch (editErr: any) {
+          console.error("Error syncing offline edit:", edit.id, editErr);
+          await updateRetryCount(edit.id, edit.retryCount + 1);
+          failed++;
+        }
+      }
+
 
       for (let i = 0; i < pending.length; i += CHUNK) {
         if (!navigator.onLine) break;
