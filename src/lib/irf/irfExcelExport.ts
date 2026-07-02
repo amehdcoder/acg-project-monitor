@@ -13,7 +13,7 @@
 import ExcelJS from "exceljs";
 import { IRF_CATEGORY_FORMS, type IrfCategoryForm } from "@/lib/irf/categoryForms";
 import type { IrfReport } from "@/lib/irf/definition";
-import { normalizeIrfRows } from "@/lib/irf/normalize";
+import { normalizeIrfRows, computeIrfReach } from "@/lib/irf/normalize";
 
 const NAVY = "FF0C2340";
 const WHITE = "FFFFFFFF";
