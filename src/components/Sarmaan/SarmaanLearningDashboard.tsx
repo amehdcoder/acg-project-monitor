@@ -575,6 +575,74 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
 
 /* ---------- helpers ---------- */
 
+function timeAgo(ts: number): string {
+  if (!ts) return "—";
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 5) return "just now";
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  return `${h}h ago`;
+}
+
+function LiveIndicator({ live, lastUpdated, flash }: { live: boolean; lastUpdated: number; flash: boolean }) {
+  return (
+    <div
+      className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide transition"
+      style={{
+        borderColor: live ? "rgba(16,185,129,0.35)" : NAVY.line,
+        background: live ? "rgba(16,185,129,0.10)" : "transparent",
+        color: live ? NAVY.good : NAVY.inkSoft,
+      }}
+      title={live ? "Realtime connected — updates apply instantly" : "Connecting to realtime…"}
+    >
+      <span className="relative flex h-2 w-2">
+        {live && <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" style={{ background: NAVY.good }} />}
+        <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: live ? NAVY.good : NAVY.inkSoft }} />
+      </span>
+      <span>{live ? "Live" : "Offline"}</span>
+      <span className="font-medium normal-case tracking-normal" style={{ color: NAVY.inkSoft }}>· {flash ? "updating…" : timeAgo(lastUpdated)}</span>
+    </div>
+  );
+}
+
+function SkeletonBlock({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return <div className={`animate-pulse rounded-lg ${className ?? ""}`} style={{ background: "rgba(15,23,42,0.06)", ...style }} />;
+}
+
+function DashboardSkeleton() {
+  return (
+    <div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="rounded-2xl border p-3.5 shadow-sm" style={{ borderColor: NAVY.line, background: NAVY.panel }}>
+            <div className="flex items-center gap-2">
+              <SkeletonBlock className="h-8 w-8" />
+              <SkeletonBlock className="h-3 flex-1" />
+            </div>
+            <SkeletonBlock className="mt-3 h-7 w-2/3" />
+            <SkeletonBlock className="mt-2 h-2 w-1/2" />
+            <SkeletonBlock className="mt-3 h-6 w-full" />
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-5">
+        <SkeletonBlock className="h-[260px] xl:col-span-2" />
+        <SkeletonBlock className="h-[260px] xl:col-span-2" />
+        <SkeletonBlock className="h-[260px]" />
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <SkeletonBlock className="h-[220px]" />
+        <SkeletonBlock className="h-[220px]" />
+      </div>
+      <p className="mt-6 text-center text-xs" style={{ color: NAVY.inkSoft }}>Loading live SARMAAN submissions…</p>
+    </div>
+  );
+}
+
+
+
 function Empty({ loading, label }: { loading: boolean; label: string }) {
   return <p className="flex h-[180px] items-center justify-center text-center text-xs" style={{ color: NAVY.inkSoft }}>{loading ? "Loading…" : label}</p>;
 }
