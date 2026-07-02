@@ -242,6 +242,7 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
     return [...m.entries()].map(([lga, e]) => ({
       lga,
       count: e.count,
+      scoreN: e.scoreN,
       quality: e.scoreN ? Math.round(e.scoreSum / e.scoreN) : 0,
       completion: e.completeN ? Math.round(e.completeSum / e.completeN) : 0,
     }));
