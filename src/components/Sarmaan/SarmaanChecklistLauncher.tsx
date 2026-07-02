@@ -679,12 +679,16 @@ function FormMenu({
   visibleQuestions,
   onOpenGuidance,
   onPick,
+  onStartJourney,
+  completedCount = 0,
 }: {
   sections: { id: string; label: string; questions: Question[] }[];
   responses: Record<string, any>;
   visibleQuestions: (idx: number) => Question[];
   onOpenGuidance: () => void;
   onPick: (idx: number) => void;
+  onStartJourney?: () => void;
+  completedCount?: number;
 }) {
   return (
     <main className="min-w-0 flex-1 p-5 lg:p-7" style={{ background: NAVY.canvas }}>
@@ -705,6 +709,27 @@ function FormMenu({
           <BookOpen className="h-4 w-4" style={{ color: NAVY.gold }} /> Guidance &amp; Resources
         </button>
       </div>
+
+      {onStartJourney && sections.length > 1 && (
+        <button
+          onClick={onStartJourney}
+          className="mt-4 flex w-full items-center gap-3 overflow-hidden rounded-2xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+          style={{ borderColor: "rgba(129,140,248,0.5)", background: "linear-gradient(100deg, rgba(99,102,241,0.14), rgba(56,189,248,0.10))" }}
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow" style={{ background: "#6366F1" }}>
+            <Route className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-extrabold" style={{ fontFamily: NAVY.headingFont, color: NAVY.ink }}>
+              Start a guided supervision journey
+            </span>
+            <span className="mt-0.5 block text-[12.5px]" style={{ color: NAVY.inkSoft }}>
+              Walk the modules in a natural order — your location, GPS &amp; respondent carry over, with a friendly nudge to the next form after each submission. {completedCount}/{sections.length} done.
+            </span>
+          </span>
+          <ArrowRight className="hidden h-5 w-5 shrink-0 sm:block" style={{ color: "#6366F1" }} />
+        </button>
+      )}
 
       {sections.length === 0 && (
         <div className="mt-6 rounded-2xl border p-8 text-center" style={{ borderColor: NAVY.line, background: NAVY.panel }}>
