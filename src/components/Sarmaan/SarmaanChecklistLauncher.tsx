@@ -290,6 +290,15 @@ export default function SarmaanChecklistLauncher({
       payload.__section_id = section.id;
       payload.__section_label = section.label;
       payload.__section_index = idx + 1;
+      // Shared supervision context — carried forward across every module so the
+      // dashboard can stitch a complete picture of one supervision visit.
+      payload.__respondent_name = shared.respondentName || null;
+      payload.__respondent_role = shared.respondentRole || null;
+      payload.__reporting_month = shared.reportingMonth || null;
+      payload.__round = shared.round || null;
+      payload.__project_id = projectId || null;
+      payload.__captured_at = gpsCapturedAt || new Date().toISOString();
+      payload.__submitted_at = new Date().toISOString();
       const result = await saveSubmission(formId, userId, payload, location, null, "regular");
       if (result.success) {
         toast({
@@ -299,7 +308,12 @@ export default function SarmaanChecklistLauncher({
             : "This supervision form has been recorded to the dashboard.",
         });
         onSubmitted?.();
-        setActive(MENU);
+        if (journeyMode) {
+          setHandoff({ fromIdx: idx });
+          setActive(MENU);
+        } else {
+          setActive(MENU);
+        }
       } else {
         toast({ title: "Submission failed", description: "Please try again.", variant: "destructive" });
       }
