@@ -857,6 +857,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
                           : `Select or add ${label.toLowerCase()}`
                     }
                     emptyLabel="No microplan match — type to add"
+                    triggerClassName={big ? "h-12 text-base" : undefined}
                     onChange={(v) => {
                       const inMicroplan = microplanOptions(key).includes(v);
                       const inGrid3 =
