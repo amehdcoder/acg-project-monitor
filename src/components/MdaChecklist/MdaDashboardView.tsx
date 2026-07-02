@@ -155,12 +155,57 @@ function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm, questions:
 export default function MdaDashboardView({ form, projects = [], onClose, embedded = false }: Props) {
   const { isOwner, isAdmin, isOwnerLevel } = useAuth();
   const canManageAccess = isAdmin || isOwnerLevel;
+  const canManageLifecycle = isAdmin || isOwnerLevel;
   const [showAccess, setShowAccess] = useState(false);
   const { submissions, loading, loadFailed, refresh } = useDataAnalytics({ formId: form.id });
   const [refreshing, setRefreshing] = useState(false);
   const [cacheVersion, setCacheVersion] = useState(0);
   const [optimisticallyHiddenIds, setOptimisticallyHiddenIds] = useState<Set<string>>(new Set());
   const [optimisticallyEmpty, setOptimisticallyEmpty] = useState(false);
+
+  // ── Dashboard publish / checklist finalize lifecycle ──
+  const formSettings = (form.settings ?? {}) as MdaCopySettings;
+  const [published, setPublished] = useState(isDashboardPublished(formSettings));
+  const [finalized, setFinalized] = useState(String((form as any).status ?? "") === "published");
+  const [savingLifecycle, setSavingLifecycle] = useState(false);
+
+  useEffect(() => {
+    setPublished(isDashboardPublished((form.settings ?? {}) as MdaCopySettings));
+    setFinalized(String((form as any).status ?? "") === "published");
+  }, [form]);
+
+  const togglePublish = async () => {
+    const next = !published;
+    setSavingLifecycle(true);
+    try {
+      const merged = { ...((form.settings ?? {}) as MdaCopySettings), dashboardPublished: next };
+      const { error } = await supabase.from("forms").update({ settings: merged as any }).eq("id", form.id);
+      if (error) throw error;
+      (form as any).settings = merged;
+      setPublished(next);
+      toast.success(next ? "Dashboard published — members can now view it." : "Dashboard unpublished — hidden from members.");
+    } catch (e: any) {
+      toast.error(e?.message || "Could not update the dashboard.");
+    } finally {
+      setSavingLifecycle(false);
+    }
+  };
+
+  const finalizeChecklist = async () => {
+    setSavingLifecycle(true);
+    try {
+      const { error } = await supabase.from("forms").update({ status: "published" }).eq("id", form.id);
+      if (error) throw error;
+      (form as any).status = "published";
+      setFinalized(true);
+      toast.success("Checklist finalized — field users can now fill it.");
+    } catch (e: any) {
+      toast.error(e?.message || "Could not finalize the checklist.");
+    } finally {
+      setSavingLifecycle(false);
+    }
+  };
+
 
   const handleRefresh = async () => {
     setRefreshing(true);
