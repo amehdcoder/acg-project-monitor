@@ -73,10 +73,16 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [nav, setNav] = useState<string>(DASHBOARD_NAV[0]);
+  // Realtime feedback: connection state, last refresh time, and a transient
+  // "flash" pulse whenever a live change is applied so updates feel instant.
+  const [live, setLive] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<number>(0);
+  const [flash, setFlash] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { live?: boolean }) => {
+    if (!opts?.live) setLoading(true);
     const { data } = await supabase
       .from("form_submissions")
       .select("id,data,submitted_at,created_at,user_id")
