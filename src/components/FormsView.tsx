@@ -1261,25 +1261,25 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   );
   const sarmaanSearchMatches = !searchQuery.trim() || /sarmaan|supervisory|supervision|checklist|dashboard|learning/i.test(searchQuery);
   const shouldShowSarmaanSupervisoryBlock = currentProjectIsSarmaan && sarmaanSearchMatches && (!!primarySarmaanSupervisoryForm || isAdmin);
-  const sarmaanVisibleRowCount = shouldShowSarmaanSupervisoryBlock ? (primarySarmaanSupervisoryForm ? 2 : 1) : 0;
+  const sarmaanVisibleRowCount = shouldShowSarmaanSupervisoryBlock ? 2 : 0;
   const visibleMyFormsCount = filteredNonSarmaanForms.length + sarmaanVisibleRowCount;
 
-  const createSarmaanSupervisoryTool = async () => {
+  const createSarmaanSupervisoryTool = async (): Promise<Form | null> => {
     if (!currentProjectId) {
       toast({ title: "Select a project", description: "Choose the SARMAAN project before adding the checklist.", variant: "destructive" });
-      return;
+      return null;
     }
     const existing = sarmaanSupervisoryForms.find((form) => form.project_id === currentProjectId);
     if (existing) {
       toast({ title: "Already visible", description: "The SARMAAN Supervisory Checklist and Supervision Dashboard are already shown under this project." });
-      return;
+      return existing;
     }
     try {
       const preset = getPreset("supervisory_learning");
       if (!preset) throw new Error("SARMAAN supervisory template is unavailable.");
       const sections = preset.sections();
       const dashboardConfig = preset.dashboard();
-      const { error } = await supabase.from("forms").insert({
+      const { data, error } = await supabase.from("forms").insert({
         name: SARMAAN_SUPERVISORY_FORM_NAME,
         description: SARMAAN_SUPERVISORY_DESC,
         questions: sections as any,
@@ -1295,13 +1295,28 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         project_id: currentProjectId,
         created_by: user?.id,
         status: "active",
-      } as any);
+      } as any).select("*").single();
       if (error) throw error;
+      const allItems = ((data as any)?.questions as unknown as any[]) || [];
+      const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
+      const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
+      const createdForm = {
+        ...(data as any),
+        questions: ungroupedQuestions,
+        groups: groupItems,
+        geofence: ((data as any)?.geofence as unknown as GeofenceArea) || null,
+        settings: ((data as any)?.settings as unknown as FormSettings) || {},
+        submissions_count: 0,
+      } as Form;
+      setForms((prev) => (prev.some((f) => f.id === createdForm.id) ? prev : [createdForm, ...prev]));
+      cacheFormsForOffline([createdForm]);
       toast({ title: "Added to SARMAAN forms", description: "The checklist and dashboard are now visible as separate entries." });
       fetchForms(currentProjectId);
+      return createdForm;
     } catch (e: any) {
       console.error("SARMAAN supervisory add error", e);
       toast({ title: "Could not add", description: e?.message || "Please try again.", variant: "destructive" });
+      return null;
     }
   };
 
