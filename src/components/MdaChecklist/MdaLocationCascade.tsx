@@ -277,7 +277,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     })();
     return () => { cancelled = true; controller.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, stateScopeKey]);
+  }, [projectId, stateScopeKey, disableMicroplan]);
 
   // The state restriction used for BOTH the microplan filter and the off-microplan
   // / no-microplan cascade: the admin-defined form state scope takes priority,
