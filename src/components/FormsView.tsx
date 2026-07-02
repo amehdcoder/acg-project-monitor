@@ -2068,6 +2068,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   <div className="border-b border-border/60 bg-[#F8FAFD] p-3 sm:p-4">
                     {primarySarmaanSupervisoryForm ? (
                       <div className="grid gap-3 sm:grid-cols-2">
+                        {canSeeSarmaanChecklist && (
                         <button
                           type="button"
                           onClick={() => setSarmaanLaunchForm(primarySarmaanSupervisoryForm)}
