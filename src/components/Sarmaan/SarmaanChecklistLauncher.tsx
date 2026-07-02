@@ -58,6 +58,15 @@ const tint = (hex: string, alpha: number) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
+// Darken a hex color by a factor (0..1) for crisp outlines / centers.
+const shade = (hex: string, factor: number) => {
+  const h = hex.replace("#", "");
+  const r = Math.round(parseInt(h.slice(0, 2), 16) * (1 - factor));
+  const g = Math.round(parseInt(h.slice(2, 4), 16) * (1 - factor));
+  const b = Math.round(parseInt(h.slice(4, 6), 16) * (1 - factor));
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
 /**
  * SARMAAN ACSM Integrated Supervisory Checklist — an interactive, section-by-
  * section data-collection surface. Every sidebar module is clickable and
