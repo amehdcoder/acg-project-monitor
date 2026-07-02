@@ -58,6 +58,15 @@ const tint = (hex: string, alpha: number) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
+// Darken a hex color by a factor (0..1) for crisp outlines / centers.
+const shade = (hex: string, factor: number) => {
+  const h = hex.replace("#", "");
+  const r = Math.round(parseInt(h.slice(0, 2), 16) * (1 - factor));
+  const g = Math.round(parseInt(h.slice(2, 4), 16) * (1 - factor));
+  const b = Math.round(parseInt(h.slice(4, 6), 16) * (1 - factor));
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
 /**
  * SARMAAN ACSM Integrated Supervisory Checklist — an interactive, section-by-
  * section data-collection surface. Every sidebar module is clickable and
@@ -105,7 +114,8 @@ export default function SarmaanChecklistLauncher({
   }, [allQuestions]);
 
   const [responses, setResponses] = useState<Record<string, any>>({});
-  const [active, setActive] = useState<number | typeof GUIDANCE>(0);
+  const MENU = "menu" as const;
+  const [active, setActive] = useState<number | typeof GUIDANCE | typeof MENU>(MENU);
   const [submitting, setSubmitting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -143,32 +153,33 @@ export default function SarmaanChecklistLauncher({
     return { done, total };
   }, [allQuestions, responses, nameToId]);
 
-  const progress = active === GUIDANCE
-    ? 0
-    : Math.round(((typeof active === "number" ? active + 1 : 0) / Math.max(sections.length, 1)) * 100);
+  const progress = typeof active === "number"
+    ? Math.round((visibleQuestions(active).filter((q) => {
+        const v = responses[q.id];
+        return v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
+      }).length / Math.max(visibleQuestions(active).length, 1)) * 100)
+    : 0;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   }, [active]);
 
-  // ---- Submission ----
-  const missingRequired = () =>
-    allQuestions.filter((q) => {
+  // ---- Per-section submission (each section is an independent form) ----
+  const missingInSection = (idx: number) =>
+    visibleQuestions(idx).filter((q) => {
       if (!q.required) return false;
-      if (!evaluateRelevant(q.relevant, responses, nameToId)) return false;
       const v = responses[q.id];
       return v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
     });
 
-  const handleSubmit = async () => {
-    const missing = missingRequired();
+  const handleSubmit = async (idx: number) => {
+    const section = sections[idx];
+    if (!section) return;
+    const missing = missingInSection(idx);
     if (missing.length > 0) {
-      const first = missing[0];
-      const idx = sections.findIndex((s) => s.questions.some((q) => q.id === first.id));
-      if (idx >= 0) setActive(idx);
       toast({
         title: "Complete required questions",
-        description: `${missing.length} required question(s) still need an answer.`,
+        description: `${missing.length} required question(s) still need an answer in this form.`,
         variant: "destructive",
       });
       return;
@@ -176,16 +187,28 @@ export default function SarmaanChecklistLauncher({
     setSubmitting(true);
     try {
       const location = geo.position ? { lat: geo.position.lat, lng: geo.position.lng } : null;
-      const result = await saveSubmission(formId, userId, { ...responses }, location, null, "regular");
+      // Build a self-contained payload: this section's answers + shared geography/GPS context.
+      const geoIds = new Set(
+        allQuestions.filter((q) => GEO_NAMES.has(q.name || "") || q.type === "geopoint").map((q) => q.id),
+      );
+      const sectionIds = new Set(section.questions.map((q) => q.id));
+      const payload: Record<string, any> = {};
+      Object.entries(responses).forEach(([k, v]) => {
+        if (sectionIds.has(k) || geoIds.has(k)) payload[k] = v;
+      });
+      payload.__section_id = section.id;
+      payload.__section_label = section.label;
+      payload.__section_index = idx + 1;
+      const result = await saveSubmission(formId, userId, payload, location, null, "regular");
       if (result.success) {
         toast({
-          title: result.offline ? "Saved offline" : "Checklist submitted",
+          title: result.offline ? "Saved offline" : `“${section.label}” submitted`,
           description: result.offline
-            ? "Your submission is stored on device and will sync when you're online."
-            : "Thank you — the supervisory checklist has been recorded.",
+            ? "Your form is stored on device and will sync when you're online."
+            : "This supervision form has been recorded to the dashboard.",
         });
         onSubmitted?.();
-        onClose();
+        setActive(MENU);
       } else {
         toast({ title: "Submission failed", description: "Please try again.", variant: "destructive" });
       }
@@ -195,6 +218,7 @@ export default function SarmaanChecklistLauncher({
       setSubmitting(false);
     }
   };
+
 
   const currentIdx = typeof active === "number" ? active : -1;
   const hue = currentIdx >= 0 ? SECTION_HUES[currentIdx % SECTION_HUES.length] : NAVY.teal;
@@ -229,7 +253,18 @@ export default function SarmaanChecklistLauncher({
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 pb-3">
-          {/* Guidance entry — always at the very top */}
+          {/* All forms menu — return to the form picker */}
+          <button
+            onClick={() => setActive(MENU)}
+            className="mb-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition"
+            style={{ background: active === MENU ? NAVY.sidebarActive : "rgba(18,181,165,0.10)", border: `1px solid ${active === MENU ? NAVY.teal : "rgba(18,181,165,0.35)"}` }}
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ background: NAVY.teal }}>
+              <ClipboardList className="h-4 w-4 text-white" />
+            </span>
+            <span className="min-w-0 flex-1 text-[13px] font-semibold leading-snug">All supervision forms</span>
+          </button>
+          {/* Guidance entry */}
           <button
             onClick={() => setActive(GUIDANCE)}
             className="mb-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition"
@@ -303,7 +338,7 @@ export default function SarmaanChecklistLauncher({
           </button>
           <div className="hidden items-center gap-2 lg:flex">
             <span className="text-xs font-semibold" style={{ color: NAVY.inkSoft }}>
-              {active === GUIDANCE ? "Guidance" : `Step ${currentIdx + 1} of ${sections.length}`}
+              {active === GUIDANCE ? "Guidance" : active === MENU ? "Supervision forms" : `Form ${currentIdx + 1} of ${sections.length}`}
             </span>
             {currentSection && <span className="text-sm font-bold" style={{ color: NAVY.ink }}>· {currentSection.label}</span>}
           </div>
@@ -318,35 +353,29 @@ export default function SarmaanChecklistLauncher({
           </div>
         </header>
 
-        {/* step chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto border-b px-5 py-3" style={{ borderColor: NAVY.line, background: NAVY.panel2 }}>
-          {sections.map((s, i) => (
-            <div key={s.id} className="flex shrink-0 items-center">
-              <button
-                onClick={() => setActive(i)}
-                className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold transition"
-                style={{
-                  background: currentIdx >= i ? SECTION_HUES[i % SECTION_HUES.length] : NAVY.line,
-                  color: currentIdx >= i ? "#fff" : NAVY.inkSoft,
-                }}
-              >
-                {currentIdx > i ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
-              </button>
-              {i < sections.length - 1 && (
-                <span className="h-0.5 w-6" style={{ background: currentIdx > i ? SECTION_HUES[i % SECTION_HUES.length] : NAVY.line }} />
-              )}
-            </div>
-          ))}
-        </div>
-
         {/* body */}
         <div ref={scrollRef} className="relative flex min-h-0 flex-1 overflow-y-auto">
           {active === GUIDANCE ? (
-            <GuidancePanel onStart={() => setActive(0)} />
+            <GuidancePanel onStart={() => setActive(MENU)} />
+          ) : active === MENU ? (
+            <FormMenu
+              sections={sections}
+              responses={responses}
+              visibleQuestions={visibleQuestions}
+              onOpenGuidance={() => setActive(GUIDANCE)}
+              onPick={(i) => setActive(i)}
+            />
           ) : currentSection ? (
             <main className="relative min-w-0 flex-1 p-5 lg:p-6">
               <RoseBackground hue={hue} />
               <div className="relative">
+                <button
+                  onClick={() => setActive(MENU)}
+                  className="mb-3 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[12px] font-semibold transition hover:bg-black/5"
+                  style={{ color: hue }}
+                >
+                  <ChevronLeft className="h-4 w-4" /> All supervision forms
+                </button>
                 <div className="mb-1 flex items-center gap-2">
                   <span
                     className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-extrabold text-white shadow"
@@ -362,8 +391,8 @@ export default function SarmaanChecklistLauncher({
                 {/* module hint pulled from guidance */}
                 <ModuleHint idx={currentIdx} hue={hue} />
 
-                {/* GPS strip for the visit-information section */}
-                {(isGeoSection(currentIdx) || currentSection.questions.some((q) => q.type === "geopoint")) && requiresGps && (
+                {/* GPS strip — every form is self-contained */}
+                {requiresGps && (
                   <GpsStrip
                     hue={hue}
                     position={geo.position}
@@ -372,8 +401,8 @@ export default function SarmaanChecklistLauncher({
                   />
                 )}
 
-                {/* Location cascade for the geography section */}
-                {isGeoSection(currentIdx) && projectId && (
+                {/* Location cascade — captured on every independent form for context */}
+                {projectId && (
                   <div className="mb-5 rounded-2xl border bg-white/70 p-4 backdrop-blur" style={{ borderColor: tint(hue, 0.35) }}>
                     <div className="mb-3 flex items-center gap-2 text-sm font-bold" style={{ color: hue }}>
                       <Compass className="h-4 w-4" /> Supervision location (from microplan)
@@ -391,7 +420,7 @@ export default function SarmaanChecklistLauncher({
                 {/* Questions */}
                 <div className="space-y-4">
                   {visibleQuestions(currentIdx)
-                    .filter((q) => !(isGeoSection(currentIdx) && GEO_NAMES.has(q.name || "")))
+                    .filter((q) => !GEO_NAMES.has(q.name || ""))
                     .filter((q) => q.type !== "geopoint")
                     .map((q) => (
                       <QuestionField
@@ -402,9 +431,9 @@ export default function SarmaanChecklistLauncher({
                         onChange={(v) => setValue(q.id, v)}
                       />
                     ))}
-                  {visibleQuestions(currentIdx).length === 0 && !isGeoSection(currentIdx) && (
+                  {visibleQuestions(currentIdx).filter((q) => !GEO_NAMES.has(q.name || "") && q.type !== "geopoint").length === 0 && (
                     <div className="rounded-2xl border bg-white/70 p-6 text-center text-sm" style={{ borderColor: tint(hue, 0.3), color: NAVY.inkSoft }}>
-                      No questions apply to this section based on your answers so far.
+                      Fill the supervision location above, then submit this form.
                     </div>
                   )}
                 </div>
@@ -417,57 +446,146 @@ export default function SarmaanChecklistLauncher({
           )}
         </div>
 
-        {/* bottom action bar */}
-        <footer
-          className="flex items-center gap-2 border-t px-4 py-3"
-          style={{ borderColor: NAVY.line, background: NAVY.panel, paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-        >
-          <button
-            onClick={() => {
-              if (active === GUIDANCE) return;
-              if (currentIdx <= 0) setActive(GUIDANCE);
-              else setActive(currentIdx - 1);
-            }}
-            disabled={active === GUIDANCE}
-            className="inline-flex items-center gap-1 rounded-xl border px-4 py-2.5 text-sm font-semibold transition hover:bg-black/5 disabled:opacity-40"
-            style={{ borderColor: NAVY.line, color: NAVY.inkSoft }}
+        {/* bottom action bar — only when filling an individual form */}
+        {typeof active === "number" && currentSection && (
+          <footer
+            className="flex items-center gap-2 border-t px-4 py-3"
+            style={{ borderColor: NAVY.line, background: NAVY.panel, paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
           >
-            <ChevronLeft className="h-4 w-4" /> Previous
-          </button>
-          <div className="ml-auto flex items-center gap-2">
-            {active !== GUIDANCE && currentIdx < sections.length - 1 ? (
-              <button
-                onClick={() => setActive(currentIdx + 1)}
-                className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition active:scale-[0.98]"
-                style={{ background: hue }}
-              >
-                Next Section <ChevronRight className="h-4 w-4" />
-              </button>
-            ) : active !== GUIDANCE ? (
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition active:scale-[0.98] disabled:opacity-60"
-                style={{ background: NAVY.primary }}
-              >
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Submit Checklist
-              </button>
-            ) : (
-              <button
-                onClick={() => setActive(0)}
-                className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition active:scale-[0.98]"
-                style={{ background: NAVY.teal }}
-              >
-                Start checklist <ChevronRight className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </footer>
+            <button
+              onClick={() => setActive(MENU)}
+              className="inline-flex items-center gap-1 rounded-xl border px-4 py-2.5 text-sm font-semibold transition hover:bg-black/5"
+              style={{ borderColor: NAVY.line, color: NAVY.inkSoft }}
+            >
+              <ChevronLeft className="h-4 w-4" /> Cancel
+            </button>
+            <button
+              onClick={() => handleSubmit(currentIdx)}
+              disabled={submitting}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition active:scale-[0.98] disabled:opacity-60"
+              style={{ background: hue }}
+            >
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Submit “{currentSection.label}”
+            </button>
+          </footer>
+        )}
       </div>
     </div>
   );
 }
+
+
+/* ------------------------------------------------------------------ */
+/* Form picker — each section is an independent, separately-submittable */
+/* supervision form.                                                    */
+/* ------------------------------------------------------------------ */
+function FormMenu({
+  sections,
+  responses,
+  visibleQuestions,
+  onOpenGuidance,
+  onPick,
+}: {
+  sections: { id: string; label: string; questions: Question[] }[];
+  responses: Record<string, any>;
+  visibleQuestions: (idx: number) => Question[];
+  onOpenGuidance: () => void;
+  onPick: (idx: number) => void;
+}) {
+  return (
+    <main className="min-w-0 flex-1 p-5 lg:p-7" style={{ background: NAVY.canvas }}>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-extrabold" style={{ fontFamily: NAVY.headingFont }}>
+            Choose a supervision form
+          </h2>
+          <p className="mt-0.5 text-[13px]" style={{ color: NAVY.inkSoft }}>
+            Each module is an independent form — fill and submit only what you are supervising right now.
+          </p>
+        </div>
+        <button
+          onClick={onOpenGuidance}
+          className="inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition hover:bg-black/5"
+          style={{ borderColor: tint(NAVY.gold, 0.5), color: NAVY.ink, background: tint(NAVY.gold, 0.12) }}
+        >
+          <BookOpen className="h-4 w-4" style={{ color: NAVY.gold }} /> Guidance &amp; Resources
+        </button>
+      </div>
+
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {sections.map((s, i) => {
+          const h = SECTION_HUES[i % SECTION_HUES.length];
+          const total = visibleQuestions(i).filter((q) => q.type !== "geopoint" && !GEO_NAMES.has(q.name || "")).length;
+          const done = visibleQuestions(i).filter((q) => {
+            if (q.type === "geopoint" || GEO_NAMES.has(q.name || "")) return false;
+            const v = responses[q.id];
+            return v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
+          }).length;
+          const started = done > 0;
+          return (
+            <button
+              key={s.id}
+              onClick={() => onPick(i)}
+              className="group relative overflow-hidden rounded-2xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+              style={{ borderColor: tint(h, 0.5), background: NAVY.panel }}
+            >
+              <div
+                className="absolute inset-x-0 top-0 h-1.5"
+                style={{ background: `linear-gradient(90deg, ${h}, ${shade(h, 0.25)})` }}
+              />
+              <div className="pointer-events-none absolute right-0 top-0 opacity-90">
+                <MiniRose hue={h} />
+              </div>
+              <div className="relative">
+                <span
+                  className="flex h-11 w-11 items-center justify-center rounded-xl text-[15px] font-extrabold text-white shadow"
+                  style={{ background: h, fontFamily: NAVY.headingFont }}
+                >
+                  {i + 1}
+                </span>
+                <h3 className="mt-3 text-[15px] font-extrabold leading-snug" style={{ fontFamily: NAVY.headingFont, color: NAVY.ink }}>
+                  {s.label}
+                </h3>
+                <div className="mt-3 flex items-center gap-2">
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                    style={{
+                      background: started ? tint(h, 0.16) : NAVY.panel2,
+                      color: started ? shade(h, 0.2) : NAVY.inkSoft,
+                    }}
+                  >
+                    {started ? <CheckCircle2 className="h-3.5 w-3.5" /> : <ClipboardList className="h-3.5 w-3.5" />}
+                    {done}/{total} answered
+                  </span>
+                </div>
+                <div className="mt-4 inline-flex items-center gap-1 text-[13px] font-bold" style={{ color: h }}>
+                  {started ? "Continue form" : "Open form"} <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </main>
+  );
+}
+
+function MiniRose({ hue }: { hue: string }) {
+  const stroke = shade(hue, 0.45);
+  return (
+    <svg width="92" height="92" viewBox="-46 -46 92 92" aria-hidden="true" opacity={0.35}>
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
+        <ellipse key={a} rx={26} ry={13} fill={hue} stroke={stroke} strokeWidth={2} transform={`rotate(${a}) translate(0 -20)`} />
+      ))}
+      <circle r={11} fill={shade(hue, 0.15)} stroke={stroke} strokeWidth={2} />
+      <circle r={5} fill={NAVY.gold} />
+    </svg>
+  );
+}
+
+
+
 
 /* ------------------------------------------------------------------ */
 /* Guidance panel                                                      */
@@ -553,25 +671,54 @@ function GuideRow({ icon, label, text }: { icon: React.ReactNode; label: string;
 /* Section decor + hints                                               */
 /* ------------------------------------------------------------------ */
 function RoseBackground({ hue }: { hue: string }) {
-  // Repeating rose-flower motif, tinted to the section hue, sitting softly
-  // behind the questions.
+  // Bold, high-contrast rose-flower motif tinted to the section hue.
+  // Uses saturated fills + dark outlines so the pattern is clearly visible,
+  // including for low-vision users.
+  const stroke = shade(hue, 0.45);
   const rose = (cx: number, cy: number, r: number, opacity: number) => (
     <g transform={`translate(${cx} ${cy})`} opacity={opacity}>
-      {[0, 60, 120, 180, 240, 300].map((a) => (
-        <ellipse key={a} rx={r} ry={r * 0.55} fill={hue} transform={`rotate(${a}) translate(0 ${-r * 0.7})`} />
+      {/* outer petals */}
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
+        <ellipse
+          key={`o${a}`}
+          rx={r}
+          ry={r * 0.5}
+          fill={hue}
+          stroke={stroke}
+          strokeWidth={2}
+          transform={`rotate(${a}) translate(0 ${-r * 0.75})`}
+        />
       ))}
-      <circle r={r * 0.5} fill={hue} />
-      <circle r={r * 0.22} fill="#fff" opacity={0.5} />
+      {/* inner petals */}
+      {[22, 67, 112, 157, 202, 247, 292, 337].map((a) => (
+        <ellipse
+          key={`i${a}`}
+          rx={r * 0.6}
+          ry={r * 0.32}
+          fill={tint(hue, 0.35)}
+          stroke={stroke}
+          strokeWidth={1.5}
+          transform={`rotate(${a}) translate(0 ${-r * 0.45})`}
+        />
+      ))}
+      <circle r={r * 0.42} fill={shade(hue, 0.15)} stroke={stroke} strokeWidth={2} />
+      <circle r={r * 0.18} fill={NAVY.gold} />
     </g>
   );
   return (
-    <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
-      {rose(60, 80, 46, 0.06)}
-      {rose(320, 40, 30, 0.05)}
-      {rose(90, 360, 34, 0.05)}
-      {rose(280, 300, 52, 0.05)}
-      {rose(180, 180, 24, 0.04)}
-      {rose(360, 480, 40, 0.05)}
+    <svg
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      aria-hidden="true"
+      preserveAspectRatio="xMidYMid slice"
+      viewBox="0 0 420 560"
+    >
+      {rose(60, 80, 52, 0.3)}
+      {rose(340, 60, 40, 0.26)}
+      {rose(100, 380, 44, 0.26)}
+      {rose(300, 320, 58, 0.24)}
+      {rose(200, 200, 30, 0.22)}
+      {rose(380, 500, 46, 0.26)}
+      {rose(30, 260, 26, 0.22)}
     </svg>
   );
 }
