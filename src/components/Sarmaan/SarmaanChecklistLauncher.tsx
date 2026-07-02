@@ -702,6 +702,9 @@ export default function SarmaanChecklistLauncher({
                       onSet={(updates) => setResponses((r) => ({ ...r, ...updates }))}
                       stateScope={stateScope}
                       disableMicroplan
+                      visibleLevels={["state", "lga", "ward"]}
+                      optionalLevels={["ward"]}
+                      big
                     />
                   </div>
                 )}
