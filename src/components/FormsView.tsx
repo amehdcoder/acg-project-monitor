@@ -2121,6 +2121,26 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5" />
                           </div>
                         </button>
+                        {sarmaanIsManager && (
+                          <div className="sm:col-span-2 flex flex-wrap gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setSarmaanChecklistAccessOpen(true)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-muted"
+                              style={{ borderColor: "#12B5A54D", color: "#0A2540" }}
+                            >
+                              <ShieldCheck className="h-3.5 w-3.5" style={{ color: "#0E8D80" }} /> Manage checklist access
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSarmaanDashAccessOpen(true)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-muted"
+                              style={{ borderColor: "#12B5A54D", color: "#0A2540" }}
+                            >
+                              <ShieldCheck className="h-3.5 w-3.5" style={{ color: "#0E8D80" }} /> Manage dashboard access
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="grid gap-3 sm:grid-cols-2">
