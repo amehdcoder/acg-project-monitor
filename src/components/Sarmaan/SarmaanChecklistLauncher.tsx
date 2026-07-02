@@ -64,6 +64,23 @@ const GEO_ORDER = ["state", "lga", "ward", "flhf_name", "community", "settlement
 const GUIDANCE = "guidance"; // sentinel for the guidance nav entry
 
 /**
+ * A merged, immersive chapter built from one or more raw form modules (A–M).
+ * Carries the concatenated questions plus the narrative framing used to make
+ * the supervision journey feel like one continuous human conversation.
+ */
+interface ChapterSection {
+  id: string;
+  label: string;
+  subtitle: string;
+  narrative: string;
+  closing: string;
+  /** Raw module group ids merged into this chapter (for access + submission). */
+  memberIds: string[];
+  guidance: ModuleGuidance[];
+  questions: Question[];
+}
+
+/**
  * Shared supervision context carried across every module in a guided journey.
  * Captured once, reused on each independent form submission so the supervisor
  * never re-enters who they spoke with, the reporting period, or the round.
