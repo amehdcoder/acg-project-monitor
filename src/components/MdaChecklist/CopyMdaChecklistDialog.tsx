@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -18,9 +20,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Copy, Loader2, MapPin, ClipboardCheck } from "lucide-react";
+import {
+  Copy,
+  Loader2,
+  MapPin,
+  ClipboardCheck,
+  LayoutDashboard,
+  ArrowRight,
+  CheckCircle2,
+  ListChecks,
+  Layers,
+} from "lucide-react";
 import type { FormGroup } from "@/components/FormBuilder/types";
-import { getStateChoices, restrictChecklistToState } from "@/lib/mda/copyChecklist";
+import {
+  getStateChoices,
+  buildChecklistCopyPayload,
+  type MdaCopySettings,
+} from "@/lib/mda/copyChecklist";
 
 interface SourceChecklist {
   id: string;
@@ -28,7 +44,7 @@ interface SourceChecklist {
   description: string | null;
   project_id: string;
   questions: FormGroup[];
-  settings: Record<string, any> | null;
+  settings: MdaCopySettings | null;
 }
 
 interface Props {
@@ -46,6 +62,21 @@ interface Props {
 
 const NONE = "__none__";
 
+/** Count the number of sections (groups) and questions in a checklist payload. */
+function summarize(questions: FormGroup[]): { sections: number; questions: number } {
+  let sections = 0;
+  let qs = 0;
+  for (const g of questions ?? []) {
+    if (g && Array.isArray((g as any).questions)) {
+      sections += 1;
+      qs += (g as any).questions.length;
+    } else {
+      qs += 1;
+    }
+  }
+  return { sections, questions: qs };
+}
+
 export default function CopyMdaChecklistDialog({
   open,
   onOpenChange,
@@ -61,6 +92,8 @@ export default function CopyMdaChecklistDialog({
   const [sources, setSources] = useState<SourceChecklist[]>([]);
   const [sourceId, setSourceId] = useState<string>("");
   const [stateValue, setStateValue] = useState<string>(NONE);
+  const [publishDashboard, setPublishDashboard] = useState(false);
+  const [finalizeChecklist, setFinalizeChecklist] = useState(false);
 
   const stateChoices = useMemo(() => getStateChoices(), []);
   const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? "Project";
@@ -69,6 +102,8 @@ export default function CopyMdaChecklistDialog({
     if (!open) return;
     setSourceId("");
     setStateValue(NONE);
+    setPublishDashboard(false);
+    setFinalizeChecklist(false);
     (async () => {
       setLoading(true);
       try {
@@ -94,33 +129,34 @@ export default function CopyMdaChecklistDialog({
   }, [open, currentProjectId, toast]);
 
   const selected = sources.find((s) => s.id === sourceId);
+  const counts = selected ? summarize(selected.questions) : null;
 
   const handleCopy = async () => {
     if (!currentProjectId || !selected) return;
     setCopying(true);
     try {
-      const restricted = restrictChecklistToState(
-        selected.questions,
-        stateValue === NONE ? null : stateValue,
-      );
-      const settings = {
-        ...(selected.settings ?? {}),
-        copiedFromProject: projectName(selected.project_id),
-        ...(stateValue !== NONE ? { stateRestricted: stateValue } : {}),
-      };
+      const payload = buildChecklistCopyPayload(selected, {
+        stateValue: stateValue === NONE ? null : stateValue,
+        publishDashboard,
+        finalizeChecklist,
+        sourceProjectName: projectName(selected.project_id),
+      });
       const { error } = await supabase.from("forms").insert({
-        name: selected.name,
-        description: selected.description,
-        questions: restricted as any,
-        settings: settings as any,
+        name: payload.name,
+        description: payload.description,
+        questions: payload.questions as any,
+        settings: payload.settings as any,
         project_id: currentProjectId,
         created_by: userId,
-        status: "draft",
+        status: payload.status,
       } as any);
       if (error) throw error;
       toast({
-        title: "Checklist copied",
-        description: "It's now editable in this project from your forms list.",
+        title: "Checklist & dashboard copied",
+        description: finalizeChecklist
+          ? "The checklist is finalized and ready to fill. The linked dashboard is "
+              + (publishDashboard ? "published." : "unpublished — publish it when ready.")
+          : "Saved as an editable draft. Finalize it and publish the dashboard when ready.",
       });
       onOpenChange(false);
       onCopied();
@@ -137,27 +173,27 @@ export default function CopyMdaChecklistDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Copy className="h-5 w-5 text-emerald-600" />
-            Copy MDA Supervisory Checklist
+            Copy MDA Checklist & Dashboard
           </DialogTitle>
           <DialogDescription>
-            Bring an existing checklist from another project into{" "}
+            Make an exact copy of the complete Integrated MDA Supervisory
+            Checklist and its linked dashboard into{" "}
             <span className="font-medium text-foreground">
               {currentProjectId ? projectName(currentProjectId) : "this project"}
             </span>
-            . You can restrict it to a single state so field users only pick the
-            supervision location within that state. The copy stays fully editable.
+            . Everything stays fully editable in the Form Builder.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-1">
           {destinationHasChecklist && (
             <p className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
-              This project already has an MDA checklist. Copying will add another
-              one — remove the existing checklist first if you want to replace it.
+              This project already has an MDA checklist. Copying adds another one
+              — remove the existing checklist first if you want to replace it.
             </p>
           )}
 
@@ -190,6 +226,37 @@ export default function CopyMdaChecklistDialog({
             )}
           </div>
 
+          {selected && counts && (
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <div className="flex items-center justify-center gap-3 text-sm">
+                <span className="font-medium">{projectName(selected.project_id)}</span>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-emerald-700">
+                  {currentProjectId ? projectName(currentProjectId) : "This project"}
+                </span>
+              </div>
+              <Separator className="my-3" />
+              <p className="text-xs font-medium text-muted-foreground mb-2">
+                What gets copied
+              </p>
+              <ul className="grid grid-cols-1 gap-1.5 text-xs text-foreground">
+                <li className="flex items-center gap-2">
+                  <Layers className="h-3.5 w-3.5 text-emerald-600" />
+                  {counts.sections} sections · {counts.questions} questions (with
+                  skip logic, validation & cascade selects)
+                </li>
+                <li className="flex items-center gap-2">
+                  <ListChecks className="h-3.5 w-3.5 text-emerald-600" />
+                  Linked Coverage Evaluation 3D flow
+                </li>
+                <li className="flex items-center gap-2">
+                  <LayoutDashboard className="h-3.5 w-3.5 text-emerald-600" />
+                  The complete linked supervisory dashboard
+                </li>
+              </ul>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label className="text-sm flex items-center gap-1.5">
               <MapPin className="h-4 w-4 text-emerald-600" /> Restrict to a state
@@ -218,6 +285,38 @@ export default function CopyMdaChecklistDialog({
               </p>
             )}
           </div>
+
+          <Separator />
+
+          <div className="space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <Label className="text-sm flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Finalize
+                  checklist now
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Publish immediately so field users can fill it. Leave off to
+                  keep an editable draft.
+                </p>
+              </div>
+              <Switch checked={finalizeChecklist} onCheckedChange={setFinalizeChecklist} />
+            </div>
+
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <Label className="text-sm flex items-center gap-1.5">
+                  <LayoutDashboard className="h-4 w-4 text-emerald-600" /> Publish
+                  dashboard now
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Make the linked dashboard visible to members. You can
+                  publish/unpublish it any time from the dashboard.
+                </p>
+              </div>
+              <Switch checked={publishDashboard} onCheckedChange={setPublishDashboard} />
+            </div>
+          </div>
         </div>
 
         <DialogFooter>
@@ -231,7 +330,7 @@ export default function CopyMdaChecklistDialog({
               </>
             ) : (
               <>
-                <Copy className="h-4 w-4 mr-1.5" /> Copy checklist
+                <Copy className="h-4 w-4 mr-1.5" /> Copy checklist & dashboard
               </>
             )}
           </Button>

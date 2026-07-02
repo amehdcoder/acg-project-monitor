@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, ChevronUp, Loader2, RefreshCw, WifiOff, UserPlus } from "lucide-react";
+import { ArrowLeft, BarChart3, ChevronUp, Loader2, RefreshCw, WifiOff, UserPlus, Eye, EyeOff, Lock, CheckCircle2 } from "lucide-react";
 import DashboardAccessManager from "@/components/dashboard/DashboardAccessManager";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,10 +7,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useDataAnalytics, type SubmissionRecord } from "@/hooks/useDataAnalytics";
 import { clearMdaCache, loadMdaCache, saveMdaCache, isOffline } from "@/lib/mda/offlineCache";
 import { canonicalizeSubmissionData } from "@/lib/mda/dashboardData";
+import { isDashboardPublished, type MdaCopySettings } from "@/lib/mda/copyChecklist";
 import MdaSupervisoryChecklistDashboard from "./MdaSupervisoryChecklistDashboard";
 import OwnerSubmissionManager, { type OwnerDataMutation } from "@/components/owner/OwnerSubmissionManager";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
 
 interface MdaDashboardForm {
   id: string;
@@ -20,6 +22,7 @@ interface MdaDashboardForm {
   questions?: unknown[];
   groups?: unknown[];
   settings?: unknown;
+  status?: string | null;
 }
 
 interface DashboardOption {
@@ -153,12 +156,57 @@ function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm, questions:
 export default function MdaDashboardView({ form, projects = [], onClose, embedded = false }: Props) {
   const { isOwner, isAdmin, isOwnerLevel } = useAuth();
   const canManageAccess = isAdmin || isOwnerLevel;
+  const canManageLifecycle = isAdmin || isOwnerLevel;
   const [showAccess, setShowAccess] = useState(false);
   const { submissions, loading, loadFailed, refresh } = useDataAnalytics({ formId: form.id });
   const [refreshing, setRefreshing] = useState(false);
   const [cacheVersion, setCacheVersion] = useState(0);
   const [optimisticallyHiddenIds, setOptimisticallyHiddenIds] = useState<Set<string>>(new Set());
   const [optimisticallyEmpty, setOptimisticallyEmpty] = useState(false);
+
+  // ── Dashboard publish / checklist finalize lifecycle ──
+  const formSettings = (form.settings ?? {}) as MdaCopySettings;
+  const [published, setPublished] = useState(isDashboardPublished(formSettings));
+  const [finalized, setFinalized] = useState(String((form as any).status ?? "") === "published");
+  const [savingLifecycle, setSavingLifecycle] = useState(false);
+
+  useEffect(() => {
+    setPublished(isDashboardPublished((form.settings ?? {}) as MdaCopySettings));
+    setFinalized(String((form as any).status ?? "") === "published");
+  }, [form]);
+
+  const togglePublish = async () => {
+    const next = !published;
+    setSavingLifecycle(true);
+    try {
+      const merged = { ...((form.settings ?? {}) as MdaCopySettings), dashboardPublished: next };
+      const { error } = await supabase.from("forms").update({ settings: merged as any }).eq("id", form.id);
+      if (error) throw error;
+      (form as any).settings = merged;
+      setPublished(next);
+      toast.success(next ? "Dashboard published — members can now view it." : "Dashboard unpublished — hidden from members.");
+    } catch (e: any) {
+      toast.error(e?.message || "Could not update the dashboard.");
+    } finally {
+      setSavingLifecycle(false);
+    }
+  };
+
+  const finalizeChecklist = async () => {
+    setSavingLifecycle(true);
+    try {
+      const { error } = await supabase.from("forms").update({ status: "published" }).eq("id", form.id);
+      if (error) throw error;
+      (form as any).status = "published";
+      setFinalized(true);
+      toast.success("Checklist finalized — field users can now fill it.");
+    } catch (e: any) {
+      toast.error(e?.message || "Could not finalize the checklist.");
+    } finally {
+      setSavingLifecycle(false);
+    }
+  };
+
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -298,6 +346,37 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
               {refreshing ? "Refreshing" : "Refresh"}
             </Button>
 
+            {canManageLifecycle && !finalized && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={finalizeChecklist}
+                disabled={savingLifecycle}
+                className="gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              >
+                <CheckCircle2 className="h-4 w-4" /> Finalize checklist
+              </Button>
+            )}
+
+            {canManageLifecycle && (
+              <Button
+                variant={published ? "outline" : "default"}
+                size="sm"
+                onClick={togglePublish}
+                disabled={savingLifecycle}
+                className="gap-1.5"
+              >
+                {savingLifecycle ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : published ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+                {published ? "Unpublish dashboard" : "Publish dashboard"}
+              </Button>
+            )}
+
             {canManageAccess && (
               <Button
                 variant="outline"
@@ -308,6 +387,7 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
                 <UserPlus className="h-4 w-4" /> Grant access
               </Button>
             )}
+
 
             {isOwner && (
               <OwnerSubmissionManager
@@ -330,6 +410,16 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
       <main className={`space-y-6 px-4 py-6 ${embedded ? "" : "container mx-auto"}`}>
 
 
+        {!published && canManageLifecycle && (
+          <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+            <EyeOff className="h-4 w-4 shrink-0" />
+            <span>
+              <strong>Unpublished:</strong> only admins & owners can see this dashboard.
+              Use <em>Publish dashboard</em> to make it visible to members.
+            </span>
+          </div>
+        )}
+
         {useCacheNow && (
           <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
             <WifiOff className="h-4 w-4 shrink-0" />
@@ -340,7 +430,15 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
           </div>
         )}
 
-        {showLoader ? (
+        {!published && !canManageLifecycle ? (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
+              <Lock className="h-8 w-8 text-muted-foreground/60" />
+              <p className="text-sm font-medium text-foreground">Dashboard not yet published</p>
+              <p className="text-xs">An administrator will publish this dashboard when it's ready.</p>
+            </CardContent>
+          </Card>
+        ) : showLoader ? (
           <Card className="border-dashed">
             <CardContent className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading MDA dashboard data…
@@ -359,5 +457,6 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
         )}
       </main>
     </div>
+
   );
 }
