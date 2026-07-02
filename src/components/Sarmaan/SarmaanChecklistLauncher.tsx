@@ -868,6 +868,11 @@ function FormMenu({
                 <h3 className="mt-3 text-[15px] font-extrabold leading-snug" style={{ fontFamily: NAVY.headingFont, color: NAVY.ink }}>
                   {s.label}
                 </h3>
+                {s.subtitle && (
+                  <p className="mt-1 text-[12px] leading-snug" style={{ color: NAVY.inkSoft }}>
+                    {s.subtitle}
+                  </p>
+                )}
                 <div className="mt-3 flex items-center gap-2">
                   <span
                     className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold"
@@ -881,7 +886,7 @@ function FormMenu({
                   </span>
                 </div>
                 <div className="mt-4 inline-flex items-center gap-1 text-[13px] font-bold" style={{ color: h }}>
-                  {started ? "Continue form" : "Open form"} <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+                  {started ? "Continue chapter" : "Open chapter"} <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
                 </div>
               </div>
             </button>
