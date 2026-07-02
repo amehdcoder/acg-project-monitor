@@ -369,6 +369,7 @@ export default function SarmaanChecklistLauncher({
       });
       payload.__section_id = section.id;
       payload.__section_label = section.label;
+      payload.__member_section_ids = section.memberIds;
       payload.__section_index = idx + 1;
       // Shared supervision context — carried forward across every module so the
       // dashboard can stitch a complete picture of one supervision visit.
