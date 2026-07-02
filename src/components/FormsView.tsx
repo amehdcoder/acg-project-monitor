@@ -1930,22 +1930,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               Checklist copy feature. Previously this lived two collapsed levels
               deep (Open your form → Standard Forms), so admins couldn't find it.
               Now it's surfaced at the top of the Forms view for any admin. */}
-          {isAdmin && !isAdhoc && (!copyFeatureHidden || isOwnerLevel) && (
-            <div className={`rounded-2xl border p-4 shadow-sm ${copyFeatureHidden ? "border-slate-200 bg-slate-50" : "border-emerald-200 bg-gradient-to-br from-emerald-50 via-emerald-50/70 to-transparent"}`}>
+          {isAdmin && !isAdhoc && !copyFeatureHidden && (
+            <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-emerald-50/70 to-transparent p-4 shadow-sm">
               <div className="flex items-start gap-3">
-                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${copyFeatureHidden ? "bg-slate-200" : "bg-emerald-100"}`}>
-                  <Copy className={`h-5 w-5 ${copyFeatureHidden ? "text-slate-500" : "text-emerald-700"}`} />
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100">
+                  <Copy className="h-5 w-5 text-emerald-700" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-display text-base font-bold text-foreground">
                       Integrated MDA Supervisory Checklist
                     </h3>
-                    {copyFeatureHidden && (
-                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
-                        Hidden from admins
-                      </span>
-                    )}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Add a fresh checklist or copy the complete checklist{" "}
@@ -1959,7 +1954,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 </div>
               </div>
 
-              {!copyFeatureHidden && (
+              {(
               <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                 <div className="flex-1 min-w-0">
                 <Button
