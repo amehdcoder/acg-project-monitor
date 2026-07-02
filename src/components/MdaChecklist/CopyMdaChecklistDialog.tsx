@@ -135,6 +135,14 @@ export default function CopyMdaChecklistDialog({
   const selected = sources.find((s) => s.id === sourceId);
   const counts = selected ? summarize(selected.questions) : null;
 
+  // Resolve the destination name up front so the admin sees exactly what will
+  // be created, and so same-name copies never collide.
+  const finalName = useMemo(
+    () => (selected ? makeUniqueChecklistName(selected.name, existingFormNames) : ""),
+    [selected, existingFormNames],
+  );
+  const nameWasAdjusted = !!selected && finalName !== selected.name;
+
   const handleCopy = async () => {
     if (!currentProjectId || !selected) return;
     setCopying(true);
