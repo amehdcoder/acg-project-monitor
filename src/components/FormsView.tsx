@@ -1988,7 +1988,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 <div className="flex-1 min-w-0">
                 <Button
                   size="sm"
-                  className="w-full justify-center whitespace-nowrap bg-emerald-600 text-white shadow-sm hover:bg-emerald-700"
+                  className="w-full justify-center gap-1.5 whitespace-nowrap rounded-md border-none bg-blue-600 px-3 text-white shadow-sm hover:bg-blue-700"
                   onClick={() => {
                     if (!currentProjectId) {
                       toast({ title: "Select a project", description: "Choose a destination project first.", variant: "destructive" });
@@ -1997,7 +1997,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     setShowCopyMda(true);
                   }}
                 >
-                  <Copy className="h-4 w-4 mr-1.5" /> Copy from another project
+                  <Copy className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Copy from another project</span>
                 </Button>
                 </div>
               </div>
