@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, ChevronUp, Loader2, RefreshCw, WifiOff, UserPlus } from "lucide-react";
+import { ArrowLeft, BarChart3, ChevronUp, Loader2, RefreshCw, WifiOff, UserPlus, Eye, EyeOff, Lock, CheckCircle2 } from "lucide-react";
 import DashboardAccessManager from "@/components/dashboard/DashboardAccessManager";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,10 +7,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useDataAnalytics, type SubmissionRecord } from "@/hooks/useDataAnalytics";
 import { clearMdaCache, loadMdaCache, saveMdaCache, isOffline } from "@/lib/mda/offlineCache";
 import { canonicalizeSubmissionData } from "@/lib/mda/dashboardData";
+import { isDashboardPublished, type MdaCopySettings } from "@/lib/mda/copyChecklist";
 import MdaSupervisoryChecklistDashboard from "./MdaSupervisoryChecklistDashboard";
 import OwnerSubmissionManager, { type OwnerDataMutation } from "@/components/owner/OwnerSubmissionManager";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
 
 interface MdaDashboardForm {
   id: string;
