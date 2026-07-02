@@ -1121,6 +1121,230 @@ function QuestionField({ q, hue, value, onChange }: { q: Question; hue: string; 
 }
 
 /* ------------------------------------------------------------------ */
+/* Shared supervision context bar — carried across every module        */
+function SharedContextBar({
+  shared,
+  setShared,
+  open,
+  setOpen,
+  geoSummary,
+  gps,
+  gpsCapturedAt,
+  hasContext,
+}: {
+  shared: SharedContext;
+  setShared: React.Dispatch<React.SetStateAction<SharedContext>>;
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  geoSummary: string[];
+  gps: { lat: number; lng: number } | null;
+  gpsCapturedAt: string | null;
+  hasContext: boolean;
+}) {
+  const monthLabel = shared.reportingMonth
+    ? new Date(shared.reportingMonth + "-01").toLocaleDateString(undefined, { month: "short", year: "numeric" })
+    : "Set period";
+  const chip = (icon: React.ReactNode, label: string, active: boolean) => (
+    <span
+      className="inline-flex max-w-[46vw] items-center gap-1.5 truncate rounded-full px-2.5 py-1 text-[11.5px] font-semibold sm:max-w-none"
+      style={{ background: active ? tint(NAVY.teal, 0.14) : NAVY.panel2, color: active ? shade(NAVY.teal, 0.15) : NAVY.inkSoft, border: `1px solid ${active ? tint(NAVY.teal, 0.4) : NAVY.line}` }}
+    >
+      {icon}
+      <span className="truncate">{label}</span>
+    </span>
+  );
+  return (
+    <div className="border-b px-4 py-2" style={{ borderColor: NAVY.line, background: NAVY.canvas }}>
+      <div className="flex items-center gap-2 overflow-x-auto">
+        <span className="shrink-0 text-[10.5px] font-bold uppercase tracking-wide" style={{ color: NAVY.inkSoft }}>
+          Shared context
+        </span>
+        <div className="flex flex-1 flex-wrap items-center gap-1.5">
+          {chip(<MapPin className="h-3.5 w-3.5" />, geoSummary.length ? geoSummary.slice(-3).join(" › ") : "Set location", geoSummary.length > 0)}
+          {chip(<Crosshair className="h-3.5 w-3.5" />, gps ? `${gps.lat.toFixed(4)}, ${gps.lng.toFixed(4)}` : "Awaiting GPS", !!gps)}
+          {chip(<UserRound className="h-3.5 w-3.5" />, shared.respondentName ? `${shared.respondentName}${shared.respondentRole ? ` · ${shared.respondentRole}` : ""}` : "Add respondent", !!shared.respondentName)}
+          {chip(<CalendarDays className="h-3.5 w-3.5" />, `${monthLabel}${shared.round ? ` · ${shared.round}` : ""}`, !!shared.reportingMonth)}
+        </div>
+        <button
+          onClick={() => setOpen(!open)}
+          className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-bold transition hover:bg-black/5"
+          style={{ color: NAVY.teal }}
+        >
+          {open ? "Done" : "Edit context"}
+          <ChevronDown className={`h-3.5 w-3.5 transition ${open ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+      {open && (
+        <div className="mt-2 grid gap-2 rounded-xl border p-3 sm:grid-cols-2 lg:grid-cols-4" style={{ borderColor: NAVY.line, background: NAVY.panel }}>
+          <label className="text-[11px] font-semibold" style={{ color: NAVY.inkSoft }}>
+            Person spoken to
+            <input
+              value={shared.respondentName}
+              onChange={(e) => setShared((s) => ({ ...s, respondentName: e.target.value }))}
+              placeholder="e.g. Hajiya A. (in-charge)"
+              className="mt-1 w-full rounded-lg border px-2.5 py-1.5 text-[13px] font-medium"
+              style={{ borderColor: NAVY.line, color: NAVY.ink }}
+            />
+          </label>
+          <label className="text-[11px] font-semibold" style={{ color: NAVY.inkSoft }}>
+            Their role
+            <input
+              value={shared.respondentRole}
+              onChange={(e) => setShared((s) => ({ ...s, respondentRole: e.target.value }))}
+              placeholder="e.g. Facility in-charge"
+              className="mt-1 w-full rounded-lg border px-2.5 py-1.5 text-[13px] font-medium"
+              style={{ borderColor: NAVY.line, color: NAVY.ink }}
+            />
+          </label>
+          <label className="text-[11px] font-semibold" style={{ color: NAVY.inkSoft }}>
+            Reporting month
+            <input
+              type="month"
+              value={shared.reportingMonth}
+              onChange={(e) => setShared((s) => ({ ...s, reportingMonth: e.target.value }))}
+              className="mt-1 w-full rounded-lg border px-2.5 py-1.5 text-[13px] font-medium"
+              style={{ borderColor: NAVY.line, color: NAVY.ink }}
+            />
+          </label>
+          <label className="text-[11px] font-semibold" style={{ color: NAVY.inkSoft }}>
+            Round / phase
+            <input
+              value={shared.round}
+              onChange={(e) => setShared((s) => ({ ...s, round: e.target.value }))}
+              placeholder="e.g. Round 2"
+              className="mt-1 w-full rounded-lg border px-2.5 py-1.5 text-[13px] font-medium"
+              style={{ borderColor: NAVY.line, color: NAVY.ink }}
+            />
+          </label>
+          <p className="sm:col-span-2 lg:col-span-4 text-[11px]" style={{ color: NAVY.inkSoft }}>
+            This context is captured once and attached to every form you submit in this visit{gpsCapturedAt ? ` · GPS fixed at ${new Date(gpsCapturedAt).toLocaleTimeString()}` : ""}.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Journey rail — persistent stepper shown while chaining modules      */
+function JourneyRail({
+  sections,
+  currentIdx,
+  isSectionComplete,
+  onJump,
+}: {
+  sections: { id: string; label: string }[];
+  currentIdx: number;
+  isSectionComplete: (i: number) => boolean;
+  onJump: (i: number) => void;
+}) {
+  return (
+    <div className="mb-3 rounded-xl border p-2.5" style={{ borderColor: "rgba(129,140,248,0.4)", background: "linear-gradient(100deg, rgba(99,102,241,0.10), rgba(56,189,248,0.06))" }}>
+      <div className="mb-1.5 flex items-center gap-1.5 px-1">
+        <Route className="h-3.5 w-3.5" style={{ color: "#6366F1" }} />
+        <span className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color: "#4f46e5" }}>Guided journey</span>
+      </div>
+      <div className="flex items-center gap-1 overflow-x-auto pb-1">
+        {sections.map((s, i) => {
+          const done = isSectionComplete(i);
+          const isActive = i === currentIdx;
+          return (
+            <button
+              key={s.id}
+              onClick={() => onJump(i)}
+              title={s.label}
+              className="flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold transition"
+              style={{
+                background: isActive ? "#6366F1" : done ? tint(NAVY.good, 0.18) : NAVY.panel,
+                color: isActive ? "#fff" : done ? shade(NAVY.good, 0.2) : NAVY.inkSoft,
+                border: `1px solid ${isActive ? "#6366F1" : done ? tint(NAVY.good, 0.4) : NAVY.line}`,
+              }}
+            >
+              {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
+              <span className="max-w-[120px] truncate">{i + 1}. {s.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Conversational hand-off after a module is submitted in the journey  */
+function HandoffCard({
+  sections,
+  fromIdx,
+  nextIdx,
+  completedCount,
+  onContinue,
+  onChooseAnother,
+  onFinish,
+}: {
+  sections: { id: string; label: string }[];
+  fromIdx: number;
+  nextIdx: number;
+  completedCount: number;
+  onContinue: (i: number) => void;
+  onChooseAnother: () => void;
+  onFinish: () => void;
+}) {
+  const fromLabel = sections[fromIdx]?.label || "that form";
+  const hasNext = nextIdx >= 0 && nextIdx < sections.length;
+  const nextLabel = hasNext ? sections[nextIdx].label : "";
+  const opener = TRANSITION_OPENERS[fromIdx % TRANSITION_OPENERS.length];
+  const nextGuide = hasNext ? MODULE_GUIDANCE[nextIdx] : null;
+  const bridge = hasNext
+    ? `We've captured “${fromLabel}”. ${opener} let's talk about ${nextLabel.toLowerCase()}${nextGuide?.purpose ? ` — ${nextGuide.purpose}` : "."}`
+    : `You've captured “${fromLabel}”, and every module in this visit is now complete. Nice work.`;
+  return (
+    <div className="p-4 lg:p-5">
+      <div className="relative overflow-hidden rounded-2xl border p-5 shadow-sm" style={{ borderColor: "rgba(129,140,248,0.5)", background: "linear-gradient(120deg, rgba(99,102,241,0.12), rgba(56,189,248,0.08))" }}>
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white shadow" style={{ background: hasNext ? "#6366F1" : NAVY.good }}>
+            {hasNext ? <MessageCircle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "#4f46e5" }}>
+              {hasNext ? "Continuing the conversation" : "Journey complete"} · {completedCount}/{sections.length} forms
+            </p>
+            <p className="mt-1 text-[14px] font-semibold leading-snug" style={{ color: NAVY.ink }}>
+              {bridge}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {hasNext && (
+                <button
+                  onClick={() => onContinue(nextIdx)}
+                  className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-[13px] font-bold text-white shadow transition hover:brightness-105"
+                  style={{ background: "#6366F1" }}
+                >
+                  Continue to “{nextLabel}” <ArrowRight className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                onClick={onChooseAnother}
+                className="inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-[13px] font-bold transition hover:bg-black/5"
+                style={{ borderColor: NAVY.line, color: NAVY.ink }}
+              >
+                Choose another form
+              </button>
+              <button
+                onClick={onFinish}
+                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-semibold transition hover:bg-black/5"
+                style={{ color: NAVY.inkSoft }}
+              >
+                <X className="h-4 w-4" /> {hasNext ? "End journey" : "Done"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+/* ------------------------------------------------------------------ */
 function ProgressRing({ pct, color }: { pct: number; color: string }) {
   const r = 16;
   const c = 2 * Math.PI * r;
