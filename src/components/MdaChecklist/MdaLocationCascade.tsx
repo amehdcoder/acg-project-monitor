@@ -71,6 +71,13 @@ interface Props {
    * selectable, and the off-microplan State picker is limited to them too.
    */
   stateScope?: string[];
+  /**
+   * When true, the component runs as a plain State → LGA → Ward → FLHF →
+   * Community → Settlement geography cascade with NO microplan sourcing,
+   * toggle, or copy. Used by forms (e.g. the SARMAAN Supervisory Checklist)
+   * that must not be tied to microplanning data at all.
+   */
+  disableMicroplan?: boolean;
 }
 
 // Maps a cascade level to the FormFiller question `name` it should populate.
