@@ -1729,6 +1729,85 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             </button>
           </div>
 
+          {/* Prominent, always-visible admin card for the MDA Supervisory
+              Checklist copy feature. Previously this lived two collapsed levels
+              deep (Open your form → Standard Forms), so admins couldn't find it.
+              Now it's surfaced at the top of the Forms view for any admin. */}
+          {isAdmin && !isAdhoc && (
+            <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-emerald-50/70 to-transparent p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100">
+                  <Copy className="h-5 w-5 text-emerald-700" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-display text-base font-bold text-foreground">
+                    Integrated MDA Supervisory Checklist
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Add a fresh checklist or copy the complete checklist{" "}
+                    <span className="font-medium">and its linked dashboard</span> from another
+                    project into{" "}
+                    <span className="font-medium text-foreground">
+                      {currentProjectId ? (projects.find((p) => p.id === currentProjectId)?.name ?? "this project") : "your project"}
+                    </span>
+                    . Name clashes are resolved automatically and everything stays editable.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full justify-center border-emerald-300 text-emerald-800 hover:bg-emerald-100"
+                  onClick={async () => {
+                    if (!currentProjectId) {
+                      toast({ title: "Select a project", description: "Choose a project before creating the checklist.", variant: "destructive" });
+                      return;
+                    }
+                    const existing = forms.find((f) => f.name === MDA_CHECKLIST_NAME);
+                    if (existing) {
+                      toast({ title: "Already added", description: "This checklist already exists in this project. Open it from the list to edit." });
+                      return;
+                    }
+                    try {
+                      const built = buildMdaSupervisoryChecklist();
+                      const { error } = await supabase.from("forms").insert({
+                        name: built.name,
+                        description: built.description,
+                        questions: built.questions as any,
+                        settings: built.settings as any,
+                        project_id: currentProjectId,
+                        created_by: user?.id,
+                        status: "draft",
+                      } as any);
+                      if (error) throw error;
+                      toast({ title: "Checklist created", description: "Open it from your forms list to fill, share, or edit." });
+                      fetchForms(currentProjectId);
+                    } catch (e: any) {
+                      console.error("MDA checklist create error", e);
+                      toast({ title: "Could not create", description: e?.message || "Please try again.", variant: "destructive" });
+                    }
+                  }}
+                >
+                  <Sparkles className="h-4 w-4 mr-1.5" /> Add fresh checklist
+                </Button>
+                <Button
+                  size="sm"
+                  className="w-full justify-center bg-emerald-600 text-white shadow-sm hover:bg-emerald-700"
+                  onClick={() => {
+                    if (!currentProjectId) {
+                      toast({ title: "Select a project", description: "Choose a destination project first.", variant: "destructive" });
+                      return;
+                    }
+                    setShowCopyMda(true);
+                  }}
+                >
+                  <Copy className="h-4 w-4 mr-1.5" /> Copy from another project
+                </Button>
+              </div>
+            </div>
+          )}
+
           {showFormsExplorer && (
           <div className="space-y-3">
             {/* Folder 1 — My Forms (custom forms) */}
