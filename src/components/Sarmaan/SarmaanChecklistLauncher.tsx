@@ -244,7 +244,18 @@ export default function SarmaanChecklistLauncher({
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 pb-3">
-          {/* Guidance entry — always at the very top */}
+          {/* All forms menu — return to the form picker */}
+          <button
+            onClick={() => setActive(MENU)}
+            className="mb-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition"
+            style={{ background: active === MENU ? NAVY.sidebarActive : "rgba(18,181,165,0.10)", border: `1px solid ${active === MENU ? NAVY.teal : "rgba(18,181,165,0.35)"}` }}
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ background: NAVY.teal }}>
+              <ClipboardList className="h-4 w-4 text-white" />
+            </span>
+            <span className="min-w-0 flex-1 text-[13px] font-semibold leading-snug">All supervision forms</span>
+          </button>
+          {/* Guidance entry */}
           <button
             onClick={() => setActive(GUIDANCE)}
             className="mb-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition"
