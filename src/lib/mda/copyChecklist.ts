@@ -64,3 +64,93 @@ export function restrictChecklistToState(
     return { ...g, questions: g.questions.map((q) => restrictQuestionToState(q as Question, stateValue)) };
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Full checklist + linked dashboard copy
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Settings keys that define the MDA checklist AND its linked dashboard. */
+export interface MdaCopySettings {
+  isMdaChecklist?: boolean;
+  /** Flags the FormFiller/dashboard experience. */
+  n?: boolean;
+  coverageEvaluation?: boolean;
+  /** Whether the linked dashboard is visible to non-admin members. */
+  dashboardPublished?: boolean;
+  [key: string]: any;
+}
+
+export interface CopySource {
+  name: string;
+  description: string | null;
+  questions: FormGroup[];
+  settings: MdaCopySettings | null;
+  project_id: string;
+}
+
+export interface BuildCopyOptions {
+  /** Restrict the destination checklist to a single state slug. */
+  stateValue?: string | null;
+  /** Publish the linked dashboard immediately (default false → unpublished). */
+  publishDashboard?: boolean;
+  /** Finalize the checklist immediately (status "published") instead of draft. */
+  finalizeChecklist?: boolean;
+  /** Friendly name of the source project (stored for provenance). */
+  sourceProjectName?: string;
+}
+
+export interface CopyPayload {
+  name: string;
+  description: string | null;
+  questions: FormGroup[];
+  settings: MdaCopySettings;
+  status: "draft" | "published";
+}
+
+/**
+ * Produce an INSERT-ready payload that copies the COMPLETE checklist AND its
+ * linked dashboard configuration into the destination project. The copy is a
+ * standard forms payload so it stays 100% editable in the Form Builder, and it
+ * carries the dashboard flags so the linked dashboard renders identically.
+ */
+export function buildChecklistCopyPayload(
+  source: CopySource,
+  opts: BuildCopyOptions = {},
+): CopyPayload {
+  const {
+    stateValue = null,
+    publishDashboard = false,
+    finalizeChecklist = false,
+    sourceProjectName,
+  } = opts;
+
+  const questions = restrictChecklistToState(source.questions, stateValue);
+
+  // Preserve the full dashboard config: the MDA dashboard is derived from these
+  // flags, so copying them reproduces the exact linked dashboard.
+  const settings: MdaCopySettings = {
+    ...(source.settings ?? {}),
+    isMdaChecklist: source.settings?.isMdaChecklist ?? true,
+    n: source.settings?.n ?? true,
+    coverageEvaluation: source.settings?.coverageEvaluation ?? true,
+    dashboardPublished: publishDashboard,
+    ...(sourceProjectName ? { copiedFromProject: sourceProjectName } : {}),
+    ...(stateValue ? { stateRestricted: stateValue } : {}),
+  };
+
+  return {
+    name: source.name,
+    description: source.description,
+    questions,
+    settings,
+    status: finalizeChecklist ? "published" : "draft",
+  };
+}
+
+/** True when the form's linked dashboard should be visible to a given viewer. */
+export function isDashboardPublished(settings: MdaCopySettings | null | undefined): boolean {
+  // Backward-compat: forms created before this flag existed are treated as
+  // published so existing dashboards keep rendering.
+  if (!settings) return true;
+  return settings.dashboardPublished !== false;
+}
