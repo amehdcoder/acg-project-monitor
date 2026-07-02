@@ -201,13 +201,28 @@ export default function SarmaanChecklistLauncher({
   // GPS question (geopoint) — capture the device fix into responses.
   const gpsQuestion = allQuestions.find((q) => q.type === "geopoint");
   useEffect(() => {
-    if (gpsQuestion && geo.position) {
-      setResponses((r) => ({
-        ...r,
-        [gpsQuestion.id]: `${geo.position!.lat},${geo.position!.lng}`,
-      }));
+    if (geo.position) {
+      setGpsCapturedAt((prev) => prev ?? new Date().toISOString());
+      if (gpsQuestion) {
+        setResponses((r) => ({
+          ...r,
+          [gpsQuestion.id]: `${geo.position!.lat},${geo.position!.lng}`,
+        }));
+      }
     }
   }, [geo.position, gpsQuestion]);
+
+  // Geography summary derived from the shared responses (carried across modules).
+  const geoSummary = useMemo(() => {
+    const parts: string[] = [];
+    for (const name of GEO_ORDER) {
+      const id = mdaNameToId[name];
+      const v = id ? responses[id] : undefined;
+      if (v) parts.push(String(v));
+    }
+    return parts;
+  }, [responses, mdaNameToId]);
+  const hasContext = geoSummary.length > 0 || !!geo.position || !!shared.respondentName;
 
   const isGeoSection = (i: number) =>
     sections[i]?.questions.some((q) => GEO_NAMES.has(q.name || ""));
