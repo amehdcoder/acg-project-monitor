@@ -26,6 +26,7 @@ import IrfStatisticalPanel from "@/components/IRF/IrfStatisticalPanel";
 import IrfFieldAnalysis from "@/components/IRF/IrfFieldAnalysis";
 import IrfInterpretation from "@/components/IRF/IrfInterpretation";
 import IrfSubmitterPanel from "@/components/IRF/IrfSubmitterPanel";
+import IrfParticipationPanel from "@/components/IRF/IrfParticipationPanel";
 import IrfDuplicateManager from "@/components/IRF/IrfDuplicateManager";
 import AdminSubmissionEditor from "@/components/AdminSubmissionEditor";
 import DashboardAccessManager from "@/components/dashboard/DashboardAccessManager";
