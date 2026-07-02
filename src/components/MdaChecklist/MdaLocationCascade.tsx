@@ -71,6 +71,13 @@ interface Props {
    * selectable, and the off-microplan State picker is limited to them too.
    */
   stateScope?: string[];
+  /**
+   * When true, the component runs as a plain State → LGA → Ward → FLHF →
+   * Community → Settlement geography cascade with NO microplan sourcing,
+   * toggle, or copy. Used by forms (e.g. the SARMAAN Supervisory Checklist)
+   * that must not be tied to microplanning data at all.
+   */
+  disableMicroplan?: boolean;
 }
 
 // Maps a cascade level to the FormFiller question `name` it should populate.
@@ -147,7 +154,7 @@ const uniqueSorted = (values: string[]) =>
 
 
 
-export default function MdaLocationCascade({ projectId, responses, nameToId, onSet, stateScope }: Props) {
+export default function MdaLocationCascade({ projectId, responses, nameToId, onSet, stateScope, disableMicroplan }: Props) {
   const { user, isOwner, isAdmin } = useAuth();
   const scope = useMicroplanScope(isOwner || isAdmin);
 
@@ -205,6 +212,16 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     const controller = new AbortController();
     (async () => {
       setLoading(true);
+      // Microplan disabled: run as a pure GRID3/admin-hierarchy cascade with no
+      // microplan rows loaded at all.
+      if (disableMicroplan) {
+        try {
+          const pScope = projectId ? await fetchProjectScope(projectId) : { ...EMPTY_SCOPE };
+          if (!cancelled) setProjectStates(pScope.states || []);
+        } catch { /* ignore */ }
+        if (!cancelled) { setRows([]); setLoading(false); }
+        return;
+      }
       try {
         const pScope = projectId ? await fetchProjectScope(projectId) : { ...EMPTY_SCOPE };
         const pStates = pScope.states || [];
@@ -260,7 +277,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     })();
     return () => { cancelled = true; controller.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, stateScopeKey]);
+  }, [projectId, stateScopeKey, disableMicroplan]);
 
   // The state restriction used for BOTH the microplan filter and the off-microplan
   // / no-microplan cascade: the admin-defined form state scope takes priority,
@@ -362,7 +379,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
 
   // Use the consolidated GRID3 cascade when the supervisor explicitly flags an
   // off-microplan community OR when the project has no linked microplan yet.
-  const useAdminHierarchy = notInMicroplan || microplanIsEmpty;
+  const useAdminHierarchy = disableMicroplan || notInMicroplan || microplanIsEmpty;
 
   useEffect(() => {
     let cancelled = false;
@@ -638,7 +655,9 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
           <div>
             <h4 className="text-sm font-bold text-foreground sm:text-base">Supervision Location</h4>
             <p className="text-xs text-muted-foreground">
-              {microplanIsEmpty
+              {disableMicroplan
+                ? "Pick the area you are supervising from the State cascade"
+                : microplanIsEmpty
                 ? "No microplan linked — pick the area from the State cascade"
                 : "Driven by the microplan — pick the area you are supervising"}
             </p>
@@ -652,7 +671,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
             </Badge>
           )}
           <Badge variant="outline" className="gap-1 border-primary/40 text-primary">
-            <Lock className="h-3 w-3" /> {microplanIsEmpty ? "State cascade" : "Microplan-locked"}
+            <Lock className="h-3 w-3" /> {(disableMicroplan || microplanIsEmpty) ? "State cascade" : "Microplan-locked"}
           </Badge>
         </div>
       </div>
@@ -666,7 +685,9 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
           {/* GRID3 vs microplan switch — ENABLED BY DEFAULT (GRID3 national
               cascade). Placed BEFORE the location fields so the supervisor first
               decides the data source, then picks the area. Turn OFF to drive the
-              cascade from this project's locked-in microplan data. */}
+              cascade from this project's locked-in microplan data. Hidden
+              entirely when microplan sourcing is disabled for this form. */}
+          {!disableMicroplan && (
           <div
             className={cn(
               "overflow-hidden rounded-2xl border transition-colors",
@@ -711,6 +732,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
               </div>
             </div>
           </div>
+          )}
 
           {/* Offline prefetch — save the GRID3 location data for the relevant
               states so the cascade works instantly with no network. */}
@@ -771,7 +793,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
 
 
 
-          {microplanIsEmpty && (
+          {microplanIsEmpty && !disableMicroplan && (
             <div className="flex items-start gap-3 rounded-xl border border-sky-300 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
               <Info className="mt-0.5 h-4 w-4 shrink-0" />
               <p className="text-xs">

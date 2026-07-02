@@ -372,10 +372,10 @@ function supervisoryLearningSections(): FormGroup[] {
       // omitted here — they are captured from the authenticated session and
       // visit metadata rather than as manual questions.
 
-      // Geography is driven by the microplan via the shared MDA location
-      // cascade (State → LGA → Ward → FLHF → Community → Settlement). These
-      // question names are the cascade write targets and are rendered by the
-      // cascade instead of as free-text fields.
+      // Geography is driven by the shared location cascade (State → LGA →
+      // Ward → FLHF → Community → Settlement) with no microplan dependency.
+      // These question names are the cascade write targets and are rendered by
+      // the cascade instead of as free-text fields.
       stateField(),
       qn("text", "lga", "LGA", { required: true }),
       qn("text", "ward", "Ward", { required: true }),
@@ -402,7 +402,7 @@ function supervisoryLearningSections(): FormGroup[] {
 
     // ---- Section B ----
     section("B. Activity Planning & Preparedness", [
-      qn("select_one", "in_workplan", "Was the activity included in the approved workplan or microplan?", { options: opts("Yes", "No", "Not sure") }),
+      qn("select_one", "in_workplan", "Was the activity included in the approved workplan?", { options: opts("Yes", "No", "Not sure") }),
       ynp("clear_objective", "Was there a clear objective for the activity?", { hint: "Score 2/0/1" }),
       ynp("target_defined", "Was the target audience clearly defined before the activity?", { hint: "Score 2/0/1" }),
       ynp("roles_assigned", "Were roles and responsibilities assigned before implementation?", { hint: "Score 2/0/1" }),

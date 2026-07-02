@@ -113,8 +113,8 @@ const shade = (hex: string, factor: number) => {
  * SARMAAN ACSM Integrated Supervisory Checklist — an interactive, section-by-
  * section data-collection surface. Every sidebar module is clickable and
  * renders its own questions inline (answerable right here), each on a unique
- * rose-flower backdrop. Geography is driven by the microplan cascade and GPS
- * is captured on device; submissions save through the offline-capable store.
+ * rose-flower backdrop. Geography is driven by a standalone State cascade and
+ * GPS is captured on device; submissions save through the offline-capable store.
  */
 export default function SarmaanChecklistLauncher({
   formName,
@@ -598,7 +598,7 @@ export default function SarmaanChecklistLauncher({
                 {projectId && (
                   <div className="mb-5 rounded-2xl border bg-white/70 p-4 backdrop-blur" style={{ borderColor: tint(hue, 0.35) }}>
                     <div className="mb-3 flex items-center gap-2 text-sm font-bold" style={{ color: hue }}>
-                      <Compass className="h-4 w-4" /> Supervision location (from microplan)
+                      <Compass className="h-4 w-4" /> Supervision location
                     </div>
                     <MdaLocationCascade
                       projectId={projectId}
@@ -606,6 +606,7 @@ export default function SarmaanChecklistLauncher({
                       nameToId={mdaNameToId}
                       onSet={(updates) => setResponses((r) => ({ ...r, ...updates }))}
                       stateScope={stateScope}
+                      disableMicroplan
                     />
                   </div>
                 )}
@@ -837,7 +838,7 @@ function GuidancePanel({ onStart }: { onStart: () => void }) {
         </div>
         <ul className="mt-2 space-y-1.5 text-[13px]" style={{ color: NAVY.ink }}>
           <li>• Click any module on the left to answer its questions right here — the checklist adapts and hides questions that don't apply.</li>
-          <li>• Capture GPS on site and let the microplan drive State → LGA → Ward → FLHF → Community → Settlement.</li>
+          <li>• Capture GPS on site and pick State → LGA → Ward → FLHF → Community → Settlement from the location cascade.</li>
           <li>• Score quality items honestly against evidence: 2 = Yes, 1 = Partly, 0 = No.</li>
           <li>• Complete all required questions, then submit — offline submissions sync automatically once you're back online.</li>
         </ul>

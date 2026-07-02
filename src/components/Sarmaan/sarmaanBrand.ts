@@ -199,8 +199,8 @@ export const MODULE_GUIDANCE: ModuleGuidance[] = [
       "Establish exactly what was supervised, where, and how it was verified so every downstream score is anchored to a real, located visit.",
     whoToAsk: "Implementing team lead, facility in-charge, community entry point (CHW / volunteer).",
     whatToCheck:
-      "Geography is set from the microplan cascade (State → LGA → Ward → FLHF → Community → Settlement). Confirm the GPS is captured on site and the visit type matches what actually happened.",
-    howToCollect: "Direct observation, GPS capture on arrival, and the microplan-driven location cascade.",
+      "Geography is set from the location cascade (State → LGA → Ward → FLHF → Community → Settlement). Confirm the GPS is captured on site and the visit type matches what actually happened.",
+    howToCollect: "Direct observation, GPS capture on arrival, and the State-driven location cascade.",
     tips: [
       "Capture GPS while physically at the activity location — not in the vehicle or afterwards.",
       "Select every activity actually supervised; leave out those you only heard about.",
@@ -211,9 +211,9 @@ export const MODULE_GUIDANCE: ModuleGuidance[] = [
     code: "B",
     title: "Activity Planning & Preparedness",
     purpose: "Judge whether the activity was deliberately planned, resourced and de-risked before implementation.",
-    whoToAsk: "Team lead and the officer responsible for the workplan / microplan.",
+    whoToAsk: "Team lead and the officer responsible for the workplan.",
     whatToCheck: "Workplan inclusion, clear objective, defined target, assigned roles, tools ready and anticipated barriers with mitigation.",
-    howToCollect: "Review workplan / microplan, activity plan, and pre-activity checklists.",
+    howToCollect: "Review workplan, activity plan, and pre-activity checklists.",
     scoring: "Each preparedness item scores 2 (Yes) / 1 (Partly) / 0 (No).",
     tips: [
       "A plan that only exists verbally is not a plan — look for a written or digital record.",

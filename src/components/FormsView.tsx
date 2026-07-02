@@ -332,10 +332,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }, [user?.id]);
 
   // Owner-controlled per-project hiding of the MDA checklist copy feature card.
-  const [copyFeatureHidden, setCopyFeatureHidden] = useState(false);
+  // Hidden by default; only the Owner can reveal it via the kebab menu.
+  const [copyFeatureHidden, setCopyFeatureHidden] = useState(true);
   const [copyHideBusy, setCopyHideBusy] = useState(false);
   useEffect(() => {
-    if (!currentProjectId) { setCopyFeatureHidden(false); return; }
+    if (!currentProjectId) { setCopyFeatureHidden(true); return; }
     let cancelled = false;
     (async () => {
       const { data } = await (supabase as any)
@@ -343,7 +344,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         .select("hidden")
         .eq("project_id", currentProjectId)
         .maybeSingle();
-      if (!cancelled) setCopyFeatureHidden(!!(data as any)?.hidden);
+      if (!cancelled) setCopyFeatureHidden(data ? !!(data as any).hidden : true);
     })();
     return () => { cancelled = true; };
   }, [currentProjectId]);
@@ -1826,6 +1827,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 {isOwner && (
                   <>
                     <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      disabled={copyHideBusy || !currentProjectId}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        toggleCopyFeatureHidden(!copyFeatureHidden);
+                      }}
+                    >
+                      {copyFeatureHidden ? (
+                        <Eye className="mr-2 h-4 w-4 text-blue-600" />
+                      ) : (
+                        <EyeOff className="mr-2 h-4 w-4 text-blue-600" />
+                      )}
+                      {copyFeatureHidden ? "Show MDA Checklist Setup" : "Hide MDA Checklist Setup"}
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setShowBulkAccess(true)}>
                       <KeyRound className="mr-2 h-4 w-4 text-emerald-600" />
                       Bulk Upload Access
@@ -1915,22 +1930,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               Checklist copy feature. Previously this lived two collapsed levels
               deep (Open your form → Standard Forms), so admins couldn't find it.
               Now it's surfaced at the top of the Forms view for any admin. */}
-          {isAdmin && !isAdhoc && (!copyFeatureHidden || isOwnerLevel) && (
-            <div className={`rounded-2xl border p-4 shadow-sm ${copyFeatureHidden ? "border-slate-200 bg-slate-50" : "border-emerald-200 bg-gradient-to-br from-emerald-50 via-emerald-50/70 to-transparent"}`}>
+          {isAdmin && !isAdhoc && !copyFeatureHidden && (
+            <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-emerald-50/70 to-transparent p-4 shadow-sm">
               <div className="flex items-start gap-3">
-                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${copyFeatureHidden ? "bg-slate-200" : "bg-emerald-100"}`}>
-                  <Copy className={`h-5 w-5 ${copyFeatureHidden ? "text-slate-500" : "text-emerald-700"}`} />
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100">
+                  <Copy className="h-5 w-5 text-emerald-700" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-display text-base font-bold text-foreground">
                       Integrated MDA Supervisory Checklist
                     </h3>
-                    {copyFeatureHidden && (
-                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
-                        Hidden from admins
-                      </span>
-                    )}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Add a fresh checklist or copy the complete checklist{" "}
@@ -1942,22 +1952,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     . Name clashes are resolved automatically and everything stays editable.
                   </p>
                 </div>
-                {/* Owner-only per-project visibility toggle. Sits in its own column so
-                    it never overlaps the action buttons below. */}
-                {isOwnerLevel && currentProjectId && (
-                  <button
-                    type="button"
-                    disabled={copyHideBusy}
-                    onClick={() => toggleCopyFeatureHidden(!copyFeatureHidden)}
-                    className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted disabled:opacity-60"
-                    title={copyFeatureHidden ? "Show this feature to admins" : "Hide this feature from admins"}
-                  >
-                    {copyFeatureHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-                    {copyFeatureHidden ? "Show" : "Hide"}
-                  </button>
-                )}
               </div>
-              {!copyFeatureHidden && (
+
+              {(
               <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                 <div className="flex-1 min-w-0">
                 <Button
@@ -2000,7 +1997,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 <div className="flex-1 min-w-0">
                 <Button
                   size="sm"
-                  className="w-full justify-center whitespace-nowrap bg-emerald-600 text-white shadow-sm hover:bg-emerald-700"
+                  className="w-full justify-center gap-1.5 whitespace-nowrap rounded-md border-none bg-blue-600 px-3 text-white shadow-sm hover:bg-blue-700"
                   onClick={() => {
                     if (!currentProjectId) {
                       toast({ title: "Select a project", description: "Choose a destination project first.", variant: "destructive" });
@@ -2009,7 +2006,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     setShowCopyMda(true);
                   }}
                 >
-                  <Copy className="h-4 w-4 mr-1.5" /> Copy from another project
+                  <Copy className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Copy from another project</span>
                 </Button>
                 </div>
               </div>
