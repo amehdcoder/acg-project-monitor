@@ -2093,9 +2093,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-white/70 transition group-hover:translate-x-0.5" />
                           </div>
                         </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() => setSarmaanDashForm(primarySarmaanSupervisoryForm)}
+                          onClick={() => {
+                            if (canSeeSarmaanDashboard) setSarmaanDashForm(primarySarmaanSupervisoryForm);
+                            else toast.error("You don't have access to this dashboard. Ask an Owner to grant access.");
+                          }}
                           className="group relative overflow-hidden rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                           style={{ borderColor: "#12B5A54D" }}
                         >
