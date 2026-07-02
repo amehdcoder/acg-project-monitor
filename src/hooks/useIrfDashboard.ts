@@ -83,8 +83,8 @@ export const useIrfDashboard = (projectId?: string | null, overrideMap?: Overrid
     const lgas = new Set(rows.map((r) => (r.lga || "").trim()).filter(Boolean)).size;
 
     // People reached = town-announcer estimated reach + radio reach + meeting/dialogue attendance.
-    const peopleReached =
-      sum("total_reach") + sum("radio_estimated_reach") + sum("attendance_men") + sum("attendance_women");
+    // Uses the shared computeIrfReach helper so every reference stays reconciled.
+    const peopleReached = rows.reduce((s, r) => s + computeIrfReach(r), 0);
 
     // Stakeholders/officials engaged — advocacy officials (stored in `answers`)
     // plus the legacy combined-form stakeholder columns when present.
