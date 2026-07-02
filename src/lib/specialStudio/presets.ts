@@ -402,7 +402,7 @@ function supervisoryLearningSections(): FormGroup[] {
 
     // ---- Section B ----
     section("B. Activity Planning & Preparedness", [
-      qn("select_one", "in_workplan", "Was the activity included in the approved workplan or microplan?", { options: opts("Yes", "No", "Not sure") }),
+      qn("select_one", "in_workplan", "Was the activity included in the approved workplan?", { options: opts("Yes", "No", "Not sure") }),
       ynp("clear_objective", "Was there a clear objective for the activity?", { hint: "Score 2/0/1" }),
       ynp("target_defined", "Was the target audience clearly defined before the activity?", { hint: "Score 2/0/1" }),
       ynp("roles_assigned", "Were roles and responsibilities assigned before implementation?", { hint: "Score 2/0/1" }),
