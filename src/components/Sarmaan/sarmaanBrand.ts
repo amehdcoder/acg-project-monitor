@@ -344,3 +344,129 @@ export const MODULE_GUIDANCE: ModuleGuidance[] = [
     tips: ["Score against evidence, not impressions — the signature attests to the whole visit."],
   },
 ];
+
+/* ------------------------------------------------------------------ */
+/* Immersive 6-chapter narrative arc                                   */
+/*                                                                     */
+/* The 13 raw supervision modules (A–M) are experienced by a real     */
+/* supervisor as a handful of connected moments, not thirteen isolated */
+/* forms. These six chapters merge the closely-related modules into a  */
+/* single human narrative — arrival → power → community → proof →      */
+/* reflection → verdict — while each chapter still submits on its own. */
+/* ------------------------------------------------------------------ */
+export interface SupervisoryChapter {
+  /** Stable id used as __section_id on submission. */
+  id: string;
+  /** Display index label ("1".."6"). */
+  code: string;
+  title: string;
+  /** One-line immersive framing shown under the title. */
+  subtitle: string;
+  /** Conversational opening shown at the top of the chapter while filling. */
+  narrative: string;
+  /** Conversational hand-off line nudging toward the next chapter. */
+  closing: string;
+  /** Raw module letter codes (A–M) merged into this chapter. */
+  members: string[];
+  /** Accent hue (aligned to SECTION_HUES ordering). */
+  hue: string;
+}
+
+export const SUPERVISORY_CHAPTERS: SupervisoryChapter[] = [
+  {
+    id: "ch_arrival",
+    code: "1",
+    title: "Arrival & Intent",
+    subtitle: "Who you met, where you stood, and what today was meant to achieve.",
+    narrative:
+      "Every supervision visit begins the moment you arrive. Before judging anything, ground the visit in reality — pin exactly where you are, who is beside you, and what this activity set out to do. A plan you can point to is the difference between a real visit and a guess.",
+    closing:
+      "Now that we know where we stand and what was promised, let's step into the rooms where the decisions were made.",
+    members: ["A", "B"],
+    hue: "#0F7B6C",
+  },
+  {
+    id: "ch_rooms_of_power",
+    code: "2",
+    title: "The Rooms of Power",
+    subtitle: "The advocacy that opened doors — from stakeholders to the LGA.",
+    narrative:
+      "Programmes move at the speed of the people who can say yes. Retrace the conversations with decision-makers and LGA actors: who was truly in the room, what they committed to, and whether those promises turned into support you can actually see on the ground.",
+    closing:
+      "With the powerful engaged, the real test is what happened when the message finally reached the community.",
+    members: ["C", "D"],
+    hue: "#3AA0B8",
+  },
+  {
+    id: "ch_community_encounter",
+    code: "3",
+    title: "The Community Encounter",
+    subtitle: "Dialogue, resistance, and how the word spread.",
+    narrative:
+      "This is where the programme meets people. Sit with the dialogue as it happened — who showed up, who spoke, who stayed silent. Follow every refusal to its real cause, and trace how awareness travelled through radio, announcements and materials.",
+    closing:
+      "The encounter is only as trustworthy as the evidence behind it — let's verify what we've been told.",
+    members: ["E", "F", "G"],
+    hue: "#7C4D8F",
+  },
+  {
+    id: "ch_proof",
+    code: "4",
+    title: "Proof & Verification",
+    subtitle: "The records, photos and numbers that back the story.",
+    narrative:
+      "Claims are easy; evidence is hard. Put the records side by side and cross-check the same figure in two places. Where the numbers agree, confidence grows; where they diverge, you've found the story that matters most.",
+    closing:
+      "With the facts settled, step back and reflect honestly on what worked and what didn't.",
+    members: ["H"],
+    hue: "#0B5CAB",
+  },
+  {
+    id: "ch_reflection",
+    code: "5",
+    title: "Honest Reflection",
+    subtitle: "Successes, challenges and the lessons worth keeping.",
+    narrative:
+      "The most valuable part of any visit is the truth told plainly. Name the win worth copying, the bottleneck that hurt, and the underlying cause behind it — then turn it into a lesson with a stop, start or continue that someone actually owns.",
+    closing:
+      "Reflection means nothing without commitment — let's turn these lessons into a plan and a verdict.",
+    members: ["I", "J", "K"],
+    hue: "#EF6C4D",
+  },
+  {
+    id: "ch_verdict",
+    code: "6",
+    title: "Commitments & Verdict",
+    subtitle: "Owned action points and your final, evidence-based judgement.",
+    narrative:
+      "Close the loop. Every finding should leave as a SMART action with an owner and a date, and your final scores should mirror the evidence you gathered — not the impression you formed. Sign off on the whole visit, honestly.",
+    closing:
+      "That completes the visit — a full, honest picture from arrival to verdict. Nice work.",
+    members: ["L", "M"],
+    hue: "#C0392B",
+  },
+];
+
+/**
+ * Extract the leading module letter (A–M) from a raw group label such as
+ * "A. Supervisor & Visit Information" or "Section C — Stakeholder Advocacy".
+ * Returns the upper-case letter, or null when no module code is present.
+ */
+export function chapterCodeFromLabel(label: string): string | null {
+  if (!label) return null;
+  const m = label.match(/(?:^|section\s+)([A-M])(?=[\s.)*:—–-]|$)/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
+/** Find the chapter that owns a given raw module letter code. */
+export function chapterForCode(code: string | null): SupervisoryChapter | null {
+  if (!code) return null;
+  return SUPERVISORY_CHAPTERS.find((c) => c.members.includes(code.toUpperCase())) || null;
+}
+
+/** Guidance objects belonging to a chapter, in module order. */
+export function chapterGuidance(chapter: SupervisoryChapter): ModuleGuidance[] {
+  return chapter.members
+    .map((code) => MODULE_GUIDANCE.find((g) => g.code === code))
+    .filter((g): g is ModuleGuidance => !!g);
+}
