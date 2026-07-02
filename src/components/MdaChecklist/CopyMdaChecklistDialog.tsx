@@ -267,6 +267,20 @@ export default function CopyMdaChecklistDialog({
                   The complete linked supervisory dashboard
                 </li>
               </ul>
+              <Separator className="my-3" />
+              <div className="flex items-start gap-2 text-xs">
+                <ClipboardCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                <div>
+                  <span className="text-muted-foreground">Will be saved as </span>
+                  <span className="font-semibold text-foreground">"{finalName}"</span>
+                  {nameWasAdjusted && (
+                    <span className="mt-0.5 block text-[11px] text-amber-700">
+                      Renamed automatically to avoid a clash with an existing
+                      checklist in this project.
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
