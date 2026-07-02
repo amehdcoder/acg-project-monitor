@@ -691,8 +691,7 @@ function QuestionField({ q, hue, value, onChange }: { q: Question; hue: string; 
         );
       }
       case "number":
-      case "integer":
-      case "decimal":
+      case "range":
         return (
           <input
             type="number"
