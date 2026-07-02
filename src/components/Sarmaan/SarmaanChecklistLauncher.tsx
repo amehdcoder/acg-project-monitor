@@ -338,7 +338,7 @@ export default function SarmaanChecklistLauncher({
           </button>
           <div className="hidden items-center gap-2 lg:flex">
             <span className="text-xs font-semibold" style={{ color: NAVY.inkSoft }}>
-              {active === GUIDANCE ? "Guidance" : `Step ${currentIdx + 1} of ${sections.length}`}
+              {active === GUIDANCE ? "Guidance" : active === MENU ? "Supervision forms" : `Form ${currentIdx + 1} of ${sections.length}`}
             </span>
             {currentSection && <span className="text-sm font-bold" style={{ color: NAVY.ink }}>· {currentSection.label}</span>}
           </div>
