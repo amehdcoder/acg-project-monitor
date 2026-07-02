@@ -106,6 +106,12 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
       setProfiles(map);
     }
     setLoading(false);
+    setHasLoadedOnce(true);
+    setLastUpdated(Date.now());
+    if (opts?.live) {
+      setFlash(true);
+      window.setTimeout(() => setFlash(false), 1200);
+    }
   }, [form.id]);
 
   useEffect(() => {
@@ -115,11 +121,18 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "form_submissions", filter: `form_id=eq.${form.id}` },
-        () => load(),
+        () => load({ live: true }),
       )
-      .subscribe();
+      .subscribe((status) => setLive(status === "SUBSCRIBED"));
     return () => { supabase.removeChannel(ch); };
   }, [form.id, load]);
+
+  // "Updated Ns ago" ticker.
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => forceTick((n) => n + 1), 15000);
+    return () => window.clearInterval(t);
+  }, []);
 
   const val = (r: Row, name: string): unknown => {
     const id = nameToId.get(name);
