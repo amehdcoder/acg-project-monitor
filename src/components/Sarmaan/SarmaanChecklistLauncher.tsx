@@ -477,6 +477,117 @@ export default function SarmaanChecklistLauncher({
 
 
 /* ------------------------------------------------------------------ */
+/* Form picker — each section is an independent, separately-submittable */
+/* supervision form.                                                    */
+/* ------------------------------------------------------------------ */
+function FormMenu({
+  sections,
+  responses,
+  visibleQuestions,
+  onOpenGuidance,
+  onPick,
+}: {
+  sections: { id: string; label: string; questions: Question[] }[];
+  responses: Record<string, any>;
+  visibleQuestions: (idx: number) => Question[];
+  onOpenGuidance: () => void;
+  onPick: (idx: number) => void;
+}) {
+  return (
+    <main className="min-w-0 flex-1 p-5 lg:p-7" style={{ background: NAVY.canvas }}>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-extrabold" style={{ fontFamily: NAVY.headingFont }}>
+            Choose a supervision form
+          </h2>
+          <p className="mt-0.5 text-[13px]" style={{ color: NAVY.inkSoft }}>
+            Each module is an independent form — fill and submit only what you are supervising right now.
+          </p>
+        </div>
+        <button
+          onClick={onOpenGuidance}
+          className="inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition hover:bg-black/5"
+          style={{ borderColor: tint(NAVY.gold, 0.5), color: NAVY.ink, background: tint(NAVY.gold, 0.12) }}
+        >
+          <BookOpen className="h-4 w-4" style={{ color: NAVY.gold }} /> Guidance &amp; Resources
+        </button>
+      </div>
+
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {sections.map((s, i) => {
+          const h = SECTION_HUES[i % SECTION_HUES.length];
+          const total = visibleQuestions(i).filter((q) => q.type !== "geopoint" && !GEO_NAMES.has(q.name || "")).length;
+          const done = visibleQuestions(i).filter((q) => {
+            if (q.type === "geopoint" || GEO_NAMES.has(q.name || "")) return false;
+            const v = responses[q.id];
+            return v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
+          }).length;
+          const started = done > 0;
+          return (
+            <button
+              key={s.id}
+              onClick={() => onPick(i)}
+              className="group relative overflow-hidden rounded-2xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+              style={{ borderColor: tint(h, 0.5), background: NAVY.panel }}
+            >
+              <div
+                className="absolute inset-x-0 top-0 h-1.5"
+                style={{ background: `linear-gradient(90deg, ${h}, ${shade(h, 0.25)})` }}
+              />
+              <div className="pointer-events-none absolute right-0 top-0 opacity-90">
+                <MiniRose hue={h} />
+              </div>
+              <div className="relative">
+                <span
+                  className="flex h-11 w-11 items-center justify-center rounded-xl text-[15px] font-extrabold text-white shadow"
+                  style={{ background: h, fontFamily: NAVY.headingFont }}
+                >
+                  {i + 1}
+                </span>
+                <h3 className="mt-3 text-[15px] font-extrabold leading-snug" style={{ fontFamily: NAVY.headingFont, color: NAVY.ink }}>
+                  {s.label}
+                </h3>
+                <div className="mt-3 flex items-center gap-2">
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                    style={{
+                      background: started ? tint(h, 0.16) : NAVY.panel2,
+                      color: started ? shade(h, 0.2) : NAVY.inkSoft,
+                    }}
+                  >
+                    {started ? <CheckCircle2 className="h-3.5 w-3.5" /> : <ClipboardList className="h-3.5 w-3.5" />}
+                    {done}/{total} answered
+                  </span>
+                </div>
+                <div className="mt-4 inline-flex items-center gap-1 text-[13px] font-bold" style={{ color: h }}>
+                  {started ? "Continue form" : "Open form"} <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </main>
+  );
+}
+
+function MiniRose({ hue }: { hue: string }) {
+  const stroke = shade(hue, 0.45);
+  return (
+    <svg width="92" height="92" viewBox="-46 -46 92 92" aria-hidden="true" opacity={0.35}>
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
+        <ellipse key={a} rx={26} ry={13} fill={hue} stroke={stroke} strokeWidth={2} transform={`rotate(${a}) translate(0 -20)`} />
+      ))}
+      <circle r={11} fill={shade(hue, 0.15)} stroke={stroke} strokeWidth={2} />
+      <circle r={5} fill={NAVY.gold} />
+    </svg>
+  );
+}
+
+
+
+
+/* ------------------------------------------------------------------ */
 /* Guidance panel                                                      */
 /* ------------------------------------------------------------------ */
 function GuidancePanel({ onStart }: { onStart: () => void }) {
