@@ -1550,6 +1550,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         questions={launch.questions}
         groups={launch.groups}
         requiresGps={launch.settings?.requireLocation !== false}
+        allowedSectionIds={sarmaanAllowedSectionIds}
         onOpenDashboard={() => {
           setSarmaanLaunchForm(null);
           setSarmaanDashForm(launch);
