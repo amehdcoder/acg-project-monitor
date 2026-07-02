@@ -42,6 +42,7 @@ export default function LocationCombobox({
   disabled,
   allowAdd = true,
   emptyLabel = "No matches",
+  triggerClassName,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
