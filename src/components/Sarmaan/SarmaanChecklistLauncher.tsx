@@ -523,7 +523,17 @@ function FormMenu({
         </button>
       </div>
 
+      {sections.length === 0 && (
+        <div className="mt-6 rounded-2xl border p-8 text-center" style={{ borderColor: NAVY.line, background: NAVY.panel }}>
+          <p className="text-sm font-semibold" style={{ color: NAVY.ink }}>No modules assigned to you yet</p>
+          <p className="mt-1 text-[13px]" style={{ color: NAVY.inkSoft }}>
+            Ask an Owner or Admin to grant you access to one or more checklist modules.
+          </p>
+        </div>
+      )}
+
       <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+
         {sections.map((s, i) => {
           const h = SECTION_HUES[i % SECTION_HUES.length];
           const total = visibleQuestions(i).filter((q) => q.type !== "geopoint" && !GEO_NAMES.has(q.name || "")).length;
