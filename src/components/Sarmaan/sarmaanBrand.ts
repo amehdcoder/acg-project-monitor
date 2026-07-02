@@ -211,9 +211,9 @@ export const MODULE_GUIDANCE: ModuleGuidance[] = [
     code: "B",
     title: "Activity Planning & Preparedness",
     purpose: "Judge whether the activity was deliberately planned, resourced and de-risked before implementation.",
-    whoToAsk: "Team lead and the officer responsible for the workplan / microplan.",
+    whoToAsk: "Team lead and the officer responsible for the workplan.",
     whatToCheck: "Workplan inclusion, clear objective, defined target, assigned roles, tools ready and anticipated barriers with mitigation.",
-    howToCollect: "Review workplan / microplan, activity plan, and pre-activity checklists.",
+    howToCollect: "Review workplan, activity plan, and pre-activity checklists.",
     scoring: "Each preparedness item scores 2 (Yes) / 1 (Partly) / 0 (No).",
     tips: [
       "A plan that only exists verbally is not a plan — look for a written or digital record.",
