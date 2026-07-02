@@ -332,10 +332,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }, [user?.id]);
 
   // Owner-controlled per-project hiding of the MDA checklist copy feature card.
-  const [copyFeatureHidden, setCopyFeatureHidden] = useState(false);
+  // Hidden by default; only the Owner can reveal it via the kebab menu.
+  const [copyFeatureHidden, setCopyFeatureHidden] = useState(true);
   const [copyHideBusy, setCopyHideBusy] = useState(false);
   useEffect(() => {
-    if (!currentProjectId) { setCopyFeatureHidden(false); return; }
+    if (!currentProjectId) { setCopyFeatureHidden(true); return; }
     let cancelled = false;
     (async () => {
       const { data } = await (supabase as any)
@@ -343,7 +344,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         .select("hidden")
         .eq("project_id", currentProjectId)
         .maybeSingle();
-      if (!cancelled) setCopyFeatureHidden(!!(data as any)?.hidden);
+      if (!cancelled) setCopyFeatureHidden(data ? !!(data as any).hidden : true);
     })();
     return () => { cancelled = true; };
   }, [currentProjectId]);
