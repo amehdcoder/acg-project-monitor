@@ -112,6 +112,7 @@ import SpecialFormDashboard from "@/components/SpecialFormStudio/SpecialFormDash
 import SarmaanLearningDashboard from "@/components/Sarmaan/SarmaanLearningDashboard";
 import SarmaanChecklistLauncher from "@/components/Sarmaan/SarmaanChecklistLauncher";
 import { isSupervisoryLearningForm } from "@/components/Sarmaan/sarmaanBrand";
+import { getPreset } from "@/lib/specialStudio/presets";
 import { downloadXlsForm } from "@/lib/specialStudio/xlsformExport";
 import { FormFiller } from "@/components/FormFiller";
 import MdaChecklistLanding from "@/components/MdaChecklist/MdaChecklistLanding";
@@ -218,6 +219,11 @@ export const getProjectAccent = (
   const i = projects.findIndex((p) => p.id === projectId);
   return PROJECT_ACCENT_COLORS[(i >= 0 ? i : fallbackIdx) % PROJECT_ACCENT_COLORS.length];
 };
+
+const SARMAAN_SUPERVISORY_FORM_NAME = "SARMAAN Supervisory Checklist";
+const SARMAAN_SUPERVISORY_DASH_NAME = "SARMAAN Supervision Dashboard";
+const SARMAAN_SUPERVISORY_DESC = "12-module supportive supervision checklist with GPS, evidence capture, scoring and learning actions.";
+const SARMAAN_DASH_DESC = "Executive supervision dashboard with live KPIs, learning funnels, quality bands and corrective-action insights.";
 
 interface FormsViewProps {
   selectedProjectId?: string | null;
