@@ -1943,21 +1943,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     . Name clashes are resolved automatically and everything stays editable.
                   </p>
                 </div>
-                {/* Owner-only per-project visibility toggle. Sits in its own column so
-                    it never overlaps the action buttons below. */}
-                {isOwnerLevel && currentProjectId && (
-                  <button
-                    type="button"
-                    disabled={copyHideBusy}
-                    onClick={() => toggleCopyFeatureHidden(!copyFeatureHidden)}
-                    className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted disabled:opacity-60"
-                    title={copyFeatureHidden ? "Show this feature to admins" : "Hide this feature from admins"}
-                  >
-                    {copyFeatureHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-                    {copyFeatureHidden ? "Show" : "Hide"}
-                  </button>
-                )}
               </div>
+
               {!copyFeatureHidden && (
               <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                 <div className="flex-1 min-w-0">
