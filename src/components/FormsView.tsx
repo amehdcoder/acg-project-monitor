@@ -111,6 +111,9 @@ import SpecialFormStudio from "@/components/SpecialFormStudio/SpecialFormStudio"
 import SpecialFormDashboard from "@/components/SpecialFormStudio/SpecialFormDashboard";
 import SarmaanLearningDashboard from "@/components/Sarmaan/SarmaanLearningDashboard";
 import SarmaanChecklistLauncher from "@/components/Sarmaan/SarmaanChecklistLauncher";
+import SarmaanChecklistAccessManager from "@/components/Sarmaan/SarmaanChecklistAccessManager";
+import DashboardAccessManager from "@/components/dashboard/DashboardAccessManager";
+import { useSarmaanFormAccess } from "@/hooks/useSarmaanFormAccess";
 import { isSupervisoryLearningForm } from "@/components/Sarmaan/sarmaanBrand";
 import { getPreset } from "@/lib/specialStudio/presets";
 import { downloadXlsForm } from "@/lib/specialStudio/xlsformExport";
