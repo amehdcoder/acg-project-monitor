@@ -379,7 +379,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
 
   // Use the consolidated GRID3 cascade when the supervisor explicitly flags an
   // off-microplan community OR when the project has no linked microplan yet.
-  const useAdminHierarchy = notInMicroplan || microplanIsEmpty;
+  const useAdminHierarchy = disableMicroplan || notInMicroplan || microplanIsEmpty;
 
   useEffect(() => {
     let cancelled = false;
