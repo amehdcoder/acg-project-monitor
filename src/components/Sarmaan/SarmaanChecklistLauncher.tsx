@@ -598,7 +598,7 @@ export default function SarmaanChecklistLauncher({
                 {projectId && (
                   <div className="mb-5 rounded-2xl border bg-white/70 p-4 backdrop-blur" style={{ borderColor: tint(hue, 0.35) }}>
                     <div className="mb-3 flex items-center gap-2 text-sm font-bold" style={{ color: hue }}>
-                      <Compass className="h-4 w-4" /> Supervision location (from microplan)
+                      <Compass className="h-4 w-4" /> Supervision location
                     </div>
                     <MdaLocationCascade
                       projectId={projectId}
@@ -606,6 +606,7 @@ export default function SarmaanChecklistLauncher({
                       nameToId={mdaNameToId}
                       onSet={(updates) => setResponses((r) => ({ ...r, ...updates }))}
                       stateScope={stateScope}
+                      disableMicroplan
                     />
                   </div>
                 )}
