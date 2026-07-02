@@ -765,6 +765,15 @@ export const STUDIO_PRESETS: StudioPreset[] = [
       accent: "#0891b2",
     }),
   },
+  {
+    key: "supervisory_learning",
+    title: "Integrated Supervisory Checklist & Learning Dashboard",
+    subtitle: "13-section programme implementation supervision (A–M) + executive learning dashboard",
+    accent: "#0b3b6f",
+    theme: theme("#0b3b6f", "#2563eb", "#0b3b6f"),
+    sections: supervisoryLearningSections,
+    dashboard: supervisoryLearningDashboard,
+  },
 ];
 
 export function getPreset(key: string): StudioPreset | undefined {
