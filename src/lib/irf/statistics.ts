@@ -5,6 +5,7 @@
 // robust to small samples and missing values.
 
 import type { IrfReport } from "@/lib/irf/definition";
+import { computeIrfReach } from "@/lib/irf/normalize";
 
 export interface IndicatorStat {
   key: string;
