@@ -154,7 +154,7 @@ export default function CopyMdaChecklistDialog({
         sourceProjectName: projectName(selected.project_id),
       });
       const { error } = await supabase.from("forms").insert({
-        name: payload.name,
+        name: finalName || payload.name,
         description: payload.description,
         questions: payload.questions as any,
         settings: payload.settings as any,
