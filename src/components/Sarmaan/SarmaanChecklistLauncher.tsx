@@ -691,9 +691,9 @@ export default function SarmaanChecklistLauncher({
 
                 {/* Location cascade — captured on every independent form for context */}
                 {projectId && (
-                  <div className="mb-5 rounded-2xl border bg-white/70 p-4 backdrop-blur" style={{ borderColor: tint(hue, 0.35) }}>
-                    <div className="mb-3 flex items-center gap-2 text-sm font-bold" style={{ color: hue }}>
-                      <Compass className="h-4 w-4" /> Supervision location
+                  <div className="mb-5 rounded-2xl border bg-white/70 p-5 backdrop-blur" style={{ borderColor: tint(hue, 0.35) }}>
+                    <div className="mb-4 flex items-center gap-2 text-base font-bold sm:text-lg" style={{ color: hue }}>
+                      <Compass className="h-5 w-5" /> Supervision location
                     </div>
                     <MdaLocationCascade
                       projectId={projectId}
