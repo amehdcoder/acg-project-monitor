@@ -661,8 +661,9 @@ export default function SarmaanChecklistLauncher({
                   </h2>
                 </div>
 
-                {/* module hint pulled from guidance */}
-                <ModuleHint idx={currentIdx} hue={hue} />
+                {/* chapter narrative + guidance pulled from merged modules */}
+                <ModuleHint section={currentSection} hue={hue} />
+
 
                 {/* GPS strip — every form is self-contained */}
                 {requiresGps && (
