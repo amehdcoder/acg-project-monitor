@@ -2098,7 +2098,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                           type="button"
                           onClick={() => {
                             if (canSeeSarmaanDashboard) setSarmaanDashForm(primarySarmaanSupervisoryForm);
-                            else toast.error("You don't have access to this dashboard. Ask an Owner to grant access.");
+                            else toast({ title: "Dashboard locked", description: "You don't have access to this dashboard. Ask an Owner to grant access.", variant: "destructive" });
                           }}
                           className="group relative overflow-hidden rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                           style={{ borderColor: "#12B5A54D" }}
