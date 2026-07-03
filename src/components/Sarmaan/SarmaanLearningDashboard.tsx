@@ -371,9 +371,105 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
       .sort((a, b) => b.count - a.count);
   }, [filtered, questions]);
 
+  // ---- Statistical analysis of every numeric data point (basic → advanced) ----
+  // Descriptive statistics, dispersion, and a 95% confidence interval of the mean
+  // (normal approximation) for each numeric question captured across all chapters.
+  const statistics = useMemo(() => {
+    const numericQs = (questions as Question[]).filter((q) => q.type === "number" && q.name);
+    const describe = (values: number[]) => {
+      const n = values.length;
+      if (!n) return null;
+      const sorted = [...values].sort((a, b) => a - b);
+      const sum = values.reduce((a, b) => a + b, 0);
+      const mean = sum / n;
+      const median = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+      const variance = n > 1 ? values.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1) : 0;
+      const sd = Math.sqrt(variance);
+      const se = sd / Math.sqrt(n);
+      const margin = 1.96 * se;
+      const r2 = (x: number) => Math.round(x * 100) / 100;
+      return {
+        n, sum,
+        mean: r2(mean), median: r2(median),
+        min: sorted[0], max: sorted[n - 1], sd: r2(sd),
+        ciLow: Math.max(0, r2(mean - margin)), ciHigh: r2(mean + margin),
+        cv: mean ? Math.round((sd / mean) * 1000) / 10 : 0,
+      };
+    };
+    const palette = ["#0891b2", "#2563eb", "#db2777", "#ea580c", "#7c3aed", "#16a34a", "#f59e0b", "#0ea5e9", "#a64d79", "#45818e"];
+    const indicators = numericQs
+      .map((q, i) => {
+        const values = filtered
+          .map((r) => Number(val(r, q.name!)))
+          .filter((v) => Number.isFinite(v));
+        const d = describe(values);
+        if (!d || d.sum <= 0) return null;
+        return { key: q.id, label: q.label || q.name!, color: palette[i % palette.length], ...d };
+      })
+      .filter((x): x is NonNullable<typeof x> => !!x);
+
+    // Month-over-month growth of reach (aligned with the People Reached KPI field).
+    const byMonth = new Map<string, number>();
+    for (const r of filtered) {
+      const key = new Date(r.submitted_at || r.created_at).toISOString().slice(0, 7);
+      byMonth.set(key, (byMonth.get(key) || 0) + num(r, "estimated_total_reached"));
+    }
+    const months = [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b));
+    let momGrowthPct: number | null = null;
+    if (months.length >= 2) {
+      const prev = months[months.length - 2][1];
+      const last = months[months.length - 1][1];
+      momGrowthPct = prev > 0 ? Math.round(((last - prev) / prev) * 1000) / 10 : null;
+    }
+    return {
+      indicators,
+      momGrowthPct,
+      reportsPerActiveMonth: months.length ? Math.round((filtered.length / months.length) * 10) / 10 : filtered.length,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, questions]);
+
+  // ---- Merged submissions across every chapter — colorful editable/deletable table ----
+  const questionLabels = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const q of questions as Question[]) if (q.id) m[q.id] = q.label || q.name || q.id;
+    return m;
+  }, [questions]);
+
+  const fieldSpec = useMemo<FieldDescriptor[]>(() => {
+    const mapType = (t: string): FieldDescriptor["type"] =>
+      t === "number" ? "number"
+      : t === "date" || t === "datetime" ? "date"
+      : t === "select_one" || t === "select_multiple" ? "select"
+      : t === "note" ? "longtext"
+      : "text";
+    return (questions as Question[])
+      .filter((q) => q.id)
+      .map((q) => ({
+        key: q.id,
+        label: q.label || q.name || q.id,
+        type: mapType(q.type),
+        options: q.options?.map((o) => o.label ?? String(o.value ?? "")).filter(Boolean),
+      }));
+  }, [questions]);
+
+  const editableSubmissions = useMemo<EditableSubmission[]>(
+    () =>
+      filtered.map((r) => ({
+        id: r.id,
+        data: (r.data || {}) as Record<string, any>,
+        submitter: (r.user_id && profiles[r.user_id]) || "Unknown supervisor",
+        submittedAt: r.submitted_at || r.created_at,
+        state: str(r, "state") || null,
+        lga: str(r, "lga") || null,
+        ward: str(r, "ward") || null,
+        fieldSpec,
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, profiles, fieldSpec],
+  );
 
 
-  const hasFilters = Object.values(filters).some((v) => v && v !== "__all__");
   const dq = qualityBand(agg.avgScorePct || 0);
 
   const kpis = [
