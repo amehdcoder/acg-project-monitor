@@ -455,6 +455,11 @@ const Dashboard = ({ onOpenDashboardBuilder, onOpenDashboardStudio, initialProje
                 <BarChart3 className="h-3 w-3" /> Builder
               </Button>
             )}
+            {onOpenDashboardStudio && (
+              <Button variant="default" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-wider gap-1.5 px-3 hidden sm:inline-flex" onClick={onOpenDashboardStudio}>
+                <Sparkles className="h-3 w-3" /> Studio
+              </Button>
+            )}
           </div>
         </div>
 
