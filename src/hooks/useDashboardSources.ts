@@ -20,11 +20,55 @@ function inferType(v: unknown): SourceField["type"] {
 
 function fieldsFromRows(rows: Record<string, unknown>[]): SourceField[] {
   const keys = new Set<string>();
-  rows.slice(0, 50).forEach((r) => Object.keys(r).forEach((k) => keys.add(k)));
+  rows.slice(0, 200).forEach((r) => Object.keys(r).forEach((k) => keys.add(k)));
   return [...keys].map((k) => {
     const sample = rows.find((r) => r[k] !== null && r[k] !== undefined && r[k] !== "");
     return { id: k, label: k, type: inferType(sample?.[k]) };
   });
+}
+
+const FORM_TYPE_MAP: Record<string, SourceField["type"]> = {
+  integer: "number", decimal: "number", number: "number", calculate: "number",
+  date: "date", datetime: "date", time: "date",
+  boolean: "boolean", checkbox: "boolean",
+};
+
+/**
+ * Flatten a KoboToolbox-style form `questions` JSON (groups + questions) into a
+ * flat list of selectable fields, keyed by the question `name` (the key stored
+ * in submission `data`). This lets a form data source expose ALL of its fields
+ * in the Studio even before any submissions exist — exactly like Looker Studio.
+ */
+function fieldsFromForm(questions: unknown): SourceField[] {
+  const out: SourceField[] = [];
+  const seen = new Set<string>();
+  const NON_DATA = new Set(["note", "group", "begin_group", "end_group"]);
+  const walk = (nodes: any[]) => {
+    for (const n of nodes ?? []) {
+      if (!n || typeof n !== "object") continue;
+      if (Array.isArray(n.questions)) { walk(n.questions); continue; }
+      if (Array.isArray(n.children)) { walk(n.children); continue; }
+      const type = String(n.type ?? "");
+      if (NON_DATA.has(type)) continue;
+      const key = n.name || n.id;
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        id: key,
+        label: n.label || n.name || key,
+        type: FORM_TYPE_MAP[type] ?? "text",
+      });
+    }
+  };
+  if (Array.isArray(questions)) walk(questions);
+  return out;
+}
+
+/** Merge field lists, de-duplicating by id (first occurrence wins for label). */
+function mergeFields(...lists: SourceField[][]): SourceField[] {
+  const map = new Map<string, SourceField>();
+  for (const list of lists) for (const f of list) if (!map.has(f.id)) map.set(f.id, f);
+  return [...map.values()];
 }
 
 export function useDashboardSources() {
@@ -164,4 +208,4 @@ export async function resolveSourceRows(
   return source.config.cachedRows ?? [];
 }
 
-export { fieldsFromRows };
+export { fieldsFromRows, fieldsFromForm, mergeFields };

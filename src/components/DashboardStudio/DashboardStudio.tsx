@@ -74,7 +74,7 @@ function SortableCard({
 
 export default function DashboardStudio({ dashboardId, dashboardName, onBack }: Props) {
   const { user } = useAuth();
-  const { sources, deleteSource } = useDashboardSources();
+  const { sources, deleteSource, fetchSources } = useDashboardSources();
   const [widgets, setWidgets] = useState<StudioWidget[]>([]);
   const [rowsBySource, setRowsBySource] = useState<Record<string, Record<string, unknown>[]>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
