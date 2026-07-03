@@ -90,6 +90,74 @@ export default function IrfDuplicateManager({ projectId, duplicateIds, onChanged
     return out.sort((a, b) => (a.items[0]?.lga || "").localeCompare(b.items[0]?.lga || ""));
   }, [rows]);
 
+  // Every flagged-duplicate row (the actionable candidates, excluding originals).
+  const dupItems = useMemo(
+    () => groups.flatMap((g) => g.items.filter((it) => it.__isDup)),
+    [groups],
+  );
+  const dupItemIds = useMemo(() => dupItems.map((it) => it.id), [dupItems]);
+
+  // Keep the selection valid whenever the underlying duplicate set changes.
+  useEffect(() => {
+    setSelected((prev) => {
+      const valid = new Set(dupItemIds);
+      const next = new Set<string>();
+      prev.forEach((id) => { if (valid.has(id)) next.add(id); });
+      return next;
+    });
+  }, [dupItemIds]);
+
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const toggleGroup = (groupDupIds: string[], on: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      groupDupIds.forEach((id) => (on ? next.add(id) : next.delete(id)));
+      return next;
+    });
+
+  const allSelected = dupItemIds.length > 0 && dupItemIds.every((id) => selected.has(id));
+  const selectAll = () => setSelected(allSelected ? new Set() : new Set(dupItemIds));
+
+  const acceptSelected = async () => {
+    const items = dupItems.filter((it) => selected.has(it.id) && irfMap.get(it.id) !== "unique");
+    if (!items.length) { toast.info("Nothing new to accept in the selection."); return; }
+    setBusy("batch-accept");
+    try {
+      for (const it of items) {
+        await setOverride({ sourceTable: "irf_reports", submissionId: it.id, decision: "unique", signature: irfSignature(it) });
+      }
+      toast.success(`${items.length} submission(s) accepted as unique — counts recomputed everywhere.`);
+      setSelected(new Set());
+      await onChanged();
+    } catch (e: any) {
+      toast.error(e?.message || "Could not accept selected submissions.");
+    } finally { setBusy(null); }
+  };
+
+  const removeSelected = async () => {
+    const idsToRemove = dupItemIds.filter((id) => selected.has(id));
+    if (!idsToRemove.length) return;
+    if (!window.confirm(`Permanently remove ${idsToRemove.length} selected duplicate submission(s) from the database and every dashboard computation? This cannot be undone.`)) return;
+    setBusy("batch-delete");
+    try {
+      const { error } = await supabase.rpc("owner_delete_irf_duplicates" as any, { _ids: idsToRemove });
+      if (error) throw error;
+      toast.success(`${idsToRemove.length} duplicate(s) permanently removed.`);
+      setRows((prev) => prev.filter((r) => !idsToRemove.includes(r.id)));
+      setSelected(new Set());
+      await onChanged();
+    } catch (e: any) {
+      toast.error(e?.message || "Could not remove selected submissions.");
+    } finally { setBusy(null); }
+  };
+
+
   const run = async (mode: "archive" | "delete") => {
     if (!ids.length) return;
     setBusy(mode);
