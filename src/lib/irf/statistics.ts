@@ -73,7 +73,12 @@ function describe(values: number[]): Omit<IndicatorStat, "key" | "label" | "colo
 
 export function analyzeStatistics(rows: IrfReport[]): IrfStatistics {
   const indicators: IndicatorStat[] = INDICATORS.map((ind) => {
-    const values = rows.map((r) => num((r as any)[ind.key])).filter((v): v is number => v != null && Number.isFinite(v));
+    // The reach indicator must equal the composite KPI reach per report, otherwise
+    // the "Total" column diverges from the "People Reached" headline KPI.
+    const values = (ind.key === "total_reach"
+      ? rows.map((r) => computeIrfReach(r))
+      : rows.map((r) => num((r as any)[ind.key])).filter((v): v is number => v != null && Number.isFinite(v))
+    ).filter((v): v is number => v != null && Number.isFinite(v));
     return { key: ind.key, label: ind.label, color: ind.color, ...describe(values) };
   }).filter((s) => s.n > 0 && s.sum > 0);
 
