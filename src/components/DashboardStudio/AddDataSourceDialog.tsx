@@ -306,18 +306,45 @@ export default function AddDataSourceDialog({ open, onClose, onCreated }: Props)
               </div>
             )}
 
+            {busy && !preview && (kind === "form" || kind === "table") && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Reading fields…
+              </div>
+            )}
+
             {preview && (
               <div className="rounded-lg border border-border bg-muted/30 p-3">
                 <div className="mb-2 flex items-center gap-2 text-sm font-medium text-emerald-600">
                   <CheckCircle2 className="h-4 w-4" /> {preview.rows.length} rows · {preview.fields.length} fields detected
                 </div>
-                <div className="flex flex-wrap gap-1">
-                  {preview.fields.slice(0, 24).map((f) => (
+                <div className="mb-2 flex max-h-32 flex-wrap gap-1 overflow-y-auto">
+                  {preview.fields.map((f) => (
                     <Badge key={f.id} variant="outline" className="text-[10px]">{f.label} <span className="ml-1 opacity-60">{f.type}</span></Badge>
                   ))}
                 </div>
+                {preview.rows.length > 0 && (
+                  <div className="max-h-40 overflow-auto rounded border border-border/60 bg-background">
+                    <table className="w-full text-[10px]">
+                      <thead className="sticky top-0 bg-muted">
+                        <tr>{preview.fields.slice(0, 8).map((f) => (
+                          <th key={f.id} className="whitespace-nowrap px-2 py-1 text-left font-medium">{f.label}</th>
+                        ))}</tr>
+                      </thead>
+                      <tbody>
+                        {preview.rows.slice(0, 8).map((row, i) => (
+                          <tr key={i} className="border-t border-border/40">
+                            {preview.fields.slice(0, 8).map((f) => (
+                              <td key={f.id} className="max-w-[120px] truncate px-2 py-1">{String(row[f.id] ?? "")}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
+
           </div>
         )}
 
