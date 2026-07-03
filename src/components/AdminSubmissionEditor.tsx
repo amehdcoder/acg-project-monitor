@@ -292,7 +292,9 @@ export default function AdminSubmissionEditor({
                 columnData={active.columns}
                 onDataUpdate={async (updated) => {
                   setActive((prev) => (prev ? { ...prev, data: updated } : prev));
-                  await onChanged?.();
+                  // Optimistic path: update the parent's row in place, no reload.
+                  if (onOptimisticEdit && active) onOptimisticEdit(active.id, updated);
+                  else await onChanged?.();
                 }}
                 onColumnsUpdate={(updatedColumns) => {
                   setActive((prev) =>
