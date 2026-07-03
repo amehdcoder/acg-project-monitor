@@ -463,11 +463,68 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
         state: str(r, "state") || null,
         lga: str(r, "lga") || null,
         ward: str(r, "ward") || null,
+        chapter: meta(r, "__section_label") || "General",
         fieldSpec,
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [filtered, profiles, fieldSpec],
   );
+
+  // Distinct chapters for the merged-table chapter filter.
+  const chapterList = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of rows) s.add(meta(r, "__section_label") || "General");
+    return [...s].sort();
+  }, [rows]);
+
+  // Optimistic edit / delete — update local rows in place so the whole dashboard
+  // (KPIs, charts, text analysis) reflects the change instantly without a reload.
+  const optimisticDelete = useCallback((id: string) => {
+    setRows((prev) => prev.filter((r) => r.id !== id));
+    setLastUpdated(Date.now());
+  }, []);
+  const optimisticEdit = useCallback((id: string, data: Record<string, any>) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, data } : r)));
+    setLastUpdated(Date.now());
+  }, []);
+
+  // Beautiful, colourful Excel export of every merged chapter submission.
+  const exportExcel = useCallback(async () => {
+    const geoCols = [
+      { key: "__submitter", label: "Supervisor" },
+      { key: "__date", label: "Submitted" },
+      { key: "__chapter", label: "Chapter" },
+      { key: "state", label: "State" },
+      { key: "lga", label: "LGA" },
+      { key: "ward", label: "Ward" },
+    ];
+    const qCols = (questions as Question[])
+      .filter((q) => q.id && q.name && !["state", "lga", "ward"].includes(q.name))
+      .map((q) => ({ key: q.id, label: q.label || q.name || q.id, numeric: q.type === "number" }));
+    const columns = [...geoCols, ...qCols];
+    const exportRows = filtered.map((r) => {
+      const base: Record<string, any> = {
+        __submitter: (r.user_id && profiles[r.user_id]) || "Unknown supervisor",
+        __date: new Date(r.submitted_at || r.created_at).toLocaleString(),
+        __chapter: meta(r, "__section_label") || "General",
+        state: str(r, "state"),
+        lga: str(r, "lga"),
+        ward: str(r, "ward"),
+      };
+      for (const q of qCols) {
+        const v = (r.data || {})[q.key];
+        base[q.key] = Array.isArray(v) ? v.join(", ") : v ?? "";
+      }
+      return base;
+    });
+    const chapterCounts = chapterList.map((c) => ({
+      chapter: c,
+      count: filtered.filter((r) => (meta(r, "__section_label") || "General") === c).length,
+    }));
+    const { exportSarmaanSubmissions } = await import("@/lib/sarmaan/sarmaanExcelExport");
+    await exportSarmaanSubmissions({ formName: form.name, columns, rows: exportRows, chapterCounts });
+  }, [filtered, profiles, questions, chapterList, form.name]);
+
 
   const hasFilters = Object.values(filters).some((v) => v && v !== "__all__");
   const dq = qualityBand(agg.avgScorePct || 0);
