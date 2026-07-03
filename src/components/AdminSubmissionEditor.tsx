@@ -24,6 +24,8 @@ export interface EditableSubmission {
   state?: string | null;
   lga?: string | null;
   ward?: string | null;
+  /** Chapter/module this submission belongs to (used for the chapter filter). */
+  chapter?: string | null;
   /** Ordered list of every form field so the editor can render all questions. */
   fieldSpec?: FieldDescriptor[];
   /** Current values for column-mapped fields (keyed by column name). */
@@ -44,9 +46,21 @@ interface Props {
   onChanged?: () => void | Promise<void>;
   /** When true, each row gets an owner-only delete button that removes the row. */
   enableDelete?: boolean;
+  /**
+   * Optimistic delete hook — when provided the parent updates its own state
+   * (no full dashboard reload). Return true if the parent handled the state.
+   */
+  onOptimisticDelete?: (id: string) => void;
+  /** Optimistic edit hook — called with the new answer JSON instead of onChanged. */
+  onOptimisticEdit?: (id: string, data: Record<string, any>) => void;
+  /** Chapter filter options; when non-empty a chapter dropdown is shown. */
+  chapters?: string[];
+  /** Extra header actions (e.g. an Excel export button). */
+  extraActions?: ReactNode;
   title?: string;
   pageSize?: number;
 }
+
 
 const geoLabel = (s: EditableSubmission) =>
   [s.lga, s.ward].filter(Boolean).join(" · ") || s.state || "—";
