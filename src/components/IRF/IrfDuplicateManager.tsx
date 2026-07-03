@@ -1,17 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Copy, Trash2, Archive, RotateCcw, Loader2, ShieldAlert } from "lucide-react";
+import {
+  Copy, Trash2, Archive, RotateCcw, Loader2, ShieldAlert, GitCompare,
+  Check, Star, ArrowRightLeft, MapPin, Calendar, User,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { flagDuplicates, irfSignature, irfOrder } from "@/lib/acsm/irfBridge";
+import { IRF_METRIC_FIELDS, type IrfReport } from "@/lib/irf/definition";
+import { normalizeIrfRows } from "@/lib/irf/normalize";
+import { useAcsmDuplicateOverrides } from "@/hooks/useAcsmDuplicateOverrides";
 
 interface Props {
   projectId?: string | null;
@@ -19,12 +27,28 @@ interface Props {
   onChanged: () => void | Promise<void>;
 }
 
-/** Owner-only removal of duplicate SARMAAN ACSM reports from the data source. */
+const fmtWhen = (s?: string | null) => (s ? new Date(s).toLocaleString() : "—");
+const period = (r: any) => String(r?.reporting_month || r?.reporting_period || "").slice(0, 7) || "—";
+const who = (r: any) => r?.focal_person_name || r?.created_by_name || r?.created_by || "—";
+
+/** Compare fields shown in the side-by-side preview (geography + key metrics). */
+const COMPARE_FIELDS: { key: string; label: string }[] = [
+  { key: "state", label: "State" },
+  { key: "lga", label: "LGA" },
+  { key: "ward", label: "Ward" },
+  ...IRF_METRIC_FIELDS.slice(0, 14).map((f) => ({ key: f.key, label: f.label })),
+];
+
+/** Owner-only removal + professional compare/review of duplicate SARMAAN ACSM reports. */
 export default function IrfDuplicateManager({ projectId, duplicateIds, onChanged }: Props) {
   const ids = Array.from(duplicateIds);
   const [busy, setBusy] = useState<string | null>(null);
   const [archived, setArchived] = useState<any[]>([]);
   const [showArchive, setShowArchive] = useState(false);
+  const [showReview, setShowReview] = useState(false);
+  const [rows, setRows] = useState<IrfReport[]>([]);
+  const [loadingRows, setLoadingRows] = useState(false);
+  const { irfMap, setOverride, clearOverride } = useAcsmDuplicateOverrides(projectId);
 
   const loadArchive = async () => {
     let q = supabase.from("irf_archived_reports").select("id, report_id, payload, reason, created_at").order("created_at", { ascending: false });
@@ -33,7 +57,36 @@ export default function IrfDuplicateManager({ projectId, duplicateIds, onChanged
     setArchived(data || []);
   };
 
+  const loadRows = async () => {
+    setLoadingRows(true);
+    try {
+      let q = supabase.from("irf_reports" as any).select("*");
+      if (projectId) q = q.eq("project_id", projectId);
+      const { data } = await q.limit(4000);
+      setRows(normalizeIrfRows((data as any) || []));
+    } finally { setLoadingRows(false); }
+  };
+
   useEffect(() => { if (showArchive) void loadArchive(); }, [showArchive]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (showReview) void loadRows(); }, [showReview]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Group duplicate sets (one authoritative original + its duplicates).
+  const groups = useMemo(() => {
+    const res = flagDuplicates(rows, irfSignature, (r) => r.id, irfOrder);
+    const out: { key: string; items: (IrfReport & { __isOriginal: boolean; __isDup: boolean })[] }[] = [];
+    res.groups.forEach((groupRows, sig) => {
+      if (groupRows.length < 2) return;
+      out.push({
+        key: sig,
+        items: groupRows.map((r, i) => ({
+          ...r,
+          __isOriginal: i === 0,
+          __isDup: res.duplicateIds.has(r.id),
+        })),
+      });
+    });
+    return out.sort((a, b) => (a.items[0]?.lga || "").localeCompare(b.items[0]?.lga || ""));
+  }, [rows]);
 
   const run = async (mode: "archive" | "delete") => {
     if (!ids.length) return;
@@ -47,6 +100,42 @@ export default function IrfDuplicateManager({ projectId, duplicateIds, onChanged
       await onChanged();
     } catch (e: any) {
       toast.error(e?.message || `Could not ${mode} duplicates.`);
+    } finally { setBusy(null); }
+  };
+
+  const deleteOne = async (id: string) => {
+    if (!window.confirm("Permanently remove this duplicate submission from the database and every dashboard computation? This cannot be undone.")) return;
+    setBusy(id);
+    try {
+      const { error } = await supabase.rpc("owner_delete_irf_duplicates" as any, { _ids: [id] });
+      if (error) throw error;
+      toast.success("Duplicate permanently removed.");
+      setRows((prev) => prev.filter((r) => r.id !== id));
+      await onChanged();
+    } catch (e: any) {
+      toast.error(e?.message || "Could not remove submission.");
+    } finally { setBusy(null); }
+  };
+
+  const acceptUnique = async (r: IrfReport & { __isDup: boolean }) => {
+    setBusy(r.id);
+    try {
+      await setOverride({ sourceTable: "irf_reports", submissionId: r.id, decision: "unique", signature: irfSignature(r) });
+      toast.success("Accepted as unique — counts recomputed across all dashboards.");
+      await onChanged();
+    } catch (e: any) {
+      toast.error(e?.message || "Could not accept submission.");
+    } finally { setBusy(null); }
+  };
+
+  const resetDecision = async (id: string) => {
+    setBusy(id);
+    try {
+      await clearOverride("irf_reports", id);
+      toast.success("Reverted to automatic detection.");
+      await onChanged();
+    } catch (e: any) {
+      toast.error(e?.message || "Could not reset decision.");
     } finally { setBusy(null); }
   };
 
@@ -74,11 +163,141 @@ export default function IrfDuplicateManager({ projectId, duplicateIds, onChanged
           {ids.length} duplicate report(s) currently flagged
         </span>
         <div className="ml-auto flex flex-wrap gap-2">
+          {/* Preview & compare individual duplicates */}
+          <Dialog open={showReview} onOpenChange={setShowReview}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="bg-amber-600 text-white hover:bg-amber-700" disabled={!ids.length}>
+                <GitCompare className="mr-1 h-4 w-4" /> Review & compare
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <ArrowRightLeft className="h-5 w-5 text-amber-600" /> Duplicate review & comparison
+                </DialogTitle>
+                <DialogDescription>
+                  Preview each duplicate set side-by-side. The <Star className="inline h-3 w-3 text-amber-500" /> row is the
+                  authoritative original. Accept a flagged record as unique, or permanently remove it from the database
+                  and every dashboard computation.
+                </DialogDescription>
+              </DialogHeader>
+              <ScrollArea className="max-h-[68vh] pr-3">
+                {loadingRows ? (
+                  <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading submissions…
+                  </div>
+                ) : groups.length === 0 ? (
+                  <div className="py-12 text-center text-sm text-muted-foreground">
+                    <Copy className="mx-auto mb-2 h-6 w-6 opacity-50" />
+                    No duplicate sets to compare. Unique counts are clean.
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    {groups.map((g) => {
+                      const original = g.items[0];
+                      return (
+                        <div key={g.key} className="overflow-hidden rounded-xl border">
+                          <div className="flex items-center gap-2 border-b bg-muted/50 px-3 py-2">
+                            <Badge variant="outline" className="gap-1">
+                              <Copy className="h-3 w-3" /> {g.items.length} in set
+                            </Badge>
+                            <span className="truncate text-sm font-semibold">
+                              {original.lga || "Unspecified LGA"}{original.ward ? ` — ${original.ward}` : ""}
+                            </span>
+                            <span className="ml-auto text-xs text-muted-foreground">{period(original)}</span>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full min-w-[560px] text-xs">
+                              <thead>
+                                <tr className="border-b bg-muted/30 text-left text-muted-foreground">
+                                  <th className="px-3 py-2 font-semibold">Field</th>
+                                  {g.items.map((it) => (
+                                    <th key={it.id} className="px-3 py-2 font-semibold">
+                                      <span className="flex items-center gap-1">
+                                        {it.__isOriginal && <Star className="h-3 w-3 text-amber-500" />}
+                                        {it.__isOriginal ? "Original" : "Duplicate"}
+                                      </span>
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr className="border-b">
+                                  <td className="px-3 py-1.5 font-medium text-muted-foreground"><User className="mr-1 inline h-3 w-3" />Submitter</td>
+                                  {g.items.map((it) => <td key={it.id} className="px-3 py-1.5">{who(it)}</td>)}
+                                </tr>
+                                <tr className="border-b">
+                                  <td className="px-3 py-1.5 font-medium text-muted-foreground"><Calendar className="mr-1 inline h-3 w-3" />Submitted</td>
+                                  {g.items.map((it) => <td key={it.id} className="px-3 py-1.5">{fmtWhen(it.created_at)}</td>)}
+                                </tr>
+                                {COMPARE_FIELDS.map((f) => {
+                                  const vals = g.items.map((it) => (it as any)[f.key]);
+                                  const differs = vals.some((v) => String(v ?? "") !== String(vals[0] ?? ""));
+                                  if (vals.every((v) => v == null || v === "" || v === 0)) return null;
+                                  return (
+                                    <tr key={f.key} className={`border-b ${differs ? "bg-amber-50 dark:bg-amber-500/10" : ""}`}>
+                                      <td className="px-3 py-1.5 font-medium text-muted-foreground">
+                                        {f.key === "state" || f.key === "lga" || f.key === "ward" ? <MapPin className="mr-1 inline h-3 w-3" /> : null}
+                                        {f.label}{differs && <span title="Values differ" className="ml-1 text-amber-600">•</span>}
+                                      </td>
+                                      {g.items.map((it) => (
+                                        <td key={it.id} className={`px-3 py-1.5 ${differs ? "font-semibold" : ""}`}>
+                                          {String((it as any)[f.key] ?? "—")}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  );
+                                })}
+                                <tr>
+                                  <td className="px-3 py-2 font-medium text-muted-foreground">Actions</td>
+                                  {g.items.map((it) => {
+                                    const decision = irfMap.get(it.id);
+                                    return (
+                                      <td key={it.id} className="px-3 py-2">
+                                        {it.__isOriginal && !decision ? (
+                                          <Badge variant="outline" className="text-emerald-600">Kept</Badge>
+                                        ) : (
+                                          <div className="flex flex-wrap items-center gap-1">
+                                            {decision === "unique" && <Badge className="bg-emerald-600 hover:bg-emerald-600">Unique</Badge>}
+                                            {decision !== "unique" && (
+                                              <Button size="sm" variant="outline" className="h-7 gap-1 text-xs"
+                                                disabled={busy === it.id} onClick={() => acceptUnique(it)}>
+                                                {busy === it.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />} Accept
+                                              </Button>
+                                            )}
+                                            {decision && (
+                                              <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs"
+                                                disabled={busy === it.id} onClick={() => resetDecision(it.id)}>
+                                                <RotateCcw className="h-3 w-3" /> Reset
+                                              </Button>
+                                            )}
+                                            <Button size="sm" variant="destructive" className="h-7 gap-1 text-xs"
+                                              disabled={busy === it.id} onClick={() => deleteOne(it.id)}>
+                                              <Trash2 className="h-3 w-3" /> Remove
+                                            </Button>
+                                          </div>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </ScrollArea>
+            </DialogContent>
+          </Dialog>
+
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button size="sm" variant="outline" disabled={!ids.length || !!busy}>
                 {busy === "archive" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Archive className="mr-1 h-4 w-4" />}
-                Archive duplicates
+                Archive all
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -100,7 +319,7 @@ export default function IrfDuplicateManager({ projectId, duplicateIds, onChanged
             <AlertDialogTrigger asChild>
               <Button size="sm" variant="destructive" disabled={!ids.length || !!busy}>
                 {busy === "delete" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1 h-4 w-4" />}
-                Delete permanently
+                Delete all
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>

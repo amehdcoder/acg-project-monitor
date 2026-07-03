@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   Pencil, Search, ChevronLeft, ChevronRight, Copy, MapPin,
-  CalendarDays, User, FileEdit, Database, ShieldCheck, Trash2,
+  CalendarDays, User, FileEdit, Database, ShieldCheck, Trash2, Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,8 @@ export interface EditableSubmission {
   state?: string | null;
   lga?: string | null;
   ward?: string | null;
+  /** Chapter/module this submission belongs to (used for the chapter filter). */
+  chapter?: string | null;
   /** Ordered list of every form field so the editor can render all questions. */
   fieldSpec?: FieldDescriptor[];
   /** Current values for column-mapped fields (keyed by column name). */
@@ -44,9 +46,21 @@ interface Props {
   onChanged?: () => void | Promise<void>;
   /** When true, each row gets an owner-only delete button that removes the row. */
   enableDelete?: boolean;
+  /**
+   * Optimistic delete hook — when provided the parent updates its own state
+   * (no full dashboard reload). Return true if the parent handled the state.
+   */
+  onOptimisticDelete?: (id: string) => void;
+  /** Optimistic edit hook — called with the new answer JSON instead of onChanged. */
+  onOptimisticEdit?: (id: string, data: Record<string, any>) => void;
+  /** Chapter filter options; when non-empty a chapter dropdown is shown. */
+  chapters?: string[];
+  /** Extra header actions (e.g. an Excel export button). */
+  extraActions?: ReactNode;
   title?: string;
   pageSize?: number;
 }
+
 
 const geoLabel = (s: EditableSubmission) =>
   [s.lga, s.ward].filter(Boolean).join(" · ") || s.state || "—";
@@ -70,6 +84,10 @@ export default function AdminSubmissionEditor({
   duplicateIds,
   onChanged,
   enableDelete = false,
+  onOptimisticDelete,
+  onOptimisticEdit,
+  chapters,
+  extraActions,
   title = "Submissions — Admin edit",
   pageSize = 10,
 }: Props) {
@@ -77,6 +95,7 @@ export default function AdminSubmissionEditor({
   const [page, setPage] = useState(0);
   const [active, setActive] = useState<EditableSubmission | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [chapterFilter, setChapterFilter] = useState<string>("__all__");
 
   const handleDelete = async (s: EditableSubmission) => {
     if (!window.confirm("Permanently delete this submission? This updates every part of the dashboard instantly.")) return;
@@ -84,26 +103,32 @@ export default function AdminSubmissionEditor({
     const { error } = await supabase.from(table as any).delete().eq("id", s.id);
     setDeleting(null);
     if (error) { window.alert(`Delete failed: ${error.message}`); return; }
-    await onChanged?.();
+    // Optimistic path: let the parent drop the row from its own state instantly.
+    if (onOptimisticDelete) onOptimisticDelete(s.id);
+    else await onChanged?.();
   };
 
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const rows = q
-      ? submissions.filter((s) => {
-          const hay = [
-            s.submitter, s.state, s.lga, s.ward, s.id,
-            ...Object.values(s.data || {}).map((v) =>
-              typeof v === "object" ? JSON.stringify(v) : String(v ?? "")),
-          ].join(" ").toLowerCase();
-          return hay.includes(q);
-        })
-      : submissions;
+    let rows = submissions;
+    if (chapterFilter !== "__all__") {
+      rows = rows.filter((s) => (s.chapter || "") === chapterFilter);
+    }
+    if (q) {
+      rows = rows.filter((s) => {
+        const hay = [
+          s.submitter, s.state, s.lga, s.ward, s.id, s.chapter,
+          ...Object.values(s.data || {}).map((v) =>
+            typeof v === "object" ? JSON.stringify(v) : String(v ?? "")),
+        ].join(" ").toLowerCase();
+        return hay.includes(q);
+      });
+    }
     return [...rows].sort(
       (a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime(),
     );
-  }, [submissions, search]);
+  }, [submissions, search, chapterFilter]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, pageCount - 1);
@@ -118,6 +143,7 @@ export default function AdminSubmissionEditor({
 
   return (
     <Card className="overflow-hidden border-primary/20">
+
       <div className="flex flex-wrap items-center gap-2 border-b bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3">
         <FileEdit className="h-5 w-5 text-white" />
         <div className="min-w-0">
@@ -127,21 +153,43 @@ export default function AdminSubmissionEditor({
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {extraActions}
           <Badge variant="secondary" className="gap-1 bg-white/15 text-white hover:bg-white/25">
             <ShieldCheck className="h-3 w-3" /> Admin
           </Badge>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 border-b bg-muted/40 px-3 py-2.5">
-        <Search className="h-4 w-4 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-          placeholder="Search by submitter, location or any answer…"
-          className="h-8 border-0 bg-transparent text-sm shadow-none focus-visible:ring-0"
-        />
+      <div className="flex flex-wrap items-center gap-2 border-b bg-muted/40 px-3 py-2.5">
+        <div className="flex min-w-[200px] flex-1 items-center gap-2">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+            placeholder="Search by submitter, location or any answer…"
+            className="h-8 border-0 bg-transparent text-sm shadow-none focus-visible:ring-0"
+          />
+        </div>
+        {chapters && chapters.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <Layers className="h-4 w-4 text-muted-foreground" />
+            <select
+              value={chapterFilter}
+              onChange={(e) => { setChapterFilter(e.target.value); setPage(0); }}
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+              aria-label="Filter by chapter"
+            >
+              <option value="__all__">All chapters ({submissions.length})</option>
+              {chapters.map((c) => (
+                <option key={c} value={c}>
+                  {c} ({submissions.filter((s) => (s.chapter || "") === c).length})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
+
 
       <div className="divide-y">
         {pageRows.length === 0 ? (
@@ -244,7 +292,9 @@ export default function AdminSubmissionEditor({
                 columnData={active.columns}
                 onDataUpdate={async (updated) => {
                   setActive((prev) => (prev ? { ...prev, data: updated } : prev));
-                  await onChanged?.();
+                  // Optimistic path: update the parent's row in place, no reload.
+                  if (onOptimisticEdit && active) onOptimisticEdit(active.id, updated);
+                  else await onChanged?.();
                 }}
                 onColumnsUpdate={(updatedColumns) => {
                   setActive((prev) =>

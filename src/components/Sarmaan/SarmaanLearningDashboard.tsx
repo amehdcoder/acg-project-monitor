@@ -35,6 +35,10 @@ import {
   PieChart,
   Pie,
   ReferenceLine,
+  LineChart,
+  Line,
+  ComposedChart,
+  Legend as RLegend,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -409,25 +413,68 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
       .filter((x): x is NonNullable<typeof x> => !!x);
 
     // Month-over-month growth of reach (aligned with the People Reached KPI field).
-    const byMonth = new Map<string, number>();
+    const byMonth = new Map<string, { reach: number; count: number }>();
     for (const r of filtered) {
       const key = new Date(r.submitted_at || r.created_at).toISOString().slice(0, 7);
-      byMonth.set(key, (byMonth.get(key) || 0) + num(r, "estimated_total_reached"));
+      const cur = byMonth.get(key) || { reach: 0, count: 0 };
+      cur.reach += num(r, "estimated_total_reached");
+      cur.count += 1;
+      byMonth.set(key, cur);
     }
     const months = [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b));
+    const timeSeries = months.map(([m, v]) => ({
+      month: m,
+      label: new Date(`${m}-01`).toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
+      reach: v.reach,
+      submissions: v.count,
+    }));
     let momGrowthPct: number | null = null;
     if (months.length >= 2) {
-      const prev = months[months.length - 2][1];
-      const last = months[months.length - 1][1];
+      const prev = months[months.length - 2][1].reach;
+      const last = months[months.length - 1][1].reach;
       momGrowthPct = prev > 0 ? Math.round(((last - prev) / prev) * 1000) / 10 : null;
     }
+
+    // Breakdown by chapter (submissions + reach per module).
+    const byChapter = new Map<string, { count: number; reach: number }>();
+    for (const r of filtered) {
+      const key = meta(r, "__section_label") || "General";
+      const cur = byChapter.get(key) || { count: 0, reach: 0 };
+      cur.count += 1;
+      cur.reach += num(r, "estimated_total_reached");
+      byChapter.set(key, cur);
+    }
+    const chapterBreakdown = [...byChapter.entries()]
+      .map(([chapter, v], i) => ({
+        chapter: chapter.length > 22 ? chapter.slice(0, 21) + "…" : chapter,
+        fullChapter: chapter,
+        count: v.count,
+        reach: v.reach,
+        color: palette[i % palette.length],
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // Attendance vs reach — dialogue/meeting attendance against estimated reach.
+    const attendanceVsReach = filtered
+      .map((r) => {
+        const attendance =
+          num(r, "num_men") + num(r, "num_women") + num(r, "num_youth") + num(r, "num_pwd");
+        const reach = num(r, "estimated_total_reached");
+        return { attendance, reach };
+      })
+      .filter((p) => p.attendance > 0 || p.reach > 0);
+
     return {
       indicators,
       momGrowthPct,
       reportsPerActiveMonth: months.length ? Math.round((filtered.length / months.length) * 10) / 10 : filtered.length,
+      timeSeries,
+      chapterBreakdown,
+      attendanceVsReach,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, questions]);
+
 
   // ---- Merged submissions across every chapter — colorful editable/deletable table ----
   const questionLabels = useMemo(() => {
@@ -463,11 +510,68 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
         state: str(r, "state") || null,
         lga: str(r, "lga") || null,
         ward: str(r, "ward") || null,
+        chapter: meta(r, "__section_label") || "General",
         fieldSpec,
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [filtered, profiles, fieldSpec],
   );
+
+  // Distinct chapters for the merged-table chapter filter.
+  const chapterList = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of rows) s.add(meta(r, "__section_label") || "General");
+    return [...s].sort();
+  }, [rows]);
+
+  // Optimistic edit / delete — update local rows in place so the whole dashboard
+  // (KPIs, charts, text analysis) reflects the change instantly without a reload.
+  const optimisticDelete = useCallback((id: string) => {
+    setRows((prev) => prev.filter((r) => r.id !== id));
+    setLastUpdated(Date.now());
+  }, []);
+  const optimisticEdit = useCallback((id: string, data: Record<string, any>) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, data } : r)));
+    setLastUpdated(Date.now());
+  }, []);
+
+  // Beautiful, colourful Excel export of every merged chapter submission.
+  const exportExcel = useCallback(async () => {
+    const geoCols = [
+      { key: "__submitter", label: "Supervisor" },
+      { key: "__date", label: "Submitted" },
+      { key: "__chapter", label: "Chapter" },
+      { key: "state", label: "State" },
+      { key: "lga", label: "LGA" },
+      { key: "ward", label: "Ward" },
+    ];
+    const qCols = (questions as Question[])
+      .filter((q) => q.id && q.name && !["state", "lga", "ward"].includes(q.name))
+      .map((q) => ({ key: q.id, label: q.label || q.name || q.id, numeric: q.type === "number" }));
+    const columns = [...geoCols, ...qCols];
+    const exportRows = filtered.map((r) => {
+      const base: Record<string, any> = {
+        __submitter: (r.user_id && profiles[r.user_id]) || "Unknown supervisor",
+        __date: new Date(r.submitted_at || r.created_at).toLocaleString(),
+        __chapter: meta(r, "__section_label") || "General",
+        state: str(r, "state"),
+        lga: str(r, "lga"),
+        ward: str(r, "ward"),
+      };
+      for (const q of qCols) {
+        const v = (r.data || {})[q.key];
+        base[q.key] = Array.isArray(v) ? v.join(", ") : v ?? "";
+      }
+      return base;
+    });
+    const chapterCounts = chapterList.map((c) => ({
+      chapter: c,
+      count: filtered.filter((r) => (meta(r, "__section_label") || "General") === c).length,
+    }));
+    const { exportSarmaanSubmissions } = await import("@/lib/sarmaan/sarmaanExcelExport");
+    await exportSarmaanSubmissions({ formName: form.name, columns, rows: exportRows, chapterCounts });
+  }, [filtered, profiles, questions, chapterList, form.name]);
+
 
   const hasFilters = Object.values(filters).some((v) => v && v !== "__all__");
   const dq = qualityBand(agg.avgScorePct || 0);
@@ -762,7 +866,18 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
                 questionLabels={questionLabels}
                 table="form_submissions"
                 enableDelete
+                chapters={chapterList}
+                onOptimisticDelete={optimisticDelete}
+                onOptimisticEdit={optimisticEdit}
                 onChanged={() => load()}
+                extraActions={
+                  <button
+                    onClick={exportExcel}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-600"
+                  >
+                    <FileCheck2 className="h-3.5 w-3.5" /> Excel
+                  </button>
+                }
                 title="All Chapter Submissions — Owner edit & delete"
                 pageSize={12}
               />
@@ -944,11 +1059,20 @@ interface StatRow {
   n: number; sum: number; mean: number; median: number;
   min: number; max: number; sd: number; ciLow: number; ciHigh: number; cv: number;
 }
-interface Stats { indicators: StatRow[]; momGrowthPct: number | null; reportsPerActiveMonth: number; }
+interface Stats {
+  indicators: StatRow[];
+  momGrowthPct: number | null;
+  reportsPerActiveMonth: number;
+  timeSeries: { month: string; label: string; reach: number; submissions: number }[];
+  chapterBreakdown: { chapter: string; fullChapter: string; count: number; reach: number; color: string }[];
+  attendanceVsReach: { attendance: number; reach: number }[];
+}
 
 function StatsPanel({ stats }: { stats: Stats }) {
   const fmt = (n: number) => (Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 2 }));
-  if (!stats.indicators.length) {
+  const hasCharts =
+    stats.timeSeries.length > 0 || stats.chapterBreakdown.length > 0 || stats.attendanceVsReach.length > 0;
+  if (!stats.indicators.length && !hasCharts) {
     return (
       <div className="rounded-2xl border p-6 text-center text-sm shadow-sm" style={{ borderColor: NAVY.line, background: NAVY.panel, color: NAVY.inkSoft }}>
         <Sigma className="mx-auto mb-2 h-7 w-7 opacity-40" />
@@ -971,6 +1095,70 @@ function StatsPanel({ stats }: { stats: Stats }) {
           )}
         </div>
       </div>
+
+      {/* Interactive charts: time series, chapter breakdown, attendance vs reach */}
+      {hasCharts && (
+        <div className="grid gap-4 border-b p-4 lg:grid-cols-3" style={{ borderColor: NAVY.line }}>
+          <div className="rounded-xl border p-3" style={{ borderColor: NAVY.line, background: "rgba(15,23,42,0.02)" }}>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide" style={{ color: NAVY.inkSoft }}>Reach & submissions over time</p>
+            {stats.timeSeries.length ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <ComposedChart data={stats.timeSeries} margin={{ left: -8, right: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={NAVY.line} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: NAVY.inkSoft }} />
+                  <YAxis yAxisId="l" tick={{ fontSize: 10, fill: NAVY.inkSoft }} allowDecimals={false} />
+                  <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 10, fill: NAVY.inkSoft }} allowDecimals={false} />
+                  <Tooltip />
+                  <RLegend wrapperStyle={{ fontSize: 10 }} />
+                  <Bar yAxisId="r" dataKey="submissions" name="Submissions" fill={NAVY.teal} radius={[4, 4, 0, 0]} barSize={16} />
+                  <Line yAxisId="l" type="monotone" dataKey="reach" name="Reach" stroke={NAVY.violet} strokeWidth={2.5} dot={{ r: 3 }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="py-12 text-center text-xs" style={{ color: NAVY.inkSoft }}>No dated submissions yet.</p>
+            )}
+          </div>
+
+          <div className="rounded-xl border p-3" style={{ borderColor: NAVY.line, background: "rgba(15,23,42,0.02)" }}>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide" style={{ color: NAVY.inkSoft }}>Submissions by chapter</p>
+            {stats.chapterBreakdown.length ? (
+              <ResponsiveContainer width="100%" height={Math.max(200, stats.chapterBreakdown.length * 30)}>
+                <BarChart data={stats.chapterBreakdown} layout="vertical" margin={{ left: 8, right: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={NAVY.line} horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: NAVY.inkSoft }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="chapter" width={110} tick={{ fontSize: 9, fill: NAVY.inkSoft }} />
+                  <Tooltip formatter={(v: any, _n, p: any) => [v, p?.payload?.fullChapter || "Chapter"]} />
+                  <Bar dataKey="count" name="Submissions" radius={[0, 6, 6, 0]} barSize={16}>
+                    {stats.chapterBreakdown.map((c) => <Cell key={c.fullChapter} fill={c.color} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="py-12 text-center text-xs" style={{ color: NAVY.inkSoft }}>No chapter data yet.</p>
+            )}
+          </div>
+
+          <div className="rounded-xl border p-3" style={{ borderColor: NAVY.line, background: "rgba(15,23,42,0.02)" }}>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide" style={{ color: NAVY.inkSoft }}>Attendance vs reach</p>
+            {stats.attendanceVsReach.length ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <ScatterChart margin={{ left: -8, right: 8, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={NAVY.line} />
+                  <XAxis type="number" dataKey="attendance" name="Attendance" tick={{ fontSize: 10, fill: NAVY.inkSoft }} />
+                  <YAxis type="number" dataKey="reach" name="Reach" tick={{ fontSize: 10, fill: NAVY.inkSoft }} />
+                  <ZAxis range={[50, 50]} />
+                  <Tooltip cursor={{ strokeDasharray: "3 3" }} />
+                  <Scatter data={stats.attendanceVsReach} fill={NAVY.teal} fillOpacity={0.7} />
+                </ScatterChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="py-12 text-center text-xs" style={{ color: NAVY.inkSoft }}>No attendance/reach pairs yet.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {stats.indicators.length > 0 && (
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
@@ -1012,9 +1200,12 @@ function StatsPanel({ stats }: { stats: Stats }) {
           </tbody>
         </table>
       </div>
+      )}
+      {stats.indicators.length > 0 && (
       <p className="border-t px-3 py-2 text-[11px]" style={{ borderColor: NAVY.line, color: NAVY.inkSoft }}>
         95% confidence interval of the mean (normal approximation). “Consistency” reflects the coefficient of variation across submissions — lower variation indicates more uniform field performance.
       </p>
+      )}
     </div>
   );
 }
