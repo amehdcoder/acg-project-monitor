@@ -57,10 +57,20 @@ interface Props {
 
 interface Row {
   id: string;
+  /** The form record this submission actually belongs to (duplicates exist). */
+  formId: string;
   data: Record<string, unknown>;
   submitted_at: string | null;
   created_at: string;
   user_id: string | null;
+}
+
+interface FormMeta {
+  questions: Question[];
+  /** question name → question id (submission payloads are keyed by id). */
+  nameToId: Map<string, string>;
+  /** question id → question name. */
+  idToName: Map<string, string>;
 }
 
 function sectionsFrom(questions: unknown): FormGroup[] {
@@ -70,6 +80,25 @@ function sectionsFrom(questions: unknown): FormGroup[] {
   }
   return [];
 }
+
+function questionsFrom(questions: unknown): Question[] {
+  return sectionsFrom(questions).flatMap((s) => s.questions) as Question[];
+}
+
+/** Build the name↔id maps for a single form definition. */
+function buildFormMeta(questions: unknown): FormMeta {
+  const qs = questionsFrom(questions);
+  const nameToId = new Map<string, string>();
+  const idToName = new Map<string, string>();
+  for (const q of qs as Question[]) {
+    if (q.name && q.id) {
+      nameToId.set(q.name, q.id);
+      idToName.set(q.id, q.name);
+    }
+  }
+  return { questions: qs, nameToId, idToName };
+}
+
 
 export default function SarmaanLearningDashboard({ form, onClose }: Props) {
   const { isOwner } = useAuth();
