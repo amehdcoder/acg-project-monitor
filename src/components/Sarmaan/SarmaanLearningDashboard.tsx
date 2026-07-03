@@ -653,8 +653,8 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
       { key: "ward", label: "Ward" },
     ];
     const qCols = (questions as Question[])
-      .filter((q) => q.id && q.name && !["state", "lga", "ward"].includes(q.name))
-      .map((q) => ({ key: q.id, label: q.label || q.name || q.id, numeric: q.type === "number" }));
+      .filter((q) => q.name && !["state", "lga", "ward"].includes(q.name))
+      .map((q) => ({ key: q.name as string, label: q.label || q.name || q.id, numeric: q.type === "number" }));
     const columns = [...geoCols, ...qCols];
     const exportRows = filtered.map((r) => {
       const base: Record<string, any> = {
@@ -666,11 +666,12 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
         ward: str(r, "ward"),
       };
       for (const q of qCols) {
-        const v = (r.data || {})[q.key];
+        const v = val(r, q.key);
         base[q.key] = Array.isArray(v) ? v.join(", ") : v ?? "";
       }
       return base;
     });
+
     const chapterCounts = chapterList.map((c) => ({
       chapter: c,
       count: filtered.filter((r) => (meta(r, "__section_label") || "General") === c).length,
