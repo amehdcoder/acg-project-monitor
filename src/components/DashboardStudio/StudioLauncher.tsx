@@ -85,6 +85,23 @@ export default function StudioLauncher({ onBack }: Props) {
     load();
   };
 
+  const cloneBuiltIn = async (preset: BuiltInPreset) => {
+    if (!user) return;
+    setCloningKey(preset.key);
+    try {
+      const created = await cloneBuiltInDashboard(preset, user.id);
+      if (!created) { toast.error("Failed to clone dashboard"); return; }
+      toast.success(`Cloned “${preset.name}” — opening in Studio`);
+      setShowClone(false);
+      await load();
+      setOpen({ id: created.id, name: created.name, description: null, is_published: false, updated_at: new Date().toISOString() });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to clone dashboard");
+    } finally {
+      setCloningKey(null);
+    }
+  };
+
   if (open) {
     return <DashboardStudio dashboardId={open.id} dashboardName={open.name} onBack={() => { setOpen(null); load(); }} />;
   }
