@@ -30,7 +30,10 @@ export interface IrfStatistics {
 }
 
 const INDICATORS: { key: string; label: string; color: string }[] = [
-  { key: "total_reach", label: "Estimated reach / report", color: "#0891b2" },
+  // NOTE: `total_reach` here is the SAME composite reach used by the "People Reached"
+  // KPI (reach + radio + community-dialogue attendance) so the table Total reconciles
+  // exactly with the headline KPI. It is computed per report via computeIrfReach below.
+  { key: "total_reach", label: "Estimated people reached / report", color: "#0891b2" },
   { key: "attendance_men", label: "Men in attendance", color: "#2563eb" },
   { key: "attendance_women", label: "Women in attendance", color: "#db2777" },
   { key: "persons_engaged", label: "Officials engaged (advocacy)", color: "#0ea5e9" },
