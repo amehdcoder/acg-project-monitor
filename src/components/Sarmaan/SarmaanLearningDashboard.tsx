@@ -563,7 +563,61 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
             </Panel>
           </div>
 
-          {/* bottom row: visits + data quality */}
+          {/* open-ended text response analysis */}
+          <div className="mt-4">
+            <Panel title="Open-Ended Response Analysis">
+              {textAnalysis.length ? (
+                <>
+                  <p className="mb-3 text-[11px]" style={{ color: NAVY.inkSoft }}>
+                    Thematic summary of every free-text question — key terms are the most frequent
+                    words across supervisor narratives, drawn entirely from live submissions.
+                  </p>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {textAnalysis.map((t) => {
+                      const maxK = Math.max(1, ...t.keywords.map((k) => k.count));
+                      return (
+                        <div key={t.id} className="rounded-xl border p-3" style={{ borderColor: NAVY.line, background: NAVY.canvas }}>
+                          <div className="flex items-start gap-2">
+                            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-white" style={{ background: NAVY.teal }}>
+                              <MessageCircle className="h-3.5 w-3.5" />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[12px] font-bold leading-snug" style={{ color: NAVY.ink }}>{t.label}</div>
+                              <div className="text-[10.5px] font-semibold" style={{ color: NAVY.inkSoft }}>{t.count} response{t.count === 1 ? "" : "s"}</div>
+                            </div>
+                          </div>
+                          {t.keywords.length > 0 && (
+                            <div className="mt-2.5 space-y-1">
+                              {t.keywords.map((k) => (
+                                <div key={k.term} className="flex items-center gap-2">
+                                  <span className="w-24 shrink-0 truncate text-[11px] font-medium" style={{ color: NAVY.ink }}>{k.term}</span>
+                                  <div className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: NAVY.line }}>
+                                    <div className="h-full rounded-full" style={{ width: `${(k.count / maxK) * 100}%`, background: NAVY.violet }} />
+                                  </div>
+                                  <span className="w-6 shrink-0 text-right text-[10.5px] font-bold" style={{ color: NAVY.inkSoft }}>{k.count}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {t.samples.length > 0 && (
+                            <div className="mt-2.5 space-y-1 border-t pt-2" style={{ borderColor: NAVY.line }}>
+                              {t.samples.map((s, i) => (
+                                <p key={i} className="line-clamp-2 text-[11px] italic" style={{ color: NAVY.inkSoft }}>“{s}”</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <Empty loading={loading} label="Free-text narratives will be analysed here as supervisors submit them." />
+              )}
+            </Panel>
+          </div>
+
+
           <div className="mt-4 grid gap-3 lg:grid-cols-3">
             <Panel title="Supervision Submissions" className="lg:col-span-2">
               <div className="overflow-x-auto">
