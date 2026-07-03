@@ -164,7 +164,32 @@ export default function StudioLauncher({ onBack }: Props) {
         </div>
       )}
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog open={showClone} onOpenChange={(o) => !cloningKey && setShowClone(o)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Clone a built-in dashboard</DialogTitle>
+            <DialogDescription>
+              Creates a fully editable Studio copy pre-seeded with the dashboard’s form as a data source and starter charts. The original dashboard is untouched.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {BUILT_IN_PRESETS.map((p) => (
+              <button key={p.key} disabled={!!cloningKey} onClick={() => cloneBuiltIn(p)}
+                className="flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left transition-colors hover:border-primary/50 hover:bg-muted/40 disabled:opacity-60">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  {cloningKey === p.key ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold">{p.name}</div>
+                  <div className="truncate text-xs text-muted-foreground">{p.description}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New dashboard</DialogTitle>
