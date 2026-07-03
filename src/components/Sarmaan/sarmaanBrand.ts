@@ -172,7 +172,12 @@ export const REMOVED_CHECKLIST_QUESTIONS = new Set<string>([
   "supervisor_name",
   "date_of_supervision",
   "supervisor_designation",
+  // FLHF / Community / Settlement free-text fields removed from the checklist.
+  "flhf_name",
+  "community",
+  "settlement_name",
 ]);
+
 
 export interface ModuleGuidance {
   code: string;
