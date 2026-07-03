@@ -49,6 +49,7 @@ export default function IrfDuplicateManager({ projectId, duplicateIds, onChanged
   const [showReview, setShowReview] = useState(false);
   const [rows, setRows] = useState<IrfReport[]>([]);
   const [loadingRows, setLoadingRows] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const { irfMap, setOverride, clearOverride } = useAcsmDuplicateOverrides(projectId);
 
   const loadArchive = async () => {
