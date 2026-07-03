@@ -320,6 +320,56 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
 
   const lowQualityLgas = lgaAgg.filter((l) => l.scoreN !== 0 && l.quality < 50).length;
 
+  // ---- Open-ended text response analysis (all free-text questions) ----
+  const textAnalysis = useMemo(() => {
+    const STOP = new Set([
+      "the", "and", "for", "are", "was", "were", "with", "that", "this", "have", "has",
+      "had", "not", "但", "from", "they", "them", "their", "there", "here", "will", "would",
+      "been", "being", "than", "then", "into", "onto", "some", "such", "more", "most", "also",
+      "which", "when", "what", "where", "who", "whom", "how", "why", "did", "does", "done",
+      "you", "your", "our", "his", "her", "its", "all", "any", "can", "could", "should",
+      "about", "very", "just", "like", "get", "got", "one", "two", "yes", "none", "nil",
+      "over", "because", "during", "while", "each", "other", "these", "those", "still", "much",
+    ]);
+    const geoNames = new Set(["state", "lga", "ward", "flhf_name", "community", "settlement_name", "gps"]);
+    const textQs = (questions as Question[]).filter(
+      (q) => (q.type === "text" || q.type === "textarea") && q.name && !geoNames.has(q.name),
+    );
+    return textQs
+      .map((q) => {
+        const responses: string[] = [];
+        for (const r of filtered) {
+          const v = str(r, q.name!).trim();
+          if (v && !/^\d+([.,]\d+)?$/.test(v) && v.length > 1) responses.push(v);
+        }
+        const freq = new Map<string, number>();
+        for (const resp of responses) {
+          const words = resp.toLowerCase().match(/[a-z]{4,}/g) || [];
+          const seen = new Set<string>();
+          for (const w of words) {
+            if (STOP.has(w) || seen.has(w)) continue;
+            seen.add(w);
+            freq.set(w, (freq.get(w) || 0) + 1);
+          }
+        }
+        const keywords = [...freq.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([term, count]) => ({ term, count }));
+        return {
+          id: q.id,
+          label: q.label || q.name!,
+          count: responses.length,
+          keywords,
+          samples: responses.slice(0, 4),
+        };
+      })
+      .filter((t) => t.count > 0)
+      .sort((a, b) => b.count - a.count);
+  }, [filtered, questions]);
+
+
+
   const hasFilters = Object.values(filters).some((v) => v && v !== "__all__");
   const dq = qualityBand(agg.avgScorePct || 0);
 
