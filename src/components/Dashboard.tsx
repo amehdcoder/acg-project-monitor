@@ -107,13 +107,14 @@ interface FormSubmission {
 
 interface DashboardProps {
   onOpenDashboardBuilder?: () => void;
+  onOpenDashboardStudio?: () => void;
   onViewSubmissions?: () => void;
   initialProjectId?: string | null;
   onProjectSelect?: (projectId: string | null) => void;
 }
 
 
-const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }: DashboardProps) => {
+const Dashboard = ({ onOpenDashboardBuilder, onOpenDashboardStudio, initialProjectId, onProjectSelect }: DashboardProps) => {
   const { isAdmin, user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialProjectId || null);
