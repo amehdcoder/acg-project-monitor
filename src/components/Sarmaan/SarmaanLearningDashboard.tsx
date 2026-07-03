@@ -15,7 +15,7 @@ import {
   ClipboardList,
   Settings,
   HelpCircle,
-  Bell,
+  MessageCircle,
   Info,
   ShieldCheck,
   ChevronRight,
@@ -37,8 +37,11 @@ import {
   ReferenceLine,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 import type { FormGroup, Question } from "@/components/FormBuilder/types";
 import { NAVY, DASHBOARD_NAV, qualityBand } from "./sarmaanBrand";
+
 
 interface Props {
   form: { id: string; name: string; questions: unknown; settings: unknown };
@@ -62,6 +65,7 @@ function sectionsFrom(questions: unknown): FormGroup[] {
 }
 
 export default function SarmaanLearningDashboard({ form, onClose }: Props) {
+  const { isOwner } = useAuth();
   const sections = useMemo(() => sectionsFrom(form.questions), [form.questions]);
   const questions = useMemo(() => sections.flatMap((s) => s.questions), [sections]);
   const nameToId = useMemo(() => {
@@ -316,6 +320,56 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
 
   const lowQualityLgas = lgaAgg.filter((l) => l.scoreN !== 0 && l.quality < 50).length;
 
+  // ---- Open-ended text response analysis (all free-text questions) ----
+  const textAnalysis = useMemo(() => {
+    const STOP = new Set([
+      "the", "and", "for", "are", "was", "were", "with", "that", "this", "have", "has",
+      "had", "not", "但", "from", "they", "them", "their", "there", "here", "will", "would",
+      "been", "being", "than", "then", "into", "onto", "some", "such", "more", "most", "also",
+      "which", "when", "what", "where", "who", "whom", "how", "why", "did", "does", "done",
+      "you", "your", "our", "his", "her", "its", "all", "any", "can", "could", "should",
+      "about", "very", "just", "like", "get", "got", "one", "two", "yes", "none", "nil",
+      "over", "because", "during", "while", "each", "other", "these", "those", "still", "much",
+    ]);
+    const geoNames = new Set(["state", "lga", "ward", "flhf_name", "community", "settlement_name", "gps"]);
+    const textQs = (questions as Question[]).filter(
+      (q) => q.type === "text" && q.name && !geoNames.has(q.name),
+    );
+    return textQs
+      .map((q) => {
+        const responses: string[] = [];
+        for (const r of filtered) {
+          const v = str(r, q.name!).trim();
+          if (v && !/^\d+([.,]\d+)?$/.test(v) && v.length > 1) responses.push(v);
+        }
+        const freq = new Map<string, number>();
+        for (const resp of responses) {
+          const words = resp.toLowerCase().match(/[a-z]{4,}/g) || [];
+          const seen = new Set<string>();
+          for (const w of words) {
+            if (STOP.has(w) || seen.has(w)) continue;
+            seen.add(w);
+            freq.set(w, (freq.get(w) || 0) + 1);
+          }
+        }
+        const keywords = [...freq.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([term, count]) => ({ term, count }));
+        return {
+          id: q.id,
+          label: q.label || q.name!,
+          count: responses.length,
+          keywords,
+          samples: responses.slice(0, 4),
+        };
+      })
+      .filter((t) => t.count > 0)
+      .sort((a, b) => b.count - a.count);
+  }, [filtered, questions]);
+
+
+
   const hasFilters = Object.values(filters).some((v) => v && v !== "__all__");
   const dq = qualityBand(agg.avgScorePct || 0);
 
@@ -390,10 +444,16 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
               <Printer className="h-4 w-4" /> Print
             </button>
             <LiveIndicator live={live} lastUpdated={lastUpdated} flash={flash} />
-            <div className="relative">
-              <Bell className="h-5 w-5" style={{ color: NAVY.inkSoft }} />
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white" style={{ background: NAVY.bad }}>{agg.pendingCritical || 0}</span>
-            </div>
+            {isOwner && (
+              <OwnerSubmissionManager
+                table="form_submissions"
+                title="SARMAAN checklist submissions"
+                labelColumns={["data.state", "data.lga", "status"]}
+                filter={{ column: "form_id", value: form.id }}
+                onChanged={() => load()}
+                compact
+              />
+            )}
             <button onClick={() => load()} className="inline-flex items-center justify-center rounded-full p-2 transition hover:bg-black/5" aria-label="Refresh">
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} style={{ color: NAVY.inkSoft }} />
             </button>
@@ -503,7 +563,61 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
             </Panel>
           </div>
 
-          {/* bottom row: visits + data quality */}
+          {/* open-ended text response analysis */}
+          <div className="mt-4">
+            <Panel title="Open-Ended Response Analysis">
+              {textAnalysis.length ? (
+                <>
+                  <p className="mb-3 text-[11px]" style={{ color: NAVY.inkSoft }}>
+                    Thematic summary of every free-text question — key terms are the most frequent
+                    words across supervisor narratives, drawn entirely from live submissions.
+                  </p>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {textAnalysis.map((t) => {
+                      const maxK = Math.max(1, ...t.keywords.map((k) => k.count));
+                      return (
+                        <div key={t.id} className="rounded-xl border p-3" style={{ borderColor: NAVY.line, background: NAVY.canvas }}>
+                          <div className="flex items-start gap-2">
+                            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-white" style={{ background: NAVY.teal }}>
+                              <MessageCircle className="h-3.5 w-3.5" />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[12px] font-bold leading-snug" style={{ color: NAVY.ink }}>{t.label}</div>
+                              <div className="text-[10.5px] font-semibold" style={{ color: NAVY.inkSoft }}>{t.count} response{t.count === 1 ? "" : "s"}</div>
+                            </div>
+                          </div>
+                          {t.keywords.length > 0 && (
+                            <div className="mt-2.5 space-y-1">
+                              {t.keywords.map((k) => (
+                                <div key={k.term} className="flex items-center gap-2">
+                                  <span className="w-24 shrink-0 truncate text-[11px] font-medium" style={{ color: NAVY.ink }}>{k.term}</span>
+                                  <div className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: NAVY.line }}>
+                                    <div className="h-full rounded-full" style={{ width: `${(k.count / maxK) * 100}%`, background: NAVY.violet }} />
+                                  </div>
+                                  <span className="w-6 shrink-0 text-right text-[10.5px] font-bold" style={{ color: NAVY.inkSoft }}>{k.count}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {t.samples.length > 0 && (
+                            <div className="mt-2.5 space-y-1 border-t pt-2" style={{ borderColor: NAVY.line }}>
+                              {t.samples.map((s, i) => (
+                                <p key={i} className="line-clamp-2 text-[11px] italic" style={{ color: NAVY.inkSoft }}>“{s}”</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <Empty loading={loading} label="Free-text narratives will be analysed here as supervisors submit them." />
+              )}
+            </Panel>
+          </div>
+
+
           <div className="mt-4 grid gap-3 lg:grid-cols-3">
             <Panel title="Supervision Submissions" className="lg:col-span-2">
               <div className="overflow-x-auto">
@@ -514,7 +628,7 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
                       <th className="p-2 font-semibold">Supervisor</th>
                       <th className="p-2 font-semibold">Module</th>
                       <th className="p-2 font-semibold">LGA</th>
-                      <th className="p-2 font-semibold">Community</th>
+                      <th className="p-2 font-semibold">Ward</th>
                       <th className="p-2 text-right font-semibold">Score</th>
                     </tr>
                   </thead>
@@ -527,7 +641,7 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
                           <td className="p-2 font-medium">{(r.user_id && profiles[r.user_id]) || "—"}</td>
                           <td className="max-w-[150px] truncate p-2">{meta(r, "__section_label") || "—"}</td>
                           <td className="p-2">{str(r, "lga") || "—"}</td>
-                          <td className="max-w-[140px] truncate p-2">{str(r, "community") || "—"}</td>
+                          <td className="max-w-[140px] truncate p-2">{str(r, "ward") || "—"}</td>
                           <td className="p-2 text-right">{score > 0 ? <span className="rounded-full px-2 py-0.5 font-bold text-white" style={{ background: qualityBand((score / 80) * 100).color }}>{score}</span> : "—"}</td>
                         </tr>
                       );

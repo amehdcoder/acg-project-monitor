@@ -373,16 +373,13 @@ function supervisoryLearningSections(): FormGroup[] {
       // visit metadata rather than as manual questions.
 
       // Geography is driven by the shared location cascade (State → LGA →
-      // Ward → FLHF → Community → Settlement) with no microplan dependency.
-      // These question names are the cascade write targets and are rendered by
-      // the cascade instead of as free-text fields.
+      // Ward) with no microplan dependency. FLHF / Community / Settlement free-
+      // text fields were intentionally removed from the checklist.
       stateField(),
       qn("text", "lga", "LGA", { required: true }),
       qn("text", "ward", "Ward", { required: true }),
-      qn("text", "flhf_name", "Front-Line Health Facility (FLHF)"),
-      qn("text", "community", "Community / settlement / facility visited", { required: true }),
-      qn("text", "settlement_name", "Settlement"),
       qn("geopoint", "gps", "GPS coordinate of supervision location", { required: true }),
+
 
       qn("select_one", "type_of_visit", "Type of visit", {
         required: true,
