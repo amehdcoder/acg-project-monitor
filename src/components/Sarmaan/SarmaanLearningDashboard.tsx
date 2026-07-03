@@ -1059,11 +1059,20 @@ interface StatRow {
   n: number; sum: number; mean: number; median: number;
   min: number; max: number; sd: number; ciLow: number; ciHigh: number; cv: number;
 }
-interface Stats { indicators: StatRow[]; momGrowthPct: number | null; reportsPerActiveMonth: number; }
+interface Stats {
+  indicators: StatRow[];
+  momGrowthPct: number | null;
+  reportsPerActiveMonth: number;
+  timeSeries: { month: string; label: string; reach: number; submissions: number }[];
+  chapterBreakdown: { chapter: string; fullChapter: string; count: number; reach: number; color: string }[];
+  attendanceVsReach: { attendance: number; reach: number }[];
+}
 
 function StatsPanel({ stats }: { stats: Stats }) {
   const fmt = (n: number) => (Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 2 }));
-  if (!stats.indicators.length) {
+  const hasCharts =
+    stats.timeSeries.length > 0 || stats.chapterBreakdown.length > 0 || stats.attendanceVsReach.length > 0;
+  if (!stats.indicators.length && !hasCharts) {
     return (
       <div className="rounded-2xl border p-6 text-center text-sm shadow-sm" style={{ borderColor: NAVY.line, background: NAVY.panel, color: NAVY.inkSoft }}>
         <Sigma className="mx-auto mb-2 h-7 w-7 opacity-40" />
