@@ -2142,7 +2142,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         )}
                       </div>
                     ) : (
-                      <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="grid gap-3 sm:mx-auto sm:max-w-4xl sm:grid-cols-2 lg:max-w-5xl">
                         <button
                           type="button"
                           onClick={async () => {
