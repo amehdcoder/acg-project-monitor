@@ -84,6 +84,10 @@ export default function AdminSubmissionEditor({
   duplicateIds,
   onChanged,
   enableDelete = false,
+  onOptimisticDelete,
+  onOptimisticEdit,
+  chapters,
+  extraActions,
   title = "Submissions — Admin edit",
   pageSize = 10,
 }: Props) {
@@ -91,6 +95,7 @@ export default function AdminSubmissionEditor({
   const [page, setPage] = useState(0);
   const [active, setActive] = useState<EditableSubmission | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [chapterFilter, setChapterFilter] = useState<string>("__all__");
 
   const handleDelete = async (s: EditableSubmission) => {
     if (!window.confirm("Permanently delete this submission? This updates every part of the dashboard instantly.")) return;
@@ -98,26 +103,32 @@ export default function AdminSubmissionEditor({
     const { error } = await supabase.from(table as any).delete().eq("id", s.id);
     setDeleting(null);
     if (error) { window.alert(`Delete failed: ${error.message}`); return; }
-    await onChanged?.();
+    // Optimistic path: let the parent drop the row from its own state instantly.
+    if (onOptimisticDelete) onOptimisticDelete(s.id);
+    else await onChanged?.();
   };
 
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const rows = q
-      ? submissions.filter((s) => {
-          const hay = [
-            s.submitter, s.state, s.lga, s.ward, s.id,
-            ...Object.values(s.data || {}).map((v) =>
-              typeof v === "object" ? JSON.stringify(v) : String(v ?? "")),
-          ].join(" ").toLowerCase();
-          return hay.includes(q);
-        })
-      : submissions;
+    let rows = submissions;
+    if (chapterFilter !== "__all__") {
+      rows = rows.filter((s) => (s.chapter || "") === chapterFilter);
+    }
+    if (q) {
+      rows = rows.filter((s) => {
+        const hay = [
+          s.submitter, s.state, s.lga, s.ward, s.id, s.chapter,
+          ...Object.values(s.data || {}).map((v) =>
+            typeof v === "object" ? JSON.stringify(v) : String(v ?? "")),
+        ].join(" ").toLowerCase();
+        return hay.includes(q);
+      });
+    }
     return [...rows].sort(
       (a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime(),
     );
-  }, [submissions, search]);
+  }, [submissions, search, chapterFilter]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, pageCount - 1);
@@ -132,6 +143,7 @@ export default function AdminSubmissionEditor({
 
   return (
     <Card className="overflow-hidden border-primary/20">
+
       <div className="flex flex-wrap items-center gap-2 border-b bg-gradient-to-r from-[#0c2340] to-[#1a4a6e] px-4 py-3">
         <FileEdit className="h-5 w-5 text-white" />
         <div className="min-w-0">
