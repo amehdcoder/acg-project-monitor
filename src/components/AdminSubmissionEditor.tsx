@@ -41,6 +41,8 @@ interface Props {
   duplicateIds?: Set<string>;
   /** Called after a submission is edited so the dashboard can refresh. */
   onChanged?: () => void | Promise<void>;
+  /** When true, each row gets an owner-only delete button that removes the row. */
+  enableDelete?: boolean;
   title?: string;
   pageSize?: number;
 }
