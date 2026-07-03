@@ -409,25 +409,68 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
       .filter((x): x is NonNullable<typeof x> => !!x);
 
     // Month-over-month growth of reach (aligned with the People Reached KPI field).
-    const byMonth = new Map<string, number>();
+    const byMonth = new Map<string, { reach: number; count: number }>();
     for (const r of filtered) {
       const key = new Date(r.submitted_at || r.created_at).toISOString().slice(0, 7);
-      byMonth.set(key, (byMonth.get(key) || 0) + num(r, "estimated_total_reached"));
+      const cur = byMonth.get(key) || { reach: 0, count: 0 };
+      cur.reach += num(r, "estimated_total_reached");
+      cur.count += 1;
+      byMonth.set(key, cur);
     }
     const months = [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b));
+    const timeSeries = months.map(([m, v]) => ({
+      month: m,
+      label: new Date(`${m}-01`).toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
+      reach: v.reach,
+      submissions: v.count,
+    }));
     let momGrowthPct: number | null = null;
     if (months.length >= 2) {
-      const prev = months[months.length - 2][1];
-      const last = months[months.length - 1][1];
+      const prev = months[months.length - 2][1].reach;
+      const last = months[months.length - 1][1].reach;
       momGrowthPct = prev > 0 ? Math.round(((last - prev) / prev) * 1000) / 10 : null;
     }
+
+    // Breakdown by chapter (submissions + reach per module).
+    const byChapter = new Map<string, { count: number; reach: number }>();
+    for (const r of filtered) {
+      const key = meta(r, "__section_label") || "General";
+      const cur = byChapter.get(key) || { count: 0, reach: 0 };
+      cur.count += 1;
+      cur.reach += num(r, "estimated_total_reached");
+      byChapter.set(key, cur);
+    }
+    const chapterBreakdown = [...byChapter.entries()]
+      .map(([chapter, v], i) => ({
+        chapter: chapter.length > 22 ? chapter.slice(0, 21) + "…" : chapter,
+        fullChapter: chapter,
+        count: v.count,
+        reach: v.reach,
+        color: palette[i % palette.length],
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // Attendance vs reach — dialogue/meeting attendance against estimated reach.
+    const attendanceVsReach = filtered
+      .map((r) => {
+        const attendance =
+          num(r, "num_men") + num(r, "num_women") + num(r, "num_youth") + num(r, "num_pwd");
+        const reach = num(r, "estimated_total_reached");
+        return { attendance, reach };
+      })
+      .filter((p) => p.attendance > 0 || p.reach > 0);
+
     return {
       indicators,
       momGrowthPct,
       reportsPerActiveMonth: months.length ? Math.round((filtered.length / months.length) * 10) / 10 : filtered.length,
+      timeSeries,
+      chapterBreakdown,
+      attendanceVsReach,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, questions]);
+
 
   // ---- Merged submissions across every chapter — colorful editable/deletable table ----
   const questionLabels = useMemo(() => {
