@@ -17,7 +17,7 @@ import {
 import {
   Activity, ChevronDown, Home, Users2, Percent, Sigma, FileText,
   Search, TrendingDown, TrendingUp, CheckCircle2, AlertTriangle, Target,
-  SlidersHorizontal, RotateCcw, ChevronRight, X, AlertCircle, Loader2,
+  SlidersHorizontal, RotateCcw, ChevronRight, X, AlertCircle, Loader2, Building2,
 } from "lucide-react";
 import { testAgainstBenchmark, type BenchmarkTest } from "@/lib/ces/coverageStats";
 
@@ -183,6 +183,56 @@ function aggregate(visits: HCAPoint[], txBenchmark: number, hhBenchmark: number)
     return r;
   });
   return rows.sort((a, b) => a.txCoveragePct - b.txCoveragePct);
+}
+
+interface LgaRow {
+  key: string;
+  lga: string;
+  state: string;
+  communities: number;
+  households: number;
+  treatedHouseholds: number;
+  eligible: number;
+  treated: number;
+  hhReachPct: number;
+  txCoveragePct: number;
+  txTest: BenchmarkTest | null;
+  hhTest: BenchmarkTest | null;
+  missingEligible: number;
+  belowCommunities: number; // communities significantly below the tx benchmark
+}
+
+/** Aggregate household visits up to the LGA level (state-wide coverage insight). */
+function aggregateLga(rows: CommunityRow[], txBenchmark: number, hhBenchmark: number): LgaRow[] {
+  const map = new Map<string, LgaRow>();
+  for (const c of rows) {
+    const key = `${norm(c.state)}|${norm(c.lga)}`;
+    let r = map.get(key);
+    if (!r) {
+      r = {
+        key, lga: c.lga || "—", state: c.state || "—",
+        communities: 0, households: 0, treatedHouseholds: 0, eligible: 0, treated: 0,
+        hhReachPct: 0, txCoveragePct: 0, txTest: null, hhTest: null,
+        missingEligible: 0, belowCommunities: 0,
+      };
+      map.set(key, r);
+    }
+    r.communities += 1;
+    r.households += c.households;
+    r.treatedHouseholds += c.treatedHouseholds;
+    r.eligible += c.eligible;
+    r.treated += c.treated;
+    r.missingEligible += c.missingEligible;
+    if (c.txTest?.ciBelow) r.belowCommunities += 1;
+  }
+  const out = [...map.values()].map((r) => {
+    r.hhReachPct = r.households > 0 ? (r.treatedHouseholds / r.households) * 100 : 0;
+    r.txCoveragePct = r.eligible > 0 ? (r.treated / r.eligible) * 100 : 0;
+    r.txTest = r.eligible > 0 ? testAgainstBenchmark(r.treated, r.eligible, txBenchmark) : null;
+    r.hhTest = r.households > 0 ? testAgainstBenchmark(r.treatedHouseholds, r.households, hhBenchmark) : null;
+    return r;
+  });
+  return out.sort((a, b) => a.txCoveragePct - b.txCoveragePct);
 }
 
 // ── Community drill-down dialog ──────────────────────────────────────────────
@@ -366,6 +416,20 @@ export default function HouseholdCoverageAnalysis({ points, loading, error, onRe
   const communities = useMemo<CommunityRow[]>(
     () => aggregate(visits, txBenchmark, hhBenchmark),
     [visits, txBenchmark, hhBenchmark],
+  );
+
+  const lgas = useMemo<LgaRow[]>(
+    () => aggregateLga(communities, txBenchmark, hhBenchmark),
+    [communities, txBenchmark, hhBenchmark],
+  );
+
+  const lgaChartData = useMemo(
+    () => lgas.filter((l) => l.eligible > 0).slice(0, 14).map((l) => ({
+      name: l.lga.length > 16 ? l.lga.slice(0, 15) + "…" : l.lga,
+      coverage: Math.round(l.txCoveragePct * 10) / 10,
+      full: l.lga,
+    })),
+    [lgas],
   );
 
   // ── Programme-wide totals + benchmark tests ────────────────────────────────
@@ -584,7 +648,92 @@ export default function HouseholdCoverageAnalysis({ points, loading, error, onRe
         </Section>
       )}
 
+      {/* ── Household coverage summary by LGA ── */}
+      <Section title="Household coverage summary by LGA" icon={Building2} tint={BLUE}
+        badge={`${lgas.length} LGA${lgas.length === 1 ? "" : "s"}`}>
+        <p className="mb-3 text-[11px] text-muted-foreground">
+          State-wide roll-up: household visits aggregated to each LGA. Coverage = (Persons Treated ÷ Persons Eligible) × 100%,
+          with a Wilson 95% confidence interval tested against the {txBenchmark}% therapeutic and {hhBenchmark}% household-reach benchmarks.
+        </p>
+
+        {lgaChartData.length > 0 && (
+          <div className="mb-4">
+            <ResponsiveContainer width="100%" height={Math.max(180, lgaChartData.length * 26)}>
+              <BarChart data={lgaChartData} layout="vertical" margin={{ top: 5, right: 24, left: 8, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} unit="%" />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={110} />
+                <RTooltip formatter={(v: any) => [`${v}%`, "Coverage"]} labelFormatter={(_, p: any) => p?.[0]?.payload?.full || ""} />
+                <ReferenceLine x={txBenchmark} stroke={AMBER} strokeDasharray="4 4" label={{ value: `${txBenchmark}%`, fontSize: 10, fill: AMBER, position: "top" }} />
+                <Bar dataKey="coverage" radius={[0, 4, 4, 0]}>
+                  {lgaChartData.map((d, i) => <Cell key={i} fill={d.coverage < txBenchmark ? RED : EMERALD} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        <div className="max-h-[440px] overflow-auto rounded-lg border border-border/60">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
+              <tr className="text-left text-[11px] text-muted-foreground">
+                <th className="px-3 py-2 font-semibold">LGA · State</th>
+                <th className="px-3 py-2 text-right font-semibold">Comm.</th>
+                <th className="px-3 py-2 text-right font-semibold">HH</th>
+                <th className="px-3 py-2 text-right font-semibold">Eligible</th>
+                <th className="px-3 py-2 text-right font-semibold">Treated</th>
+                <th className="px-3 py-2 text-right font-semibold">Coverage</th>
+                <th className="px-3 py-2 font-semibold">95% CI</th>
+                <th className="px-3 py-2 font-semibold">vs {txBenchmark}%</th>
+                <th className="px-3 py-2 text-right font-semibold">HH reach</th>
+                <th className="px-3 py-2 font-semibold">vs {hhBenchmark}%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lgas.length === 0 ? (
+                <tr><td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">No LGA data yet.</td></tr>
+              ) : lgas.map((l) => (
+                <tr key={l.key} className="border-t border-border/60 hover:bg-muted/40">
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                      {l.lga}
+                      {l.belowCommunities > 0 && (
+                        <span className="rounded-full bg-red-500/10 px-1.5 py-0.5 text-[9px] font-bold text-red-600 dark:text-red-400"
+                          title={`${l.belowCommunities} community/communities significantly below ${txBenchmark}%`}>
+                          {l.belowCommunities} below
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">{l.state}</div>
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">{l.communities}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{l.households.toLocaleString()}</td>
+                  <td className={`px-3 py-2 text-right tabular-nums ${l.missingEligible > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>{l.eligible.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{l.treated.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right font-semibold tabular-nums"
+                    style={{ color: l.eligible === 0 ? SLATE : l.txCoveragePct < txBenchmark ? RED : EMERALD }}>
+                    {l.eligible > 0 ? `${l.txCoveragePct.toFixed(1)}%` : "—"}
+                  </td>
+                  <td className="px-3 py-2 tabular-nums text-muted-foreground">
+                    {l.txTest ? `${l.txTest.ci95[0].toFixed(1)}–${l.txTest.ci95[1].toFixed(1)}%` : "—"}
+                  </td>
+                  <td className="px-3 py-2"><Verdict test={l.txTest} /></td>
+                  <td className="px-3 py-2 text-right tabular-nums">{l.hhReachPct.toFixed(0)}%</td>
+                  <td className="px-3 py-2"><Verdict test={l.hhTest} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-2 text-[10px] italic text-muted-foreground">
+          LGA coverage pools every household record in the LGA (design-consistent with the community rows). “Below”/“Above” means the whole
+          Wilson 95% interval falls under/over the benchmark — a statistically significant gap at 95% confidence. The red “below” chip counts
+          how many communities inside the LGA are themselves significantly under the {txBenchmark}% benchmark.
+        </p>
+      </Section>
+
       {/* ── Per-community coverage register ── */}
+
       <Section title="Per-community coverage register" icon={Home} tint={TEAL} badge={`${communities.length}`}>
         <p className="mb-2 text-[11px] text-muted-foreground">Click any community to drill into its households, calculations and notes.</p>
         <div className="mb-2 flex justify-end">

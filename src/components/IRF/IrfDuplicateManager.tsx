@@ -3,11 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   Copy, Trash2, Archive, RotateCcw, Loader2, ShieldAlert, GitCompare,
-  Check, Star, ArrowRightLeft, MapPin, Calendar, User,
+  Check, Star, ArrowRightLeft, MapPin, Calendar, User, CheckCheck, ListChecks,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -48,6 +49,7 @@ export default function IrfDuplicateManager({ projectId, duplicateIds, onChanged
   const [showReview, setShowReview] = useState(false);
   const [rows, setRows] = useState<IrfReport[]>([]);
   const [loadingRows, setLoadingRows] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const { irfMap, setOverride, clearOverride } = useAcsmDuplicateOverrides(projectId);
 
   const loadArchive = async () => {
@@ -87,6 +89,74 @@ export default function IrfDuplicateManager({ projectId, duplicateIds, onChanged
     });
     return out.sort((a, b) => (a.items[0]?.lga || "").localeCompare(b.items[0]?.lga || ""));
   }, [rows]);
+
+  // Every flagged-duplicate row (the actionable candidates, excluding originals).
+  const dupItems = useMemo(
+    () => groups.flatMap((g) => g.items.filter((it) => it.__isDup)),
+    [groups],
+  );
+  const dupItemIds = useMemo(() => dupItems.map((it) => it.id), [dupItems]);
+
+  // Keep the selection valid whenever the underlying duplicate set changes.
+  useEffect(() => {
+    setSelected((prev) => {
+      const valid = new Set(dupItemIds);
+      const next = new Set<string>();
+      prev.forEach((id) => { if (valid.has(id)) next.add(id); });
+      return next;
+    });
+  }, [dupItemIds]);
+
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const toggleGroup = (groupDupIds: string[], on: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      groupDupIds.forEach((id) => (on ? next.add(id) : next.delete(id)));
+      return next;
+    });
+
+  const allSelected = dupItemIds.length > 0 && dupItemIds.every((id) => selected.has(id));
+  const selectAll = () => setSelected(allSelected ? new Set() : new Set(dupItemIds));
+
+  const acceptSelected = async () => {
+    const items = dupItems.filter((it) => selected.has(it.id) && irfMap.get(it.id) !== "unique");
+    if (!items.length) { toast.info("Nothing new to accept in the selection."); return; }
+    setBusy("batch-accept");
+    try {
+      for (const it of items) {
+        await setOverride({ sourceTable: "irf_reports", submissionId: it.id, decision: "unique", signature: irfSignature(it) });
+      }
+      toast.success(`${items.length} submission(s) accepted as unique — counts recomputed everywhere.`);
+      setSelected(new Set());
+      await onChanged();
+    } catch (e: any) {
+      toast.error(e?.message || "Could not accept selected submissions.");
+    } finally { setBusy(null); }
+  };
+
+  const removeSelected = async () => {
+    const idsToRemove = dupItemIds.filter((id) => selected.has(id));
+    if (!idsToRemove.length) return;
+    if (!window.confirm(`Permanently remove ${idsToRemove.length} selected duplicate submission(s) from the database and every dashboard computation? This cannot be undone.`)) return;
+    setBusy("batch-delete");
+    try {
+      const { error } = await supabase.rpc("owner_delete_irf_duplicates" as any, { _ids: idsToRemove });
+      if (error) throw error;
+      toast.success(`${idsToRemove.length} duplicate(s) permanently removed.`);
+      setRows((prev) => prev.filter((r) => !idsToRemove.includes(r.id)));
+      setSelected(new Set());
+      await onChanged();
+    } catch (e: any) {
+      toast.error(e?.message || "Could not remove selected submissions.");
+    } finally { setBusy(null); }
+  };
+
 
   const run = async (mode: "archive" | "delete") => {
     if (!ids.length) return;
@@ -181,7 +251,40 @@ export default function IrfDuplicateManager({ projectId, duplicateIds, onChanged
                   and every dashboard computation.
                 </DialogDescription>
               </DialogHeader>
-              <ScrollArea className="max-h-[68vh] pr-3">
+
+              {/* Status summary + batch action bar */}
+              {!loadingRows && groups.length > 0 && (
+                <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-2">
+                  <Badge variant="outline" className="gap-1 text-xs">
+                    <Copy className="h-3 w-3" /> {groups.length} set{groups.length === 1 ? "" : "s"}
+                  </Badge>
+                  <Badge variant="outline" className="gap-1 text-xs text-amber-600">
+                    {dupItemIds.filter((id) => irfMap.get(id) !== "unique").length} pending
+                  </Badge>
+                  <Badge variant="outline" className="gap-1 text-xs text-emerald-600">
+                    <Check className="h-3 w-3" /> {dupItemIds.filter((id) => irfMap.get(id) === "unique").length} accepted
+                  </Badge>
+                  <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={selectAll} disabled={!dupItemIds.length}>
+                    <ListChecks className="h-3.5 w-3.5" /> {allSelected ? "Clear all" : "Select all"}
+                  </Button>
+                  <span className="text-xs font-medium text-muted-foreground">{selected.size} selected</span>
+                  <div className="ml-auto flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" className="h-7 gap-1 text-xs text-emerald-700"
+                      disabled={!selected.size || !!busy} onClick={acceptSelected}>
+                      {busy === "batch-accept" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />}
+                      Accept selected
+                    </Button>
+                    <Button size="sm" variant="destructive" className="h-7 gap-1 text-xs"
+                      disabled={!selected.size || !!busy} onClick={removeSelected}>
+                      {busy === "batch-delete" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                      Remove selected
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <ScrollArea className="max-h-[62vh] pr-3">
+
                 {loadingRows ? (
                   <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" /> Loading submissions…
@@ -195,9 +298,14 @@ export default function IrfDuplicateManager({ projectId, duplicateIds, onChanged
                   <div className="space-y-5">
                     {groups.map((g) => {
                       const original = g.items[0];
+                      const groupDupIds = g.items.filter((it) => it.__isDup).map((it) => it.id);
+                      const groupAllSel = groupDupIds.length > 0 && groupDupIds.every((id) => selected.has(id));
                       return (
                         <div key={g.key} className="overflow-hidden rounded-xl border">
                           <div className="flex items-center gap-2 border-b bg-muted/50 px-3 py-2">
+                            <Checkbox checked={groupAllSel}
+                              onCheckedChange={(v) => toggleGroup(groupDupIds, !!v)}
+                              aria-label="Select all duplicates in this set" />
                             <Badge variant="outline" className="gap-1">
                               <Copy className="h-3 w-3" /> {g.items.length} in set
                             </Badge>
@@ -211,15 +319,33 @@ export default function IrfDuplicateManager({ projectId, duplicateIds, onChanged
                               <thead>
                                 <tr className="border-b bg-muted/30 text-left text-muted-foreground">
                                   <th className="px-3 py-2 font-semibold">Field</th>
-                                  {g.items.map((it) => (
-                                    <th key={it.id} className="px-3 py-2 font-semibold">
-                                      <span className="flex items-center gap-1">
-                                        {it.__isOriginal && <Star className="h-3 w-3 text-amber-500" />}
-                                        {it.__isOriginal ? "Original" : "Duplicate"}
-                                      </span>
-                                    </th>
-                                  ))}
+                                  {g.items.map((it) => {
+                                    const decision = irfMap.get(it.id);
+                                    return (
+                                      <th key={it.id} className="px-3 py-2 font-semibold align-top">
+                                        <span className="flex items-center gap-1.5">
+                                          {it.__isDup && (
+                                            <Checkbox checked={selected.has(it.id)}
+                                              onCheckedChange={() => toggle(it.id)}
+                                              aria-label="Select this duplicate" />
+                                          )}
+                                          {it.__isOriginal && <Star className="h-3 w-3 text-amber-500" />}
+                                          {it.__isOriginal ? "Original" : "Duplicate"}
+                                        </span>
+                                        <span className="mt-1 block">
+                                          {it.__isOriginal ? (
+                                            <Badge variant="outline" className="text-[9px] text-emerald-600">Kept</Badge>
+                                          ) : decision === "unique" ? (
+                                            <Badge className="bg-emerald-600 text-[9px] hover:bg-emerald-600">Accepted unique</Badge>
+                                          ) : (
+                                            <Badge variant="outline" className="text-[9px] text-amber-600">Pending review</Badge>
+                                          )}
+                                        </span>
+                                      </th>
+                                    );
+                                  })}
                                 </tr>
+
                               </thead>
                               <tbody>
                                 <tr className="border-b">
