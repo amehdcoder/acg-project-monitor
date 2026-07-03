@@ -3019,8 +3019,9 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          default_data_source_id: string | null
           description: string | null
-          form_id: string
+          form_id: string | null
           id: string
           is_published: boolean
           layout: Json
@@ -3030,8 +3031,9 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by: string
+          default_data_source_id?: string | null
           description?: string | null
-          form_id: string
+          form_id?: string | null
           id?: string
           is_published?: boolean
           layout?: Json
@@ -3041,8 +3043,9 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
+          default_data_source_id?: string | null
           description?: string | null
-          form_id?: string
+          form_id?: string | null
           id?: string
           is_published?: boolean
           layout?: Json
@@ -3050,6 +3053,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "custom_dashboards_default_data_source_id_fkey"
+            columns: ["default_data_source_id"]
+            isOneToOne: false
+            referencedRelation: "dashboard_data_sources"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "custom_dashboards_form_id_fkey"
             columns: ["form_id"]
@@ -3086,11 +3096,45 @@ export type Database = {
         }
         Relationships: []
       }
+      dashboard_data_sources: {
+        Row: {
+          config: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          schema: Json
+          source_kind: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          schema?: Json
+          source_kind: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          schema?: Json
+          source_kind?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       dashboard_widgets: {
         Row: {
           config: Json
           created_at: string
           dashboard_id: string
+          data_source_id: string | null
           id: string
           position: Json
           title: string
@@ -3101,6 +3145,7 @@ export type Database = {
           config?: Json
           created_at?: string
           dashboard_id: string
+          data_source_id?: string | null
           id?: string
           position?: Json
           title: string
@@ -3111,6 +3156,7 @@ export type Database = {
           config?: Json
           created_at?: string
           dashboard_id?: string
+          data_source_id?: string | null
           id?: string
           position?: Json
           title?: string
@@ -3123,6 +3169,13 @@ export type Database = {
             columns: ["dashboard_id"]
             isOneToOne: false
             referencedRelation: "custom_dashboards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dashboard_widgets_data_source_id_fkey"
+            columns: ["data_source_id"]
+            isOneToOne: false
+            referencedRelation: "dashboard_data_sources"
             referencedColumns: ["id"]
           },
         ]
@@ -7641,6 +7694,7 @@ export type Database = {
         Returns: boolean
       }
       can_edit_dashboard: { Args: { _user_id: string }; Returns: boolean }
+      can_edit_dashboards: { Args: { _user_id: string }; Returns: boolean }
       can_locate_community: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
