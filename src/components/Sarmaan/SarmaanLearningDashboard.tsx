@@ -939,6 +939,86 @@ function Legend({ color, label }: { color: string; label: string }) {
   return <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} /> {label}</span>;
 }
 
+interface StatRow {
+  key: string; label: string; color: string;
+  n: number; sum: number; mean: number; median: number;
+  min: number; max: number; sd: number; ciLow: number; ciHigh: number; cv: number;
+}
+interface Stats { indicators: StatRow[]; momGrowthPct: number | null; reportsPerActiveMonth: number; }
+
+function StatsPanel({ stats }: { stats: Stats }) {
+  const fmt = (n: number) => (Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 2 }));
+  if (!stats.indicators.length) {
+    return (
+      <div className="rounded-2xl border p-6 text-center text-sm shadow-sm" style={{ borderColor: NAVY.line, background: NAVY.panel, color: NAVY.inkSoft }}>
+        <Sigma className="mx-auto mb-2 h-7 w-7 opacity-40" />
+        No numeric indicators captured yet for statistical analysis.
+      </div>
+    );
+  }
+  return (
+    <div className="overflow-hidden rounded-2xl border shadow-sm" style={{ borderColor: NAVY.line, background: NAVY.panel }}>
+      <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3" style={{ borderColor: NAVY.line, background: "linear-gradient(90deg, rgba(8,145,178,0.10), rgba(20,184,166,0.10))" }}>
+        <Sigma className="h-4 w-4" style={{ color: NAVY.teal }} />
+        <h3 className="text-[13px] font-bold" style={{ fontFamily: NAVY.headingFont, color: NAVY.ink }}>Statistical Analysis of Indicators</h3>
+        <div className="ml-auto flex flex-wrap items-center gap-3 text-[11px]" style={{ color: NAVY.inkSoft }}>
+          <span className="inline-flex items-center gap-1"><Activity className="h-3.5 w-3.5" /> {stats.reportsPerActiveMonth} reports / active month</span>
+          {stats.momGrowthPct != null && (
+            <span className="inline-flex items-center gap-1 font-semibold" style={{ color: stats.momGrowthPct >= 0 ? NAVY.good : NAVY.bad }}>
+              {stats.momGrowthPct >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+              {stats.momGrowthPct >= 0 ? "+" : ""}{stats.momGrowthPct}% reach MoM
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] text-sm">
+          <thead>
+            <tr className="border-b text-[11px]" style={{ borderColor: NAVY.line, color: NAVY.inkSoft, background: "rgba(15,23,42,0.03)" }}>
+              <th className="px-3 py-2 text-left font-semibold">Indicator</th>
+              <th className="px-3 py-2 text-right font-semibold">n</th>
+              <th className="px-3 py-2 text-right font-semibold">Total</th>
+              <th className="px-3 py-2 text-right font-semibold">Mean</th>
+              <th className="px-3 py-2 text-right font-semibold">Median</th>
+              <th className="px-3 py-2 text-right font-semibold">95% CI</th>
+              <th className="px-3 py-2 text-right font-semibold">SD</th>
+              <th className="px-3 py-2 text-right font-semibold">Range</th>
+              <th className="px-3 py-2 text-right font-semibold" title="Coefficient of variation — lower is more consistent">Consistency</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stats.indicators.map((ind) => {
+              const consistency = ind.cv <= 50 ? "High" : ind.cv <= 100 ? "Moderate" : "Variable";
+              const cColor = ind.cv <= 50 ? NAVY.good : ind.cv <= 100 ? NAVY.warn : NAVY.bad;
+              return (
+                <tr key={ind.key} className="border-b" style={{ borderColor: NAVY.line }}>
+                  <td className="px-3 py-2">
+                    <span className="inline-flex items-center gap-2 font-medium" style={{ color: NAVY.ink }}>
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: ind.color }} />
+                      {ind.label}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-right" style={{ color: NAVY.inkSoft }}>{ind.n}</td>
+                  <td className="px-3 py-2 text-right font-semibold" style={{ color: NAVY.ink }}>{fmt(ind.sum)}</td>
+                  <td className="px-3 py-2 text-right" style={{ color: NAVY.ink }}>{fmt(ind.mean)}</td>
+                  <td className="px-3 py-2 text-right" style={{ color: NAVY.ink }}>{fmt(ind.median)}</td>
+                  <td className="px-3 py-2 text-right text-xs" style={{ color: NAVY.inkSoft }}>{fmt(ind.ciLow)} – {fmt(ind.ciHigh)}</td>
+                  <td className="px-3 py-2 text-right" style={{ color: NAVY.inkSoft }}>{fmt(ind.sd)}</td>
+                  <td className="px-3 py-2 text-right text-xs" style={{ color: NAVY.inkSoft }}>{fmt(ind.min)}–{fmt(ind.max)}</td>
+                  <td className="px-3 py-2 text-right text-xs font-semibold" style={{ color: cColor }}>{consistency}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="border-t px-3 py-2 text-[11px]" style={{ borderColor: NAVY.line, color: NAVY.inkSoft }}>
+        95% confidence interval of the mean (normal approximation). “Consistency” reflects the coefficient of variation across submissions — lower variation indicates more uniform field performance.
+      </p>
+    </div>
+  );
+}
+
 function mix(a: string, b: string, t: number): string {
   const pa = [parseInt(a.slice(1, 3), 16), parseInt(a.slice(3, 5), 16), parseInt(a.slice(5, 7), 16)];
   const pb = [parseInt(b.slice(1, 3), 16), parseInt(b.slice(3, 5), 16), parseInt(b.slice(5, 7), 16)];
