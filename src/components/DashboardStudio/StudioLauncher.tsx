@@ -12,9 +12,10 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  ArrowLeft, Plus, LayoutDashboard, Loader2, Sparkles, Search, ShieldAlert, Trash2,
+  ArrowLeft, Plus, LayoutDashboard, Loader2, Sparkles, Search, ShieldAlert, Trash2, Copy,
 } from "lucide-react";
 import DashboardStudio from "./DashboardStudio";
+import { BUILT_IN_PRESETS, cloneBuiltInDashboard, type BuiltInPreset } from "@/lib/dashboardStudio/cloneToStudio";
 
 interface DashRow {
   id: string;
@@ -37,6 +38,8 @@ export default function StudioLauncher({ onBack }: Props) {
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [creating, setCreating] = useState(false);
+  const [showClone, setShowClone] = useState(false);
+  const [cloningKey, setCloningKey] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -82,6 +85,23 @@ export default function StudioLauncher({ onBack }: Props) {
     load();
   };
 
+  const cloneBuiltIn = async (preset: BuiltInPreset) => {
+    if (!user) return;
+    setCloningKey(preset.key);
+    try {
+      const created = await cloneBuiltInDashboard(preset, user.id);
+      if (!created) { toast.error("Failed to clone dashboard"); return; }
+      toast.success(`Cloned “${preset.name}” — opening in Studio`);
+      setShowClone(false);
+      await load();
+      setOpen({ id: created.id, name: created.name, description: null, is_published: false, updated_at: new Date().toISOString() });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to clone dashboard");
+    } finally {
+      setCloningKey(null);
+    }
+  };
+
   if (open) {
     return <DashboardStudio dashboardId={open.id} dashboardName={open.name} onBack={() => { setOpen(null); load(); }} />;
   }
@@ -100,7 +120,10 @@ export default function StudioLauncher({ onBack }: Props) {
             <p className="text-sm text-muted-foreground">Build fully configurable dashboards with any data source — Looker-style.</p>
           </div>
         </div>
-        <Button onClick={() => setShowCreate(true)}><Plus className="mr-2 h-4 w-4" /> New dashboard</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowClone(true)}><Copy className="mr-2 h-4 w-4" /> Clone built-in</Button>
+          <Button onClick={() => setShowCreate(true)}><Plus className="mr-2 h-4 w-4" /> New dashboard</Button>
+        </div>
       </div>
 
       <div className="relative max-w-md">
@@ -140,6 +163,31 @@ export default function StudioLauncher({ onBack }: Props) {
           ))}
         </div>
       )}
+
+      <Dialog open={showClone} onOpenChange={(o) => !cloningKey && setShowClone(o)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Clone a built-in dashboard</DialogTitle>
+            <DialogDescription>
+              Creates a fully editable Studio copy pre-seeded with the dashboard’s form as a data source and starter charts. The original dashboard is untouched.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {BUILT_IN_PRESETS.map((p) => (
+              <button key={p.key} disabled={!!cloningKey} onClick={() => cloneBuiltIn(p)}
+                className="flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left transition-colors hover:border-primary/50 hover:bg-muted/40 disabled:opacity-60">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  {cloningKey === p.key ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold">{p.name}</div>
+                  <div className="truncate text-xs text-muted-foreground">{p.description}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent>
