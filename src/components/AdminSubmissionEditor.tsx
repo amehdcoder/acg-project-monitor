@@ -153,21 +153,43 @@ export default function AdminSubmissionEditor({
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {extraActions}
           <Badge variant="secondary" className="gap-1 bg-white/15 text-white hover:bg-white/25">
             <ShieldCheck className="h-3 w-3" /> Admin
           </Badge>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 border-b bg-muted/40 px-3 py-2.5">
-        <Search className="h-4 w-4 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-          placeholder="Search by submitter, location or any answer…"
-          className="h-8 border-0 bg-transparent text-sm shadow-none focus-visible:ring-0"
-        />
+      <div className="flex flex-wrap items-center gap-2 border-b bg-muted/40 px-3 py-2.5">
+        <div className="flex min-w-[200px] flex-1 items-center gap-2">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+            placeholder="Search by submitter, location or any answer…"
+            className="h-8 border-0 bg-transparent text-sm shadow-none focus-visible:ring-0"
+          />
+        </div>
+        {chapters && chapters.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <Layers className="h-4 w-4 text-muted-foreground" />
+            <select
+              value={chapterFilter}
+              onChange={(e) => { setChapterFilter(e.target.value); setPage(0); }}
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+              aria-label="Filter by chapter"
+            >
+              <option value="__all__">All chapters ({submissions.length})</option>
+              {chapters.map((c) => (
+                <option key={c} value={c}>
+                  {c} ({submissions.filter((s) => (s.chapter || "") === c).length})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
+
 
       <div className="divide-y">
         {pageRows.length === 0 ? (
