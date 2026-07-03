@@ -151,42 +151,56 @@ export default function AdminSubmissionEditor({
             const isDup = duplicateIds?.has(s.id);
             const rank = safePage * pageSize + i + 1;
             return (
-              <button
+              <div
                 key={s.id}
-                onClick={() => setActive(s)}
-                className={`group flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-primary/5 ${
+                className={`group flex w-full items-center gap-3 transition-colors hover:bg-primary/5 ${
                   isDup ? "bg-amber-50/70 dark:bg-amber-500/5" : ""
                 }`}
               >
-                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
-                  isDup ? "bg-amber-500" : "bg-gradient-to-br from-[#1a4a6e] to-[#0891b2]"
-                }`}>
-                  {rank}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm font-medium text-foreground">
-                    <span className="inline-flex items-center gap-1 truncate">
-                      <User className="h-3.5 w-3.5 text-primary" />
-                      {s.submitter || "Unknown submitter"}
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                      <MapPin className="h-3.5 w-3.5 text-emerald-600" /> {geoLabel(s)}
-                    </span>
-                    {isDup && (
-                      <Badge variant="outline" className="gap-1 border-amber-400 text-amber-700 dark:text-amber-300">
-                        <Copy className="h-3 w-3" /> Duplicate
-                      </Badge>
-                    )}
+                <button
+                  onClick={() => setActive(s)}
+                  className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-left"
+                >
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
+                    isDup ? "bg-amber-500" : "bg-gradient-to-br from-[#1a4a6e] to-[#0891b2]"
+                  }`}>
+                    {rank}
                   </div>
-                  <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                    <CalendarDays className="h-3 w-3" /> {fmtDate(s.submittedAt)}
-                    {summarize(s) && <span className="truncate">· {summarize(s)}</span>}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm font-medium text-foreground">
+                      <span className="inline-flex items-center gap-1 truncate">
+                        <User className="h-3.5 w-3.5 text-primary" />
+                        {s.submitter || "Unknown submitter"}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <MapPin className="h-3.5 w-3.5 text-emerald-600" /> {geoLabel(s)}
+                      </span>
+                      {isDup && (
+                        <Badge variant="outline" className="gap-1 border-amber-400 text-amber-700 dark:text-amber-300">
+                          <Copy className="h-3 w-3" /> Duplicate
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                      <CalendarDays className="h-3 w-3" /> {fmtDate(s.submittedAt)}
+                      {summarize(s) && <span className="truncate">· {summarize(s)}</span>}
+                    </div>
                   </div>
-                </div>
-                <Badge className="shrink-0 gap-1 bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground">
-                  <Pencil className="h-3 w-3" /> Edit
-                </Badge>
-              </button>
+                  <Badge className="shrink-0 gap-1 bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground">
+                    <Pencil className="h-3 w-3" /> Edit
+                  </Badge>
+                </button>
+                {enableDelete && (
+                  <button
+                    onClick={() => handleDelete(s)}
+                    disabled={deleting === s.id}
+                    className="mr-3 flex shrink-0 items-center gap-1 rounded-lg border border-destructive/30 px-2.5 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+                    aria-label="Delete submission"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> {deleting === s.id ? "Deleting…" : "Delete"}
+                  </button>
+                )}
+              </div>
             );
           })
         )}
