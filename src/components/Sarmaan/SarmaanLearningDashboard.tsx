@@ -65,6 +65,7 @@ function sectionsFrom(questions: unknown): FormGroup[] {
 }
 
 export default function SarmaanLearningDashboard({ form, onClose }: Props) {
+  const { isOwner } = useAuth();
   const sections = useMemo(() => sectionsFrom(form.questions), [form.questions]);
   const questions = useMemo(() => sections.flatMap((s) => s.questions), [sections]);
   const nameToId = useMemo(() => {
