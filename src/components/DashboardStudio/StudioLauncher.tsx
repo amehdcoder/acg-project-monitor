@@ -38,6 +38,8 @@ export default function StudioLauncher({ onBack }: Props) {
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [creating, setCreating] = useState(false);
+  const [showClone, setShowClone] = useState(false);
+  const [cloningKey, setCloningKey] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
