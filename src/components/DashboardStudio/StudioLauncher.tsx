@@ -189,7 +189,7 @@ export default function StudioLauncher({ onBack }: Props) {
         </DialogContent>
       </Dialog>
 
-
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New dashboard</DialogTitle>
