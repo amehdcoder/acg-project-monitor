@@ -469,7 +469,7 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
     [filtered, profiles, fieldSpec],
   );
 
-
+  const hasFilters = Object.values(filters).some((v) => v && v !== "__all__");
   const dq = qualityBand(agg.avgScorePct || 0);
 
   const kpis = [
