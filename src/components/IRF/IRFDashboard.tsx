@@ -353,6 +353,9 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
             {/* Narrative & free-text intelligence */}
             <IrfTextInsights rows={rows} />
 
+            {/* Form-scoped, LGA-wise free-text intelligence */}
+            <IrfFreeTextIntel rows={rows} />
+
             {/* Collapsible evidence library: activity pictures + consent forms */}
             <IrfEvidenceLibrary rows={rows} />
 
