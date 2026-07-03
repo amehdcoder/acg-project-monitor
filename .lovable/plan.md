@@ -1,51 +1,54 @@
-# Special Form Studio — Templates, Versioning, Dashboard Designer & XLSForm I/O
+# Looker Studio–Style Dashboard Editor
 
-All five capabilities extend the existing Studio (`src/components/SpecialFormStudio/`) and store data inside the `forms.settings` JSON — **no schema migration needed**. The `forms` table already has `status` (`active`/`draft`/`inactive`), `questions` (sections), and `settings` (theme + dashboardConfig).
+Build a standalone, admin-only visual dashboard editor modeled on Google Looker Studio, layered on top of the existing dashboard tables. Admins (Owner, Systems Admin, Super Admin) can edit **any** dashboard, rebind each chart/KPI to a different data source and field, add many chart types with deep styling, and connect **external** data sources (Google Sheets, CSV/Excel upload, REST/JSON URL).
 
-## 1. Template versioning + publish/unpublish
+## What exists today
+- `custom_dashboards` (bound to one `form_id`), `dashboard_widgets` (widget_type, config, position), `dashboard_access`.
+- `DashboardBuilder` + `AddWidgetDialog` + `WidgetRenderer` + `DraggableWidgetGrid`: widget types bar/line/pie/area/radar/table/kpi/text/map/location_table, config with questionId/aggregation/groupBy, drag layout, filters, export.
+- Data feeds from a single form's submissions.
 
-Store an immutable version history in `settings.versions[]`:
-```text
-version: { v: number, label, createdAt, createdBy, status: "published"|"archived",
-           snapshot: { sections, theme, description, dashboardConfig } }
-```
-- **Publish** (existing "Publish" button): snapshots current state as a new version marked `published`, demotes the previously published one to `archived`, sets form `status="active"`, and records `settings.publishedVersion`.
-- **Save draft**: writes working state without cutting a version.
-- **Unpublish**: sets form `status="draft"` and clears `publishedVersion` so field users stop seeing it; older versions stay in history.
-- New `VersionHistoryPanel.tsx`: lists versions, lets the Owner **preview**, **restore** (loads snapshot into the editor as new working draft), and **re-publish** an older version. Users always run the `publishedVersion` snapshot.
-- Helpers in new `src/lib/specialStudio/versioning.ts` (cut/restore/resolve active snapshot). `recordStudioAudit` already logs actions.
+## Data model changes (one migration)
+1. New table `dashboard_data_sources`:
+   - `id, name, source_kind` (`form` | `table` | `google_sheet` | `csv_upload` | `rest_api`), `config jsonb` (form_id, or sheet URL/range, or file storage path + parsed schema, or endpoint URL + auth headers + JSON path), `schema jsonb` (cached field list: {id,label,type}), `created_by`, timestamps.
+   - GRANTs + RLS: readable by authenticated; insert/update/delete restricted to admins via `has_role`/owner check.
+2. `dashboard_widgets.data_source_id uuid` (nullable, FK to `dashboard_data_sources`) so each widget can override the dashboard default source.
+3. `custom_dashboards.default_data_source_id uuid` + make `form_id` nullable so a dashboard can be created without a form.
+4. New storage bucket `dashboard-uploads` (private) for CSV/Excel files.
+5. Edge function `dashboard-fetch-source` to server-side fetch Google Sheet / REST API rows (avoids CORS, hides auth headers). CSV/Excel parsed client-side on upload, rows cached in the data source `config`.
 
-## 2. Export / import full-fidelity presets (with dashboard)
+## Access control
+- New `useCanEditDashboards()` hook: true when `isOwner`, `is_co_owner`, or role `super_admin`/`systems_admin`.
+- Route/entry to the editor is gated by this hook. Editor loads any dashboard regardless of creator.
 
-New `src/lib/specialStudio/templatePackage.ts`:
-- `exportTemplate(form)` → downloadable `.amtemplate.json` containing `{ meta, name, description, sections, theme, dashboardConfig, dashboardLayout }` — a complete, portable copy including linked dashboard structure.
-- `importTemplate(file)` → validates + re-IDs (`id`/`name` regenerated to avoid collisions, dashboard field references remapped) and returns Studio state.
-- Studio top bar gets **Export template** / **Import template** buttons; PresetPicker gets an "Import a shared template" entry so shared files become new starting points.
+## New standalone editor (`src/components/DashboardStudio/`)
+Looker-style three-pane layout:
+- **Left rail — Data & Pages**: list of data sources with "Add data source" (opens connector UI), fields panel showing dimensions vs metrics per selected source.
+- **Center — Canvas**: the draggable/resizable widget grid (reuse `DraggableWidgetGrid`) with live preview.
+- **Right rail — Properties**: contextual config for the selected widget — Setup tab (data source dropdown, dimension, metric, aggregation, filter, date range) and Style tab (colors/palette, legend, axis, labels, number format, fonts, background, border, corner radius).
+Top bar: dashboard name, View/Edit toggle, add-chart menu, theme, save state.
 
-## 3. Drag-and-drop dashboard metric designer
+### Data source connector UI (`AddDataSourceDialog`)
+Colorful card picker: App Form, App Table, Google Sheets, CSV/Excel upload, REST/JSON API. Each with a guided config step, "Connect & preview" that fetches a sample and auto-detects the field schema, then saves the source.
 
-Extend `DashboardConfig` (backward-compatible) with a `widgets[]` array:
-```text
-widget: { id, kind: "kpi"|"bar"|"donut"|"table"|"filter",
-          field (question name), agg: "sum"|"count"|"avg"|"distinct",
-          title, color, span: 1|2 }
-```
-- New `DashboardDesigner.tsx` (replaces the current simple Dashboard tab body): a `@dnd-kit` canvas where the Owner picks **any question/status field** from a palette and drops it in as a KPI card, chart, or filter; edit each card's title/aggregation/color inline; drag to reorder; delete.
-- `dashboardSync.ts` gains `reconcileWidgets()` so widgets referencing deleted fields are dropped and legacy `kpiFields/statusField/geoField` auto-migrate into `widgets` on first open.
-- `SpecialFormDashboard.tsx` renders `widgets[]` in saved order (KPI cards, bar/donut charts via existing `recharts`, tables, and working filter controls that filter the submission rows). Falls back to legacy rendering when no widgets exist. Realtime sync already in place.
+### Chart types (expand `WIDGET_TYPES` + `WidgetRenderer`)
+Add: scorecard/KPI-with-delta, combo (bar+line), scatter, stacked/grouped bar, donut, gauge, treemap, heatmap-table, pivot table — on top of existing types.
 
-## 4. Saved UI theming + layout per template
+### Deep styling
+Extend `WidgetConfig` with a `style` object (palette, series colors, showLegend/position, gridlines, axis titles, number/date format, font family/size, background, border, radius, conditional formatting for tables/scorecards). `WidgetRenderer` reads `style` for every type.
 
-- Form theme already persists in `settings.theme`. Add `settings.dashboardLayout = { accent, background, columns, widgetOrder, density }` saved alongside the widgets so dashboard branding/positions survive edits.
-- Both `theme` and `dashboardLayout` are captured inside every version snapshot (section 1) and inside exported template packages (section 2), so branding stays consistent after edits, restores, and imports.
+### Unified data layer
+`useWidgetData(widget)` resolves the widget's data source (form submissions via existing analytics, app table query, or cached external rows), applies dimension/metric/aggregation/filters, and returns chart-ready rows. This decouples widgets from the single-form assumption.
 
-## 5. XLSForm import into Studio + export/download of any special form
-
-- **Import**: reuse `parseXLSForm` (SheetJS already a dep). Add an **Import XLSForm** button in the Studio that maps parsed `questions`/`groups` into Studio `sections` (wrapping ungrouped questions in a section), preserving skip logic/calculations/choice filters already supported by the parser.
-- **Export**: new `src/lib/specialStudio/xlsformExport.ts` builds a valid three-sheet (`survey`, `choices`, `settings`) `.xlsx` with SheetJS at 100% fidelity — every field, type, `required`, `relevant`, `constraint`, `calculation`, `choice_filter`, `appearance`, and all options. Wired to a **Download XLSForm** action in both the Studio top bar and the FormsView form dropdown (available for any special/studio form).
+## Build order (phased)
+1. Migration + storage bucket + `dashboard-fetch-source` edge function.
+2. `useCanEditDashboards`, data-source hook + `AddDataSourceDialog` with all 5 source kinds.
+3. `DashboardStudio` shell (3-pane) reusing existing grid; wire load-any-dashboard.
+4. Per-widget data source + field rebinding in the right-rail Setup tab.
+5. New chart types + Style tab.
+6. Entry point in admin area + access gating; verify with typecheck and a Playwright smoke pass.
 
 ## Technical notes
-- No DB migration: everything rides in existing `forms.status`/`questions`/`settings` columns; realtime `forms` updates already flow to the live dashboard.
-- New files: `versioning.ts`, `templatePackage.ts`, `xlsformExport.ts`, `VersionHistoryPanel.tsx`, `DashboardDesigner.tsx`. Edited: `SpecialFormStudio.tsx`, `SpecialFormDashboard.tsx`, `dashboardSync.ts`, `presets.ts` (types), `PresetPicker.tsx`, `FormsView.tsx`.
-- Types stay backward-compatible so existing saved special forms keep working; legacy configs auto-migrate on open.
-- Verify with `tsgo` typecheck + a Playwright smoke pass of the Studio (build form → designer → publish → export/import) before finishing.
+- Reuses `recharts` already in the project; add lightweight `xlsx` parse for uploads (or SheetJS already present via ExcelJS — will parse CSV natively, Excel via a small reader).
+- Google Sheets uses the connector gateway pattern if a connection is linked; otherwise a public-sheet CSV export URL fallback.
+- All external fetches go through the edge function with input validation; secrets (API auth headers) stored per-source encrypted in config are avoided — instead sensitive headers go through a project secret when needed.
+- No changes to existing per-form dashboards' runtime behavior; the studio is additive.

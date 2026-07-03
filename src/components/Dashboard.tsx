@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   FileText, Send, CheckCircle, ChevronRight, Pencil, Trash2, Loader2, Search, BarChart3, RefreshCw,
-  LayoutDashboard, Settings2, ClipboardList
+  LayoutDashboard, Settings2, ClipboardList, Sparkles
 } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
@@ -107,13 +107,14 @@ interface FormSubmission {
 
 interface DashboardProps {
   onOpenDashboardBuilder?: () => void;
+  onOpenDashboardStudio?: () => void;
   onViewSubmissions?: () => void;
   initialProjectId?: string | null;
   onProjectSelect?: (projectId: string | null) => void;
 }
 
 
-const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }: DashboardProps) => {
+const Dashboard = ({ onOpenDashboardBuilder, onOpenDashboardStudio, initialProjectId, onProjectSelect }: DashboardProps) => {
   const { isAdmin, user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialProjectId || null);
@@ -452,6 +453,11 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
             {isAdmin && onOpenDashboardBuilder && (
               <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-wider gap-1.5 px-3 hidden sm:inline-flex" onClick={onOpenDashboardBuilder}>
                 <BarChart3 className="h-3 w-3" /> Builder
+              </Button>
+            )}
+            {onOpenDashboardStudio && (
+              <Button variant="default" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-wider gap-1.5 px-3 hidden sm:inline-flex" onClick={onOpenDashboardStudio}>
+                <Sparkles className="h-3 w-3" /> Studio
               </Button>
             )}
           </div>

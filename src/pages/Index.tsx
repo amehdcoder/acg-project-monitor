@@ -23,6 +23,8 @@ import DataView from "@/components/DataView";
 import IntegrationsView from "@/components/IntegrationsView";
 import UsersView from "@/components/UsersView";
 import AdminDashboardBuilder from "@/components/AdminDashboardBuilder";
+import { StudioLauncher } from "@/components/DashboardStudio";
+import { useCanEditDashboards } from "@/hooks/useCanEditDashboards";
 import SubmissionHistory from "@/components/SubmissionHistory";
 import CasesView from "@/components/CasesView";
 import FormTemplatesView from "@/components/FormTemplatesView";
@@ -96,6 +98,7 @@ const Index = () => {
 
   const { user, loading, profile, role, isAdmin, isApproved, isPendingApproval, isSuperAdmin, isOwner, isCoOwner, isAdhoc } = useAuth();
   const { canAccessPage, minimalAccess, loadingAccess } = usePageAccess();
+  const { canEditDashboards } = useCanEditDashboards();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   useHeartbeat();
@@ -243,6 +246,7 @@ const Index = () => {
         return (
           <Dashboard
             onOpenDashboardBuilder={isAdmin ? () => handleTabChange("dashboard-builder") : undefined}
+            onOpenDashboardStudio={canEditDashboards ? () => handleTabChange("dashboard-studio") : undefined}
             onViewSubmissions={() => setShowSubmissionHistory(true)}
             initialProjectId={selectedProjectId}
             onProjectSelect={setSelectedProjectId}
@@ -251,6 +255,7 @@ const Index = () => {
 
       case "supervisor": return isAdmin ? <SupervisorDashboard /> : guardedPage("__admin_only__", <></>);
       case "dashboard-builder": return isAdmin ? <AdminDashboardBuilder onBack={() => setActiveTab("dashboard")} /> : guardedPage("__admin_only__", <></>);
+      case "dashboard-studio": return canEditDashboards ? <StudioLauncher onBack={() => setActiveTab("dashboard")} /> : guardedPage("__admin_only__", <></>);
       case "forms": return <FormsView />;
       case "project-chat": return <AdhocProjectChatView />;
       case "my-submissions": return <SubmissionHistory onClose={() => setActiveTab("forms")} />;
