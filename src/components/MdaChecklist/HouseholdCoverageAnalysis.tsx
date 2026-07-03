@@ -185,6 +185,56 @@ function aggregate(visits: HCAPoint[], txBenchmark: number, hhBenchmark: number)
   return rows.sort((a, b) => a.txCoveragePct - b.txCoveragePct);
 }
 
+interface LgaRow {
+  key: string;
+  lga: string;
+  state: string;
+  communities: number;
+  households: number;
+  treatedHouseholds: number;
+  eligible: number;
+  treated: number;
+  hhReachPct: number;
+  txCoveragePct: number;
+  txTest: BenchmarkTest | null;
+  hhTest: BenchmarkTest | null;
+  missingEligible: number;
+  belowCommunities: number; // communities significantly below the tx benchmark
+}
+
+/** Aggregate household visits up to the LGA level (state-wide coverage insight). */
+function aggregateLga(rows: CommunityRow[], txBenchmark: number, hhBenchmark: number): LgaRow[] {
+  const map = new Map<string, LgaRow>();
+  for (const c of rows) {
+    const key = `${norm(c.state)}|${norm(c.lga)}`;
+    let r = map.get(key);
+    if (!r) {
+      r = {
+        key, lga: c.lga || "—", state: c.state || "—",
+        communities: 0, households: 0, treatedHouseholds: 0, eligible: 0, treated: 0,
+        hhReachPct: 0, txCoveragePct: 0, txTest: null, hhTest: null,
+        missingEligible: 0, belowCommunities: 0,
+      };
+      map.set(key, r);
+    }
+    r.communities += 1;
+    r.households += c.households;
+    r.treatedHouseholds += c.treatedHouseholds;
+    r.eligible += c.eligible;
+    r.treated += c.treated;
+    r.missingEligible += c.missingEligible;
+    if (c.txTest?.ciBelow) r.belowCommunities += 1;
+  }
+  const out = [...map.values()].map((r) => {
+    r.hhReachPct = r.households > 0 ? (r.treatedHouseholds / r.households) * 100 : 0;
+    r.txCoveragePct = r.eligible > 0 ? (r.treated / r.eligible) * 100 : 0;
+    r.txTest = r.eligible > 0 ? testAgainstBenchmark(r.treated, r.eligible, txBenchmark) : null;
+    r.hhTest = r.households > 0 ? testAgainstBenchmark(r.treatedHouseholds, r.households, hhBenchmark) : null;
+    return r;
+  });
+  return out.sort((a, b) => a.txCoveragePct - b.txCoveragePct);
+}
+
 // ── Community drill-down dialog ──────────────────────────────────────────────
 function CommunityDrillDown({ row, txBenchmark, hhBenchmark, onClose }: {
   row: CommunityRow; txBenchmark: number; hhBenchmark: number; onClose: () => void;
