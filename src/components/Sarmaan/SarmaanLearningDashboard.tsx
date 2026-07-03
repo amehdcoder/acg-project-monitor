@@ -47,7 +47,7 @@ import AdminSubmissionEditor, { type EditableSubmission } from "@/components/Adm
 import { Sigma, TrendingUp, TrendingDown, Activity } from "lucide-react";
 import type { FormGroup, Question } from "@/components/FormBuilder/types";
 import type { FieldDescriptor } from "@/components/FormDataTable";
-import { NAVY, DASHBOARD_NAV, qualityBand } from "./sarmaanBrand";
+import { NAVY, DASHBOARD_NAV, qualityBand, isSupervisoryLearningForm } from "./sarmaanBrand";
 
 
 interface Props {
