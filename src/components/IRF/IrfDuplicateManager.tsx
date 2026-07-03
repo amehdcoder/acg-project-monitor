@@ -251,7 +251,40 @@ export default function IrfDuplicateManager({ projectId, duplicateIds, onChanged
                   and every dashboard computation.
                 </DialogDescription>
               </DialogHeader>
-              <ScrollArea className="max-h-[68vh] pr-3">
+
+              {/* Status summary + batch action bar */}
+              {!loadingRows && groups.length > 0 && (
+                <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-2">
+                  <Badge variant="outline" className="gap-1 text-xs">
+                    <Copy className="h-3 w-3" /> {groups.length} set{groups.length === 1 ? "" : "s"}
+                  </Badge>
+                  <Badge variant="outline" className="gap-1 text-xs text-amber-600">
+                    {dupItemIds.filter((id) => irfMap.get(id) !== "unique").length} pending
+                  </Badge>
+                  <Badge variant="outline" className="gap-1 text-xs text-emerald-600">
+                    <Check className="h-3 w-3" /> {dupItemIds.filter((id) => irfMap.get(id) === "unique").length} accepted
+                  </Badge>
+                  <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={selectAll} disabled={!dupItemIds.length}>
+                    <ListChecks className="h-3.5 w-3.5" /> {allSelected ? "Clear all" : "Select all"}
+                  </Button>
+                  <span className="text-xs font-medium text-muted-foreground">{selected.size} selected</span>
+                  <div className="ml-auto flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" className="h-7 gap-1 text-xs text-emerald-700"
+                      disabled={!selected.size || !!busy} onClick={acceptSelected}>
+                      {busy === "batch-accept" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />}
+                      Accept selected
+                    </Button>
+                    <Button size="sm" variant="destructive" className="h-7 gap-1 text-xs"
+                      disabled={!selected.size || !!busy} onClick={removeSelected}>
+                      {busy === "batch-delete" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                      Remove selected
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <ScrollArea className="max-h-[62vh] pr-3">
+
                 {loadingRows ? (
                   <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" /> Loading submissions…
