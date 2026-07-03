@@ -587,7 +587,7 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
                           <td className="p-2 font-medium">{(r.user_id && profiles[r.user_id]) || "—"}</td>
                           <td className="max-w-[150px] truncate p-2">{meta(r, "__section_label") || "—"}</td>
                           <td className="p-2">{str(r, "lga") || "—"}</td>
-                          <td className="max-w-[140px] truncate p-2">{str(r, "community") || "—"}</td>
+                          <td className="max-w-[140px] truncate p-2">{str(r, "ward") || "—"}</td>
                           <td className="p-2 text-right">{score > 0 ? <span className="rounded-full px-2 py-0.5 font-bold text-white" style={{ background: qualityBand((score / 80) * 100).color }}>{score}</span> : "—"}</td>
                         </tr>
                       );
