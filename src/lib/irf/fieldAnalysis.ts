@@ -1,5 +1,25 @@
 import { IRF_ALL_FIELDS, type IrfReport } from "./definition";
 import { IRF_EXTRA_FIELDS } from "./normalize";
+import { IRF_CATEGORY_FORMS } from "./categoryForms";
+
+// Map every field key to the standalone activity form it belongs to, so the
+// field-by-field analysis can be grouped by form (Advocacy, Town Announcers,
+// Compound Meeting, Community Dialogue). Falls back to a "General" bucket for
+// legacy/combined-form fields that aren't part of any category form.
+export interface FormBucket { id: string; name: string; short: string; color: string }
+const GENERAL_BUCKET: FormBucket = { id: "general", name: "General / Reporting context", short: "General", color: "#64748b" };
+
+const FIELD_FORM = new Map<string, FormBucket>();
+for (const form of IRF_CATEGORY_FORMS) {
+  const bucket: FormBucket = { id: form.id, name: form.name, short: form.short, color: form.color };
+  for (const g of form.groups) for (const f of g.fields) {
+    // First form to claim a key wins; shared keys (e.g. issues_raised) are
+    // reported per-form in the free-text intelligence panel instead.
+    if (!FIELD_FORM.has(f.key)) FIELD_FORM.set(f.key, bucket);
+  }
+}
+export const FORM_BUCKETS: FormBucket[] = [...IRF_CATEGORY_FORMS.map((f) => ({ id: f.id, name: f.name, short: f.short, color: f.color })), GENERAL_BUCKET];
+const formOf = (key: string): FormBucket => FIELD_FORM.get(key) || GENERAL_BUCKET;
 
 // Combined field universe analysed by the dashboard: the legacy combined-form
 // fields plus the standalone category-form fields (officials engaged, announcers
@@ -15,6 +35,7 @@ const ANALYSED_FIELDS: { key: string; label: string; type: string; activity: str
   }
   return out;
 })();
+
 
 // McKinsey-style categorical palette — calm, high-contrast, print-friendly.
 export const MCKINSEY_PALETTE = [
@@ -32,6 +53,7 @@ export interface CategoricalFieldAnalysis {
   label: string;
   activity: string;
   section: string;
+  form: FormBucket;
   answered: number;
   responseRate: number;
   unique: number;
@@ -47,6 +69,7 @@ export interface NumericFieldAnalysis {
   label: string;
   activity: string;
   section: string;
+  form: FormBucket;
   answered: number;
   responseRate: number;
   sum: number;
@@ -79,7 +102,7 @@ export type FieldAnalysis = CategoricalFieldAnalysis | NumericFieldAnalysis;
 const prettify = (s: string) =>
   String(s).replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 
-function analyzeNumeric(values: number[]): Omit<NumericFieldAnalysis, "kind" | "key" | "label" | "activity" | "section" | "answered" | "responseRate" | "histogram" | "byLga"> & { histogram: { name: string; value: number }[] } {
+function analyzeNumeric(values: number[]): Omit<NumericFieldAnalysis, "kind" | "key" | "label" | "activity" | "section" | "form" | "answered" | "responseRate" | "histogram" | "byLga"> & { histogram: { name: string; value: number }[] } {
   const sorted = [...values].sort((a, b) => a - b);
   const n = sorted.length;
   const sum = sorted.reduce((a, b) => a + b, 0);
@@ -143,7 +166,7 @@ export function analyzeFields(rows: IrfReport[]): { categorical: CategoricalFiel
         .sort((a, b) => b.sum - a.sum);
 
       numeric.push({
-        kind: "numeric", key: f.key, label: f.label, activity: f.activity, section: f.sectionId,
+        kind: "numeric", key: f.key, label: f.label, activity: f.activity, section: f.sectionId, form: formOf(f.key),
         answered: nums.length, responseRate: Math.round((nums.length / total) * 100),
         ...analyzeNumeric(nums), byLga,
       });
@@ -195,7 +218,7 @@ export function analyzeFields(rows: IrfReport[]): { categorical: CategoricalFiel
         .sort((a, b) => b.total - a.total);
 
       categorical.push({
-        kind: "categorical", key: f.key, label: f.label, activity: f.activity, section: f.sectionId,
+        kind: "categorical", key: f.key, label: f.label, activity: f.activity, section: f.sectionId, form: formOf(f.key),
         answered, responseRate: Math.round((answered / total) * 100), unique: counts.size,
         top: data[0], data, byLga,
       });
