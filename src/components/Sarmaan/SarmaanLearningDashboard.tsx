@@ -35,6 +35,10 @@ import {
   PieChart,
   Pie,
   ReferenceLine,
+  LineChart,
+  Line,
+  ComposedChart,
+  Legend as RLegend,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
