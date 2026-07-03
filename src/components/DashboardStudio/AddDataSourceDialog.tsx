@@ -17,7 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import {
-  useDashboardSources, previewExternalSource, fieldsFromRows,
+  useDashboardSources, previewExternalSource, fieldsFromRows, fieldsFromForm, mergeFields,
 } from "@/hooks/useDashboardSources";
 import { SOURCE_KIND_META, type SourceKind, type SourceField, type DataSourceConfig } from "@/lib/dashboardStudio/types";
 
@@ -58,6 +58,57 @@ export default function AddDataSourceDialog({ open, onClose, onCreated }: Props)
     if (!open) return;
     supabase.from("forms").select("id, name").order("name").then(({ data }) => setForms(data ?? []));
   }, [open]);
+
+  // Build a full field schema + preview when an App Form is selected.
+  useEffect(() => {
+    if (kind !== "form" || !formId) return;
+    let cancelled = false;
+    (async () => {
+      setBusy(true);
+      try {
+        const [{ data: formRow }, { data: subs }] = await Promise.all([
+          supabase.from("forms").select("name, questions").eq("id", formId).maybeSingle(),
+          supabase.from("form_submissions").select("data, submitted_at, location, state, status").eq("form_id", formId).order("submitted_at", { ascending: false }).limit(200),
+        ]);
+        if (cancelled) return;
+        const rows = (subs ?? []).map((r: any) => ({
+          submitted_at: r.submitted_at, location: r.location, state: r.state, status: r.status,
+          ...(r.data && typeof r.data === "object" ? r.data : {}),
+        }));
+        const base: SourceField[] = [
+          { id: "submitted_at", label: "Submitted at", type: "date" },
+          { id: "location", label: "Location", type: "text" },
+          { id: "state", label: "State", type: "text" },
+          { id: "status", label: "Status", type: "text" },
+        ];
+        const fields = mergeFields(base, fieldsFromForm((formRow as any)?.questions), fieldsFromRows(rows));
+        setPreview({ fields, rows });
+        if (!name && (formRow as any)?.name) setName((formRow as any).name);
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [kind, formId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Build a full field schema + preview when an App Table is selected.
+  useEffect(() => {
+    if (kind !== "table" || !tableName) return;
+    let cancelled = false;
+    (async () => {
+      setBusy(true);
+      try {
+        const { data } = await supabase.from(tableName as any).select("*").limit(200);
+        if (cancelled) return;
+        const rows = ((data as unknown) as Record<string, unknown>[]) ?? [];
+        setPreview({ fields: fieldsFromRows(rows), rows });
+        if (!name) setName(tableName);
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [kind, tableName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reset = () => {
     setKind(null); setName(""); setFormId(""); setTableName(""); setUrl(""); setGid("");
@@ -111,20 +162,15 @@ export default function AddDataSourceDialog({ open, onClose, onCreated }: Props)
       let schema: SourceField[] = [];
       if (kind === "form") {
         config = { formId };
-        // fetch a sample to build schema from a submission
-        const { data } = await supabase.from("form_submissions").select("data").eq("form_id", formId).limit(20);
-        const rows = (data ?? []).map((r: any) => (r.data && typeof r.data === "object" ? r.data : {}));
-        schema = [
+        schema = preview?.fields ?? [
           { id: "submitted_at", label: "Submitted at", type: "date" },
           { id: "location", label: "Location", type: "text" },
           { id: "state", label: "State", type: "text" },
           { id: "status", label: "Status", type: "text" },
-          ...fieldsFromRows(rows),
         ];
       } else if (kind === "table") {
         config = { tableName };
-        const { data } = await supabase.from(tableName as any).select("*").limit(20);
-        schema = fieldsFromRows(((data as unknown) as Record<string, unknown>[]) ?? []);
+        schema = preview?.fields ?? [];
       } else if (kind === "csv_upload") {
         if (!preview) { toast.error("Upload a file first"); setBusy(false); return; }
         config = {
@@ -260,18 +306,45 @@ export default function AddDataSourceDialog({ open, onClose, onCreated }: Props)
               </div>
             )}
 
+            {busy && !preview && (kind === "form" || kind === "table") && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Reading fields…
+              </div>
+            )}
+
             {preview && (
               <div className="rounded-lg border border-border bg-muted/30 p-3">
                 <div className="mb-2 flex items-center gap-2 text-sm font-medium text-emerald-600">
                   <CheckCircle2 className="h-4 w-4" /> {preview.rows.length} rows · {preview.fields.length} fields detected
                 </div>
-                <div className="flex flex-wrap gap-1">
-                  {preview.fields.slice(0, 24).map((f) => (
+                <div className="mb-2 flex max-h-32 flex-wrap gap-1 overflow-y-auto">
+                  {preview.fields.map((f) => (
                     <Badge key={f.id} variant="outline" className="text-[10px]">{f.label} <span className="ml-1 opacity-60">{f.type}</span></Badge>
                   ))}
                 </div>
+                {preview.rows.length > 0 && (
+                  <div className="max-h-40 overflow-auto rounded border border-border/60 bg-background">
+                    <table className="w-full text-[10px]">
+                      <thead className="sticky top-0 bg-muted">
+                        <tr>{preview.fields.slice(0, 8).map((f) => (
+                          <th key={f.id} className="whitespace-nowrap px-2 py-1 text-left font-medium">{f.label}</th>
+                        ))}</tr>
+                      </thead>
+                      <tbody>
+                        {preview.rows.slice(0, 8).map((row, i) => (
+                          <tr key={i} className="border-t border-border/40">
+                            {preview.fields.slice(0, 8).map((f) => (
+                              <td key={f.id} className="max-w-[120px] truncate px-2 py-1">{String(row[f.id] ?? "")}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
+
           </div>
         )}
 
