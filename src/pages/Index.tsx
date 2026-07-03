@@ -246,6 +246,7 @@ const Index = () => {
         return (
           <Dashboard
             onOpenDashboardBuilder={isAdmin ? () => handleTabChange("dashboard-builder") : undefined}
+            onOpenDashboardStudio={canEditDashboards ? () => handleTabChange("dashboard-studio") : undefined}
             onViewSubmissions={() => setShowSubmissionHistory(true)}
             initialProjectId={selectedProjectId}
             onProjectSelect={setSelectedProjectId}
@@ -254,6 +255,7 @@ const Index = () => {
 
       case "supervisor": return isAdmin ? <SupervisorDashboard /> : guardedPage("__admin_only__", <></>);
       case "dashboard-builder": return isAdmin ? <AdminDashboardBuilder onBack={() => setActiveTab("dashboard")} /> : guardedPage("__admin_only__", <></>);
+      case "dashboard-studio": return canEditDashboards ? <StudioLauncher onBack={() => setActiveTab("dashboard")} /> : guardedPage("__admin_only__", <></>);
       case "forms": return <FormsView />;
       case "project-chat": return <AdhocProjectChatView />;
       case "my-submissions": return <SubmissionHistory onClose={() => setActiveTab("forms")} />;
