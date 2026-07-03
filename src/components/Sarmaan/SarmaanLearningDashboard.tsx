@@ -566,28 +566,45 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
 
 
   // ---- Merged submissions across every chapter — colorful editable/deletable table ----
+  // Labels are unioned across every sibling form so ids from any duplicate form
+  // resolve to a readable label in the editor.
   const questionLabels = useMemo(() => {
     const m: Record<string, string> = {};
-    for (const q of questions as Question[]) if (q.id) m[q.id] = q.label || q.name || q.id;
+    for (const meta of Object.values(formMetas)) {
+      for (const q of meta.questions as Question[]) if (q.id) m[q.id] = q.label || q.name || q.id;
+    }
     return m;
-  }, [questions]);
+  }, [formMetas]);
 
-  const fieldSpec = useMemo<FieldDescriptor[]>(() => {
-    const mapType = (t: string): FieldDescriptor["type"] =>
-      t === "number" ? "number"
-      : t === "date" || t === "datetime" ? "date"
-      : t === "select_one" || t === "select_multiple" ? "select"
-      : t === "note" ? "longtext"
-      : "text";
-    return (questions as Question[])
-      .filter((q) => q.id)
-      .map((q) => ({
-        key: q.id,
-        label: q.label || q.name || q.id,
-        type: mapType(q.type),
-        options: q.options?.map((o) => o.label ?? String(o.value ?? "")).filter(Boolean),
-      }));
-  }, [questions]);
+  const mapType = (t: string): FieldDescriptor["type"] =>
+    t === "number" ? "number"
+    : t === "date" || t === "datetime" ? "date"
+    : t === "select_one" || t === "select_multiple" ? "select"
+    : t === "note" ? "longtext"
+    : "text";
+
+  // A field spec PER form, so each submission is edited against its own form's
+  // question ids (duplicate forms have different ids for the same question).
+  const fieldSpecByForm = useMemo<Record<string, FieldDescriptor[]>>(() => {
+    const out: Record<string, FieldDescriptor[]> = {};
+    for (const [fid, meta] of Object.entries(formMetas)) {
+      out[fid] = (meta.questions as Question[])
+        .filter((q) => q.id)
+        .map((q) => ({
+          key: q.id,
+          label: q.label || q.name || q.id,
+          type: mapType(q.type),
+          options: q.options?.map((o) => o.label ?? String(o.value ?? "")).filter(Boolean),
+        }));
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formMetas]);
+
+  const fieldSpec = useMemo<FieldDescriptor[]>(
+    () => fieldSpecByForm[form.id] ?? [],
+    [fieldSpecByForm, form.id],
+  );
 
   const editableSubmissions = useMemo<EditableSubmission[]>(
     () =>
@@ -600,11 +617,12 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
         lga: str(r, "lga") || null,
         ward: str(r, "ward") || null,
         chapter: meta(r, "__section_label") || "General",
-        fieldSpec,
+        fieldSpec: fieldSpecByForm[r.formId] ?? fieldSpec,
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filtered, profiles, fieldSpec],
+    [filtered, profiles, fieldSpecByForm, fieldSpec],
   );
+
 
   // Distinct chapters for the merged-table chapter filter.
   const chapterList = useMemo(() => {
