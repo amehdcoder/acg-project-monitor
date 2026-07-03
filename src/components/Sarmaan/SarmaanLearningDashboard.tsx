@@ -1095,6 +1095,70 @@ function StatsPanel({ stats }: { stats: Stats }) {
           )}
         </div>
       </div>
+
+      {/* Interactive charts: time series, chapter breakdown, attendance vs reach */}
+      {hasCharts && (
+        <div className="grid gap-4 border-b p-4 lg:grid-cols-3" style={{ borderColor: NAVY.line }}>
+          <div className="rounded-xl border p-3" style={{ borderColor: NAVY.line, background: "rgba(15,23,42,0.02)" }}>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide" style={{ color: NAVY.inkSoft }}>Reach & submissions over time</p>
+            {stats.timeSeries.length ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <ComposedChart data={stats.timeSeries} margin={{ left: -8, right: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={NAVY.line} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: NAVY.inkSoft }} />
+                  <YAxis yAxisId="l" tick={{ fontSize: 10, fill: NAVY.inkSoft }} allowDecimals={false} />
+                  <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 10, fill: NAVY.inkSoft }} allowDecimals={false} />
+                  <Tooltip />
+                  <RLegend wrapperStyle={{ fontSize: 10 }} />
+                  <Bar yAxisId="r" dataKey="submissions" name="Submissions" fill={NAVY.teal} radius={[4, 4, 0, 0]} barSize={16} />
+                  <Line yAxisId="l" type="monotone" dataKey="reach" name="Reach" stroke={NAVY.violet} strokeWidth={2.5} dot={{ r: 3 }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="py-12 text-center text-xs" style={{ color: NAVY.inkSoft }}>No dated submissions yet.</p>
+            )}
+          </div>
+
+          <div className="rounded-xl border p-3" style={{ borderColor: NAVY.line, background: "rgba(15,23,42,0.02)" }}>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide" style={{ color: NAVY.inkSoft }}>Submissions by chapter</p>
+            {stats.chapterBreakdown.length ? (
+              <ResponsiveContainer width="100%" height={Math.max(200, stats.chapterBreakdown.length * 30)}>
+                <BarChart data={stats.chapterBreakdown} layout="vertical" margin={{ left: 8, right: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={NAVY.line} horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: NAVY.inkSoft }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="chapter" width={110} tick={{ fontSize: 9, fill: NAVY.inkSoft }} />
+                  <Tooltip formatter={(v: any, _n, p: any) => [v, p?.payload?.fullChapter || "Chapter"]} />
+                  <Bar dataKey="count" name="Submissions" radius={[0, 6, 6, 0]} barSize={16}>
+                    {stats.chapterBreakdown.map((c) => <Cell key={c.fullChapter} fill={c.color} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="py-12 text-center text-xs" style={{ color: NAVY.inkSoft }}>No chapter data yet.</p>
+            )}
+          </div>
+
+          <div className="rounded-xl border p-3" style={{ borderColor: NAVY.line, background: "rgba(15,23,42,0.02)" }}>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide" style={{ color: NAVY.inkSoft }}>Attendance vs reach</p>
+            {stats.attendanceVsReach.length ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <ScatterChart margin={{ left: -8, right: 8, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={NAVY.line} />
+                  <XAxis type="number" dataKey="attendance" name="Attendance" tick={{ fontSize: 10, fill: NAVY.inkSoft }} />
+                  <YAxis type="number" dataKey="reach" name="Reach" tick={{ fontSize: 10, fill: NAVY.inkSoft }} />
+                  <ZAxis range={[50, 50]} />
+                  <Tooltip cursor={{ strokeDasharray: "3 3" }} />
+                  <Scatter data={stats.attendanceVsReach} fill={NAVY.teal} fillOpacity={0.7} />
+                </ScatterChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="py-12 text-center text-xs" style={{ color: NAVY.inkSoft }}>No attendance/reach pairs yet.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {stats.indicators.length > 0 && (
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
