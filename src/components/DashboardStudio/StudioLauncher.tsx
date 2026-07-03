@@ -12,9 +12,10 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  ArrowLeft, Plus, LayoutDashboard, Loader2, Sparkles, Search, ShieldAlert, Trash2,
+  ArrowLeft, Plus, LayoutDashboard, Loader2, Sparkles, Search, ShieldAlert, Trash2, Copy,
 } from "lucide-react";
 import DashboardStudio from "./DashboardStudio";
+import { BUILT_IN_PRESETS, cloneBuiltInDashboard, type BuiltInPreset } from "@/lib/dashboardStudio/cloneToStudio";
 
 interface DashRow {
   id: string;
