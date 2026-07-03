@@ -574,7 +574,7 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
                       <th className="p-2 font-semibold">Supervisor</th>
                       <th className="p-2 font-semibold">Module</th>
                       <th className="p-2 font-semibold">LGA</th>
-                      <th className="p-2 font-semibold">Community</th>
+                      <th className="p-2 font-semibold">Ward</th>
                       <th className="p-2 text-right font-semibold">Score</th>
                     </tr>
                   </thead>
