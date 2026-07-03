@@ -120,7 +120,10 @@ export default function StudioLauncher({ onBack }: Props) {
             <p className="text-sm text-muted-foreground">Build fully configurable dashboards with any data source — Looker-style.</p>
           </div>
         </div>
-        <Button onClick={() => setShowCreate(true)}><Plus className="mr-2 h-4 w-4" /> New dashboard</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowClone(true)}><Copy className="mr-2 h-4 w-4" /> Clone built-in</Button>
+          <Button onClick={() => setShowCreate(true)}><Plus className="mr-2 h-4 w-4" /> New dashboard</Button>
+        </div>
       </div>
 
       <div className="relative max-w-md">
