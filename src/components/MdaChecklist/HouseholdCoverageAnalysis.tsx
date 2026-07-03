@@ -17,7 +17,7 @@ import {
 import {
   Activity, ChevronDown, Home, Users2, Percent, Sigma, FileText,
   Search, TrendingDown, TrendingUp, CheckCircle2, AlertTriangle, Target,
-  SlidersHorizontal, RotateCcw, ChevronRight, X, AlertCircle, Loader2,
+  SlidersHorizontal, RotateCcw, ChevronRight, X, AlertCircle, Loader2, Building2,
 } from "lucide-react";
 import { testAgainstBenchmark, type BenchmarkTest } from "@/lib/ces/coverageStats";
 
