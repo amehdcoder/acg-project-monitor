@@ -1200,9 +1200,12 @@ function StatsPanel({ stats }: { stats: Stats }) {
           </tbody>
         </table>
       </div>
+      )}
+      {stats.indicators.length > 0 && (
       <p className="border-t px-3 py-2 text-[11px]" style={{ borderColor: NAVY.line, color: NAVY.inkSoft }}>
         95% confidence interval of the mean (normal approximation). “Consistency” reflects the coefficient of variation across submissions — lower variation indicates more uniform field performance.
       </p>
+      )}
     </div>
   );
 }
