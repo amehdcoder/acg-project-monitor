@@ -418,6 +418,20 @@ export default function HouseholdCoverageAnalysis({ points, loading, error, onRe
     [visits, txBenchmark, hhBenchmark],
   );
 
+  const lgas = useMemo<LgaRow[]>(
+    () => aggregateLga(communities, txBenchmark, hhBenchmark),
+    [communities, txBenchmark, hhBenchmark],
+  );
+
+  const lgaChartData = useMemo(
+    () => lgas.filter((l) => l.eligible > 0).slice(0, 14).map((l) => ({
+      name: l.lga.length > 16 ? l.lga.slice(0, 15) + "…" : l.lga,
+      coverage: Math.round(l.txCoveragePct * 10) / 10,
+      full: l.lga,
+    })),
+    [lgas],
+  );
+
   // ── Programme-wide totals + benchmark tests ────────────────────────────────
   const overall = useMemo(() => {
     const households = visits.length;
