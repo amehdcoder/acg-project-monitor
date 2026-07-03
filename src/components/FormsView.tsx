@@ -2065,7 +2065,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 {shouldShowSarmaanSupervisoryBlock && (
                   <div className="border-b border-border/60 bg-[#F8FAFD] p-3 sm:p-4">
                     {primarySarmaanSupervisoryForm ? (
-                      <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="grid gap-3 sm:mx-auto sm:max-w-4xl sm:grid-cols-2 lg:max-w-5xl">
+
                         {canSeeSarmaanChecklist && (
                         <button
                           type="button"
