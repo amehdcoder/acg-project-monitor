@@ -281,7 +281,7 @@ export default function DashboardStudio({ dashboardId, dashboardName, onBack }: 
         )}
       </div>
 
-      <AddDataSourceDialog open={showAddSource} onClose={() => setShowAddSource(false)} />
+      <AddDataSourceDialog open={showAddSource} onClose={() => setShowAddSource(false)} onCreated={() => fetchSources()} />
     </div>
   );
 }
