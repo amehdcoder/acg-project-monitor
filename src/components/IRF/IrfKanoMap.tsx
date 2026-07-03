@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { buildLgaIndex, placePoints, type LgaIndex, type RawPoint } from "@/lib/irf/geoSnap";
 
-interface PointT { id: string; lat: number; lng: number; reach: number; label: string }
+interface PointT { id: string; lat: number; lng: number; reach: number; label: string; lga?: string | null }
 
 interface Props {
   /** Full LGA name -> aggregated value (people reached). */
@@ -39,8 +40,18 @@ export default function IrfKanoMap({ lgaValues, points }: Props) {
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.GeoJSON | null>(null);
   const markersRef = useRef<L.LayerGroup | null>(null);
+  const [index, setIndex] = useState<LgaIndex | null>(null);
 
   const maxVal = useMemo(() => Math.max(1, ...Object.values(lgaValues)), [lgaValues]);
+
+  // Correct/snap every marker to its authoritative LGA polygon once the
+  // boundary index is available. Points outside their LGA (or off-map) are
+  // relocated to a guaranteed-interior point of the correct LGA.
+  const placed = useMemo(() => {
+    if (!index) return null;
+    return placePoints(points as RawPoint[], index);
+  }, [index, points]);
+  const correctedCount = useMemo(() => (placed ? placed.filter((p) => p.corrected).length : 0), [placed]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -54,6 +65,7 @@ export default function IrfKanoMap({ lgaValues, points }: Props) {
 
     fetch("/kano-lga.geojson").then((r) => r.json()).then((geo) => {
       if (!mapRef.current) return;
+      setIndex(buildLgaIndex(geo));
       layerRef.current = L.geoJSON(geo, {
         style: (f: any) => ({
           color: "#fbbf24",
@@ -83,17 +95,22 @@ export default function IrfKanoMap({ lgaValues, points }: Props) {
     }));
   }, [lgaValues, maxVal]);
 
-  // GPS markers.
+  // GPS markers (snapped to the correct LGA polygon).
   useEffect(() => {
     const grp = markersRef.current;
-    if (!grp) return;
+    if (!grp || !placed) return;
     grp.clearLayers();
-    points.forEach((p) => {
+    placed.forEach((p) => {
       L.circleMarker([p.lat, p.lng], {
-        radius: 5, color: "#fff", weight: 1.5, fillColor: "#ef4444", fillOpacity: 0.95,
-      }).bindTooltip(`${p.label || "Report"} · ${p.reach.toLocaleString()} reached`).addTo(grp);
+        radius: 5, color: "#fff", weight: 1.5,
+        fillColor: p.corrected ? "#f59e0b" : "#ef4444", fillOpacity: 0.95,
+      })
+        .bindTooltip(
+          `${p.label || "Report"} · ${p.reach.toLocaleString()} reached${p.corrected ? "<br/><em>Placed within reported LGA</em>" : ""}`,
+        )
+        .addTo(grp);
     });
-  }, [points]);
+  }, [placed]);
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-border">
@@ -107,7 +124,16 @@ export default function IrfKanoMap({ lgaValues, points }: Props) {
           <span className="h-2.5 w-7 rounded-sm" style={{ background: "#a7f3d0" }} />
           <span className="text-muted-foreground">High</span>
         </div>
+        <div className="mt-1.5 flex items-center gap-2 text-[10px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: "#ef4444" }} /> GPS</span>
+          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: "#f59e0b" }} /> Placed in LGA</span>
+        </div>
       </div>
+      {correctedCount > 0 && (
+        <div className="pointer-events-none absolute right-3 top-3 z-[400] rounded-lg bg-amber-500/90 px-2.5 py-1 text-[11px] font-medium text-white shadow">
+          {correctedCount} marker{correctedCount === 1 ? "" : "s"} repositioned into reported LGA
+        </div>
+      )}
     </div>
   );
 }

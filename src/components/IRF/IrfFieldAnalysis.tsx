@@ -7,7 +7,7 @@ import {
 
 import { Card } from "@/components/ui/card";
 import {
-  analyzeFields, categoricalInsight, numericInsight, cvLabel, CV_MEANING,
+  analyzeFields, categoricalInsight, numericInsight, cvLabel, CV_MEANING, FORM_BUCKETS,
   type CategoricalFieldAnalysis, type NumericFieldAnalysis, type FieldInsight,
 } from "@/lib/irf/fieldAnalysis";
 import type { IrfReport } from "@/lib/irf/definition";
@@ -211,23 +211,42 @@ export default function IrfFieldAnalysis({ rows }: { rows: IrfReport[] }) {
         </div>
       )}
 
-      <div className="space-y-5 p-4">
-        {showNum && numeric.length > 0 && (
-          <div>
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><BarChart3 className="h-3.5 w-3.5" /> Quantitative indicators ({numeric.length})</p>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {numeric.map((a) => <NumericCard key={a.key} a={a} />)}
+      {/* Grouped by activity form so each SAIRF form's indicators read together */}
+      <div className="space-y-6 p-4">
+        {FORM_BUCKETS.map((bucket) => {
+          const nums = showNum ? numeric.filter((a) => a.form.id === bucket.id) : [];
+          const cats = showCat ? categorical.filter((a) => a.form.id === bucket.id) : [];
+          if (!nums.length && !cats.length) return null;
+          return (
+            <div key={bucket.id} className="rounded-xl border" style={{ borderColor: `${bucket.color}55` }}>
+              <div className="flex flex-wrap items-center gap-2 rounded-t-xl border-b px-4 py-2.5" style={{ background: `${bucket.color}14` }}>
+                <span className="h-3 w-3 rounded-full" style={{ background: bucket.color }} />
+                <h4 className="text-sm font-semibold text-foreground">{bucket.name}</h4>
+                <span className="ml-auto text-[11px] text-muted-foreground">
+                  {nums.length} quantitative · {cats.length} categorical
+                </span>
+              </div>
+              <div className="space-y-5 p-4">
+                {nums.length > 0 && (
+                  <div>
+                    <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><BarChart3 className="h-3.5 w-3.5" /> Quantitative indicators ({nums.length})</p>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {nums.map((a) => <NumericCard key={a.key} a={a} />)}
+                    </div>
+                  </div>
+                )}
+                {cats.length > 0 && (
+                  <div>
+                    <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><PieIcon className="h-3.5 w-3.5" /> Response distributions ({cats.length})</p>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {cats.map((a) => <CategoricalCard key={a.key} a={a} />)}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-        {showCat && categorical.length > 0 && (
-          <div>
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><PieIcon className="h-3.5 w-3.5" /> Response distributions ({categorical.length})</p>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {categorical.map((a) => <CategoricalCard key={a.key} a={a} />)}
-            </div>
-          </div>
-        )}
+          );
+        })}
       </div>
     </Card>
   );

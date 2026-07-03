@@ -22,6 +22,7 @@ import IrfKanoMap from "@/components/IRF/IrfKanoMap";
 import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
 import IrfEvidenceLibrary from "@/components/IRF/IrfEvidenceLibrary";
 import IrfTextInsights from "@/components/IRF/IrfTextInsights";
+import IrfFreeTextIntel from "@/components/IRF/IrfFreeTextIntel";
 import IrfStatisticalPanel from "@/components/IRF/IrfStatisticalPanel";
 import IrfFieldAnalysis from "@/components/IRF/IrfFieldAnalysis";
 import IrfInterpretation from "@/components/IRF/IrfInterpretation";
@@ -351,6 +352,9 @@ export default function IRFDashboard({ projectId, onClose }: Props) {
 
             {/* Narrative & free-text intelligence */}
             <IrfTextInsights rows={rows} />
+
+            {/* Form-scoped, LGA-wise free-text intelligence */}
+            <IrfFreeTextIntel rows={rows} />
 
             {/* Collapsible evidence library: activity pictures + consent forms */}
             <IrfEvidenceLibrary rows={rows} />

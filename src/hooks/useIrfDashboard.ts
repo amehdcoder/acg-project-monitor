@@ -188,8 +188,9 @@ export const useIrfDashboard = (projectId?: string | null, overrideMap?: Overrid
           id: r.id,
           lat: Number(r.gps_lat),
           lng: Number(r.gps_lng),
-          reach: num(r.total_reach),
+          reach: computeIrfReach(r),
           label: `${r.lga || ""} ${r.ward ? "— " + r.ward : ""}`.trim(),
+          lga: r.lga || null,
         })),
     [rows],
   );

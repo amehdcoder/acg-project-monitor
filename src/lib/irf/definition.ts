@@ -209,7 +209,7 @@ export const IRF_SECTIONS: IrfSection[] = [
       {
         activity: "Total Reach & IEC Materials",
         fields: [
-          { key: "total_reach", label: "Total people reached", what: "Estimated total population reached", type: "number", metric: true, example: "12000" },
+          { key: "total_reach", label: "Estimated reach (town announcers / radio)", what: "Estimated audience reached via announcements & radio — a component of the composite 'People Reached' KPI", type: "number", metric: true, example: "12000" },
           { key: "iec_materials_distributed", label: "IEC materials distributed", what: "Number of posters / leaflets", type: "number", metric: true, example: "200" },
           { key: "iec_visibility", label: "IEC materials visible / displayed", what: "Seen / displayed", type: "boolean" },
           { key: "iec_locations", label: "Locations displayed", what: "Where materials are placed", type: "text", example: "Health centers" },
