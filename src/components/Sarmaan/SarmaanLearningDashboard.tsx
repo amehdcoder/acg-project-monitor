@@ -492,6 +492,15 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
           <button onClick={onClose} className="inline-flex items-center gap-1 self-center rounded-full px-2 py-1 text-sm font-semibold transition hover:bg-black/5" style={{ color: NAVY.inkSoft }}>
             <ChevronLeft className="h-4 w-4" /> Back
           </button>
+          <div className="mr-2 flex items-center gap-2 self-center">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: NAVY.teal }}>
+              <LayoutGrid className="h-5 w-5 text-white" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <h1 className="text-[13px] font-extrabold" style={{ fontFamily: NAVY.headingFont, color: NAVY.ink }}>SARMAAN Programme Implementation</h1>
+              <p className="text-[10px] font-semibold" style={{ color: NAVY.teal }}>Learning & Improvement Dashboard</p>
+            </div>
+          </div>
           {filterDefs.map((f) => (
             <div key={f.field} className="min-w-[120px]">
               <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide" style={{ color: NAVY.inkSoft }}>{f.label}</label>
