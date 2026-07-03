@@ -23,6 +23,8 @@ import DataView from "@/components/DataView";
 import IntegrationsView from "@/components/IntegrationsView";
 import UsersView from "@/components/UsersView";
 import AdminDashboardBuilder from "@/components/AdminDashboardBuilder";
+import { StudioLauncher } from "@/components/DashboardStudio";
+import { useCanEditDashboards } from "@/hooks/useCanEditDashboards";
 import SubmissionHistory from "@/components/SubmissionHistory";
 import CasesView from "@/components/CasesView";
 import FormTemplatesView from "@/components/FormTemplatesView";
