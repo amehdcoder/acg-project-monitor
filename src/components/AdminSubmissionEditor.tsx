@@ -68,12 +68,24 @@ export default function AdminSubmissionEditor({
   dataColumn = "data",
   duplicateIds,
   onChanged,
+  enableDelete = false,
   title = "Submissions — Admin edit",
   pageSize = 10,
 }: Props) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [active, setActive] = useState<EditableSubmission | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const handleDelete = async (s: EditableSubmission) => {
+    if (!window.confirm("Permanently delete this submission? This updates every part of the dashboard instantly.")) return;
+    setDeleting(s.id);
+    const { error } = await supabase.from(table as any).delete().eq("id", s.id);
+    setDeleting(null);
+    if (error) { window.alert(`Delete failed: ${error.message}`); return; }
+    await onChanged?.();
+  };
+
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
