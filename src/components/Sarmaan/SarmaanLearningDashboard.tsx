@@ -333,7 +333,7 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
     ]);
     const geoNames = new Set(["state", "lga", "ward", "flhf_name", "community", "settlement_name", "gps"]);
     const textQs = (questions as Question[]).filter(
-      (q) => (q.type === "text" || q.type === "textarea") && q.name && !geoNames.has(q.name),
+      (q) => q.type === "text" && q.name && !geoNames.has(q.name),
     );
     return textQs
       .map((q) => {
