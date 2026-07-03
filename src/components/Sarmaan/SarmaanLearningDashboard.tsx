@@ -15,7 +15,7 @@ import {
   ClipboardList,
   Settings,
   HelpCircle,
-  Bell,
+  MessageCircle,
   Info,
   ShieldCheck,
   ChevronRight,
