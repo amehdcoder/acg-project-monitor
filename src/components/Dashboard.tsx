@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   FileText, Send, CheckCircle, ChevronRight, Pencil, Trash2, Loader2, Search, BarChart3, RefreshCw,
-  LayoutDashboard, Settings2, ClipboardList
+  LayoutDashboard, Settings2, ClipboardList, Sparkles
 } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
