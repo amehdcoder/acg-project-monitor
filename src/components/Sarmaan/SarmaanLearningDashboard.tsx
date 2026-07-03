@@ -444,10 +444,16 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
               <Printer className="h-4 w-4" /> Print
             </button>
             <LiveIndicator live={live} lastUpdated={lastUpdated} flash={flash} />
-            <div className="relative">
-              <Bell className="h-5 w-5" style={{ color: NAVY.inkSoft }} />
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white" style={{ background: NAVY.bad }}>{agg.pendingCritical || 0}</span>
-            </div>
+            {isOwner && (
+              <OwnerSubmissionManager
+                table="form_submissions"
+                title="SARMAAN checklist submissions"
+                labelColumns={["data.state", "data.lga", "status"]}
+                filter={{ column: "form_id", value: form.id }}
+                onChanged={() => load()}
+                compact
+              />
+            )}
             <button onClick={() => load()} className="inline-flex items-center justify-center rounded-full p-2 transition hover:bg-black/5" aria-label="Refresh">
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} style={{ color: NAVY.inkSoft }} />
             </button>
