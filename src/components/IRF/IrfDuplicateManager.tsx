@@ -298,9 +298,14 @@ export default function IrfDuplicateManager({ projectId, duplicateIds, onChanged
                   <div className="space-y-5">
                     {groups.map((g) => {
                       const original = g.items[0];
+                      const groupDupIds = g.items.filter((it) => it.__isDup).map((it) => it.id);
+                      const groupAllSel = groupDupIds.length > 0 && groupDupIds.every((id) => selected.has(id));
                       return (
                         <div key={g.key} className="overflow-hidden rounded-xl border">
                           <div className="flex items-center gap-2 border-b bg-muted/50 px-3 py-2">
+                            <Checkbox checked={groupAllSel}
+                              onCheckedChange={(v) => toggleGroup(groupDupIds, !!v)}
+                              aria-label="Select all duplicates in this set" />
                             <Badge variant="outline" className="gap-1">
                               <Copy className="h-3 w-3" /> {g.items.length} in set
                             </Badge>
@@ -314,15 +319,33 @@ export default function IrfDuplicateManager({ projectId, duplicateIds, onChanged
                               <thead>
                                 <tr className="border-b bg-muted/30 text-left text-muted-foreground">
                                   <th className="px-3 py-2 font-semibold">Field</th>
-                                  {g.items.map((it) => (
-                                    <th key={it.id} className="px-3 py-2 font-semibold">
-                                      <span className="flex items-center gap-1">
-                                        {it.__isOriginal && <Star className="h-3 w-3 text-amber-500" />}
-                                        {it.__isOriginal ? "Original" : "Duplicate"}
-                                      </span>
-                                    </th>
-                                  ))}
+                                  {g.items.map((it) => {
+                                    const decision = irfMap.get(it.id);
+                                    return (
+                                      <th key={it.id} className="px-3 py-2 font-semibold align-top">
+                                        <span className="flex items-center gap-1.5">
+                                          {it.__isDup && (
+                                            <Checkbox checked={selected.has(it.id)}
+                                              onCheckedChange={() => toggle(it.id)}
+                                              aria-label="Select this duplicate" />
+                                          )}
+                                          {it.__isOriginal && <Star className="h-3 w-3 text-amber-500" />}
+                                          {it.__isOriginal ? "Original" : "Duplicate"}
+                                        </span>
+                                        <span className="mt-1 block">
+                                          {it.__isOriginal ? (
+                                            <Badge variant="outline" className="text-[9px] text-emerald-600">Kept</Badge>
+                                          ) : decision === "unique" ? (
+                                            <Badge className="bg-emerald-600 text-[9px] hover:bg-emerald-600">Accepted unique</Badge>
+                                          ) : (
+                                            <Badge variant="outline" className="text-[9px] text-amber-600">Pending review</Badge>
+                                          )}
+                                        </span>
+                                      </th>
+                                    );
+                                  })}
                                 </tr>
+
                               </thead>
                               <tbody>
                                 <tr className="border-b">
