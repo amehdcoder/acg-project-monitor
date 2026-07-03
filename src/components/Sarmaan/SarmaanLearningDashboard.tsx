@@ -749,6 +749,28 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
             </Panel>
           </div>
 
+          {/* Statistical analysis of numeric indicators (basic → advanced) */}
+          <div className="mt-4">
+            <StatsPanel stats={statistics} />
+          </div>
+
+          {/* Merged submissions from every chapter — colorful table with owner edit & delete */}
+          {isOwner && (
+            <div className="mt-4">
+              <AdminSubmissionEditor
+                submissions={editableSubmissions}
+                questionLabels={questionLabels}
+                table="form_submissions"
+                enableDelete
+                onChanged={() => load()}
+                title="All Chapter Submissions — Owner edit & delete"
+                pageSize={12}
+              />
+            </div>
+          )}
+
+
+
           <div className="py-4 text-center text-[11px]" style={{ color: NAVY.inkSoft }}>
             SARMAAN Programme · Integrated Supervisory Checklist & Learning Dashboard · {agg.n} live submissions
           </div>
