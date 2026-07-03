@@ -3,11 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   Copy, Trash2, Archive, RotateCcw, Loader2, ShieldAlert, GitCompare,
-  Check, Star, ArrowRightLeft, MapPin, Calendar, User,
+  Check, Star, ArrowRightLeft, MapPin, Calendar, User, CheckCheck, ListChecks,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
