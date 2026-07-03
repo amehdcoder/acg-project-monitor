@@ -39,7 +39,10 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
+import AdminSubmissionEditor, { type EditableSubmission } from "@/components/AdminSubmissionEditor";
+import { Sigma, TrendingUp, TrendingDown, Activity } from "lucide-react";
 import type { FormGroup, Question } from "@/components/FormBuilder/types";
+import type { FieldDescriptor } from "@/components/FormDataTable";
 import { NAVY, DASHBOARD_NAV, qualityBand } from "./sarmaanBrand";
 
 
