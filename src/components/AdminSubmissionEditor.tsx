@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   Pencil, Search, ChevronLeft, ChevronRight, Copy, MapPin,
-  CalendarDays, User, FileEdit, Database, ShieldCheck, Trash2,
+  CalendarDays, User, FileEdit, Database, ShieldCheck, Trash2, Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
