@@ -158,7 +158,7 @@ export async function resolveSourceRows(
       console.error("resolve table", error);
       return [];
     }
-    return (data as Record<string, unknown>[]) ?? [];
+    return ((data as unknown) as Record<string, unknown>[]) ?? [];
   }
   // google_sheet / rest_api / csv_upload -> cached
   return source.config.cachedRows ?? [];
