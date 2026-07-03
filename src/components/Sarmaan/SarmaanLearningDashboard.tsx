@@ -104,13 +104,14 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
   const { isOwner } = useAuth();
   const sections = useMemo(() => sectionsFrom(form.questions), [form.questions]);
   const questions = useMemo(() => sections.flatMap((s) => s.questions), [sections]);
-  const nameToId = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const q of questions as Question[]) if (q.name) m.set(q.name, q.id);
-    return m;
-  }, [questions]);
 
   const [rows, setRows] = useState<Row[]>([]);
+  // Per-form name↔id maps for every form that feeds this dashboard. Duplicate
+  // "SARMAAN Supervisory Checklist" form records each own a different set of
+  // question ids, so every submission MUST be decoded with its own form's map.
+  const [formMetas, setFormMetas] = useState<Record<string, FormMeta>>(() => ({
+    [form.id]: buildFormMeta(form.questions),
+  }));
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -120,25 +121,72 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
   const [live, setLive] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<number>(0);
   const [flash, setFlash] = useState(false);
+  // The full set of form ids whose submissions belong on this dashboard.
+  const formIdsRef = useRef<Set<string>>(new Set([form.id]));
 
   const load = useCallback(async (opts?: { live?: boolean }) => {
     if (!opts?.live) setLoading(true);
+
+    // 1) Resolve the primary form's project, then gather EVERY sibling
+    //    supervisory-checklist form in that project. Duplicate form records
+    //    otherwise fragment submissions across ids the dashboard never reads.
+    const { data: self } = await supabase
+      .from("forms")
+      .select("id, name, project_id, questions, settings")
+      .eq("id", form.id)
+      .maybeSingle();
+
+    const projectId = (self as any)?.project_id ?? null;
+    let siblings: { id: string; name: string; questions: unknown; settings: unknown }[] = [];
+    if (projectId) {
+      const { data: pForms } = await supabase
+        .from("forms")
+        .select("id, name, project_id, questions, settings")
+        .eq("project_id", projectId);
+      siblings = ((pForms as any[]) || []).filter(
+        (f) =>
+          f.id === form.id ||
+          f.name === form.name ||
+          isSupervisoryLearningForm({ settings: f.settings, name: f.name }),
+      );
+    }
+    // Always include the form we were opened with.
+    if (!siblings.some((f) => f.id === form.id)) {
+      siblings.push({ id: form.id, name: form.name, questions: (self as any)?.questions ?? form.questions, settings: form.settings });
+    }
+
+    const metas: Record<string, FormMeta> = {};
+    for (const f of siblings) metas[f.id] = buildFormMeta(f.questions);
+    setFormMetas(metas);
+
+    const ids = siblings.map((f) => f.id);
+    formIdsRef.current = new Set(ids);
+
+    // 2) Load submissions across every sibling form.
     const { data } = await supabase
       .from("form_submissions")
-      .select("id,data,submitted_at,created_at,user_id")
-      .eq("form_id", form.id)
+      .select("id,form_id,data,submitted_at,created_at,user_id")
+      .in("form_id", ids)
       .order("created_at", { ascending: false })
-      .limit(4000);
-    const list = (data || []) as unknown as Row[];
+      .limit(8000);
+    const list = ((data as any[]) || []).map((r) => ({
+      id: r.id,
+      formId: r.form_id,
+      data: r.data,
+      submitted_at: r.submitted_at,
+      created_at: r.created_at,
+      user_id: r.user_id,
+    })) as Row[];
     setRows(list);
+
     // Resolve submitter names (supervisor identity is captured from the session,
     // not as a manual question) so the visits table shows the real supervisor.
-    const ids = [...new Set(list.map((r) => r.user_id).filter(Boolean))] as string[];
-    if (ids.length) {
+    const userIds = [...new Set(list.map((r) => r.user_id).filter(Boolean))] as string[];
+    if (userIds.length) {
       const { data: profs } = await supabase
         .from("profiles")
         .select("user_id, first_name, last_name, email")
-        .in("user_id", ids);
+        .in("user_id", userIds);
       const map: Record<string, string> = {};
       (profs as any[] | null)?.forEach((p) => {
         map[p.user_id] = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.email || "";
@@ -152,16 +200,22 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
       setFlash(true);
       window.setTimeout(() => setFlash(false), 1200);
     }
-  }, [form.id]);
+  }, [form.id, form.name, form.questions, form.settings]);
 
   useEffect(() => {
     load();
+    // Subscribe to ALL submission changes and reload when a change touches one
+    // of the sibling forms feeding this dashboard (a single channel filter
+    // cannot cover multiple form ids, so we filter in the handler).
     const ch = supabase
       .channel(`sarmaan-dash-${form.id}-${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "form_submissions", filter: `form_id=eq.${form.id}` },
-        () => load({ live: true }),
+        { event: "*", schema: "public", table: "form_submissions" },
+        (payload: { new?: { form_id?: string }; old?: { form_id?: string } }) => {
+          const fid = payload.new?.form_id ?? payload.old?.form_id;
+          if (!fid || formIdsRef.current.has(fid)) load({ live: true });
+        },
       )
       .subscribe((status) => setLive(status === "SUBSCRIBED"));
     return () => { supabase.removeChannel(ch); };
@@ -174,9 +228,14 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
     return () => window.clearInterval(t);
   }, []);
 
+  // Decode a value using the submission's OWN form map (falls back to
+  // name-keyed payloads and the primary form map for resilience).
   const val = (r: Row, name: string): unknown => {
-    const id = nameToId.get(name);
-    return id ? r.data?.[id] : undefined;
+    const m = formMetas[r.formId];
+    const id = m?.nameToId.get(name);
+    if (id && r.data && id in r.data) return (r.data as any)[id];
+    if (r.data && name in r.data) return (r.data as any)[name];
+    return undefined;
   };
   const num = (r: Row, name: string): number => {
     const n = Number(val(r, name));
@@ -192,6 +251,7 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
     const v = r.data?.[key];
     return v == null ? "" : String(v);
   };
+
 
   // ---- Filters (mapped to real checklist questions + module meta) ----
   const [filters, setFilters] = useState<Record<string, string>>({});
