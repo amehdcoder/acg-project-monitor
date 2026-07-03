@@ -819,7 +819,18 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
                 questionLabels={questionLabels}
                 table="form_submissions"
                 enableDelete
+                chapters={chapterList}
+                onOptimisticDelete={optimisticDelete}
+                onOptimisticEdit={optimisticEdit}
                 onChanged={() => load()}
+                extraActions={
+                  <button
+                    onClick={exportExcel}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-600"
+                  >
+                    <FileCheck2 className="h-3.5 w-3.5" /> Excel
+                  </button>
+                }
                 title="All Chapter Submissions — Owner edit & delete"
                 pageSize={12}
               />
