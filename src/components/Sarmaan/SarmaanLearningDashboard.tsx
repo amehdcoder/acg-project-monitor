@@ -37,8 +37,11 @@ import {
   ReferenceLine,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { OwnerSubmissionManager } from "@/components/owner/OwnerSubmissionManager";
 import type { FormGroup, Question } from "@/components/FormBuilder/types";
 import { NAVY, DASHBOARD_NAV, qualityBand } from "./sarmaanBrand";
+
 
 interface Props {
   form: { id: string; name: string; questions: unknown; settings: unknown };
