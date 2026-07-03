@@ -30,7 +30,10 @@ export interface IrfStatistics {
 }
 
 const INDICATORS: { key: string; label: string; color: string }[] = [
-  { key: "total_reach", label: "Estimated reach / report", color: "#0891b2" },
+  // NOTE: `total_reach` here is the SAME composite reach used by the "People Reached"
+  // KPI (reach + radio + community-dialogue attendance) so the table Total reconciles
+  // exactly with the headline KPI. It is computed per report via computeIrfReach below.
+  { key: "total_reach", label: "Estimated people reached / report", color: "#0891b2" },
   { key: "attendance_men", label: "Men in attendance", color: "#2563eb" },
   { key: "attendance_women", label: "Women in attendance", color: "#db2777" },
   { key: "persons_engaged", label: "Officials engaged (advocacy)", color: "#0ea5e9" },
@@ -70,7 +73,12 @@ function describe(values: number[]): Omit<IndicatorStat, "key" | "label" | "colo
 
 export function analyzeStatistics(rows: IrfReport[]): IrfStatistics {
   const indicators: IndicatorStat[] = INDICATORS.map((ind) => {
-    const values = rows.map((r) => num((r as any)[ind.key])).filter((v): v is number => v != null && Number.isFinite(v));
+    // The reach indicator must equal the composite KPI reach per report, otherwise
+    // the "Total" column diverges from the "People Reached" headline KPI.
+    const values = (ind.key === "total_reach"
+      ? rows.map((r) => computeIrfReach(r))
+      : rows.map((r) => num((r as any)[ind.key])).filter((v): v is number => v != null && Number.isFinite(v))
+    ).filter((v): v is number => v != null && Number.isFinite(v));
     return { key: ind.key, label: ind.label, color: ind.color, ...describe(values) };
   }).filter((s) => s.n > 0 && s.sum > 0);
 

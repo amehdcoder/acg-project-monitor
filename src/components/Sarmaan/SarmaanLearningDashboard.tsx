@@ -39,7 +39,10 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import OwnerSubmissionManager from "@/components/owner/OwnerSubmissionManager";
+import AdminSubmissionEditor, { type EditableSubmission } from "@/components/AdminSubmissionEditor";
+import { Sigma, TrendingUp, TrendingDown, Activity } from "lucide-react";
 import type { FormGroup, Question } from "@/components/FormBuilder/types";
+import type { FieldDescriptor } from "@/components/FormDataTable";
 import { NAVY, DASHBOARD_NAV, qualityBand } from "./sarmaanBrand";
 
 
@@ -368,7 +371,103 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
       .sort((a, b) => b.count - a.count);
   }, [filtered, questions]);
 
+  // ---- Statistical analysis of every numeric data point (basic → advanced) ----
+  // Descriptive statistics, dispersion, and a 95% confidence interval of the mean
+  // (normal approximation) for each numeric question captured across all chapters.
+  const statistics = useMemo(() => {
+    const numericQs = (questions as Question[]).filter((q) => q.type === "number" && q.name);
+    const describe = (values: number[]) => {
+      const n = values.length;
+      if (!n) return null;
+      const sorted = [...values].sort((a, b) => a - b);
+      const sum = values.reduce((a, b) => a + b, 0);
+      const mean = sum / n;
+      const median = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+      const variance = n > 1 ? values.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1) : 0;
+      const sd = Math.sqrt(variance);
+      const se = sd / Math.sqrt(n);
+      const margin = 1.96 * se;
+      const r2 = (x: number) => Math.round(x * 100) / 100;
+      return {
+        n, sum,
+        mean: r2(mean), median: r2(median),
+        min: sorted[0], max: sorted[n - 1], sd: r2(sd),
+        ciLow: Math.max(0, r2(mean - margin)), ciHigh: r2(mean + margin),
+        cv: mean ? Math.round((sd / mean) * 1000) / 10 : 0,
+      };
+    };
+    const palette = ["#0891b2", "#2563eb", "#db2777", "#ea580c", "#7c3aed", "#16a34a", "#f59e0b", "#0ea5e9", "#a64d79", "#45818e"];
+    const indicators = numericQs
+      .map((q, i) => {
+        const values = filtered
+          .map((r) => Number(val(r, q.name!)))
+          .filter((v) => Number.isFinite(v));
+        const d = describe(values);
+        if (!d || d.sum <= 0) return null;
+        return { key: q.id, label: q.label || q.name!, color: palette[i % palette.length], ...d };
+      })
+      .filter((x): x is NonNullable<typeof x> => !!x);
 
+    // Month-over-month growth of reach (aligned with the People Reached KPI field).
+    const byMonth = new Map<string, number>();
+    for (const r of filtered) {
+      const key = new Date(r.submitted_at || r.created_at).toISOString().slice(0, 7);
+      byMonth.set(key, (byMonth.get(key) || 0) + num(r, "estimated_total_reached"));
+    }
+    const months = [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b));
+    let momGrowthPct: number | null = null;
+    if (months.length >= 2) {
+      const prev = months[months.length - 2][1];
+      const last = months[months.length - 1][1];
+      momGrowthPct = prev > 0 ? Math.round(((last - prev) / prev) * 1000) / 10 : null;
+    }
+    return {
+      indicators,
+      momGrowthPct,
+      reportsPerActiveMonth: months.length ? Math.round((filtered.length / months.length) * 10) / 10 : filtered.length,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, questions]);
+
+  // ---- Merged submissions across every chapter — colorful editable/deletable table ----
+  const questionLabels = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const q of questions as Question[]) if (q.id) m[q.id] = q.label || q.name || q.id;
+    return m;
+  }, [questions]);
+
+  const fieldSpec = useMemo<FieldDescriptor[]>(() => {
+    const mapType = (t: string): FieldDescriptor["type"] =>
+      t === "number" ? "number"
+      : t === "date" || t === "datetime" ? "date"
+      : t === "select_one" || t === "select_multiple" ? "select"
+      : t === "note" ? "longtext"
+      : "text";
+    return (questions as Question[])
+      .filter((q) => q.id)
+      .map((q) => ({
+        key: q.id,
+        label: q.label || q.name || q.id,
+        type: mapType(q.type),
+        options: q.options?.map((o) => o.label ?? String(o.value ?? "")).filter(Boolean),
+      }));
+  }, [questions]);
+
+  const editableSubmissions = useMemo<EditableSubmission[]>(
+    () =>
+      filtered.map((r) => ({
+        id: r.id,
+        data: (r.data || {}) as Record<string, any>,
+        submitter: (r.user_id && profiles[r.user_id]) || "Unknown supervisor",
+        submittedAt: r.submitted_at || r.created_at,
+        state: str(r, "state") || null,
+        lga: str(r, "lga") || null,
+        ward: str(r, "ward") || null,
+        fieldSpec,
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, profiles, fieldSpec],
+  );
 
   const hasFilters = Object.values(filters).some((v) => v && v !== "__all__");
   const dq = qualityBand(agg.avgScorePct || 0);
@@ -384,50 +483,24 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
     { icon: <AlertOctagon className="h-5 w-5" />, label: "Pending Critical Issues", value: agg.pendingCritical.toLocaleString(), sub: "High priority", color: NAVY.bad, band: "" },
   ];
 
-  const navIcons = [LayoutGrid, CheckSquare, Users, MessageSquare, Scale, Radio, FileCheck2, AlertOctagon, BookOpen, ClipboardList];
-
   return (
     <div className="fixed inset-0 z-50 flex overflow-hidden" style={{ background: NAVY.canvas, fontFamily: NAVY.bodyFont, color: NAVY.ink }}>
-      {/* sidebar */}
-      <aside className="hidden w-[270px] shrink-0 flex-col md:flex" style={{ background: `linear-gradient(180deg, ${NAVY.sidebar} 0%, ${NAVY.sidebarDeep} 100%)`, color: NAVY.sidebarText }}>
-        <div className="flex items-start gap-3 px-5 pb-4 pt-5">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ background: NAVY.teal }}>
-            <LayoutGrid className="h-6 w-6 text-white" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-[14px] font-extrabold leading-tight" style={{ fontFamily: NAVY.headingFont }}>SARMAAN Programme Implementation</h1>
-            <p className="mt-0.5 text-[11px] font-semibold" style={{ color: NAVY.teal }}>Learning & Improvement Dashboard</p>
-          </div>
-        </div>
-        <nav className="flex-1 overflow-y-auto px-3 py-2">
-          {DASHBOARD_NAV.map((label, i) => {
-            const Icon = navIcons[i] ?? LayoutGrid;
-            const isActive = nav === label;
-            return (
-              <button key={label} onClick={() => setNav(label)} className="mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold transition"
-                style={{ background: isActive ? NAVY.sidebarActive : "transparent", color: isActive ? "#fff" : NAVY.sidebarText }}>
-                <Icon className="h-4 w-4 shrink-0" style={{ color: isActive ? NAVY.teal : NAVY.sidebarSub }} />
-                <span className="min-w-0 flex-1 leading-snug">{label}</span>
-              </button>
-            );
-          })}
-        </nav>
-        <div className="border-t px-3 py-3" style={{ borderColor: NAVY.sidebarLine }}>
-          <button className="mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[13px] font-semibold" style={{ color: NAVY.sidebarSub }}><Settings className="h-4 w-4" /> Settings</button>
-          <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[13px] font-semibold" style={{ color: NAVY.sidebarSub }}><HelpCircle className="h-4 w-4" /> Help & Resources</button>
-          <div className="mt-3 flex items-center gap-2 rounded-xl px-3 py-2 text-[11px]" style={{ background: "rgba(255,255,255,0.05)", color: NAVY.sidebarSub }}>
-            <ShieldCheck className="h-4 w-4" style={{ color: NAVY.good }} /> Data Quality: {dq.label}
-          </div>
-        </div>
-      </aside>
-
-      {/* main */}
+      {/* main — full width, sidebar removed for an edge-to-edge desktop dashboard */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* top filter bar */}
         <header className="flex flex-wrap items-end gap-3 border-b px-4 py-3" style={{ borderColor: NAVY.line, background: NAVY.panel }}>
           <button onClick={onClose} className="inline-flex items-center gap-1 self-center rounded-full px-2 py-1 text-sm font-semibold transition hover:bg-black/5" style={{ color: NAVY.inkSoft }}>
             <ChevronLeft className="h-4 w-4" /> Back
           </button>
+          <div className="mr-2 flex items-center gap-2 self-center">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: NAVY.teal }}>
+              <LayoutGrid className="h-5 w-5 text-white" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <h1 className="text-[13px] font-extrabold" style={{ fontFamily: NAVY.headingFont, color: NAVY.ink }}>SARMAAN Programme Implementation</h1>
+              <p className="text-[10px] font-semibold" style={{ color: NAVY.teal }}>Learning & Improvement Dashboard</p>
+            </div>
+          </div>
           {filterDefs.map((f) => (
             <div key={f.field} className="min-w-[120px]">
               <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide" style={{ color: NAVY.inkSoft }}>{f.label}</label>
@@ -676,6 +749,28 @@ export default function SarmaanLearningDashboard({ form, onClose }: Props) {
             </Panel>
           </div>
 
+          {/* Statistical analysis of numeric indicators (basic → advanced) */}
+          <div className="mt-4">
+            <StatsPanel stats={statistics} />
+          </div>
+
+          {/* Merged submissions from every chapter — colorful table with owner edit & delete */}
+          {isOwner && (
+            <div className="mt-4">
+              <AdminSubmissionEditor
+                submissions={editableSubmissions}
+                questionLabels={questionLabels}
+                table="form_submissions"
+                enableDelete
+                onChanged={() => load()}
+                title="All Chapter Submissions — Owner edit & delete"
+                pageSize={12}
+              />
+            </div>
+          )}
+
+
+
           <div className="py-4 text-center text-[11px]" style={{ color: NAVY.inkSoft }}>
             SARMAAN Programme · Integrated Supervisory Checklist & Learning Dashboard · {agg.n} live submissions
           </div>
@@ -842,6 +937,86 @@ function HBar({ data, color, suffix }: { data: { name: string; value: number }[]
 
 function Legend({ color, label }: { color: string; label: string }) {
   return <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} /> {label}</span>;
+}
+
+interface StatRow {
+  key: string; label: string; color: string;
+  n: number; sum: number; mean: number; median: number;
+  min: number; max: number; sd: number; ciLow: number; ciHigh: number; cv: number;
+}
+interface Stats { indicators: StatRow[]; momGrowthPct: number | null; reportsPerActiveMonth: number; }
+
+function StatsPanel({ stats }: { stats: Stats }) {
+  const fmt = (n: number) => (Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 2 }));
+  if (!stats.indicators.length) {
+    return (
+      <div className="rounded-2xl border p-6 text-center text-sm shadow-sm" style={{ borderColor: NAVY.line, background: NAVY.panel, color: NAVY.inkSoft }}>
+        <Sigma className="mx-auto mb-2 h-7 w-7 opacity-40" />
+        No numeric indicators captured yet for statistical analysis.
+      </div>
+    );
+  }
+  return (
+    <div className="overflow-hidden rounded-2xl border shadow-sm" style={{ borderColor: NAVY.line, background: NAVY.panel }}>
+      <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3" style={{ borderColor: NAVY.line, background: "linear-gradient(90deg, rgba(8,145,178,0.10), rgba(20,184,166,0.10))" }}>
+        <Sigma className="h-4 w-4" style={{ color: NAVY.teal }} />
+        <h3 className="text-[13px] font-bold" style={{ fontFamily: NAVY.headingFont, color: NAVY.ink }}>Statistical Analysis of Indicators</h3>
+        <div className="ml-auto flex flex-wrap items-center gap-3 text-[11px]" style={{ color: NAVY.inkSoft }}>
+          <span className="inline-flex items-center gap-1"><Activity className="h-3.5 w-3.5" /> {stats.reportsPerActiveMonth} reports / active month</span>
+          {stats.momGrowthPct != null && (
+            <span className="inline-flex items-center gap-1 font-semibold" style={{ color: stats.momGrowthPct >= 0 ? NAVY.good : NAVY.bad }}>
+              {stats.momGrowthPct >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+              {stats.momGrowthPct >= 0 ? "+" : ""}{stats.momGrowthPct}% reach MoM
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] text-sm">
+          <thead>
+            <tr className="border-b text-[11px]" style={{ borderColor: NAVY.line, color: NAVY.inkSoft, background: "rgba(15,23,42,0.03)" }}>
+              <th className="px-3 py-2 text-left font-semibold">Indicator</th>
+              <th className="px-3 py-2 text-right font-semibold">n</th>
+              <th className="px-3 py-2 text-right font-semibold">Total</th>
+              <th className="px-3 py-2 text-right font-semibold">Mean</th>
+              <th className="px-3 py-2 text-right font-semibold">Median</th>
+              <th className="px-3 py-2 text-right font-semibold">95% CI</th>
+              <th className="px-3 py-2 text-right font-semibold">SD</th>
+              <th className="px-3 py-2 text-right font-semibold">Range</th>
+              <th className="px-3 py-2 text-right font-semibold" title="Coefficient of variation — lower is more consistent">Consistency</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stats.indicators.map((ind) => {
+              const consistency = ind.cv <= 50 ? "High" : ind.cv <= 100 ? "Moderate" : "Variable";
+              const cColor = ind.cv <= 50 ? NAVY.good : ind.cv <= 100 ? NAVY.warn : NAVY.bad;
+              return (
+                <tr key={ind.key} className="border-b" style={{ borderColor: NAVY.line }}>
+                  <td className="px-3 py-2">
+                    <span className="inline-flex items-center gap-2 font-medium" style={{ color: NAVY.ink }}>
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: ind.color }} />
+                      {ind.label}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-right" style={{ color: NAVY.inkSoft }}>{ind.n}</td>
+                  <td className="px-3 py-2 text-right font-semibold" style={{ color: NAVY.ink }}>{fmt(ind.sum)}</td>
+                  <td className="px-3 py-2 text-right" style={{ color: NAVY.ink }}>{fmt(ind.mean)}</td>
+                  <td className="px-3 py-2 text-right" style={{ color: NAVY.ink }}>{fmt(ind.median)}</td>
+                  <td className="px-3 py-2 text-right text-xs" style={{ color: NAVY.inkSoft }}>{fmt(ind.ciLow)} – {fmt(ind.ciHigh)}</td>
+                  <td className="px-3 py-2 text-right" style={{ color: NAVY.inkSoft }}>{fmt(ind.sd)}</td>
+                  <td className="px-3 py-2 text-right text-xs" style={{ color: NAVY.inkSoft }}>{fmt(ind.min)}–{fmt(ind.max)}</td>
+                  <td className="px-3 py-2 text-right text-xs font-semibold" style={{ color: cColor }}>{consistency}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="border-t px-3 py-2 text-[11px]" style={{ borderColor: NAVY.line, color: NAVY.inkSoft }}>
+        95% confidence interval of the mean (normal approximation). “Consistency” reflects the coefficient of variation across submissions — lower variation indicates more uniform field performance.
+      </p>
+    </div>
+  );
 }
 
 function mix(a: string, b: string, t: number): string {
