@@ -98,6 +98,7 @@ const Index = () => {
 
   const { user, loading, profile, role, isAdmin, isApproved, isPendingApproval, isSuperAdmin, isOwner, isCoOwner, isAdhoc } = useAuth();
   const { canAccessPage, minimalAccess, loadingAccess } = usePageAccess();
+  const { canEditDashboards } = useCanEditDashboards();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   useHeartbeat();
