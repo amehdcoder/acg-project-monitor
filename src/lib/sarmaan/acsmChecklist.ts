@@ -60,7 +60,16 @@ export const ANNOUNCEMENT_CONTENT_ITEMS: CheckItem[] = [
   { name: "content_when_visit", label: "Tells caregivers when CDDs will visit" },
 ];
 
-export const ID_TYPES = ["Cap", "T-shirt", "ID Card", "Other", "None"];
+export const ID_TYPES = ["Cap", "T-shirt", "ID Card", "Apron", "Other", "None"];
+
+/** Section C — what caregivers think the medicine prevents (multi-select). */
+export const MEDICINE_PREVENTS_OPTIONS = [
+  "Acute respiratory tract infection",
+  "Diarrheal diseases",
+  "Skin and soft tissue infections",
+  "Middle ear infections",
+  "Others",
+];
 
 /** Section D — community awareness validation (sample of 5 caregivers). */
 export const AWARENESS_COLUMNS: AwarenessColumn[] = [
