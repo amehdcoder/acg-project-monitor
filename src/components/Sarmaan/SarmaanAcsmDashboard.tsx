@@ -279,8 +279,35 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
               main={`${M.refusalRate}%`} bar={M.refusalRate * 5} barColor={C.red} footer="Target: ≤ 5%" footerColor={C.sub} />
           </div>
 
-          {/* Row 2: map · overall summary · awareness donut · info channels */}
-          <div className="grid gap-3 xl:grid-cols-4">
+          {/* Kano supervision map — geolocated visits by ACSM band */}
+          <Panel
+            title={<span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" style={{ color: C.green }} /> Kano Supervision Map — State, LGA &amp; Ward Coverage</span>}
+            right={
+              <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold" style={{ color: C.sub }}>
+                <span>{visitPoints.length} geolocated visit{visitPoints.length === 1 ? "" : "s"}</span>
+                {(["strong", "moderate", "weak", "critical"] as BandKey[]).map((b) => (
+                  <span key={b} className="flex items-center gap-1">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: BAND_META[b].color }} />
+                    {BAND_META[b].label.split(" ")[0]}
+                  </span>
+                ))}
+              </div>
+            }>
+            <div className="relative h-[420px] w-full overflow-hidden rounded-xl">
+              <SarmaanKanoMap points={visitPoints} />
+              {visitPoints.length === 0 && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <span className="rounded-lg bg-white/90 px-4 py-2 text-xs font-semibold shadow" style={{ color: C.sub }}>
+                    No GPS-tagged supervision visits yet — points appear here in realtime as checklists are submitted.
+                  </span>
+                </div>
+              )}
+            </div>
+          </Panel>
+
+          {/* Row 2: ward map · overall summary · awareness donut · info channels */}
+          <div className="grid gap-4 xl:grid-cols-4">
+
             {/* Ward performance map */}
             <Panel title="Ward Performance Map" className="xl:col-span-1"
               right={<span className="text-[10px] font-semibold" style={{ color: C.sub }}>{stateLabel}</span>}>
