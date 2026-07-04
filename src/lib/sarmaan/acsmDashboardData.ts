@@ -111,12 +111,12 @@ export interface AcsmMetrics {
 
 export type BandKey = "strong" | "moderate" | "weak" | "critical" | "none";
 
-export const BAND_META: Record<BandKey, { label: string; color: string }> = {
-  strong: { label: "Strong (85–100%)", color: "#16A34A" },
-  moderate: { label: "Moderate (70–84%)", color: "#84CC16" },
-  weak: { label: "Weak (50–69%)", color: "#F59E0B" },
-  critical: { label: "Critical (<50%)", color: "#DC2626" },
-  none: { label: "Not Supervised", color: "#CBD5E1" },
+export const BAND_META: Record<BandKey, { label: string; color: string; desc: string }> = {
+  strong: { label: "Strong (85–100%)", color: "#16A34A", desc: "Excellent supervision — IEC, dosing, consent & documentation all on target." },
+  moderate: { label: "Moderate (70–84%)", color: "#84CC16", desc: "Good performance with a few gaps to close in coverage or documentation." },
+  weak: { label: "Weak (50–69%)", color: "#F59E0B", desc: "Underperforming — multiple checklist areas need corrective follow-up." },
+  critical: { label: "Critical (<50%)", color: "#DC2626", desc: "Urgent intervention required — core MDA standards not being met." },
+  none: { label: "Not Supervised", color: "#CBD5E1", desc: "No supervision visit recorded for this ward yet." },
 };
 
 export function bandOf(score: number): BandKey {
