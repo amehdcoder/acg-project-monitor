@@ -1,9 +1,10 @@
-// SARMAAN ACSM & MDA Supervision Dashboard — image-parity UI.
+// SARMAAN ACSM & MDA Supervision Dashboard — full-width, sidebar-free UI.
 // ---------------------------------------------------------------------------
-// Pixel-faithful reproduction of the "ACSM & MDA SUPERVISION DASHBOARD"
-// reference: dark-green sidebar, white KPI strip, ward performance map, gauges,
-// donuts, component grid, town-announcer / dosing panels, deployment & refusal
-// tables, adverse-events, alerts, quick insights and a village footer.
+// Responsive board: white KPI strip, Kano supervision map (state/LGA/ward
+// boundaries + geolocated visits as medicine-bottle markers), ward performance
+// map, gauges, donuts, component grid, town-announcer / dosing panels,
+// deployment & refusal tables, adverse-events, alerts, quick insights and a
+// pinned tagline footer.
 //
 // Every panel is bound to real SARMAAN ACSM checklist submissions via
 // computeAcsmMetrics(), and the whole board refreshes in realtime as new
@@ -11,20 +12,20 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Menu, LayoutGrid, Users2, BarChart3, Megaphone, MessageSquare, Pill,
-  ShieldAlert, Activity, MapPin, FileText, Download, ChevronDown, RefreshCw,
-  UserCheck, HandHeart, Hand, ExternalLink, Bell, AlertCircle, Info,
-  CheckCircle2, Lightbulb, TrendingUp, ChevronRight, ShieldCheck,
+  Users2, Megaphone, Pill, MapPin, Download, ChevronDown, RefreshCw,
+  UserCheck, HandHeart, Hand, Bell, AlertCircle, Info,
+  CheckCircle2, TrendingUp, ShieldCheck, X,
   Shirt, IdCard, Ban, Award,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
-import heroImg from "@/assets/sarmaan-acsm-hero.png";
 import type { Question, FormGroup } from "@/components/FormBuilder/types";
+import SarmaanKanoMap, { type VisitPoint } from "@/components/Sarmaan/SarmaanKanoMap";
 import {
-  computeAcsmMetrics, BAND_META, type AcsmSub, type NameToId, type BandKey,
+  computeAcsmMetrics, BAND_META, bandOf, overallScoreOf, readVal, readStr,
+  type AcsmSub, type NameToId, type BandKey,
 } from "@/lib/sarmaan/acsmDashboardData";
 import { ACSM_FIELD } from "@/lib/sarmaan/acsmChecklist";
 
@@ -36,8 +37,6 @@ interface Props {
 const C = {
   green: "#1E9E52",
   greenDeep: "#0E7A3B",
-  sidebar: "#0B5E30",
-  sidebarDeep: "#084A26",
   canvas: "#F4F6F8",
   amber: "#F59E0B",
   amberSoft: "#84CC16",
@@ -111,25 +110,14 @@ function Donut({ data, center, sub }: { data: { name: string; value: number; col
   );
 }
 
-const NAV = [
-  { icon: LayoutGrid, label: "Overview" },
-  { icon: Users2, label: "Coverage & Teams" },
-  { icon: BarChart3, label: "ACSM Performance" },
-  { icon: Megaphone, label: "IEC & Mobilization" },
-  { icon: MessageSquare, label: "Community Awareness" },
-  { icon: Pill, label: "Dosing & Safety" },
-  { icon: ShieldAlert, label: "Refusals & Rumors" },
-  { icon: Activity, label: "ADR Monitoring" },
-  { icon: MapPin, label: "Maps & Geography" },
-  { icon: FileText, label: "Reports" },
-];
+
 
 function Panel({ title, children, right, className = "" }: { title?: React.ReactNode; children: React.ReactNode; right?: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-xl border bg-white p-4 shadow-sm ${className}`} style={{ borderColor: C.line }}>
+    <div className={`rounded-xl border bg-white p-5 shadow-sm ${className}`} style={{ borderColor: C.line }}>
       {(title || right) && (
-        <div className="mb-3 flex items-center justify-between">
-          <div className="text-[13px] font-bold uppercase tracking-wide" style={{ color: C.ink }}>{title}</div>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm font-bold uppercase tracking-wide" style={{ color: C.ink }}>{title}</div>
           {right}
         </div>
       )}
@@ -141,9 +129,9 @@ function Panel({ title, children, right, className = "" }: { title?: React.React
 function MiniStat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div className="text-center">
-      <div className="mb-1 text-[10px] font-semibold leading-tight" style={{ color: C.sub }}>{label}</div>
-      <div className="text-lg font-extrabold" style={{ color: C.ink }}>{value}</div>
-      <div className="mx-auto mt-1.5 h-1.5 w-14 overflow-hidden rounded-full" style={{ background: "#EEF2F6" }}>
+      <div className="mb-1 text-[11px] font-semibold leading-tight" style={{ color: C.sub }}>{label}</div>
+      <div className="text-xl font-extrabold" style={{ color: C.ink }}>{value}</div>
+      <div className="mx-auto mt-2 h-2 w-16 overflow-hidden rounded-full" style={{ background: "#EEF2F6" }}>
         <div className="h-full rounded-full" style={{ width: value, background: color }} />
       </div>
     </div>
@@ -157,7 +145,7 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
   const [live, setLive] = useState(false);
   const [flash, setFlash] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
-  const [nav, setNav] = useState("Overview");
+  
   const [filters, setFilters] = useState<{ state: string; lga: string; ward: string }>({ state: "", lga: "", ward: "" });
   const idsRef = useRef<Set<string>>(new Set([form.id]));
 
@@ -221,91 +209,61 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
 
   const M = useMemo(() => computeAcsmMetrics(filtered, maps), [filtered, maps]);
 
+  // Geolocated supervision visits → map markers, coloured by ACSM band.
+  const visitPoints = useMemo<VisitPoint[]>(() => {
+    const pts: VisitPoint[] = [];
+    for (const s of filtered) {
+      const gps = readVal(s, ACSM_FIELD.gps, maps) as any;
+      const lat = Number(gps?.lat), lng = Number(gps?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) continue;
+      const score = overallScoreOf([s], maps);
+      pts.push({
+        lat, lng, score,
+        ward: readStr(s, ACSM_FIELD.ward, maps) || readStr(s, ACSM_FIELD.community, maps),
+        lga: readStr(s, ACSM_FIELD.lga, maps),
+        color: BAND_META[bandOf(score)].color,
+      });
+    }
+    return pts;
+  }, [filtered, maps]);
+
   const stateLabel = filters.state || options.states[0] || "All States";
   const timeStr = new Date(lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div className="fixed inset-0 z-[60] flex" style={{ background: C.canvas, fontFamily: "'Manrope', system-ui, sans-serif" }}>
-      {/* ── Sidebar ── */}
-      <aside className="hidden w-56 shrink-0 flex-col text-white lg:flex" style={{ background: `linear-gradient(180deg,${C.sidebar},${C.sidebarDeep})` }}>
-        <div className="flex items-center gap-2 px-4 py-4">
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-white/10"><Menu className="h-5 w-5" /></button>
+    <div className="fixed inset-0 z-[60] flex flex-col overflow-y-auto" style={{ background: C.canvas, fontFamily: "'Manrope', system-ui, sans-serif" }}>
+      {/* Header */}
+      <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b bg-white px-4 py-3 sm:px-6" style={{ borderColor: C.line }}>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-xl font-extrabold sm:text-2xl" style={{ color: C.green, fontFamily: "'Sora', system-ui, sans-serif" }}>
+            ACSM &amp; MDA SUPERVISION DASHBOARD
+          </h1>
+          <p className="text-xs font-semibold sm:text-sm" style={{ color: C.sub }}>
+            Mass Drug Administration by CDDs · Azithromycin for children 1–59 months
+          </p>
         </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3">
-          {NAV.map((n) => {
-            const active = n.label === "Overview";
-            return (
-              <button key={n.label} onClick={() => setNav(n.label)}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-semibold transition"
-                style={active ? { background: "#127A3F" } : {}}>
-                <n.icon className="h-4 w-4" /> {n.label}
-              </button>
-            );
-          })}
-        </nav>
-        {/* Supervision summary */}
-        <div className="m-3 rounded-xl p-3" style={{ background: "rgba(255,255,255,0.07)" }}>
-          <div className="mb-1 text-center text-xs font-bold">Supervision Summary</div>
-          <div className="flex justify-center"><Gauge value={M.overallScore} size={150} /></div>
-          <div className="-mt-8 text-center">
-            <div className="text-2xl font-extrabold">{M.overallScore}%</div>
-            <div className="text-[10px] opacity-80">Overall ACSM Score</div>
-            <span className="mt-1 inline-block rounded-md bg-[#16A34A] px-2 py-0.5 text-[10px] font-bold">
-              {BAND_META[M.overallScore >= 85 ? "strong" : M.overallScore >= 70 ? "moderate" : M.overallScore >= 50 ? "weak" : "critical"].label.split(" ")[0]}
-            </span>
-          </div>
-          <div className="mt-2 space-y-1">
-            {(["strong", "moderate", "weak", "critical"] as BandKey[]).map((b) => (
-              <div key={b} className="flex items-center justify-between text-[10px]">
-                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: BAND_META[b].color }} />{BAND_META[b].label}</span>
-                <span className="font-bold">{M.bandCounts[b]}</span>
-              </div>
-            ))}
-            <div className="mt-1 flex items-center justify-between border-t border-white/10 pt-1 text-[10px] font-bold">
-              <span>Total Wards</span><span>{M.wardsSupervised}</span>
-            </div>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={filters.state} onChange={(v) => setFilters((f) => ({ ...f, state: v }))} placeholder={stateLabel} options={options.states} allLabel="All States" />
+          <Select value={filters.lga} onChange={(v) => setFilters((f) => ({ ...f, lga: v }))} placeholder="All LGAs" options={options.lgas} allLabel="All LGAs" />
+          <Select value={filters.ward} onChange={(v) => setFilters((f) => ({ ...f, ward: v }))} placeholder="All Wards" options={options.wards} allLabel="All Wards" />
+          <button className="flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-bold text-white shadow-sm" style={{ background: C.green }}>
+            <Download className="h-4 w-4" /> Export
+          </button>
+          <button onClick={onClose} aria-label="Close dashboard" className="flex items-center gap-1.5 rounded-lg border px-3 py-2.5 text-xs font-bold" style={{ borderColor: C.line, color: C.ink }}>
+            <X className="h-4 w-4" /> Close
+          </button>
         </div>
-        <div className="m-3 mt-0 flex gap-2 rounded-xl p-3" style={{ background: "rgba(255,255,255,0.07)" }}>
-          <img src={heroImg} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
-          <div>
-            <div className="flex items-center gap-1 text-[11px] font-bold"><Lightbulb className="h-3 w-3 text-yellow-300" /> Supervisor Tip</div>
-            <p className="mt-0.5 text-[10px] leading-snug opacity-80">Focus on wards with low awareness and high refusal rates for immediate action.</p>
-          </div>
+        <div className="flex w-full items-center justify-end gap-2 text-[11px] sm:text-xs" style={{ color: C.sub }}>
+          <span className={`h-2 w-2 rounded-full ${live ? "bg-emerald-500" : "bg-slate-300"} ${flash ? "animate-ping" : ""}`} />
+          Live · Last updated: Today, {timeStr}
+          <button onClick={() => load()} className="rounded p-1 hover:bg-muted"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button>
         </div>
-      </aside>
+      </header>
 
-      {/* ── Main ── */}
-      <div className="flex flex-1 flex-col overflow-y-auto">
-        {/* Header */}
-        <header className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b bg-white px-5 py-3" style={{ borderColor: C.line }}>
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted lg:hidden"><Menu className="h-5 w-5" style={{ color: C.green }} /></button>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-xl font-extrabold" style={{ color: C.green, fontFamily: "'Sora', system-ui, sans-serif" }}>
-              ACSM & MDA SUPERVISION DASHBOARD
-            </h1>
-            <p className="text-xs font-semibold" style={{ color: C.sub }}>
-              Mass Drug Administration by CDDs · Azithromycin for children 1–59 months
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Select value={filters.state} onChange={(v) => setFilters((f) => ({ ...f, state: v }))} placeholder={stateLabel} options={options.states} allLabel="All States" />
-            <Select value={filters.lga} onChange={(v) => setFilters((f) => ({ ...f, lga: v }))} placeholder="All LGAs" options={options.lgas} allLabel="All LGAs" />
-            <Select value={filters.ward} onChange={(v) => setFilters((f) => ({ ...f, ward: v }))} placeholder="All Wards" options={options.wards} allLabel="All Wards" />
-            <button className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold text-white shadow-sm" style={{ background: C.green }}>
-              <Download className="h-3.5 w-3.5" /> Export
-            </button>
-          </div>
-          <div className="flex w-full items-center justify-end gap-2 text-[11px]" style={{ color: C.sub }}>
-            <span className={`h-1.5 w-1.5 rounded-full ${live ? "bg-emerald-500" : "bg-slate-300"} ${flash ? "animate-ping" : ""}`} />
-            Last updated: Today, {timeStr}
-            <button onClick={() => load()} className="rounded p-1 hover:bg-muted"><RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /></button>
-          </div>
-        </header>
-
-        <main className="space-y-4 p-4">
+      <main className="mx-auto w-full max-w-[1600px] flex-1 space-y-5 p-4 sm:p-6">
           {/* KPI strip */}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+
             <Kpi icon={Users2} tint={C.green} title="Wards Supervised"
               main={`${M.wardsSupervised}`} sub2={`/ ${M.wardsTotal}`} badge={`${M.wardsSupervisedPct}%`} footer="On Track" footerColor={C.green} />
             <Kpi icon={UserCheck} tint={C.blue} title="Teams Deployed"
@@ -320,8 +278,35 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
               main={`${M.refusalRate}%`} bar={M.refusalRate * 5} barColor={C.red} footer="Target: ≤ 5%" footerColor={C.sub} />
           </div>
 
-          {/* Row 2: map · overall summary · awareness donut · info channels */}
-          <div className="grid gap-3 xl:grid-cols-4">
+          {/* Kano supervision map — geolocated visits by ACSM band */}
+          <Panel
+            title={<span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" style={{ color: C.green }} /> Kano Supervision Map — State, LGA &amp; Ward Coverage</span>}
+            right={
+              <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold" style={{ color: C.sub }}>
+                <span>{visitPoints.length} geolocated visit{visitPoints.length === 1 ? "" : "s"}</span>
+                {(["strong", "moderate", "weak", "critical"] as BandKey[]).map((b) => (
+                  <span key={b} className="flex items-center gap-1">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: BAND_META[b].color }} />
+                    {BAND_META[b].label.split(" ")[0]}
+                  </span>
+                ))}
+              </div>
+            }>
+            <div className="relative h-[420px] w-full overflow-hidden rounded-xl">
+              <SarmaanKanoMap points={visitPoints} />
+              {visitPoints.length === 0 && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <span className="rounded-lg bg-white/90 px-4 py-2 text-xs font-semibold shadow" style={{ color: C.sub }}>
+                    No GPS-tagged supervision visits yet — points appear here in realtime as checklists are submitted.
+                  </span>
+                </div>
+              )}
+            </div>
+          </Panel>
+
+          {/* Row 2: ward map · overall summary · awareness donut · info channels */}
+          <div className="grid gap-4 xl:grid-cols-4">
+
             {/* Ward performance map */}
             <Panel title="Ward Performance Map" className="xl:col-span-1"
               right={<span className="text-[10px] font-semibold" style={{ color: C.sub }}>{stateLabel}</span>}>
@@ -400,7 +385,7 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
           </div>
 
           {/* Row 3: components · town announcers · dosing · alerts */}
-          <div className="grid gap-3 xl:grid-cols-4">
+          <div className="grid gap-4 xl:grid-cols-4">
             <Panel title="Supervision Components" className="xl:col-span-1">
               <div className="grid grid-cols-4 gap-3">
                 <MiniStat label="IEC Materials Visibility" value={`${M.iecVisibility}%`} color={C.green} />
@@ -478,7 +463,7 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
           </div>
 
           {/* Row 4: deployment table · refusal reasons · adverse events · quick insights */}
-          <div className="grid gap-3 xl:grid-cols-4">
+          <div className="grid gap-4 xl:grid-cols-4">
             <Panel title="Team Deployment by Ward" className="xl:col-span-1">
               <div className="overflow-x-auto">
                 <table className="w-full text-[11px]">
@@ -566,15 +551,15 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
               </div>
             </Panel>
           </div>
-        </main>
+      </main>
 
-        {/* Footer */}
-        <footer className="flex items-center gap-2 px-6 py-4 text-white" style={{ background: `linear-gradient(90deg,${C.green},${C.greenDeep})` }}>
-          <ShieldCheck className="h-5 w-5" />
-          <span className="text-sm font-semibold">Every check. Every child. Every dose. <b>A healthier tomorrow.</b></span>
-        </footer>
-      </div>
+      {/* Footer tagline — pinned to the very bottom of the dashboard */}
+      <footer className="mt-auto flex items-center justify-center gap-2.5 px-6 py-5 text-center text-white" style={{ background: `linear-gradient(90deg,${C.green},${C.greenDeep})` }}>
+        <ShieldCheck className="h-6 w-6 shrink-0" />
+        <span className="text-sm font-semibold sm:text-base">Every check. Every child. Every dose. <b>A healthier tomorrow.</b></span>
+      </footer>
     </div>
+
   );
 }
 
@@ -584,27 +569,28 @@ function Kpi({ icon: Icon, tint, title, main, sub2, badge, bar, barColor, footer
   bar?: number; barColor?: string; footer: string; footerColor: string;
 }) {
   return (
-    <div className="rounded-xl border bg-white p-3 shadow-sm" style={{ borderColor: C.line }}>
-      <div className="flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${tint}1A` }}>
-          <Icon className="h-4 w-4" style={{ color: tint }} />
+    <div className="rounded-xl border bg-white p-4 shadow-sm" style={{ borderColor: C.line }}>
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `${tint}1A` }}>
+          <Icon className="h-5 w-5" style={{ color: tint }} />
         </span>
-        <span className="text-[11px] font-bold leading-tight" style={{ color: C.sub }}>{title}</span>
+        <span className="text-xs font-bold leading-tight" style={{ color: C.sub }}>{title}</span>
       </div>
-      <div className="mt-2 flex items-end gap-1">
-        <span className="text-2xl font-extrabold" style={{ color: C.ink }}>{main}</span>
-        {sub2 && <span className="mb-0.5 text-xs font-semibold" style={{ color: C.sub }}>{sub2}</span>}
-        {badge && <span className="mb-0.5 ml-auto text-xs font-bold" style={{ color: C.green }}>{badge}</span>}
+      <div className="mt-3 flex items-end gap-1.5">
+        <span className="text-3xl font-extrabold" style={{ color: C.ink }}>{main}</span>
+        {sub2 && <span className="mb-1 text-sm font-semibold" style={{ color: C.sub }}>{sub2}</span>}
+        {badge && <span className="mb-1 ml-auto text-sm font-bold" style={{ color: C.green }}>{badge}</span>}
       </div>
       {bar != null && (
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ background: "#EEF2F6" }}>
+        <div className="mt-2.5 h-2 overflow-hidden rounded-full" style={{ background: "#EEF2F6" }}>
           <div className="h-full rounded-full" style={{ width: `${Math.min(100, bar)}%`, background: barColor }} />
         </div>
       )}
-      <div className="mt-1.5 flex items-center gap-1 text-[10px] font-semibold" style={{ color: footerColor }}>
+      <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold" style={{ color: footerColor }}>
         {footerColor === C.green && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}{footer}
       </div>
     </div>
+
   );
 }
 
