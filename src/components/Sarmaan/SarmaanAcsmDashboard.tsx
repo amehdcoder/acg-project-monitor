@@ -171,19 +171,39 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
       if (!sibs.some((s) => s.id === form.id)) sibs.push({ id: form.id, questions: (self as any)?.questions ?? form.questions });
     }
     const m: Record<string, NameToId> = {};
-    sibs.forEach((s) => { m[s.id] = buildMap(s.questions); });
+    const labels: QuestionLabelMap = {};
+    sibs.forEach((s) => {
+      m[s.id] = buildMap(s.questions);
+      Object.assign(labels, buildLabelMap(sections(s.questions) as any[]));
+    });
     setMaps(m);
+    setQuestionLabels(labels);
     const ids = sibs.map((s) => s.id);
     idsRef.current = new Set(ids);
 
     const { data } = await supabase.from("form_submissions")
       .select("id,form_id,data,created_at,user_id")
       .in("form_id", ids).order("created_at", { ascending: false }).limit(8000);
-    setSubs(((data as any[]) || []).map((r) => ({ id: r.id, formId: r.form_id, data: r.data, created_at: r.created_at, user_id: r.user_id })));
+    const rows = ((data as any[]) || []).map((r) => ({ id: r.id, formId: r.form_id, data: r.data, created_at: r.created_at, user_id: r.user_id }));
+    setSubs(rows);
+
+    // Resolve supervisor names for accountability + editor.
+    const uids = [...new Set(rows.map((r) => r.user_id).filter(Boolean))] as string[];
+    if (uids.length) {
+      const { data: profs } = await supabase.from("profiles")
+        .select("user_id, first_name, last_name, email").in("user_id", uids);
+      const pm = new Map<string, ProfileLite>();
+      (profs as any[] | null)?.forEach((p) => {
+        const name = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.email || "Supervisor";
+        pm.set(p.user_id, { name, email: p.email || "" });
+      });
+      setProfiles(pm);
+    }
     setLoading(false);
     setLastUpdated(Date.now());
     if (opts?.live) { setFlash(true); window.setTimeout(() => setFlash(false), 1200); }
   }, [form.id, form.name, form.questions]);
+
 
   useEffect(() => {
     load();
