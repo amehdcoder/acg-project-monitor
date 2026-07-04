@@ -1603,6 +1603,18 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
+  if (acsmLaunchOpen && acsmForm) {
+    return (
+      <SarmaanAcsmChecklist
+        formId={acsmForm.id}
+        userId={user?.id || ""}
+        projectId={acsmForm.project_id || currentProjectId || ""}
+        onSubmitted={() => currentProjectId && fetchForms(currentProjectId)}
+        onClose={() => setAcsmLaunchOpen(false)}
+      />
+    );
+  }
+
 
 
 
