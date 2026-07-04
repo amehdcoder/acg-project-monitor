@@ -252,7 +252,7 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
               <div className="flex items-center gap-2.5 px-4 pt-4">
                 <span className="flex h-9 w-9 items-center justify-center rounded-full text-white shadow"
                   style={{ background: `linear-gradient(135deg,${TEAL},${GREEN})` }}>
-                  <Navigation className="h-4.5 w-4.5" />
+                  <Navigation className="h-4 w-4" />
                 </span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 text-sm font-extrabold" style={{ color: NAVY }}>
