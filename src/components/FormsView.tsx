@@ -1279,6 +1279,42 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     : sarmaanGrants.filter((g) => g.user_id === user?.id).map((g) => g.section_id);
   const canSeeSarmaanChecklist = sarmaanIsManager || hasAnySarmaanGrant;
 
+  // SARMAAN ACSM & MDA Supervision Checklist (image-parity form)
+  const acsmForm = useMemo(
+    () => mergedForms.find((f) => f.name === SARMAAN_ACSM_FORM_NAME && (!currentProjectId || f.project_id === currentProjectId)) || null,
+    [mergedForms, currentProjectId],
+  );
+  const { grants: acsmGrants, hasAnyGrant: hasAnyAcsmGrant } = useSarmaanFormAccess(acsmForm?.id, sarmaanIsManager);
+  const canSeeAcsmChecklist = sarmaanIsManager || hasAnyAcsmGrant;
+
+  const createAcsmChecklist = async (): Promise<Form | null> => {
+    if (!currentProjectId) {
+      toast({ title: "Select a project", description: "Choose the SARMAAN project first.", variant: "destructive" });
+      return null;
+    }
+    if (acsmForm) return acsmForm;
+    try {
+      const { data, error } = await supabase.from("forms").insert({
+        name: SARMAAN_ACSM_FORM_NAME,
+        description: SARMAAN_ACSM_DESC,
+        questions: buildAcsmFormSchema() as any,
+        settings: { requireLocation: true, offlineEnabled: true, sarmaan_acsm: true } as any,
+        project_id: currentProjectId,
+        created_by: user?.id,
+        status: "active",
+      } as any).select("*").single();
+      if (error) throw error;
+      const created = { ...(data as any), submissions_count: 0 } as Form;
+      setForms((prev) => (prev.some((f) => f.id === created.id) ? prev : [created, ...prev]));
+      toast({ title: "Checklist added", description: "SARMAAN ACSM & MDA Supervision Checklist is ready." });
+      fetchForms(currentProjectId);
+      return created;
+    } catch (e: any) {
+      toast({ title: "Could not add", description: e?.message || "Please try again.", variant: "destructive" });
+      return null;
+    }
+  };
+
   const filteredNonSarmaanForms = filteredForms.filter(
     (form) => !(currentProjectIsSarmaan && isSupervisoryLearningForm({ settings: form.settings, name: form.name })),
   );
