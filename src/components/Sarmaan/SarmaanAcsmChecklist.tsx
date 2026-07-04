@@ -148,9 +148,8 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
         return "Enter the reason at least one team did not go out.";
     }
     if (idx === 1 && !allAnswered(IEC_ITEMS)) return "Answer all IEC materials & visibility checks.";
-    if (idx === 2) {
-      if (!responses[MOBILIZATION_ITEMS[0].name]) return "Answer whether town announcers were selected.";
-    }
+    // Section C (Town Announcers & Mobilization) is optional.
+
     if (idx === 4 && !allAnswered(DRUG_ITEMS)) return "Answer all drug management & administration checks.";
     if (idx === 5 && !allAnswered(ELIGIBILITY_ITEMS)) return "Answer all eligibility & safety checks.";
     if (idx === 6 && !allAnswered(DOCUMENTATION_ITEMS)) return "Answer all documentation & house marking checks.";
@@ -509,7 +508,9 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
   const isLast = step === ACSM_SECTIONS.length - 1;
 
   return (
-    <div className="min-h-screen bg-[#F4F8FC] pb-28">
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-[#F4F8FC]">
+      {/* Scrollable region: hero + progress + body */}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       {/* Hero */}
       <div className="relative overflow-hidden" style={{ background: "linear-gradient(135deg,#F2FBF5 0%,#EAF6FF 100%)" }}>
         <button onClick={onClose} className="absolute right-3 top-3 z-10 rounded-full bg-white/80 p-2 text-muted-foreground shadow hover:bg-white">
@@ -558,9 +559,11 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
       <div className="mx-auto max-w-5xl px-4 py-5 sm:px-6">
         {renderStep()}
       </div>
+      </div>
+      {/* end scroll region */}
 
-      {/* Footer nav */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur"
+      {/* Footer nav — always visible sibling of the scroll region */}
+      <div className="shrink-0 border-t border-border bg-card/95 backdrop-blur"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-3 sm:px-6">
           <button type="button" onClick={goPrev} disabled={step === 0}
