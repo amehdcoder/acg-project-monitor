@@ -174,26 +174,31 @@ export default function SarmaanChecklistAccessManager({ open, onOpenChange, form
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90dvh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> Checklist module access</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> {wholeChecklist ? "Checklist access" : "Checklist module access"}</DialogTitle>
           <DialogDescription>
-            Grant project members access to individual modules of the <strong>{formName}</strong>. Each module is an independent form.
+            {wholeChecklist
+              ? <>Grant project members access to the <strong>entire {formName}</strong>. One grant unlocks the whole checklist.</>
+              : <>Grant project members access to individual modules of the <strong>{formName}</strong>. Each module is an independent form.</>}
           </DialogDescription>
         </DialogHeader>
 
-        <div>
-          <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-            <LayoutGrid className="h-3.5 w-3.5" /> Select module to manage
-          </label>
-          <select
-            className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-            value={activeSection}
-            onChange={(e) => setActiveSection(e.target.value)}
-          >
-            {sections.map((s) => (
-              <option key={s.id} value={s.id}>{s.label}</option>
-            ))}
-          </select>
-        </div>
+        {!wholeChecklist && (
+          <div>
+            <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+              <LayoutGrid className="h-3.5 w-3.5" /> Select module to manage
+            </label>
+            <select
+              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              value={activeSection}
+              onChange={(e) => setActiveSection(e.target.value)}
+            >
+              {sections.map((s) => (
+                <option key={s.id} value={s.id}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
 
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
