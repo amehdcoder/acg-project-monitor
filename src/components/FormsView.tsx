@@ -2240,6 +2240,18 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-white/70 transition group-hover:translate-x-0.5" />
                               </div>
                             </button>
+                            {acsmForm && canSeeAcsmChecklist && (
+                              <div className="mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setAcsmDashOpen(true)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:brightness-105"
+                                  style={{ background: "linear-gradient(135deg,#0B5E30,#1E9E52)" }}
+                                >
+                                  <LayoutGrid className="h-3.5 w-3.5" /> View ACSM & MDA Supervision Dashboard
+                                </button>
+                              </div>
+                            )}
                             {sarmaanIsManager && acsmForm && (
                               <div className="mt-2">
                                 <button
