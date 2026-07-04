@@ -245,6 +245,34 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
               </Field>
             </div>
 
+            {/* Instant GPS capture — colourful, auto-triggered */}
+            <div className="overflow-hidden rounded-2xl border shadow-sm"
+              style={{ borderColor: "#12B5A533", background: "linear-gradient(135deg,#E9FBF4 0%,#EAF3FF 100%)" }}>
+              <div className="flex items-center gap-2.5 px-4 pt-4">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full text-white shadow"
+                  style={{ background: `linear-gradient(135deg,${TEAL},${GREEN})` }}>
+                  <Navigation className="h-4.5 w-4.5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 text-sm font-extrabold" style={{ color: NAVY }}>
+                    <MapPin className="h-4 w-4" style={{ color: TEAL }} /> Supervision Location (GPS)
+                  </div>
+                  <div className="text-[11px] font-medium text-muted-foreground">
+                    Captured automatically — pins this visit on the Kano supervision map.
+                  </div>
+                </div>
+              </div>
+              <div className="p-3">
+                <GPSCapture
+                  value={responses[ACSM_FIELD.gps] || null}
+                  onChange={(pos) => set(ACSM_FIELD.gps, pos)}
+                  autoTrigger
+                />
+              </div>
+            </div>
+
+
+
             <SectionBadge letter="A" title="Location & Teams" color="#2F6FE6" tint="#EAF1FE" />
             <div className="grid gap-3 sm:grid-cols-4">
               <KpiCard label="Teams Planned" accent="#2F6FE6"
