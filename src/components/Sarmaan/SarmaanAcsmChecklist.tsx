@@ -8,8 +8,10 @@ import {
 import heroImg from "@/assets/sarmaan-acsm-hero.png";
 import MdaLocationCascade from "@/components/MdaChecklist/MdaLocationCascade";
 import SignatureCapture from "@/components/FormFiller/SignatureCapture";
+import GPSCapture from "@/components/FormFiller/GPSCapture";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { MapPin, Navigation } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import {
   ACSM_SECTIONS, IEC_ITEMS, MOBILIZATION_ITEMS, ANNOUNCEMENT_CONTENT_ITEMS, ID_TYPES,
