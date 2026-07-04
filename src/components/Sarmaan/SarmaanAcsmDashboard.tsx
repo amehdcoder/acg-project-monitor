@@ -150,9 +150,13 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
   const [live, setLive] = useState(false);
   const [flash, setFlash] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
-  
+  const [profiles, setProfiles] = useState<Map<string, ProfileLite>>(new Map());
+  const [questionLabels, setQuestionLabels] = useState<QuestionLabelMap>(() => buildLabelMap(sections(form.questions) as any[]));
+  const { canEditDashboards } = useCanEditDashboards();
+
   const [filters, setFilters] = useState<{ state: string; lga: string; ward: string }>({ state: "", lga: "", ward: "" });
   const idsRef = useRef<Set<string>>(new Set([form.id]));
+
 
   const load = useCallback(async (opts?: { live?: boolean }) => {
     if (!opts?.live) setLoading(true);
