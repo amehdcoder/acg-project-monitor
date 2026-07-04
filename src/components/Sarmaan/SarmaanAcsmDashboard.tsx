@@ -111,18 +111,7 @@ function Donut({ data, center, sub }: { data: { name: string; value: number; col
   );
 }
 
-const NAV = [
-  { icon: LayoutGrid, label: "Overview" },
-  { icon: Users2, label: "Coverage & Teams" },
-  { icon: BarChart3, label: "ACSM Performance" },
-  { icon: Megaphone, label: "IEC & Mobilization" },
-  { icon: MessageSquare, label: "Community Awareness" },
-  { icon: Pill, label: "Dosing & Safety" },
-  { icon: ShieldAlert, label: "Refusals & Rumors" },
-  { icon: Activity, label: "ADR Monitoring" },
-  { icon: MapPin, label: "Maps & Geography" },
-  { icon: FileText, label: "Reports" },
-];
+
 
 function Panel({ title, children, right, className = "" }: { title?: React.ReactNode; children: React.ReactNode; right?: React.ReactNode; className?: string }) {
   return (
