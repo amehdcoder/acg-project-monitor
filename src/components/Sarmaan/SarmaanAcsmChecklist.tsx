@@ -547,16 +547,23 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
         <button onClick={onClose} className="absolute right-3 top-3 z-10 rounded-full bg-white/80 p-2 text-muted-foreground shadow hover:bg-white">
           <X className="h-5 w-5" />
         </button>
-        <div className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-4 py-5 text-center sm:flex-row sm:gap-4 sm:py-6 sm:text-left">
-          <img
-            src={heroImg}
-            alt="SARMAAN community health — mother, children and health worker"
-            loading="eager"
-            decoding="async"
-            className="order-1 h-28 w-auto shrink-0 rounded-2xl object-contain drop-shadow-md sm:order-2 sm:h-36"
-          />
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 px-4 py-5 text-center sm:flex-row sm:gap-5 sm:py-6 sm:text-left">
+          <div className="order-1 w-full shrink-0 sm:order-2 sm:w-auto">
+            <div className="mx-auto w-full max-w-[320px] overflow-hidden rounded-2xl bg-white/60 shadow-md ring-1 ring-black/5 sm:w-44 sm:max-w-none">
+              <div className="relative w-full" style={{ aspectRatio: "4 / 3" }}>
+                <img
+                  src={heroImg}
+                  alt="SARMAAN community health — mother, children and health worker"
+                  loading="eager"
+                  decoding="async"
+                  fetchPriority="high"
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              </div>
+            </div>
+          </div>
           <div className="order-2 min-w-0 flex-1 sm:order-1">
-            <h1 className="text-lg font-extrabold leading-tight sm:text-2xl" style={{ color: NAVY }}>
+            <h1 className="text-xl font-extrabold leading-tight sm:text-2xl" style={{ color: NAVY }}>
               SARMAAN ACSM &amp; MDA SUPERVISION CHECKLIST
             </h1>
             <div className="mt-1 text-sm font-bold" style={{ color: GREEN }}>Mass Drug Administration by CDDs</div>
