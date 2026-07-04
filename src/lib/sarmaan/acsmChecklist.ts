@@ -131,6 +131,7 @@ export const ACSM_FIELD = {
   deploymentRate: "teams_deployment_rate",
   teamReason: "teams_not_out_reason",
   idType: "announcer_id_type",
+  medicinePrevents: "announcement_prevents",
   awarenessRate: "awareness_rate",
   ageKnowledge: "age_knowledge_rate",
   freeMedicineKnowledge: "free_medicine_knowledge_rate",
