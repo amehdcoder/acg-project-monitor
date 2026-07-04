@@ -28,6 +28,11 @@ import {
   type AcsmSub, type NameToId, type BandKey,
 } from "@/lib/sarmaan/acsmDashboardData";
 import { ACSM_FIELD } from "@/lib/sarmaan/acsmChecklist";
+import SarmaanAcsmAnalytics from "@/components/Sarmaan/SarmaanAcsmAnalytics";
+import { useCanEditDashboards } from "@/hooks/useCanEditDashboards";
+import { buildLabelMap, type QuestionLabelMap } from "@/lib/formLabelUtils";
+import type { ProfileLite } from "@/lib/accountability";
+
 
 interface Props {
   form: { id: string; name: string; questions: unknown; settings: unknown };
@@ -145,9 +150,13 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
   const [live, setLive] = useState(false);
   const [flash, setFlash] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
-  
+  const [profiles, setProfiles] = useState<Map<string, ProfileLite>>(new Map());
+  const [questionLabels, setQuestionLabels] = useState<QuestionLabelMap>(() => buildLabelMap(sections(form.questions) as any[]));
+  const { canEditDashboards } = useCanEditDashboards();
+
   const [filters, setFilters] = useState<{ state: string; lga: string; ward: string }>({ state: "", lga: "", ward: "" });
   const idsRef = useRef<Set<string>>(new Set([form.id]));
+
 
   const load = useCallback(async (opts?: { live?: boolean }) => {
     if (!opts?.live) setLoading(true);
@@ -162,19 +171,39 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
       if (!sibs.some((s) => s.id === form.id)) sibs.push({ id: form.id, questions: (self as any)?.questions ?? form.questions });
     }
     const m: Record<string, NameToId> = {};
-    sibs.forEach((s) => { m[s.id] = buildMap(s.questions); });
+    const labels: QuestionLabelMap = {};
+    sibs.forEach((s) => {
+      m[s.id] = buildMap(s.questions);
+      Object.assign(labels, buildLabelMap(sections(s.questions) as any[]));
+    });
     setMaps(m);
+    setQuestionLabels(labels);
     const ids = sibs.map((s) => s.id);
     idsRef.current = new Set(ids);
 
     const { data } = await supabase.from("form_submissions")
       .select("id,form_id,data,created_at,user_id")
       .in("form_id", ids).order("created_at", { ascending: false }).limit(8000);
-    setSubs(((data as any[]) || []).map((r) => ({ id: r.id, formId: r.form_id, data: r.data, created_at: r.created_at, user_id: r.user_id })));
+    const rows = ((data as any[]) || []).map((r) => ({ id: r.id, formId: r.form_id, data: r.data, created_at: r.created_at, user_id: r.user_id }));
+    setSubs(rows);
+
+    // Resolve supervisor names for accountability + editor.
+    const uids = [...new Set(rows.map((r) => r.user_id).filter(Boolean))] as string[];
+    if (uids.length) {
+      const { data: profs } = await supabase.from("profiles")
+        .select("user_id, first_name, last_name, email").in("user_id", uids);
+      const pm = new Map<string, ProfileLite>();
+      (profs as any[] | null)?.forEach((p) => {
+        const name = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.email || "Supervisor";
+        pm.set(p.user_id, { name, email: p.email || "" });
+      });
+      setProfiles(pm);
+    }
     setLoading(false);
     setLastUpdated(Date.now());
     if (opts?.live) { setFlash(true); window.setTimeout(() => setFlash(false), 1200); }
   }, [form.id, form.name, form.questions]);
+
 
   useEffect(() => {
     load();
@@ -577,7 +606,19 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
               </div>
             </Panel>
           </div>
+
+          {/* Row 5: Accountability · Statistical & Thematic analysis · Owner editor */}
+          <SarmaanAcsmAnalytics
+            subs={filtered}
+            maps={maps}
+            profiles={profiles}
+            form={{ id: form.id, name: form.name, questions: form.questions }}
+            canEdit={canEditDashboards}
+            questionLabels={questionLabels}
+            onChanged={() => load({ live: true })}
+          />
       </main>
+
     </div>
 
   );

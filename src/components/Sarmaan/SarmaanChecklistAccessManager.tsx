@@ -29,17 +29,26 @@ interface Props {
   formName: string;
   sections: SectionRef[];
   projectId?: string | null;
+  /**
+   * When true, access is granted for the ENTIRE checklist as a single unit
+   * (one grant per member) instead of per-module. The module selector is hidden.
+   */
+  wholeChecklist?: boolean;
 }
 
 /**
- * Owner / Admin tool to grant named project members access to individual
- * modules (sections) of the SARMAAN Integrated Supervisory Checklist. Because
- * each section is an independent, separately-submittable form, access is granted
- * per-module. Dashboard access is managed separately via DashboardAccessManager.
+ * Owner / Admin tool to grant named project members access to the SARMAAN
+ * Integrated Supervisory Checklist. In per-module mode each section is an
+ * independent, separately-submittable form so access is granted per-module.
+ * In whole-checklist mode a single grant unlocks the complete checklist.
+ * Dashboard access is managed separately via DashboardAccessManager.
  */
-export default function SarmaanChecklistAccessManager({ open, onOpenChange, formId, formName, sections, projectId }: Props) {
+export default function SarmaanChecklistAccessManager({ open, onOpenChange, formId, formName, sections: sectionsProp, projectId, wholeChecklist }: Props) {
   const { user } = useAuth();
+  const WHOLE_ID = "__acsm_whole__";
+  const sections: SectionRef[] = wholeChecklist ? [{ id: WHOLE_ID, label: "Entire Checklist" }] : sectionsProp;
   const [members, setMembers] = useState<Member[]>([]);
+
   const [activeSection, setActiveSection] = useState<string>(sections[0]?.id ?? "");
   // grants map: `${section_id}::${user_id}` -> access row id
   const [granted, setGranted] = useState<Record<string, string>>({});
@@ -165,26 +174,31 @@ export default function SarmaanChecklistAccessManager({ open, onOpenChange, form
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90dvh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> Checklist module access</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> {wholeChecklist ? "Checklist access" : "Checklist module access"}</DialogTitle>
           <DialogDescription>
-            Grant project members access to individual modules of the <strong>{formName}</strong>. Each module is an independent form.
+            {wholeChecklist
+              ? <>Grant project members access to the <strong>entire {formName}</strong>. One grant unlocks the whole checklist.</>
+              : <>Grant project members access to individual modules of the <strong>{formName}</strong>. Each module is an independent form.</>}
           </DialogDescription>
         </DialogHeader>
 
-        <div>
-          <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-            <LayoutGrid className="h-3.5 w-3.5" /> Select module to manage
-          </label>
-          <select
-            className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-            value={activeSection}
-            onChange={(e) => setActiveSection(e.target.value)}
-          >
-            {sections.map((s) => (
-              <option key={s.id} value={s.id}>{s.label}</option>
-            ))}
-          </select>
-        </div>
+        {!wholeChecklist && (
+          <div>
+            <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+              <LayoutGrid className="h-3.5 w-3.5" /> Select module to manage
+            </label>
+            <select
+              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              value={activeSection}
+              onChange={(e) => setActiveSection(e.target.value)}
+            >
+              {sections.map((s) => (
+                <option key={s.id} value={s.id}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
 
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
@@ -213,13 +227,16 @@ export default function SarmaanChecklistAccessManager({ open, onOpenChange, form
                       <p className="truncate text-sm font-medium">{name}</p>
                       <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
                         <Mail className="h-3 w-3" />{m.email || "no email"}
-                        <span className="ml-1 rounded bg-muted px-1 text-[10px]">{totalForMember}/{sections.length} modules</span>
+                        {!wholeChecklist && <span className="ml-1 rounded bg-muted px-1 text-[10px]">{totalForMember}/{sections.length} modules</span>}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <Button size="sm" variant="ghost" className="h-8 px-2 text-[11px]" disabled={!!busy} onClick={() => grantAllModules(m)} title="Grant all modules">
-                        <CheckSquare className="mr-1 h-3.5 w-3.5" /> All
-                      </Button>
+                      {!wholeChecklist && (
+                        <Button size="sm" variant="ghost" className="h-8 px-2 text-[11px]" disabled={!!busy} onClick={() => grantAllModules(m)} title="Grant all modules">
+                          <CheckSquare className="mr-1 h-3.5 w-3.5" /> All
+                        </Button>
+                      )}
+
                       {isGranted ? (
                         <Button size="sm" variant="ghost" className="text-destructive" disabled={busy === m.user_id} onClick={() => revoke(m)}>
                           {busy === m.user_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}

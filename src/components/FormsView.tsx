@@ -2240,7 +2240,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-white/70 transition group-hover:translate-x-0.5" />
                               </div>
                             </button>
-                            {acsmForm && canSeeAcsmChecklist && (
+                            {acsmForm && (sarmaanIsManager || canSeeAcsmChecklist || canSeeSarmaanChecklist) && (
                               <div className="mt-2">
                                 <button
                                   type="button"
@@ -2252,6 +2252,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 </button>
                               </div>
                             )}
+
                             {sarmaanIsManager && acsmForm && (
                               <div className="mt-2">
                                 <button
@@ -2269,7 +2270,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                   formName={acsmForm.name}
                                   projectId={acsmForm.project_id || currentProjectId}
                                   sections={ACSM_SECTIONS}
+                                  wholeChecklist
                                 />
+
                               </div>
                             )}
                           </div>
