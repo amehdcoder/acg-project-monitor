@@ -210,6 +210,24 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
 
   const M = useMemo(() => computeAcsmMetrics(filtered, maps), [filtered, maps]);
 
+  // Geolocated supervision visits → map markers, coloured by ACSM band.
+  const visitPoints = useMemo<VisitPoint[]>(() => {
+    const pts: VisitPoint[] = [];
+    for (const s of filtered) {
+      const gps = readVal(s, ACSM_FIELD.gps, maps) as any;
+      const lat = Number(gps?.lat), lng = Number(gps?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) continue;
+      const score = overallScoreOf([s], maps);
+      pts.push({
+        lat, lng, score,
+        ward: readStr(s, ACSM_FIELD.ward, maps) || readStr(s, ACSM_FIELD.community, maps),
+        lga: readStr(s, ACSM_FIELD.lga, maps),
+        color: BAND_META[bandOf(score)].color,
+      });
+    }
+    return pts;
+  }, [filtered, maps]);
+
   const stateLabel = filters.state || options.states[0] || "All States";
   const timeStr = new Date(lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
