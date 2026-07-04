@@ -227,13 +227,16 @@ export default function SarmaanChecklistAccessManager({ open, onOpenChange, form
                       <p className="truncate text-sm font-medium">{name}</p>
                       <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
                         <Mail className="h-3 w-3" />{m.email || "no email"}
-                        <span className="ml-1 rounded bg-muted px-1 text-[10px]">{totalForMember}/{sections.length} modules</span>
+                        {!wholeChecklist && <span className="ml-1 rounded bg-muted px-1 text-[10px]">{totalForMember}/{sections.length} modules</span>}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <Button size="sm" variant="ghost" className="h-8 px-2 text-[11px]" disabled={!!busy} onClick={() => grantAllModules(m)} title="Grant all modules">
-                        <CheckSquare className="mr-1 h-3.5 w-3.5" /> All
-                      </Button>
+                      {!wholeChecklist && (
+                        <Button size="sm" variant="ghost" className="h-8 px-2 text-[11px]" disabled={!!busy} onClick={() => grantAllModules(m)} title="Grant all modules">
+                          <CheckSquare className="mr-1 h-3.5 w-3.5" /> All
+                        </Button>
+                      )}
+
                       {isGranted ? (
                         <Button size="sm" variant="ghost" className="text-destructive" disabled={busy === m.user_id} onClick={() => revoke(m)}>
                           {busy === m.user_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
