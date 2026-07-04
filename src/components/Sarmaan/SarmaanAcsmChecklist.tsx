@@ -247,9 +247,10 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
             <SectionBadge letter="A" title="Location & Teams" color="#2F6FE6" tint="#EAF1FE" />
             <div className="grid gap-3 sm:grid-cols-4">
               <KpiCard label="Teams Planned" accent="#2F6FE6"
-                editable value2={responses[ACSM_FIELD.teamsPlanned]} onEdit={(v) => set(ACSM_FIELD.teamsPlanned, v)} />
+                value2={responses[ACSM_FIELD.teamsPlanned]} onEdit={(v) => set(ACSM_FIELD.teamsPlanned, v)} />
               <KpiCard label="Teams That Went Out" accent={GREEN}
-                editable value2={responses[ACSM_FIELD.teamsWentOut]} onEdit={(v) => set(ACSM_FIELD.teamsWentOut, v)} />
+                value2={responses[ACSM_FIELD.teamsWentOut]} onEdit={(v) => set(ACSM_FIELD.teamsWentOut, v)} />
+
               <div className="rounded-2xl border border-border bg-card p-3">
                 <div className="text-xs font-semibold text-muted-foreground">Teams Deployment Rate</div>
                 <div className="mt-1 text-2xl font-extrabold" style={{ color: "#2F6FE6" }}>{deploymentRate}%</div>
