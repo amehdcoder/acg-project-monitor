@@ -282,25 +282,51 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
           <Panel
             title={<span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" style={{ color: C.green }} /> Kano Supervision Map — State, LGA &amp; Ward Coverage</span>}
             right={
-              <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold" style={{ color: C.sub }}>
-                <span>{visitPoints.length} geolocated visit{visitPoints.length === 1 ? "" : "s"}</span>
-                {(["strong", "moderate", "weak", "critical"] as BandKey[]).map((b) => (
-                  <span key={b} className="flex items-center gap-1">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: BAND_META[b].color }} />
-                    {BAND_META[b].label.split(" ")[0]}
-                  </span>
-                ))}
-              </div>
+              <span className="text-[11px] font-semibold" style={{ color: C.sub }}>
+                {visitPoints.length} geolocated visit{visitPoints.length === 1 ? "" : "s"} · tap a bottle for details
+              </span>
             }>
-            <div className="relative h-[420px] w-full overflow-hidden rounded-xl">
-              <SarmaanKanoMap points={visitPoints} />
-              {visitPoints.length === 0 && (
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <span className="rounded-lg bg-white/90 px-4 py-2 text-xs font-semibold shadow" style={{ color: C.sub }}>
-                    No GPS-tagged supervision visits yet — points appear here in realtime as checklists are submitted.
-                  </span>
+            <div className="grid gap-4 lg:grid-cols-[1fr_260px]">
+              <div className="relative h-[420px] w-full overflow-hidden rounded-xl">
+                <SarmaanKanoMap points={visitPoints} />
+                {visitPoints.length === 0 && (
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <span className="rounded-lg bg-white/90 px-4 py-2 text-xs font-semibold shadow" style={{ color: C.sub }}>
+                      No GPS-tagged supervision visits yet — points appear here in realtime as checklists are submitted.
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Professional legend + performance-band explanation */}
+              <div className="rounded-xl border p-3.5" style={{ borderColor: C.line, background: "#FBFDFC" }}>
+                <div className="flex items-center gap-2 border-b pb-2" style={{ borderColor: C.line }}>
+                  <Pill className="h-4 w-4" style={{ color: C.green }} />
+                  <span className="text-xs font-extrabold uppercase tracking-wide" style={{ color: C.ink }}>Marker Legend</span>
                 </div>
-              )}
+                <p className="mt-2 text-[11px] leading-relaxed" style={{ color: C.sub }}>
+                  Each <b style={{ color: C.green }}>medicine-bottle</b> marks one supervision visit, coloured by its overall ACSM performance band. Click any marker to open the visit's ward, LGA and score.
+                </p>
+                <div className="mt-3 space-y-2.5">
+                  {(["strong", "moderate", "weak", "critical"] as BandKey[]).map((b) => {
+                    const count = visitPoints.filter((p) => BAND_META[bandOf(p.score)].color === BAND_META[b].color).length;
+                    return (
+                      <div key={b} className="flex items-start gap-2.5">
+                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md" style={{ background: `${BAND_META[b].color}1A` }}>
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ background: BAND_META[b].color }} />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-bold" style={{ color: C.ink }}>{BAND_META[b].label}</span>
+                            <span className="rounded px-1 text-[9px] font-bold text-white" style={{ background: BAND_META[b].color }}>{count}</span>
+                          </div>
+                          <p className="text-[10px] leading-snug" style={{ color: C.sub }}>{BAND_META[b].desc}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </Panel>
 
