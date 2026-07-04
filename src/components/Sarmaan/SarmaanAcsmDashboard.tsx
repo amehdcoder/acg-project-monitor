@@ -28,6 +28,11 @@ import {
   type AcsmSub, type NameToId, type BandKey,
 } from "@/lib/sarmaan/acsmDashboardData";
 import { ACSM_FIELD } from "@/lib/sarmaan/acsmChecklist";
+import SarmaanAcsmAnalytics from "@/components/Sarmaan/SarmaanAcsmAnalytics";
+import { useCanEditDashboards } from "@/hooks/useCanEditDashboards";
+import { buildLabelMap, type QuestionLabelMap } from "@/lib/formLabelUtils";
+import type { ProfileLite } from "@/lib/accountability";
+
 
 interface Props {
   form: { id: string; name: string; questions: unknown; settings: unknown };
