@@ -232,87 +232,39 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
   const timeStr = new Date(lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div className="fixed inset-0 z-[60] flex" style={{ background: C.canvas, fontFamily: "'Manrope', system-ui, sans-serif" }}>
-      {/* ── Sidebar ── */}
-      <aside className="hidden w-56 shrink-0 flex-col text-white lg:flex" style={{ background: `linear-gradient(180deg,${C.sidebar},${C.sidebarDeep})` }}>
-        <div className="flex items-center gap-2 px-4 py-4">
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-white/10"><Menu className="h-5 w-5" /></button>
+    <div className="fixed inset-0 z-[60] flex flex-col overflow-y-auto" style={{ background: C.canvas, fontFamily: "'Manrope', system-ui, sans-serif" }}>
+      {/* Header */}
+      <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b bg-white px-4 py-3 sm:px-6" style={{ borderColor: C.line }}>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-xl font-extrabold sm:text-2xl" style={{ color: C.green, fontFamily: "'Sora', system-ui, sans-serif" }}>
+            ACSM &amp; MDA SUPERVISION DASHBOARD
+          </h1>
+          <p className="text-xs font-semibold sm:text-sm" style={{ color: C.sub }}>
+            Mass Drug Administration by CDDs · Azithromycin for children 1–59 months
+          </p>
         </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3">
-          {NAV.map((n) => {
-            const active = n.label === "Overview";
-            return (
-              <button key={n.label} onClick={() => setNav(n.label)}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-semibold transition"
-                style={active ? { background: "#127A3F" } : {}}>
-                <n.icon className="h-4 w-4" /> {n.label}
-              </button>
-            );
-          })}
-        </nav>
-        {/* Supervision summary */}
-        <div className="m-3 rounded-xl p-3" style={{ background: "rgba(255,255,255,0.07)" }}>
-          <div className="mb-1 text-center text-xs font-bold">Supervision Summary</div>
-          <div className="flex justify-center"><Gauge value={M.overallScore} size={150} /></div>
-          <div className="-mt-8 text-center">
-            <div className="text-2xl font-extrabold">{M.overallScore}%</div>
-            <div className="text-[10px] opacity-80">Overall ACSM Score</div>
-            <span className="mt-1 inline-block rounded-md bg-[#16A34A] px-2 py-0.5 text-[10px] font-bold">
-              {BAND_META[M.overallScore >= 85 ? "strong" : M.overallScore >= 70 ? "moderate" : M.overallScore >= 50 ? "weak" : "critical"].label.split(" ")[0]}
-            </span>
-          </div>
-          <div className="mt-2 space-y-1">
-            {(["strong", "moderate", "weak", "critical"] as BandKey[]).map((b) => (
-              <div key={b} className="flex items-center justify-between text-[10px]">
-                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: BAND_META[b].color }} />{BAND_META[b].label}</span>
-                <span className="font-bold">{M.bandCounts[b]}</span>
-              </div>
-            ))}
-            <div className="mt-1 flex items-center justify-between border-t border-white/10 pt-1 text-[10px] font-bold">
-              <span>Total Wards</span><span>{M.wardsSupervised}</span>
-            </div>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={filters.state} onChange={(v) => setFilters((f) => ({ ...f, state: v }))} placeholder={stateLabel} options={options.states} allLabel="All States" />
+          <Select value={filters.lga} onChange={(v) => setFilters((f) => ({ ...f, lga: v }))} placeholder="All LGAs" options={options.lgas} allLabel="All LGAs" />
+          <Select value={filters.ward} onChange={(v) => setFilters((f) => ({ ...f, ward: v }))} placeholder="All Wards" options={options.wards} allLabel="All Wards" />
+          <button className="flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-bold text-white shadow-sm" style={{ background: C.green }}>
+            <Download className="h-4 w-4" /> Export
+          </button>
+          <button onClick={onClose} aria-label="Close dashboard" className="flex items-center gap-1.5 rounded-lg border px-3 py-2.5 text-xs font-bold" style={{ borderColor: C.line, color: C.ink }}>
+            <X className="h-4 w-4" /> Close
+          </button>
         </div>
-        <div className="m-3 mt-0 flex gap-2 rounded-xl p-3" style={{ background: "rgba(255,255,255,0.07)" }}>
-          <img src={heroImg} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
-          <div>
-            <div className="flex items-center gap-1 text-[11px] font-bold"><Lightbulb className="h-3 w-3 text-yellow-300" /> Supervisor Tip</div>
-            <p className="mt-0.5 text-[10px] leading-snug opacity-80">Focus on wards with low awareness and high refusal rates for immediate action.</p>
-          </div>
+        <div className="flex w-full items-center justify-end gap-2 text-[11px] sm:text-xs" style={{ color: C.sub }}>
+          <span className={`h-2 w-2 rounded-full ${live ? "bg-emerald-500" : "bg-slate-300"} ${flash ? "animate-ping" : ""}`} />
+          Live · Last updated: Today, {timeStr}
+          <button onClick={() => load()} className="rounded p-1 hover:bg-muted"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button>
         </div>
-      </aside>
+      </header>
 
-      {/* ── Main ── */}
-      <div className="flex flex-1 flex-col overflow-y-auto">
-        {/* Header */}
-        <header className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b bg-white px-5 py-3" style={{ borderColor: C.line }}>
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted lg:hidden"><Menu className="h-5 w-5" style={{ color: C.green }} /></button>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-xl font-extrabold" style={{ color: C.green, fontFamily: "'Sora', system-ui, sans-serif" }}>
-              ACSM & MDA SUPERVISION DASHBOARD
-            </h1>
-            <p className="text-xs font-semibold" style={{ color: C.sub }}>
-              Mass Drug Administration by CDDs · Azithromycin for children 1–59 months
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Select value={filters.state} onChange={(v) => setFilters((f) => ({ ...f, state: v }))} placeholder={stateLabel} options={options.states} allLabel="All States" />
-            <Select value={filters.lga} onChange={(v) => setFilters((f) => ({ ...f, lga: v }))} placeholder="All LGAs" options={options.lgas} allLabel="All LGAs" />
-            <Select value={filters.ward} onChange={(v) => setFilters((f) => ({ ...f, ward: v }))} placeholder="All Wards" options={options.wards} allLabel="All Wards" />
-            <button className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold text-white shadow-sm" style={{ background: C.green }}>
-              <Download className="h-3.5 w-3.5" /> Export
-            </button>
-          </div>
-          <div className="flex w-full items-center justify-end gap-2 text-[11px]" style={{ color: C.sub }}>
-            <span className={`h-1.5 w-1.5 rounded-full ${live ? "bg-emerald-500" : "bg-slate-300"} ${flash ? "animate-ping" : ""}`} />
-            Last updated: Today, {timeStr}
-            <button onClick={() => load()} className="rounded p-1 hover:bg-muted"><RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /></button>
-          </div>
-        </header>
-
-        <main className="space-y-4 p-4">
+      <main className="mx-auto w-full max-w-[1600px] flex-1 space-y-5 p-4 sm:p-6">
           {/* KPI strip */}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+
             <Kpi icon={Users2} tint={C.green} title="Wards Supervised"
               main={`${M.wardsSupervised}`} sub2={`/ ${M.wardsTotal}`} badge={`${M.wardsSupervisedPct}%`} footer="On Track" footerColor={C.green} />
             <Kpi icon={UserCheck} tint={C.blue} title="Teams Deployed"
