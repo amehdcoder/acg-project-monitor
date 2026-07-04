@@ -116,6 +116,7 @@ import DashboardAccessManager from "@/components/dashboard/DashboardAccessManage
 import { useSarmaanFormAccess } from "@/hooks/useSarmaanFormAccess";
 import { isSupervisoryLearningForm } from "@/components/Sarmaan/sarmaanBrand";
 import SarmaanAcsmChecklist from "@/components/Sarmaan/SarmaanAcsmChecklist";
+import SarmaanAcsmDashboard from "@/components/Sarmaan/SarmaanAcsmDashboard";
 import { SARMAAN_ACSM_FORM_NAME, SARMAAN_ACSM_DESC, buildAcsmFormSchema, ACSM_SECTIONS } from "@/lib/sarmaan/acsmChecklist";
 import { getPreset } from "@/lib/specialStudio/presets";
 import { downloadXlsForm } from "@/lib/specialStudio/xlsformExport";
@@ -259,6 +260,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [sarmaanDashAccessOpen, setSarmaanDashAccessOpen] = useState(false);
   const [acsmLaunchOpen, setAcsmLaunchOpen] = useState(false);
   const [acsmAccessOpen, setAcsmAccessOpen] = useState(false);
+  const [acsmDashOpen, setAcsmDashOpen] = useState(false);
   const [templateForm, setTemplateForm] = useState<{ templateId: string; name: string; description: string; questions: Question[]; settings: any; geofence?: GeofenceArea } | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
@@ -1615,6 +1617,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
+  if (acsmDashOpen && acsmForm) {
+    return (
+      <SarmaanAcsmDashboard
+        form={{ id: acsmForm.id, name: acsmForm.name, questions: acsmForm.questions, settings: acsmForm.settings }}
+        onClose={() => setAcsmDashOpen(false)}
+      />
+    );
+  }
+
+
+
 
 
 
@@ -2227,6 +2240,18 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-white/70 transition group-hover:translate-x-0.5" />
                               </div>
                             </button>
+                            {acsmForm && canSeeAcsmChecklist && (
+                              <div className="mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setAcsmDashOpen(true)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:brightness-105"
+                                  style={{ background: "linear-gradient(135deg,#0B5E30,#1E9E52)" }}
+                                >
+                                  <LayoutGrid className="h-3.5 w-3.5" /> View ACSM & MDA Supervision Dashboard
+                                </button>
+                              </div>
+                            )}
                             {sarmaanIsManager && acsmForm && (
                               <div className="mt-2">
                                 <button
