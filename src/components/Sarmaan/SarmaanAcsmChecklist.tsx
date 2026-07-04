@@ -560,9 +560,11 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
       <div className="mx-auto max-w-5xl px-4 py-5 sm:px-6">
         {renderStep()}
       </div>
+      </div>
+      {/* end scroll region */}
 
-      {/* Footer nav */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur"
+      {/* Footer nav — always visible sibling of the scroll region */}
+      <div className="shrink-0 border-t border-border bg-card/95 backdrop-blur"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-3 sm:px-6">
           <button type="button" onClick={goPrev} disabled={step === 0}
