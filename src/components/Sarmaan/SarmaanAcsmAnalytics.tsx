@@ -15,17 +15,19 @@ import {
 } from "recharts";
 import {
   Users, Sigma, Sparkles, Loader2, Quote, TrendingUp, TrendingDown, Minus,
-  MessageSquareText, BarChart3,
+  MessageSquareText, BarChart3, Filter, X, ChevronDown, ChevronRight,
+  MapPin, CalendarDays, Pencil,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import AccountabilityTable from "@/components/shared/AccountabilityTable";
 import AdminSubmissionEditor from "@/components/AdminSubmissionEditor";
 import type { ProfileLite } from "@/lib/accountability";
+import { formatDay } from "@/lib/accountability";
 import type { QuestionLabelMap } from "@/lib/formLabelUtils";
 import {
   buildAcsmAccountability, computeAcsmStatistics, buildThematicDocs,
-  localThematicAnalysis, type LocalThematicResult,
+  localThematicAnalysis, buildSupervisorDrilldown, type LocalThematicResult,
 } from "@/lib/sarmaan/acsmAnalytics";
 import { readStr } from "@/lib/sarmaan/acsmDashboardData";
 import type { AcsmSub, NameToId } from "@/lib/sarmaan/acsmDashboardData";
@@ -57,6 +59,76 @@ function Panel({ title, icon, children, right }: { title: React.ReactNode; icon?
   );
 }
 
+/** One drill-down row: a supervisor's exact visit submission, expandable to
+ *  reveal the free-text issues & corrective actions captured on the visit. */
+function FragmentRow({
+  row, isOpen, hasNarrative, canEdit, onToggle, onEdit,
+}: {
+  row: import("@/lib/sarmaan/acsmAnalytics").SupervisorVisitRow;
+  isOpen: boolean;
+  hasNarrative: boolean;
+  canEdit: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+}) {
+  return (
+    <>
+      <tr className="border-t" style={{ borderColor: C.line }}>
+        <td className="px-3 py-2">
+          {hasNarrative ? (
+            <button onClick={onToggle} className="inline-flex h-5 w-5 items-center justify-center rounded" style={{ color: C.sub }} title="Show narratives">
+              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </button>
+          ) : null}
+        </td>
+        <td className="px-3 py-2">
+          <div className="font-semibold" style={{ color: C.ink }}>{row.ward}</div>
+          <div style={{ color: C.sub }}>{row.lga} · {row.state}</div>
+        </td>
+        <td className="px-3 py-2" style={{ color: C.sub }}>
+          <CalendarDays className="mr-1 inline h-3 w-3" />{formatDay(row.date)}
+        </td>
+        <td className="px-3 py-2 text-center tabular-nums" style={{ color: C.ink }}>
+          {row.teamsWentOut ?? "—"}/{row.teamsPlanned ?? "—"}
+        </td>
+        <td className="px-3 py-2 text-right tabular-nums" style={{ color: C.ink }}>
+          {row.deploymentRate != null ? `${row.deploymentRate}%` : "—"}
+        </td>
+        <td className="px-3 py-2 text-center">
+          <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: row.bandColor }}>
+            {row.score}%
+          </span>
+        </td>
+        {canEdit && (
+          <td className="px-3 py-2 text-right">
+            <button onClick={onEdit} className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-semibold" style={{ borderColor: C.line, color: C.blue }}>
+              <Pencil className="h-3 w-3" /> Edit
+            </button>
+          </td>
+        )}
+      </tr>
+      {isOpen && hasNarrative && (
+        <tr style={{ background: "#F8FAFC" }}>
+          <td colSpan={canEdit ? 7 : 6} className="px-3 py-2">
+            {row.issues && (
+              <div className="mb-1.5">
+                <span className="text-[10px] font-bold uppercase" style={{ color: C.red }}>Issues identified: </span>
+                <span className="text-[11px]" style={{ color: C.ink }}>{row.issues}</span>
+              </div>
+            )}
+            {row.corrective && (
+              <div>
+                <span className="text-[10px] font-bold uppercase" style={{ color: C.green }}>Corrective actions: </span>
+                <span className="text-[11px]" style={{ color: C.ink }}>{row.corrective}</span>
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
 interface Props {
   subs: AcsmSub[];
   maps: Record<string, NameToId>;
@@ -71,14 +143,27 @@ export default function SarmaanAcsmAnalytics({ subs, maps, profiles, form, canEd
   const accountability = useMemo(() => buildAcsmAccountability(subs, maps, profiles), [subs, maps, profiles]);
   const stats = useMemo(() => computeAcsmStatistics(subs, maps), [subs, maps]);
   const thematicDocs = useMemo(() => buildThematicDocs(subs, maps), [subs, maps]);
+  const drilldown = useMemo(() => buildSupervisorDrilldown(subs, maps, profiles), [subs, maps, profiles]);
 
   const [thematic, setThematic] = useState<LocalThematicResult | null>(null);
   const [thematizing, setThematizing] = useState(false);
+  // Interactive accountability filter / drill-down state
+  const [selectedUid, setSelectedUid] = useState<string | null>(null);
+  const [openRows, setOpenRows] = useState<Set<string>>(new Set());
+  const [editSub, setEditSub] = useState<AcsmSub | null>(null);
 
+  const BAR_COLORS = [C.green, C.blue, C.purple, C.amber, "#0EA5A5"];
   const chartData = useMemo(
-    () => accountability.slice(0, 12).map((u) => ({ name: u.name.split(" ")[0] || u.name, full: u.name, visits: u.visitCount, days: u.daysWorked })),
+    () => accountability.slice(0, 12).map((u) => ({ uid: u.userId, name: u.name.split(" ")[0] || u.name, full: u.name, visits: u.visitCount, days: u.daysWorked })),
     [accountability],
   );
+  const selected = selectedUid ? drilldown.get(selectedUid) || null : null;
+  const toggleRow = (id: string) =>
+    setOpenRows((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   const runThematic = async () => {
     if (thematicDocs.length === 0) {
@@ -111,12 +196,30 @@ export default function SarmaanAcsmAnalytics({ subs, maps, profiles, form, canEd
       <Panel
         title="Supervisor Accountability"
         icon={<Users className="h-4 w-4" style={{ color: C.green }} />}
-        right={<span className="text-[11px] font-semibold" style={{ color: C.sub }}>{accountability.length} supervisor{accountability.length === 1 ? "" : "s"} · {subs.length} visit{subs.length === 1 ? "" : "s"}</span>}
+        right={
+          <div className="flex items-center gap-2">
+            <Filter className="h-3.5 w-3.5" style={{ color: C.sub }} />
+            <select
+              value={selectedUid ?? ""}
+              onChange={(e) => { setSelectedUid(e.target.value || null); setOpenRows(new Set()); }}
+              className="rounded-lg border bg-white px-2 py-1.5 text-[11px] font-semibold outline-none"
+              style={{ borderColor: C.line, color: C.ink }}
+            >
+              <option value="">All supervisors ({accountability.length})</option>
+              {accountability.map((u) => (
+                <option key={u.userId} value={u.userId}>{u.name} · {u.visitCount}</option>
+              ))}
+            </select>
+          </div>
+        }
       >
         {chartData.length === 0 ? (
           <p className="py-8 text-center text-sm" style={{ color: C.sub }}>No supervision submissions yet.</p>
         ) : (
           <>
+            <p className="mb-2 text-[11px]" style={{ color: C.sub }}>
+              Tap a bar (or use the filter) to drill into the exact visits behind a supervisor's metrics.
+            </p>
             <div className="h-[260px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
@@ -124,22 +227,130 @@ export default function SarmaanAcsmAnalytics({ subs, maps, profiles, form, canEd
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: C.sub }} interval={0} angle={-20} textAnchor="end" height={50} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: C.sub }} />
                   <Tooltip
+                    cursor={{ fill: "rgba(30,158,82,0.06)" }}
                     formatter={(v: number, n: string) => [v, n === "visits" ? "Visits reported" : "Days worked"]}
                     labelFormatter={(_l, p: any) => p?.[0]?.payload?.full || _l}
                     contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: C.line }}
                   />
-                  <Bar dataKey="visits" radius={[6, 6, 0, 0]}>
-                    {chartData.map((_, i) => <Cell key={i} fill={[C.green, C.blue, C.purple, C.amber, "#0EA5A5"][i % 5]} />)}
+                  <Bar
+                    dataKey="visits"
+                    radius={[6, 6, 0, 0]}
+                    cursor="pointer"
+                    onClick={(d: any) => {
+                      const uid = d?.uid || d?.payload?.uid;
+                      if (uid) { setSelectedUid((prev) => (prev === uid ? null : uid)); setOpenRows(new Set()); }
+                    }}
+                  >
+                    {chartData.map((d, i) => (
+                      <Cell
+                        key={i}
+                        fill={BAR_COLORS[i % BAR_COLORS.length]}
+                        fillOpacity={selectedUid && selectedUid !== d.uid ? 0.3 : 1}
+                        stroke={selectedUid === d.uid ? C.ink : "none"}
+                        strokeWidth={selectedUid === d.uid ? 2 : 0}
+                      />
+                    ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
+
+            {/* ── Drill-down: exact submissions behind the selected supervisor ── */}
+            {selected && (
+              <div className="mt-4 rounded-xl border p-4" style={{ borderColor: C.green, background: "#F4FBF6" }}>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-bold" style={{ color: C.greenDeep }}>{selected.name}</div>
+                    {selected.email && <div className="text-[11px]" style={{ color: C.sub }}>{selected.email}</div>}
+                    <div className="mt-1 flex flex-wrap gap-3 text-[11px] font-semibold" style={{ color: C.sub }}>
+                      <span><MapPin className="mr-1 inline h-3 w-3" />{selected.visitCount} visit{selected.visitCount === 1 ? "" : "s"}</span>
+                      <span>{selected.wards} ward{selected.wards === 1 ? "" : "s"}</span>
+                      <span>Avg score <b style={{ color: C.ink }}>{selected.avgScore}%</b></span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setSelectedUid(null); setOpenRows(new Set()); }}
+                    className="inline-flex items-center gap-1 rounded-lg border bg-white px-2.5 py-1.5 text-[11px] font-semibold"
+                    style={{ borderColor: C.line, color: C.sub }}
+                  >
+                    <X className="h-3.5 w-3.5" /> Clear
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto rounded-lg border bg-white" style={{ borderColor: C.line }}>
+                  <table className="w-full text-[11px]">
+                    <thead>
+                      <tr className="text-left" style={{ background: "#F8FAFC", color: C.sub }}>
+                        <th className="px-3 py-2 font-semibold w-8"></th>
+                        <th className="px-3 py-2 font-semibold">Ward / LGA</th>
+                        <th className="px-3 py-2 font-semibold">Date</th>
+                        <th className="px-3 py-2 text-center font-semibold">Teams (out/plan)</th>
+                        <th className="px-3 py-2 text-right font-semibold">Deployment</th>
+                        <th className="px-3 py-2 text-center font-semibold">Score</th>
+                        {canEdit && <th className="px-3 py-2 text-right font-semibold">Edit</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selected.rows.map((r) => {
+                        const isOpen = openRows.has(r.id);
+                        const hasNarrative = !!(r.issues || r.corrective);
+                        return (
+                          <FragmentRow
+                            key={r.id}
+                            row={r}
+                            isOpen={isOpen}
+                            hasNarrative={hasNarrative}
+                            canEdit={canEdit}
+                            onToggle={() => hasNarrative && toggleRow(r.id)}
+                            onEdit={() => {
+                              const sub = subs.find((s) => s.id === r.id);
+                              if (sub) setEditSub(sub);
+                            }}
+                          />
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             <div className="mt-4">
               <AccountabilityTable users={accountability} unitLabel="Ward" unitLabelPlural="Wards" accent={C.green} />
             </div>
           </>
         )}
       </Panel>
+
+      {/* ── Single-submission editor modal (drill-down edit) ── */}
+      {canEdit && editSub && (
+        <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:p-6" onClick={() => setEditSub(null)}>
+          <div className="w-full max-w-3xl rounded-xl bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-sm font-bold" style={{ color: C.ink }}>Edit visit submission</div>
+              <button onClick={() => setEditSub(null)} className="rounded-lg border p-1.5" style={{ borderColor: C.line, color: C.sub }}>
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <AdminSubmissionEditor
+              submissions={[{
+                id: editSub.id,
+                data: editSub.data || {},
+                submitter: profiles.get(editSub.user_id || "")?.name || readStr(editSub, ACSM_FIELD.supervisorName, maps) || null,
+                submittedAt: editSub.created_at,
+                state: readStr(editSub, ACSM_FIELD.state, maps),
+                lga: readStr(editSub, ACSM_FIELD.lga, maps),
+                ward: readStr(editSub, ACSM_FIELD.ward, maps),
+              }]}
+              questionLabels={questionLabels}
+              table="form_submissions"
+              dataColumn="data"
+              title="ACSM & MDA Supervision — edit visit"
+              onChanged={async () => { await onChanged(); }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ── Statistical Analysis ── */}
       <Panel title="Statistical Analysis" icon={<Sigma className="h-4 w-4" style={{ color: C.blue }} />}
