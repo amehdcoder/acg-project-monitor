@@ -148,9 +148,8 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
         return "Enter the reason at least one team did not go out.";
     }
     if (idx === 1 && !allAnswered(IEC_ITEMS)) return "Answer all IEC materials & visibility checks.";
-    if (idx === 2) {
-      if (!responses[MOBILIZATION_ITEMS[0].name]) return "Answer whether town announcers were selected.";
-    }
+    // Section C (Town Announcers & Mobilization) is optional.
+
     if (idx === 4 && !allAnswered(DRUG_ITEMS)) return "Answer all drug management & administration checks.";
     if (idx === 5 && !allAnswered(ELIGIBILITY_ITEMS)) return "Answer all eligibility & safety checks.";
     if (idx === 6 && !allAnswered(DOCUMENTATION_ITEMS)) return "Answer all documentation & house marking checks.";
