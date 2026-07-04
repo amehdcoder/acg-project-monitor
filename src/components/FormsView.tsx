@@ -1617,6 +1617,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
+  if (acsmDashOpen && acsmForm) {
+    return (
+      <SarmaanAcsmDashboard
+        form={{ id: acsmForm.id, name: acsmForm.name, questions: acsmForm.questions, settings: acsmForm.settings }}
+        onClose={() => setAcsmDashOpen(false)}
+      />
+    );
+
 
 
 
