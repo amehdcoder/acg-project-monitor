@@ -178,6 +178,7 @@ export function buildAcsmFormSchema() {
         q("select_one", ACSM_FIELD.ward, "Ward"),
         q("text", ACSM_FIELD.community, "Community"),
         q("text", ACSM_FIELD.wardApexFacility, "Ward Apex Facility"),
+        q("geopoint", ACSM_FIELD.gps, "Supervision GPS Location"),
         q("date", ACSM_FIELD.supervisionDate, "Date", { required: true }),
         q("text", ACSM_FIELD.teamSupervised, "Team(s) Supervised"),
         q("number", ACSM_FIELD.teamsPlanned, "Teams Planned", { required: true }),
