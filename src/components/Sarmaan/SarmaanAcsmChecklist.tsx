@@ -509,7 +509,9 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
   const isLast = step === ACSM_SECTIONS.length - 1;
 
   return (
-    <div className="min-h-screen bg-[#F4F8FC] pb-28">
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-[#F4F8FC]">
+      {/* Scrollable region: hero + progress + body */}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       {/* Hero */}
       <div className="relative overflow-hidden" style={{ background: "linear-gradient(135deg,#F2FBF5 0%,#EAF6FF 100%)" }}>
         <button onClick={onClose} className="absolute right-3 top-3 z-10 rounded-full bg-white/80 p-2 text-muted-foreground shadow hover:bg-white">
