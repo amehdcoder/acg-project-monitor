@@ -2270,7 +2270,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                   formName={acsmForm.name}
                                   projectId={acsmForm.project_id || currentProjectId}
                                   sections={ACSM_SECTIONS}
+                                  wholeChecklist
                                 />
+
                               </div>
                             )}
                           </div>
