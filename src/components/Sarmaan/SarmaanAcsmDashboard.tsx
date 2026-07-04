@@ -146,7 +146,7 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
   const [live, setLive] = useState(false);
   const [flash, setFlash] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
-  const [nav, setNav] = useState("Overview");
+  
   const [filters, setFilters] = useState<{ state: string; lga: string; ward: string }>({ state: "", lga: "", ward: "" });
   const idsRef = useRef<Set<string>>(new Set([form.id]));
 
