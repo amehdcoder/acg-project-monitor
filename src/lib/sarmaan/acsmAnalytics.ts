@@ -49,6 +49,88 @@ export function buildAcsmAccountability(
   return buildAccountability(records, profiles);
 }
 
+/* ---------------------------------- Supervisor drill-down (per submission) - */
+export interface SupervisorVisitRow {
+  id: string;
+  ward: string;
+  lga: string;
+  state: string;
+  date: string;
+  score: number;
+  band: BandKey;
+  bandLabel: string;
+  bandColor: string;
+  teamsPlanned: number | null;
+  teamsWentOut: number | null;
+  deploymentRate: number | null;
+  issues: string;
+  corrective: string;
+}
+
+export interface SupervisorDrilldown {
+  userId: string;
+  name: string;
+  email: string;
+  visitCount: number;
+  avgScore: number;
+  wards: number;
+  rows: SupervisorVisitRow[];
+}
+
+/** Build per-supervisor drill-down data: the exact submissions behind each
+ *  supervisor's accountability metrics, richly summarised for the dashboard. */
+export function buildSupervisorDrilldown(
+  subs: AcsmSub[],
+  maps: Record<string, NameToId>,
+  profiles: Map<string, ProfileLite>,
+): Map<string, SupervisorDrilldown> {
+  const byUser = new Map<string, AcsmSub[]>();
+  for (const s of subs) {
+    const uid = s.user_id || "unassigned";
+    if (!byUser.has(uid)) byUser.set(uid, []);
+    byUser.get(uid)!.push(s);
+  }
+
+  const out = new Map<string, SupervisorDrilldown>();
+  byUser.forEach((list, uid) => {
+    const rows: SupervisorVisitRow[] = list
+      .map((s) => {
+        const score = overallScoreOf([s], maps);
+        const band = bandOf(score);
+        return {
+          id: s.id,
+          ward: readStr(s, ACSM_FIELD.ward, maps) || readStr(s, ACSM_FIELD.community, maps) || "Unspecified ward",
+          lga: readStr(s, ACSM_FIELD.lga, maps) || "—",
+          state: readStr(s, ACSM_FIELD.state, maps) || "—",
+          date: s.created_at,
+          score,
+          band,
+          bandLabel: BAND_META[band].label,
+          bandColor: BAND_META[band].color,
+          teamsPlanned: numOrNull(readVal(s, ACSM_FIELD.teamsPlanned, maps)),
+          teamsWentOut: numOrNull(readVal(s, ACSM_FIELD.teamsWentOut, maps)),
+          deploymentRate: numOrNull(readVal(s, ACSM_FIELD.deploymentRate, maps)),
+          issues: readStr(s, ACSM_FIELD.issues, maps).trim(),
+          corrective: readStr(s, ACSM_FIELD.corrective, maps).trim(),
+        };
+      })
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    const wards = new Set(rows.map((r) => r.ward)).size;
+    const scored = rows.map((r) => r.score).filter((v) => Number.isFinite(v));
+    const profile = profiles.get(uid);
+    out.set(uid, {
+      userId: uid,
+      name: profile?.name || (uid === "unassigned" ? "Unassigned" : "Unknown user"),
+      email: profile?.email || "",
+      visitCount: rows.length,
+      avgScore: scored.length ? Math.round(scored.reduce((a, b) => a + b, 0) / scored.length) : 0,
+      wards,
+      rows,
+    });
+  });
+  return out;
+}
+
 /* --------------------------------------------------- 2. Statistics -------- */
 export interface NumericStat {
   key: string;
