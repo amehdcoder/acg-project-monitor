@@ -1,9 +1,10 @@
-// SARMAAN ACSM & MDA Supervision Dashboard — image-parity UI.
+// SARMAAN ACSM & MDA Supervision Dashboard — full-width, sidebar-free UI.
 // ---------------------------------------------------------------------------
-// Pixel-faithful reproduction of the "ACSM & MDA SUPERVISION DASHBOARD"
-// reference: dark-green sidebar, white KPI strip, ward performance map, gauges,
-// donuts, component grid, town-announcer / dosing panels, deployment & refusal
-// tables, adverse-events, alerts, quick insights and a village footer.
+// Responsive board: white KPI strip, Kano supervision map (state/LGA/ward
+// boundaries + geolocated visits as medicine-bottle markers), ward performance
+// map, gauges, donuts, component grid, town-announcer / dosing panels,
+// deployment & refusal tables, adverse-events, alerts, quick insights and a
+// pinned tagline footer.
 //
 // Every panel is bound to real SARMAAN ACSM checklist submissions via
 // computeAcsmMetrics(), and the whole board refreshes in realtime as new
