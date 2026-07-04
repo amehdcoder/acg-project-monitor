@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Users2, Megaphone, Pill, MapPin, Download, ChevronDown, RefreshCw,
   UserCheck, HandHeart, Hand, Bell, AlertCircle, Info,
-  CheckCircle2, TrendingUp, ShieldCheck, X,
+  CheckCircle2, TrendingUp, X,
   Shirt, IdCard, Ban, Award,
 } from "lucide-react";
 import {
