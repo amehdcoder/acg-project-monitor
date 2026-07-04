@@ -183,7 +183,8 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
         [ACSM_FIELD.ageKnowledge]: awarenessStats.ageKnowledge,
         [ACSM_FIELD.freeMedicineKnowledge]: awarenessStats.freeMedicine,
       };
-      const loc = position ? { lat: position.lat, lng: position.lng } : null;
+      const gps = responses[ACSM_FIELD.gps] || position;
+      const loc = gps ? { lat: gps.lat, lng: gps.lng } : null;
       const res = await saveSubmission(formId, userId, payload, loc, null, "regular");
       if (res.success) {
         toast({
