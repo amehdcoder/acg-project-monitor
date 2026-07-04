@@ -142,6 +142,7 @@ export const ACSM_FIELD = {
   responsible: "responsible_person",
   deadline: "action_deadline",
   supervisorName: "supervisor_name",
+  supervisorSignature: "supervisor_signature",
   attestation: "attestation",
 } as const;
 
