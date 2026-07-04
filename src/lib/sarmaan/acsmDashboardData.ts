@@ -247,9 +247,10 @@ export function computeAcsmMetrics(subs: AcsmSub[], maps: Record<string, NameToI
   }).sort((a, b) => b.rate - a.rate);
 
   const wardScores = [...wardMap.entries()].map(([ward, rows]) => {
-    const s = computeAcsmMetrics(rows, maps); // recursion over a single ward's rows
-    return { ward, score: s.overallScore, band: bandOf(s.overallScore) };
+    const score = overallScoreOf(rows, maps); // non-recursive per-ward score
+    return { ward, score, band: bandOf(score) };
   }).sort((a, b) => b.score - a.score);
+
 
   const bandCounts: Record<BandKey, number> = { strong: 0, moderate: 0, weak: 0, critical: 0, none: 0 };
   wardScores.forEach((w) => { bandCounts[w.band]++; });
