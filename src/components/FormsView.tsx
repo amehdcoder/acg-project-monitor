@@ -2192,6 +2192,63 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             </button>
                           </div>
                         )}
+                        {/* SARMAAN ACSM & MDA Supervision Checklist */}
+                        {(canSeeAcsmChecklist || sarmaanIsManager) && (
+                          <div className="sm:col-span-2">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!acsmForm) {
+                                  if (!sarmaanIsManager) { toast({ title: "Not available yet", description: "Ask an Owner to set up this checklist." }); return; }
+                                  const created = await createAcsmChecklist();
+                                  if (created) setAcsmLaunchOpen(true);
+                                } else if (canSeeAcsmChecklist) {
+                                  setAcsmLaunchOpen(true);
+                                } else {
+                                  toast({ title: "Checklist locked", description: "Ask an Owner to grant you access.", variant: "destructive" });
+                                }
+                              }}
+                              className="group relative w-full overflow-hidden rounded-2xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                              style={{ borderColor: "#22A55A33", background: "linear-gradient(135deg,#0A2540 0%,#1B7A46 60%,#22A55A 140%)" }}
+                            >
+                              <div className="relative flex items-start gap-3">
+                                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: "#22A55A" }}>
+                                  <ClipboardCheck className="h-6 w-6 text-white" strokeWidth={2.2} />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "rgba(34,165,90,0.22)", color: "#C9F7DC" }}>
+                                    {acsmForm ? "ACSM & MDA · Azithromycin 1–59m" : "Not created · Tap to create"}
+                                  </span>
+                                  <span className="mt-2 block whitespace-normal break-words text-[15px] font-extrabold leading-snug text-white">
+                                    {SARMAAN_ACSM_FORM_NAME}
+                                  </span>
+                                  <span className="mt-1 line-clamp-2 block text-xs text-white/80">{SARMAAN_ACSM_DESC}</span>
+                                </span>
+                                <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-white/70 transition group-hover:translate-x-0.5" />
+                              </div>
+                            </button>
+                            {sarmaanIsManager && acsmForm && (
+                              <div className="mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setAcsmAccessOpen(true)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-muted"
+                                  style={{ borderColor: "#22A55A4D", color: "#0A2540" }}
+                                >
+                                  <ShieldCheck className="h-3.5 w-3.5" style={{ color: "#1B7A46" }} /> Manage ACSM checklist access
+                                </button>
+                                <SarmaanChecklistAccessManager
+                                  open={acsmAccessOpen}
+                                  onOpenChange={setAcsmAccessOpen}
+                                  formId={acsmForm.id}
+                                  formName={acsmForm.name}
+                                  projectId={acsmForm.project_id || currentProjectId}
+                                  sections={ACSM_SECTIONS}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="grid gap-3 sm:mx-auto sm:max-w-4xl sm:grid-cols-2 lg:max-w-5xl">
