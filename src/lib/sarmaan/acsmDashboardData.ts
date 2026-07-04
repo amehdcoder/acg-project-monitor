@@ -136,6 +136,26 @@ const INFO_MAP: Record<string, string> = {
   other: "Others",
 };
 
+/** Lightweight overall ACSM score for a subset (used per-ward, no recursion). */
+export function overallScoreOf(subs: AcsmSub[], maps: Record<string, NameToId>): number {
+  const iec = yesRate(subs, IEC_ITEMS.map((i) => i.name), maps);
+  const ann = yesRate(subs, ["announcers_present"], maps);
+  const doc = yesRate(subs, DOCUMENTATION_ITEMS.map((i) => i.name), maps);
+  const dose = yesRate(subs, ["dose_by_age_1_11", "dose_pole_used", "correct_reconstitution"], maps);
+  const consent = yesRate(subs, ["consent_sought"], maps);
+  let aware = 0, sample = 0;
+  for (const s of subs) {
+    for (let r = 1; r <= AWARENESS_SAMPLE_SIZE; r++) {
+      const heard = readVal(s, `aw_${r}_heard`, maps);
+      if (heard === undefined || heard === "") continue;
+      sample++;
+      if (isYes(heard) && isYes(readVal(s, `aw_${r}_knows_age`, maps)) && isYes(readVal(s, `aw_${r}_knows_free`, maps))) aware++;
+    }
+  }
+  const awarePct = pct(aware, sample);
+  return Math.round((iec + ann + awarePct + dose + consent + doc) / 6);
+}
+
 export function computeAcsmMetrics(subs: AcsmSub[], maps: Record<string, NameToId>): AcsmMetrics {
   const count = subs.length;
 
