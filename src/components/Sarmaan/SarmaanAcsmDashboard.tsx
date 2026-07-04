@@ -570,27 +570,28 @@ function Kpi({ icon: Icon, tint, title, main, sub2, badge, bar, barColor, footer
   bar?: number; barColor?: string; footer: string; footerColor: string;
 }) {
   return (
-    <div className="rounded-xl border bg-white p-3 shadow-sm" style={{ borderColor: C.line }}>
-      <div className="flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${tint}1A` }}>
-          <Icon className="h-4 w-4" style={{ color: tint }} />
+    <div className="rounded-xl border bg-white p-4 shadow-sm" style={{ borderColor: C.line }}>
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `${tint}1A` }}>
+          <Icon className="h-5 w-5" style={{ color: tint }} />
         </span>
-        <span className="text-[11px] font-bold leading-tight" style={{ color: C.sub }}>{title}</span>
+        <span className="text-xs font-bold leading-tight" style={{ color: C.sub }}>{title}</span>
       </div>
-      <div className="mt-2 flex items-end gap-1">
-        <span className="text-2xl font-extrabold" style={{ color: C.ink }}>{main}</span>
-        {sub2 && <span className="mb-0.5 text-xs font-semibold" style={{ color: C.sub }}>{sub2}</span>}
-        {badge && <span className="mb-0.5 ml-auto text-xs font-bold" style={{ color: C.green }}>{badge}</span>}
+      <div className="mt-3 flex items-end gap-1.5">
+        <span className="text-3xl font-extrabold" style={{ color: C.ink }}>{main}</span>
+        {sub2 && <span className="mb-1 text-sm font-semibold" style={{ color: C.sub }}>{sub2}</span>}
+        {badge && <span className="mb-1 ml-auto text-sm font-bold" style={{ color: C.green }}>{badge}</span>}
       </div>
       {bar != null && (
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ background: "#EEF2F6" }}>
+        <div className="mt-2.5 h-2 overflow-hidden rounded-full" style={{ background: "#EEF2F6" }}>
           <div className="h-full rounded-full" style={{ width: `${Math.min(100, bar)}%`, background: barColor }} />
         </div>
       )}
-      <div className="mt-1.5 flex items-center gap-1 text-[10px] font-semibold" style={{ color: footerColor }}>
+      <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold" style={{ color: footerColor }}>
         {footerColor === C.green && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}{footer}
       </div>
     </div>
+
   );
 }
 
