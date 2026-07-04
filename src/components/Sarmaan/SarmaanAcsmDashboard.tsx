@@ -11,20 +11,20 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Menu, LayoutGrid, Users2, BarChart3, Megaphone, MessageSquare, Pill,
-  ShieldAlert, Activity, MapPin, FileText, Download, ChevronDown, RefreshCw,
-  UserCheck, HandHeart, Hand, ExternalLink, Bell, AlertCircle, Info,
-  CheckCircle2, Lightbulb, TrendingUp, ChevronRight, ShieldCheck,
+  Users2, Megaphone, Pill, MapPin, Download, ChevronDown, RefreshCw,
+  UserCheck, HandHeart, Hand, Bell, AlertCircle, Info,
+  CheckCircle2, TrendingUp, ShieldCheck, X,
   Shirt, IdCard, Ban, Award,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
-import heroImg from "@/assets/sarmaan-acsm-hero.png";
 import type { Question, FormGroup } from "@/components/FormBuilder/types";
+import SarmaanKanoMap, { type VisitPoint } from "@/components/Sarmaan/SarmaanKanoMap";
 import {
-  computeAcsmMetrics, BAND_META, type AcsmSub, type NameToId, type BandKey,
+  computeAcsmMetrics, BAND_META, bandOf, overallScoreOf, readVal, readStr,
+  type AcsmSub, type NameToId, type BandKey,
 } from "@/lib/sarmaan/acsmDashboardData";
 import { ACSM_FIELD } from "@/lib/sarmaan/acsmChecklist";
 
