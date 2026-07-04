@@ -129,7 +129,7 @@ export default function SarmaanAcsmAnalytics({ subs, maps, profiles, form, canEd
                     contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: C.line }}
                   />
                   <Bar dataKey="visits" radius={[6, 6, 0, 0]}>
-                    {chartData.map((_, i) => <Cell key={i} fill={[C.green, C.blue, C.purple, C.amber, C.teal || C.blue][i % 5]} />)}
+                    {chartData.map((_, i) => <Cell key={i} fill={[C.green, C.blue, C.purple, C.amber, "#0EA5A5"][i % 5]} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
