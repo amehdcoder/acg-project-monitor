@@ -29,17 +29,26 @@ interface Props {
   formName: string;
   sections: SectionRef[];
   projectId?: string | null;
+  /**
+   * When true, access is granted for the ENTIRE checklist as a single unit
+   * (one grant per member) instead of per-module. The module selector is hidden.
+   */
+  wholeChecklist?: boolean;
 }
 
 /**
- * Owner / Admin tool to grant named project members access to individual
- * modules (sections) of the SARMAAN Integrated Supervisory Checklist. Because
- * each section is an independent, separately-submittable form, access is granted
- * per-module. Dashboard access is managed separately via DashboardAccessManager.
+ * Owner / Admin tool to grant named project members access to the SARMAAN
+ * Integrated Supervisory Checklist. In per-module mode each section is an
+ * independent, separately-submittable form so access is granted per-module.
+ * In whole-checklist mode a single grant unlocks the complete checklist.
+ * Dashboard access is managed separately via DashboardAccessManager.
  */
-export default function SarmaanChecklistAccessManager({ open, onOpenChange, formId, formName, sections, projectId }: Props) {
+export default function SarmaanChecklistAccessManager({ open, onOpenChange, formId, formName, sections: sectionsProp, projectId, wholeChecklist }: Props) {
   const { user } = useAuth();
+  const WHOLE_ID = "__acsm_whole__";
+  const sections: SectionRef[] = wholeChecklist ? [{ id: WHOLE_ID, label: "Entire Checklist" }] : sectionsProp;
   const [members, setMembers] = useState<Member[]>([]);
+
   const [activeSection, setActiveSection] = useState<string>(sections[0]?.id ?? "");
   // grants map: `${section_id}::${user_id}` -> access row id
   const [granted, setGranted] = useState<Record<string, string>>({});
