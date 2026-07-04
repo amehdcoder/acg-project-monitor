@@ -14,8 +14,8 @@ import {
   type ProfileLite,
 } from "@/lib/accountability";
 import {
-  readVal, readStr, overallScoreOf, pct,
-  type AcsmSub, type NameToId,
+  readVal, readStr, overallScoreOf, pct, bandOf, BAND_META,
+  type AcsmSub, type NameToId, type BandKey,
 } from "@/lib/sarmaan/acsmDashboardData";
 
 /* ----------------------------------------------------------------- helpers */
