@@ -36,8 +36,6 @@ interface Props {
 const C = {
   green: "#1E9E52",
   greenDeep: "#0E7A3B",
-  sidebar: "#0B5E30",
-  sidebarDeep: "#084A26",
   canvas: "#F4F6F8",
   amber: "#F59E0B",
   amberSoft: "#84CC16",
