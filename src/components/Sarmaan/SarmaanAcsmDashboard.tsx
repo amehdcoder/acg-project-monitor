@@ -552,12 +552,6 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
             </Panel>
           </div>
       </main>
-
-      {/* Footer tagline — pinned to the very bottom of the dashboard */}
-      <footer className="mt-auto flex items-center justify-center gap-2.5 px-6 py-5 text-center text-white" style={{ background: `linear-gradient(90deg,${C.green},${C.greenDeep})` }}>
-        <ShieldCheck className="h-6 w-6 shrink-0" />
-        <span className="text-sm font-semibold sm:text-base">Every check. Every child. Every dose. <b>A healthier tomorrow.</b></span>
-      </footer>
     </div>
 
   );
