@@ -59,6 +59,76 @@ function Panel({ title, icon, children, right }: { title: React.ReactNode; icon?
   );
 }
 
+/** One drill-down row: a supervisor's exact visit submission, expandable to
+ *  reveal the free-text issues & corrective actions captured on the visit. */
+function FragmentRow({
+  row, isOpen, hasNarrative, canEdit, onToggle, onEdit,
+}: {
+  row: import("@/lib/sarmaan/acsmAnalytics").SupervisorVisitRow;
+  isOpen: boolean;
+  hasNarrative: boolean;
+  canEdit: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+}) {
+  return (
+    <>
+      <tr className="border-t" style={{ borderColor: C.line }}>
+        <td className="px-3 py-2">
+          {hasNarrative ? (
+            <button onClick={onToggle} className="inline-flex h-5 w-5 items-center justify-center rounded" style={{ color: C.sub }} title="Show narratives">
+              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </button>
+          ) : null}
+        </td>
+        <td className="px-3 py-2">
+          <div className="font-semibold" style={{ color: C.ink }}>{row.ward}</div>
+          <div style={{ color: C.sub }}>{row.lga} · {row.state}</div>
+        </td>
+        <td className="px-3 py-2" style={{ color: C.sub }}>
+          <CalendarDays className="mr-1 inline h-3 w-3" />{formatDay(row.date)}
+        </td>
+        <td className="px-3 py-2 text-center tabular-nums" style={{ color: C.ink }}>
+          {row.teamsWentOut ?? "—"}/{row.teamsPlanned ?? "—"}
+        </td>
+        <td className="px-3 py-2 text-right tabular-nums" style={{ color: C.ink }}>
+          {row.deploymentRate != null ? `${row.deploymentRate}%` : "—"}
+        </td>
+        <td className="px-3 py-2 text-center">
+          <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: row.bandColor }}>
+            {row.score}%
+          </span>
+        </td>
+        {canEdit && (
+          <td className="px-3 py-2 text-right">
+            <button onClick={onEdit} className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-semibold" style={{ borderColor: C.line, color: C.blue }}>
+              <Pencil className="h-3 w-3" /> Edit
+            </button>
+          </td>
+        )}
+      </tr>
+      {isOpen && hasNarrative && (
+        <tr style={{ background: "#F8FAFC" }}>
+          <td colSpan={canEdit ? 7 : 6} className="px-3 py-2">
+            {row.issues && (
+              <div className="mb-1.5">
+                <span className="text-[10px] font-bold uppercase" style={{ color: C.red }}>Issues identified: </span>
+                <span className="text-[11px]" style={{ color: C.ink }}>{row.issues}</span>
+              </div>
+            )}
+            {row.corrective && (
+              <div>
+                <span className="text-[10px] font-bold uppercase" style={{ color: C.green }}>Corrective actions: </span>
+                <span className="text-[11px]" style={{ color: C.ink }}>{row.corrective}</span>
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
 interface Props {
   subs: AcsmSub[];
   maps: Record<string, NameToId>;
