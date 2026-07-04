@@ -73,14 +73,27 @@ export default function SarmaanAcsmAnalytics({ subs, maps, profiles, form, canEd
   const accountability = useMemo(() => buildAcsmAccountability(subs, maps, profiles), [subs, maps, profiles]);
   const stats = useMemo(() => computeAcsmStatistics(subs, maps), [subs, maps]);
   const thematicDocs = useMemo(() => buildThematicDocs(subs, maps), [subs, maps]);
+  const drilldown = useMemo(() => buildSupervisorDrilldown(subs, maps, profiles), [subs, maps, profiles]);
 
   const [thematic, setThematic] = useState<LocalThematicResult | null>(null);
   const [thematizing, setThematizing] = useState(false);
+  // Interactive accountability filter / drill-down state
+  const [selectedUid, setSelectedUid] = useState<string | null>(null);
+  const [openRows, setOpenRows] = useState<Set<string>>(new Set());
+  const [editSub, setEditSub] = useState<AcsmSub | null>(null);
 
+  const BAR_COLORS = [C.green, C.blue, C.purple, C.amber, "#0EA5A5"];
   const chartData = useMemo(
-    () => accountability.slice(0, 12).map((u) => ({ name: u.name.split(" ")[0] || u.name, full: u.name, visits: u.visitCount, days: u.daysWorked })),
+    () => accountability.slice(0, 12).map((u) => ({ uid: u.userId, name: u.name.split(" ")[0] || u.name, full: u.name, visits: u.visitCount, days: u.daysWorked })),
     [accountability],
   );
+  const selected = selectedUid ? drilldown.get(selectedUid) || null : null;
+  const toggleRow = (id: string) =>
+    setOpenRows((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   const runThematic = async () => {
     if (thematicDocs.length === 0) {
