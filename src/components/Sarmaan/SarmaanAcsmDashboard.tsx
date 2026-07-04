@@ -130,9 +130,9 @@ function Panel({ title, children, right, className = "" }: { title?: React.React
 function MiniStat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div className="text-center">
-      <div className="mb-1 text-[10px] font-semibold leading-tight" style={{ color: C.sub }}>{label}</div>
-      <div className="text-lg font-extrabold" style={{ color: C.ink }}>{value}</div>
-      <div className="mx-auto mt-1.5 h-1.5 w-14 overflow-hidden rounded-full" style={{ background: "#EEF2F6" }}>
+      <div className="mb-1 text-[11px] font-semibold leading-tight" style={{ color: C.sub }}>{label}</div>
+      <div className="text-xl font-extrabold" style={{ color: C.ink }}>{value}</div>
+      <div className="mx-auto mt-2 h-2 w-16 overflow-hidden rounded-full" style={{ background: "#EEF2F6" }}>
         <div className="h-full rounded-full" style={{ width: value, background: color }} />
       </div>
     </div>
