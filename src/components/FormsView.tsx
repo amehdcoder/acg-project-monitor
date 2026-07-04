@@ -115,6 +115,8 @@ import SarmaanChecklistAccessManager from "@/components/Sarmaan/SarmaanChecklist
 import DashboardAccessManager from "@/components/dashboard/DashboardAccessManager";
 import { useSarmaanFormAccess } from "@/hooks/useSarmaanFormAccess";
 import { isSupervisoryLearningForm } from "@/components/Sarmaan/sarmaanBrand";
+import SarmaanAcsmChecklist from "@/components/Sarmaan/SarmaanAcsmChecklist";
+import { SARMAAN_ACSM_FORM_NAME, SARMAAN_ACSM_DESC, buildAcsmFormSchema, ACSM_SECTIONS } from "@/lib/sarmaan/acsmChecklist";
 import { getPreset } from "@/lib/specialStudio/presets";
 import { downloadXlsForm } from "@/lib/specialStudio/xlsformExport";
 import { FormFiller } from "@/components/FormFiller";
