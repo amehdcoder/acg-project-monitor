@@ -386,7 +386,7 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
           </div>
 
           {/* Row 3: components · town announcers · dosing · alerts */}
-          <div className="grid gap-3 xl:grid-cols-4">
+          <div className="grid gap-4 xl:grid-cols-4">
             <Panel title="Supervision Components" className="xl:col-span-1">
               <div className="grid grid-cols-4 gap-3">
                 <MiniStat label="IEC Materials Visibility" value={`${M.iecVisibility}%`} color={C.green} />
@@ -464,7 +464,7 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
           </div>
 
           {/* Row 4: deployment table · refusal reasons · adverse events · quick insights */}
-          <div className="grid gap-3 xl:grid-cols-4">
+          <div className="grid gap-4 xl:grid-cols-4">
             <Panel title="Team Deployment by Ward" className="xl:col-span-1">
               <div className="overflow-x-auto">
                 <table className="w-full text-[11px]">
