@@ -115,6 +115,8 @@ import SarmaanChecklistAccessManager from "@/components/Sarmaan/SarmaanChecklist
 import DashboardAccessManager from "@/components/dashboard/DashboardAccessManager";
 import { useSarmaanFormAccess } from "@/hooks/useSarmaanFormAccess";
 import { isSupervisoryLearningForm } from "@/components/Sarmaan/sarmaanBrand";
+import SarmaanAcsmChecklist from "@/components/Sarmaan/SarmaanAcsmChecklist";
+import { SARMAAN_ACSM_FORM_NAME, SARMAAN_ACSM_DESC, buildAcsmFormSchema, ACSM_SECTIONS } from "@/lib/sarmaan/acsmChecklist";
 import { getPreset } from "@/lib/specialStudio/presets";
 import { downloadXlsForm } from "@/lib/specialStudio/xlsformExport";
 import { FormFiller } from "@/components/FormFiller";
@@ -255,6 +257,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [sarmaanLaunchForm, setSarmaanLaunchForm] = useState<Form | null>(null);
   const [sarmaanChecklistAccessOpen, setSarmaanChecklistAccessOpen] = useState(false);
   const [sarmaanDashAccessOpen, setSarmaanDashAccessOpen] = useState(false);
+  const [acsmLaunchOpen, setAcsmLaunchOpen] = useState(false);
+  const [acsmAccessOpen, setAcsmAccessOpen] = useState(false);
   const [templateForm, setTemplateForm] = useState<{ templateId: string; name: string; description: string; questions: Question[]; settings: any; geofence?: GeofenceArea } | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
@@ -1275,6 +1279,42 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     : sarmaanGrants.filter((g) => g.user_id === user?.id).map((g) => g.section_id);
   const canSeeSarmaanChecklist = sarmaanIsManager || hasAnySarmaanGrant;
 
+  // SARMAAN ACSM & MDA Supervision Checklist (image-parity form)
+  const acsmForm = useMemo(
+    () => mergedForms.find((f) => f.name === SARMAAN_ACSM_FORM_NAME && (!currentProjectId || f.project_id === currentProjectId)) || null,
+    [mergedForms, currentProjectId],
+  );
+  const { grants: acsmGrants, hasAnyGrant: hasAnyAcsmGrant } = useSarmaanFormAccess(acsmForm?.id, sarmaanIsManager);
+  const canSeeAcsmChecklist = sarmaanIsManager || hasAnyAcsmGrant;
+
+  const createAcsmChecklist = async (): Promise<Form | null> => {
+    if (!currentProjectId) {
+      toast({ title: "Select a project", description: "Choose the SARMAAN project first.", variant: "destructive" });
+      return null;
+    }
+    if (acsmForm) return acsmForm;
+    try {
+      const { data, error } = await supabase.from("forms").insert({
+        name: SARMAAN_ACSM_FORM_NAME,
+        description: SARMAAN_ACSM_DESC,
+        questions: buildAcsmFormSchema() as any,
+        settings: { requireLocation: true, offlineEnabled: true, sarmaan_acsm: true } as any,
+        project_id: currentProjectId,
+        created_by: user?.id,
+        status: "active",
+      } as any).select("*").single();
+      if (error) throw error;
+      const created = { ...(data as any), submissions_count: 0 } as Form;
+      setForms((prev) => (prev.some((f) => f.id === created.id) ? prev : [created, ...prev]));
+      toast({ title: "Checklist added", description: "SARMAAN ACSM & MDA Supervision Checklist is ready." });
+      fetchForms(currentProjectId);
+      return created;
+    } catch (e: any) {
+      toast({ title: "Could not add", description: e?.message || "Please try again.", variant: "destructive" });
+      return null;
+    }
+  };
+
   const filteredNonSarmaanForms = filteredForms.filter(
     (form) => !(currentProjectIsSarmaan && isSupervisoryLearningForm({ settings: form.settings, name: form.name })),
   );
@@ -1560,6 +1600,18 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         onClose={() => setSarmaanLaunchForm(null)}
       />
 
+    );
+  }
+
+  if (acsmLaunchOpen && acsmForm) {
+    return (
+      <SarmaanAcsmChecklist
+        formId={acsmForm.id}
+        userId={user?.id || ""}
+        projectId={acsmForm.project_id || currentProjectId || ""}
+        onSubmitted={() => currentProjectId && fetchForms(currentProjectId)}
+        onClose={() => setAcsmLaunchOpen(false)}
+      />
     );
   }
 
@@ -2138,6 +2190,63 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             >
                               <ShieldCheck className="h-3.5 w-3.5" style={{ color: "#0E8D80" }} /> Manage dashboard access
                             </button>
+                          </div>
+                        )}
+                        {/* SARMAAN ACSM & MDA Supervision Checklist */}
+                        {(canSeeAcsmChecklist || sarmaanIsManager) && (
+                          <div className="sm:col-span-2">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!acsmForm) {
+                                  if (!sarmaanIsManager) { toast({ title: "Not available yet", description: "Ask an Owner to set up this checklist." }); return; }
+                                  const created = await createAcsmChecklist();
+                                  if (created) setAcsmLaunchOpen(true);
+                                } else if (canSeeAcsmChecklist) {
+                                  setAcsmLaunchOpen(true);
+                                } else {
+                                  toast({ title: "Checklist locked", description: "Ask an Owner to grant you access.", variant: "destructive" });
+                                }
+                              }}
+                              className="group relative w-full overflow-hidden rounded-2xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                              style={{ borderColor: "#22A55A33", background: "linear-gradient(135deg,#0A2540 0%,#1B7A46 60%,#22A55A 140%)" }}
+                            >
+                              <div className="relative flex items-start gap-3">
+                                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: "#22A55A" }}>
+                                  <ClipboardCheck className="h-6 w-6 text-white" strokeWidth={2.2} />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "rgba(34,165,90,0.22)", color: "#C9F7DC" }}>
+                                    {acsmForm ? "ACSM & MDA · Azithromycin 1–59m" : "Not created · Tap to create"}
+                                  </span>
+                                  <span className="mt-2 block whitespace-normal break-words text-[15px] font-extrabold leading-snug text-white">
+                                    {SARMAAN_ACSM_FORM_NAME}
+                                  </span>
+                                  <span className="mt-1 line-clamp-2 block text-xs text-white/80">{SARMAAN_ACSM_DESC}</span>
+                                </span>
+                                <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-white/70 transition group-hover:translate-x-0.5" />
+                              </div>
+                            </button>
+                            {sarmaanIsManager && acsmForm && (
+                              <div className="mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setAcsmAccessOpen(true)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-muted"
+                                  style={{ borderColor: "#22A55A4D", color: "#0A2540" }}
+                                >
+                                  <ShieldCheck className="h-3.5 w-3.5" style={{ color: "#1B7A46" }} /> Manage ACSM checklist access
+                                </button>
+                                <SarmaanChecklistAccessManager
+                                  open={acsmAccessOpen}
+                                  onOpenChange={setAcsmAccessOpen}
+                                  formId={acsmForm.id}
+                                  formName={acsmForm.name}
+                                  projectId={acsmForm.project_id || currentProjectId}
+                                  sections={ACSM_SECTIONS}
+                                />
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
