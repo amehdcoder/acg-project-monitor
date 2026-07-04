@@ -606,6 +606,19 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
               </div>
             </Panel>
           </div>
+
+          {/* Row 5: Accountability · Statistical & Thematic analysis · Owner editor */}
+          <SarmaanAcsmAnalytics
+            subs={filtered}
+            maps={maps}
+            profiles={profiles}
+            form={{ id: form.id, name: form.name, questions: form.questions }}
+            canEdit={canEditDashboards}
+            questionLabels={questionLabels}
+            onChanged={() => load({ live: true })}
+          />
+        </div>
+
       </main>
     </div>
 
