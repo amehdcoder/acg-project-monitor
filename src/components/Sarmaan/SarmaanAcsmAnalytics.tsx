@@ -15,17 +15,19 @@ import {
 } from "recharts";
 import {
   Users, Sigma, Sparkles, Loader2, Quote, TrendingUp, TrendingDown, Minus,
-  MessageSquareText, BarChart3,
+  MessageSquareText, BarChart3, Filter, X, ChevronDown, ChevronRight,
+  MapPin, CalendarDays, Pencil,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import AccountabilityTable from "@/components/shared/AccountabilityTable";
 import AdminSubmissionEditor from "@/components/AdminSubmissionEditor";
 import type { ProfileLite } from "@/lib/accountability";
+import { formatDay } from "@/lib/accountability";
 import type { QuestionLabelMap } from "@/lib/formLabelUtils";
 import {
   buildAcsmAccountability, computeAcsmStatistics, buildThematicDocs,
-  localThematicAnalysis, type LocalThematicResult,
+  localThematicAnalysis, buildSupervisorDrilldown, type LocalThematicResult,
 } from "@/lib/sarmaan/acsmAnalytics";
 import { readStr } from "@/lib/sarmaan/acsmDashboardData";
 import type { AcsmSub, NameToId } from "@/lib/sarmaan/acsmDashboardData";
