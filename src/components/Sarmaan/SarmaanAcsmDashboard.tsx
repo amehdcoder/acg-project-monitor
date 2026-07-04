@@ -617,9 +617,8 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
             questionLabels={questionLabels}
             onChanged={() => load({ live: true })}
           />
-        </div>
-
       </main>
+
     </div>
 
   );
