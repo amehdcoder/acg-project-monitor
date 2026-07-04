@@ -123,6 +123,7 @@ export const ACSM_FIELD = {
   ward: "ward",
   community: "community",
   wardApexFacility: "ward_apex_facility",
+  gps: "supervision_gps",
   supervisionDate: "supervision_date",
   teamSupervised: "team_supervised",
   teamsPlanned: "teams_planned",
