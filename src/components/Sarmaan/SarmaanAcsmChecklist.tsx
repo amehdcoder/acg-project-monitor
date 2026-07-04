@@ -1,19 +1,20 @@
 import { useMemo, useState } from "react";
 import {
-  ChevronLeft, ChevronRight, Save, Send, Loader2, X, CloudUpload, Wifi, WifiOff,
-  Users, ShieldCheck, CheckCircle2, Landmark, Flag, Home, Building2, ClipboardList,
-  MessageSquare, Megaphone, BadgeCheck, ClipboardCheck, Pill, HeartPulse, FileText,
-  AlertTriangle,
+  ChevronLeft, ChevronRight, Send, Loader2, X, Wifi, WifiOff,
+  Users, CheckCircle2, Landmark, Flag, Home, Building2, ClipboardList,
+  MessageSquare, Megaphone, ClipboardCheck, Pill, HeartPulse, FileText,
+  AlertTriangle, BadgeCheck, ShieldCheck, PenTool,
 } from "lucide-react";
 import heroImg from "@/assets/sarmaan-acsm-hero.png";
 import MdaLocationCascade from "@/components/MdaChecklist/MdaLocationCascade";
+import SignatureCapture from "@/components/FormFiller/SignatureCapture";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { toast } from "@/hooks/use-toast";
 import {
   ACSM_SECTIONS, IEC_ITEMS, MOBILIZATION_ITEMS, ANNOUNCEMENT_CONTENT_ITEMS, ID_TYPES,
-  AWARENESS_COLUMNS, AWARENESS_SAMPLE_SIZE, AWARENESS_TARGETS, DRUG_ITEMS, ELIGIBILITY_ITEMS,
-  DOCUMENTATION_ITEMS, ACSM_FIELD, SARMAAN_ACSM_FORM_NAME, type CheckItem,
+  MEDICINE_PREVENTS_OPTIONS, AWARENESS_COLUMNS, AWARENESS_SAMPLE_SIZE, AWARENESS_TARGETS,
+  DRUG_ITEMS, ELIGIBILITY_ITEMS, DOCUMENTATION_ITEMS, ACSM_FIELD, type CheckItem,
 } from "@/lib/sarmaan/acsmChecklist";
 
 const GREEN = "#22A55A";
@@ -23,6 +24,9 @@ const TEAL = "#12B5A5";
 const ICONS: Record<string, any> = {
   Landmark, Flag, Home, Building2, ClipboardList, MessageSquare,
 };
+
+const inputCls =
+  "w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-[#12B5A5] focus:ring-2 focus:ring-[#12B5A5]/20";
 
 interface Props {
   formId: string;
@@ -39,6 +43,51 @@ const num = (v: any): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
+// ---------- stable presentational helpers (defined outside to preserve focus) ----------
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}{required && <span className="text-[#E25555]">*</span>}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function YnpRow({ item, options, value, onSelect }: {
+  item: CheckItem; options: string[]; value: any; onSelect: (v: string) => void;
+}) {
+  const Icon = item.icon ? ICONS[item.icon] : null;
+  const colors: Record<string, string> = { Yes: GREEN, No: "#E25555", Partly: "#F0A020", "N/A": "#94A3B8" };
+  return (
+    <div className="flex flex-col gap-2 border-b border-border/50 py-3 last:border-0 sm:flex-row sm:items-center">
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+        {Icon && <Icon className="h-4 w-4 shrink-0" style={{ color: GREEN }} />}
+        <span className="text-sm font-medium text-foreground">{item.label}</span>
+      </div>
+      <div className="flex shrink-0 flex-wrap gap-2">
+        {options.map((o) => {
+          const active = value === o;
+          return (
+            <button
+              key={o}
+              type="button"
+              onClick={() => onSelect(o)}
+              className="min-w-[52px] rounded-full border px-3 py-1.5 text-xs font-semibold transition active:scale-95"
+              style={active
+                ? { background: colors[o], borderColor: colors[o], color: "#fff" }
+                : { background: "transparent", borderColor: "#D5DEEA", color: "#64748B" }}
+            >
+              {o}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClose, onSubmitted }: Props) {
   const { saveSubmission, isOnline } = useOfflineStorage();
   const { position } = useGeolocation();
@@ -48,8 +97,16 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
 
   const set = (name: string, value: any) => setResponses((p) => ({ ...p, [name]: value }));
   const merge = (updates: Responses) => setResponses((p) => ({ ...p, ...updates }));
+  const toggleMulti = (name: string, option: string) =>
+    setResponses((p) => {
+      const cur: string[] = Array.isArray(p[name]) ? p[name] : [];
+      const next = cur.includes(option) ? cur.filter((o) => o !== option) : [...cur, option];
+      return { ...p, [name]: next };
+    });
+  const isChecked = (name: string, option: string) =>
+    Array.isArray(responses[name]) && responses[name].includes(option);
+
   const nameToId = useMemo(() => {
-    // identity map so the cascade writes into responses keyed by field name
     const m: Record<string, string> = {};
     ["state", "lga", "ward", "community"].forEach((n) => (m[n] = n));
     return m;
@@ -77,6 +134,8 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
     };
   }, [responses]);
 
+  const allAnswered = (items: CheckItem[]) => items.every((i) => !!responses[i.name]);
+
   const validateStep = (idx: number): string | null => {
     if (idx === 0) {
       if (!responses[ACSM_FIELD.state]) return "Select the State of supervision.";
@@ -85,15 +144,18 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
       if (!responses[ACSM_FIELD.teamsPlanned]) return "Enter the number of teams planned.";
       if (responses[ACSM_FIELD.teamsWentOut] === undefined || responses[ACSM_FIELD.teamsWentOut] === "")
         return "Enter the number of teams that went out.";
+      if (teamsNotOut > 0 && !String(responses[ACSM_FIELD.teamReason] || "").trim())
+        return "Enter the reason at least one team did not go out.";
     }
-    if (idx === 1) {
-      if (!responses[IEC_ITEMS[0].name]) return "Answer the first IEC visibility check.";
-    }
+    if (idx === 1 && !allAnswered(IEC_ITEMS)) return "Answer all IEC materials & visibility checks.";
     if (idx === 2) {
       if (!responses[MOBILIZATION_ITEMS[0].name]) return "Answer whether town announcers were selected.";
     }
+    if (idx === 4 && !allAnswered(DRUG_ITEMS)) return "Answer all drug management & administration checks.";
+    if (idx === 5 && !allAnswered(ELIGIBILITY_ITEMS)) return "Answer all eligibility & safety checks.";
+    if (idx === 6 && !allAnswered(DOCUMENTATION_ITEMS)) return "Answer all documentation & house marking checks.";
     if (idx === 7) {
-      if (!responses[ACSM_FIELD.supervisorName]) return "Enter the supervisor name.";
+      if (!responses[ACSM_FIELD.supervisorSignature]) return "Please provide the supervisor signature.";
       if (!responses[ACSM_FIELD.attestation]) return "You must confirm the attestation before submitting.";
     }
     return null;
@@ -139,49 +201,17 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
     }
   };
 
-  // ---------- shared field renderers ----------
-  const YnpRow = ({ item, options }: { item: CheckItem; options: string[] }) => {
-    const Icon = item.icon ? ICONS[item.icon] : null;
-    const val = responses[item.name];
-    const colors: Record<string, string> = { Yes: GREEN, No: "#E25555", Partly: "#F0A020", "N/A": "#94A3B8" };
-    return (
-      <div className="flex flex-col gap-2 border-b border-border/50 py-3 last:border-0 sm:flex-row sm:items-center">
-        <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          {Icon && <Icon className="h-4 w-4 shrink-0" style={{ color: GREEN }} />}
-          <span className="text-sm font-medium text-foreground">{item.label}</span>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          {options.map((o) => {
-            const active = val === o;
-            return (
-              <button
-                key={o}
-                type="button"
-                onClick={() => set(item.name, o)}
-                className="rounded-full border px-3 py-1 text-xs font-semibold transition"
-                style={active
-                  ? { background: colors[o], borderColor: colors[o], color: "#fff" }
-                  : { background: "transparent", borderColor: "#D5DEEA", color: "#64748B" }}
-              >
-                {o}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  const Field = ({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) => (
-    <label className="block">
-      <span className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}{required && <span className="text-[#E25555]">*</span>}
-      </span>
-      {children}
-    </label>
+  const Chip = ({ label, active, onClick, color = GREEN }: { label: string; active: boolean; onClick: () => void; color?: string }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition active:scale-95"
+      style={active ? { background: color, borderColor: color, color: "#fff" } : { borderColor: "#D5DEEA", color: "#64748B" }}
+    >
+      {active && <CheckCircle2 className="h-3.5 w-3.5" />}
+      {label}
+    </button>
   );
-
-  const inputCls = "w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-[#12B5A5] focus:ring-2 focus:ring-[#12B5A5]/20";
 
   // ---------- step content ----------
   const renderStep = () => {
@@ -216,10 +246,11 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
 
             <SectionBadge letter="A" title="Location & Teams" color="#2F6FE6" tint="#EAF1FE" />
             <div className="grid gap-3 sm:grid-cols-4">
-              <KpiCard label="Teams Planned" value={teamsPlanned || "—"} icon={<Users className="h-4 w-4" />} accent="#2F6FE6"
-                editable value2={responses[ACSM_FIELD.teamsPlanned]} onEdit={(v) => set(ACSM_FIELD.teamsPlanned, v)} />
-              <KpiCard label="Teams That Went Out" value={teamsWent || "—"} icon={<CheckCircle2 className="h-4 w-4" />} accent={GREEN}
-                editable value2={responses[ACSM_FIELD.teamsWentOut]} onEdit={(v) => set(ACSM_FIELD.teamsWentOut, v)} />
+              <KpiCard label="Teams Planned" accent="#2F6FE6"
+                value2={responses[ACSM_FIELD.teamsPlanned]} onEdit={(v) => set(ACSM_FIELD.teamsPlanned, v)} />
+              <KpiCard label="Teams That Went Out" accent={GREEN}
+                value2={responses[ACSM_FIELD.teamsWentOut]} onEdit={(v) => set(ACSM_FIELD.teamsWentOut, v)} />
+
               <div className="rounded-2xl border border-border bg-card p-3">
                 <div className="text-xs font-semibold text-muted-foreground">Teams Deployment Rate</div>
                 <div className="mt-1 text-2xl font-extrabold" style={{ color: "#2F6FE6" }}>{deploymentRate}%</div>
@@ -234,10 +265,12 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
                 </div>
               </div>
             </div>
-            <Field label="Reason any team did not go out">
-              <input className={inputCls} value={responses[ACSM_FIELD.teamReason] || ""}
-                onChange={(e) => set(ACSM_FIELD.teamReason, e.target.value)} placeholder="Enter reason (if any)" />
-            </Field>
+            {teamsNotOut > 0 && (
+              <Field label="Reason any team did not go out" required>
+                <input className={inputCls} value={responses[ACSM_FIELD.teamReason] || ""}
+                  onChange={(e) => set(ACSM_FIELD.teamReason, e.target.value)} placeholder="Explain why a team did not deploy" />
+              </Field>
+            )}
           </div>
         );
       case 1:
@@ -245,7 +278,10 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
           <div>
             <SectionBadge letter="B" title="IEC Materials & Visibility" color={GREEN} tint="#E7F6EE" />
             <div className="rounded-2xl border border-border bg-card px-4">
-              {IEC_ITEMS.map((i) => <YnpRow key={i.name} item={i} options={["Yes", "No", "Partly", "N/A"]} />)}
+              {IEC_ITEMS.map((i) => (
+                <YnpRow key={i.name} item={i} options={["Yes", "No", "Partly", "N/A"]}
+                  value={responses[i.name]} onSelect={(v) => set(i.name, v)} />
+              ))}
             </div>
           </div>
         );
@@ -255,28 +291,44 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
             <SectionBadge letter="C" title="Town Announcers & Mobilization" color="#F0A020" tint="#FDF3E3" />
             <div className="grid gap-5 lg:grid-cols-2">
               <div className="rounded-2xl border border-border bg-card px-4">
-                {MOBILIZATION_ITEMS.map((i) => <YnpRow key={i.name} item={i} options={["Yes", "No"]} />)}
+                {MOBILIZATION_ITEMS.map((i) => (
+                  <YnpRow key={i.name} item={i} options={["Yes", "No"]}
+                    value={responses[i.name]} onSelect={(v) => set(i.name, v)} />
+                ))}
                 <div className="border-t border-border/50 py-3">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type of identification</div>
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Type of identification <span className="normal-case opacity-60">(select all that apply)</span>
+                  </div>
                   <div className="flex flex-wrap gap-2">
-                    {ID_TYPES.map((t) => {
-                      const active = responses[ACSM_FIELD.idType] === t;
-                      return (
-                        <button key={t} type="button" onClick={() => set(ACSM_FIELD.idType, t)}
-                          className="rounded-lg border px-3 py-1.5 text-xs font-semibold transition"
-                          style={active ? { background: GREEN, borderColor: GREEN, color: "#fff" } : { borderColor: "#D5DEEA", color: "#64748B" }}>
-                          {t}
-                        </button>
-                      );
-                    })}
+                    {ID_TYPES.map((t) => (
+                      <Chip key={t} label={t} active={isChecked(ACSM_FIELD.idType, t)}
+                        onClick={() => toggleMulti(ACSM_FIELD.idType, t)} />
+                    ))}
                   </div>
                 </div>
               </div>
-              <div className="rounded-2xl border p-4" style={{ background: "#FDF6EC", borderColor: "#F0A02033" }}>
-                <div className="mb-2 flex items-center gap-2 text-sm font-bold" style={{ color: "#C77C10" }}>
-                  <Megaphone className="h-4 w-4" /> Announcement Content Check
+              <div className="space-y-4">
+                <div className="rounded-2xl border p-4" style={{ background: "#FDF6EC", borderColor: "#F0A02033" }}>
+                  <div className="mb-2 flex items-center gap-2 text-sm font-bold" style={{ color: "#C77C10" }}>
+                    <Megaphone className="h-4 w-4" /> Announcement Content Check
+                  </div>
+                  {ANNOUNCEMENT_CONTENT_ITEMS.map((i) => (
+                    <YnpRow key={i.name} item={i} options={["Yes", "No"]}
+                      value={responses[i.name]} onSelect={(v) => set(i.name, v)} />
+                  ))}
                 </div>
-                {ANNOUNCEMENT_CONTENT_ITEMS.map((i) => <YnpRow key={i.name} item={i} options={["Yes", "No"]} />)}
+                <div className="rounded-2xl border p-4" style={{ background: "#EAF6FF", borderColor: "#2F6FE633" }}>
+                  <div className="mb-2 flex items-center gap-2 text-sm font-bold" style={{ color: "#2F6FE6" }}>
+                    <ShieldCheck className="h-4 w-4" /> What caregivers think the medicine prevents
+                  </div>
+                  <div className="mb-2 text-[11px] text-muted-foreground">Select all that were mentioned.</div>
+                  <div className="flex flex-wrap gap-2">
+                    {MEDICINE_PREVENTS_OPTIONS.map((o) => (
+                      <Chip key={o} label={o} color="#2F6FE6" active={isChecked(ACSM_FIELD.medicinePrevents, o)}
+                        onClick={() => toggleMulti(ACSM_FIELD.medicinePrevents, o)} />
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -357,7 +409,10 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
           <div>
             <SectionBadge letter="E" title="Drug Management & Administration" color={TEAL} tint="#E4F7F4" icon={<Pill className="h-4 w-4" />} />
             <div className="rounded-2xl border border-border bg-card px-4">
-              {DRUG_ITEMS.map((i) => <YnpRow key={i.name} item={i} options={["Yes", "No", "N/A"]} />)}
+              {DRUG_ITEMS.map((i) => (
+                <YnpRow key={i.name} item={i} options={["Yes", "No", "N/A"]}
+                  value={responses[i.name]} onSelect={(v) => set(i.name, v)} />
+              ))}
             </div>
           </div>
         );
@@ -366,7 +421,10 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
           <div className="space-y-5">
             <SectionBadge letter="F" title="Eligibility & Safety" color="#E25555" tint="#FCEBEB" icon={<HeartPulse className="h-4 w-4" />} />
             <div className="rounded-2xl border border-border bg-card px-4">
-              {ELIGIBILITY_ITEMS.map((i) => <YnpRow key={i.name} item={i} options={["Yes", "No", "N/A"]} />)}
+              {ELIGIBILITY_ITEMS.map((i) => (
+                <YnpRow key={i.name} item={i} options={["Yes", "No", "N/A"]}
+                  value={responses[i.name]} onSelect={(v) => set(i.name, v)} />
+              ))}
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Adverse events observed">
@@ -385,7 +443,10 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
           <div>
             <SectionBadge letter="G" title="Documentation & House Marking" color="#2F6FE6" tint="#EAF1FE" icon={<FileText className="h-4 w-4" />} />
             <div className="rounded-2xl border border-border bg-card px-4">
-              {DOCUMENTATION_ITEMS.map((i) => <YnpRow key={i.name} item={i} options={["Yes", "No", "Partly", "N/A"]} />)}
+              {DOCUMENTATION_ITEMS.map((i) => (
+                <YnpRow key={i.name} item={i} options={["Yes", "No", "Partly", "N/A"]}
+                  value={responses[i.name]} onSelect={(v) => set(i.name, v)} />
+              ))}
             </div>
           </div>
         );
@@ -411,10 +472,25 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
                   onChange={(e) => set(ACSM_FIELD.deadline, e.target.value)} />
               </Field>
             </div>
-            <Field label="Supervisor name" required>
+            <Field label="Supervisor name">
               <input className={inputCls} value={responses[ACSM_FIELD.supervisorName] || ""}
                 onChange={(e) => set(ACSM_FIELD.supervisorName, e.target.value)} placeholder="Your full name" />
             </Field>
+
+            <div className="rounded-2xl border p-4" style={{ background: "#F2FBF5", borderColor: `${GREEN}33` }}>
+              <div className="mb-2 flex items-center gap-2 text-sm font-bold" style={{ color: GREEN }}>
+                <PenTool className="h-4 w-4" /> Supervisor Signature <span className="text-[#E25555]">*</span>
+              </div>
+              <div className="mb-3 text-[11px] text-muted-foreground">
+                Sign in the box below to authenticate this supervisory visit.
+              </div>
+              <SignatureCapture
+                value={responses[ACSM_FIELD.supervisorSignature] || null}
+                onChange={(sig) => set(ACSM_FIELD.supervisorSignature, sig)}
+                penColor={NAVY}
+              />
+            </div>
+
             <label className="flex items-start gap-3 rounded-2xl border p-4" style={{ background: "#E7F6EE", borderColor: `${GREEN}44` }}>
               <input type="checkbox" checked={!!responses[ACSM_FIELD.attestation]}
                 onChange={(e) => set(ACSM_FIELD.attestation, e.target.checked)} className="mt-0.5 h-5 w-5 accent-[#22A55A]" />
@@ -439,21 +515,26 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
         <button onClick={onClose} className="absolute right-3 top-3 z-10 rounded-full bg-white/80 p-2 text-muted-foreground shadow hover:bg-white">
           <X className="h-5 w-5" />
         </button>
-        <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-5 sm:px-6">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-extrabold leading-tight sm:text-2xl" style={{ color: NAVY }}>
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-4 py-5 text-center sm:flex-row sm:gap-4 sm:py-6 sm:text-left">
+          <img
+            src={heroImg}
+            alt="SARMAAN community health — mother, children and health worker"
+            loading="eager"
+            decoding="async"
+            className="order-1 h-28 w-auto shrink-0 rounded-2xl object-contain drop-shadow-md sm:order-2 sm:h-36"
+          />
+          <div className="order-2 min-w-0 flex-1 sm:order-1">
+            <h1 className="text-lg font-extrabold leading-tight sm:text-2xl" style={{ color: NAVY }}>
               SARMAAN ACSM &amp; MDA SUPERVISION CHECKLIST
             </h1>
             <div className="mt-1 text-sm font-bold" style={{ color: GREEN }}>Mass Drug Administration by CDDs</div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <div className="mt-1 flex items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground sm:justify-start">
               <Pill className="h-3.5 w-3.5" style={{ color: TEAL }} /> Azithromycin for children 1–59 months
             </div>
             <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-[11px] font-semibold">
               {isOnline ? <><Wifi className="h-3 w-3 text-[#22A55A]" /> Online</> : <><WifiOff className="h-3 w-3 text-[#E25555]" /> Offline — will sync</>}
             </div>
           </div>
-          <img src={heroImg} alt="SARMAAN community health" width={200} height={168}
-            className="hidden h-28 w-auto shrink-0 object-contain sm:block" />
         </div>
       </div>
 
@@ -479,7 +560,8 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
       </div>
 
       {/* Footer nav */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-3 sm:px-6">
           <button type="button" onClick={goPrev} disabled={step === 0}
             className="inline-flex items-center gap-1.5 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-40">
@@ -520,21 +602,16 @@ function SectionBadge({ letter, title, subtitle, color, tint, icon }: {
   );
 }
 
-function KpiCard({ label, value, icon, accent, editable, value2, onEdit }: {
-  label: string; value: React.ReactNode; icon: React.ReactNode; accent: string;
-  editable?: boolean; value2?: any; onEdit?: (v: string) => void;
+function KpiCard({ label, accent, value2, onEdit }: {
+  label: string; accent: string; value2?: any; onEdit?: (v: string) => void;
 }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-3">
       <div className="text-xs font-semibold text-muted-foreground">{label}</div>
-      {editable ? (
-        <input type="number" min={0} value={value2 ?? ""} onChange={(e) => onEdit?.(e.target.value)}
-          placeholder="0"
-          className="mt-1 w-full bg-transparent text-2xl font-extrabold outline-none"
-          style={{ color: accent }} />
-      ) : (
-        <div className="mt-1 flex items-center gap-2 text-2xl font-extrabold" style={{ color: accent }}>{value}{icon}</div>
-      )}
+      <input type="number" min={0} value={value2 ?? ""} onChange={(e) => onEdit?.(e.target.value)}
+        placeholder="0"
+        className="mt-1 w-full bg-transparent text-2xl font-extrabold outline-none"
+        style={{ color: accent }} />
     </div>
   );
 }

@@ -60,7 +60,16 @@ export const ANNOUNCEMENT_CONTENT_ITEMS: CheckItem[] = [
   { name: "content_when_visit", label: "Tells caregivers when CDDs will visit" },
 ];
 
-export const ID_TYPES = ["Cap", "T-shirt", "ID Card", "Other", "None"];
+export const ID_TYPES = ["Cap", "T-shirt", "ID Card", "Apron", "Other", "None"];
+
+/** Section C — what caregivers think the medicine prevents (multi-select). */
+export const MEDICINE_PREVENTS_OPTIONS = [
+  "Acute respiratory tract infection",
+  "Diarrheal diseases",
+  "Skin and soft tissue infections",
+  "Middle ear infections",
+  "Others",
+];
 
 /** Section D — community awareness validation (sample of 5 caregivers). */
 export const AWARENESS_COLUMNS: AwarenessColumn[] = [
@@ -122,6 +131,7 @@ export const ACSM_FIELD = {
   deploymentRate: "teams_deployment_rate",
   teamReason: "teams_not_out_reason",
   idType: "announcer_id_type",
+  medicinePrevents: "announcement_prevents",
   awarenessRate: "awareness_rate",
   ageKnowledge: "age_knowledge_rate",
   freeMedicineKnowledge: "free_medicine_knowledge_rate",
@@ -132,6 +142,7 @@ export const ACSM_FIELD = {
   responsible: "responsible_person",
   deadline: "action_deadline",
   supervisorName: "supervisor_name",
+  supervisorSignature: "supervisor_signature",
   attestation: "attestation",
 } as const;
 
@@ -176,12 +187,13 @@ export function buildAcsmFormSchema() {
       ],
     },
     { id: uid(), name: "acsm_iec", label: "B. IEC Materials & Visibility",
-      questions: IEC_ITEMS.map((i) => q("select_one", i.name, i.label, { options: ynp() })) },
+      questions: IEC_ITEMS.map((i) => q("select_one", i.name, i.label, { options: ynp(), required: true })) },
     { id: uid(), name: "acsm_mobilization", label: "C. Town Announcers & Mobilization",
       questions: [
         ...MOBILIZATION_ITEMS.map((i) => q("select_one", i.name, i.label, { options: yn() })),
-        q("select_one", ACSM_FIELD.idType, "Type of identification", { options: ID_TYPES.map(opt) }),
+        q("select_multiple", ACSM_FIELD.idType, "Type of identification", { options: ID_TYPES.map(opt) }),
         ...ANNOUNCEMENT_CONTENT_ITEMS.map((i) => q("select_one", i.name, i.label, { options: yn() })),
+        q("select_multiple", ACSM_FIELD.medicinePrevents, "What caregivers think the medicine prevents", { options: MEDICINE_PREVENTS_OPTIONS.map(opt) }),
       ] },
     { id: uid(), name: "acsm_awareness", label: "D. Community Awareness Validation",
       questions: [
@@ -192,22 +204,23 @@ export function buildAcsmFormSchema() {
         q("number", ACSM_FIELD.freeMedicineKnowledge, "Free Medicine Knowledge (%)"),
       ] },
     { id: uid(), name: "acsm_drug", label: "E. Drug Management & Administration",
-      questions: DRUG_ITEMS.map((i) => q("select_one", i.name, i.label, { options: [opt("Yes"), opt("No"), opt("N/A")] })) },
+      questions: DRUG_ITEMS.map((i) => q("select_one", i.name, i.label, { options: [opt("Yes"), opt("No"), opt("N/A")], required: true })) },
     { id: uid(), name: "acsm_safety", label: "F. Eligibility & Safety",
       questions: [
-        ...ELIGIBILITY_ITEMS.map((i) => q("select_one", i.name, i.label, { options: [opt("Yes"), opt("No"), opt("N/A")] })),
+        ...ELIGIBILITY_ITEMS.map((i) => q("select_one", i.name, i.label, { options: [opt("Yes"), opt("No"), opt("N/A")], required: true })),
         q("number", ACSM_FIELD.aesObserved, "Adverse events observed"),
         q("number", ACSM_FIELD.aesReferred, "Adverse events referred to facility"),
       ] },
     { id: uid(), name: "acsm_documentation", label: "G. Documentation & House Marking",
-      questions: DOCUMENTATION_ITEMS.map((i) => q("select_one", i.name, i.label, { options: ynp() })) },
+      questions: DOCUMENTATION_ITEMS.map((i) => q("select_one", i.name, i.label, { options: ynp(), required: true })) },
     { id: uid(), name: "acsm_summary", label: "H. Summary & Corrective Actions",
       questions: [
         q("text", ACSM_FIELD.issues, "Issues identified", { appearance: "multiline" }),
         q("text", ACSM_FIELD.corrective, "Corrective actions agreed", { appearance: "multiline" }),
         q("text", ACSM_FIELD.responsible, "Responsible person"),
         q("date", ACSM_FIELD.deadline, "Action deadline"),
-        q("text", ACSM_FIELD.supervisorName, "Supervisor name", { required: true }),
+        q("text", ACSM_FIELD.supervisorName, "Supervisor name"),
+        q("signature", ACSM_FIELD.supervisorSignature, "Supervisor signature", { required: true }),
         q("acknowledge", ACSM_FIELD.attestation, "I confirm these observations are accurate and were made during this supervisory visit.", { required: true }),
       ] },
   ];
