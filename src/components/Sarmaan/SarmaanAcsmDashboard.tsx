@@ -115,10 +115,10 @@ function Donut({ data, center, sub }: { data: { name: string; value: number; col
 
 function Panel({ title, children, right, className = "" }: { title?: React.ReactNode; children: React.ReactNode; right?: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-xl border bg-white p-4 shadow-sm ${className}`} style={{ borderColor: C.line }}>
+    <div className={`rounded-xl border bg-white p-5 shadow-sm ${className}`} style={{ borderColor: C.line }}>
       {(title || right) && (
-        <div className="mb-3 flex items-center justify-between">
-          <div className="text-[13px] font-bold uppercase tracking-wide" style={{ color: C.ink }}>{title}</div>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm font-bold uppercase tracking-wide" style={{ color: C.ink }}>{title}</div>
           {right}
         </div>
       )}
