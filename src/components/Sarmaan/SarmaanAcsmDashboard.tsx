@@ -339,7 +339,56 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
     return pts;
   }, [filtered, maps]);
 
-  const stateLabel = filters.state || options.states[0] || "All States";
+  const communitiesCount = useMemo(() => communitiesSupervised(filtered, maps), [filtered, maps]);
+
+  // Per-LGA average performance (LGA choropleth) for the Kano ward map.
+  const lgaScores = useMemo<LgaScore[]>(() => {
+    const byLga = new Map<string, AcsmSub[]>();
+    const wards = new Map<string, Set<string>>();
+    for (const s of filtered) {
+      const lga = readStr(s, ACSM_FIELD.lga, maps).trim();
+      if (!lga) continue;
+      if (!byLga.has(lga)) { byLga.set(lga, []); wards.set(lga, new Set()); }
+      byLga.get(lga)!.push(s);
+      const w = readStr(s, ACSM_FIELD.ward, maps).trim();
+      if (w) wards.get(lga)!.add(w);
+    }
+    return [...byLga.entries()].map(([name, rows]) => {
+      const score = overallScoreOf(rows, maps);
+      return {
+        key: name.toLowerCase().replace(/[^a-z0-9]/g, ""),
+        name, score, color: BAND_META[bandOf(score)].color,
+        wards: wards.get(name)?.size || 0,
+      };
+    });
+  }, [filtered, maps]);
+
+  // Supervised wards as performance-coloured dots at their mean GPS.
+  const wardPoints = useMemo<WardPoint[]>(() => {
+    const byWard = new Map<string, { subs: AcsmSub[]; lat: number; lng: number; n: number; lga: string }>();
+    for (const s of filtered) {
+      const ward = readStr(s, ACSM_FIELD.ward, maps).trim() || readStr(s, ACSM_FIELD.community, maps).trim();
+      if (!ward) continue;
+      const gps = readVal(s, ACSM_FIELD.gps, maps) as any;
+      const lat = Number(gps?.lat), lng = Number(gps?.lng);
+      const key = `${readStr(s, ACSM_FIELD.lga, maps)}|${ward}`;
+      if (!byWard.has(key)) byWard.set(key, { subs: [], lat: 0, lng: 0, n: 0, lga: readStr(s, ACSM_FIELD.lga, maps) });
+      const g = byWard.get(key)!;
+      g.subs.push(s);
+      if (Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)) { g.lat += lat; g.lng += lng; g.n++; }
+    }
+    const pts: WardPoint[] = [];
+    byWard.forEach((g, key) => {
+      if (g.n === 0) return;
+      const score = overallScoreOf(g.subs, maps);
+      pts.push({
+        lat: g.lat / g.n, lng: g.lng / g.n, score,
+        ward: key.split("|")[1], lga: g.lga || "—",
+        color: BAND_META[bandOf(score)].color,
+      });
+    });
+    return pts;
+  }, [filtered, maps]);
   const timeStr = new Date(lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   return (
