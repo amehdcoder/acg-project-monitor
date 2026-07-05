@@ -114,13 +114,17 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
       const shell = shellRef.current;
       if (!shell) return;
       const vv = window.visualViewport;
-      const visibleHeight = Math.max(360, Math.floor(vv?.height ?? window.innerHeight ?? document.documentElement.clientHeight));
+      // Use the real *visual* viewport so Android browser chrome and the soft
+      // keyboard cannot push the in-flow footer below the user's screen.
+      const visibleHeight = Math.max(240, Math.floor(vv?.height ?? window.innerHeight ?? document.documentElement.clientHeight));
       shell.style.setProperty("--acsm-vh", `${visibleHeight}px`);
     };
 
     syncViewport();
     const raf = requestAnimationFrame(syncViewport);
     window.addEventListener("resize", syncViewport);
+    document.addEventListener("focusin", syncViewport);
+    document.addEventListener("focusout", syncViewport);
     window.visualViewport?.addEventListener("resize", syncViewport);
     window.visualViewport?.addEventListener("scroll", syncViewport);
     return () => {
@@ -130,6 +134,8 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
       document.body.style.overscrollBehavior = previousBodyOverscroll;
       document.documentElement.style.overscrollBehavior = previousHtmlOverscroll;
       window.removeEventListener("resize", syncViewport);
+      document.removeEventListener("focusin", syncViewport);
+      document.removeEventListener("focusout", syncViewport);
       window.visualViewport?.removeEventListener("resize", syncViewport);
       window.visualViewport?.removeEventListener("scroll", syncViewport);
     };
