@@ -420,59 +420,57 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
         return (
           <div className="space-y-5">
             <SectionBadge letter="D" title="Community Awareness Validation" color="#7C5CFF" tint="#EFEBFE" subtitle="Sample of 5 caregivers" />
-            <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-              <table className="w-full min-w-[640px] text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
-                    <th className="p-3">#</th>
-                    {AWARENESS_COLUMNS.map((c) => (
-                      <th key={c.name} className="p-3 font-semibold">
-                        {c.label}{c.sub && <div className="font-normal text-[10px] opacity-70">{c.sub}</div>}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {Array.from({ length: AWARENESS_SAMPLE_SIZE }).map((_, r) => {
-                    const row = r + 1;
-                    return (
-                      <tr key={row} className="border-b border-border/50 last:border-0">
-                        <td className="p-3 font-semibold text-muted-foreground">{row}</td>
-                        {AWARENESS_COLUMNS.map((c) => {
-                          const fname = `aw_${row}_${c.name}`;
-                          if (c.kind === "yn") {
-                            return (
-                              <td key={c.name} className="p-2">
-                                <div className="flex gap-1.5">
-                                  {["Yes", "No"].map((o) => {
-                                    const active = responses[fname] === o;
-                                    return (
-                                      <button key={o} type="button" onClick={() => set(fname, o)}
-                                        className="rounded-md border px-2.5 py-1 text-xs font-semibold transition"
-                                        style={active ? { background: o === "Yes" ? GREEN : "#E25555", borderColor: o === "Yes" ? GREEN : "#E25555", color: "#fff" } : { borderColor: "#D5DEEA", color: "#64748B" }}>
-                                        {o}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </td>
-                            );
-                          }
-                          return (
-                            <td key={c.name} className="p-2">
-                              <select className={inputCls + " min-w-[140px] py-1.5"} value={responses[fname] || ""}
+            <div className="space-y-4">
+              {Array.from({ length: AWARENESS_SAMPLE_SIZE }).map((_, r) => {
+                const row = r + 1;
+                return (
+                  <div key={row} className="overflow-hidden rounded-2xl border-2 shadow-sm" style={{ borderColor: "#7C5CFF33", background: "#FCFBFF" }}>
+                    <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: "linear-gradient(90deg,#7C5CFF,#9B7BFF)" }}>
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/25 text-base font-extrabold text-white">
+                        {row}
+                      </span>
+                      <span className="text-base font-bold text-white">Caregiver {row}</span>
+                    </div>
+                    <div className="space-y-4 p-4">
+                      {AWARENESS_COLUMNS.map((c) => {
+                        const fname = `aw_${row}_${c.name}`;
+                        return (
+                          <div key={c.name} className="space-y-2">
+                            <label className="block text-[17px] font-semibold leading-snug text-foreground">
+                              {c.label}
+                              {c.sub && <span className="ml-1 text-sm font-normal text-muted-foreground">{c.sub}</span>}
+                            </label>
+                            {c.kind === "yn" ? (
+                              <div className="grid grid-cols-2 gap-3">
+                                {["Yes", "No"].map((o) => {
+                                  const active = responses[fname] === o;
+                                  const on = o === "Yes" ? GREEN : "#E25555";
+                                  return (
+                                    <button key={o} type="button" onClick={() => set(fname, o)}
+                                      className="rounded-xl border-2 px-4 py-3 text-base font-bold transition active:scale-95"
+                                      style={active
+                                        ? { background: on, borderColor: on, color: "#fff" }
+                                        : { borderColor: "#D5DEEA", color: "#475569", background: "#fff" }}>
+                                      {o}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <select className="w-full rounded-xl border-2 border-border bg-background px-4 py-3 text-base outline-none focus:border-[#7C5CFF] focus:ring-2 focus:ring-[#7C5CFF]/20"
+                                value={responses[fname] || ""}
                                 onChange={(e) => set(fname, e.target.value)}>
                                 <option value="">Select option</option>
                                 {c.options?.map((o) => <option key={o} value={o}>{o}</option>)}
                               </select>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             <div className="rounded-2xl border p-4" style={{ background: "#F7F5FF", borderColor: "#7C5CFF22" }}>
               <div className="mb-3 text-sm font-bold" style={{ color: "#5B3FD6" }}>Awareness Summary</div>
