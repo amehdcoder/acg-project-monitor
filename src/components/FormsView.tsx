@@ -261,6 +261,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [acsmLaunchOpen, setAcsmLaunchOpen] = useState(false);
   const [acsmAccessOpen, setAcsmAccessOpen] = useState(false);
   const [acsmDashOpen, setAcsmDashOpen] = useState(false);
+  const [acsmDashAccessOpen, setAcsmDashAccessOpen] = useState(false);
   const [templateForm, setTemplateForm] = useState<{ templateId: string; name: string; description: string; questions: Question[]; settings: any; geofence?: GeofenceArea } | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
