@@ -2210,7 +2210,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                           </div>
                         )}
                         {/* SARMAAN ACSM & MDA Supervision Checklist */}
-                        {(canSeeAcsmChecklist || sarmaanIsManager) && (
+                        {(canSeeAcsmChecklist || canSeeAcsmDashboard || sarmaanIsManager) && (
                           <div className="sm:col-span-2">
                             <button
                               type="button"
