@@ -25,10 +25,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import type { Question, FormGroup } from "@/components/FormBuilder/types";
 import SarmaanKanoMap, { type VisitPoint } from "@/components/Sarmaan/SarmaanKanoMap";
+import SarmaanWardPerformanceMap, { type LgaScore, type WardPoint } from "@/components/Sarmaan/SarmaanWardPerformanceMap";
+import SarmaanAcsmSections from "@/components/Sarmaan/SarmaanAcsmSections";
 import {
   computeAcsmMetrics, BAND_META, bandOf, overallScoreOf, readVal, readStr,
   type AcsmSub, type NameToId, type BandKey,
 } from "@/lib/sarmaan/acsmDashboardData";
+import { communitiesSupervised } from "@/lib/sarmaan/acsmSectionAnalytics";
 import { ACSM_FIELD } from "@/lib/sarmaan/acsmChecklist";
 import { exportAcsmSubmissions } from "@/lib/sarmaan/acsmExcelExport";
 import SarmaanAcsmAnalytics from "@/components/Sarmaan/SarmaanAcsmAnalytics";
