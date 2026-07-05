@@ -315,6 +315,52 @@ export default function SarmaanAcsmAnalytics({ subs, maps, profiles, form, canEd
               </div>
             )}
 
+            {/* Enhanced accountability summary: LGA worked, communities, wards, quality */}
+            <div className="mt-4 overflow-x-auto rounded-xl border" style={{ borderColor: C.line }}>
+              <table className="w-full text-[12px]">
+                <thead>
+                  <tr className="text-left" style={{ background: "#F1F5F9", color: C.sub }}>
+                    <th className="px-3 py-2 font-bold">Supervisor</th>
+                    <th className="px-3 py-2 font-bold">LGA(s) Worked</th>
+                    <th className="px-3 py-2 text-center font-bold">Communities</th>
+                    <th className="px-3 py-2 text-center font-bold">Wards</th>
+                    <th className="px-3 py-2 text-center font-bold">Visits</th>
+                    <th className="px-3 py-2 text-center font-bold">Overall Quality (MDA &amp; ACSM)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...drilldown.values()]
+                    .sort((a, b) => b.visitCount - a.visitCount)
+                    .map((u, i) => (
+                      <tr key={u.userId} className="border-t" style={{ borderColor: C.line, background: i % 2 ? "#FBFDFC" : "#fff" }}>
+                        <td className="px-3 py-2">
+                          <div className="font-semibold" style={{ color: C.ink }}>{u.name}</div>
+                          {u.email && <div className="text-[10px]" style={{ color: C.sub }}>{u.email}</div>}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap gap-1">
+                            {u.lgas.length ? u.lgas.map((l) => (
+                              <span key={l} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                                style={{ background: `${C.green}14`, color: C.greenDeep }}>
+                                <MapPin className="h-2.5 w-2.5" /> {l}
+                              </span>
+                            )) : <span style={{ color: C.sub }}>—</span>}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-center font-bold tabular-nums" style={{ color: C.ink }}>{u.communities}</td>
+                        <td className="px-3 py-2 text-center font-bold tabular-nums" style={{ color: C.ink }}>{u.wards}</td>
+                        <td className="px-3 py-2 text-center font-bold tabular-nums" style={{ color: C.ink }}>{u.visitCount}</td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="inline-block rounded-full px-2.5 py-0.5 text-[10px] font-extrabold text-white" style={{ background: u.qualityColor }}>
+                            {u.avgScore}% · {u.qualityLabel.split(" ")[0]}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+
             <div className="mt-4">
               <AccountabilityTable users={accountability} unitLabel="Ward" unitLabelPlural="Wards" accent={C.green} />
             </div>
