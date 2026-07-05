@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ChevronLeft, ChevronRight, Send, Loader2, X, Wifi, WifiOff,
   Users, CheckCircle2, Landmark, Flag, Home, Building2, ClipboardList,
@@ -586,7 +587,7 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
 
   const isLast = step === ACSM_SECTIONS.length - 1;
 
-  return (
+  const checklistShell = (
     <div
       ref={shellRef}
       className="fixed inset-x-0 top-0 z-50 flex min-h-0 flex-col overflow-hidden bg-[#F4F8FC]"
@@ -690,6 +691,8 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
       </div>
     </div>
   );
+
+  return createPortal(checklistShell, document.body);
 }
 
 // ---------- small presentational helpers ----------
