@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft, ChevronRight, Send, Loader2, X, Wifi, WifiOff,
   Users, CheckCircle2, Landmark, Flag, Home, Building2, ClipboardList,
@@ -93,9 +93,49 @@ function YnpRow({ item, options, value, onSelect }: {
 export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClose, onSubmitted }: Props) {
   const { saveSubmission, isOnline } = useOfflineStorage();
   const { position } = useGeolocation();
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const footerRef = useRef<HTMLDivElement | null>(null);
   const [step, setStep] = useState(0);
   const [responses, setResponses] = useState<Responses>({});
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    const syncViewport = () => {
+      const shell = shellRef.current;
+      if (!shell) return;
+      const vv = window.visualViewport;
+      const visibleHeight = Math.max(320, Math.floor(vv?.height ?? window.innerHeight));
+      const visibleOffsetTop = Math.max(0, Math.floor(vv?.offsetTop ?? 0));
+      const footerHeight = Math.ceil(footerRef.current?.getBoundingClientRect().height ?? 88);
+      shell.style.setProperty("--acsm-vh", `${visibleHeight}px`);
+      shell.style.setProperty("--acsm-vv-top", `${visibleOffsetTop}px`);
+      shell.style.setProperty("--acsm-footer-h", `${footerHeight}px`);
+    };
+
+    syncViewport();
+    const raf = requestAnimationFrame(syncViewport);
+    window.addEventListener("resize", syncViewport);
+    window.visualViewport?.addEventListener("resize", syncViewport);
+    window.visualViewport?.addEventListener("scroll", syncViewport);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      window.removeEventListener("resize", syncViewport);
+      window.visualViewport?.removeEventListener("resize", syncViewport);
+      window.visualViewport?.removeEventListener("scroll", syncViewport);
+    };
+  }, [step, submitting]);
+
+  const scrollChecklistToTop = () => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const set = (name: string, value: any) => setResponses((p) => ({ ...p, [name]: value }));
   const merge = (updates: Responses) => setResponses((p) => ({ ...p, ...updates }));
@@ -166,9 +206,9 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
     const err = validateStep(step);
     if (err) { toast({ title: "Complete required fields", description: err, variant: "destructive" }); return; }
     setStep((s) => Math.min(ACSM_SECTIONS.length - 1, s + 1));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    scrollChecklistToTop();
   };
-  const goPrev = () => { setStep((s) => Math.max(0, s - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const goPrev = () => { setStep((s) => Math.max(0, s - 1)); scrollChecklistToTop(); };
 
   const handleSubmit = async () => {
     const err = validateStep(7);
@@ -539,9 +579,25 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
   const isLast = step === ACSM_SECTIONS.length - 1;
 
   return (
-    <div className="fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[#F4F8FC]">
+    <div
+      ref={shellRef}
+      className="fixed inset-x-0 top-0 z-50 flex flex-col overflow-hidden bg-[#F4F8FC]"
+      style={{
+        height: "var(--acsm-vh, 100svh)",
+        maxHeight: "var(--acsm-vh, 100svh)",
+        transform: "translateY(var(--acsm-vv-top, 0px))",
+      }}
+    >
       {/* Scrollable region: hero + progress + body */}
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: "touch" }}>
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        style={{
+          WebkitOverflowScrolling: "touch",
+          paddingBottom: "calc(var(--acsm-footer-h, 96px) + max(env(safe-area-inset-bottom, 0px), 18px))",
+          scrollPaddingBottom: "calc(var(--acsm-footer-h, 96px) + 24px)",
+        }}
+      >
       {/* Hero */}
       <div className="relative overflow-hidden" style={{ background: "linear-gradient(135deg,#F2FBF5 0%,#EAF6FF 100%)" }}>
         <button onClick={onClose} className="absolute right-3 top-3 z-10 rounded-full bg-white/80 p-2 text-muted-foreground shadow hover:bg-white">
@@ -601,22 +657,25 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
       {/* end scroll region */}
 
       {/* Footer nav — always visible sibling of the scroll region */}
-      <div className="shrink-0 border-t border-border bg-card/95 backdrop-blur"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-3 sm:px-6">
+      <div
+        ref={footerRef}
+        className="absolute inset-x-0 bottom-0 z-[80] shrink-0 border-t border-border bg-card/95 shadow-[0_-10px_24px_rgba(15,23,42,0.10)] backdrop-blur"
+        style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 18px)" }}
+      >
+        <div className="mx-auto grid max-w-5xl grid-cols-2 items-center gap-2 px-4 py-3 sm:flex sm:justify-between sm:px-6">
           <button type="button" onClick={goPrev} disabled={step === 0}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-40">
+            className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl border border-border px-3 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-40 sm:w-auto sm:px-4">
             <ChevronLeft className="h-4 w-4" /> Previous
           </button>
           {!isLast ? (
             <button type="button" onClick={goNext}
-              className="inline-flex items-center gap-1.5 rounded-xl px-6 py-2.5 text-sm font-bold text-white shadow transition hover:brightness-105"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow transition hover:brightness-105 sm:w-auto sm:px-6"
               style={{ background: GREEN }}>
               Next <ChevronRight className="h-4 w-4" />
             </button>
           ) : (
             <button type="button" onClick={handleSubmit} disabled={submitting}
-              className="inline-flex items-center gap-1.5 rounded-xl px-6 py-2.5 text-sm font-bold text-white shadow transition hover:brightness-105 disabled:opacity-60"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow transition hover:brightness-105 disabled:opacity-60 sm:w-auto sm:px-6"
               style={{ background: GREEN }}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Submit Checklist
             </button>
