@@ -261,6 +261,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [acsmLaunchOpen, setAcsmLaunchOpen] = useState(false);
   const [acsmAccessOpen, setAcsmAccessOpen] = useState(false);
   const [acsmDashOpen, setAcsmDashOpen] = useState(false);
+  const [acsmDashAccessOpen, setAcsmDashAccessOpen] = useState(false);
   const [templateForm, setTemplateForm] = useState<{ templateId: string; name: string; description: string; questions: Question[]; settings: any; geofence?: GeofenceArea } | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
@@ -1288,6 +1289,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   );
   const { grants: acsmGrants, hasAnyGrant: hasAnyAcsmGrant } = useSarmaanFormAccess(acsmForm?.id, sarmaanIsManager);
   const canSeeAcsmChecklist = sarmaanIsManager || hasAnyAcsmGrant;
+  // Dashboard access is INDEPENDENT of checklist access: managers, anyone with
+  // a checklist grant, or anyone granted the dashboard directly can view it.
+  const canSeeAcsmDashboard = sarmaanIsManager || canSeeAcsmChecklist || hasDashboardAccess("sarmaan_acsm", currentProjectId);
 
   const createAcsmChecklist = async (): Promise<Form | null> => {
     if (!currentProjectId) {
@@ -2206,7 +2210,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                           </div>
                         )}
                         {/* SARMAAN ACSM & MDA Supervision Checklist */}
-                        {(canSeeAcsmChecklist || sarmaanIsManager) && (
+                        {(canSeeAcsmChecklist || canSeeAcsmDashboard || sarmaanIsManager) && (
                           <div className="sm:col-span-2">
                             <button
                               type="button"
@@ -2240,7 +2244,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-white/70 transition group-hover:translate-x-0.5" />
                               </div>
                             </button>
-                            {acsmForm && (sarmaanIsManager || canSeeAcsmChecklist || canSeeSarmaanChecklist) && (
+                            {acsmForm && canSeeAcsmDashboard && (
                               <div className="mt-2">
                                 <button
                                   type="button"
@@ -2254,14 +2258,22 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             )}
 
                             {sarmaanIsManager && acsmForm && (
-                              <div className="mt-2">
+                              <div className="mt-2 flex flex-wrap gap-2">
                                 <button
                                   type="button"
                                   onClick={() => setAcsmAccessOpen(true)}
                                   className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-muted"
                                   style={{ borderColor: "#22A55A4D", color: "#0A2540" }}
                                 >
-                                  <ShieldCheck className="h-3.5 w-3.5" style={{ color: "#1B7A46" }} /> Manage ACSM checklist access
+                                  <ShieldCheck className="h-3.5 w-3.5" style={{ color: "#1B7A46" }} /> Manage checklist access
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setAcsmDashAccessOpen(true)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-muted"
+                                  style={{ borderColor: "#0B5E304D", color: "#0A2540" }}
+                                >
+                                  <LayoutGrid className="h-3.5 w-3.5" style={{ color: "#0B5E30" }} /> Manage dashboard access
                                 </button>
                                 <SarmaanChecklistAccessManager
                                   open={acsmAccessOpen}
@@ -2272,7 +2284,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                   sections={ACSM_SECTIONS}
                                   wholeChecklist
                                 />
-
+                                <DashboardAccessManager
+                                  open={acsmDashAccessOpen}
+                                  onOpenChange={setAcsmDashAccessOpen}
+                                  dashboardId="sarmaan_acsm"
+                                  projectId={acsmForm.project_id || currentProjectId}
+                                />
                               </div>
                             )}
                           </div>
