@@ -1289,6 +1289,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   );
   const { grants: acsmGrants, hasAnyGrant: hasAnyAcsmGrant } = useSarmaanFormAccess(acsmForm?.id, sarmaanIsManager);
   const canSeeAcsmChecklist = sarmaanIsManager || hasAnyAcsmGrant;
+  // Dashboard access is INDEPENDENT of checklist access: managers, anyone with
+  // a checklist grant, or anyone granted the dashboard directly can view it.
+  const canSeeAcsmDashboard = sarmaanIsManager || canSeeAcsmChecklist || hasDashboardAccess("sarmaan_acsm", currentProjectId);
 
   const createAcsmChecklist = async (): Promise<Form | null> => {
     if (!currentProjectId) {
