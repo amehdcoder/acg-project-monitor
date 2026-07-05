@@ -1293,6 +1293,55 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   // a checklist grant, or anyone granted the dashboard directly can view it.
   const canSeeAcsmDashboard = sarmaanIsManager || canSeeAcsmChecklist || hasDashboardAccess("sarmaan_acsm", currentProjectId);
 
+  // One-click: grant the ENTIRE SARMAAN ACSM & MDA Supervision Checklist to
+  // every active member assigned to the current project.
+  const [grantingAllAcsm, setGrantingAllAcsm] = useState(false);
+  const grantAcsmToAllMembers = async () => {
+    if (!acsmForm) return;
+    const projId = acsmForm.project_id || currentProjectId;
+    if (!projId) {
+      toast({ title: "Select a project", description: "Choose the SARMAAN project first.", variant: "destructive" });
+      return;
+    }
+    setGrantingAllAcsm(true);
+    try {
+      const WHOLE_ID = "__acsm_whole__";
+      // Members assigned to this project
+      const { data: assigns } = await supabase
+        .from("user_project_assignments").select("user_id").eq("project_id", projId);
+      let userIds = Array.from(new Set((assigns || []).map((r: any) => r.user_id)));
+      // Keep only active profiles
+      if (userIds.length) {
+        const { data: profs } = await supabase
+          .from("profiles").select("user_id").eq("is_active", true).in("user_id", userIds);
+        userIds = (profs || []).map((r: any) => r.user_id);
+      }
+      if (!userIds.length) {
+        toast({ title: "No members found", description: "No active members are assigned to this project yet." });
+        return;
+      }
+      // Existing whole-checklist grants
+      const { data: existing } = await supabase
+        .from("sarmaan_form_access" as any)
+        .select("user_id").eq("form_id", acsmForm.id).eq("section_id", WHOLE_ID);
+      const have = new Set((existing as any[] | null || []).map((r) => r.user_id));
+      const toGrant = userIds.filter((uid) => !have.has(uid));
+      if (!toGrant.length) {
+        toast({ title: "Already granted", description: "All project members already have access to this checklist." });
+        return;
+      }
+      const { error } = await supabase.from("sarmaan_form_access" as any).insert(
+        toGrant.map((uid) => ({ form_id: acsmForm.id, section_id: WHOLE_ID, user_id: uid, project_id: projId, granted_by: user?.id ?? null })),
+      );
+      if (error) throw error;
+      toast({ title: "Access granted", description: `${toGrant.length} member(s) can now view and use the checklist.` });
+    } catch (e: any) {
+      toast({ title: "Could not grant access", description: e?.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setGrantingAllAcsm(false);
+    }
+  };
+
   const createAcsmChecklist = async (): Promise<Form | null> => {
     if (!currentProjectId) {
       toast({ title: "Select a project", description: "Choose the SARMAAN project first.", variant: "destructive" });
