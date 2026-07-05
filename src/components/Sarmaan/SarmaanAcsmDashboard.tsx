@@ -691,6 +691,65 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
           />
       </main>
 
+      {/* Owner-only: Archive & permanent delete manager */}
+      {isOwner && manageOpen && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={() => busy || setManageOpen(false)}>
+          <div className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 border-b px-4 py-3 sm:px-5" style={{ borderColor: C.line }}>
+              <ShieldAlert className="h-5 w-5" style={{ color: C.red }} />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-extrabold" style={{ color: C.ink }}>Manage Submissions — Owner</div>
+                <div className="text-[11px]" style={{ color: C.sub }}>Archive keeps a copy before removing from the dashboard. Permanent delete cannot be undone.</div>
+              </div>
+              <button onClick={() => setManageOpen(false)} className="rounded-lg p-1.5 hover:bg-muted"><X className="h-4 w-4" style={{ color: C.sub }} /></button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2.5 text-xs sm:px-5" style={{ borderColor: C.line }}>
+              <button onClick={selectAll} className="rounded-md border px-2.5 py-1.5 font-semibold" style={{ borderColor: C.line, color: C.ink }}>Select all ({filtered.length})</button>
+              <button onClick={clearSel} className="rounded-md border px-2.5 py-1.5 font-semibold" style={{ borderColor: C.line, color: C.ink }}>Clear</button>
+              <span className="ml-auto font-bold" style={{ color: C.ink }}>{selectedIds.size} selected</span>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2 sm:px-3">
+              {filtered.length === 0 && <p className="py-10 text-center text-sm" style={{ color: C.sub }}>No submissions match the current filters.</p>}
+              {filtered.map((s) => {
+                const sel = selectedIds.has(s.id);
+                const sup = s.user_id ? profiles.get(s.user_id) : undefined;
+                return (
+                  <button key={s.id} onClick={() => toggleSelect(s.id)}
+                    className="mb-1.5 flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition"
+                    style={{ borderColor: sel ? C.red : C.line, background: sel ? "#FEF2F2" : "#fff" }}>
+                    {sel ? <CheckSquare className="h-4 w-4 shrink-0" style={{ color: C.red }} /> : <Square className="h-4 w-4 shrink-0" style={{ color: C.sub }} />}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-xs font-bold" style={{ color: C.ink }}>
+                        {readStr(s, ACSM_FIELD.ward, maps) || readStr(s, ACSM_FIELD.community, maps) || "Unspecified ward"} · {readStr(s, ACSM_FIELD.lga, maps) || "—"}
+                      </div>
+                      <div className="truncate text-[11px]" style={{ color: C.sub }}>
+                        {sup?.name || "—"} · {readStr(s, ACSM_FIELD.supervisionDate, maps) || (s.created_at ? new Date(s.created_at).toLocaleDateString() : "")}
+                      </div>
+                    </div>
+                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-extrabold text-white" style={{ background: BAND_META[bandOf(overallScoreOf([s], maps))].color }}>
+                      {overallScoreOf([s], maps)}%
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t px-4 py-3 sm:px-5" style={{ borderColor: C.line, paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+              <button onClick={archiveSelected} disabled={!!busy || selectedIds.size === 0}
+                className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-xs font-bold text-white shadow-sm disabled:opacity-50" style={{ background: C.blue }}>
+                {busy === "archive" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />} Archive selected
+              </button>
+              <button onClick={deleteSelected} disabled={!!busy || selectedIds.size === 0}
+                className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-xs font-bold text-white shadow-sm disabled:opacity-50" style={{ background: C.red }}>
+                {busy === "delete" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Permanently delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
 
   );
