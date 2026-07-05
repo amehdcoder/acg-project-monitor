@@ -230,7 +230,7 @@ export async function exportAcsmSubmissions(opts: {
     cell.border = border;
     cell.alignment = { horizontal: i === 0 ? "left" : "center" };
   });
-  (M.wardPerformance || []).forEach((w, i) => {
+  (M.wardScores || []).forEach((w, i) => {
     const row = ps.getRow(i + 3);
     const a = row.getCell(1); a.value = w.ward; a.border = border;
     const b = row.getCell(2); b.value = w.score; b.numFmt = '0"%"'; b.border = border; b.alignment = { horizontal: "center" };
