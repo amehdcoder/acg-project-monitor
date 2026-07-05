@@ -342,9 +342,14 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
           <Select value={filters.state} onChange={(v) => setFilters((f) => ({ ...f, state: v }))} placeholder={stateLabel} options={options.states} allLabel="All States" />
           <Select value={filters.lga} onChange={(v) => setFilters((f) => ({ ...f, lga: v }))} placeholder="All LGAs" options={options.lgas} allLabel="All LGAs" />
           <Select value={filters.ward} onChange={(v) => setFilters((f) => ({ ...f, ward: v }))} placeholder="All Wards" options={options.wards} allLabel="All Wards" />
-          <button className="flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-bold text-white shadow-sm" style={{ background: C.green }}>
-            <Download className="h-4 w-4" /> Export
+          <button onClick={handleExport} disabled={exporting} className="flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-bold text-white shadow-sm disabled:opacity-60" style={{ background: C.green }}>
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Export
           </button>
+          {isOwner && (
+            <button onClick={() => { clearSel(); setManageOpen(true); }} className="flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-bold text-white shadow-sm" style={{ background: C.red }}>
+              <Archive className="h-4 w-4" /> Manage Data
+            </button>
+          )}
           <button onClick={onClose} aria-label="Close dashboard" className="flex items-center gap-1.5 rounded-lg border px-3 py-2.5 text-xs font-bold" style={{ borderColor: C.line, color: C.ink }}>
             <X className="h-4 w-4" /> Close
           </button>
