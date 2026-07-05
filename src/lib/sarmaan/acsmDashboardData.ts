@@ -94,7 +94,7 @@ export interface AcsmMetrics {
   // dosing accuracy donut
   dosingCorrect: number; dosingIncorrect: number; dosingObservations: number;
   // team deployment by ward
-  wardDeployment: { ward: string; planned: number; went: number; rate: number; onTrack: boolean }[];
+  wardDeployment: { ward: string; lga: string; planned: number; went: number; rate: number; onTrack: boolean }[];
   // ward performance bands
   wardScores: { ward: string; score: number; band: BandKey }[];
   bandCounts: Record<BandKey, number>;
