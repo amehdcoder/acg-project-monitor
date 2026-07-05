@@ -124,15 +124,26 @@ export function buildSupervisorDrilldown(
       })
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
     const wards = new Set(rows.map((r) => r.ward)).size;
+    const lgas = [...new Set(list.map((s) => readStr(s, ACSM_FIELD.lga, maps).trim()).filter(Boolean))].sort();
+    const communities = new Set(
+      list.map((s) => readStr(s, ACSM_FIELD.community, maps).trim()).filter(Boolean),
+    ).size;
     const scored = rows.map((r) => r.score).filter((v) => Number.isFinite(v));
+    const avgScore = scored.length ? Math.round(scored.reduce((a, b) => a + b, 0) / scored.length) : 0;
+    const qualityBand = bandOf(avgScore);
     const profile = profiles.get(uid);
     out.set(uid, {
       userId: uid,
       name: profile?.name || (uid === "unassigned" ? "Unassigned" : "Unknown user"),
       email: profile?.email || "",
       visitCount: rows.length,
-      avgScore: scored.length ? Math.round(scored.reduce((a, b) => a + b, 0) / scored.length) : 0,
+      avgScore,
       wards,
+      lgas,
+      communities,
+      qualityBand,
+      qualityLabel: BAND_META[qualityBand].label,
+      qualityColor: BAND_META[qualityBand].color,
       rows,
     });
   });
