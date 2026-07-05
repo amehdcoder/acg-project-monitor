@@ -2360,6 +2360,104 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   </div>
                 )}
 
+                {shouldShowSarmaanAcsmBlock && (
+                  <div className="border-b border-border/60 bg-[#F4FBF7] p-3 sm:p-4">
+                    <div className="grid gap-3 sm:mx-auto sm:max-w-4xl sm:grid-cols-2 lg:max-w-5xl">
+                      <div className="sm:col-span-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!acsmForm) {
+                              if (!sarmaanIsManager) { toast({ title: "Not available yet", description: "Ask an Owner to set up this checklist." }); return; }
+                              const created = await createAcsmChecklist();
+                              if (created) setAcsmLaunchOpen(true);
+                            } else if (canSeeAcsmChecklist) {
+                              setAcsmLaunchOpen(true);
+                            } else {
+                              toast({ title: "Checklist locked", description: "Ask an Owner to grant you access.", variant: "destructive" });
+                            }
+                          }}
+                          className="group relative w-full overflow-hidden rounded-2xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                          style={{ borderColor: "#22A55A33", background: "linear-gradient(135deg,#0A2540 0%,#1B7A46 60%,#22A55A 140%)" }}
+                        >
+                          <div className="relative flex items-start gap-3">
+                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: "#22A55A" }}>
+                              <ClipboardCheck className="h-6 w-6 text-white" strokeWidth={2.2} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "rgba(34,165,90,0.22)", color: "#C9F7DC" }}>
+                                {acsmForm ? "ACSM & MDA · Azithromycin 1–59m" : "Not created · Tap to create"}
+                              </span>
+                              <span className="mt-2 block whitespace-normal break-words text-[15px] font-extrabold leading-snug text-white">
+                                {SARMAAN_ACSM_FORM_NAME}
+                              </span>
+                              <span className="mt-1 line-clamp-2 block text-xs text-white/80">{SARMAAN_ACSM_DESC}</span>
+                            </span>
+                            <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-white/70 transition group-hover:translate-x-0.5" />
+                          </div>
+                        </button>
+                        {acsmForm && canSeeAcsmDashboard && (
+                          <div className="mt-2">
+                            <button
+                              type="button"
+                              onClick={() => setAcsmDashOpen(true)}
+                              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:brightness-105"
+                              style={{ background: "linear-gradient(135deg,#0B5E30,#1E9E52)" }}
+                            >
+                              <LayoutGrid className="h-3.5 w-3.5" /> View ACSM & MDA Supervision Dashboard
+                            </button>
+                          </div>
+                        )}
+
+                        {sarmaanIsManager && acsmForm && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setAcsmAccessOpen(true)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-muted"
+                              style={{ borderColor: "#22A55A4D", color: "#0A2540" }}
+                            >
+                              <ShieldCheck className="h-3.5 w-3.5" style={{ color: "#1B7A46" }} /> Manage checklist access
+                            </button>
+                            <button
+                              type="button"
+                              onClick={grantAcsmToAllMembers}
+                              disabled={grantingAllAcsm}
+                              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:brightness-105 disabled:opacity-60"
+                              style={{ background: "linear-gradient(135deg,#1B7A46,#22A55A)" }}
+                            >
+                              <ShieldCheck className="h-3.5 w-3.5" /> {grantingAllAcsm ? "Granting…" : "Grant access to all members"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAcsmDashAccessOpen(true)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-muted"
+                              style={{ borderColor: "#0B5E304D", color: "#0A2540" }}
+                            >
+                              <LayoutGrid className="h-3.5 w-3.5" style={{ color: "#0B5E30" }} /> Manage dashboard access
+                            </button>
+                            <SarmaanChecklistAccessManager
+                              open={acsmAccessOpen}
+                              onOpenChange={setAcsmAccessOpen}
+                              formId={acsmForm.id}
+                              formName={acsmForm.name}
+                              projectId={acsmForm.project_id || currentProjectId}
+                              sections={ACSM_SECTIONS}
+                              wholeChecklist
+                            />
+                            <DashboardAccessManager
+                              open={acsmDashAccessOpen}
+                              onOpenChange={setAcsmDashAccessOpen}
+                              dashboardId="sarmaan_acsm"
+                              projectId={acsmForm.project_id || currentProjectId}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {filteredNonSarmaanForms.map((form, idx) => {
                   // Vary the row icon by index to feel like the mockup (home, group, clipboard...)
                   const rowIconSet = [
