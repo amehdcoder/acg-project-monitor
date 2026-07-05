@@ -2258,14 +2258,22 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             )}
 
                             {sarmaanIsManager && acsmForm && (
-                              <div className="mt-2">
+                              <div className="mt-2 flex flex-wrap gap-2">
                                 <button
                                   type="button"
                                   onClick={() => setAcsmAccessOpen(true)}
                                   className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-muted"
                                   style={{ borderColor: "#22A55A4D", color: "#0A2540" }}
                                 >
-                                  <ShieldCheck className="h-3.5 w-3.5" style={{ color: "#1B7A46" }} /> Manage ACSM checklist access
+                                  <ShieldCheck className="h-3.5 w-3.5" style={{ color: "#1B7A46" }} /> Manage checklist access
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setAcsmDashAccessOpen(true)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-muted"
+                                  style={{ borderColor: "#0B5E304D", color: "#0A2540" }}
+                                >
+                                  <LayoutGrid className="h-3.5 w-3.5" style={{ color: "#0B5E30" }} /> Manage dashboard access
                                 </button>
                                 <SarmaanChecklistAccessManager
                                   open={acsmAccessOpen}
@@ -2276,7 +2284,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                   sections={ACSM_SECTIONS}
                                   wholeChecklist
                                 />
-
+                                <DashboardAccessManager
+                                  open={acsmDashAccessOpen}
+                                  onOpenChange={setAcsmDashAccessOpen}
+                                  dashboardId="sarmaan_acsm"
+                                  projectId={acsmForm.project_id || currentProjectId}
+                                />
                               </div>
                             )}
                           </div>
