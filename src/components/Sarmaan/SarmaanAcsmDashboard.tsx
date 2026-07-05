@@ -767,6 +767,9 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
             </Panel>
           </div>
 
+          {/* Section deep-dives: per-question responses by LGA, coverage stats & listings */}
+          <SarmaanAcsmSections subs={filtered} maps={maps} />
+
           {/* Row 5: Accountability · Statistical & Thematic analysis · Owner editor */}
           <SarmaanAcsmAnalytics
             subs={filtered}
