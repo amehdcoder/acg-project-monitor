@@ -74,6 +74,14 @@ export interface SupervisorDrilldown {
   visitCount: number;
   avgScore: number;
   wards: number;
+  /** distinct LGAs the supervisor worked in */
+  lgas: string[];
+  /** distinct communities the supervisor covered */
+  communities: number;
+  /** overall quality band of the supervisor's MDA & ACSM activities */
+  qualityBand: BandKey;
+  qualityLabel: string;
+  qualityColor: string;
   rows: SupervisorVisitRow[];
 }
 
