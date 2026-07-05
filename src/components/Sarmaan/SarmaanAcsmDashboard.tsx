@@ -74,30 +74,43 @@ function buildMap(q: unknown): NameToId {
 }
 
 /* ---------------------------------------------------------------- gauge */
-function Gauge({ value, size = 190 }: { value: number; size?: number }) {
-  const r = size / 2 - 16;
+function Gauge({ value, size = 230 }: { value: number; size?: number }) {
+  const v = Math.min(100, Math.max(0, value));
+  const stroke = 22;
+  const r = size / 2 - stroke / 2 - 6;
   const cx = size / 2, cy = size / 2;
-  const start = Math.PI, end = 0; // 180° → 0°
+  const start = Math.PI, end = 0; // 180° → 0° (left to right, top half)
+  const pt = (ang: number) => ({ x: cx + r * Math.cos(ang), y: cy + r * Math.sin(ang) });
   const arc = (from: number, to: number) => {
-    const x1 = cx + r * Math.cos(from), y1 = cy + r * Math.sin(from);
-    const x2 = cx + r * Math.cos(to), y2 = cy + r * Math.sin(to);
+    const a = pt(from), b = pt(to);
     const large = to - from <= Math.PI ? 0 : 1;
-    return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
+    return `M ${a.x} ${a.y} A ${r} ${r} 0 ${large} 1 ${b.x} ${b.y}`;
   };
-  // three coloured background bands
-  const bands = [
-    { from: Math.PI, to: Math.PI * (1 - 0.34), color: C.red },
-    { from: Math.PI * (1 - 0.34), to: Math.PI * (1 - 0.67), color: C.amber },
-    { from: Math.PI * (1 - 0.67), to: 0, color: C.green },
-  ];
-  const angle = Math.PI - (Math.min(100, Math.max(0, value)) / 100) * Math.PI;
+  // Value angle (sweeps from left toward right as value rises).
+  const valAng = Math.PI - (v / 100) * Math.PI;
+  // Band colour for the value fill.
+  const fill = v >= 85 ? C.green : v >= 70 ? C.amberSoft : v >= 50 ? C.amber : C.red;
+  const needle = pt(valAng);
+  const h = size / 2 + 30;
   return (
-    <svg width={size} height={size / 2 + 24} viewBox={`0 0 ${size} ${size / 2 + 24}`}>
-      {bands.map((b, i) => (
-        <path key={i} d={arc(b.from, b.to)} stroke={b.color} strokeWidth={14} fill="none" strokeLinecap="round" opacity={0.9} />
-      ))}
-      {/* needle marker */}
-      <circle cx={cx + r * Math.cos(angle)} cy={cy + r * Math.sin(angle)} r={7} fill="#fff" stroke={C.ink} strokeWidth={3} />
+    <svg width={size} height={h} viewBox={`0 0 ${size} ${h}`}>
+      {/* full track */}
+      <path d={arc(start, end)} stroke="#EDF1F5" strokeWidth={stroke} fill="none" strokeLinecap="round" />
+      {/* value fill (green when strong) */}
+      <path d={arc(start, valAng)} stroke={fill} strokeWidth={stroke} fill="none" strokeLinecap="round" />
+      {/* tick marks at 25/50/75 */}
+      {[0.25, 0.5, 0.75].map((t) => {
+        const ang = Math.PI - t * Math.PI;
+        const o = pt(ang), i = { x: cx + (r - stroke / 2 - 3) * Math.cos(ang), y: cy + (r - stroke / 2 - 3) * Math.sin(ang) };
+        return <line key={t} x1={i.x} y1={i.y} x2={o.x} y2={o.y} stroke="#fff" strokeWidth={2} />;
+      })}
+      {/* needle */}
+      <line x1={cx} y1={cy} x2={needle.x} y2={needle.y} stroke={C.ink} strokeWidth={3.5} strokeLinecap="round" />
+      <circle cx={cx} cy={cy} r={8} fill="#fff" stroke={C.ink} strokeWidth={3} />
+      <circle cx={needle.x} cy={needle.y} r={6} fill={fill} stroke="#fff" strokeWidth={2} />
+      {/* end labels */}
+      <text x={pt(start).x} y={cy + 18} fontSize={11} fill={C.sub} textAnchor="middle" fontWeight={700}>0</text>
+      <text x={pt(end).x} y={cy + 18} fontSize={11} fill={C.sub} textAnchor="middle" fontWeight={700}>100</text>
     </svg>
   );
 }
