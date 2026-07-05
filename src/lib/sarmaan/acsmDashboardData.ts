@@ -263,7 +263,8 @@ export function computeAcsmMetrics(subs: AcsmSub[], maps: Record<string, NameToI
     const planned = rows.reduce((a, s) => a + num(readVal(s, ACSM_FIELD.teamsPlanned, maps)), 0);
     const went = rows.reduce((a, s) => a + num(readVal(s, ACSM_FIELD.teamsWentOut, maps)), 0);
     const rate = pct(went, planned);
-    return { ward, planned, went, rate, onTrack: rate >= 90 };
+    const lga = readStr(rows[0], ACSM_FIELD.lga, maps) || "—";
+    return { ward, lga, planned, went, rate, onTrack: rate >= 90 };
   }).sort((a, b) => b.rate - a.rate);
 
   const wardScores = [...wardMap.entries()].map(([ward, rows]) => {
