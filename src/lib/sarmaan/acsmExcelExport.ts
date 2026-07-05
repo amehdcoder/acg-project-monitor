@@ -154,7 +154,6 @@ export async function exportAcsmSubmissions(opts: {
     views: [{ state: "frozen", ySplit: 4, xSplit: 3 }],
     properties: { defaultRowHeight: 18 },
     pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
-    pageMargins: { left: 0.25, right: 0.25, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 },
   });
   ws.properties.tabColor = { argb: X.green };
   const colCount = columns.length;
@@ -191,7 +190,7 @@ export async function exportAcsmSubmissions(opts: {
       }
       cell.border = border;
       if (ri % 2 === 1 && c.key !== "__score") {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: STRIPE } };
+        cell.fill = fillStripe();
       }
       if (c.key === "__band") {
         applyBandCell(cell, overallScoreOf([s], maps), String(v));
@@ -211,7 +210,7 @@ export async function exportAcsmSubmissions(opts: {
   titleBand(ks, 1, 4, "Dashboard KPIs");
   legendBand(ks, 2, 4);
   ["Metric", "Value", "Band / Rule", "Interpretation"].forEach((h, i) => {
-    const cell = ks.getCell(2, i + 1);
+    const cell = ks.getCell(3, i + 1);
     cell.value = h;
     cell.font = { bold: true, color: { argb: X.white } };
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: X.navy } };
@@ -233,7 +232,7 @@ export async function exportAcsmSubmissions(opts: {
     { metric: "ADRs Referred", value: `${M.adrReferred} (${M.adrReferredPct}%)`, score: M.adrReferredPct, interpretation: "Reported adverse events referred to facility." },
   ];
   kpis.forEach((k, i) => {
-    const row = ks.getRow(i + 3);
+    const row = ks.getRow(i + 4);
     const a = row.getCell(1); a.value = k.metric; a.border = border; a.font = { color: { argb: X.ink }, bold: true };
     const b = row.getCell(2); b.value = k.value; b.border = border; b.alignment = { horizontal: "center" }; b.font = { bold: true, color: { argb: X.ink } };
     const c = row.getCell(3); c.border = border; c.alignment = { horizontal: "center", wrapText: true };
