@@ -2318,6 +2318,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 </button>
                                 <button
                                   type="button"
+                                  onClick={grantAcsmToAllMembers}
+                                  disabled={grantingAllAcsm}
+                                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:brightness-105 disabled:opacity-60"
+                                  style={{ background: "linear-gradient(135deg,#1B7A46,#22A55A)" }}
+                                >
+                                  <ShieldCheck className="h-3.5 w-3.5" /> {grantingAllAcsm ? "Granting…" : "Grant access to all members"}
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => setAcsmDashAccessOpen(true)}
                                   className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-muted"
                                   style={{ borderColor: "#0B5E304D", color: "#0A2540" }}
