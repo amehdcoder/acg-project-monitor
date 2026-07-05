@@ -248,6 +248,63 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
 
   const M = useMemo(() => computeAcsmMetrics(filtered, maps), [filtered, maps]);
 
+  // ---- Export: colourful, professional workbook of every submission ----
+  const handleExport = useCallback(async () => {
+    if (!filtered.length) { toast({ title: "Nothing to export", description: "No submissions match the current filters yet." }); return; }
+    setExporting(true);
+    try {
+      await exportAcsmSubmissions({ formName: form.name, questions: form.questions, subs: filtered, maps, profiles });
+      toast({ title: "Excel exported", description: `${filtered.length} submission(s) exported.` });
+    } catch (e: any) {
+      toast({ title: "Export failed", description: e?.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setExporting(false);
+    }
+  }, [filtered, form.name, form.questions, maps, profiles]);
+
+  // ---- Owner-only: archive (retain a copy) then permanent delete ----
+  const toggleSelect = (id: string) =>
+    setSelectedIds((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const selectAll = () => setSelectedIds(new Set(filtered.map((s) => s.id)));
+  const clearSel = () => setSelectedIds(new Set());
+
+  const archiveSelected = useCallback(async () => {
+    const chosen = filtered.filter((s) => selectedIds.has(s.id));
+    if (!chosen.length) { toast({ title: "Select submissions first" }); return; }
+    if (!window.confirm(`Archive ${chosen.length} submission(s)? A copy is stored, then they are removed from the live dashboard.`)) return;
+    setBusy("archive");
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const rows = chosen.map((s) => ({
+        original_submission_id: s.id, form_id: s.formId, submitted_by: s.user_id,
+        data: s.data as any, original_created_at: s.created_at, archived_by: auth.user?.id,
+      }));
+      const { error: insErr } = await supabase.from("sarmaan_acsm_archived_submissions").insert(rows);
+      if (insErr) throw insErr;
+      const { error: delErr } = await supabase.from("form_submissions").delete().in("id", chosen.map((s) => s.id));
+      if (delErr) throw delErr;
+      toast({ title: "Archived", description: `${chosen.length} submission(s) archived and removed from the dashboard.` });
+      clearSel(); setManageOpen(false); load({ live: true });
+    } catch (e: any) {
+      toast({ title: "Archive failed", description: e?.message || "Please try again.", variant: "destructive" });
+    } finally { setBusy(null); }
+  }, [filtered, selectedIds, load]);
+
+  const deleteSelected = useCallback(async () => {
+    const chosen = filtered.filter((s) => selectedIds.has(s.id));
+    if (!chosen.length) { toast({ title: "Select submissions first" }); return; }
+    if (!window.confirm(`PERMANENTLY delete ${chosen.length} submission(s)? This cannot be undone.`)) return;
+    setBusy("delete");
+    try {
+      const { error } = await supabase.from("form_submissions").delete().in("id", chosen.map((s) => s.id));
+      if (error) throw error;
+      toast({ title: "Deleted", description: `${chosen.length} submission(s) permanently deleted.` });
+      clearSel(); setManageOpen(false); load({ live: true });
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e?.message || "Please try again.", variant: "destructive" });
+    } finally { setBusy(null); }
+  }, [filtered, selectedIds, load]);
+
   // Geolocated supervision visits → map markers, coloured by ACSM band.
   const visitPoints = useMemo<VisitPoint[]>(() => {
     const pts: VisitPoint[] = [];
