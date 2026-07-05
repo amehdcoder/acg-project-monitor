@@ -594,7 +594,7 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
   const checklistShell = (
     <div
       ref={shellRef}
-      className="fixed inset-x-0 top-0 z-50 flex min-h-0 flex-col overflow-hidden bg-[#F4F8FC]"
+      className="fixed inset-x-0 top-0 z-50 flex h-screen max-h-screen min-h-0 flex-col overflow-hidden bg-[#F4F8FC]"
       style={{
         height: "var(--acsm-vh, 100dvh)",
         maxHeight: "var(--acsm-vh, 100dvh)",
