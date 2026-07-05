@@ -16,11 +16,13 @@ import {
   UserCheck, HandHeart, Hand, Bell, AlertCircle, Info,
   CheckCircle2, TrendingUp, X,
   Shirt, IdCard, Ban, Award,
+  Archive, Trash2, Loader2, CheckSquare, Square, ShieldAlert,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 import type { Question, FormGroup } from "@/components/FormBuilder/types";
 import SarmaanKanoMap, { type VisitPoint } from "@/components/Sarmaan/SarmaanKanoMap";
 import {
@@ -28,8 +30,10 @@ import {
   type AcsmSub, type NameToId, type BandKey,
 } from "@/lib/sarmaan/acsmDashboardData";
 import { ACSM_FIELD } from "@/lib/sarmaan/acsmChecklist";
+import { exportAcsmSubmissions } from "@/lib/sarmaan/acsmExcelExport";
 import SarmaanAcsmAnalytics from "@/components/Sarmaan/SarmaanAcsmAnalytics";
 import { useCanEditDashboards } from "@/hooks/useCanEditDashboards";
+import { useAuth } from "@/hooks/useAuth";
 import { buildLabelMap, type QuestionLabelMap } from "@/lib/formLabelUtils";
 import type { ProfileLite } from "@/lib/accountability";
 
@@ -153,9 +157,15 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
   const [profiles, setProfiles] = useState<Map<string, ProfileLite>>(new Map());
   const [questionLabels, setQuestionLabels] = useState<QuestionLabelMap>(() => buildLabelMap(sections(form.questions) as any[]));
   const { canEditDashboards } = useCanEditDashboards();
+  const { isOwner } = useAuth();
 
   const [filters, setFilters] = useState<{ state: string; lga: string; ward: string }>({ state: "", lga: "", ward: "" });
   const idsRef = useRef<Set<string>>(new Set([form.id]));
+
+  const [exporting, setExporting] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState<"archive" | "delete" | null>(null);
 
 
   const load = useCallback(async (opts?: { live?: boolean }) => {
@@ -238,6 +248,63 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
 
   const M = useMemo(() => computeAcsmMetrics(filtered, maps), [filtered, maps]);
 
+  // ---- Export: colourful, professional workbook of every submission ----
+  const handleExport = useCallback(async () => {
+    if (!filtered.length) { toast({ title: "Nothing to export", description: "No submissions match the current filters yet." }); return; }
+    setExporting(true);
+    try {
+      await exportAcsmSubmissions({ formName: form.name, questions: form.questions, subs: filtered, maps, profiles });
+      toast({ title: "Excel exported", description: `${filtered.length} submission(s) exported.` });
+    } catch (e: any) {
+      toast({ title: "Export failed", description: e?.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setExporting(false);
+    }
+  }, [filtered, form.name, form.questions, maps, profiles]);
+
+  // ---- Owner-only: archive (retain a copy) then permanent delete ----
+  const toggleSelect = (id: string) =>
+    setSelectedIds((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const selectAll = () => setSelectedIds(new Set(filtered.map((s) => s.id)));
+  const clearSel = () => setSelectedIds(new Set());
+
+  const archiveSelected = useCallback(async () => {
+    const chosen = filtered.filter((s) => selectedIds.has(s.id));
+    if (!chosen.length) { toast({ title: "Select submissions first" }); return; }
+    if (!window.confirm(`Archive ${chosen.length} submission(s)? A copy is stored, then they are removed from the live dashboard.`)) return;
+    setBusy("archive");
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const rows = chosen.map((s) => ({
+        original_submission_id: s.id, form_id: s.formId, submitted_by: s.user_id,
+        data: s.data as any, original_created_at: s.created_at, archived_by: auth.user?.id,
+      }));
+      const { error: insErr } = await supabase.from("sarmaan_acsm_archived_submissions").insert(rows);
+      if (insErr) throw insErr;
+      const { error: delErr } = await supabase.from("form_submissions").delete().in("id", chosen.map((s) => s.id));
+      if (delErr) throw delErr;
+      toast({ title: "Archived", description: `${chosen.length} submission(s) archived and removed from the dashboard.` });
+      clearSel(); setManageOpen(false); load({ live: true });
+    } catch (e: any) {
+      toast({ title: "Archive failed", description: e?.message || "Please try again.", variant: "destructive" });
+    } finally { setBusy(null); }
+  }, [filtered, selectedIds, load]);
+
+  const deleteSelected = useCallback(async () => {
+    const chosen = filtered.filter((s) => selectedIds.has(s.id));
+    if (!chosen.length) { toast({ title: "Select submissions first" }); return; }
+    if (!window.confirm(`PERMANENTLY delete ${chosen.length} submission(s)? This cannot be undone.`)) return;
+    setBusy("delete");
+    try {
+      const { error } = await supabase.from("form_submissions").delete().in("id", chosen.map((s) => s.id));
+      if (error) throw error;
+      toast({ title: "Deleted", description: `${chosen.length} submission(s) permanently deleted.` });
+      clearSel(); setManageOpen(false); load({ live: true });
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e?.message || "Please try again.", variant: "destructive" });
+    } finally { setBusy(null); }
+  }, [filtered, selectedIds, load]);
+
   // Geolocated supervision visits → map markers, coloured by ACSM band.
   const visitPoints = useMemo<VisitPoint[]>(() => {
     const pts: VisitPoint[] = [];
@@ -275,9 +342,14 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
           <Select value={filters.state} onChange={(v) => setFilters((f) => ({ ...f, state: v }))} placeholder={stateLabel} options={options.states} allLabel="All States" />
           <Select value={filters.lga} onChange={(v) => setFilters((f) => ({ ...f, lga: v }))} placeholder="All LGAs" options={options.lgas} allLabel="All LGAs" />
           <Select value={filters.ward} onChange={(v) => setFilters((f) => ({ ...f, ward: v }))} placeholder="All Wards" options={options.wards} allLabel="All Wards" />
-          <button className="flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-bold text-white shadow-sm" style={{ background: C.green }}>
-            <Download className="h-4 w-4" /> Export
+          <button onClick={handleExport} disabled={exporting} className="flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-bold text-white shadow-sm disabled:opacity-60" style={{ background: C.green }}>
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Export
           </button>
+          {isOwner && (
+            <button onClick={() => { clearSel(); setManageOpen(true); }} className="flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-bold text-white shadow-sm" style={{ background: C.red }}>
+              <Archive className="h-4 w-4" /> Manage Data
+            </button>
+          )}
           <button onClick={onClose} aria-label="Close dashboard" className="flex items-center gap-1.5 rounded-lg border px-3 py-2.5 text-xs font-bold" style={{ borderColor: C.line, color: C.ink }}>
             <X className="h-4 w-4" /> Close
           </button>
@@ -618,6 +690,65 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
             onChanged={() => load({ live: true })}
           />
       </main>
+
+      {/* Owner-only: Archive & permanent delete manager */}
+      {isOwner && manageOpen && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={() => busy || setManageOpen(false)}>
+          <div className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 border-b px-4 py-3 sm:px-5" style={{ borderColor: C.line }}>
+              <ShieldAlert className="h-5 w-5" style={{ color: C.red }} />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-extrabold" style={{ color: C.ink }}>Manage Submissions — Owner</div>
+                <div className="text-[11px]" style={{ color: C.sub }}>Archive keeps a copy before removing from the dashboard. Permanent delete cannot be undone.</div>
+              </div>
+              <button onClick={() => setManageOpen(false)} className="rounded-lg p-1.5 hover:bg-muted"><X className="h-4 w-4" style={{ color: C.sub }} /></button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2.5 text-xs sm:px-5" style={{ borderColor: C.line }}>
+              <button onClick={selectAll} className="rounded-md border px-2.5 py-1.5 font-semibold" style={{ borderColor: C.line, color: C.ink }}>Select all ({filtered.length})</button>
+              <button onClick={clearSel} className="rounded-md border px-2.5 py-1.5 font-semibold" style={{ borderColor: C.line, color: C.ink }}>Clear</button>
+              <span className="ml-auto font-bold" style={{ color: C.ink }}>{selectedIds.size} selected</span>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2 sm:px-3">
+              {filtered.length === 0 && <p className="py-10 text-center text-sm" style={{ color: C.sub }}>No submissions match the current filters.</p>}
+              {filtered.map((s) => {
+                const sel = selectedIds.has(s.id);
+                const sup = s.user_id ? profiles.get(s.user_id) : undefined;
+                return (
+                  <button key={s.id} onClick={() => toggleSelect(s.id)}
+                    className="mb-1.5 flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition"
+                    style={{ borderColor: sel ? C.red : C.line, background: sel ? "#FEF2F2" : "#fff" }}>
+                    {sel ? <CheckSquare className="h-4 w-4 shrink-0" style={{ color: C.red }} /> : <Square className="h-4 w-4 shrink-0" style={{ color: C.sub }} />}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-xs font-bold" style={{ color: C.ink }}>
+                        {readStr(s, ACSM_FIELD.ward, maps) || readStr(s, ACSM_FIELD.community, maps) || "Unspecified ward"} · {readStr(s, ACSM_FIELD.lga, maps) || "—"}
+                      </div>
+                      <div className="truncate text-[11px]" style={{ color: C.sub }}>
+                        {sup?.name || "—"} · {readStr(s, ACSM_FIELD.supervisionDate, maps) || (s.created_at ? new Date(s.created_at).toLocaleDateString() : "")}
+                      </div>
+                    </div>
+                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-extrabold text-white" style={{ background: BAND_META[bandOf(overallScoreOf([s], maps))].color }}>
+                      {overallScoreOf([s], maps)}%
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t px-4 py-3 sm:px-5" style={{ borderColor: C.line, paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+              <button onClick={archiveSelected} disabled={!!busy || selectedIds.size === 0}
+                className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-xs font-bold text-white shadow-sm disabled:opacity-50" style={{ background: C.blue }}>
+                {busy === "archive" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />} Archive selected
+              </button>
+              <button onClick={deleteSelected} disabled={!!busy || selectedIds.size === 0}
+                className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-xs font-bold text-white shadow-sm disabled:opacity-50" style={{ background: C.red }}>
+                {busy === "delete" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Permanently delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
 

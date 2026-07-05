@@ -6111,6 +6111,39 @@ export type Database = {
           },
         ]
       }
+      sarmaan_acsm_archived_submissions: {
+        Row: {
+          archived_at: string
+          archived_by: string
+          data: Json
+          form_id: string
+          id: string
+          original_created_at: string | null
+          original_submission_id: string
+          submitted_by: string | null
+        }
+        Insert: {
+          archived_at?: string
+          archived_by: string
+          data?: Json
+          form_id: string
+          id?: string
+          original_created_at?: string | null
+          original_submission_id: string
+          submitted_by?: string | null
+        }
+        Update: {
+          archived_at?: string
+          archived_by?: string
+          data?: Json
+          form_id?: string
+          id?: string
+          original_created_at?: string | null
+          original_submission_id?: string
+          submitted_by?: string | null
+        }
+        Relationships: []
+      }
       sarmaan_form_access: {
         Row: {
           created_at: string
