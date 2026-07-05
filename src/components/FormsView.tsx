@@ -2244,7 +2244,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-white/70 transition group-hover:translate-x-0.5" />
                               </div>
                             </button>
-                            {acsmForm && (sarmaanIsManager || canSeeAcsmChecklist || canSeeSarmaanChecklist) && (
+                            {acsmForm && canSeeAcsmDashboard && (
                               <div className="mt-2">
                                 <button
                                   type="button"
