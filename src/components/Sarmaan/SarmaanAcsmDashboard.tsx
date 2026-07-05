@@ -682,6 +682,7 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
                 <table className="w-full text-[11px]">
                   <thead>
                     <tr className="text-left" style={{ color: C.sub }}>
+                      <th className="py-1 font-semibold">LGA</th>
                       <th className="py-1 font-semibold">Ward</th>
                       <th className="py-1 text-center font-semibold">Planned</th>
                       <th className="py-1 text-center font-semibold">Out</th>
@@ -691,8 +692,9 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
                   </thead>
                   <tbody>
                     {M.wardDeployment.slice(0, 6).map((w) => (
-                      <tr key={w.ward} className="border-t" style={{ borderColor: C.line }}>
-                        <td className="py-1.5 font-semibold" style={{ color: C.ink }}>{w.ward}</td>
+                      <tr key={`${w.lga}-${w.ward}`} className="border-t" style={{ borderColor: C.line }}>
+                        <td className="py-1.5 font-semibold" style={{ color: C.ink }}>{w.lga}</td>
+                        <td className="py-1.5" style={{ color: C.ink }}>{w.ward}</td>
                         <td className="py-1.5 text-center tabular-nums">{w.planned}</td>
                         <td className="py-1.5 text-center tabular-nums">{w.went}</td>
                         <td className="py-1.5 text-center font-bold tabular-nums">{w.rate}%</td>
@@ -703,7 +705,7 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
                         </td>
                       </tr>
                     ))}
-                    {M.wardDeployment.length === 0 && <tr><td colSpan={5} className="py-6 text-center" style={{ color: C.sub }}>No deployment data.</td></tr>}
+                    {M.wardDeployment.length === 0 && <tr><td colSpan={6} className="py-6 text-center" style={{ color: C.sub }}>No deployment data.</td></tr>}
                   </tbody>
                 </table>
               </div>
