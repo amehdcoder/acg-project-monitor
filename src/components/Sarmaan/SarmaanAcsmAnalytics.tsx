@@ -264,8 +264,10 @@ export default function SarmaanAcsmAnalytics({ subs, maps, profiles, form, canEd
                     {selected.email && <div className="text-[11px]" style={{ color: C.sub }}>{selected.email}</div>}
                     <div className="mt-1 flex flex-wrap gap-3 text-[11px] font-semibold" style={{ color: C.sub }}>
                       <span><MapPin className="mr-1 inline h-3 w-3" />{selected.visitCount} visit{selected.visitCount === 1 ? "" : "s"}</span>
+                      <span>{selected.lgas.join(", ") || "—"}</span>
+                      <span>{selected.communities} communit{selected.communities === 1 ? "y" : "ies"}</span>
                       <span>{selected.wards} ward{selected.wards === 1 ? "" : "s"}</span>
-                      <span>Avg score <b style={{ color: C.ink }}>{selected.avgScore}%</b></span>
+                      <span>Overall quality <b style={{ color: selected.qualityColor }}>{selected.avgScore}% · {selected.qualityLabel.split(" ")[0]}</b></span>
                     </div>
                   </div>
                   <button
