@@ -1293,7 +1293,6 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     ? sarmaanSupervisoryForms.find((form) => form.project_id === currentProjectId) || null
     : sarmaanSupervisoryForms[0] || null;
   const currentProjectIsSarmaan = /sarmaan/i.test(currentProject?.name || "");
-  const currentUserIsProjectMember = !!currentProjectId && projects.some((p) => p.id === currentProjectId);
 
   // SARMAAN checklist/dashboard access control
   const sarmaanIsManager = isAdmin || isOwnerLevel;
@@ -1313,7 +1312,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     [mergedForms, currentProjectId],
   );
   const { grants: acsmGrants, hasAnyGrant: hasAnyAcsmGrant } = useSarmaanFormAccess(acsmForm?.id, sarmaanIsManager);
-  const canSeeAcsmChecklist = sarmaanIsManager || hasAnyAcsmGrant || (currentProjectIsSarmaan && !!acsmForm && currentUserIsProjectMember);
+  const canSeeAcsmChecklist = sarmaanIsManager || hasAnyAcsmGrant || (currentProjectIsSarmaan && !!acsmForm);
   // Dashboard access is INDEPENDENT of checklist access: managers, anyone with
   // a checklist grant, or anyone granted the dashboard directly can view it.
   const canSeeAcsmDashboard = sarmaanIsManager || canSeeAcsmChecklist || hasDashboardAccess("sarmaan_acsm", currentProjectId);
