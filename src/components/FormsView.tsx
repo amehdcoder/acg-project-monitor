@@ -230,6 +230,8 @@ const SARMAAN_SUPERVISORY_FORM_NAME = "SARMAAN Supervisory Checklist";
 const SARMAAN_SUPERVISORY_DASH_NAME = "SARMAAN Supervision Dashboard";
 const SARMAAN_SUPERVISORY_DESC = "12-module supportive supervision checklist with GPS, evidence capture, scoring and learning actions.";
 const SARMAAN_DASH_DESC = "Executive supervision dashboard with live KPIs, learning funnels, quality bands and corrective-action insights.";
+const isSarmaanAcsmStoredForm = (form: { name?: string | null; settings?: any } | null | undefined) =>
+  !!form && (form.name === SARMAAN_ACSM_FORM_NAME || form.settings?.sarmaan_acsm === true);
 
 interface FormsViewProps {
   selectedProjectId?: string | null;
@@ -892,7 +894,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         
         if (projectAssignError) throw projectAssignError;
         
+        const { data: sarmaanAccessRows, error: sarmaanAccessError } = await supabase
+          .from("sarmaan_form_access" as any)
+          .select("form_id")
+          .eq("user_id", user?.id);
+
+        if (sarmaanAccessError) throw sarmaanAccessError;
+
         const directFormIds = formAssignments?.map(a => a.form_id) || [];
+        const sarmaanAccessFormIds = (sarmaanAccessRows as any[] | null || []).map(a => a.form_id);
         const projectIds = projectAssignments?.map(a => a.project_id) || [];
         
         let formsFromProjects: string[] = [];
@@ -904,7 +914,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           formsFromProjects = projectForms?.map(f => f.id) || [];
         }
         
-        const allFormIds = [...new Set([...directFormIds, ...formsFromProjects])];
+        const allFormIds = [...new Set([...directFormIds, ...formsFromProjects, ...sarmaanAccessFormIds])];
         
         if (allFormIds.length > 0) {
           const { data, error } = await supabase
@@ -930,6 +940,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         if (assignError) throw assignError;
 
         const assignedFormIds = (assignments || []).map(a => a.form_id);
+
+        // SARMAAN checklist grants live in their own access table. Include those
+        // form ids here so users see the dedicated SARMAAN ACSM checklist even
+        // when they are not otherwise assigned through the generic form system.
+        const { data: sarmaanAccessRows, error: sarmaanAccessError } = await supabase
+          .from("sarmaan_form_access" as any)
+          .select("form_id")
+          .eq("user_id", user?.id);
+        if (sarmaanAccessError) throw sarmaanAccessError;
+        const sarmaanAccessFormIds = (sarmaanAccessRows as any[] | null || []).map(a => a.form_id);
 
         // Pull all forms from the user's assigned projects so we can surface the
         // MDA checklist automatically even when it was never explicitly assigned.
@@ -958,7 +978,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             .map((f: any) => f.id);
         }
 
-        const formIds = [...new Set([...assignedFormIds, ...autoMdaFormIds])];
+        const formIds = [...new Set([...assignedFormIds, ...autoMdaFormIds, ...sarmaanAccessFormIds])];
 
         if (formIds.length > 0) {
           const { data, error } = await supabase
@@ -1284,7 +1304,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   // SARMAAN ACSM & MDA Supervision Checklist (image-parity form)
   const acsmForm = useMemo(
-    () => mergedForms.find((f) => f.name === SARMAAN_ACSM_FORM_NAME && (!currentProjectId || f.project_id === currentProjectId)) || null,
+    () => mergedForms.find((f) => isSarmaanAcsmStoredForm(f) && (!currentProjectId || f.project_id === currentProjectId)) || null,
     [mergedForms, currentProjectId],
   );
   const { grants: acsmGrants, hasAnyGrant: hasAnyAcsmGrant } = useSarmaanFormAccess(acsmForm?.id, sarmaanIsManager);
@@ -1371,11 +1391,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   };
 
   const filteredNonSarmaanForms = filteredForms.filter(
-    (form) => !(currentProjectIsSarmaan && isSupervisoryLearningForm({ settings: form.settings, name: form.name })),
+    (form) => !(currentProjectIsSarmaan && (
+      isSupervisoryLearningForm({ settings: form.settings, name: form.name }) || isSarmaanAcsmStoredForm(form)
+    )),
   );
-  const sarmaanSearchMatches = !searchQuery.trim() || /sarmaan|supervisory|supervision|checklist|dashboard|learning/i.test(searchQuery);
+  const sarmaanSearchMatches = !searchQuery.trim() || /sarmaan|supervisory|supervision|checklist|dashboard|learning|acsm|mda|azithromycin/i.test(searchQuery);
+  const acsmSearchMatches = !searchQuery.trim() || /sarmaan|acsm|mda|supervision|checklist|dashboard|azithromycin/i.test(searchQuery);
   const shouldShowSarmaanSupervisoryBlock = currentProjectIsSarmaan && sarmaanSearchMatches && (!!primarySarmaanSupervisoryForm || isAdmin);
-  const sarmaanVisibleRowCount = shouldShowSarmaanSupervisoryBlock ? 2 : 0;
+  const shouldShowSarmaanAcsmBlock = currentProjectIsSarmaan && acsmSearchMatches && (sarmaanIsManager || !!acsmForm || canSeeAcsmChecklist || canSeeAcsmDashboard);
+  const sarmaanVisibleRowCount = (shouldShowSarmaanSupervisoryBlock ? 2 : 0) + (shouldShowSarmaanAcsmBlock ? 1 : 0);
   const visibleMyFormsCount = filteredNonSarmaanForms.length + sarmaanVisibleRowCount;
 
   const createSarmaanSupervisoryTool = async (): Promise<Form | null> => {
