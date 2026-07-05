@@ -16,11 +16,13 @@ import {
   UserCheck, HandHeart, Hand, Bell, AlertCircle, Info,
   CheckCircle2, TrendingUp, X,
   Shirt, IdCard, Ban, Award,
+  Archive, Trash2, Loader2, CheckSquare, Square, ShieldAlert,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 import type { Question, FormGroup } from "@/components/FormBuilder/types";
 import SarmaanKanoMap, { type VisitPoint } from "@/components/Sarmaan/SarmaanKanoMap";
 import {
@@ -28,8 +30,10 @@ import {
   type AcsmSub, type NameToId, type BandKey,
 } from "@/lib/sarmaan/acsmDashboardData";
 import { ACSM_FIELD } from "@/lib/sarmaan/acsmChecklist";
+import { exportAcsmSubmissions } from "@/lib/sarmaan/acsmExcelExport";
 import SarmaanAcsmAnalytics from "@/components/Sarmaan/SarmaanAcsmAnalytics";
 import { useCanEditDashboards } from "@/hooks/useCanEditDashboards";
+import { useAuth } from "@/hooks/useAuth";
 import { buildLabelMap, type QuestionLabelMap } from "@/lib/formLabelUtils";
 import type { ProfileLite } from "@/lib/accountability";
 
