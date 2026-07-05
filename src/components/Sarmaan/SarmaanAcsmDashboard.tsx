@@ -25,10 +25,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import type { Question, FormGroup } from "@/components/FormBuilder/types";
 import SarmaanKanoMap, { type VisitPoint } from "@/components/Sarmaan/SarmaanKanoMap";
+import SarmaanWardPerformanceMap, { type LgaScore, type WardPoint } from "@/components/Sarmaan/SarmaanWardPerformanceMap";
+import SarmaanAcsmSections from "@/components/Sarmaan/SarmaanAcsmSections";
 import {
   computeAcsmMetrics, BAND_META, bandOf, overallScoreOf, readVal, readStr,
   type AcsmSub, type NameToId, type BandKey,
 } from "@/lib/sarmaan/acsmDashboardData";
+import { communitiesSupervised } from "@/lib/sarmaan/acsmSectionAnalytics";
 import { ACSM_FIELD } from "@/lib/sarmaan/acsmChecklist";
 import { exportAcsmSubmissions } from "@/lib/sarmaan/acsmExcelExport";
 import SarmaanAcsmAnalytics from "@/components/Sarmaan/SarmaanAcsmAnalytics";
@@ -71,30 +74,43 @@ function buildMap(q: unknown): NameToId {
 }
 
 /* ---------------------------------------------------------------- gauge */
-function Gauge({ value, size = 190 }: { value: number; size?: number }) {
-  const r = size / 2 - 16;
+function Gauge({ value, size = 230 }: { value: number; size?: number }) {
+  const v = Math.min(100, Math.max(0, value));
+  const stroke = 22;
+  const r = size / 2 - stroke / 2 - 6;
   const cx = size / 2, cy = size / 2;
-  const start = Math.PI, end = 0; // 180° → 0°
+  const start = Math.PI, end = 0; // 180° → 0° (left to right, top half)
+  const pt = (ang: number) => ({ x: cx + r * Math.cos(ang), y: cy + r * Math.sin(ang) });
   const arc = (from: number, to: number) => {
-    const x1 = cx + r * Math.cos(from), y1 = cy + r * Math.sin(from);
-    const x2 = cx + r * Math.cos(to), y2 = cy + r * Math.sin(to);
+    const a = pt(from), b = pt(to);
     const large = to - from <= Math.PI ? 0 : 1;
-    return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
+    return `M ${a.x} ${a.y} A ${r} ${r} 0 ${large} 1 ${b.x} ${b.y}`;
   };
-  // three coloured background bands
-  const bands = [
-    { from: Math.PI, to: Math.PI * (1 - 0.34), color: C.red },
-    { from: Math.PI * (1 - 0.34), to: Math.PI * (1 - 0.67), color: C.amber },
-    { from: Math.PI * (1 - 0.67), to: 0, color: C.green },
-  ];
-  const angle = Math.PI - (Math.min(100, Math.max(0, value)) / 100) * Math.PI;
+  // Value angle (sweeps from left toward right as value rises).
+  const valAng = Math.PI - (v / 100) * Math.PI;
+  // Band colour for the value fill.
+  const fill = v >= 85 ? C.green : v >= 70 ? C.amberSoft : v >= 50 ? C.amber : C.red;
+  const needle = pt(valAng);
+  const h = size / 2 + 30;
   return (
-    <svg width={size} height={size / 2 + 24} viewBox={`0 0 ${size} ${size / 2 + 24}`}>
-      {bands.map((b, i) => (
-        <path key={i} d={arc(b.from, b.to)} stroke={b.color} strokeWidth={14} fill="none" strokeLinecap="round" opacity={0.9} />
-      ))}
-      {/* needle marker */}
-      <circle cx={cx + r * Math.cos(angle)} cy={cy + r * Math.sin(angle)} r={7} fill="#fff" stroke={C.ink} strokeWidth={3} />
+    <svg width={size} height={h} viewBox={`0 0 ${size} ${h}`}>
+      {/* full track */}
+      <path d={arc(start, end)} stroke="#EDF1F5" strokeWidth={stroke} fill="none" strokeLinecap="round" />
+      {/* value fill (green when strong) */}
+      <path d={arc(start, valAng)} stroke={fill} strokeWidth={stroke} fill="none" strokeLinecap="round" />
+      {/* tick marks at 25/50/75 */}
+      {[0.25, 0.5, 0.75].map((t) => {
+        const ang = Math.PI - t * Math.PI;
+        const o = pt(ang), i = { x: cx + (r - stroke / 2 - 3) * Math.cos(ang), y: cy + (r - stroke / 2 - 3) * Math.sin(ang) };
+        return <line key={t} x1={i.x} y1={i.y} x2={o.x} y2={o.y} stroke="#fff" strokeWidth={2} />;
+      })}
+      {/* needle */}
+      <line x1={cx} y1={cy} x2={needle.x} y2={needle.y} stroke={C.ink} strokeWidth={3.5} strokeLinecap="round" />
+      <circle cx={cx} cy={cy} r={8} fill="#fff" stroke={C.ink} strokeWidth={3} />
+      <circle cx={needle.x} cy={needle.y} r={6} fill={fill} stroke="#fff" strokeWidth={2} />
+      {/* end labels */}
+      <text x={pt(start).x} y={cy + 18} fontSize={11} fill={C.sub} textAnchor="middle" fontWeight={700}>0</text>
+      <text x={pt(end).x} y={cy + 18} fontSize={11} fill={C.sub} textAnchor="middle" fontWeight={700}>100</text>
     </svg>
   );
 }
@@ -323,6 +339,56 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
     return pts;
   }, [filtered, maps]);
 
+  const communitiesCount = useMemo(() => communitiesSupervised(filtered, maps), [filtered, maps]);
+
+  // Per-LGA average performance (LGA choropleth) for the Kano ward map.
+  const lgaScores = useMemo<LgaScore[]>(() => {
+    const byLga = new Map<string, AcsmSub[]>();
+    const wards = new Map<string, Set<string>>();
+    for (const s of filtered) {
+      const lga = readStr(s, ACSM_FIELD.lga, maps).trim();
+      if (!lga) continue;
+      if (!byLga.has(lga)) { byLga.set(lga, []); wards.set(lga, new Set()); }
+      byLga.get(lga)!.push(s);
+      const w = readStr(s, ACSM_FIELD.ward, maps).trim();
+      if (w) wards.get(lga)!.add(w);
+    }
+    return [...byLga.entries()].map(([name, rows]) => {
+      const score = overallScoreOf(rows, maps);
+      return {
+        key: name.toLowerCase().replace(/[^a-z0-9]/g, ""),
+        name, score, color: BAND_META[bandOf(score)].color,
+        wards: wards.get(name)?.size || 0,
+      };
+    });
+  }, [filtered, maps]);
+
+  // Supervised wards as performance-coloured dots at their mean GPS.
+  const wardPoints = useMemo<WardPoint[]>(() => {
+    const byWard = new Map<string, { subs: AcsmSub[]; lat: number; lng: number; n: number; lga: string }>();
+    for (const s of filtered) {
+      const ward = readStr(s, ACSM_FIELD.ward, maps).trim() || readStr(s, ACSM_FIELD.community, maps).trim();
+      if (!ward) continue;
+      const gps = readVal(s, ACSM_FIELD.gps, maps) as any;
+      const lat = Number(gps?.lat), lng = Number(gps?.lng);
+      const key = `${readStr(s, ACSM_FIELD.lga, maps)}|${ward}`;
+      if (!byWard.has(key)) byWard.set(key, { subs: [], lat: 0, lng: 0, n: 0, lga: readStr(s, ACSM_FIELD.lga, maps) });
+      const g = byWard.get(key)!;
+      g.subs.push(s);
+      if (Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)) { g.lat += lat; g.lng += lng; g.n++; }
+    }
+    const pts: WardPoint[] = [];
+    byWard.forEach((g, key) => {
+      if (g.n === 0) return;
+      const score = overallScoreOf(g.subs, maps);
+      pts.push({
+        lat: g.lat / g.n, lng: g.lng / g.n, score,
+        ward: key.split("|")[1], lga: g.lga || "—",
+        color: BAND_META[bandOf(score)].color,
+      });
+    });
+    return pts;
+  }, [filtered, maps]);
   const stateLabel = filters.state || options.states[0] || "All States";
   const timeStr = new Date(lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
@@ -363,7 +429,11 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
 
       <main className="mx-auto w-full max-w-[1600px] flex-1 space-y-5 p-4 sm:p-6">
           {/* KPI strip */}
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+
+            <Kpi icon={MapPin} tint={C.greenDeep} title="Communities Supervised"
+              main={`${communitiesCount}`} badge={`${M.count} visits`} footer="Unique communities reached" footerColor={C.green} />
+
 
             <Kpi icon={Users2} tint={C.green} title="Wards Supervised"
               main={`${M.wardsSupervised}`} sub2={`/ ${M.wardsTotal}`} badge={`${M.wardsSupervisedPct}%`} footer="On Track" footerColor={C.green} />
@@ -431,30 +501,46 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
             </div>
           </Panel>
 
-          {/* Row 2: ward map · overall summary · awareness donut · info channels */}
-          <div className="grid gap-4 xl:grid-cols-4">
+          {/* Ward Performance Map — real Kano State / LGA / Ward map */}
+          <Panel
+            title={<span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" style={{ color: C.green }} /> Ward Performance Map — Kano State, LGA &amp; Ward Coverage</span>}
+            right={<span className="text-[11px] font-semibold" style={{ color: C.sub }}>{lgaScores.length} LGA(s) · {wardPoints.length} ward point(s)</span>}>
+            <div className="grid gap-4 lg:grid-cols-[1fr_260px]">
+              <div className="relative h-[440px] w-full overflow-hidden rounded-xl">
+                <SarmaanWardPerformanceMap lgaScores={lgaScores} wardPoints={wardPoints} />
+                {lgaScores.length === 0 && (
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <span className="rounded-lg bg-white/90 px-4 py-2 text-xs font-semibold shadow" style={{ color: C.sub }}>
+                      No supervised LGAs yet — LGAs shade by performance as checklists are submitted.
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="rounded-xl border p-3.5" style={{ borderColor: C.line, background: "#FBFDFC" }}>
+                <div className="flex items-center gap-2 border-b pb-2" style={{ borderColor: C.line }}>
+                  <Award className="h-4 w-4" style={{ color: C.green }} />
+                  <span className="text-xs font-extrabold uppercase tracking-wide" style={{ color: C.ink }}>Performance Bands</span>
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed" style={{ color: C.sub }}>
+                  Each <b style={{ color: C.greenDeep }}>LGA</b> is shaded by the average performance of its supervised wards. <b>Ward dots</b> show the exact ward score at its supervision GPS.
+                </p>
+                <div className="mt-3 space-y-2">
+                  {(["strong", "moderate", "weak", "critical", "none"] as BandKey[]).map((b) => (
+                    <div key={b} className="flex items-center gap-2 text-[11px]" style={{ color: C.sub }}>
+                      <span className="h-3 w-3 rounded-sm" style={{ background: BAND_META[b].color }} /> {BAND_META[b].label}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 border-t pt-2 text-[10px]" style={{ borderColor: C.line, color: C.sub }}>
+                  Top LGAs: {lgaScores.slice().sort((a, b) => b.score - a.score).slice(0, 3).map((l) => `${l.name} ${l.score}%`).join(" · ") || "—"}
+                </div>
+              </div>
+            </div>
+          </Panel>
 
-            {/* Ward performance map */}
-            <Panel title="Ward Performance Map" className="xl:col-span-1"
-              right={<span className="text-[10px] font-semibold" style={{ color: C.sub }}>{stateLabel}</span>}>
-              <div className="grid grid-cols-6 gap-1.5">
-                {M.wardScores.slice(0, 24).map((w) => (
-                  <div key={w.ward} title={`${w.ward}: ${w.score}%`}
-                    className="flex aspect-square items-center justify-center rounded-md text-[9px] font-bold text-white"
-                    style={{ background: BAND_META[w.band].color }}>
-                    {w.score}
-                  </div>
-                ))}
-                {M.wardScores.length === 0 && <p className="col-span-6 py-6 text-center text-xs" style={{ color: C.sub }}>No supervised wards yet.</p>}
-              </div>
-              <div className="mt-3 space-y-1">
-                {(["strong", "moderate", "weak", "critical", "none"] as BandKey[]).map((b) => (
-                  <div key={b} className="flex items-center gap-1.5 text-[10px]" style={{ color: C.sub }}>
-                    <span className="h-2.5 w-2.5 rounded-sm" style={{ background: BAND_META[b].color }} /> {BAND_META[b].label}
-                  </div>
-                ))}
-              </div>
-            </Panel>
+          {/* Row 2: overall summary · awareness donut · info channels */}
+          <div className="grid gap-4 xl:grid-cols-3">
+
 
             {/* Overall supervision summary */}
             <Panel title={<>Overall Supervision Summary <span className="ml-1 text-[10px] font-normal" style={{ color: C.sub }}>(Sample Validation)</span></>}>
@@ -596,6 +682,7 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
                 <table className="w-full text-[11px]">
                   <thead>
                     <tr className="text-left" style={{ color: C.sub }}>
+                      <th className="py-1 font-semibold">LGA</th>
                       <th className="py-1 font-semibold">Ward</th>
                       <th className="py-1 text-center font-semibold">Planned</th>
                       <th className="py-1 text-center font-semibold">Out</th>
@@ -605,8 +692,9 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
                   </thead>
                   <tbody>
                     {M.wardDeployment.slice(0, 6).map((w) => (
-                      <tr key={w.ward} className="border-t" style={{ borderColor: C.line }}>
-                        <td className="py-1.5 font-semibold" style={{ color: C.ink }}>{w.ward}</td>
+                      <tr key={`${w.lga}-${w.ward}`} className="border-t" style={{ borderColor: C.line }}>
+                        <td className="py-1.5 font-semibold" style={{ color: C.ink }}>{w.lga}</td>
+                        <td className="py-1.5" style={{ color: C.ink }}>{w.ward}</td>
                         <td className="py-1.5 text-center tabular-nums">{w.planned}</td>
                         <td className="py-1.5 text-center tabular-nums">{w.went}</td>
                         <td className="py-1.5 text-center font-bold tabular-nums">{w.rate}%</td>
@@ -617,7 +705,7 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
                         </td>
                       </tr>
                     ))}
-                    {M.wardDeployment.length === 0 && <tr><td colSpan={5} className="py-6 text-center" style={{ color: C.sub }}>No deployment data.</td></tr>}
+                    {M.wardDeployment.length === 0 && <tr><td colSpan={6} className="py-6 text-center" style={{ color: C.sub }}>No deployment data.</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -678,6 +766,9 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
               </div>
             </Panel>
           </div>
+
+          {/* Section deep-dives: per-question responses by LGA, coverage stats & listings */}
+          <SarmaanAcsmSections subs={filtered} maps={maps} />
 
           {/* Row 5: Accountability · Statistical & Thematic analysis · Owner editor */}
           <SarmaanAcsmAnalytics
