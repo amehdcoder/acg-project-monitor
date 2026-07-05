@@ -115,9 +115,13 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
       const shell = shellRef.current;
       if (!shell) return;
       const vv = window.visualViewport;
+      if (!vv?.height) {
+        shell.style.removeProperty("--acsm-vh");
+        return;
+      }
       // Use the real *visual* viewport so Android browser chrome and the soft
       // keyboard cannot push the in-flow footer below the user's screen.
-      const visibleHeight = Math.max(240, Math.floor(vv?.height ?? window.innerHeight ?? document.documentElement.clientHeight));
+      const visibleHeight = Math.max(240, Math.floor(vv.height));
       shell.style.setProperty("--acsm-vh", `${visibleHeight}px`);
     };
 
@@ -592,8 +596,8 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
       ref={shellRef}
       className="fixed inset-x-0 top-0 z-50 flex min-h-0 flex-col overflow-hidden bg-[#F4F8FC]"
       style={{
-        height: "var(--acsm-vh, 100svh)",
-        maxHeight: "var(--acsm-vh, 100svh)",
+        height: "var(--acsm-vh, 100dvh)",
+        maxHeight: "var(--acsm-vh, 100dvh)",
       }}
     >
       {/* Scrollable region: hero + progress + body */}
