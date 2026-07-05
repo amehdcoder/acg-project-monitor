@@ -429,7 +429,11 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
 
       <main className="mx-auto w-full max-w-[1600px] flex-1 space-y-5 p-4 sm:p-6">
           {/* KPI strip */}
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+
+            <Kpi icon={MapPin} tint={C.greenDeep} title="Communities Supervised"
+              main={`${communitiesCount}`} badge={`${M.count} visits`} footer="Unique communities reached" footerColor={C.green} />
+
 
             <Kpi icon={Users2} tint={C.green} title="Wards Supervised"
               main={`${M.wardsSupervised}`} sub2={`/ ${M.wardsTotal}`} badge={`${M.wardsSupervisedPct}%`} footer="On Track" footerColor={C.green} />
