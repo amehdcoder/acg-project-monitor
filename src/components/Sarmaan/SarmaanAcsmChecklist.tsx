@@ -101,6 +101,11 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
     const syncViewport = () => {
       const shell = shellRef.current;
       if (!shell) return;
@@ -120,6 +125,8 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
     window.visualViewport?.addEventListener("scroll", syncViewport);
     return () => {
       cancelAnimationFrame(raf);
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
       window.removeEventListener("resize", syncViewport);
       window.visualViewport?.removeEventListener("resize", syncViewport);
       window.visualViewport?.removeEventListener("scroll", syncViewport);
@@ -652,7 +659,7 @@ export default function SarmaanAcsmChecklist({ formId, userId, projectId, onClos
       {/* Footer nav — always visible sibling of the scroll region */}
       <div
         ref={footerRef}
-        className="fixed inset-x-0 bottom-0 z-[80] shrink-0 border-t border-border bg-card/95 shadow-[0_-10px_24px_rgba(15,23,42,0.10)] backdrop-blur"
+        className="absolute inset-x-0 bottom-0 z-[80] shrink-0 border-t border-border bg-card/95 shadow-[0_-10px_24px_rgba(15,23,42,0.10)] backdrop-blur"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 18px)" }}
       >
         <div className="mx-auto grid max-w-5xl grid-cols-2 items-center gap-2 px-4 py-3 sm:flex sm:justify-between sm:px-6">
