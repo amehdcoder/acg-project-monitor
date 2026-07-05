@@ -389,6 +389,7 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
     });
     return pts;
   }, [filtered, maps]);
+  const stateLabel = filters.state || options.states[0] || "All States";
   const timeStr = new Date(lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   return (
