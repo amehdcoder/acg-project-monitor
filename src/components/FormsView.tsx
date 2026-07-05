@@ -1311,8 +1311,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     () => mergedForms.find((f) => isSarmaanAcsmStoredForm(f) && (!currentProjectId || f.project_id === currentProjectId)) || null,
     [mergedForms, currentProjectId],
   );
+  const acsmProjectIsSarmaan = !!acsmForm && projects.some((p) => p.id === acsmForm.project_id && /sarmaan/i.test(p.name || ""));
+  const sarmaanAcsmContext = currentProjectIsSarmaan || acsmProjectIsSarmaan;
   const { grants: acsmGrants, hasAnyGrant: hasAnyAcsmGrant } = useSarmaanFormAccess(acsmForm?.id, sarmaanIsManager);
-  const canSeeAcsmChecklist = sarmaanIsManager || hasAnyAcsmGrant || (currentProjectIsSarmaan && !!acsmForm);
+  const canSeeAcsmChecklist = sarmaanIsManager || hasAnyAcsmGrant || (sarmaanAcsmContext && !!acsmForm);
   // Dashboard access is INDEPENDENT of checklist access: managers, anyone with
   // a checklist grant, or anyone granted the dashboard directly can view it.
   const canSeeAcsmDashboard = sarmaanIsManager || canSeeAcsmChecklist || hasDashboardAccess("sarmaan_acsm", currentProjectId);
@@ -1402,7 +1404,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const sarmaanSearchMatches = !searchQuery.trim() || /sarmaan|supervisory|supervision|checklist|dashboard|learning|acsm|mda|azithromycin/i.test(searchQuery);
   const acsmSearchMatches = !searchQuery.trim() || /sarmaan|acsm|mda|supervision|checklist|dashboard|azithromycin/i.test(searchQuery);
   const shouldShowSarmaanSupervisoryBlock = currentProjectIsSarmaan && sarmaanSearchMatches && (!!primarySarmaanSupervisoryForm || isAdmin);
-  const shouldShowSarmaanAcsmBlock = currentProjectIsSarmaan && acsmSearchMatches && (sarmaanIsManager || !!acsmForm || canSeeAcsmChecklist || canSeeAcsmDashboard);
+  const shouldShowSarmaanAcsmBlock = sarmaanAcsmContext && acsmSearchMatches && (sarmaanIsManager || !!acsmForm || canSeeAcsmChecklist || canSeeAcsmDashboard);
   const sarmaanVisibleRowCount = (shouldShowSarmaanSupervisoryBlock ? 2 : 0) + (shouldShowSarmaanAcsmBlock ? 1 : 0);
   const visibleMyFormsCount = filteredNonSarmaanForms.length + sarmaanVisibleRowCount;
 
