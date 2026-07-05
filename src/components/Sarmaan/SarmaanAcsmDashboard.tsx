@@ -157,9 +157,15 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
   const [profiles, setProfiles] = useState<Map<string, ProfileLite>>(new Map());
   const [questionLabels, setQuestionLabels] = useState<QuestionLabelMap>(() => buildLabelMap(sections(form.questions) as any[]));
   const { canEditDashboards } = useCanEditDashboards();
+  const { isOwner } = useAuth();
 
   const [filters, setFilters] = useState<{ state: string; lga: string; ward: string }>({ state: "", lga: "", ward: "" });
   const idsRef = useRef<Set<string>>(new Set([form.id]));
+
+  const [exporting, setExporting] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState<"archive" | "delete" | null>(null);
 
 
   const load = useCallback(async (opts?: { live?: boolean }) => {
