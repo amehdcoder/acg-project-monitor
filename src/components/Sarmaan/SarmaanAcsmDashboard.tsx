@@ -501,30 +501,46 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
             </div>
           </Panel>
 
-          {/* Row 2: ward map · overall summary · awareness donut · info channels */}
-          <div className="grid gap-4 xl:grid-cols-4">
+          {/* Ward Performance Map — real Kano State / LGA / Ward map */}
+          <Panel
+            title={<span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" style={{ color: C.green }} /> Ward Performance Map — Kano State, LGA &amp; Ward Coverage</span>}
+            right={<span className="text-[11px] font-semibold" style={{ color: C.sub }}>{lgaScores.length} LGA(s) · {wardPoints.length} ward point(s)</span>}>
+            <div className="grid gap-4 lg:grid-cols-[1fr_260px]">
+              <div className="relative h-[440px] w-full overflow-hidden rounded-xl">
+                <SarmaanWardPerformanceMap lgaScores={lgaScores} wardPoints={wardPoints} />
+                {lgaScores.length === 0 && (
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <span className="rounded-lg bg-white/90 px-4 py-2 text-xs font-semibold shadow" style={{ color: C.sub }}>
+                      No supervised LGAs yet — LGAs shade by performance as checklists are submitted.
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="rounded-xl border p-3.5" style={{ borderColor: C.line, background: "#FBFDFC" }}>
+                <div className="flex items-center gap-2 border-b pb-2" style={{ borderColor: C.line }}>
+                  <Award className="h-4 w-4" style={{ color: C.green }} />
+                  <span className="text-xs font-extrabold uppercase tracking-wide" style={{ color: C.ink }}>Performance Bands</span>
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed" style={{ color: C.sub }}>
+                  Each <b style={{ color: C.greenDeep }}>LGA</b> is shaded by the average performance of its supervised wards. <b>Ward dots</b> show the exact ward score at its supervision GPS.
+                </p>
+                <div className="mt-3 space-y-2">
+                  {(["strong", "moderate", "weak", "critical", "none"] as BandKey[]).map((b) => (
+                    <div key={b} className="flex items-center gap-2 text-[11px]" style={{ color: C.sub }}>
+                      <span className="h-3 w-3 rounded-sm" style={{ background: BAND_META[b].color }} /> {BAND_META[b].label}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 border-t pt-2 text-[10px]" style={{ borderColor: C.line, color: C.sub }}>
+                  Top LGAs: {lgaScores.slice().sort((a, b) => b.score - a.score).slice(0, 3).map((l) => `${l.name} ${l.score}%`).join(" · ") || "—"}
+                </div>
+              </div>
+            </div>
+          </Panel>
 
-            {/* Ward performance map */}
-            <Panel title="Ward Performance Map" className="xl:col-span-1"
-              right={<span className="text-[10px] font-semibold" style={{ color: C.sub }}>{stateLabel}</span>}>
-              <div className="grid grid-cols-6 gap-1.5">
-                {M.wardScores.slice(0, 24).map((w) => (
-                  <div key={w.ward} title={`${w.ward}: ${w.score}%`}
-                    className="flex aspect-square items-center justify-center rounded-md text-[9px] font-bold text-white"
-                    style={{ background: BAND_META[w.band].color }}>
-                    {w.score}
-                  </div>
-                ))}
-                {M.wardScores.length === 0 && <p className="col-span-6 py-6 text-center text-xs" style={{ color: C.sub }}>No supervised wards yet.</p>}
-              </div>
-              <div className="mt-3 space-y-1">
-                {(["strong", "moderate", "weak", "critical", "none"] as BandKey[]).map((b) => (
-                  <div key={b} className="flex items-center gap-1.5 text-[10px]" style={{ color: C.sub }}>
-                    <span className="h-2.5 w-2.5 rounded-sm" style={{ background: BAND_META[b].color }} /> {BAND_META[b].label}
-                  </div>
-                ))}
-              </div>
-            </Panel>
+          {/* Row 2: overall summary · awareness donut · info channels */}
+          <div className="grid gap-4 xl:grid-cols-3">
+
 
             {/* Overall supervision summary */}
             <Panel title={<>Overall Supervision Summary <span className="ml-1 text-[10px] font-normal" style={{ color: C.sub }}>(Sample Validation)</span></>}>
