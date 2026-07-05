@@ -35,6 +35,12 @@ export const DASHBOARDS: Record<string, DashboardMeta> = {
     blurb:
       "Real-time programme implementation supervision — coverage, quality scores, community engagement, non-compliance resolution and learning-to-action analytics.",
   },
+  sarmaan_acsm: {
+    id: "sarmaan_acsm",
+    name: "SARMAAN ACSM & MDA Supervision Dashboard",
+    blurb:
+      "Live ACSM & MDA supervision analytics — coverage, supervisor accountability, thematic text intelligence and statistical insights from the ACSM & MDA Supervision Checklist.",
+  },
 };
 
 interface Grant {
