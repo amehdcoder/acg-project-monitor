@@ -55,6 +55,7 @@ import { useTablePagination } from "@/hooks/useTablePagination";
 import { useAuth } from "@/hooks/useAuth";
 import { buildLabelMap } from "@/lib/formLabelUtils";
 import AdminSubmissionEditor from "@/components/AdminSubmissionEditor";
+import NarrativeInsightsPanel from "@/components/shared/NarrativeInsightsPanel";
 import {
   Pagination, PaginationContent, PaginationItem, PaginationLink,
   PaginationNext, PaginationPrevious,
@@ -477,6 +478,20 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       return true;
     });
   }, [submissions, fState, fLga, fWard, fStatus, fFrom, fTo, search]);
+
+  // Normalized submissions for the plain-language narrative engine.
+  const narrativeSubs = useMemo(
+    () => filtered.map((s) => ({
+      id: s.id,
+      state: pickGeo(s, "state") || null,
+      lga: pickGeo(s, "lga") || null,
+      ward: pickGeo(s, "ward") || null,
+      submitter_name: stripTags(s.submitter || s.data?.supervisor_name) || null,
+      submitted_at: s.submittedAt || null,
+      data: s.data || {},
+    })),
+    [filtered],
+  );
 
   // Clone the rows before merging so the KPI engine below always reads clean,
   // un-mutated first-visit answers (prepareMdaData overwrites linked fields).
@@ -938,7 +953,14 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         </div>
       </div>
 
-      {/* ── Filter bar ── */}
+      {/* ── Plain-language narrative & recommended actions ── */}
+      <NarrativeInsightsPanel
+        submissions={narrativeSubs}
+        questions={questions as any}
+        config={{ formName: formName || "Integrated MDA Supervisory Checklist", domainHint: "MDA supervision mass drug administration" }}
+        accent={TEAL}
+      />
+
       <Card>
         <CardContent className="p-3">
           <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-foreground">

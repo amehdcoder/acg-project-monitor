@@ -14,6 +14,7 @@ import BloombergStateLGADrilldown from "@/components/Bloomberg/BloombergStateLGA
 import BloombergValidatorDrilldown from "@/components/Bloomberg/BloombergValidatorDrilldown";
 import BloombergDeviceSnapshotViewer from "@/components/Bloomberg/BloombergDeviceSnapshotViewer";
 import AccountabilityTable from "@/components/shared/AccountabilityTable";
+import NarrativeInsightsPanel from "@/components/shared/NarrativeInsightsPanel";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { exportSchoolTemplate, importSchoolTemplate } from "@/lib/bloomberg/schoolTemplate";
@@ -193,6 +194,33 @@ export default function BloombergDashboard({ onClose }: Props) {
   const validatedPg = useTablePagination(validatedTable, 25);
   const notValidatedPg = useTablePagination(notValidatedTable, 25);
   const managePg = useTablePagination(validations, 25);
+
+  // Normalized submissions for the plain-language narrative engine.
+  const narrativeQuestions = useMemo(() => ([
+    { id: "school_verified", label: "School exists / verified on the ground", type: "select_one" },
+    { id: "register_available", label: "Enrolment register available", type: "select_one" },
+    { id: "enrolment_recorded", label: "Enrolment figures recorded", type: "select_one" },
+  ]), []);
+  const narrativeSubs = useMemo(
+    () => validations.map((v: any) => {
+      const ver = v.verification || {};
+      return {
+        id: v.id,
+        state: v.state || null,
+        lga: v.lga || null,
+        ward: v.ward || null,
+        submitter_name: v.validator_name || v.validator_id || null,
+        submitted_at: v.submitted_at || v.created_at || null,
+        data: {
+          community: v.school_name || "",
+          school_verified: ver.school_exists === "yes" ? "Yes" : ver.school_exists === "no" ? "No" : "",
+          register_available: ver.register_available === true ? "Yes" : ver.register_available === false ? "No" : "",
+          enrolment_recorded: v.grand_total && Number(v.grand_total) > 0 ? "Yes" : "No",
+        },
+      };
+    }),
+    [validations],
+  );
   const [downloadingData, setDownloadingData] = useState(false);
   const handleDownloadData = async () => {
     setDownloadingData(true);
@@ -560,6 +588,14 @@ export default function BloombergDashboard({ onClose }: Props) {
           </div>
           <p className="text-xs font-medium text-muted-foreground">Generated: {new Date().toLocaleString()}</p>
         </div>
+
+        {/* Plain-language narrative & recommended actions */}
+        <NarrativeInsightsPanel
+          submissions={narrativeSubs}
+          questions={narrativeQuestions}
+          config={{ formName: "Bloomberg School Enrolment Validation", domainHint: "school enrolment validation education" }}
+          accent="#2dd4a8"
+        />
 
         {/* KPI tiles */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

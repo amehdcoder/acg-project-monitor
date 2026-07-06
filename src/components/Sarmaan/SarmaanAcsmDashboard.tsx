@@ -34,6 +34,7 @@ import {
 import { communitiesSupervised } from "@/lib/sarmaan/acsmSectionAnalytics";
 import { ACSM_FIELD } from "@/lib/sarmaan/acsmChecklist";
 import { exportAcsmSubmissions } from "@/lib/sarmaan/acsmExcelExport";
+import NarrativeInsightsPanel from "@/components/shared/NarrativeInsightsPanel";
 import SarmaanAcsmAnalytics from "@/components/Sarmaan/SarmaanAcsmAnalytics";
 import { useCanEditDashboards } from "@/hooks/useCanEditDashboards";
 import { useAuth } from "@/hooks/useAuth";
@@ -392,6 +393,30 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
   const stateLabel = filters.state || options.states[0] || "All States";
   const timeStr = new Date(lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
+  // Normalized submissions (keyed by human field name) for the narrative engine.
+  const narrativeQuestions = useMemo(
+    () => sections(form.questions).flatMap((g) => (g.questions || [])).map((q: any) => ({
+      id: q.name, label: q.label, type: q.type, options: q.options,
+    })),
+    [form.questions],
+  );
+  const narrativeSubs = useMemo(
+    () => filtered.map((s) => {
+      const data: Record<string, unknown> = {};
+      for (const q of narrativeQuestions) data[q.id] = readVal(s, q.id, maps);
+      return {
+        id: s.id,
+        state: readStr(s, ACSM_FIELD.state, maps) || null,
+        lga: readStr(s, ACSM_FIELD.lga, maps) || null,
+        ward: readStr(s, ACSM_FIELD.ward, maps) || null,
+        submitter_name: readStr(s, "supervisor_name", maps) || null,
+        submitted_at: s.created_at || null,
+        data,
+      };
+    }),
+    [filtered, maps, narrativeQuestions],
+  );
+
   return (
     <div className="fixed inset-0 z-[60] flex flex-col overflow-y-auto" style={{ background: C.canvas, fontFamily: "'Manrope', system-ui, sans-serif" }}>
       {/* Header */}
@@ -448,6 +473,14 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
             <Kpi icon={Hand} tint={C.red} title="Refusal Rate"
               main={`${M.refusalRate}%`} bar={M.refusalRate * 5} barColor={C.red} footer="Target: ≤ 5%" footerColor={C.sub} />
           </div>
+
+          {/* Plain-language narrative & recommended actions */}
+          <NarrativeInsightsPanel
+            submissions={narrativeSubs}
+            questions={narrativeQuestions}
+            config={{ formName: form.name || "SARMAAN ACSM & MDA Supervision Checklist", domainHint: "ACSM awareness mobilization MDA supervision" }}
+            accent={C.green}
+          />
 
           {/* Kano supervision map — geolocated visits by ACSM band */}
           <Panel

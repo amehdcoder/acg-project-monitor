@@ -12,6 +12,7 @@ import MapVisualization from "@/components/MapVisualization/MapVisualization";
 import { MapMarker } from "@/components/MapVisualization/types";
 import { useSeeClearDashboard } from "@/hooks/useSeeClearDashboard";
 import AccountabilityTable from "@/components/shared/AccountabilityTable";
+import NarrativeInsightsPanel from "@/components/shared/NarrativeInsightsPanel";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
@@ -47,6 +48,31 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 export default function SeeClearDashboard({ onClose }: Props) {
   const { rows, stats, byLevel, byOwnership, readinessByLevel, equipment, referrals, dataQuality, flagged, challenges, points, draftCount, loading, reload, simulate, setSimulate, deleteFacilities, accountability } = useSeeClearDashboard();
   const { isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
+
+  const narrativeQuestions = useMemo(() => ([
+    { id: "is_functional", label: "Facility is functional", type: "select_one" },
+    { id: "essential_supplies", label: "Essential supplies available", type: "select_one" },
+    { id: "complete_records", label: "Records complete", type: "select_one" },
+    { id: "referral_compliance", label: "Referral compliance met", type: "select_one" },
+  ]), []);
+  const narrativeSubs = useMemo(
+    () => rows.map((r) => ({
+      id: r.id,
+      state: r.state || null,
+      lga: r.lga || null,
+      ward: r.ward || null,
+      submitter_name: r.monitor_id || null,
+      submitted_at: r.date_of_visit || r.created_at || null,
+      data: {
+        community: r.community || r.facility_name || "",
+        is_functional: r.is_functional == null ? "" : r.is_functional ? "Yes" : "No",
+        essential_supplies: r.essential_supplies == null ? "" : r.essential_supplies ? "Yes" : "No",
+        complete_records: r.complete_records == null ? "" : r.complete_records ? "Yes" : "No",
+        referral_compliance: r.referral_compliance == null ? "" : r.referral_compliance ? "Yes" : "No",
+      },
+    })),
+    [rows],
+  );
   const [capturing, setCapturing] = useState(false);
   const captureRef = useRef<HTMLDivElement | null>(null);
   // Owner / Co-owner only hard delete (never while simulating).
@@ -134,7 +160,16 @@ export default function SeeClearDashboard({ onClose }: Props) {
           <p className="text-xs font-medium text-muted-foreground">Last updated: {new Date().toLocaleString()}</p>
         </div>
 
+        {/* Plain-language narrative & recommended actions */}
+        <NarrativeInsightsPanel
+          submissions={narrativeSubs}
+          questions={narrativeQuestions}
+          config={{ formName: "See Clear Eye Health Facility Monitoring", domainHint: "facility readiness monitoring eye health WASH supplies referral" }}
+          accent="#0EA5A5"
+        />
+
         {/* KPI tiles */}
+
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Kpi icon={Building2} label="Total Facilities Assessed" value={fmt(stats.total)} tint={NAVY} sub="Across 3 levels" />
           <Kpi icon={CheckCircle2} label="Functional Facilities" value={fmt(stats.functional)} tint={toneColor(pctTone(stats.functionalPct))} sub={`${stats.functionalPct.toFixed(1)}%`} />
