@@ -28,6 +28,7 @@ import {
   Archive,
   FolderPlus,
   X,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
