@@ -20,6 +20,7 @@ import {
   SlidersHorizontal, RotateCcw, ChevronRight, X, AlertCircle, Loader2, Building2,
 } from "lucide-react";
 import { testAgainstBenchmark, type BenchmarkTest } from "@/lib/ces/coverageStats";
+import { oneWayAnova, meanConfidenceInterval, formatP } from "@/lib/statisticalInference";
 
 // ── Default benchmarks (user-configurable in the UI) ─────────────────────────
 const DEFAULT_HH_BENCHMARK = 100; // Household reach target (%)
@@ -447,7 +448,54 @@ export default function HouseholdCoverageAnalysis({ points, loading, error, onRe
     };
   }, [visits, txBenchmark, hhBenchmark]);
 
+  // ── Hypothesis testing on the Household Coverage Survey submissions ─────────
+  // One-way ANOVA across LGAs on the two headline metrics (therapeutic coverage
+  // and household reach), computed from the actual survey communities, plus a
+  // 95% CI on the programme mean. This answers: do coverage gaps between LGAs
+  // reflect real differences or just sampling noise?
+  const hypotheses = useMemo(() => {
+    const build = (metricName: string, pick: (c: CommunityRow) => number, usable: (c: CommunityRow) => boolean) => {
+      const byLga: Record<string, number[]> = {};
+      const all: number[] = [];
+      for (const c of communities) {
+        if (!usable(c)) continue;
+        const v = clamp(pick(c));
+        all.push(v);
+        (byLga[c.lga || "Unknown"] ||= []).push(v);
+      }
+      if (all.length < 4) return null;
+      const ci = meanConfidenceInterval(all);
+      const groups = Object.values(byLga).filter((g) => g.length >= 2);
+      const anova = groups.length >= 2 ? oneWayAnova(groups) : null;
+      const mean = ci ? ci.mean.toFixed(1) : "n/a";
+      const interpretation = anova
+        ? `${metricName} varies ${anova.significant ? "significantly" : "only modestly"} across ${anova.groups} LGAs (${formatP(anova.pValue)}, η²=${(anova.etaSquared * 100).toFixed(0)}%). ${anova.significant
+            ? "The gaps between LGAs are unlikely to be chance — target the lagging LGAs rather than applying blanket action."
+            : "Differences look like normal sampling variation — a uniform strategy is reasonable for now."} Programme mean ≈ ${mean}%.`
+        : `${metricName} averages ${mean}% across ${all.length} communities; not enough LGA spread yet for a group comparison.`;
+      return {
+        metric: metricName,
+        n: all.length,
+        groups: anova?.groups ?? 0,
+        p: anova?.pValue ?? null,
+        significant: !!anova?.significant,
+        ciLow: ci?.ciLow ?? 0,
+        ciHigh: ci?.ciHigh ?? 0,
+        mean: ci?.mean ?? 0,
+        interpretation,
+      };
+    };
+    return [
+      build("Therapeutic coverage", (c) => c.txCoveragePct, (c) => c.eligible > 0),
+      build("Household coverage", (c) => c.hhReachPct, (c) => c.households > 0),
+    ].filter(Boolean) as {
+      metric: string; n: number; groups: number; p: number | null; significant: boolean;
+      ciLow: number; ciHigh: number; mean: number; interpretation: string;
+    }[];
+  }, [communities]);
+
   const notesInsight = useMemo(() => analyzeNotes(visits.map((p) => p.notes || "")), [visits]);
+
 
   const filteredCommunities = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -559,6 +607,52 @@ export default function HouseholdCoverageAnalysis({ points, loading, error, onRe
           </Button>
         </div>
       </Section>
+
+      {/* ── Hypothesis testing (Therapeutic & Household coverage) ── */}
+      {hypotheses.length > 0 && (
+        <Section title="Hypothesis testing — Therapeutic & Household coverage" icon={Sigma} tint={BLUE}
+          badge="ANOVA · 95% CI">
+          <p className="mb-3 text-[11px] text-muted-foreground">
+            One-way ANOVA across LGAs on the Household Coverage Survey submissions, testing whether
+            coverage differences between LGAs are statistically significant, with a 95% confidence
+            interval on the programme mean. Recomputes instantly with the benchmarks and filters above.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {hypotheses.map((h) => (
+              <div key={h.metric} className="rounded-xl border bg-card p-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-foreground">{h.metric}</span>
+                  <Badge variant={h.significant ? "default" : "secondary"} className="text-[10px]">
+                    {h.p === null ? "insufficient LGA spread" : h.significant ? "significant" : "not significant"}
+                  </Badge>
+                </div>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Mean</p>
+                    <p className="font-display text-base font-bold text-foreground">{h.mean.toFixed(1)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">95% CI</p>
+                    <p className="font-display text-base font-bold text-foreground">{h.ciLow.toFixed(1)}–{h.ciHigh.toFixed(1)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">LGAs · n</p>
+                    <p className="font-display text-base font-bold text-foreground">{h.groups} · {h.n}</p>
+                  </div>
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{h.interpretation}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[10px] text-muted-foreground">
+            Assumptions: community-level coverage treated as approximately independent observations grouped by LGA;
+            ANOVA assumes roughly comparable within-group variances; CI uses a t-distribution. Groups with fewer than
+            2 communities are excluded from the LGA comparison. Significance threshold α = 0.05.
+          </p>
+        </Section>
+      )}
+
+
 
       {/* ── Data validation guards ── */}
       {(dataQuality.missingEligible > 0 || dataQuality.missingTreated > 0) && (

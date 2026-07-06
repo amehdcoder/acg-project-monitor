@@ -40,7 +40,28 @@ export interface SavedFormEntry {
   sentAt?: string | null;
   submissionId?: string | null;
   offline?: boolean;
+  // Multi-device conflict tracking. `deviceId` identifies the device that last
+  // wrote this copy; `rev` is a monotonic per-record revision counter used by
+  // the deterministic merge engine to resolve divergent edits.
+  deviceId?: string | null;
+  rev?: number;
 }
+
+const DEVICE_ID_KEY = "amehnities_saved_forms_device_id";
+
+/** Stable per-device id used for multi-device conflict resolution. */
+export const getSavedFormDeviceId = (): string => {
+  try {
+    let id = localStorage.getItem(DEVICE_ID_KEY);
+    if (!id) {
+      id = crypto.randomUUID?.() || `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem(DEVICE_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    return "unknown-device";
+  }
+};
 
 const DB_NAME = "amehnities_saved_forms";
 const DB_VERSION = 1;
@@ -63,13 +84,48 @@ const initDB = (): Promise<IDBDatabase> =>
   });
 
 export const saveSavedEntry = async (entry: SavedFormEntry): Promise<void> => {
+  // Stamp device + bump revision so multi-device edits are attributable and the
+  // deterministic merge engine can resolve divergence.
+  const stamped: SavedFormEntry = {
+    ...entry,
+    deviceId: entry.deviceId || getSavedFormDeviceId(),
+    rev: (Number(entry.rev) || 0) + 1,
+  };
   const db = await initDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
-    const req = tx.objectStore(STORE).put(entry);
+    const req = tx.objectStore(STORE).put(stamped);
     req.onerror = () => reject(req.error);
     req.onsuccess = () => resolve();
   });
+};
+
+/**
+ * Reconcile an incoming copy of a saved entry (e.g. pulled from another device
+ * or the server) against whatever is already stored locally under the same id.
+ * Applies deterministic conflict detection + merge and persists the winner.
+ * Returns the merge report so callers can surface conflict notices.
+ */
+export const reconcileSavedEntry = async (
+  incoming: SavedFormEntry,
+): Promise<import("@/lib/savedFormMerge").MergeReport> => {
+  const { mergeSavedEntries } = await import("@/lib/savedFormMerge");
+  const existing = await getSavedEntry(incoming.id);
+  if (!existing) {
+    await saveSavedEntry(incoming);
+    return { hadConflict: false, divergent: false, fieldConflicts: [], statusResolvedFrom: null, chosenDevice: incoming.deviceId ?? null };
+  }
+  const { merged, report } = mergeSavedEntries(existing, incoming);
+  // Persist merged directly (preserve merged.rev) rather than via saveSavedEntry
+  // so we don't double-bump the revision the merge already set.
+  const db = await initDB();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    const req = tx.objectStore(STORE).put(merged);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => resolve();
+  });
+  return report;
 };
 
 export const getSavedEntry = async (id: string): Promise<SavedFormEntry | null> => {

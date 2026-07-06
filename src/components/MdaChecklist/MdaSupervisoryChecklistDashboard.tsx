@@ -962,15 +962,13 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         config={{ formName: formName || "Integrated MDA Supervisory Checklist", domainHint: "MDA supervision mass drug administration" }}
         accent={TEAL}
         advanced
-        advancedOptions={{
-          hypotheses: [
-            { name: "Therapeutic coverage", pattern: /therap(eutic)?|treated|drug|treatment coverage/i },
-            { name: "Household coverage", pattern: /household|houses|hh coverage|geograph|visited/i },
-          ],
-        }}
         afterHoursLog
         afterHoursTables={["form_submissions"]}
       />
+      {/* Hypothesis testing for Therapeutic & Household coverage lives in the
+          Household Coverage Analysis section below, computed from the actual
+          Household Coverage Survey submissions rather than checklist rows. */}
+
 
 
       <Card>
