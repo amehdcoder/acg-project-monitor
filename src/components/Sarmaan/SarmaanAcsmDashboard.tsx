@@ -392,6 +392,30 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
   const stateLabel = filters.state || options.states[0] || "All States";
   const timeStr = new Date(lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
+  // Normalized submissions (keyed by human field name) for the narrative engine.
+  const narrativeQuestions = useMemo(
+    () => sections(form.questions).flatMap((g) => (g.questions || [])).map((q: any) => ({
+      id: q.name, label: q.label, type: q.type, options: q.options,
+    })),
+    [form.questions],
+  );
+  const narrativeSubs = useMemo(
+    () => filtered.map((s) => {
+      const data: Record<string, unknown> = {};
+      for (const q of narrativeQuestions) data[q.id] = readVal(s, q.id, maps);
+      return {
+        id: s.id,
+        state: readStr(s, ACSM_FIELD.state, maps) || null,
+        lga: readStr(s, ACSM_FIELD.lga, maps) || null,
+        ward: readStr(s, ACSM_FIELD.ward, maps) || null,
+        submitter_name: readStr(s, "supervisor_name", maps) || null,
+        submitted_at: s.created_at || null,
+        data,
+      };
+    }),
+    [filtered, maps, narrativeQuestions],
+  );
+
   return (
     <div className="fixed inset-0 z-[60] flex flex-col overflow-y-auto" style={{ background: C.canvas, fontFamily: "'Manrope', system-ui, sans-serif" }}>
       {/* Header */}
