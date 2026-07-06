@@ -395,6 +395,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   const [fFrom, setFFrom] = useState("");
   const [fTo, setFTo] = useState("");
   const [search, setSearch] = useState("");
+  const [showSignatures, setShowSignatures] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const dashboardRef = useRef<HTMLDivElement>(null);
