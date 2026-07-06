@@ -1704,6 +1704,7 @@ const UsersView = () => {
 
           )}
         </CardContent>
+        )}
       </Card>
 
       {/* Change Role Dialog */}
