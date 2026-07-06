@@ -162,6 +162,16 @@ export default function NarrativeInsightsPanel({
 
         <p className="border-t pt-3 text-[11px] text-muted-foreground">{n.dataCoverageNote}</p>
       </div>
+      {advanced && (
+        <div className="border-t p-4">
+          <AdvancedAnalyticsPanel
+            submissions={submissions}
+            questions={questions}
+            options={advancedOptions}
+            accent="#7C3AED"
+          />
+        </div>
+      )}
     </Card>
   );
 }
