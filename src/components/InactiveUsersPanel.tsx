@@ -99,6 +99,7 @@ const InactiveUsersPanel = () => {
   const [search, setSearch] = useState("");
   const PAGE_SIZE = 25;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [collapsed, setCollapsed] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
