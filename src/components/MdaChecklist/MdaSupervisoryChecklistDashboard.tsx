@@ -968,6 +968,8 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
             { name: "Household coverage", pattern: /household|houses|hh coverage|geograph|visited/i },
           ],
         }}
+        afterHoursLog
+        afterHoursTables={["form_submissions"]}
       />
 
 
