@@ -51,7 +51,7 @@ function evalSingleCondition(
   responses: Responses,
   nameToIdMap: NameToIdMap,
 ): boolean {
-  const trimmed = expr.trim().replace(/^\(/, "").replace(/\)$/, "").trim();
+  const trimmed = stripWrappingParens(expr.trim());
   if (!trimmed) return true;
 
   // not(selected(${name}, 'value')) — checked BEFORE selected() so the inner
