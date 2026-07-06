@@ -40,7 +40,28 @@ export interface SavedFormEntry {
   sentAt?: string | null;
   submissionId?: string | null;
   offline?: boolean;
+  // Multi-device conflict tracking. `deviceId` identifies the device that last
+  // wrote this copy; `rev` is a monotonic per-record revision counter used by
+  // the deterministic merge engine to resolve divergent edits.
+  deviceId?: string | null;
+  rev?: number;
 }
+
+const DEVICE_ID_KEY = "amehnities_saved_forms_device_id";
+
+/** Stable per-device id used for multi-device conflict resolution. */
+export const getSavedFormDeviceId = (): string => {
+  try {
+    let id = localStorage.getItem(DEVICE_ID_KEY);
+    if (!id) {
+      id = crypto.randomUUID?.() || `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem(DEVICE_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    return "unknown-device";
+  }
+};
 
 const DB_NAME = "amehnities_saved_forms";
 const DB_VERSION = 1;
