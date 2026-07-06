@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { sealRecord } from "@/lib/deviceCrypto";
 
 const DB_NAME = "acg_monitor_offline";
-const DB_VERSION = 2;
+const DB_VERSION = 4;
 const FORMS_STORE = "offline_forms";
 const PENDING_STORE = "pending_submissions";
 
@@ -30,6 +30,16 @@ const openDB = (): Promise<IDBDatabase> =>
         const formStore = db.createObjectStore(FORMS_STORE, { keyPath: "id" });
         formStore.createIndex("project_id", "project_id", { unique: false });
         formStore.createIndex("downloaded_at", "downloaded_at", { unique: false });
+      }
+      if (!db.objectStoreNames.contains("autosave_drafts")) {
+        const draftStore = db.createObjectStore("autosave_drafts", { keyPath: "id" });
+        draftStore.createIndex("form_id", "form_id", { unique: false });
+        draftStore.createIndex("updated_at", "updated_at", { unique: false });
+      }
+      if (!db.objectStoreNames.contains("edit_conflicts")) {
+        const conflictStore = db.createObjectStore("edit_conflicts", { keyPath: "id" });
+        conflictStore.createIndex("submission_id", "submission_id", { unique: false });
+        conflictStore.createIndex("detected_at", "detected_at", { unique: false });
       }
     };
   });
