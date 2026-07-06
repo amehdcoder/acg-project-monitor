@@ -479,6 +479,20 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     });
   }, [submissions, fState, fLga, fWard, fStatus, fFrom, fTo, search]);
 
+  // Normalized submissions for the plain-language narrative engine.
+  const narrativeSubs = useMemo(
+    () => filtered.map((s) => ({
+      id: s.id,
+      state: pickGeo(s, "state") || null,
+      lga: pickGeo(s, "lga") || null,
+      ward: pickGeo(s, "ward") || null,
+      submitter_name: stripTags(s.submitter || s.data?.supervisor_name) || null,
+      submitted_at: s.submittedAt || null,
+      data: s.data || {},
+    })),
+    [filtered],
+  );
+
   // Clone the rows before merging so the KPI engine below always reads clean,
   // un-mutated first-visit answers (prepareMdaData overwrites linked fields).
   const prepared = useMemo(
