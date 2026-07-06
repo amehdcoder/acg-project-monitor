@@ -48,6 +48,31 @@ const Kpi = ({ icon: Icon, label, value, tint, sub }: { icon: any; label: string
 export default function SeeClearDashboard({ onClose }: Props) {
   const { rows, stats, byLevel, byOwnership, readinessByLevel, equipment, referrals, dataQuality, flagged, challenges, points, draftCount, loading, reload, simulate, setSimulate, deleteFacilities, accountability } = useSeeClearDashboard();
   const { isOwner, isSuperAdmin, isOwnerLevel } = useAuth();
+
+  const narrativeQuestions = useMemo(() => ([
+    { id: "is_functional", label: "Facility is functional", type: "select_one" },
+    { id: "essential_supplies", label: "Essential supplies available", type: "select_one" },
+    { id: "complete_records", label: "Records complete", type: "select_one" },
+    { id: "referral_compliance", label: "Referral compliance met", type: "select_one" },
+  ]), []);
+  const narrativeSubs = useMemo(
+    () => rows.map((r) => ({
+      id: r.id,
+      state: r.state || null,
+      lga: r.lga || null,
+      ward: r.ward || null,
+      submitter_name: r.monitor_id || null,
+      submitted_at: r.date_of_visit || r.created_at || null,
+      data: {
+        community: r.community || r.facility_name || "",
+        is_functional: r.is_functional == null ? "" : r.is_functional ? "Yes" : "No",
+        essential_supplies: r.essential_supplies == null ? "" : r.essential_supplies ? "Yes" : "No",
+        complete_records: r.complete_records == null ? "" : r.complete_records ? "Yes" : "No",
+        referral_compliance: r.referral_compliance == null ? "" : r.referral_compliance ? "Yes" : "No",
+      },
+    })),
+    [rows],
+  );
   const [capturing, setCapturing] = useState(false);
   const captureRef = useRef<HTMLDivElement | null>(null);
   // Owner / Co-owner only hard delete (never while simulating).
