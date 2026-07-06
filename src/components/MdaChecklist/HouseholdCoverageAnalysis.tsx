@@ -608,6 +608,52 @@ export default function HouseholdCoverageAnalysis({ points, loading, error, onRe
         </div>
       </Section>
 
+      {/* ── Hypothesis testing (Therapeutic & Household coverage) ── */}
+      {hypotheses.length > 0 && (
+        <Section title="Hypothesis testing — Therapeutic & Household coverage" icon={Sigma} tint={BLUE}
+          badge="ANOVA · 95% CI">
+          <p className="mb-3 text-[11px] text-muted-foreground">
+            One-way ANOVA across LGAs on the Household Coverage Survey submissions, testing whether
+            coverage differences between LGAs are statistically significant, with a 95% confidence
+            interval on the programme mean. Recomputes instantly with the benchmarks and filters above.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {hypotheses.map((h) => (
+              <div key={h.metric} className="rounded-xl border bg-card p-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-foreground">{h.metric}</span>
+                  <Badge variant={h.significant ? "default" : "secondary"} className="text-[10px]">
+                    {h.p === null ? "insufficient LGA spread" : h.significant ? "significant" : "not significant"}
+                  </Badge>
+                </div>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Mean</p>
+                    <p className="font-display text-base font-bold text-foreground">{h.mean.toFixed(1)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">95% CI</p>
+                    <p className="font-display text-base font-bold text-foreground">{h.ciLow.toFixed(1)}–{h.ciHigh.toFixed(1)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">LGAs · n</p>
+                    <p className="font-display text-base font-bold text-foreground">{h.groups} · {h.n}</p>
+                  </div>
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{h.interpretation}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[10px] text-muted-foreground">
+            Assumptions: community-level coverage treated as approximately independent observations grouped by LGA;
+            ANOVA assumes roughly comparable within-group variances; CI uses a t-distribution. Groups with fewer than
+            2 communities are excluded from the LGA comparison. Significance threshold α = 0.05.
+          </p>
+        </Section>
+      )}
+
+
+
       {/* ── Data validation guards ── */}
       {(dataQuality.missingEligible > 0 || dataQuality.missingTreated > 0) && (
         <Section title="Data validation guards" icon={AlertTriangle} tint={AMBER}
