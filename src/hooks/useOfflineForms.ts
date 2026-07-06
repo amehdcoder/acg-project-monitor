@@ -4,7 +4,11 @@ import type { Question, GeofenceArea } from "@/components/FormBuilder/types";
 import { sealRecord, unsealRecord, unsealAll } from "@/lib/deviceCrypto";
 
 const DB_NAME = "acg_monitor_offline";
-const DB_VERSION = 2;
+// Keep this version in lockstep with useOfflineStorage/offlineFormCache.
+// v4 repairs devices that previously opened the same DB at v2 after another
+// hook had upgraded it to v3, which caused IndexedDB VersionError and made
+// offline forms disappear.
+const DB_VERSION = 4;
 const FORMS_STORE_NAME = "offline_forms";
 
 interface FormSettings {
@@ -52,6 +56,20 @@ const initDB = (): Promise<IDBDatabase> => {
         const formStore = db.createObjectStore(FORMS_STORE_NAME, { keyPath: "id" });
         formStore.createIndex("project_id", "project_id", { unique: false });
         formStore.createIndex("downloaded_at", "downloaded_at", { unique: false });
+      }
+
+      // Stores owned by useOfflineStorage. They must also be created here
+      // because whichever hook opens this shared database first performs the
+      // version upgrade for the whole app.
+      if (!db.objectStoreNames.contains("autosave_drafts")) {
+        const draftStore = db.createObjectStore("autosave_drafts", { keyPath: "id" });
+        draftStore.createIndex("form_id", "form_id", { unique: false });
+        draftStore.createIndex("updated_at", "updated_at", { unique: false });
+      }
+      if (!db.objectStoreNames.contains("edit_conflicts")) {
+        const conflictStore = db.createObjectStore("edit_conflicts", { keyPath: "id" });
+        conflictStore.createIndex("submission_id", "submission_id", { unique: false });
+        conflictStore.createIndex("detected_at", "detected_at", { unique: false });
       }
     };
   });
