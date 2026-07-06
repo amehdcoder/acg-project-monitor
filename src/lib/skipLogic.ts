@@ -46,6 +46,29 @@ function tokenSelected(val: unknown, expectedValue: string): boolean {
   return valueTokens(val).includes(expectedValue);
 }
 
+/**
+ * Strip only *balanced* wrapping parentheses, e.g. "(a = 'b')" → "a = 'b'".
+ * Leaves function calls like "not(selected(...))" intact so their closing
+ * parenthesis is never accidentally removed.
+ */
+function stripWrappingParens(s: string): string {
+  let str = s.trim();
+  while (str.startsWith("(") && str.endsWith(")")) {
+    let depth = 0;
+    let wraps = true;
+    for (let i = 0; i < str.length; i++) {
+      if (str[i] === "(") depth++;
+      else if (str[i] === ")") depth--;
+      // If we close the opening paren before the end, it isn't a full wrap.
+      if (depth === 0 && i < str.length - 1) { wraps = false; break; }
+    }
+    if (!wraps) break;
+    str = str.slice(1, -1).trim();
+  }
+  return str;
+}
+
+
 function evalSingleCondition(
   expr: string,
   responses: Responses,
