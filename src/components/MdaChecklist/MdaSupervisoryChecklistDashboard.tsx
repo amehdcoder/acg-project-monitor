@@ -55,6 +55,7 @@ import { useTablePagination } from "@/hooks/useTablePagination";
 import { useAuth } from "@/hooks/useAuth";
 import { buildLabelMap } from "@/lib/formLabelUtils";
 import AdminSubmissionEditor from "@/components/AdminSubmissionEditor";
+import NarrativeInsightsPanel from "@/components/shared/NarrativeInsightsPanel";
 import {
   Pagination, PaginationContent, PaginationItem, PaginationLink,
   PaginationNext, PaginationPrevious,
