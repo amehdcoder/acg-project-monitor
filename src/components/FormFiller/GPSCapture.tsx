@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import useGeolocation, { GeolocationPosition } from "@/hooks/useGeolocation";
 import { GeofenceValidationResult } from "@/hooks/useGeofenceValidation";
+import { getBestWarmFix, getFreshWarmFix } from "@/lib/gps/gpsWarmer";
 
 interface GPSCaptureProps {
   value: GeolocationPosition | null;
