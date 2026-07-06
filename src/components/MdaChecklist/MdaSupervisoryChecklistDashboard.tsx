@@ -1277,10 +1277,30 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         />
       </SectionErrorBoundary>
 
-      {/* ── Supervisor signatures register ── */}
+      {/* ── Supervisor signatures register (collapsed by default) ── */}
       <SectionErrorBoundary label="Supervisor signature gallery">
-        <SupervisorSignatureGallery submissions={filtered} />
+        <Card>
+          <button
+            type="button"
+            onClick={() => setShowSignatures((s) => !s)}
+            className="flex w-full items-center gap-2 p-4 text-left"
+            aria-expanded={showSignatures}
+          >
+            <PenLine className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold text-foreground">Supervisor Signatures Register</span>
+            <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+              {showSignatures ? "Hide" : "Show"}
+              <ChevronDown className={`h-4 w-4 transition-transform ${showSignatures ? "rotate-180" : ""}`} />
+            </span>
+          </button>
+          {showSignatures && (
+            <div className="border-t p-4 pt-3">
+              <SupervisorSignatureGallery submissions={filtered} />
+            </div>
+          )}
+        </Card>
       </SectionErrorBoundary>
+
 
 
 
