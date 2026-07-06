@@ -1230,19 +1230,56 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     }
   };
 
-  // When offline, merge offline forms with server forms
-  const mergedForms = !isOnline ? [...forms, ...offlineForms.filter(of => !forms.some(f => f.id === of.id)).map(of => {
-    const allItems = (of.questions as unknown as any[]) || [];
-    const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
-    const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
-    return {
-      ...of,
-      questions: ungroupedQuestions,
-      groups: groupItems,
-      submissions_count: 0,
-      created_at: of.downloaded_at,
-    } as Form;
-  })] : forms;
+  const handleDownloadAccessibleForms = async () => {
+    if (!user?.id) return;
+    const visibleCache = filteredForms.length > 0 ? filteredForms : mergedForms;
+    if (!isOnline) {
+      toast({
+        title: "Offline forms ready",
+        description: visibleCache.length > 0
+          ? `${visibleCache.length} cached form${visibleCache.length === 1 ? " is" : "s are"} available on this device.`
+          : "No cached forms are available yet. Connect once to download your assigned forms.",
+      });
+      return;
+    }
+    try {
+      const isAdminRole = isSuperAdmin || isOwnerLevel || role === "systems_admin" || user.email === "amehjoey1@gmail.com";
+      const cached = await withTimeout(
+        warmCacheUserForms({ userId: user.id, isAdmin: isAdminRole, role }),
+        18000,
+        "download_accessible_forms_timeout",
+      );
+      if (visibleCache.length > 0) await cacheFormsForOffline(visibleCache);
+      toast({
+        title: "Forms downloaded",
+        description: `${Math.max(cached, visibleCache.length)} accessible form${Math.max(cached, visibleCache.length) === 1 ? " is" : "s are"} ready for complete offline use.`,
+      });
+    } catch (error: any) {
+      if (visibleCache.length > 0) {
+        await cacheFormsForOffline(visibleCache);
+        toast({
+          title: "Visible forms saved offline",
+          description: "The backend was slow, so the forms currently visible on this device were cached for offline use.",
+        });
+      } else {
+        toast({
+          title: "Download delayed",
+          description: error?.message || "The connection is too slow. Try again once the backend responds.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  // Always merge cached forms, even when navigator.onLine is true. Field devices
+  // can be technically online while the backend is timing out; cached forms must
+  // still remain visible and usable.
+  const mergedForms = [
+    ...forms,
+    ...offlineForms
+      .filter((of) => (!currentProjectId || of.project_id === currentProjectId) && !forms.some((f) => f.id === of.id))
+      .map(toRenderableForm),
+  ];
 
   const filteredForms = mergedForms.filter((form) =>
     form.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -4132,8 +4169,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           </button>
           <button
             onClick={() => {
-              currentProjectId ? fetchForms(currentProjectId) : fetchAllForms();
-              toast({ title: "Refreshing forms", description: "Downloading the latest forms for offline use." });
+              void handleDownloadAccessibleForms();
             }}
             className="flex w-full items-center gap-4 rounded-full bg-white px-5 py-4 text-left shadow-sm ring-1 ring-border/60 transition-colors hover:bg-[#F4F6F8]"
           >
