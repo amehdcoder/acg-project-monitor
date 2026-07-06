@@ -49,6 +49,7 @@ const slug = (s: string) => (s || "list").toLowerCase().replace(/[^a-z0-9]+/g, "
 
 export default function NarrativeInsightsPanel({
   submissions, questions, config, accent = "#0EA5A5", className,
+  advanced = false, advancedOptions,
 }: Props) {
   const n = useMemo(
     () => buildNarrative(submissions || [], questions || [], config || {}),
