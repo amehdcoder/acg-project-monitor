@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import useGeolocation, { GeolocationPosition } from "@/hooks/useGeolocation";
 import { GeofenceValidationResult } from "@/hooks/useGeofenceValidation";
+import { getBestWarmFix, getFreshWarmFix } from "@/lib/gps/gpsWarmer";
 
 interface GPSCaptureProps {
   value: GeolocationPosition | null;
@@ -46,6 +47,19 @@ const GPSCapture = ({
     if (startedRef.current) return;
     if (value) return;
     startedRef.current = true;
+    // INSTANT capture: seed immediately from the globally-warmed GPS fix so the
+    // field is populated the moment the question opens (works offline too),
+    // then refine in the background with a precise high-accuracy fix.
+    const warm = getFreshWarmFix() || getBestWarmFix();
+    if (warm) {
+      onChange({
+        lat: warm.lat,
+        lng: warm.lng,
+        accuracy: warm.accuracy,
+        altitude: null,
+        timestamp: warm.timestamp,
+      });
+    }
     getCurrentPosition();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

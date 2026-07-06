@@ -167,6 +167,8 @@ export default function SeeClearDashboard({ onClose }: Props) {
           config={{ formName: "See Clear Eye Health Facility Monitoring", domainHint: "facility readiness monitoring eye health WASH supplies referral" }}
           accent="#0EA5A5"
           advanced
+          afterHoursLog
+          afterHoursTables={["seeclear_monitoring"]}
         />
 
         {/* KPI tiles */}

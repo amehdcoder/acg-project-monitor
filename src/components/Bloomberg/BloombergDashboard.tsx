@@ -596,6 +596,8 @@ export default function BloombergDashboard({ onClose }: Props) {
           config={{ formName: "Bloomberg School Enrolment Validation", domainHint: "school enrolment validation education" }}
           accent="#2dd4a8"
           advanced
+          afterHoursLog
+          afterHoursTables={["bloomberg_validations"]}
         />
 
         {/* KPI tiles */}

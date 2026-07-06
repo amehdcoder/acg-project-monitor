@@ -481,6 +481,8 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
             config={{ formName: form.name || "SARMAAN ACSM & MDA Supervision Checklist", domainHint: "ACSM awareness mobilization MDA supervision" }}
             accent={C.green}
             advanced
+            afterHoursLog
+            afterHoursTables={["form_submissions"]}
           />
 
           {/* Kano supervision map — geolocated visits by ACSM band */}

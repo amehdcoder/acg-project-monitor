@@ -11,6 +11,7 @@ import {
 } from "@/lib/narrativeInsights";
 
 import AdvancedAnalyticsPanel from "@/components/shared/AdvancedAnalyticsPanel";
+import AfterHoursSubmissionsLog from "@/components/shared/AfterHoursSubmissionsLog";
 import type { AdvancedAnalyticsOptions } from "@/lib/advancedAnalytics";
 
 interface Props {
@@ -24,6 +25,10 @@ interface Props {
    *  Grounded Theory, Discourse Analysis, hypothesis tests) is rendered too. */
   advanced?: boolean;
   advancedOptions?: AdvancedAnalyticsOptions;
+  /** When set, an after-hours submissions log is rendered; the array (when
+   *  provided) restricts the log to those gated submission tables. */
+  afterHoursLog?: boolean;
+  afterHoursTables?: string[];
 }
 
 const toneStyles: Record<Tone, { icon: typeof AlertTriangle; color: string; bg: string }> = {
@@ -50,6 +55,7 @@ const slug = (s: string) => (s || "list").toLowerCase().replace(/[^a-z0-9]+/g, "
 export default function NarrativeInsightsPanel({
   submissions, questions, config, accent = "#0EA5A5", className,
   advanced = false, advancedOptions,
+  afterHoursLog = false, afterHoursTables,
 }: Props) {
   const n = useMemo(
     () => buildNarrative(submissions || [], questions || [], config || {}),
@@ -170,6 +176,11 @@ export default function NarrativeInsightsPanel({
             options={advancedOptions}
             accent="#7C3AED"
           />
+        </div>
+      )}
+      {afterHoursLog && (
+        <div className="border-t p-4">
+          <AfterHoursSubmissionsLog tables={afterHoursTables} accent="#6366F1" />
         </div>
       )}
     </Card>
