@@ -143,6 +143,7 @@ import BulkUploadAccessManager from "@/components/OwnerTools/BulkUploadAccessMan
 import { useBulkDataAccess } from "@/hooks/useBulkDataAccess";
 import { scrollToAppTop } from "@/lib/scrollToAppTop";
 import { isMdaChecklistLike } from "@/lib/mdaFollowUp";
+import { getOrCreateSingletonForm, insertToolFormsOnce } from "@/lib/mda/singletonForm";
 import { FileSpreadsheet, KeyRound, GanttChartSquare, NotebookPen, Copy, EyeOff } from "lucide-react";
 import CopyMdaChecklistDialog from "@/components/MdaChecklist/CopyMdaChecklistDialog";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -1406,16 +1407,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     }
     if (acsmForm) return acsmForm;
     try {
-      const { data, error } = await supabase.from("forms").insert({
+      const data = await getOrCreateSingletonForm({
+        projectId: currentProjectId,
         name: SARMAAN_ACSM_FORM_NAME,
-        description: SARMAAN_ACSM_DESC,
-        questions: buildAcsmFormSchema() as any,
-        settings: { requireLocation: true, offlineEnabled: true, sarmaan_acsm: true } as any,
-        project_id: currentProjectId,
-        created_by: user?.id,
-        status: "active",
-      } as any).select("*").single();
-      if (error) throw error;
+        settingsFlag: "sarmaan_acsm",
+        buildInsert: () => ({
+          name: SARMAAN_ACSM_FORM_NAME,
+          description: SARMAAN_ACSM_DESC,
+          questions: buildAcsmFormSchema() as any,
+          settings: { requireLocation: true, offlineEnabled: true, sarmaan_acsm: true } as any,
+          project_id: currentProjectId,
+          created_by: user?.id,
+          status: "active",
+        }),
+      });
       const created = { ...(data as any), submissions_count: 0 } as Form;
       setForms((prev) => (prev.some((f) => f.id === created.id) ? prev : [created, ...prev]));
       toast({ title: "Checklist added", description: "SARMAAN ACSM & MDA Supervision Checklist is ready." });
@@ -1454,29 +1459,32 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       if (!preset) throw new Error("SARMAAN supervisory template is unavailable.");
       const sections = preset.sections();
       const dashboardConfig = preset.dashboard();
-      const { data, error } = await supabase.from("forms").insert({
+      const data = await getOrCreateSingletonForm({
+        projectId: currentProjectId,
         name: SARMAAN_SUPERVISORY_FORM_NAME,
-        description: SARMAAN_SUPERVISORY_DESC,
-        questions: sections as any,
-        settings: {
-          theme: preset.theme,
-          studio: true,
-          presetKey: "supervisory_learning",
-          dashboardEnabled: true,
-          dashboardConfig,
-          requireLocation: true,
-          sarmaan_supervisory: true,
-          // Render sections under the beautiful ODK-style MDA interface and
-          // drive geography from the microplan location cascade.
-          supervisoryChecklistStyle: true,
-          microplanLocationCascade: true,
-
-        } as any,
-        project_id: currentProjectId,
-        created_by: user?.id,
-        status: "active",
-      } as any).select("*").single();
-      if (error) throw error;
+        settingsFlag: "sarmaan_supervisory",
+        buildInsert: () => ({
+          name: SARMAAN_SUPERVISORY_FORM_NAME,
+          description: SARMAAN_SUPERVISORY_DESC,
+          questions: sections as any,
+          settings: {
+            theme: preset.theme,
+            studio: true,
+            presetKey: "supervisory_learning",
+            dashboardEnabled: true,
+            dashboardConfig,
+            requireLocation: true,
+            sarmaan_supervisory: true,
+            // Render sections under the beautiful ODK-style MDA interface and
+            // drive geography from the microplan location cascade.
+            supervisoryChecklistStyle: true,
+            microplanLocationCascade: true,
+          } as any,
+          project_id: currentProjectId,
+          created_by: user?.id,
+          status: "active",
+        }),
+      });
       const allItems = ((data as any)?.questions as unknown as any[]) || [];
       const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
       const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
@@ -2152,16 +2160,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     }
                     try {
                       const built = buildMdaSupervisoryChecklist();
-                      const { error } = await supabase.from("forms").insert({
+                      await getOrCreateSingletonForm({
+                        projectId: currentProjectId,
                         name: built.name,
-                        description: built.description,
-                        questions: built.questions as any,
-                        settings: built.settings as any,
-                        project_id: currentProjectId,
-                        created_by: user?.id,
-                        status: "draft",
-                      } as any);
-                      if (error) throw error;
+                        settingsFlag: "isMdaChecklist",
+                        buildInsert: () => ({
+                          name: built.name,
+                          description: built.description,
+                          questions: built.questions as any,
+                          settings: built.settings as any,
+                          project_id: currentProjectId,
+                          created_by: user?.id,
+                          status: "draft",
+                        }),
+                      });
                       toast({ title: "Checklist created", description: "Open it from your forms list to fill, share, or edit." });
                       fetchForms(currentProjectId);
                     } catch (e: any) {
@@ -3263,16 +3275,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         }
                         try {
                           const built = buildMdaSupervisoryChecklist();
-                          const { error } = await supabase.from("forms").insert({
+                          await getOrCreateSingletonForm({
+                            projectId: currentProjectId,
                             name: built.name,
-                            description: built.description,
-                            questions: built.questions as any,
-                            settings: built.settings as any,
-                            project_id: currentProjectId,
-                            created_by: user?.id,
-                            status: "draft",
-                          } as any);
-                          if (error) throw error;
+                            settingsFlag: "isMdaChecklist",
+                            buildInsert: () => ({
+                              name: built.name,
+                              description: built.description,
+                              questions: built.questions as any,
+                              settings: built.settings as any,
+                              project_id: currentProjectId,
+                              created_by: user?.id,
+                              status: "draft",
+                            }),
+                          });
                           toast({ title: "Checklist created", description: "Open it from your forms list to fill, share, or edit in the Form Builder." });
                           fetchForms(currentProjectId);
                         } catch (e: any) {
@@ -3329,7 +3345,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         return;
                       }
                       try {
-                        const { error } = await supabase.from("forms").insert([
+                        await insertToolFormsOnce({
+                          projectId: currentProjectId,
+                          kindFlag: "bloomberg_kind",
+                          buildInserts: () => ([
                           {
                             name: BLOOMBERG_FORM_NAME,
                             description: BLOOMBERG_FORM_DESC,
@@ -3348,8 +3367,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             created_by: user?.id,
                             status: "active",
                           },
-                        ] as any);
-                        if (error) throw error;
+                          ]),
+                        });
                         toast({ title: "Added to project", description: "Open the validation form and dashboard from your forms list above." });
                         fetchForms(currentProjectId);
                       } catch (e: any) {
@@ -3388,7 +3407,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         return;
                       }
                       try {
-                        const { error } = await supabase.from("forms").insert([
+                        await insertToolFormsOnce({
+                          projectId: currentProjectId,
+                          kindFlag: "seeclear_kind",
+                          buildInserts: () => ([
                           {
                             name: SEECLEAR_FORM_NAME,
                             description: SEECLEAR_FORM_DESC,
@@ -3407,8 +3429,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             created_by: user?.id,
                             status: "active",
                           },
-                        ] as any);
-                        if (error) throw error;
+                          ]),
+                        });
                         toast({ title: "Added to project", description: "Open the monitoring checklist and dashboard from your forms list above." });
                         fetchForms(currentProjectId);
                       } catch (e: any) {
@@ -3447,7 +3469,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         return;
                       }
                       try {
-                        const { error } = await supabase.from("forms").insert([
+                        await insertToolFormsOnce({
+                          projectId: currentProjectId,
+                          kindFlag: "acsm_kind",
+                          buildInserts: () => ([
                           {
                             name: ACSM_FORM_NAME,
                             description: ACSM_FORM_DESC,
@@ -3466,8 +3491,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             created_by: user?.id,
                             status: "active",
                           },
-                        ] as any);
-                        if (error) throw error;
+                          ]),
+                        });
                         toast({ title: "Added to project", description: "Open the reporting form and dashboard from your forms list above." });
                         fetchForms(currentProjectId);
                       } catch (e: any) {
@@ -3506,7 +3531,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         return;
                       }
                       try {
-                        const { error } = await supabase.from("forms").insert([
+                        await insertToolFormsOnce({
+                          projectId: currentProjectId,
+                          kindFlag: "sbc_kind",
+                          buildInserts: () => ([
                           {
                             name: SBC_FORM_NAME,
                             description: SBC_FORM_DESC,
@@ -3525,8 +3553,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             created_by: user?.id,
                             status: "active",
                           },
-                        ] as any);
-                        if (error) throw error;
+                          ]),
+                        });
                         toast({ title: "Added to project", description: "Open the reporting form and dashboard from your forms list above." });
                         fetchForms(currentProjectId);
                       } catch (e: any) {
@@ -3565,7 +3593,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         return;
                       }
                       try {
-                        const { error } = await supabase.from("forms").insert([
+                        await insertToolFormsOnce({
+                          projectId: currentProjectId,
+                          kindFlag: "irf_kind",
+                          buildInserts: () => ([
                           {
                             name: IRF_FORM_NAME,
                             description: IRF_FORM_DESC,
@@ -3584,8 +3615,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             created_by: user?.id,
                             status: "active",
                           },
-                        ] as any);
-                        if (error) throw error;
+                          ]),
+                        });
                         toast({ title: "Added to project", description: "Open the reporting form and dashboard from your forms list above." });
                         fetchForms(currentProjectId);
                       } catch (e: any) {
@@ -3646,16 +3677,19 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                           }
                           try {
                             const built = tool.build();
-                            const { error } = await supabase.from("forms").insert({
+                            await getOrCreateSingletonForm({
+                              projectId: currentProjectId,
                               name: built.name,
-                              description: built.description,
-                              questions: built.questions as any,
-                              settings: built.settings as any,
-                              project_id: currentProjectId,
-                              created_by: user?.id,
-                              status: "draft",
-                            } as any);
-                            if (error) throw error;
+                              buildInsert: () => ({
+                                name: built.name,
+                                description: built.description,
+                                questions: built.questions as any,
+                                settings: built.settings as any,
+                                project_id: currentProjectId,
+                                created_by: user?.id,
+                                status: "draft",
+                              }),
+                            });
                             toast({ title: "Added to project", description: "Open it from your forms list to fill, share, or edit in the Form Builder." });
                             fetchForms(currentProjectId);
                           } catch (e: any) {

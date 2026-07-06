@@ -33,6 +33,7 @@ import {
 } from "@/lib/mdaFollowUp";
 import { flattenQuestions, isYes } from "@/lib/mda/analyses";
 import { canonicalizeSubmissionData } from "@/lib/mda/dashboardData";
+import { listAllSavedEntries } from "@/lib/savedForms";
 
 // Default illustrated tile icons (match the supervisory checklist design).
 import imgCommunity from "@/assets/mda-tiles/community-checklist.png";
@@ -940,13 +941,55 @@ function CommunityListView({
       try {
         // form_submissions has no project_id column; the MDA checklist form
         // instance is itself project-scoped, so filtering by form_id is enough.
-        const { data, error } = await supabase
-          .from("form_submissions")
-          .select("id, data, location, submitted_at")
-          .eq("form_id", formId)
-          .order("submitted_at", { ascending: false })
-          .limit(2000);
-        if (error) throw error;
+        // We tolerate an offline/failed server read: locally-saved (offline)
+        // checklist entries are merged in below so household sampling and the
+        // follow-up modules work fully offline, KoboCollect-style.
+        let serverRows: any[] = [];
+        try {
+          const { data, error } = await supabase
+            .from("form_submissions")
+            .select("id, data, location, submitted_at")
+            .eq("form_id", formId)
+            .order("submitted_at", { ascending: false })
+            .limit(2000);
+          if (error) throw error;
+          serverRows = data || [];
+        } catch (netErr) {
+          console.warn("Community list: server read unavailable, using local cache only", netErr);
+          serverRows = [];
+        }
+
+        // Merge locally-saved checklist entries (draft / ready-to-send / sent)
+        // for THIS form so anything captured offline is immediately available
+        // for household sampling and follow-up filling, before it syncs.
+        let localRows: any[] = [];
+        try {
+          const saved = await listAllSavedEntries();
+          localRows = saved
+            .filter((e) => e.formId === formId)
+            .map((e) => ({
+              id: e.submissionId || e.id,
+              data: e.submissionData || e.responses || {},
+              location: e.submissionLocation || e.gps || null,
+              submitted_at: e.finalizedAt || e.sentAt || e.updatedAt || e.createdAt,
+              __local: true,
+            }));
+        } catch (localErr) {
+          console.warn("Community list: local saved entries unavailable", localErr);
+        }
+
+        // Local entries first (most authoritative for offline), then server
+        // rows; the loop dedupes by community key and by id.
+        const seenIds = new Set<string>();
+        const data = [...localRows, ...serverRows]
+          .filter((r) => {
+            const id = String(r.id);
+            if (seenIds.has(id)) return false;
+            seenIds.add(id);
+            return true;
+          })
+          .sort((x, y) => String(y.submitted_at || "").localeCompare(String(x.submitted_at || "")));
+
 
         const norm = (v: any) => String(Array.isArray(v) ? v.join(" ") : v ?? "").trim().toLowerCase();
         const firstVal = (d: Record<string, any>, keys?: string[]) => {
