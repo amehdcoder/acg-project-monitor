@@ -2160,16 +2160,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     }
                     try {
                       const built = buildMdaSupervisoryChecklist();
-                      const { error } = await supabase.from("forms").insert({
+                      await getOrCreateSingletonForm({
+                        projectId: currentProjectId,
                         name: built.name,
-                        description: built.description,
-                        questions: built.questions as any,
-                        settings: built.settings as any,
-                        project_id: currentProjectId,
-                        created_by: user?.id,
-                        status: "draft",
-                      } as any);
-                      if (error) throw error;
+                        settingsFlag: "isMdaChecklist",
+                        buildInsert: () => ({
+                          name: built.name,
+                          description: built.description,
+                          questions: built.questions as any,
+                          settings: built.settings as any,
+                          project_id: currentProjectId,
+                          created_by: user?.id,
+                          status: "draft",
+                        }),
+                      });
                       toast({ title: "Checklist created", description: "Open it from your forms list to fill, share, or edit." });
                       fetchForms(currentProjectId);
                     } catch (e: any) {
