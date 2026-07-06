@@ -132,6 +132,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
+import { warmCacheUserForms } from "@/lib/offlineFormCache";
 import FormQRCode from "@/components/FormQRCode";
 import QRCodeScanner from "@/components/QRCodeScanner";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
@@ -233,6 +234,28 @@ const SARMAAN_DASH_DESC = "Executive supervision dashboard with live KPIs, learn
 const isSarmaanAcsmStoredForm = (form: { name?: string | null; settings?: any } | null | undefined) =>
   !!form && (form.name === SARMAAN_ACSM_FORM_NAME || form.settings?.sarmaan_acsm === true);
 
+const withTimeout = <T,>(p: Promise<T>, ms = 10000, label = "forms_request_timeout"): Promise<T> =>
+  Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(label)), ms)),
+  ]);
+
+const toRenderableForm = (form: any): Form => {
+  const allItems = (form.questions as unknown as any[]) || [];
+  const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
+  const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
+  return {
+    ...form,
+    questions: ungroupedQuestions,
+    groups: groupItems,
+    geofence: (form.geofence as unknown as GeofenceArea) || null,
+    settings: (form.settings as unknown as FormSettings) || {},
+    submissions_count: form.submissions_count || 0,
+    created_at: form.created_at || form.downloaded_at || new Date().toISOString(),
+    updated_at: form.updated_at || form.downloaded_at || new Date().toISOString(),
+  } as Form;
+};
+
 interface FormsViewProps {
   selectedProjectId?: string | null;
 }
@@ -305,7 +328,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
   const [bulkForm, setBulkForm] = useState<Form | null>(null);
   const [showBulkAccess, setShowBulkAccess] = useState(false);
-  const { user, isAdmin, isSuperAdmin, isOwner, isOwnerLevel, role, isAdhoc, loading: authLoading } = useAuth();
+  const { user, profile, isAdmin, isSuperAdmin, isOwner, isOwnerLevel, role, isAdhoc, loading: authLoading } = useAuth();
   const { hasDashboardAccess } = useDashboardAccess();
   const [assignedStandardCodes, setAssignedStandardCodes] = useState<Set<string>>(new Set());
   // Owner/Co-owner can hide the Standard forms folder from specific non-admins.
@@ -768,28 +791,28 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       // Super admins and owner-level users (Owner + Co-owner) see all projects;
       // Systems admins only see assigned projects
       if (isSuperAdmin || isOwnerLevel) {
-        const { data, error } = await supabase
+        const { data, error } = await withTimeout(supabase
           .from("projects")
           .select("id, name")
-          .order("name");
+          .order("name"), 9000, "projects_timeout");
         if (error) throw error;
         projectsData = data;
       } else if (role === "systems_admin" || !isAdmin) {
         // Systems admins and regular users see only assigned projects
-        const { data: assignments, error: assignError } = await supabase
+        const { data: assignments, error: assignError } = await withTimeout(supabase
           .from("user_project_assignments")
           .select("project_id")
-          .eq("user_id", user?.id);
+          .eq("user_id", user?.id), 9000, "project_assignments_timeout");
         
         if (assignError) throw assignError;
         
         if (assignments && assignments.length > 0) {
           const projectIds = assignments.map(a => a.project_id);
-          const { data, error } = await supabase
+          const { data, error } = await withTimeout(supabase
             .from("projects")
             .select("id, name")
             .in("id", projectIds)
-            .order("name");
+            .order("name"), 9000, "assigned_projects_timeout");
           if (error) throw error;
           projectsData = data;
         } else {
@@ -802,6 +825,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       setProjects(projectsData || []);
     } catch (error: any) {
       console.error("Error fetching projects:", error);
+      // Do not block the Forms page just because project names failed to load.
+      // Cached/offline forms below remain usable under All Projects.
+      setProjects((prev) => prev);
     }
   };
 
@@ -813,34 +839,18 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     }
     try {
       setLoading(true);
-      const { data: formsData, error } = await supabase
+      const { data: formsData, error } = await withTimeout(supabase
         .from("forms")
         .select("*")
         .eq("project_id", projectId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false }), 10000, "project_forms_timeout");
 
       if (error) throw error;
 
-      // Get submission counts and cast types
-      const formsWithCounts = await Promise.all(
-        (formsData || []).map(async (form) => {
-          const { count } = await supabase
-            .from("form_submissions")
-            .select("id", { count: "exact" })
-            .eq("form_id", form.id);
-          const allItems = (form.questions as unknown as any[]) || [];
-          const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
-          const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
-          return {
-            ...form,
-            questions: ungroupedQuestions,
-            groups: groupItems,
-            geofence: (form.geofence as unknown as GeofenceArea) || null,
-            settings: (form.settings as unknown as FormSettings) || {},
-            submissions_count: count || 0,
-          };
-        })
-      );
+      // Do not run one count query per form; that N+1 pattern was making the
+      // page unusable on slow field connections. Render immediately; dashboards
+      // and history screens fetch their own exact submission data when opened.
+      const formsWithCounts = (formsData || []).map(toRenderableForm);
 
       setForms(formsWithCounts);
       // Auto-cache every fetched form so it can be opened offline later.
@@ -871,33 +881,22 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       // Systems admins only see assigned forms
       let formsData;
       if (isSuperAdmin || isOwnerLevel) {
-        const { data, error } = await supabase
+        const { data, error } = await withTimeout(supabase
           .from("forms")
           .select("*")
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false }), 10000, "all_forms_timeout");
         if (error) throw error;
         formsData = data;
       } else if (role === "systems_admin") {
         // Systems admins see only forms they are assigned to via project or form assignments
-        const { data: formAssignments, error: formAssignError } = await supabase
-          .from("user_form_assignments")
-          .select("form_id")
-          .eq("user_id", user?.id);
-        
-        if (formAssignError) throw formAssignError;
-        
-        // Also get forms from assigned projects
-        const { data: projectAssignments, error: projectAssignError } = await supabase
-          .from("user_project_assignments")
-          .select("project_id")
-          .eq("user_id", user?.id);
-        
-        if (projectAssignError) throw projectAssignError;
-        
-        const { data: sarmaanAccessRows, error: sarmaanAccessError } = await supabase
-          .from("sarmaan_form_access" as any)
-          .select("form_id")
-          .eq("user_id", user?.id);
+        const [formAssignRes, projectAssignRes, sarmaanAccessRes] = await withTimeout(Promise.all([
+          supabase.from("user_form_assignments").select("form_id").eq("user_id", user?.id),
+          supabase.from("user_project_assignments").select("project_id").eq("user_id", user?.id),
+          supabase.from("sarmaan_form_access" as any).select("form_id").eq("user_id", user?.id),
+        ]), 10000, "systems_admin_access_timeout");
+        const { data: formAssignments, error: formAssignError } = formAssignRes;
+        const { data: projectAssignments, error: projectAssignError } = projectAssignRes;
+        const { data: sarmaanAccessRows, error: sarmaanAccessError } = sarmaanAccessRes;
 
         if (sarmaanAccessError) throw sarmaanAccessError;
 
@@ -907,21 +906,21 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         
         let formsFromProjects: string[] = [];
         if (projectIds.length > 0) {
-          const { data: projectForms } = await supabase
+          const { data: projectForms } = await withTimeout(supabase
             .from("forms")
             .select("id")
-            .in("project_id", projectIds);
+            .in("project_id", projectIds), 10000, "systems_project_forms_timeout");
           formsFromProjects = projectForms?.map(f => f.id) || [];
         }
         
         const allFormIds = [...new Set([...directFormIds, ...formsFromProjects, ...sarmaanAccessFormIds])];
         
         if (allFormIds.length > 0) {
-          const { data, error } = await supabase
+          const { data, error } = await withTimeout(supabase
             .from("forms")
             .select("*")
             .in("id", allFormIds)
-            .order("created_at", { ascending: false });
+            .order("created_at", { ascending: false }), 10000, "systems_forms_timeout");
           if (error) throw error;
           formsData = data;
         } else {
@@ -932,40 +931,36 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         // to the Integrated MDA Supervisory Checklist for every project they are a
         // member of (the checklist is auto-granted to all project members; the
         // dashboard is gated separately and not opened here).
-        const { data: assignments, error: assignError } = await supabase
-          .from("user_form_assignments")
-          .select("form_id")
-          .eq("user_id", user?.id);
+        const [assignRes, sarmaanAccessRes, projectAssignRes] = await withTimeout(Promise.all([
+          supabase.from("user_form_assignments").select("form_id").eq("user_id", user?.id),
+          supabase.from("sarmaan_form_access" as any).select("form_id").eq("user_id", user?.id),
+          supabase.from("user_project_assignments").select("project_id").eq("user_id", user?.id),
+        ]), 10000, "user_access_timeout");
+        const { data: assignments, error: assignError } = assignRes;
+        const { data: sarmaanAccessRows, error: sarmaanAccessError } = sarmaanAccessRes;
+        const { data: projectAssignments } = projectAssignRes;
 
         if (assignError) throw assignError;
+        if (sarmaanAccessError) throw sarmaanAccessError;
 
         const assignedFormIds = (assignments || []).map(a => a.form_id);
 
         // SARMAAN checklist grants live in their own access table. Include those
         // form ids here so users see the dedicated SARMAAN ACSM checklist even
         // when they are not otherwise assigned through the generic form system.
-        const { data: sarmaanAccessRows, error: sarmaanAccessError } = await supabase
-          .from("sarmaan_form_access" as any)
-          .select("form_id")
-          .eq("user_id", user?.id);
-        if (sarmaanAccessError) throw sarmaanAccessError;
         const sarmaanAccessFormIds = (sarmaanAccessRows as any[] | null || []).map(a => a.form_id);
 
         // Pull all forms from the user's assigned projects so we can surface the
         // MDA checklist automatically even when it was never explicitly assigned.
-        const { data: projectAssignments } = await supabase
-          .from("user_project_assignments")
-          .select("project_id")
-          .eq("user_id", user?.id);
         const memberProjectIds = (projectAssignments || []).map(a => a.project_id);
 
         let autoMdaFormIds: string[] = [];
         let autoSarmaanAcsmFormIds: string[] = [];
         if (memberProjectIds.length > 0) {
-          const { data: projectForms } = await supabase
+          const { data: projectForms } = await withTimeout(supabase
             .from("forms")
             .select("id, name, settings, questions")
-            .in("project_id", memberProjectIds);
+            .in("project_id", memberProjectIds), 10000, "user_project_forms_timeout");
           autoMdaFormIds = (projectForms || [])
             .filter((f: any) => {
               const allItems = (f.questions as unknown as any[]) || [];
@@ -985,11 +980,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         const formIds = [...new Set([...assignedFormIds, ...autoMdaFormIds, ...autoSarmaanAcsmFormIds, ...sarmaanAccessFormIds])];
 
         if (formIds.length > 0) {
-          const { data, error } = await supabase
+          const { data, error } = await withTimeout(supabase
             .from("forms")
             .select("*")
             .in("id", formIds)
-            .order("created_at", { ascending: false });
+            .order("created_at", { ascending: false }), 10000, "user_forms_timeout");
           if (error) throw error;
           formsData = data;
         } else {
@@ -997,26 +992,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         }
       }
 
-      // Get submission counts and cast types
-      const formsWithCounts = await Promise.all(
-        (formsData || []).map(async (form) => {
-          const { count } = await supabase
-            .from("form_submissions")
-            .select("id", { count: "exact" })
-            .eq("form_id", form.id);
-          const allItems = (form.questions as unknown as any[]) || [];
-          const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
-          const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
-          return {
-            ...form,
-            questions: ungroupedQuestions,
-            groups: groupItems,
-            geofence: (form.geofence as unknown as GeofenceArea) || null,
-            settings: (form.settings as unknown as FormSettings) || {},
-            submissions_count: count || 0,
-          };
-        })
-      );
+      const formsWithCounts = (formsData || []).map(toRenderableForm);
 
       setForms(formsWithCounts);
       // Auto-cache every fetched form so it can be opened offline later.
