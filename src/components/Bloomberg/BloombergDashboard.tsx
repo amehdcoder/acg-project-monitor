@@ -14,6 +14,7 @@ import BloombergStateLGADrilldown from "@/components/Bloomberg/BloombergStateLGA
 import BloombergValidatorDrilldown from "@/components/Bloomberg/BloombergValidatorDrilldown";
 import BloombergDeviceSnapshotViewer from "@/components/Bloomberg/BloombergDeviceSnapshotViewer";
 import AccountabilityTable from "@/components/shared/AccountabilityTable";
+import NarrativeInsightsPanel from "@/components/shared/NarrativeInsightsPanel";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { exportSchoolTemplate, importSchoolTemplate } from "@/lib/bloomberg/schoolTemplate";
