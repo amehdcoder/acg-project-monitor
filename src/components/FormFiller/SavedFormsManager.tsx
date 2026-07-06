@@ -174,12 +174,19 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
               entry.submissionType || "regular",
             ));
           if (result.success) {
-            await setSavedEntryStatus(entry.id, "sent", {
-              submissionId: result.id,
-              sentAt: new Date().toISOString(),
-              offline: result.offline,
-            });
-            synced++;
+            if (result.offline) {
+              // Keep normal forms in Ready to send when the network is not
+              // actually available. The background saved-form sender will move
+              // them to Sent only after the server confirms receipt.
+              failed++;
+            } else {
+              await setSavedEntryStatus(entry.id, "sent", {
+                submissionId: result.id,
+                sentAt: new Date().toISOString(),
+                offline: false,
+              });
+              synced++;
+            }
           } else {
             failed++;
           }
