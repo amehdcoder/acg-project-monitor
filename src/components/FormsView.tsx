@@ -3345,7 +3345,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         return;
                       }
                       try {
-                        const { error } = await supabase.from("forms").insert([
+                        await insertToolFormsOnce({
+                          projectId: currentProjectId,
+                          kindFlag: "bloomberg_kind",
+                          buildInserts: () => ([
                           {
                             name: BLOOMBERG_FORM_NAME,
                             description: BLOOMBERG_FORM_DESC,
@@ -3364,8 +3367,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             created_by: user?.id,
                             status: "active",
                           },
-                        ] as any);
-                        if (error) throw error;
+                          ]),
+                        });
                         toast({ title: "Added to project", description: "Open the validation form and dashboard from your forms list above." });
                         fetchForms(currentProjectId);
                       } catch (e: any) {
