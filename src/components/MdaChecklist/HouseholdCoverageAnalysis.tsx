@@ -448,7 +448,54 @@ export default function HouseholdCoverageAnalysis({ points, loading, error, onRe
     };
   }, [visits, txBenchmark, hhBenchmark]);
 
+  // ── Hypothesis testing on the Household Coverage Survey submissions ─────────
+  // One-way ANOVA across LGAs on the two headline metrics (therapeutic coverage
+  // and household reach), computed from the actual survey communities, plus a
+  // 95% CI on the programme mean. This answers: do coverage gaps between LGAs
+  // reflect real differences or just sampling noise?
+  const hypotheses = useMemo(() => {
+    const build = (metricName: string, pick: (c: CommunityRow) => number, usable: (c: CommunityRow) => boolean) => {
+      const byLga: Record<string, number[]> = {};
+      const all: number[] = [];
+      for (const c of communities) {
+        if (!usable(c)) continue;
+        const v = clamp(pick(c));
+        all.push(v);
+        (byLga[c.lga || "Unknown"] ||= []).push(v);
+      }
+      if (all.length < 4) return null;
+      const ci = meanConfidenceInterval(all);
+      const groups = Object.values(byLga).filter((g) => g.length >= 2);
+      const anova = groups.length >= 2 ? oneWayAnova(groups) : null;
+      const mean = ci ? ci.mean.toFixed(1) : "n/a";
+      const interpretation = anova
+        ? `${metricName} varies ${anova.significant ? "significantly" : "only modestly"} across ${anova.groups} LGAs (${formatP(anova.pValue)}, η²=${(anova.etaSquared * 100).toFixed(0)}%). ${anova.significant
+            ? "The gaps between LGAs are unlikely to be chance — target the lagging LGAs rather than applying blanket action."
+            : "Differences look like normal sampling variation — a uniform strategy is reasonable for now."} Programme mean ≈ ${mean}%.`
+        : `${metricName} averages ${mean}% across ${all.length} communities; not enough LGA spread yet for a group comparison.`;
+      return {
+        metric: metricName,
+        n: all.length,
+        groups: anova?.groups ?? 0,
+        p: anova?.pValue ?? null,
+        significant: !!anova?.significant,
+        ciLow: ci?.ciLow ?? 0,
+        ciHigh: ci?.ciHigh ?? 0,
+        mean: ci?.mean ?? 0,
+        interpretation,
+      };
+    };
+    return [
+      build("Therapeutic coverage", (c) => c.txCoveragePct, (c) => c.eligible > 0),
+      build("Household coverage", (c) => c.hhReachPct, (c) => c.households > 0),
+    ].filter(Boolean) as {
+      metric: string; n: number; groups: number; p: number | null; significant: boolean;
+      ciLow: number; ciHigh: number; mean: number; interpretation: string;
+    }[];
+  }, [communities]);
+
   const notesInsight = useMemo(() => analyzeNotes(visits.map((p) => p.notes || "")), [visits]);
+
 
   const filteredCommunities = useMemo(() => {
     const q = search.trim().toLowerCase();
