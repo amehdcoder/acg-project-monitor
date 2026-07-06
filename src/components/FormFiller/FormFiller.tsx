@@ -57,6 +57,7 @@ import {
   buildSavedEntryDisplayName,
   type SavedFormEntry,
 } from "@/lib/savedForms";
+import { syncFinalizedSavedForms } from "@/lib/savedFormAutoSync";
 import useGeolocation, { GeolocationPosition } from "@/hooks/useGeolocation";
 import useGeofenceValidation from "@/hooks/useGeofenceValidation";
 import { supabase } from "@/integrations/supabase/client";
@@ -362,6 +363,7 @@ const FormFiller = ({
   const groups = isRegistrationForm ? [] : focusedGroupsProp;
 
   const [responses, setResponses] = useState<Record<string, any>>({});
+  const localEntryIdRef = useRef(savedEntry?.id || newEntryId());
   const [gpsPosition, setGpsPosition] = useState<GeolocationPosition | null>(null);
   const [backgroundLocation, setBackgroundLocation] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1995,7 +1997,7 @@ const FormFiller = ({
       : submissionLocation;
 
     return {
-      id: savedEntry?.id || newEntryId(),
+      id: savedEntry?.id || localEntryIdRef.current,
       userId,
       formId,
       formName,
@@ -2092,6 +2094,7 @@ const FormFiller = ({
         title: "Form Finalized",
         description: "Send it from “Send Finalized” when you're ready to sync.",
       });
+      if (navigator.onLine) void syncFinalizedSavedForms();
       onSavedLocally?.();
     } catch (e) {
       toast({ title: "Finalize Failed", description: "Could not finalize the form.", variant: "destructive" });
