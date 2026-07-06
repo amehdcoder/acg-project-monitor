@@ -132,7 +132,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
-import { warmCacheUserForms } from "@/lib/offlineFormCache";
+import { warmCacheUserForms, warmCacheUserFormsDetailed } from "@/lib/offlineFormCache";
+import { startTimer } from "@/lib/metrics";
 import FormQRCode from "@/components/FormQRCode";
 import QRCodeScanner from "@/components/QRCodeScanner";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
@@ -294,6 +295,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showCopyMda, setShowCopyMda] = useState(false);
   const [geofenceManagerForm, setGeofenceManagerForm] = useState<Form | null>(null);
   const [accessManagerForm, setAccessManagerForm] = useState<Form | null>(null);
+  // On-screen confirmation of exactly which forms were cached for offline use,
+  // strictly scoped to the signed-in user's access grants.
+  const [downloadConfirm, setDownloadConfirm] = useState<{
+    forms: { id: string; name: string }[];
+    scopedToGrants: boolean;
+  } | null>(null);
   const [qrCodeForm, setQrCodeForm] = useState<Form | null>(null);
   const [dailyTargetForm, setDailyTargetForm] = useState<Form | null>(null);
   const [showQRScanner, setShowQRScanner] = useState(false);
@@ -873,6 +880,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       setLoading(false);
       return;
     }
+    const stopTimer = startTimer("forms_api_fetch_all");
+    let fetchOk = true;
     try {
       setLoading(true);
 
@@ -999,8 +1008,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       cacheFormsForOffline(formsWithCounts);
     } catch (error: any) {
       console.error("Error fetching forms:", error);
+      fetchOk = false;
     } finally {
       setLoading(false);
+      stopTimer(fetchOk, { role: role || "user" });
     }
   };
 
@@ -1244,15 +1255,22 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     }
     try {
       const isAdminRole = isSuperAdmin || isOwnerLevel || role === "systems_admin" || user.email === "amehjoey1@gmail.com";
-      const cached = await withTimeout(
-        warmCacheUserForms({ userId: user.id, isAdmin: isAdminRole, role }),
+      const stop = startTimer("forms_download_accessible");
+      const result = await withTimeout(
+        warmCacheUserFormsDetailed({ userId: user.id, isAdmin: isAdminRole, role }),
         18000,
         "download_accessible_forms_timeout",
       );
+      stop(true, { count: result.count, scopedToGrants: result.scopedToGrants });
       if (visibleCache.length > 0) await cacheFormsForOffline(visibleCache);
+      // Confirm on-screen exactly what was downloaded, scoped to access grants.
+      setDownloadConfirm({
+        forms: result.forms.map((f) => ({ id: f.id, name: f.name })),
+        scopedToGrants: result.scopedToGrants,
+      });
       toast({
         title: "Forms downloaded",
-        description: `${Math.max(cached, visibleCache.length)} accessible form${Math.max(cached, visibleCache.length) === 1 ? " is" : "s are"} ready for complete offline use.`,
+        description: `${Math.max(result.count, visibleCache.length)} accessible form${Math.max(result.count, visibleCache.length) === 1 ? " is" : "s are"} ready for complete offline use.`,
       });
     } catch (error: any) {
       if (visibleCache.length > 0) {
@@ -4262,6 +4280,39 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Confirmation of exactly which forms were downloaded for offline use */}
+      <AlertDialog open={!!downloadConfirm} onOpenChange={(open) => !open && setDownloadConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {downloadConfirm?.forms.length
+                ? `${downloadConfirm.forms.length} form${downloadConfirm.forms.length === 1 ? "" : "s"} downloaded`
+                : "No forms to download"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {downloadConfirm?.forms.length
+                ? `These forms are now available for complete offline use${downloadConfirm.scopedToGrants ? " and match your access grants" : ""}:`
+                : "You have no forms granted for offline use yet. Connect once after being assigned a form."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {downloadConfirm?.forms.length ? (
+            <div className="max-h-64 overflow-y-auto rounded-md border border-border divide-y divide-border">
+              {downloadConfirm.forms.map((f) => (
+                <div key={f.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+                  <Download className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="truncate">{f.name}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setDownloadConfirm(null)}>Done</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+
 
       {/* Copy MDA Supervisory Checklist from another project */}
       <CopyMdaChecklistDialog

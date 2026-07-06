@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { warmCacheUserForms } from "@/lib/offlineFormCache";
 import { prewarmBloombergOffline } from "@/lib/bloomberg/offlineSchoolCache";
+import { startTimer } from "@/lib/metrics";
 import {
   getLatestOfflineCredential,
   getOfflineCredential,
@@ -497,7 +498,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user?.id, isOfflineMode, role, profile?.is_owner, user?.email]);
 
 
-  const signIn = async (email: string, password: string) => {
+  const signInImpl = async (email: string, password: string) => {
     const tryOfflineSignIn = async (reason: string) => {
       void logOfflineAuditEvent("offline_login_attempt", { email, details: { reason } });
       // Device-side brute-force guard: block while locked out.
@@ -634,6 +635,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     return { error: error as Error | null };
+  };
+
+  // Timed wrapper so login duration (online + offline paths) is captured as a
+  // production metric, making future login slowdowns easy to pinpoint.
+  const signIn = async (email: string, password: string) => {
+    const stop = startTimer("login_duration");
+    try {
+      const res = await signInImpl(email, password);
+      stop(!res.error, { online: typeof navigator !== "undefined" ? navigator.onLine : true });
+      return res;
+    } catch (err: any) {
+      stop(false, { error: err?.message || String(err) });
+      throw err;
+    }
   };
 
 
