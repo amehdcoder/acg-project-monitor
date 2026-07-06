@@ -11,6 +11,7 @@ import {
 } from "@/lib/narrativeInsights";
 
 import AdvancedAnalyticsPanel from "@/components/shared/AdvancedAnalyticsPanel";
+import AfterHoursSubmissionsLog from "@/components/shared/AfterHoursSubmissionsLog";
 import type { AdvancedAnalyticsOptions } from "@/lib/advancedAnalytics";
 
 interface Props {
@@ -24,6 +25,10 @@ interface Props {
    *  Grounded Theory, Discourse Analysis, hypothesis tests) is rendered too. */
   advanced?: boolean;
   advancedOptions?: AdvancedAnalyticsOptions;
+  /** When set, an after-hours submissions log is rendered; the array (when
+   *  provided) restricts the log to those gated submission tables. */
+  afterHoursLog?: boolean;
+  afterHoursTables?: string[];
 }
 
 const toneStyles: Record<Tone, { icon: typeof AlertTriangle; color: string; bg: string }> = {
