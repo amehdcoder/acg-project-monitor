@@ -3407,7 +3407,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         return;
                       }
                       try {
-                        const { error } = await supabase.from("forms").insert([
+                        await insertToolFormsOnce({
+                          projectId: currentProjectId,
+                          kindFlag: "seeclear_kind",
+                          buildInserts: () => ([
                           {
                             name: SEECLEAR_FORM_NAME,
                             description: SEECLEAR_FORM_DESC,
@@ -3426,8 +3429,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             created_by: user?.id,
                             status: "active",
                           },
-                        ] as any);
-                        if (error) throw error;
+                          ]),
+                        });
                         toast({ title: "Added to project", description: "Open the monitoring checklist and dashboard from your forms list above." });
                         fetchForms(currentProjectId);
                       } catch (e: any) {
