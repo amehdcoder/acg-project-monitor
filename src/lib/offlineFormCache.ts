@@ -62,8 +62,26 @@ interface WarmCacheCtx {
  * Resolve which form rows the user can access, then persist a complete,
  * re-renderable snapshot of each into the offline store.
  */
+export interface WarmCacheResult {
+  count: number;
+  forms: { id: string; name: string; project_id: string }[];
+  /** True when the cached set was strictly scoped to explicit access grants. */
+  scopedToGrants: boolean;
+}
+
 export const warmCacheUserForms = async (ctx: WarmCacheCtx): Promise<number> => {
-  if (!navigator.onLine || !ctx.userId) return 0;
+  return (await warmCacheUserFormsDetailed(ctx)).count;
+};
+
+/**
+ * Like warmCacheUserForms, but returns exactly which forms were cached so the
+ * UI can confirm on-screen what was downloaded. For non-admins the set is
+ * strictly limited to their explicit access grants (direct form assignments,
+ * SARMAAN grants, and forms in assigned projects) — nothing else is cached.
+ */
+export const warmCacheUserFormsDetailed = async (ctx: WarmCacheCtx): Promise<WarmCacheResult> => {
+  const empty: WarmCacheResult = { count: 0, forms: [], scopedToGrants: !ctx.isAdmin };
+  if (!navigator.onLine || !ctx.userId) return empty;
   try {
     let formIds: string[] | null = null;
 
@@ -83,16 +101,16 @@ export const warmCacheUserForms = async (ctx: WarmCacheCtx): Promise<number> => 
         fromProjects = (data || []).map((f: any) => f.id);
       }
       formIds = [...new Set([...direct, ...sarmaan, ...fromProjects])];
-      if (formIds.length === 0) return 0;
+      if (formIds.length === 0) return empty;
     }
 
     let query = supabase.from("forms").select("*");
     if (formIds) query = query.in("id", formIds);
     const { data: formsData, error } = await query;
-    if (error || !formsData) return 0;
+    if (error || !formsData) return empty;
 
     const db = await openDB();
-    let cached = 0;
+    const cachedForms: { id: string; name: string; project_id: string }[] = [];
     for (const form of formsData) {
       const allItems = ((form.questions as unknown as any[]) || []);
       const offlineForm = {
@@ -110,14 +128,14 @@ export const warmCacheUserForms = async (ctx: WarmCacheCtx): Promise<number> => 
       };
       try {
         await putForm(db, await sealRecord(offlineForm, ["id", "project_id", "downloaded_at"]));
-        cached++;
+        cachedForms.push({ id: form.id, name: form.name, project_id: form.project_id });
       } catch {
         /* skip a single bad row */
       }
     }
-    return cached;
+    return { count: cachedForms.length, forms: cachedForms, scopedToGrants: !ctx.isAdmin };
   } catch (e) {
     console.warn("warmCacheUserForms failed:", e);
-    return 0;
+    return empty;
   }
 };
