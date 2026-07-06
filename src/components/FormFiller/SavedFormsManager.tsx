@@ -34,7 +34,6 @@ import { format, formatDistanceToNow } from "date-fns";
 import FormFiller from "@/components/FormFiller/FormFiller";
 import SentFormViewer from "@/components/FormFiller/SentFormViewer";
 import BloombergFormFiller from "@/components/Bloomberg/BloombergFormFiller";
-import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import {
   listSavedEntries,
   deleteSavedEntries,
@@ -42,7 +41,7 @@ import {
   type SavedFormEntry,
   type SavedFormStatus,
 } from "@/lib/savedForms";
-import { isBloombergSavedEntry, isSpecialBridgeEntry, syncSpecialSavedForm } from "@/lib/specialFormBridge";
+import { isBloombergSavedEntry, isSpecialBridgeEntry } from "@/lib/specialFormBridge";
 import { captureAndUploadDeviceAuditSnapshots } from "@/lib/bloomberg/deviceAuditSnapshot";
 import { syncSavedFormEntry } from "@/lib/savedFormAutoSync";
 
