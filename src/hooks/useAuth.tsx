@@ -453,8 +453,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => {
+      clearTimeout(bootWatchdog);
       subscription.unsubscribe();
       window.removeEventListener("online", syncAuditQueue);
+
     };
   }, []);
 
