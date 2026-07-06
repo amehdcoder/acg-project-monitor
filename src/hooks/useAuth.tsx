@@ -450,7 +450,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Mark the first full auth resolution as complete so every later auth
       // event refreshes the profile in the background without blinking.
       initialLoadDoneRef.current = true;
+    }).catch((e) => {
+      // getSession itself failed (network/storage error). Don't hang the boot —
+      // release the gates so the app can render and route to /auth.
+      console.warn("getSession failed during boot:", e);
+      setProfileLoading(false);
+      setLoading(false);
+      initialLoadDoneRef.current = true;
     });
+
 
     return () => {
       clearTimeout(bootWatchdog);
