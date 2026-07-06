@@ -953,7 +953,14 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         </div>
       </div>
 
-      {/* ── Filter bar ── */}
+      {/* ── Plain-language narrative & recommended actions ── */}
+      <NarrativeInsightsPanel
+        submissions={narrativeSubs}
+        questions={questions as any}
+        config={{ formName: formName || "Integrated MDA Supervisory Checklist", domainHint: "MDA supervision mass drug administration" }}
+        accent={TEAL}
+      />
+
       <Card>
         <CardContent className="p-3">
           <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-foreground">
