@@ -1459,29 +1459,32 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       if (!preset) throw new Error("SARMAAN supervisory template is unavailable.");
       const sections = preset.sections();
       const dashboardConfig = preset.dashboard();
-      const { data, error } = await supabase.from("forms").insert({
+      const data = await getOrCreateSingletonForm({
+        projectId: currentProjectId,
         name: SARMAAN_SUPERVISORY_FORM_NAME,
-        description: SARMAAN_SUPERVISORY_DESC,
-        questions: sections as any,
-        settings: {
-          theme: preset.theme,
-          studio: true,
-          presetKey: "supervisory_learning",
-          dashboardEnabled: true,
-          dashboardConfig,
-          requireLocation: true,
-          sarmaan_supervisory: true,
-          // Render sections under the beautiful ODK-style MDA interface and
-          // drive geography from the microplan location cascade.
-          supervisoryChecklistStyle: true,
-          microplanLocationCascade: true,
-
-        } as any,
-        project_id: currentProjectId,
-        created_by: user?.id,
-        status: "active",
-      } as any).select("*").single();
-      if (error) throw error;
+        settingsFlag: "sarmaan_supervisory",
+        buildInsert: () => ({
+          name: SARMAAN_SUPERVISORY_FORM_NAME,
+          description: SARMAAN_SUPERVISORY_DESC,
+          questions: sections as any,
+          settings: {
+            theme: preset.theme,
+            studio: true,
+            presetKey: "supervisory_learning",
+            dashboardEnabled: true,
+            dashboardConfig,
+            requireLocation: true,
+            sarmaan_supervisory: true,
+            // Render sections under the beautiful ODK-style MDA interface and
+            // drive geography from the microplan location cascade.
+            supervisoryChecklistStyle: true,
+            microplanLocationCascade: true,
+          } as any,
+          project_id: currentProjectId,
+          created_by: user?.id,
+          status: "active",
+        }),
+      });
       const allItems = ((data as any)?.questions as unknown as any[]) || [];
       const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
       const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
