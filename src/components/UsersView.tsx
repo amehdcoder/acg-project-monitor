@@ -1631,6 +1631,7 @@ const UsersView = () => {
             </div>
           )}
         </CardHeader>
+        {!usersListCollapsed && (
         <CardContent>
           {loading ? (
             <div className="flex h-48 items-center justify-center">
