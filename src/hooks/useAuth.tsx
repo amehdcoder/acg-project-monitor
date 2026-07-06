@@ -384,6 +384,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let initialSessionHandled = false;
 
+    // Absolute safety net: no matter what stalls (getSession hanging, a wedged
+    // network layer, a service worker intercepting the auth request), never
+    // leave the user staring at the boot spinner. After 15s force the gates
+    // open so the app renders and can route to /auth or the pending screen.
+    const bootWatchdog = setTimeout(() => {
+      setLoading(false);
+      setProfileLoading(false);
+      initialLoadDoneRef.current = true;
+    }, 15000);
+
+
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
