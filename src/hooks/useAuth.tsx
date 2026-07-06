@@ -218,11 +218,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const silent = opts?.silent ?? false;
     try {
       if (!silent) setProfileLoading(true);
-      const [profileRes, roleRes, userRes] = await Promise.all([
-        supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
-        supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
-        supabase.auth.getUser(),
-      ]);
+
+      // CRITICAL: the whole app is gated behind this fetch on first load. On a
+      // slow/flaky field connection these queries can hang indefinitely, which
+      // left the user stuck on the boot spinner forever. Race them against a
+      // hard timeout so the app ALWAYS opens. On timeout we fall back to the
+      // encrypted cached profile (if any) and keep the app usable, while a
+      // silent background refresh reconciles once the network recovers.
+      const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+        Promise.race([
+          p,
+          new Promise<T>((_, reject) =>
+            setTimeout(() => reject(new Error("profile_fetch_timeout")), ms),
+          ),
+        ]);
+
+      let profileRes: any, roleRes: any, userRes: any;
+      try {
+        [profileRes, roleRes, userRes] = await withTimeout(
+          Promise.all([
+            supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
+            supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
+            supabase.auth.getUser(),
+          ]),
+          12000,
+        );
+      } catch (timeoutErr) {
+        // Network too slow / unreachable — hydrate from cached credential so the
+        // app opens instead of spinning forever, then let a later silent refresh
+        // fill in fresh data.
+        console.warn("Profile fetch timed out — falling back to cached profile", timeoutErr);
+        try {
+          const cached = await getLatestOfflineCredential();
+          if (cached?.user?.id === userId) {
+            if (cached.profile) setProfile(cached.profile as Profile);
+            if (cached.role) setRole(cached.role as AppRole);
+          }
+        } catch {}
+        setProfileLoading(false);
+        return;
+      }
+
 
       const authUser = userRes.data?.user ?? null;
       const isOAuth =
