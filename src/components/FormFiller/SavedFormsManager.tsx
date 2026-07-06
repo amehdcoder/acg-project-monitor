@@ -44,6 +44,7 @@ import {
 } from "@/lib/savedForms";
 import { isBloombergSavedEntry, isSpecialBridgeEntry, syncSpecialSavedForm } from "@/lib/specialFormBridge";
 import { captureAndUploadDeviceAuditSnapshots } from "@/lib/bloomberg/deviceAuditSnapshot";
+import { syncSavedFormEntry } from "@/lib/savedFormAutoSync";
 
 export type SavedFormsMode = "edit" | "send" | "view" | "delete";
 
@@ -108,8 +109,6 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
-  const { saveSubmission } = useOfflineStorage();
-
   const selectable = mode === "send" || mode === "delete";
 
   const load = async () => {
@@ -158,35 +157,19 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   const handleSync = async () => {
     const targets = entries.filter((e) => selected.has(e.id));
     if (targets.length === 0) return;
+    if (!navigator.onLine) {
+      toast({ title: "You're offline", description: "Ready-to-send forms will be sent automatically when the device is online." });
+      return;
+    }
     setSyncing(true);
     let synced = 0;
     let failed = 0;
     try {
       for (const entry of targets) {
         try {
-          const result = (await syncSpecialSavedForm(entry)) ||
-            (await saveSubmission(
-              entry.formId,
-              userId,
-              entry.submissionData || entry.responses,
-              entry.submissionLocation || null,
-              entry.withinGeofence ?? null,
-              entry.submissionType || "regular",
-            ));
-          if (result.success) {
-            if (result.offline) {
-              // Keep normal forms in Ready to send when the network is not
-              // actually available. The background saved-form sender will move
-              // them to Sent only after the server confirms receipt.
-              failed++;
-            } else {
-              await setSavedEntryStatus(entry.id, "sent", {
-                submissionId: result.id,
-                sentAt: new Date().toISOString(),
-                offline: false,
-              });
-              synced++;
-            }
+          const ok = await syncSavedFormEntry(entry);
+          if (ok) {
+            synced++;
           } else {
             failed++;
           }
