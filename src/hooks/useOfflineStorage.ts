@@ -4,7 +4,7 @@ import { toast } from "@/hooks/use-toast";
 import { sealRecord, unsealRecord, unsealAll } from "@/lib/deviceCrypto";
 
 const DB_NAME = "acg_monitor_offline";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const STORE_NAME = "pending_submissions";
 const CONFLICT_STORE = "edit_conflicts";
 
@@ -12,6 +12,8 @@ interface PendingSubmission {
   id: string;
   form_id: string;
   user_id: string;
+  form_name?: string | null;
+  respondent_name?: string | null;
   data: Record<string, any>;
   location: { lat: number; lng: number } | null;
   within_geofence: boolean | null;
@@ -560,6 +562,8 @@ export const useOfflineStorage = () => {
         id: submissionId,
         form_id: formId,
         user_id: userId,
+        form_name: (data?.form_metadata as any)?.form_name || null,
+        respondent_name: (data?.form_metadata as any)?.respondent_name || null,
         data,
         location,
         within_geofence: withinGeofence,

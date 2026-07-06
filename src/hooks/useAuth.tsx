@@ -19,6 +19,12 @@ import { checkOfflineLock, registerOfflineFailure, clearOfflineFailures } from "
 
 type AppRole = "super_admin" | "systems_admin" | "user";
 
+const withTimeout = <T,>(p: Promise<T>, ms: number, label = "request_timeout"): Promise<T> =>
+  Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(label)), ms)),
+  ]);
+
 interface Profile {
   id: string;
   user_id: string;
@@ -225,14 +231,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // hard timeout so the app ALWAYS opens. On timeout we fall back to the
       // encrypted cached profile (if any) and keep the app usable, while a
       // silent background refresh reconciles once the network recovers.
-      const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
-        Promise.race([
-          p,
-          new Promise<T>((_, reject) =>
-            setTimeout(() => reject(new Error("profile_fetch_timeout")), ms),
-          ),
-        ]);
-
       let profileRes: any, roleRes: any, userRes: any;
       try {
         [profileRes, roleRes, userRes] = await withTimeout(
@@ -242,6 +240,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             supabase.auth.getUser(),
           ]),
           12000,
+          "profile_fetch_timeout",
         );
       } catch (timeoutErr) {
         // Network too slow / unreachable — hydrate from cached credential so the
@@ -538,7 +537,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    let data: any = null;
+    let error: any = null;
+    try {
+      const res = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        12000,
+        "sign_in_timeout",
+      );
+      data = res.data;
+      error = res.error;
+    } catch (err: any) {
+      error = err;
+    }
 
     if (error && isLikelyNetworkAuthError(error)) {
       try {
@@ -550,10 +561,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     if (!error && data.user) {
       // Fetch profile to ensure we cache the latest data AND enforce deactivation
-      const [profileRes, roleRes] = await Promise.all([
-        supabase.from("profiles").select("*").eq("user_id", data.user.id).maybeSingle(),
-        supabase.from("user_roles").select("role").eq("user_id", data.user.id).maybeSingle(),
-      ]);
+      const [profileRes, roleRes] = await withTimeout(
+        Promise.all([
+          supabase.from("profiles").select("*").eq("user_id", data.user.id).maybeSingle(),
+          supabase.from("user_roles").select("role").eq("user_id", data.user.id).maybeSingle(),
+        ]),
+        12000,
+        "post_login_profile_timeout",
+      ).catch(() => [{ data: null, error: null }, { data: null, error: null }] as any);
 
       // Hard block: deactivated accounts cannot proceed past sign-in.
       // We do NOT block the owner email, to avoid lockouts.

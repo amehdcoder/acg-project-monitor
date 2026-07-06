@@ -30,11 +30,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import FormFiller from "@/components/FormFiller/FormFiller";
 import SentFormViewer from "@/components/FormFiller/SentFormViewer";
 import BloombergFormFiller from "@/components/Bloomberg/BloombergFormFiller";
-import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import {
   listSavedEntries,
   deleteSavedEntries,
@@ -42,8 +41,9 @@ import {
   type SavedFormEntry,
   type SavedFormStatus,
 } from "@/lib/savedForms";
-import { isBloombergSavedEntry, isSpecialBridgeEntry, syncSpecialSavedForm } from "@/lib/specialFormBridge";
+import { isBloombergSavedEntry, isSpecialBridgeEntry } from "@/lib/specialFormBridge";
 import { captureAndUploadDeviceAuditSnapshots } from "@/lib/bloomberg/deviceAuditSnapshot";
+import { syncSavedFormEntry } from "@/lib/savedFormAutoSync";
 
 export type SavedFormsMode = "edit" | "send" | "view" | "delete";
 
@@ -59,21 +59,21 @@ const MODE_CONFIG: Record<
   { title: string; subtitle: string; status: SavedFormStatus; icon: any; accent: string }
 > = {
   edit: {
-    title: "Edit Saved Forms",
+    title: "Draft",
     subtitle: "Continue and finalize your saved drafts",
     status: "draft",
     icon: FileEdit,
     accent: "#22A55A",
   },
   send: {
-    title: "Send Finalized",
-    subtitle: "Select forms and sync them to the server",
+    title: "Ready to send",
+    subtitle: "Finalized forms waiting to sync",
     status: "finalized",
     icon: Send,
     accent: "#23B5AE",
   },
   view: {
-    title: "View Sent Forms",
+    title: "Sent",
     subtitle: "Forms that have been synced to the server",
     status: "sent",
     icon: Eye,
@@ -107,8 +107,6 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   const [viewing, setViewing] = useState<SavedFormEntry | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [syncing, setSyncing] = useState(false);
-
-  const { saveSubmission } = useOfflineStorage();
 
   const selectable = mode === "send" || mode === "delete";
 
@@ -158,27 +156,18 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   const handleSync = async () => {
     const targets = entries.filter((e) => selected.has(e.id));
     if (targets.length === 0) return;
+    if (!navigator.onLine) {
+      toast({ title: "You're offline", description: "Ready-to-send forms will be sent automatically when the device is online." });
+      return;
+    }
     setSyncing(true);
     let synced = 0;
     let failed = 0;
     try {
       for (const entry of targets) {
         try {
-          const result = (await syncSpecialSavedForm(entry)) ||
-            (await saveSubmission(
-              entry.formId,
-              userId,
-              entry.submissionData || entry.responses,
-              entry.submissionLocation || null,
-              entry.withinGeofence ?? null,
-              entry.submissionType || "regular",
-            ));
-          if (result.success) {
-            await setSavedEntryStatus(entry.id, "sent", {
-              submissionId: result.id,
-              sentAt: new Date().toISOString(),
-              offline: result.offline,
-            });
+          const ok = await syncSavedFormEntry(entry);
+          if (ok) {
             synced++;
           } else {
             failed++;
@@ -383,9 +372,15 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="font-semibold text-sm text-foreground truncate">
-                      {entry.formName}
+                      {entry.displayName || entry.formName}
                     </h3>
                     <div className="mt-0.5 flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
+                      {entry.respondentName && (
+                        <>
+                          <span>{entry.respondentName}</span>
+                          <span>·</span>
+                        </>
+                      )}
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {formatDistanceToNow(
@@ -393,6 +388,8 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
                           { addSuffix: true },
                         )}
                       </span>
+                      <span>·</span>
+                      <span>{format(new Date(entry.sentAt || entry.finalizedAt || entry.updatedAt), "PP p")}</span>
                       <span>·</span>
                       <span>{answered} answered</span>
                       {mode === "view" && entry.offline && (
