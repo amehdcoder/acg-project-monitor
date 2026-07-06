@@ -643,6 +643,7 @@ const InactiveUsersPanel = () => {
           </div>
         )}
       </CardContent>
+      )}
     </Card>
   );
 };
