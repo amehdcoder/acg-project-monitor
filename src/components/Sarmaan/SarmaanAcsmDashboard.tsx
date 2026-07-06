@@ -473,6 +473,14 @@ export default function SarmaanAcsmDashboard({ form, onClose }: Props) {
               main={`${M.refusalRate}%`} bar={M.refusalRate * 5} barColor={C.red} footer="Target: ≤ 5%" footerColor={C.sub} />
           </div>
 
+          {/* Plain-language narrative & recommended actions */}
+          <NarrativeInsightsPanel
+            submissions={narrativeSubs}
+            questions={narrativeQuestions}
+            config={{ formName: form.name || "SARMAAN ACSM & MDA Supervision Checklist", domainHint: "ACSM awareness mobilization MDA supervision" }}
+            accent={C.green}
+          />
+
           {/* Kano supervision map — geolocated visits by ACSM band */}
           <Panel
             title={<span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" style={{ color: C.green }} /> Kano Supervision Map — State, LGA &amp; Ward Coverage</span>}
