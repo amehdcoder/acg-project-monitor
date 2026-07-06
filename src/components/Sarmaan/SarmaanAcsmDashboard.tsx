@@ -34,6 +34,7 @@ import {
 import { communitiesSupervised } from "@/lib/sarmaan/acsmSectionAnalytics";
 import { ACSM_FIELD } from "@/lib/sarmaan/acsmChecklist";
 import { exportAcsmSubmissions } from "@/lib/sarmaan/acsmExcelExport";
+import NarrativeInsightsPanel from "@/components/shared/NarrativeInsightsPanel";
 import SarmaanAcsmAnalytics from "@/components/Sarmaan/SarmaanAcsmAnalytics";
 import { useCanEditDashboards } from "@/hooks/useCanEditDashboards";
 import { useAuth } from "@/hooks/useAuth";
