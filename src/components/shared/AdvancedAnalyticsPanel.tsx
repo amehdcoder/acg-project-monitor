@@ -1,12 +1,11 @@
-import { useMemo } from "react";
+import { useState } from "react";
 import {
   Brain, Dices, Sigma, Network, MessagesSquare, TrendingUp,
+  Loader2, ChevronDown, Info,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import {
-  buildAdvancedAnalytics,
-  type AdvancedAnalyticsOptions,
-} from "@/lib/advancedAnalytics";
+import { useAdvancedAnalytics } from "@/hooks/useAdvancedAnalytics";
+import type { AdvancedAnalyticsOptions } from "@/lib/advancedAnalytics";
 import type { NarrativeQuestion, NarrativeSubmission } from "@/lib/narrativeInsights";
 
 interface Props {
@@ -41,19 +40,33 @@ const Block = ({
 export default function AdvancedAnalyticsPanel({
   submissions, questions, options, accent = "#7C3AED", className,
 }: Props) {
-  const a = useMemo(
-    () => buildAdvancedAnalytics(submissions || [], questions || [], options || {}),
-    [submissions, questions, options],
-  );
+  const { result: a, computing } = useAdvancedAnalytics(submissions || [], questions || [], options);
+  const [showAssumptions, setShowAssumptions] = useState(false);
 
-  if (!a.hasData) return null;
+  if (!a && computing) {
+    return (
+      <Card className={`overflow-hidden border-l-4 ${className || ""}`} style={{ borderLeftColor: accent }}>
+        <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" style={{ color: accent }} />
+          Modelling the collected data…
+        </div>
+      </Card>
+    );
+  }
+  if (!a || !a.hasData) return null;
 
   return (
     <Card className={`overflow-hidden border-l-4 ${className || ""}`} style={{ borderLeftColor: accent }}>
       <div className="flex items-center gap-2 border-b p-4" style={{ background: `linear-gradient(90deg, ${accent}1a, transparent)` }}>
         <Brain className="h-4 w-4" style={{ color: accent }} />
         <h3 className="text-sm font-semibold text-foreground">Advanced Analytics &amp; Modelling</h3>
-        <span className="ml-auto hidden text-[11px] uppercase tracking-wide text-muted-foreground sm:inline">Updates in real-time</span>
+        <span className="ml-auto flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+          {computing ? (
+            <><Loader2 className="h-3 w-3 animate-spin" /> Refreshing</>
+          ) : (
+            <span className="hidden sm:inline">Updates in real-time</span>
+          )}
+        </span>
       </div>
 
       <div className="grid gap-3 p-4 md:grid-cols-2">
@@ -130,8 +143,62 @@ export default function AdvancedAnalyticsPanel({
           </Block>
         )}
       </div>
+
+      {/* Statistical assumptions & sample size (collapsed by default) */}
+      <div className="border-t">
+        <button
+          type="button"
+          onClick={() => setShowAssumptions((s) => !s)}
+          className="flex w-full items-center gap-2 px-4 py-3 text-left"
+          aria-expanded={showAssumptions}
+        >
+          <Info className="h-4 w-4" style={{ color: accent }} />
+          <span className="text-sm font-semibold text-foreground">Statistical assumptions &amp; sample size</span>
+          <ChevronDown className={`ml-auto h-4 w-4 text-muted-foreground transition-transform ${showAssumptions ? "rotate-180" : ""}`} />
+        </button>
+        {showAssumptions && (
+          <div className="space-y-3 px-4 pb-4 text-xs leading-relaxed text-muted-foreground">
+            {a.hypothesis.length > 0 && (
+              <p>
+                <strong className="text-foreground">Hypothesis tests.</strong> Group differences use a one-way ANOVA
+                across LGAs; the overall mean uses a Student-t 95% confidence interval. Assumptions: each record is an
+                independent observation, values are roughly normally distributed within groups, and only LGAs with at
+                least 2 records are compared. Sample sizes:{" "}
+                {a.hypothesis.map((h, i) => (
+                  <span key={i}>{i > 0 ? "; " : ""}{h.metric} across {h.groupsTested} LGA group{h.groupsTested === 1 ? "" : "s"}</span>
+                ))}. Results are significant when p &lt; 0.05.
+              </p>
+            )}
+            {a.monteCarlo && (
+              <p>
+                <strong className="text-foreground">Monte Carlo probabilities.</strong> {a.monteCarlo.runs.toLocaleString()} bootstrap
+                resamples are drawn (with replacement) from the collected {a.monteCarlo.metric.toLowerCase()} values.
+                It assumes the observed data is representative of near-future conditions and that records are exchangeable.
+                Reported figures are the mean, the 5th–95th percentile band, and the probability of meeting the benchmark.
+              </p>
+            )}
+            {a.randomForest && (
+              <p>
+                <strong className="text-foreground">Random Forest.</strong> An ensemble of 40 bootstrapped
+                variance-reduction trees (random feature subsets) built on {a.randomForest.sampleSize} complete records.
+                Importance is each field's share of explained variation in {a.randomForest.target.toLowerCase()} — it
+                indicates association and priority, not proven causation.
+              </p>
+            )}
+            {(a.groundedTheory || a.discourse) && (
+              <p>
+                <strong className="text-foreground">Text analytics.</strong> Grounded Theory (open → axial coding) and
+                Discourse Analysis run on{" "}
+                {a.groundedTheory?.documents ?? a.discourse?.documents} free-text responses. They summarise recurring
+                concepts and tone; with small corpora treat them as directional signals, not definitive conclusions.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
       <p className="border-t px-4 py-3 text-[11px] text-muted-foreground">
-        Modelling runs locally on the submissions feeding this dashboard and refreshes automatically as new data arrives. Interpretations are decision-support guidance, not a substitute for field judgement.
+        Modelling runs locally on the submissions feeding this dashboard and refreshes automatically as new data arrives (throttled + cached to keep the dashboard responsive). Interpretations are decision-support guidance, not a substitute for field judgement.
       </p>
     </Card>
   );
