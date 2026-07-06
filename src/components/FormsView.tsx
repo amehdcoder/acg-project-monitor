@@ -3593,7 +3593,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         return;
                       }
                       try {
-                        const { error } = await supabase.from("forms").insert([
+                        await insertToolFormsOnce({
+                          projectId: currentProjectId,
+                          kindFlag: "irf_kind",
+                          buildInserts: () => ([
                           {
                             name: IRF_FORM_NAME,
                             description: IRF_FORM_DESC,
@@ -3612,8 +3615,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             created_by: user?.id,
                             status: "active",
                           },
-                        ] as any);
-                        if (error) throw error;
+                          ]),
+                        });
                         toast({ title: "Added to project", description: "Open the reporting form and dashboard from your forms list above." });
                         fetchForms(currentProjectId);
                       } catch (e: any) {
