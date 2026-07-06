@@ -234,9 +234,9 @@ const SARMAAN_DASH_DESC = "Executive supervision dashboard with live KPIs, learn
 const isSarmaanAcsmStoredForm = (form: { name?: string | null; settings?: any } | null | undefined) =>
   !!form && (form.name === SARMAAN_ACSM_FORM_NAME || form.settings?.sarmaan_acsm === true);
 
-const withTimeout = <T,>(p: Promise<T>, ms = 10000, label = "forms_request_timeout"): Promise<T> =>
+const withTimeout = <T,>(p: PromiseLike<T>, ms = 10000, label = "forms_request_timeout"): Promise<T> =>
   Promise.race([
-    p,
+    Promise.resolve(p),
     new Promise<T>((_, reject) => setTimeout(() => reject(new Error(label)), ms)),
   ]);
 
