@@ -6,6 +6,11 @@ let started = false;
 let syncing = false;
 
 const isOnline = () => (typeof navigator === "undefined" ? true : navigator.onLine);
+const withTimeout = <T,>(p: Promise<T>, ms = 15000): Promise<T> =>
+  Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("saved_form_sync_timeout")), ms)),
+  ]);
 
 async function sendOne(entry: SavedFormEntry): Promise<boolean> {
   const special = isSpecialBridgeEntry(entry) ? await syncSpecialSavedForm(entry) : null;
@@ -50,7 +55,7 @@ export async function syncFinalizedSavedForms(): Promise<{ synced: number; faile
     for (const entry of entries) {
       if (!isOnline()) break;
       try {
-        if (await sendOne(entry)) synced++;
+        if (await withTimeout(sendOne(entry))) synced++;
       } catch {
         failed++;
       }

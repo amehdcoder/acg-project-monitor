@@ -192,9 +192,9 @@ interface Project {
 // of a tile, so selecting a project never causes a navigation/blink.
 const formActions = [
   { id: "fill",     label: "Fill Blank Form",  icon: FileText, description: "Start a new form",   tile: "bg-[#2F6FE6]" },
-  { id: "edit",     label: "Edit Saved Forms", icon: FileEdit, description: "Continue drafts",    tile: "bg-[#22A55A]" },
-  { id: "send",     label: "Send Finalized",   icon: Send,     description: "Sync to server",     tile: "bg-[#23B5AE]" },
-  { id: "view",     label: "View Sent Forms",  icon: Eye,      description: "Review submissions", tile: "bg-[#7C5CFF]" },
+  { id: "edit",     label: "Draft",            icon: FileEdit, description: "Continue drafts",    tile: "bg-[#22A55A]" },
+  { id: "send",     label: "Ready to send",    icon: Send,     description: "Sync to server",     tile: "bg-[#23B5AE]" },
+  { id: "view",     label: "Sent",             icon: Eye,      description: "Review submissions", tile: "bg-[#7C5CFF]" },
   { id: "delete",   label: "Delete Saved",     icon: Trash2,   description: "Remove drafts",      tile: "bg-[#E25555]" },
 ];
 

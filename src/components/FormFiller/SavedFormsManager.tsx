@@ -30,7 +30,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import FormFiller from "@/components/FormFiller/FormFiller";
 import SentFormViewer from "@/components/FormFiller/SentFormViewer";
 import BloombergFormFiller from "@/components/Bloomberg/BloombergFormFiller";
@@ -59,21 +59,21 @@ const MODE_CONFIG: Record<
   { title: string; subtitle: string; status: SavedFormStatus; icon: any; accent: string }
 > = {
   edit: {
-    title: "Edit Saved Forms",
+    title: "Draft",
     subtitle: "Continue and finalize your saved drafts",
     status: "draft",
     icon: FileEdit,
     accent: "#22A55A",
   },
   send: {
-    title: "Send Finalized",
-    subtitle: "Select forms and sync them to the server",
+    title: "Ready to send",
+    subtitle: "Finalized forms waiting to sync",
     status: "finalized",
     icon: Send,
     accent: "#23B5AE",
   },
   view: {
-    title: "View Sent Forms",
+    title: "Sent",
     subtitle: "Forms that have been synced to the server",
     status: "sent",
     icon: Eye,
@@ -399,6 +399,8 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
                           { addSuffix: true },
                         )}
                       </span>
+                      <span>·</span>
+                      <span>{format(new Date(entry.sentAt || entry.finalizedAt || entry.updatedAt), "PP p")}</span>
                       <span>·</span>
                       <span>{answered} answered</span>
                       {mode === "view" && entry.offline && (
