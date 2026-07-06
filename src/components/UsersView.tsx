@@ -506,6 +506,7 @@ const UsersView = () => {
   const [deletingUser, setDeletingUser] = useState(false);
   // Bulk selection / actions
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [usersListCollapsed, setUsersListCollapsed] = useState(true);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [bulkProject, setBulkProject] = useState<string>("");
