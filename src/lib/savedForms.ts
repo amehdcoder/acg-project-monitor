@@ -14,6 +14,8 @@ export interface SavedFormEntry {
   userId: string;
   formId: string;
   formName: string;
+  respondentName?: string | null;
+  displayName?: string | null;
   formDescription: string;
   projectId: string;
   // Full form definition snapshot — needed to re-render in FormFiller.
@@ -147,3 +149,10 @@ export const setSavedEntryStatus = async (
 };
 
 export const newEntryId = (): string => crypto.randomUUID();
+
+export const buildSavedEntryDisplayName = (entry: Pick<SavedFormEntry, "formName" | "respondentName" | "updatedAt" | "finalizedAt" | "createdAt">): string => {
+  const name = entry.respondentName?.trim() || "Unnamed respondent";
+  const when = entry.finalizedAt || entry.updatedAt || entry.createdAt;
+  const stamp = when ? new Date(when).toLocaleString() : new Date().toLocaleString();
+  return `${entry.formName} — ${name} — ${stamp}`;
+};
