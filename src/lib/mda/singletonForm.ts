@@ -83,3 +83,55 @@ export async function getOrCreateSingletonForm(args: SingletonFormArgs): Promise
     setTimeout(() => inFlight.delete(cacheKey), 4000);
   }
 }
+
+const pairInFlight = new Map<string, Promise<any>>();
+
+export interface PairedToolsArgs {
+  projectId: string;
+  /** settings flag that marks any row belonging to this toolset (e.g. "bloomberg_kind"). */
+  kindFlag: string;
+  /** Builds the INSERT array. Called only when no existing rows are found. */
+  buildInserts: () => Record<string, any>[];
+}
+
+/**
+ * Race-safe creation of a paired form+dashboard toolset (Bloomberg, See Clear,
+ * ACSM, SBC, IRF …). Prevents the double-insert that produced replicated tools
+ * when the "Add to project" button was double-tapped.
+ */
+export async function insertToolFormsOnce(args: PairedToolsArgs): Promise<void> {
+  const { projectId, kindFlag, buildInserts } = args;
+  const cacheKey = `${projectId}::${kindFlag}`;
+  const existing = pairInFlight.get(cacheKey);
+  if (existing) return existing;
+
+  const run = (async () => {
+    // Fresh DB existence check: any row already tagged with this kind flag?
+    const { data: found } = await supabase
+      .from("forms")
+      .select("id")
+      .eq("project_id", projectId)
+      .not(`settings->>${kindFlag}`, "is", null)
+      .limit(1);
+    if (found && found.length > 0) return;
+    const { error } = await supabase.from("forms").insert(buildInserts() as any);
+    if (error) {
+      // Re-check: a concurrent insert may have won.
+      const { data: retry } = await supabase
+        .from("forms")
+        .select("id")
+        .eq("project_id", projectId)
+        .not(`settings->>${kindFlag}`, "is", null)
+        .limit(1);
+      if (retry && retry.length > 0) return;
+      throw error;
+    }
+  })();
+
+  pairInFlight.set(cacheKey, run);
+  try {
+    await run;
+  } finally {
+    setTimeout(() => pairInFlight.delete(cacheKey), 4000);
+  }
+}
