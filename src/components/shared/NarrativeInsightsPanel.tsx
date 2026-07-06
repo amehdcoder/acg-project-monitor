@@ -10,6 +10,9 @@ import {
   type NarrativeItem, type Tone,
 } from "@/lib/narrativeInsights";
 
+import AdvancedAnalyticsPanel from "@/components/shared/AdvancedAnalyticsPanel";
+import type { AdvancedAnalyticsOptions } from "@/lib/advancedAnalytics";
+
 interface Props {
   submissions: NarrativeSubmission[];
   questions: NarrativeQuestion[];
@@ -17,6 +20,10 @@ interface Props {
   /** Optional accent colour (defaults to a professional teal). */
   accent?: string;
   className?: string;
+  /** When set, an Advanced Analytics panel (Random Forest, Monte Carlo,
+   *  Grounded Theory, Discourse Analysis, hypothesis tests) is rendered too. */
+  advanced?: boolean;
+  advancedOptions?: AdvancedAnalyticsOptions;
 }
 
 const toneStyles: Record<Tone, { icon: typeof AlertTriangle; color: string; bg: string }> = {
