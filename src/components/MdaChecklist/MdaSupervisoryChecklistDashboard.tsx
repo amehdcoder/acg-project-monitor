@@ -959,7 +959,15 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         questions={questions as any}
         config={{ formName: formName || "Integrated MDA Supervisory Checklist", domainHint: "MDA supervision mass drug administration" }}
         accent={TEAL}
+        advanced
+        advancedOptions={{
+          hypotheses: [
+            { name: "Therapeutic coverage", pattern: /therap(eutic)?|treated|drug|treatment coverage/i },
+            { name: "Household coverage", pattern: /household|houses|hh coverage|geograph|visited/i },
+          ],
+        }}
       />
+
 
       <Card>
         <CardContent className="p-3">
