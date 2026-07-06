@@ -29,6 +29,7 @@ import {
   ClipboardList, CheckCircle2, Pill, AlertTriangle, Flag, Activity,
   MapPin, CalendarClock, Users2, Search, RotateCcw, Download, Filter,
   ArrowRight, ShieldCheck, Map as MapIcon, Building2, Layers, Loader2, FileText,
+  ChevronDown, PenLine,
 } from "lucide-react";
 import { toast } from "sonner";
 import { prepareMdaData, communityKey, linkedCommunityKey } from "@/lib/mda/dashboardData";
@@ -394,6 +395,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   const [fFrom, setFFrom] = useState("");
   const [fTo, setFTo] = useState("");
   const [search, setSearch] = useState("");
+  const [showSignatures, setShowSignatures] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const dashboardRef = useRef<HTMLDivElement>(null);
@@ -959,7 +961,15 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         questions={questions as any}
         config={{ formName: formName || "Integrated MDA Supervisory Checklist", domainHint: "MDA supervision mass drug administration" }}
         accent={TEAL}
+        advanced
+        advancedOptions={{
+          hypotheses: [
+            { name: "Therapeutic coverage", pattern: /therap(eutic)?|treated|drug|treatment coverage/i },
+            { name: "Household coverage", pattern: /household|houses|hh coverage|geograph|visited/i },
+          ],
+        }}
       />
+
 
       <Card>
         <CardContent className="p-3">
@@ -1267,10 +1277,30 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         />
       </SectionErrorBoundary>
 
-      {/* ── Supervisor signatures register ── */}
+      {/* ── Supervisor signatures register (collapsed by default) ── */}
       <SectionErrorBoundary label="Supervisor signature gallery">
-        <SupervisorSignatureGallery submissions={filtered} />
+        <Card>
+          <button
+            type="button"
+            onClick={() => setShowSignatures((s) => !s)}
+            className="flex w-full items-center gap-2 p-4 text-left"
+            aria-expanded={showSignatures}
+          >
+            <PenLine className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold text-foreground">Supervisor Signatures Register</span>
+            <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+              {showSignatures ? "Hide" : "Show"}
+              <ChevronDown className={`h-4 w-4 transition-transform ${showSignatures ? "rotate-180" : ""}`} />
+            </span>
+          </button>
+          {showSignatures && (
+            <div className="border-t p-4 pt-3">
+              <SupervisorSignatureGallery submissions={filtered} />
+            </div>
+          )}
+        </Card>
       </SectionErrorBoundary>
+
 
 
 

@@ -10,6 +10,9 @@ import {
   type NarrativeItem, type Tone,
 } from "@/lib/narrativeInsights";
 
+import AdvancedAnalyticsPanel from "@/components/shared/AdvancedAnalyticsPanel";
+import type { AdvancedAnalyticsOptions } from "@/lib/advancedAnalytics";
+
 interface Props {
   submissions: NarrativeSubmission[];
   questions: NarrativeQuestion[];
@@ -17,6 +20,10 @@ interface Props {
   /** Optional accent colour (defaults to a professional teal). */
   accent?: string;
   className?: string;
+  /** When set, an Advanced Analytics panel (Random Forest, Monte Carlo,
+   *  Grounded Theory, Discourse Analysis, hypothesis tests) is rendered too. */
+  advanced?: boolean;
+  advancedOptions?: AdvancedAnalyticsOptions;
 }
 
 const toneStyles: Record<Tone, { icon: typeof AlertTriangle; color: string; bg: string }> = {
@@ -42,6 +49,7 @@ const slug = (s: string) => (s || "list").toLowerCase().replace(/[^a-z0-9]+/g, "
 
 export default function NarrativeInsightsPanel({
   submissions, questions, config, accent = "#0EA5A5", className,
+  advanced = false, advancedOptions,
 }: Props) {
   const n = useMemo(
     () => buildNarrative(submissions || [], questions || [], config || {}),
@@ -154,6 +162,16 @@ export default function NarrativeInsightsPanel({
 
         <p className="border-t pt-3 text-[11px] text-muted-foreground">{n.dataCoverageNote}</p>
       </div>
+      {advanced && (
+        <div className="border-t p-4">
+          <AdvancedAnalyticsPanel
+            submissions={submissions}
+            questions={questions}
+            options={advancedOptions}
+            accent="#7C3AED"
+          />
+        </div>
+      )}
     </Card>
   );
 }

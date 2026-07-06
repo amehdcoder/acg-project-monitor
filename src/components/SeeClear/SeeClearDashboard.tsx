@@ -166,6 +166,7 @@ export default function SeeClearDashboard({ onClose }: Props) {
           questions={narrativeQuestions}
           config={{ formName: "See Clear Eye Health Facility Monitoring", domainHint: "facility readiness monitoring eye health WASH supplies referral" }}
           accent="#0EA5A5"
+          advanced
         />
 
         {/* KPI tiles */}

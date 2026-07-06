@@ -28,6 +28,7 @@ import {
   Archive,
   FolderPlus,
   X,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -98,6 +99,7 @@ const InactiveUsersPanel = () => {
   const [search, setSearch] = useState("");
   const PAGE_SIZE = 25;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [collapsed, setCollapsed] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -337,20 +339,31 @@ const InactiveUsersPanel = () => {
   return (
     <Card className="border-destructive/40">
       <CardHeader className="flex flex-row items-start justify-between gap-4">
-        <div>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Archive className="h-4 w-4 text-destructive" />
-            Deactivated / Pending Accounts & Sign-in Audit Log
-          </CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">
-            {profiles.length} archived account{profiles.length === 1 ? "" : "s"} · {attempts.length} blocked attempt log{attempts.length === 1 ? "" : "s"}
-          </p>
-        </div>
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          className="flex flex-1 items-start gap-2 text-left"
+          aria-expanded={!collapsed}
+        >
+          <ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`} />
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Archive className="h-4 w-4 text-destructive" />
+              Deactivated / Pending Accounts & Sign-in Audit Log
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              {profiles.length} archived account{profiles.length === 1 ? "" : "s"} · {attempts.length} blocked attempt log{attempts.length === 1 ? "" : "s"}
+              {collapsed ? " · click to expand" : ""}
+            </p>
+          </div>
+        </button>
         <Button variant="outline" size="sm" onClick={load} disabled={loading}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
         </Button>
       </CardHeader>
+      {!collapsed && (
       <CardContent className="space-y-4">
+
         <div className="relative">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -630,6 +643,7 @@ const InactiveUsersPanel = () => {
           </div>
         )}
       </CardContent>
+      )}
     </Card>
   );
 };
