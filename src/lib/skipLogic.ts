@@ -23,6 +23,29 @@ export function buildNameToIdMap(
   return map;
 }
 
+/**
+ * Normalize any stored answer into a set of selected tokens. Handles:
+ *  - arrays (multi-select in the FormFiller runtime),
+ *  - XLSForm-standard space-separated strings ("a b c"),
+ *  - comma-separated strings ("a, b, c"),
+ *  - plain single values.
+ * This is what makes skip logic work reliably for select_multiple questions.
+ */
+function valueTokens(val: unknown): string[] {
+  if (val === undefined || val === null) return [];
+  if (Array.isArray(val)) return val.map((v) => String(v).trim()).filter(Boolean);
+  const s = String(val).trim();
+  if (!s) return [];
+  // Space- or comma-separated multi-select payloads.
+  if (/[\s,]/.test(s)) return s.split(/[\s,]+/).map((t) => t.trim()).filter(Boolean);
+  return [s];
+}
+
+/** True when `expectedValue` is among the selected tokens of `val`. */
+function tokenSelected(val: unknown, expectedValue: string): boolean {
+  return valueTokens(val).includes(expectedValue);
+}
+
 function evalSingleCondition(
   expr: string,
   responses: Responses,
@@ -38,11 +61,7 @@ function evalSingleCondition(
   if (selectedMatch) {
     const [, refName, expectedValue] = selectedMatch;
     const qId = nameToIdMap[refName];
-    if (qId) {
-      const val = responses[qId];
-      if (Array.isArray(val)) return val.map(String).includes(expectedValue);
-      return String(val ?? "") === expectedValue;
-    }
+    if (qId) return tokenSelected(responses[qId], expectedValue);
     return false;
   }
 
@@ -53,26 +72,23 @@ function evalSingleCondition(
   if (notSelectedMatch) {
     const [, refName, expectedValue] = notSelectedMatch;
     const qId = nameToIdMap[refName];
-    if (qId) {
-      const val = responses[qId];
-      const has = Array.isArray(val)
-        ? val.map(String).includes(expectedValue)
-        : String(val ?? "") === expectedValue;
-      return !has;
-    }
+    if (qId) return !tokenSelected(responses[qId], expectedValue);
     return true;
   }
 
   // ${name} = 'value' or ${name} != 'value'
+  // For multi-select answers this is treated as membership (contains value),
+  // matching how field staff expect equality checks on checkboxes to behave.
   const eqMatch = trimmed.match(/\$\{(.+?)\}\s*(=|!=)\s*['"](.+?)['"]/);
   if (eqMatch) {
     const [, refName, operator, expectedValue] = eqMatch;
     const qId = nameToIdMap[refName];
     if (qId) {
-      const raw = responses[qId];
-      const matches = Array.isArray(raw)
-        ? raw.map(String).includes(expectedValue)
-        : String(raw ?? "") === expectedValue;
+      const tokens = valueTokens(responses[qId]);
+      // Single-value answers compare exactly; multi-value answers use membership.
+      const matches = tokens.length > 1
+        ? tokens.includes(expectedValue)
+        : (tokens[0] ?? "") === expectedValue;
       return operator === "=" ? matches : !matches;
     }
     return operator === "!=";
