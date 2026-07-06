@@ -3677,16 +3677,19 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                           }
                           try {
                             const built = tool.build();
-                            const { error } = await supabase.from("forms").insert({
+                            await getOrCreateSingletonForm({
+                              projectId: currentProjectId,
                               name: built.name,
-                              description: built.description,
-                              questions: built.questions as any,
-                              settings: built.settings as any,
-                              project_id: currentProjectId,
-                              created_by: user?.id,
-                              status: "draft",
-                            } as any);
-                            if (error) throw error;
+                              buildInsert: () => ({
+                                name: built.name,
+                                description: built.description,
+                                questions: built.questions as any,
+                                settings: built.settings as any,
+                                project_id: currentProjectId,
+                                created_by: user?.id,
+                                status: "draft",
+                              }),
+                            });
                             toast({ title: "Added to project", description: "Open it from your forms list to fill, share, or edit in the Form Builder." });
                             fetchForms(currentProjectId);
                           } catch (e: any) {
