@@ -588,6 +588,14 @@ export default function BloombergDashboard({ onClose }: Props) {
           <p className="text-xs font-medium text-muted-foreground">Generated: {new Date().toLocaleString()}</p>
         </div>
 
+        {/* Plain-language narrative & recommended actions */}
+        <NarrativeInsightsPanel
+          submissions={narrativeSubs}
+          questions={narrativeQuestions}
+          config={{ formName: "Bloomberg School Enrolment Validation", domainHint: "school enrolment validation education" }}
+          accent="#2dd4a8"
+        />
+
         {/* KPI tiles */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Kpi icon={School} label="Total Schools" value={fmt(stats.totalSchools)} tint={NAVY} />
