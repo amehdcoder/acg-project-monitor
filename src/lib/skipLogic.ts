@@ -119,8 +119,8 @@ function evalSingleCondition(
     const qId = nameToIdMap[truthyMatch[1]];
     if (qId) {
       const val = responses[qId];
-      if (Array.isArray(val)) return val.length > 0;
-      return val !== undefined && val !== null && val !== "" && val !== false;
+      if (val === false) return false;
+      return valueTokens(val).length > 0;
     }
     return false;
   }
