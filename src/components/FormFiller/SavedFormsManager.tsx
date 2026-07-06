@@ -383,9 +383,15 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="font-semibold text-sm text-foreground truncate">
-                      {entry.formName}
+                      {entry.displayName || entry.formName}
                     </h3>
                     <div className="mt-0.5 flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
+                      {entry.respondentName && (
+                        <>
+                          <span>{entry.respondentName}</span>
+                          <span>·</span>
+                        </>
+                      )}
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {formatDistanceToNow(

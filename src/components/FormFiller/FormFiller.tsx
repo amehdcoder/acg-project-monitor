@@ -54,6 +54,7 @@ import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import {
   saveSavedEntry,
   newEntryId,
+  buildSavedEntryDisplayName,
   type SavedFormEntry,
 } from "@/lib/savedForms";
 import useGeolocation, { GeolocationPosition } from "@/hooks/useGeolocation";
@@ -1980,6 +1981,15 @@ const FormFiller = ({
         : null;
 
     const now = new Date().toISOString();
+    const respondentName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim() || profile?.email || "Unnamed respondent";
+    submissionData["form_metadata"] = {
+      ...(submissionData["form_metadata"] || {}),
+      form_name: formName,
+      respondent_name: respondentName,
+      captured_by: userId,
+      project_id: projectId,
+      local_saved_at: now,
+    };
     const gps = gpsPosition
       ? { lat: gpsPosition.lat, lng: gpsPosition.lng, accuracy: (gpsPosition as any).accuracy }
       : submissionLocation;
@@ -1989,6 +1999,7 @@ const FormFiller = ({
       userId,
       formId,
       formName,
+      respondentName,
       formDescription,
       projectId,
       questions,
@@ -2007,6 +2018,13 @@ const FormFiller = ({
       finalizedAt: status === "finalized" ? now : savedEntry?.finalizedAt ?? null,
       sentAt: null,
       submissionId: null,
+      displayName: buildSavedEntryDisplayName({
+        formName,
+        respondentName,
+        createdAt: savedEntry?.createdAt || now,
+        updatedAt: now,
+        finalizedAt: status === "finalized" ? now : savedEntry?.finalizedAt ?? null,
+      }),
     };
   };
 
@@ -2020,18 +2038,6 @@ const FormFiller = ({
         description: "Enter at least one answer before saving a draft.",
         variant: "destructive",
       });
-      return;
-    }
-    // Enforce mandatory questions before allowing a draft to be saved.
-    const { isValid, errors: freshErrors } = validateForm();
-    if (!isValid) {
-      const requiredKeys = Object.keys(freshErrors).filter((k) => !k.startsWith("_"));
-      const description = requiredKeys.length > 0
-        ? `${requiredKeys.length} required question(s) need an answer. Taking you to the nearest one.`
-        : Object.values(freshErrors)[0] || "Please fix the errors before saving.";
-      toast({ title: "Cannot save draft", description, variant: "destructive" });
-      setCollapsedGroups({});
-      setTimeout(() => scrollToFirstError(freshErrors), 80);
       return;
     }
     setIsSubmitting(true);
@@ -2093,6 +2099,21 @@ const FormFiller = ({
       setIsSubmitting(false);
     }
   };
+
+  // KoboCollect-style autosave into the Drafts tab: when a form is being filled
+  // through the local workflow, keep the editable saved draft current without
+  // requiring mandatory fields until the user finalizes it.
+  useEffect(() => {
+    if (!localWorkflow || !effectiveAutoSave || savedEntry?.status === "finalized") return;
+    if (!userInteractedRef.current || !hasMeaningfulFormResponses(responses) || isSubmitting) return;
+    const t = setTimeout(() => {
+      buildLocalEntry("draft")
+        .then((entry) => saveSavedEntry(entry))
+        .catch(() => {});
+    }, 2500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localWorkflow, effectiveAutoSave, responses, gpsPosition, isSubmitting, savedEntry?.status]);
 
 
 
