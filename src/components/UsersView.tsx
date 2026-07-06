@@ -1532,11 +1532,19 @@ const UsersView = () => {
         <CardHeader className="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="font-display flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              All Users ({filteredUsers.length})
+              <button
+                type="button"
+                onClick={() => setUsersListCollapsed((c) => !c)}
+                className="flex items-center gap-2"
+                aria-expanded={!usersListCollapsed}
+              >
+                <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${usersListCollapsed ? "-rotate-90" : ""}`} />
+                <Users className="h-5 w-5" />
+                All Users ({filteredUsers.length})
+              </button>
             </CardTitle>
             <div className="flex items-center gap-2">
-              {groupedUsers.length > 0 && (
+              {!usersListCollapsed && groupedUsers.length > 0 && (
                 <Button
                   size="sm"
                   variant="outline"
