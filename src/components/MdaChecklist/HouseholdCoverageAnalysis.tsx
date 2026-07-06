@@ -20,6 +20,7 @@ import {
   SlidersHorizontal, RotateCcw, ChevronRight, X, AlertCircle, Loader2, Building2,
 } from "lucide-react";
 import { testAgainstBenchmark, type BenchmarkTest } from "@/lib/ces/coverageStats";
+import { oneWayAnova, meanConfidenceInterval, formatP } from "@/lib/statisticalInference";
 
 // ── Default benchmarks (user-configurable in the UI) ─────────────────────────
 const DEFAULT_HH_BENCHMARK = 100; // Household reach target (%)
