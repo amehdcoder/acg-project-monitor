@@ -178,6 +178,11 @@ export default function NarrativeInsightsPanel({
           />
         </div>
       )}
+      {afterHoursLog && (
+        <div className="border-t p-4">
+          <AfterHoursSubmissionsLog tables={afterHoursTables} accent="#6366F1" />
+        </div>
+      )}
     </Card>
   );
 }
