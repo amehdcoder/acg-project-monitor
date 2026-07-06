@@ -160,7 +160,16 @@ export default function SeeClearDashboard({ onClose }: Props) {
           <p className="text-xs font-medium text-muted-foreground">Last updated: {new Date().toLocaleString()}</p>
         </div>
 
+        {/* Plain-language narrative & recommended actions */}
+        <NarrativeInsightsPanel
+          submissions={narrativeSubs}
+          questions={narrativeQuestions}
+          config={{ formName: "See Clear Eye Health Facility Monitoring", domainHint: "facility readiness monitoring eye health WASH supplies referral" }}
+          accent="#0EA5A5"
+        />
+
         {/* KPI tiles */}
+
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Kpi icon={Building2} label="Total Facilities Assessed" value={fmt(stats.total)} tint={NAVY} sub="Across 3 levels" />
           <Kpi icon={CheckCircle2} label="Functional Facilities" value={fmt(stats.functional)} tint={toneColor(pctTone(stats.functionalPct))} sub={`${stats.functionalPct.toFixed(1)}%`} />
