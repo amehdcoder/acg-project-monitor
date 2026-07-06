@@ -54,6 +54,18 @@ function evalSingleCondition(
   const trimmed = expr.trim().replace(/^\(/, "").replace(/\)$/, "").trim();
   if (!trimmed) return true;
 
+  // not(selected(${name}, 'value')) — checked BEFORE selected() so the inner
+  // selected(...) fragment isn't matched first.
+  const notSelectedMatch = trimmed.match(
+    /not\s*\(\s*selected\s*\(\s*\$\{(.+?)\}\s*,\s*['"](.+?)['"]\s*\)\s*\)/,
+  );
+  if (notSelectedMatch) {
+    const [, refName, expectedValue] = notSelectedMatch;
+    const qId = nameToIdMap[refName];
+    if (qId) return !tokenSelected(responses[qId], expectedValue);
+    return true;
+  }
+
   // selected(${name}, 'value') — works for both single and multi-select
   const selectedMatch = trimmed.match(
     /selected\s*\(\s*\$\{(.+?)\}\s*,\s*['"](.+?)['"]\s*\)/,
@@ -63,17 +75,6 @@ function evalSingleCondition(
     const qId = nameToIdMap[refName];
     if (qId) return tokenSelected(responses[qId], expectedValue);
     return false;
-  }
-
-  // not(selected(${name}, 'value'))
-  const notSelectedMatch = trimmed.match(
-    /not\s*\(\s*selected\s*\(\s*\$\{(.+?)\}\s*,\s*['"](.+?)['"]\s*\)\s*\)/,
-  );
-  if (notSelectedMatch) {
-    const [, refName, expectedValue] = notSelectedMatch;
-    const qId = nameToIdMap[refName];
-    if (qId) return !tokenSelected(responses[qId], expectedValue);
-    return true;
   }
 
   // ${name} = 'value' or ${name} != 'value'
