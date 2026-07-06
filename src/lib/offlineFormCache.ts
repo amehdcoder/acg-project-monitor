@@ -69,18 +69,20 @@ export const warmCacheUserForms = async (ctx: WarmCacheCtx): Promise<number> => 
 
     if (!ctx.isAdmin) {
       // Regular users: forms assigned directly + forms from assigned projects.
-      const [formAssign, projAssign] = await Promise.all([
+      const [formAssign, projAssign, sarmaanAssign] = await Promise.all([
         supabase.from("user_form_assignments").select("form_id").eq("user_id", ctx.userId),
         supabase.from("user_project_assignments").select("project_id").eq("user_id", ctx.userId),
+        supabase.from("sarmaan_form_access" as any).select("form_id").eq("user_id", ctx.userId),
       ]);
       const direct = (formAssign.data || []).map((a: any) => a.form_id);
+      const sarmaan = ((sarmaanAssign.data as any[] | null) || []).map((a: any) => a.form_id);
       const projectIds = (projAssign.data || []).map((a: any) => a.project_id);
       let fromProjects: string[] = [];
       if (projectIds.length > 0) {
         const { data } = await supabase.from("forms").select("id").in("project_id", projectIds);
         fromProjects = (data || []).map((f: any) => f.id);
       }
-      formIds = [...new Set([...direct, ...fromProjects])];
+      formIds = [...new Set([...direct, ...sarmaan, ...fromProjects])];
       if (formIds.length === 0) return 0;
     }
 
