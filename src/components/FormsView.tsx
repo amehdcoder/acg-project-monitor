@@ -1406,16 +1406,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     }
     if (acsmForm) return acsmForm;
     try {
-      const { data, error } = await supabase.from("forms").insert({
+      const data = await getOrCreateSingletonForm({
+        projectId: currentProjectId,
         name: SARMAAN_ACSM_FORM_NAME,
-        description: SARMAAN_ACSM_DESC,
-        questions: buildAcsmFormSchema() as any,
-        settings: { requireLocation: true, offlineEnabled: true, sarmaan_acsm: true } as any,
-        project_id: currentProjectId,
-        created_by: user?.id,
-        status: "active",
-      } as any).select("*").single();
-      if (error) throw error;
+        settingsFlag: "sarmaan_acsm",
+        buildInsert: () => ({
+          name: SARMAAN_ACSM_FORM_NAME,
+          description: SARMAAN_ACSM_DESC,
+          questions: buildAcsmFormSchema() as any,
+          settings: { requireLocation: true, offlineEnabled: true, sarmaan_acsm: true } as any,
+          project_id: currentProjectId,
+          created_by: user?.id,
+          status: "active",
+        }),
+      });
       const created = { ...(data as any), submissions_count: 0 } as Form;
       setForms((prev) => (prev.some((f) => f.id === created.id) ? prev : [created, ...prev]));
       toast({ title: "Checklist added", description: "SARMAAN ACSM & MDA Supervision Checklist is ready." });
