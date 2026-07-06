@@ -595,6 +595,7 @@ export default function BloombergDashboard({ onClose }: Props) {
           questions={narrativeQuestions}
           config={{ formName: "Bloomberg School Enrolment Validation", domainHint: "school enrolment validation education" }}
           accent="#2dd4a8"
+          advanced
         />
 
         {/* KPI tiles */}
