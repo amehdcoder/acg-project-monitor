@@ -12,6 +12,23 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import quizHero from "@/assets/community-health-worker.jpg.asset.json";
+
+const QuizHeroBanner = ({ title, subtitle }: { title: string; subtitle?: string }) => (
+  <div className="relative overflow-hidden rounded-2xl border border-primary/20 shadow-sm">
+    <img
+      src={quizHero.url}
+      alt="Community health worker engaging a family"
+      className="h-32 w-full object-cover object-center sm:h-44"
+      loading="lazy"
+    />
+    <div className="absolute inset-0 bg-gradient-to-t from-primary/85 via-primary/40 to-transparent" />
+    <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
+      <h2 className="text-base font-bold leading-tight text-primary-foreground drop-shadow sm:text-lg">{title}</h2>
+      {subtitle && <p className="mt-0.5 text-xs text-primary-foreground/90 sm:text-sm">{subtitle}</p>}
+    </div>
+  </div>
+);
 
 interface QuizTakerProps {
   quiz: {
