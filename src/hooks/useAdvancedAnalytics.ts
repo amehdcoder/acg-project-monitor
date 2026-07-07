@@ -33,6 +33,7 @@ function signature(
   const first = subs[0];
   const last = subs[n - 1];
   const hyp = (opts?.hypotheses || []).map((h) => h.name).join("~");
+  const tgt = (opts?.targets || []).map((t) => t.name).join("~");
   return [
     n,
     first?.id ?? "",
@@ -40,6 +41,7 @@ function signature(
     last?.submitted_at ?? "",
     qs.length,
     hyp,
+    tgt,
   ].join("|");
 }
 
