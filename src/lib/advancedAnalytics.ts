@@ -247,9 +247,11 @@ export interface MonteCarloResult {
   runs: number;
 }
 
-export function monteCarlo(subs: NarrativeSubmission[], qs: NarrativeQuestion[]): MonteCarloResult | null {
+export function monteCarlo(
+  subs: NarrativeSubmission[], qs: NarrativeQuestion[], targetOverride?: Feature,
+): MonteCarloResult | null {
   const feats = buildFeatures(subs, qs);
-  const target = pickTarget(feats);
+  const target = targetOverride || pickTarget(feats);
   if (!target) return null;
   const observed = target.values.filter((v): v is number => v !== null);
   if (observed.length < 6) return null;
