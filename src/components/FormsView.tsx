@@ -3002,6 +3002,19 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         </p>
                       </button>
 
+                      {canSeeSubmissionCounts && submissionCounts[form.id] !== undefined && (
+                        <span
+                          title="Submissions on the server (visible to owners/admins only)"
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
+                            submissionCounts[form.id] > 0
+                              ? "bg-[#0d9488] text-white"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {submissionCounts[form.id]} {submissionCounts[form.id] === 1 ? "submission" : "submissions"}
+                        </span>
+                      )}
+
 
                       <span
                         className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
