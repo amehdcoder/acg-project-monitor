@@ -339,6 +339,45 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const { user, profile, isAdmin, isSuperAdmin, isOwner, isOwnerLevel, role, isAdhoc, loading: authLoading } = useAuth();
   const { hasDashboardAccess } = useDashboardAccess();
   const [assignedStandardCodes, setAssignedStandardCodes] = useState<Set<string>>(new Set());
+  // Owner/Admin-only: exact submission count per form so the owner can tell at a
+  // glance which checklists actually have data (and how much) without opening
+  // each one. Populated with a single batched query (no N+1).
+  const [submissionCounts, setSubmissionCounts] = useState<Record<string, number>>({});
+  const canSeeSubmissionCounts = isOwnerLevel || isAdmin;
+  // Load exact submission counts (owner/admin only). One head-count request per
+  // form, batched with Promise.all so the Forms list can badge every checklist
+  // with how many submissions it actually holds.
+  const formIdsKey = forms.map((f) => f.id).join(",");
+  useEffect(() => {
+    if (!canSeeSubmissionCounts || !navigator.onLine) return;
+    const ids = formIdsKey ? formIdsKey.split(",").filter(Boolean) : [];
+    if (ids.length === 0) {
+      setSubmissionCounts({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const results = await Promise.all(
+          ids.map(async (id) => {
+            const { count } = await supabase
+              .from("form_submissions")
+              .select("id", { count: "exact", head: true })
+              .eq("form_id", id);
+            return [id, count ?? 0] as const;
+          }),
+        );
+        if (cancelled) return;
+        setSubmissionCounts(Object.fromEntries(results));
+      } catch (e) {
+        console.warn("Failed to load submission counts:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [formIdsKey, canSeeSubmissionCounts]);
+
   // Owner/Co-owner can hide the Standard forms folder from specific non-admins.
   const [standardRestricted, setStandardRestricted] = useState(false);
   useEffect(() => {
@@ -596,7 +635,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
 
   const { canBulk } = useBulkDataAccess();
-  const { isOnline, downloadForm, cacheFormsForOffline, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
+  const { isOnline, downloadForm, cacheFormsForOffline, removeForm, pruneStaleForms, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
   const [, setSearchParams] = useSearchParams();
 
@@ -863,6 +902,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       setForms(formsWithCounts);
       // Auto-cache every fetched form so it can be opened offline later.
       cacheFormsForOffline(formsWithCounts);
+      // Drop any stale offline copies in this project that no longer exist on
+      // the server (e.g. duplicates left behind after a dedup/recreate).
+      pruneStaleForms(formsWithCounts.map((f) => f.id), projectId);
     } catch (error: any) {
       console.error("Error fetching forms:", error);
       toast({
@@ -1007,6 +1049,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       setForms(formsWithCounts);
       // Auto-cache every fetched form so it can be opened offline later.
       cacheFormsForOffline(formsWithCounts);
+      // Globally drop stale offline copies not present in this authoritative set
+      // (removes ghost duplicates left behind by offline downloads / dedup).
+      pruneStaleForms(formsWithCounts.map((f) => f.id));
     } catch (error: any) {
       console.error("Error fetching forms:", error);
       fetchOk = false;
@@ -1296,9 +1341,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const mergedForms = [
     ...forms,
     ...offlineForms
-      .filter((of) => (!currentProjectId || of.project_id === currentProjectId) && !forms.some((f) => f.id === of.id))
+      .filter(
+        (of) =>
+          (!currentProjectId || of.project_id === currentProjectId) &&
+          // Skip when the same row already came from the server (by id) OR when a
+          // server form with the same name already exists in that project. The
+          // latter guards against ghost duplicates whose cached id differs from
+          // the canonical server id (left behind by offline downloads / dedup).
+          !forms.some(
+            (f) => f.id === of.id || (f.project_id === of.project_id && f.name === of.name),
+          ),
+      )
       .map(toRenderableForm),
   ];
+
 
   const filteredForms = mergedForms.filter((form) =>
     form.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -2945,6 +3001,19 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                           {form.description || "No description"}
                         </p>
                       </button>
+
+                      {canSeeSubmissionCounts && submissionCounts[form.id] !== undefined && (
+                        <span
+                          title="Submissions on the server (visible to owners/admins only)"
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
+                            submissionCounts[form.id] > 0
+                              ? "bg-[#0d9488] text-white"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {submissionCounts[form.id]} {submissionCounts[form.id] === 1 ? "submission" : "submissions"}
+                        </span>
+                      )}
 
 
                       <span
