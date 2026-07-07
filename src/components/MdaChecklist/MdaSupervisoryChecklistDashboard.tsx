@@ -187,8 +187,8 @@ function hexToRgb(hex: string) {
   const h = hex.replace("#", "");
   return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) };
 }
-function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }: {
-  title: string; icon: any; tint: string; baseTint: string; heat: KHeatmap; empty: string;
+function HeatmapPanel({ title, subtitle, icon: Icon, tint, baseTint, heat, empty, onCell }: {
+  title: string; subtitle?: string; icon: any; tint: string; baseTint: string; heat: KHeatmap; empty: string;
   onCell?: (category: string, lga: string | null) => void;
 }) {
   const max = Math.max(1, ...heat.rows.flatMap((r) => heat.categories.map((c) => r.cells[c]?.value || 0)));
@@ -279,8 +279,9 @@ function HeatmapPanel({ title, icon: Icon, tint, baseTint, heat, empty, onCell }
 
   return (
     <Card className="overflow-hidden">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 space-y-1" style={{ borderTop: `3px solid ${tint}` }}>
         <CardTitle className="flex items-center gap-1.5 text-sm"><Icon className="h-4 w-4" style={{ color: tint }} />{title}</CardTitle>
+        {subtitle && <p className="text-[11px] leading-snug text-muted-foreground">{subtitle}</p>}
       </CardHeader>
       <CardContent className="p-0">
         {!hasData ? (
@@ -1077,9 +1078,10 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       </Card>
 
       {/* ── Follow-up outcome heatmaps (categories × LGA, first visit + follow-up) ── */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 xl:grid-cols-2">
         <HeatmapPanel
           title="MDA Completion Outcomes"
+          subtitle="Each column is a completion outcome recorded at the first supervisory visit (e.g. campaign completed, ongoing, or not started). Cell shade = number of communities with that outcome; ↑% = share later confirmed via a completion follow-up visit."
           icon={CheckCircle2}
           tint={EMERALD}
           baseTint={EMERALD}
@@ -1089,6 +1091,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         />
         <HeatmapPanel
           title="Commodities Follow-up"
+          subtitle="Each column is a commodity / logistics status flagged at first visit (e.g. stock-out, shortage, wastage). Cell shade = number of communities affected; ↑% = share where a commodities follow-up confirmed resolution."
           icon={Pill}
           tint={TEAL}
           baseTint={TEAL}
@@ -1098,6 +1101,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         />
         <HeatmapPanel
           title="Adverse Reactions"
+          subtitle="Each column is an adverse-reaction category reported at first visit (by type/severity). Cell shade = number of communities reporting it; ↑% = share with a documented adverse-reaction follow-up / management outcome."
           icon={AlertTriangle}
           tint={AMBER}
           baseTint={AMBER}
@@ -1106,6 +1110,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
           onCell={(cat, lga) => openHeatDrill(kpis.adverseHeatmap, cat, lga, "Adverse Reactions", AMBER)}
         />
       </div>
+
 
       {/* ── Activity trend ── */}
       <Card>

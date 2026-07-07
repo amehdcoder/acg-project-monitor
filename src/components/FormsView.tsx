@@ -62,6 +62,7 @@ import {
   CloudOff,
   Wifi,
   WifiOff,
+  RefreshCw,
   LayoutTemplate,
   MapPin,
   QrCode,
@@ -635,7 +636,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
 
   const { canBulk } = useBulkDataAccess();
-  const { isOnline, downloadForm, cacheFormsForOffline, removeForm, pruneStaleForms, isFormAvailableOffline, offlineForms } = useOfflineForms();
+  const { isOnline, downloadForm, cacheFormsForOffline, removeForm, pruneStaleForms, refreshOfflineForms, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
   const [, setSearchParams] = useSearchParams();
 
@@ -1058,6 +1059,45 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     } finally {
       setLoading(false);
       stopTimer(fetchOk, { role: role || "user" });
+    }
+  };
+
+  // Manual, on-demand prune of offline-cached forms. Removes any offline copy
+  // whose id is not in the authoritative server set for the current scope,
+  // eliminating "ghost" duplicates left behind by past downloads / dedup.
+  const [pruningCache, setPruningCache] = useState(false);
+  const handleManualPrune = async () => {
+    if (!isOnline) {
+      toast({
+        title: "You're offline",
+        description: "Reconnect to the internet so the app can verify forms against the server before pruning.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setPruningCache(true);
+    try {
+      // Refresh from the server first so we prune against the freshest set.
+      if (currentProjectId) {
+        await fetchForms(currentProjectId);
+      } else {
+        await fetchAllForms();
+      }
+      const validIds = forms.map((f) => f.id);
+      const removed = await pruneStaleForms(validIds, currentProjectId || undefined);
+      await refreshOfflineForms();
+      toast({
+        title: removed > 0 ? "Offline cache cleaned" : "Cache is already clean",
+        description:
+          removed > 0
+            ? `Removed ${removed} ghost duplicate${removed === 1 ? "" : "s"} from offline storage.`
+            : "No stale or duplicate offline forms were found.",
+      });
+    } catch (e) {
+      console.error("Manual prune failed:", e);
+      toast({ title: "Prune failed", description: "Could not clean the offline cache. Try again.", variant: "destructive" });
+    } finally {
+      setPruningCache(false);
     }
   };
 
@@ -2063,6 +2103,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   <History className="mr-2 h-4 w-4" />
                   Submission History
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={pruningCache}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    handleManualPrune();
+                  }}
+                >
+                  <RefreshCw className={`mr-2 h-4 w-4 text-amber-600 ${pruningCache ? "animate-spin" : ""}`} />
+                  {pruningCache ? "Cleaning cache…" : "Clean offline cache"}
+                </DropdownMenuItem>
+
                 <DropdownMenuItem onClick={() => setShowQRScanner(true)}>
                   <QrCode className="mr-2 h-4 w-4" />
                   Scan QR
