@@ -299,10 +299,58 @@ export function buildNarrative(
   let lowCoverageCount = 0;
   const positiveHighlights: string[] = [];
 
+  // ── Curated critical checks (always surfaced, with Excel follow-up list) ──
+  const handledIds = new Set<string>();
+  const stdColumns = [
+    { key: "lga", label: "LGA" },
+    { key: "ward", label: "Ward" },
+    { key: "apex", label: "Ward Apex Facility" },
+    { key: "community", label: "Community" },
+    { key: "team", label: "Team Code" },
+    { key: "response", label: "Reported" },
+    { key: "submitter", label: "Submitted By" },
+    { key: "date", label: "Date" },
+  ];
+  const stdRow = (s: NarrativeSubmission, qid: string) => ({
+    lga: lgaName(s), ward: wardName(s), apex: apexFacility(s),
+    community: communityName(s), team: teamCode(s),
+    response: asArray(s.data?.[qid]).map((v) => pretty(String(v))).join(", "),
+    submitter: s.submitter_name || "—",
+    date: s.submitted_at ? new Date(s.submitted_at).toLocaleDateString("en-GB") : "—",
+  });
+  for (const chk of CRITICAL_CHECKS) {
+    const q = flat.find((f) => chk.match.test(labelOf(f)) || chk.match.test(f.name || "") || chk.match.test(f.id));
+    if (!q || handledIds.has(q.id)) continue;
+    const rows = submissions.filter((s) =>
+      asArray(s.data?.[q.id]).some((v) => isFilled(v) && chk.bad.test(String(v).trim())),
+    );
+    if (!rows.length) continue;
+    handledIds.add(q.id);
+    const answered = submissions.filter((s) => isFilled(s.data?.[q.id])).length || rows.length;
+    const pctBad = Math.round((rows.length / answered) * 100);
+    const listId = `crit_${q.id}`;
+    issues.push({
+      tone: pctBad >= 40 || rows.length >= 10 ? "critical" : "warning",
+      text: chk.issue(rows.length, answered),
+      listId,
+    });
+    actionLists[listId] = {
+      id: listId,
+      title: `Follow-up list — ${labelOf(q)}`,
+      description: `Records flagged on “${labelOf(q)}” that require follow-up (${rows.length} of ${answered} answered).`,
+      flaggedQuestionId: q.id,
+      submissionIds: rows.map((s) => s.id),
+      columns: stdColumns,
+      rows: rows.map((s) => stdRow(s, q.id)),
+    };
+  }
+
   for (const q of flat) {
+    if (handledIds.has(q.id)) continue;
     const raw = submissions.map((s) => s.data?.[q.id]).filter(isFilled);
     if (!raw.length) continue;
     const responseRate = Math.round((raw.length / total) * 100);
+
 
     // Categorical / yes-no compliance reading.
     const counts = new Map<string, number>();
