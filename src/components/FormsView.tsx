@@ -343,6 +343,41 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   // glance which checklists actually have data (and how much) without opening
   // each one. Populated with a single batched query (no N+1).
   const [submissionCounts, setSubmissionCounts] = useState<Record<string, number>>({});
+  const canSeeSubmissionCounts = isOwnerLevel || isAdmin;
+  // Load exact submission counts (owner/admin only). One head-count request per
+  // form, batched with Promise.all so the Forms list can badge every checklist
+  // with how many submissions it actually holds.
+  const formIdsKey = forms.map((f) => f.id).join(",");
+  useEffect(() => {
+    if (!canSeeSubmissionCounts || !isOnline) return;
+    const ids = formIdsKey ? formIdsKey.split(",").filter(Boolean) : [];
+    if (ids.length === 0) {
+      setSubmissionCounts({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const results = await Promise.all(
+          ids.map(async (id) => {
+            const { count } = await supabase
+              .from("form_submissions")
+              .select("id", { count: "exact", head: true })
+              .eq("form_id", id);
+            return [id, count ?? 0] as const;
+          }),
+        );
+        if (cancelled) return;
+        setSubmissionCounts(Object.fromEntries(results));
+      } catch (e) {
+        console.warn("Failed to load submission counts:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [formIdsKey, canSeeSubmissionCounts, isOnline]);
+
   // Owner/Co-owner can hide the Standard forms folder from specific non-admins.
   const [standardRestricted, setStandardRestricted] = useState(false);
   useEffect(() => {
