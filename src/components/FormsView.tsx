@@ -376,7 +376,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     return () => {
       cancelled = true;
     };
-  }, [formIdsKey, canSeeSubmissionCounts, isOnline]);
+  }, [formIdsKey, canSeeSubmissionCounts]);
 
   // Owner/Co-owner can hide the Standard forms folder from specific non-admins.
   const [standardRestricted, setStandardRestricted] = useState(false);
