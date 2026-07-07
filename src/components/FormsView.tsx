@@ -1010,6 +1010,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       setForms(formsWithCounts);
       // Auto-cache every fetched form so it can be opened offline later.
       cacheFormsForOffline(formsWithCounts);
+      // Globally drop stale offline copies not present in this authoritative set
+      // (removes ghost duplicates left behind by offline downloads / dedup).
+      pruneStaleForms(formsWithCounts.map((f) => f.id));
     } catch (error: any) {
       console.error("Error fetching forms:", error);
       fetchOk = false;
