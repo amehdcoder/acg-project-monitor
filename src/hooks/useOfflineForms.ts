@@ -260,6 +260,34 @@ export const useOfflineForms = () => {
     }
   }, [loadOfflineForms]);
 
+  // Prune stale cached forms. Removes any offline form whose id is NOT in the
+  // authoritative server set. This eliminates "ghost" duplicates left behind
+  // when a form was recreated/deduplicated on the server (the old id lingers in
+  // IndexedDB and would otherwise render as a second, submission-less copy).
+  // When scopeProjectId is provided, only forms in that project are pruned so
+  // that caches for other projects (fetched separately) are preserved.
+  const pruneStaleForms = useCallback(
+    async (validIds: Iterable<string>, scopeProjectId?: string | null): Promise<number> => {
+      try {
+        const valid = new Set(validIds);
+        const existing = await getOfflineForms();
+        const stale = existing.filter(
+          (f) => (!scopeProjectId || f.project_id === scopeProjectId) && !valid.has(f.id),
+        );
+        if (stale.length === 0) return 0;
+        for (const f of stale) {
+          await removeOfflineForm(f.id);
+        }
+        await loadOfflineForms();
+        return stale.length;
+      } catch (error) {
+        console.error("Error pruning stale offline forms:", error);
+        return 0;
+      }
+    },
+    [loadOfflineForms],
+  );
+
   // Remove a form from offline storage
   const removeForm = useCallback(async (formId: string): Promise<boolean> => {
     try {
