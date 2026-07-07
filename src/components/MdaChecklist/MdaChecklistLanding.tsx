@@ -23,6 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Question, FormGroup } from "@/components/FormBuilder/types";
 import { evaluateRelevant, type NameToIdMap } from "@/lib/skipLogic";
 import { buildCesLocationUrl } from "@/lib/mda/cesLocationBridge";
+import { prewarmSatelliteAround } from "@/lib/ces/satellitePrewarm";
 import {
   getMdaFollowUpGroupName,
   isMdaFollowUpGroup,
@@ -41,6 +42,7 @@ import imgHousehold from "@/assets/mda-tiles/household-coverage.png";
 import imgCompletion from "@/assets/mda-tiles/mda-completion.png";
 import imgCommodities from "@/assets/mda-tiles/mda-commodities.png";
 import imgAdverse from "@/assets/mda-tiles/adverse-reactions.png";
+import chwHero from "@/assets/community-health-worker.jpg.asset.json";
 
 /** Canonical MDA follow-up group names. */
 const GROUP_COMPLETION = MDA_FOLLOWUP_COMPLETION;
@@ -587,6 +589,11 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
             try {
               const d = c.data || {};
               const coords = pickCoordinate(d, c.location);
+              // Background pre-warm the CES satellite tiles for this community so
+              // the Coverage Evaluation 3D map locks instantly when it opens.
+              if (coords && Number.isFinite((coords as any).lat) && Number.isFinite((coords as any).lng)) {
+                prewarmSatelliteAround((coords as any).lat, (coords as any).lng);
+              }
               const url = buildCesLocationUrl({
                 state: pick(d, ["state", "state_name", "admin_state", "state_of_residence"]),
                 lga: pick(d, ["lga", "lga_name", "local_government", "lga_of_residence"]) || c.lga,
@@ -715,6 +722,26 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
       )}
 
       <main className="mx-auto w-full max-w-2xl px-5 py-8">
+        <section className="mb-7 overflow-hidden rounded-3xl border border-emerald-100 shadow-lg">
+          <div className="relative">
+            <img
+              src={chwHero.url}
+              alt="Community health worker engaging a mother and her children"
+              className="h-40 w-full object-cover object-center sm:h-56"
+              loading="lazy"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-emerald-900/85 via-emerald-800/35 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5">
+              <p className="text-lg font-extrabold leading-tight text-white drop-shadow sm:text-xl">
+                Integrated MDA Supervisory Checklist
+              </p>
+              <p className="mt-1 text-xs font-medium text-emerald-50/95 sm:text-sm">
+                Every Child Healthy. Every Future Bright.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {canBuildFollowUps && (
           <section className="mb-7 overflow-hidden rounded-3xl bg-gradient-to-br from-[#4338ca] via-[#7c3aed] to-[#db2777] p-4 text-white shadow-lg">
             <div className="flex items-start gap-3">
