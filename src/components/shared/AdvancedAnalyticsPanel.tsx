@@ -115,6 +115,41 @@ export default function AdvancedAnalyticsPanel({
             </div>
           </Block>
         )}
+        {/* Targeted Random Forest (specific outcome questions) */}
+        {(a.randomForests || []).map((rf, i) => (
+          <Block key={`rf-${i}`} icon={TrendingUp} title={`Random Forest — ${rf.target}`} subtitle={`n=${rf.sampleSize}`} accent={accent}>
+            <p className="mb-2 text-sm leading-relaxed text-foreground">{rf.interpretation}</p>
+            <ul className="space-y-1.5">
+              {rf.drivers.map((d, j) => (
+                <li key={j} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="truncate pr-2 text-foreground">{d.label}</span>
+                    <span>{Math.round(d.importance)}%</span>
+                  </div>
+                  <Bar value={d.importance} accent={accent} />
+                </li>
+              ))}
+            </ul>
+          </Block>
+        ))}
+
+        {/* Targeted Monte Carlo (specific outcome questions) */}
+        {(a.monteCarlos || []).map((mc, i) => (
+          <Block key={`mc-${i}`} icon={Dices} title={`Monte Carlo — ${mc.metric}`} subtitle={`${mc.runs.toLocaleString()} runs`} accent={accent}>
+            <p className="text-sm leading-relaxed text-foreground">{mc.interpretation}</p>
+            <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+              <span className="rounded bg-muted px-2 py-0.5">
+                90% band: {mc.isRate && mc.p95 <= 1
+                  ? `${Math.round(mc.p05 * 100)}%–${Math.round(mc.p95 * 100)}%`
+                  : `${mc.p05.toFixed(1)}–${mc.p95.toFixed(1)}`}
+              </span>
+              <span className="rounded bg-muted px-2 py-0.5">
+                P(benchmark) = {Math.round(mc.probAbove.probability * 100)}%
+              </span>
+            </div>
+          </Block>
+        ))}
+
 
         {/* Grounded Theory */}
         {a.groundedTheory && (

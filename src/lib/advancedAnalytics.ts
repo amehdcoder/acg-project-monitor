@@ -81,6 +81,42 @@ function buildFeatures(subs: NarrativeSubmission[], qs: NarrativeQuestion[]): Fe
   return feats;
 }
 
+// Ordinal encoder for status-style answers that plain toNumeric can't map
+// (e.g. "Status of MDA": Completed / Ongoing / Not started).
+const STATUS_MAP: { re: RegExp; val: number }[] = [
+  { re: /complete|finished|\bdone\b/i, val: 1 },
+  { re: /ongoing|in\s*progress|partial|continuing|started/i, val: 0.5 },
+  { re: /not\s*start|halt|not\s*commenc|pending|yet\s*to|no\b/i, val: 0 },
+];
+function toNumericOrdinal(v: any): number | null {
+  const n = toNumeric(v);
+  if (n !== null) return n;
+  if (v === null || v === undefined || v === "") return null;
+  const s = String(Array.isArray(v) ? v.join(" ") : v);
+  for (const m of STATUS_MAP) if (m.re.test(s)) return m.val;
+  return null;
+}
+
+/** Build a Feature for a specific question matched by label/name/id — used to
+ *  force Random Forest / Monte Carlo onto a chosen outcome (e.g. "Status of
+ *  MDA" or "Did anybody complain of side effects during MDA?"). */
+function targetFeature(
+  subs: NarrativeSubmission[], qs: NarrativeQuestion[], pattern: RegExp,
+): Feature | null {
+  const q = flatten(qs).filter((x) => x.type !== "note").find(
+    (x) => pattern.test(x.label || "") || pattern.test(x.name || "") || pattern.test(x.id),
+  );
+  if (!q) return null;
+  const values = subs.map((s) => toNumericOrdinal(readValue(s.data || {}, q)));
+  const present = values.filter((v): v is number => v !== null);
+  if (present.length < Math.max(4, subs.length * 0.1)) return null;
+  const distinct = new Set(present).size;
+  if (distinct < 2) return null;
+  const mean = present.reduce((a, b) => a + b, 0) / present.length;
+  const varc = present.reduce((a, b) => a + (b - mean) ** 2, 0) / present.length;
+  return { key: q.id, label: q.label || pretty(q.name || q.id), values, distinct, variance: varc };
+}
+
 // ─────────────────────────── Random Forest ───────────────────────────
 // A compact regression random forest built from bootstrapped variance-reduction
 // trees on random feature subsets. We report normalized feature importances
@@ -148,10 +184,12 @@ function pickTarget(feats: Feature[]): Feature | null {
   return [...pool].sort((a, b) => b.distinct * b.variance - a.distinct * a.variance)[0] || null;
 }
 
-export function randomForest(subs: NarrativeSubmission[], qs: NarrativeQuestion[]): RandomForestResult | null {
+export function randomForest(
+  subs: NarrativeSubmission[], qs: NarrativeQuestion[], targetOverride?: Feature,
+): RandomForestResult | null {
   const feats = buildFeatures(subs, qs);
-  if (feats.length < 3) return null;
-  const target = pickTarget(feats);
+  if (!targetOverride && feats.length < 3) return null;
+  const target = targetOverride || pickTarget(feats);
   if (!target) return null;
   const predictors = feats.filter((f) => f.key !== target.key);
   if (predictors.length < 2) return null;
@@ -209,9 +247,11 @@ export interface MonteCarloResult {
   runs: number;
 }
 
-export function monteCarlo(subs: NarrativeSubmission[], qs: NarrativeQuestion[]): MonteCarloResult | null {
+export function monteCarlo(
+  subs: NarrativeSubmission[], qs: NarrativeQuestion[], targetOverride?: Feature,
+): MonteCarloResult | null {
   const feats = buildFeatures(subs, qs);
-  const target = pickTarget(feats);
+  const target = targetOverride || pickTarget(feats);
   if (!target) return null;
   const observed = target.values.filter((v): v is number => v !== null);
   if (observed.length < 6) return null;
@@ -464,12 +504,29 @@ export function discourseAnalysis(subs: NarrativeSubmission[], qs: NarrativeQues
   return { documents: docs.length, sentiment, urgency, agency, framing, interpretation };
 }
 
+// ─── Targeted variants (force RF / MC onto a named outcome question) ───
+export function randomForestFor(
+  subs: NarrativeSubmission[], qs: NarrativeQuestion[], pattern: RegExp,
+): RandomForestResult | null {
+  const t = targetFeature(subs, qs, pattern);
+  return t ? randomForest(subs, qs, t) : null;
+}
+export function monteCarloFor(
+  subs: NarrativeSubmission[], qs: NarrativeQuestion[], pattern: RegExp,
+): MonteCarloResult | null {
+  const t = targetFeature(subs, qs, pattern);
+  return t ? monteCarlo(subs, qs, t) : null;
+}
+
 // ─────────────────────────── Orchestrator ───────────────────────────
 
 export interface AdvancedAnalyticsResult {
   hasData: boolean;
   randomForest: RandomForestResult | null;
   monteCarlo: MonteCarloResult | null;
+  /** Random Forest / Monte Carlo forced onto specific outcome questions. */
+  randomForests: RandomForestResult[];
+  monteCarlos: MonteCarloResult[];
   hypothesis: HypothesisTest[];
   groundedTheory: GroundedTheoryResult | null;
   discourse: DiscourseResult | null;
@@ -478,6 +535,9 @@ export interface AdvancedAnalyticsResult {
 export interface AdvancedAnalyticsOptions {
   /** Extra named hypothesis tests, e.g. therapeutic & household coverage. */
   hypotheses?: { name: string; pattern: RegExp }[];
+  /** Specific outcome questions to model with Random Forest + Monte Carlo,
+   *  e.g. "Status of MDA" and "Did anybody complain of side effects during MDA?". */
+  targets?: { name: string; pattern: RegExp }[];
 }
 
 export function buildAdvancedAnalytics(
@@ -490,12 +550,21 @@ export function buildAdvancedAnalytics(
   const hypotheses = (opts.hypotheses || []).map((h) => hypothesisTest(submissions, questions, h.pattern, h.name)).filter(Boolean) as HypothesisTest[];
   const rf = randomForest(submissions, questions);
   const mc = monteCarlo(submissions, questions);
+  const targetSpecs = opts.targets || [];
+  const randomForests = targetSpecs
+    .map((t) => randomForestFor(submissions, questions, t.pattern))
+    .filter(Boolean) as RandomForestResult[];
+  const monteCarlos = targetSpecs
+    .map((t) => monteCarloFor(submissions, questions, t.pattern))
+    .filter(Boolean) as MonteCarloResult[];
   const gt = groundedTheory(submissions, questions);
   const da = discourseAnalysis(submissions, questions);
   return {
-    hasData: !!(rf || mc || gt || da || hypotheses.length),
+    hasData: !!(rf || mc || gt || da || hypotheses.length || randomForests.length || monteCarlos.length),
     randomForest: rf,
     monteCarlo: mc,
+    randomForests,
+    monteCarlos,
     hypothesis: hypotheses,
     groundedTheory: gt,
     discourse: da,
