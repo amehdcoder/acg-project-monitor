@@ -339,6 +339,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const { user, profile, isAdmin, isSuperAdmin, isOwner, isOwnerLevel, role, isAdhoc, loading: authLoading } = useAuth();
   const { hasDashboardAccess } = useDashboardAccess();
   const [assignedStandardCodes, setAssignedStandardCodes] = useState<Set<string>>(new Set());
+  // Owner/Admin-only: exact submission count per form so the owner can tell at a
+  // glance which checklists actually have data (and how much) without opening
+  // each one. Populated with a single batched query (no N+1).
+  const [submissionCounts, setSubmissionCounts] = useState<Record<string, number>>({});
   // Owner/Co-owner can hide the Standard forms folder from specific non-admins.
   const [standardRestricted, setStandardRestricted] = useState(false);
   useEffect(() => {
