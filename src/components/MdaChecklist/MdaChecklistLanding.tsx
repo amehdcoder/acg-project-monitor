@@ -589,6 +589,11 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
             try {
               const d = c.data || {};
               const coords = pickCoordinate(d, c.location);
+              // Background pre-warm the CES satellite tiles for this community so
+              // the Coverage Evaluation 3D map locks instantly when it opens.
+              if (coords && Number.isFinite((coords as any).latitude) && Number.isFinite((coords as any).longitude)) {
+                prewarmSatelliteAround((coords as any).latitude, (coords as any).longitude);
+              }
               const url = buildCesLocationUrl({
                 state: pick(d, ["state", "state_name", "admin_state", "state_of_residence"]),
                 lga: pick(d, ["lga", "lga_name", "local_government", "lga_of_residence"]) || c.lga,
