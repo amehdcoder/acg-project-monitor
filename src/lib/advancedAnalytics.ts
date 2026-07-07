@@ -184,10 +184,12 @@ function pickTarget(feats: Feature[]): Feature | null {
   return [...pool].sort((a, b) => b.distinct * b.variance - a.distinct * a.variance)[0] || null;
 }
 
-export function randomForest(subs: NarrativeSubmission[], qs: NarrativeQuestion[]): RandomForestResult | null {
+export function randomForest(
+  subs: NarrativeSubmission[], qs: NarrativeQuestion[], targetOverride?: Feature,
+): RandomForestResult | null {
   const feats = buildFeatures(subs, qs);
-  if (feats.length < 3) return null;
-  const target = pickTarget(feats);
+  if (!targetOverride && feats.length < 3) return null;
+  const target = targetOverride || pickTarget(feats);
   if (!target) return null;
   const predictors = feats.filter((f) => f.key !== target.key);
   if (predictors.length < 2) return null;
