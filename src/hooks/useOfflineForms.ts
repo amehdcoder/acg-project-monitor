@@ -329,6 +329,7 @@ export const useOfflineForms = () => {
     downloadForm,
     cacheFormsForOffline,
     removeForm,
+    pruneStaleForms,
     getForm,
     isFormAvailableOffline,
     refreshOfflineForms: loadOfflineForms,
