@@ -23,6 +23,8 @@ interface Props {
   config?: NarrativeConfig;
   /** Optional accent colour (defaults to a professional teal). */
   accent?: string;
+  /** Project name shown in the exported Excel header. */
+  projectName?: string;
   className?: string;
   /** When set, an Advanced Analytics panel (Random Forest, Monte Carlo,
    *  Grounded Theory, Discourse Analysis, hypothesis tests) is rendered too. */
