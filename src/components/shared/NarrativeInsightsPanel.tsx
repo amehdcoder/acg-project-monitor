@@ -43,22 +43,8 @@ const toneStyles: Record<Tone, { icon: typeof AlertTriangle; color: string; bg: 
   neutral: { icon: Info, color: "text-muted-foreground", bg: "bg-muted/40" },
 };
 
-function downloadCsv(filename: string, csv: string) {
-  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-const slug = (s: string) => (s || "list").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
-
 export default function NarrativeInsightsPanel({
-  submissions, questions, config, accent = "#0EA5A5", className,
+  submissions, questions, config, accent = "#0EA5A5", projectName, className,
   advanced = false, advancedOptions,
   afterHoursLog = false, afterHoursTables,
 }: Props) {
@@ -66,30 +52,54 @@ export default function NarrativeInsightsPanel({
     () => buildNarrative(submissions || [], questions || [], config || {}),
     [submissions, questions, config],
   );
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const handleExport = async (listId: string) => {
+    const list = n.actionLists[listId];
+    if (!list) return;
+    setBusyId(listId);
+    try {
+      await exportActionListExcel(list, submissions || [], questions || [], {
+        formName: config?.formName,
+        projectName,
+        accentHex: accent,
+      });
+      toast({ title: "Excel downloaded", description: `${list.title} — ${(list.submissionIds?.length ?? list.rows.length)} record(s).` });
+    } catch (e) {
+      console.error("Insights Excel export failed:", e);
+      toast({ title: "Export failed", description: "Could not generate the Excel file.", variant: "destructive" });
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const ItemRow = ({ item }: { item: NarrativeItem }) => {
     const st = toneStyles[item.tone];
     const Icon = st.icon;
     const list = item.listId ? n.actionLists[item.listId] : undefined;
+    const count = list ? (list.submissionIds?.length ?? list.rows.length) : 0;
+    const busy = busyId === item.listId;
     return (
       <li className={`flex flex-col gap-2 rounded-lg p-3 ${st.bg}`}>
         <div className="flex items-start gap-2.5">
           <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${st.color}`} />
           <span className="text-sm leading-relaxed text-foreground">{item.text}</span>
         </div>
-        {list && list.rows.length > 0 && (
+        {list && count > 0 && (
           <button
             type="button"
-            onClick={() => downloadCsv(`${slug(list.title)}.csv`, actionListToCsv(list))}
-            className="ml-6 inline-flex w-fit items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+            disabled={busy}
+            onClick={() => handleExport(item.listId!)}
+            className="ml-6 inline-flex w-fit items-center gap-1.5 rounded-md border border-emerald-600/40 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:opacity-60 dark:bg-emerald-950/40 dark:text-emerald-300"
           >
-            <Download className="h-3.5 w-3.5" />
-            Download {list.title.toLowerCase()} ({list.rows.length})
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
+            {busy ? "Preparing Excel…" : `Download Excel — ${list.title.toLowerCase()} (${count})`}
           </button>
         )}
       </li>
     );
   };
+
 
   return (
     <Card className={`overflow-hidden border-l-4 ${className || ""}`} style={{ borderLeftColor: accent }}>
