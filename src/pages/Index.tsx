@@ -185,7 +185,7 @@ const Index = () => {
 
   // Adhoc users are confined to: their assigned form, the project chat, and
   // their own submissions. Any other tab redirects them back to Forms.
-  const ADHOC_TABS = ["forms", "project-chat", "my-submissions"];
+  const ADHOC_TABS = ["forms", "project-chat", "my-submissions", "quizzes"];
   useEffect(() => {
     if (loading || !user || !isAdhoc) return;
     if (!ADHOC_TABS.includes(activeTab)) {
