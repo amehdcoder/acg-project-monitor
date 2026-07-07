@@ -349,7 +349,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   // with how many submissions it actually holds.
   const formIdsKey = forms.map((f) => f.id).join(",");
   useEffect(() => {
-    if (!canSeeSubmissionCounts || !isOnline) return;
+    if (!canSeeSubmissionCounts || !navigator.onLine) return;
     const ids = formIdsKey ? formIdsKey.split(",").filter(Boolean) : [];
     if (ids.length === 0) {
       setSubmissionCounts({});
