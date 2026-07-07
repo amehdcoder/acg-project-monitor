@@ -14,13 +14,17 @@ import {
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import {
   Plus, Trash2, Save, Eye, Send, ChevronUp, ChevronDown,
-  BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, CalendarIcon, Users, UserPlus,
+  BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, CalendarIcon, Users, UserPlus, Archive, Eraser,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -52,7 +56,10 @@ interface Quiz {
 }
 
 const QuizBuilder = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isOwner } = useAuth();
+  const [confirmDeleteQuiz, setConfirmDeleteQuiz] = useState<Quiz | null>(null);
+  const [confirmClearQuiz, setConfirmClearQuiz] = useState<Quiz | null>(null);
+  const [submissionAction, setSubmissionAction] = useState(false);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
@@ -99,18 +106,38 @@ const QuizBuilder = () => {
       if (data) setQuizzes(data as Quiz[]);
       if (error) toast({ title: "Error loading quizzes", description: error.message, variant: "destructive" });
     } else {
-      // Non-admin: fetch assigned quizzes only
+      // Non-admin: published quizzes they're assigned to OR that belong to any
+      // project they are a member of (all linked-project members can answer).
+      const quizIds = new Set<string>();
+
       const { data: assignments } = await supabase
         .from("quiz_user_assignments")
         .select("quiz_id")
         .eq("user_id", user!.id);
-      
-      if (assignments && assignments.length > 0) {
-        const quizIds = assignments.map(a => a.quiz_id);
+      (assignments || []).forEach((a) => a.quiz_id && quizIds.add(a.quiz_id));
+
+      const { data: projAssignments } = await supabase
+        .from("user_project_assignments")
+        .select("project_id")
+        .eq("user_id", user!.id);
+      const projectIds = [...new Set((projAssignments || []).map((p) => p.project_id).filter(Boolean))];
+
+      let projectQuizzes: Quiz[] = [];
+      if (projectIds.length > 0) {
+        const { data: pq } = await supabase
+          .from("quizzes")
+          .select("*")
+          .in("project_id", projectIds)
+          .eq("is_published", true);
+        projectQuizzes = (pq as Quiz[]) || [];
+        projectQuizzes.forEach((q) => quizIds.add(q.id));
+      }
+
+      if (quizIds.size > 0) {
         const { data } = await supabase
           .from("quizzes")
           .select("*")
-          .in("id", quizIds)
+          .in("id", [...quizIds])
           .eq("is_published", true)
           .order("created_at", { ascending: false });
         if (data) setQuizzes(data as Quiz[]);
@@ -118,6 +145,7 @@ const QuizBuilder = () => {
         setQuizzes([]);
       }
     }
+
     setLoading(false);
   };
 
@@ -249,8 +277,71 @@ const QuizBuilder = () => {
       toast({ title: "Quiz deleted" });
       if (selectedQuiz?.id === quizId) { setSelectedQuiz(null); setQuestions([]); }
       fetchQuizzes();
+    } else {
+      toast({ title: "Could not delete quiz", description: error.message, variant: "destructive" });
+    }
+    setConfirmDeleteQuiz(null);
+  };
+
+  // Owner-only: archive every submission of a quiz for future reference, then
+  // clear them so the quiz starts fresh.
+  const archiveSubmissions = async (quiz: Quiz, alsoClear: boolean) => {
+    if (!user) return;
+    setSubmissionAction(true);
+    try {
+      const { data: attempts, error: fErr } = await supabase
+        .from("quiz_attempts")
+        .select("*")
+        .eq("quiz_id", quiz.id);
+      if (fErr) throw fErr;
+      const rows = (attempts || []).map((a: any) => ({
+        original_attempt_id: a.id,
+        quiz_id: a.quiz_id,
+        user_id: a.user_id,
+        attempt_type: a.attempt_type,
+        answers: a.answers,
+        score: a.score,
+        total_points: a.total_points,
+        percentage: a.percentage,
+        started_at: a.started_at,
+        completed_at: a.completed_at,
+        original_created_at: a.created_at,
+        archived_by: user.id,
+      }));
+      if (rows.length > 0) {
+        const { error: aErr } = await supabase.from("quiz_archived_attempts" as any).insert(rows);
+        if (aErr) throw aErr;
+      }
+      if (alsoClear) {
+        const { error: dErr } = await supabase.from("quiz_attempts").delete().eq("quiz_id", quiz.id);
+        if (dErr) throw dErr;
+      }
+      toast({
+        title: alsoClear ? "Submissions archived & cleared" : "Submissions archived",
+        description: `${rows.length} attempt${rows.length === 1 ? "" : "s"} archived${alsoClear ? " and removed for fresh entries" : ""}.`,
+      });
+    } catch (e: any) {
+      toast({ title: "Could not archive submissions", description: e.message, variant: "destructive" });
+    } finally {
+      setSubmissionAction(false);
     }
   };
+
+  // Owner-only: clear (delete) all submissions for fresh entries.
+  const clearSubmissions = async (quiz: Quiz) => {
+    setSubmissionAction(true);
+    try {
+      const { error } = await supabase.from("quiz_attempts").delete().eq("quiz_id", quiz.id);
+      if (error) throw error;
+      toast({ title: "Submissions cleared", description: "All quiz attempts were removed for fresh entries." });
+    } catch (e: any) {
+      toast({ title: "Could not clear submissions", description: e.message, variant: "destructive" });
+    } finally {
+      setSubmissionAction(false);
+      setConfirmClearQuiz(null);
+    }
+  };
+
 
   const getPostTestDisplay = (quiz: Quiz) => {
     if (quiz.post_test_datetime) {
@@ -390,6 +481,24 @@ const QuizBuilder = () => {
                     <Button size="sm" variant="outline" onClick={openAssignDialog} className="gap-1">
                       <UserPlus className="h-3 w-3" /> Assign Users
                     </Button>
+                    {isOwner && (
+                      <>
+                        <Button
+                          size="sm" variant="outline" disabled={submissionAction}
+                          onClick={() => archiveSubmissions(selectedQuiz, false)}
+                          className="gap-1"
+                        >
+                          <Archive className="h-3 w-3" /> Archive Submissions
+                        </Button>
+                        <Button
+                          size="sm" variant="outline" disabled={submissionAction}
+                          onClick={() => setConfirmClearQuiz(selectedQuiz)}
+                          className="gap-1 text-amber-600"
+                        >
+                          <Eraser className="h-3 w-3" /> Clear Submissions
+                        </Button>
+                      </>
+                    )}
                   </>
                 )}
                 {selectedQuiz.is_published && (
@@ -586,8 +695,14 @@ const QuizBuilder = () => {
                       </Button>
                     )}
                     {isAdmin && (
-                      <Button size="sm" variant="ghost" onClick={e => { e.stopPropagation(); deleteQuiz(quiz.id); }} className="gap-1 text-xs text-destructive">
-                        <Trash2 className="h-3 w-3" /> Delete
+                      <Button
+                        size="icon" variant="ghost"
+                        onClick={e => { e.stopPropagation(); setConfirmDeleteQuiz(quiz); }}
+                        className="ml-auto h-7 w-7 text-muted-foreground/40 hover:text-destructive"
+                        aria-label="Delete quiz"
+                        title="Delete quiz"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     )}
                   </div>
@@ -734,7 +849,58 @@ const QuizBuilder = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirm quiz deletion */}
+      <AlertDialog open={!!confirmDeleteQuiz} onOpenChange={(o) => !o && setConfirmDeleteQuiz(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this quiz?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes <strong>{confirmDeleteQuiz?.title}</strong>, its questions and
+              all related submissions. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => confirmDeleteQuiz && deleteQuiz(confirmDeleteQuiz.id)}
+            >
+              Delete quiz
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm clearing submissions (owner) */}
+      <AlertDialog open={!!confirmClearQuiz} onOpenChange={(o) => !o && setConfirmClearQuiz(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear all submissions?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes every recorded attempt for <strong>{confirmClearQuiz?.title}</strong> so the
+              quiz can start with fresh entries. Consider archiving first to keep a copy for reference.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button
+              variant="outline" disabled={submissionAction}
+              onClick={() => confirmClearQuiz && archiveSubmissions(confirmClearQuiz, true)}
+            >
+              <Archive className="mr-1 h-4 w-4" /> Archive & clear
+            </Button>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => confirmClearQuiz && clearSubmissions(confirmClearQuiz)}
+            >
+              Clear without archiving
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+
   );
 };
 

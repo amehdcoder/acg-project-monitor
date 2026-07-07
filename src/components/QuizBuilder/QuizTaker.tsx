@@ -53,7 +53,7 @@ interface QuizQuestion {
 }
 
 const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -112,7 +112,7 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
             postAvailable = new Date(preDate.getTime() + quiz.post_test_delay_days * 86400000);
           }
           setPostTestDate(postAvailable);
-          if (new Date() >= postAvailable) {
+          if (isAdmin || new Date() >= postAvailable) {
             setAttemptType("post_test");
             setCanTakePostTest(true);
           } else {
@@ -131,7 +131,7 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
       setLoading(false);
     };
     init();
-  }, [quiz.id, user]);
+  }, [quiz.id, user, isAdmin]);
 
   // Timer
   useEffect(() => {

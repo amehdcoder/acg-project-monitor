@@ -5932,6 +5932,57 @@ export type Database = {
         }
         Relationships: []
       }
+      quiz_archived_attempts: {
+        Row: {
+          answers: Json | null
+          archived_at: string
+          archived_by: string
+          attempt_type: string
+          completed_at: string | null
+          id: string
+          original_attempt_id: string | null
+          original_created_at: string | null
+          percentage: number | null
+          quiz_id: string
+          score: number | null
+          started_at: string | null
+          total_points: number | null
+          user_id: string
+        }
+        Insert: {
+          answers?: Json | null
+          archived_at?: string
+          archived_by: string
+          attempt_type: string
+          completed_at?: string | null
+          id?: string
+          original_attempt_id?: string | null
+          original_created_at?: string | null
+          percentage?: number | null
+          quiz_id: string
+          score?: number | null
+          started_at?: string | null
+          total_points?: number | null
+          user_id: string
+        }
+        Update: {
+          answers?: Json | null
+          archived_at?: string
+          archived_by?: string
+          attempt_type?: string
+          completed_at?: string | null
+          id?: string
+          original_attempt_id?: string | null
+          original_created_at?: string | null
+          percentage?: number | null
+          quiz_id?: string
+          score?: number | null
+          started_at?: string | null
+          total_points?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       quiz_attempts: {
         Row: {
           answers: Json

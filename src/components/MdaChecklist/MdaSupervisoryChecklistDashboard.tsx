@@ -14,7 +14,8 @@
  * follow-up outcome panels, a per-community linkage register and a coverage
  * map — all driven by a comprehensive, professional filter bar.
  */
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   ResponsiveContainer, Tooltip as RTooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend,
@@ -42,9 +43,10 @@ import {
   MDA_FOLLOWUP_COMPLETION, MDA_FOLLOWUP_COMMODITIES, MDA_FOLLOWUP_ADVERSE,
 } from "@/lib/mdaFollowUp";
 import { exportMdaDashboard } from "@/lib/mda/dashboardExport";
-import MdaSupervisoryMap from "./MdaSupervisoryMap";
+
 import JigawaSupervisoryMap from "./JigawaSupervisoryMap";
 import FctSupervisoryMap from "./FctSupervisoryMap";
+import KanoSupervisoryMap from "./KanoSupervisoryMap";
 import HouseholdCoverageSurveyMap from "./HouseholdCoverageSurveyMap";
 import HouseholdCoverageAnalysis, { type HCAPoint } from "./HouseholdCoverageAnalysis";
 import SupervisorSignatureGallery from "./SupervisorSignatureGallery";
@@ -784,11 +786,41 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
 
 
 
+  // ── Users assigned to this project's checklist (for zero-submission rows) ──
+  const [assignedUsers, setAssignedUsers] = useState<string[]>([]);
+  useEffect(() => {
+    if (!projectId) { setAssignedUsers([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: pa } = await supabase
+          .from("user_project_assignments")
+          .select("user_id")
+          .eq("project_id", projectId);
+        const ids = [...new Set((pa || []).map((r: any) => r.user_id).filter(Boolean))];
+        if (!ids.length) { if (!cancelled) setAssignedUsers([]); return; }
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("user_id,first_name,last_name,email")
+          .in("user_id", ids);
+        const names = (profs || []).map((p: any) => {
+          const n = `${p.first_name || ""} ${p.last_name || ""}`.trim();
+          return n || p.email || "";
+        }).filter(Boolean);
+        if (!cancelled) setAssignedUsers(names);
+      } catch {
+        if (!cancelled) setAssignedUsers([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [projectId]);
+
   // ── Field worker accountability ───────────────────────────────
   // Reconciles with the headline KPIs: `checklist` submissions are the supervised
   // community visits (the "12" everywhere else), `followups` are the linked
   // follow-up module submissions. Total = checklist + follow-ups so the column
-  // sums always tally with the dashboard header counts.
+  // sums always tally with the dashboard header counts. Every user assigned to
+  // the project's checklist is listed too — including those with 0 submissions.
   const workers = useMemo(() => {
     const map = new Map<string, {
       name: string; checklist: number; followups: number;
@@ -813,6 +845,18 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     };
     for (const s of checklist) tally(s, false);
     for (const s of followUps) tally(s, true);
+    // Seed every assigned user so zero-submission supervisors still appear.
+    const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+    const existing = new Set([...map.keys()].map(norm));
+    for (const name of assignedUsers) {
+      if (name && !existing.has(norm(name))) {
+        map.set(name, {
+          name, checklist: 0, followups: 0,
+          communities: new Set<string>(), days: new Set<string>(), last: 0,
+        });
+        existing.add(norm(name));
+      }
+    }
     return [...map.values()]
       .map((r) => ({
         name: r.name,
@@ -823,8 +867,12 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         days: r.days.size,
         last: r.last ? new Date(r.last).toLocaleDateString() : "—",
       }))
-      .sort((a, b) => b.subs - a.subs).slice(0, 12);
-  }, [checklist, followUps]);
+      // Submitters first (by volume), then zero-submission assignees alphabetically.
+      .sort((a, b) => (b.subs - a.subs) || a.name.localeCompare(b.name))
+      .slice(0, 60);
+  }, [checklist, followUps, assignedUsers]);
+
+
 
   // ── Map ───────────────────────────────────────────────────────
   const mapSubs = useMemo(
@@ -1254,10 +1302,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         ) : isFct ? (
           <FctSupervisoryMap submissions={mapSubs} formName={formName} />
         ) : (
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="flex items-center gap-1.5 text-sm"><MapPin className="h-4 w-4 text-primary" />Supervision Coverage Map</CardTitle></CardHeader>
-            <CardContent><MdaSupervisoryMap submissions={mapSubs} formName={formName} /></CardContent>
-          </Card>
+          <KanoSupervisoryMap submissions={mapSubs} formName={formName} />
         )}
       </SectionErrorBoundary>
 
