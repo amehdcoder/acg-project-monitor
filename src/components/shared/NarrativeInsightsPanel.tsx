@@ -1,18 +1,21 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Lightbulb, Target, MessageSquareText, AlertTriangle, ShieldAlert,
-  CheckCircle2, Zap, CalendarClock, Download, ArrowRight, Info,
+  CheckCircle2, Zap, CalendarClock, FileSpreadsheet, ArrowRight, Info, Loader2,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import {
-  buildNarrative, actionListToCsv,
+  buildNarrative,
   type NarrativeSubmission, type NarrativeQuestion, type NarrativeConfig,
   type NarrativeItem, type Tone,
 } from "@/lib/narrativeInsights";
+import { exportActionListExcel } from "@/lib/insightsExcel";
+import { toast } from "@/hooks/use-toast";
 
 import AdvancedAnalyticsPanel from "@/components/shared/AdvancedAnalyticsPanel";
 import AfterHoursSubmissionsLog from "@/components/shared/AfterHoursSubmissionsLog";
 import type { AdvancedAnalyticsOptions } from "@/lib/advancedAnalytics";
+
 
 interface Props {
   submissions: NarrativeSubmission[];
