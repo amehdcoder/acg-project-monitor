@@ -504,12 +504,29 @@ export function discourseAnalysis(subs: NarrativeSubmission[], qs: NarrativeQues
   return { documents: docs.length, sentiment, urgency, agency, framing, interpretation };
 }
 
+// ─── Targeted variants (force RF / MC onto a named outcome question) ───
+export function randomForestFor(
+  subs: NarrativeSubmission[], qs: NarrativeQuestion[], pattern: RegExp,
+): RandomForestResult | null {
+  const t = targetFeature(subs, qs, pattern);
+  return t ? randomForest(subs, qs, t) : null;
+}
+export function monteCarloFor(
+  subs: NarrativeSubmission[], qs: NarrativeQuestion[], pattern: RegExp,
+): MonteCarloResult | null {
+  const t = targetFeature(subs, qs, pattern);
+  return t ? monteCarlo(subs, qs, t) : null;
+}
+
 // ─────────────────────────── Orchestrator ───────────────────────────
 
 export interface AdvancedAnalyticsResult {
   hasData: boolean;
   randomForest: RandomForestResult | null;
   monteCarlo: MonteCarloResult | null;
+  /** Random Forest / Monte Carlo forced onto specific outcome questions. */
+  randomForests: RandomForestResult[];
+  monteCarlos: MonteCarloResult[];
   hypothesis: HypothesisTest[];
   groundedTheory: GroundedTheoryResult | null;
   discourse: DiscourseResult | null;
@@ -518,6 +535,9 @@ export interface AdvancedAnalyticsResult {
 export interface AdvancedAnalyticsOptions {
   /** Extra named hypothesis tests, e.g. therapeutic & household coverage. */
   hypotheses?: { name: string; pattern: RegExp }[];
+  /** Specific outcome questions to model with Random Forest + Monte Carlo,
+   *  e.g. "Status of MDA" and "Did anybody complain of side effects during MDA?". */
+  targets?: { name: string; pattern: RegExp }[];
 }
 
 export function buildAdvancedAnalytics(
@@ -530,12 +550,21 @@ export function buildAdvancedAnalytics(
   const hypotheses = (opts.hypotheses || []).map((h) => hypothesisTest(submissions, questions, h.pattern, h.name)).filter(Boolean) as HypothesisTest[];
   const rf = randomForest(submissions, questions);
   const mc = monteCarlo(submissions, questions);
+  const targetSpecs = opts.targets || [];
+  const randomForests = targetSpecs
+    .map((t) => randomForestFor(submissions, questions, t.pattern))
+    .filter(Boolean) as RandomForestResult[];
+  const monteCarlos = targetSpecs
+    .map((t) => monteCarloFor(submissions, questions, t.pattern))
+    .filter(Boolean) as MonteCarloResult[];
   const gt = groundedTheory(submissions, questions);
   const da = discourseAnalysis(submissions, questions);
   return {
-    hasData: !!(rf || mc || gt || da || hypotheses.length),
+    hasData: !!(rf || mc || gt || da || hypotheses.length || randomForests.length || monteCarlos.length),
     randomForest: rf,
     monteCarlo: mc,
+    randomForests,
+    monteCarlos,
     hypothesis: hypotheses,
     groundedTheory: gt,
     discourse: da,
