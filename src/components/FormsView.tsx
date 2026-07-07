@@ -1302,9 +1302,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const mergedForms = [
     ...forms,
     ...offlineForms
-      .filter((of) => (!currentProjectId || of.project_id === currentProjectId) && !forms.some((f) => f.id === of.id))
+      .filter(
+        (of) =>
+          (!currentProjectId || of.project_id === currentProjectId) &&
+          // Skip when the same row already came from the server (by id) OR when a
+          // server form with the same name already exists in that project. The
+          // latter guards against ghost duplicates whose cached id differs from
+          // the canonical server id (left behind by offline downloads / dedup).
+          !forms.some(
+            (f) => f.id === of.id || (f.project_id === of.project_id && f.name === of.name),
+          ),
+      )
       .map(toRenderableForm),
   ];
+
 
   const filteredForms = mergedForms.filter((form) =>
     form.name.toLowerCase().includes(searchQuery.toLowerCase())
