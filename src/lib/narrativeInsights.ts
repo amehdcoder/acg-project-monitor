@@ -394,6 +394,9 @@ export function buildNarrative(
         id: listId,
         title: "Communities with refusals",
         description: "Communities reporting refusals/hesitancy for trusted-leader engagement.",
+        flaggedQuestionId: refusalId,
+        submissionIds: refused.map((s) => s.id),
+
         columns: [
           { key: "lga", label: "LGA" },
           { key: "ward", label: "Ward" },
