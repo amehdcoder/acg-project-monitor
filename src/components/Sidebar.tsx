@@ -143,7 +143,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
   ];
 
   const isRegularUser = !isAdmin && !isOwner;
-  const ADHOC_ALLOWED = ["forms", "project-chat", "my-submissions"];
+  const ADHOC_ALLOWED = ["forms", "project-chat", "my-submissions", "quizzes"];
   // Collaboration features every user gets by default, in addition to whatever
   // their project(s), role and owner-granted access unlock.
   const DEFAULT_USER_PAGES = ["forms", "cases", "community-forum", "project-chat"];
