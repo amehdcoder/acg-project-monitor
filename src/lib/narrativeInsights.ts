@@ -355,6 +355,9 @@ export function buildNarrative(
         id: listId,
         title: "Communities where MDA is not completed",
         description: "Communities that require immediate follow-up to complete mass drug administration.",
+        flaggedQuestionId: mdaCompletionId,
+        submissionIds: notDone.map((s) => s.id),
+
         columns: [
           { key: "lga", label: "LGA" },
           { key: "ward", label: "Ward" },
