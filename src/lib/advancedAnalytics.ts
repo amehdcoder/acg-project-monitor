@@ -81,6 +81,42 @@ function buildFeatures(subs: NarrativeSubmission[], qs: NarrativeQuestion[]): Fe
   return feats;
 }
 
+// Ordinal encoder for status-style answers that plain toNumeric can't map
+// (e.g. "Status of MDA": Completed / Ongoing / Not started).
+const STATUS_MAP: { re: RegExp; val: number }[] = [
+  { re: /complete|finished|\bdone\b/i, val: 1 },
+  { re: /ongoing|in\s*progress|partial|continuing|started/i, val: 0.5 },
+  { re: /not\s*start|halt|not\s*commenc|pending|yet\s*to|no\b/i, val: 0 },
+];
+function toNumericOrdinal(v: any): number | null {
+  const n = toNumeric(v);
+  if (n !== null) return n;
+  if (v === null || v === undefined || v === "") return null;
+  const s = String(Array.isArray(v) ? v.join(" ") : v);
+  for (const m of STATUS_MAP) if (m.re.test(s)) return m.val;
+  return null;
+}
+
+/** Build a Feature for a specific question matched by label/name/id — used to
+ *  force Random Forest / Monte Carlo onto a chosen outcome (e.g. "Status of
+ *  MDA" or "Did anybody complain of side effects during MDA?"). */
+function targetFeature(
+  subs: NarrativeSubmission[], qs: NarrativeQuestion[], pattern: RegExp,
+): Feature | null {
+  const q = flatten(qs).filter((x) => x.type !== "note").find(
+    (x) => pattern.test(x.label || "") || pattern.test(x.name || "") || pattern.test(x.id),
+  );
+  if (!q) return null;
+  const values = subs.map((s) => toNumericOrdinal(readValue(s.data || {}, q)));
+  const present = values.filter((v): v is number => v !== null);
+  if (present.length < Math.max(4, subs.length * 0.1)) return null;
+  const distinct = new Set(present).size;
+  if (distinct < 2) return null;
+  const mean = present.reduce((a, b) => a + b, 0) / present.length;
+  const varc = present.reduce((a, b) => a + (b - mean) ** 2, 0) / present.length;
+  return { key: q.id, label: q.label || pretty(q.name || q.id), values, distinct, variance: varc };
+}
+
 // ─────────────────────────── Random Forest ───────────────────────────
 // A compact regression random forest built from bootstrapped variance-reduction
 // trees on random feature subsets. We report normalized feature importances
