@@ -51,7 +51,14 @@ export interface NarrativeActionList {
   description: string;
   columns: { key: string; label: string }[];
   rows: Record<string, string | number | null | undefined>[];
+  /** IDs of the exact submissions backing this list — used to build a
+   *  form-scoped Excel export whose columns are the ACTUAL form questions
+   *  (never leaked from another form). */
+  submissionIds?: string[];
+  /** The question id this list was flagged on (highlighted in the export). */
+  flaggedQuestionId?: string;
 }
+
 
 export interface NarrativeItem {
   tone: Tone;
@@ -310,6 +317,8 @@ export function buildNarrative(
       id: `neg_${q.id}`,
       title: `Follow-up list — ${labelOf(q)}`,
       description: `Communities/records that reported a gap on “${labelOf(q)}” and require follow-up.`,
+      flaggedQuestionId: q.id,
+      submissionIds: rows.map((s) => s.id),
       columns: [
         { key: "lga", label: "LGA" },
         { key: "ward", label: "Ward" },
@@ -337,6 +346,7 @@ export function buildNarrative(
   const mdaCompletionId = findFieldId(flat, /mda.*(complet|conduct|administ)|(complet|conduct).*mda|drug.*administ/i);
   if (mdaCompletionId) {
     const notDone = submissions.filter((s) =>
+
       asArray(s.data?.[mdaCompletionId]).some((v) => isFilled(v) && NEGATIVE_RE.test(pretty(String(v)))),
     );
     if (notDone.length) {
@@ -345,6 +355,9 @@ export function buildNarrative(
         id: listId,
         title: "Communities where MDA is not completed",
         description: "Communities that require immediate follow-up to complete mass drug administration.",
+        flaggedQuestionId: mdaCompletionId,
+        submissionIds: notDone.map((s) => s.id),
+
         columns: [
           { key: "lga", label: "LGA" },
           { key: "ward", label: "Ward" },
@@ -381,6 +394,9 @@ export function buildNarrative(
         id: listId,
         title: "Communities with refusals",
         description: "Communities reporting refusals/hesitancy for trusted-leader engagement.",
+        flaggedQuestionId: refusalId,
+        submissionIds: refused.map((s) => s.id),
+
         columns: [
           { key: "lga", label: "LGA" },
           { key: "ward", label: "Ward" },
