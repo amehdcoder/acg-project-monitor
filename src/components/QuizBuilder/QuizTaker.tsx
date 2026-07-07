@@ -272,6 +272,7 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
 
   return (
     <div className="space-y-4 animate-fade-in max-w-2xl mx-auto">
+      <QuizHeroBanner title={quiz.title} subtitle={quiz.description || "Every Child Healthy. Every Future Bright."} />
       <div className="flex items-center justify-between">
         <Button variant="outline" size="sm" onClick={onClose} className="gap-1">
           <ArrowLeft className="h-4 w-4" /> Exit
