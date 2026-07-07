@@ -51,7 +51,14 @@ export interface NarrativeActionList {
   description: string;
   columns: { key: string; label: string }[];
   rows: Record<string, string | number | null | undefined>[];
+  /** IDs of the exact submissions backing this list — used to build a
+   *  form-scoped Excel export whose columns are the ACTUAL form questions
+   *  (never leaked from another form). */
+  submissionIds?: string[];
+  /** The question id this list was flagged on (highlighted in the export). */
+  flaggedQuestionId?: string;
 }
+
 
 export interface NarrativeItem {
   tone: Tone;
