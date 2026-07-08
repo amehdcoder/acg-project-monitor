@@ -778,14 +778,21 @@ const QuizBuilder = () => {
 
           {/* Non-admin: show Take Quiz prominently */}
           {!isAdmin && selectedQuiz.is_published && (
-            <Card className="form-card">
-              <CardContent className="py-8 text-center space-y-4">
-                <BookOpen className="h-12 w-12 mx-auto text-primary" />
-                <p className="text-foreground font-medium">Ready to take this quiz?</p>
-                <Button onClick={() => setShowTaker(selectedQuiz)} className="gap-2">
+            <Card className="form-card overflow-hidden">
+              <div className="relative overflow-hidden bg-gradient-to-br from-indigo-500 via-fuchsia-500 to-amber-400 px-6 py-10 text-center">
+                <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/15 blur-xl" />
+                <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 ring-1 ring-white/30 backdrop-blur-sm">
+                  <BookOpen className="h-8 w-8 text-white" />
+                </div>
+                <p className="relative mt-4 text-lg font-extrabold text-white drop-shadow">Ready to take this quiz?</p>
+                <p className="relative mt-1 text-sm font-medium text-white/85">Give it your best — good luck!</p>
+                <Button
+                  onClick={() => setShowTaker(selectedQuiz)}
+                  className="relative mt-5 gap-2 bg-white text-indigo-700 shadow-md hover:bg-white/90"
+                >
                   <Eye className="h-4 w-4" /> Start Quiz
                 </Button>
-              </CardContent>
+              </div>
             </Card>
           )}
         </div>
