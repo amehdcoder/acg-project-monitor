@@ -355,39 +355,50 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
       </div>
 
       {currentQ && (
-        <Card className="form-card">
-          <CardContent className="pt-6 space-y-5">
-            <div className="flex gap-3 items-start">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
+        <Card className="form-card overflow-hidden border-t-4 border-t-primary">
+          <CardContent className="space-y-5 pt-6">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-sm font-bold text-white shadow-sm">
                 {currentIdx + 1}
               </span>
-              <p className="text-base font-medium text-foreground pt-1">{currentQ.question_text}</p>
+              <p className="pt-1 text-base font-semibold text-foreground">{currentQ.question_text}</p>
             </div>
 
             <RadioGroup
               value={answers[currentQ.id] || ""}
               onValueChange={val => setAnswers(prev => ({ ...prev, [currentQ.id]: val }))}
-              className="ml-11 space-y-2"
+              className="space-y-2.5 sm:ml-12"
             >
-              {currentQ.options.map((opt, i) => (
-                <label
-                  key={opt.value}
-                  className={`flex items-center gap-3 rounded-xl border-2 p-3.5 cursor-pointer transition-all ${
-                    answers[currentQ.id] === opt.value
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "border-border hover:border-primary/30 hover:bg-muted/30"
-                  }`}
-                >
-                  <RadioGroupItem value={opt.value} id={`q-${currentQ.id}-${opt.value}`} />
-                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-muted text-xs font-bold text-muted-foreground">
-                    {String.fromCharCode(65 + i)}
-                  </span>
-                  <Label htmlFor={`q-${currentQ.id}-${opt.value}`} className="flex-1 cursor-pointer text-sm">
-                    {opt.label}
-                  </Label>
-                </label>
-              ))}
+              {currentQ.options.map((opt, i) => {
+                const selected = answers[currentQ.id] === opt.value;
+                return (
+                  <label
+                    key={opt.value}
+                    className={`flex cursor-pointer items-center gap-3 rounded-2xl border-2 p-3.5 transition-all ${
+                      selected
+                        ? "border-primary bg-gradient-to-r from-primary/10 to-fuchsia-500/5 shadow-sm"
+                        : "border-border hover:border-primary/40 hover:bg-muted/40"
+                    }`}
+                  >
+                    <RadioGroupItem value={opt.value} id={`q-${currentQ.id}-${opt.value}`} />
+                    <span
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold transition-colors ${
+                        selected
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {String.fromCharCode(65 + i)}
+                    </span>
+                    <Label htmlFor={`q-${currentQ.id}-${opt.value}`} className="flex-1 cursor-pointer text-sm font-medium">
+                      {opt.label}
+                    </Label>
+                    {selected && <CheckCircle className="h-4 w-4 shrink-0 text-primary" />}
+                  </label>
+                );
+              })}
             </RadioGroup>
+
 
             <div className="flex items-center justify-between pt-2">
               <Button
