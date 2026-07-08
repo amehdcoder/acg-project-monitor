@@ -674,6 +674,40 @@ const QuizBuilder = () => {
                       <Loader2 className="h-3 w-3 animate-spin" /> Updating access…
                     </div>
                   )}
+
+                  {/* Reset a test type so authorized members can retake it (attempts are archived first). */}
+                  <div className="rounded-2xl border border-dashed border-border/70 bg-background/50 p-3.5">
+                    <div className="flex items-center gap-2">
+                      <RotateCcw className="h-4 w-4 text-amber-600" />
+                      <span className="text-sm font-semibold text-foreground">Reset attempts</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1 mb-2.5">
+                      Archive & clear a test so assigned members can take it again when authorized.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm" variant="outline" disabled={resetBusy}
+                        onClick={() => setConfirmReset({ quiz: selectedQuiz, type: "pre_test" })}
+                        className="gap-1 text-blue-600"
+                      >
+                        <RotateCcw className="h-3 w-3" /> Reset Pre-test
+                      </Button>
+                      <Button
+                        size="sm" variant="outline" disabled={resetBusy}
+                        onClick={() => setConfirmReset({ quiz: selectedQuiz, type: "post_test" })}
+                        className="gap-1 text-emerald-600"
+                      >
+                        <RotateCcw className="h-3 w-3" /> Reset Post-test
+                      </Button>
+                      <Button
+                        size="sm" variant="outline" disabled={resetBusy}
+                        onClick={() => setConfirmReset({ quiz: selectedQuiz, type: null })}
+                        className="gap-1 text-amber-600"
+                      >
+                        <RotateCcw className="h-3 w-3" /> Reset Both
+                      </Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             );
