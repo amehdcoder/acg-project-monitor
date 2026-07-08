@@ -273,6 +273,31 @@ const QuizBuilder = () => {
     }
   };
 
+  // Admin control: open the quiz for a specific test type (Pre-test/Post-test),
+  // or close it for all members. Publishing is auto-enabled when opening.
+  const [openStateBusy, setOpenStateBusy] = useState(false);
+  const setOpenTestType = async (quiz: Quiz, type: "pre_test" | "post_test" | null) => {
+    setOpenStateBusy(true);
+    const patch: Record<string, any> = { open_test_type: type };
+    // Opening a test implies the quiz must be live for members to see it.
+    if (type && !quiz.is_published) patch.is_published = true;
+    const { error } = await supabase.from("quizzes").update(patch).eq("id", quiz.id);
+    setOpenStateBusy(false);
+    if (error) {
+      toast({ title: "Could not update quiz status", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({
+      title: type
+        ? `${type === "pre_test" ? "Pre-test" : "Post-test"} is now OPEN for all members`
+        : "Quiz closed for all members",
+    });
+    const updated = { ...quiz, open_test_type: type, is_published: patch.is_published ?? quiz.is_published };
+    setQuizzes((prev) => prev.map((q) => (q.id === quiz.id ? updated : q)));
+    if (selectedQuiz?.id === quiz.id) setSelectedQuiz(updated);
+  };
+
+
   const deleteQuiz = async (quizId: string) => {
     const { error } = await supabase.from("quizzes").delete().eq("id", quizId);
     if (!error) {
