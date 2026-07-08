@@ -224,14 +224,17 @@ const reloadProbe = async (): Promise<boolean> => {
   try {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 7000);
-    const res = await fetch(`/version.json?__reload_probe=${Date.now()}`, {
-      cache: "no-store",
-      credentials: "same-origin",
-      headers: { "Cache-Control": "no-cache" },
-      signal: controller.signal,
-    });
-    window.clearTimeout(timer);
-    return res.ok;
+    try {
+      const res = await fetch(`/version.json?__reload_probe=${Date.now()}`, {
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { "Cache-Control": "no-cache" },
+        signal: controller.signal,
+      });
+      return res.ok;
+    } finally {
+      window.clearTimeout(timer);
+    }
   } catch (error) {
     console.warn("[UpdateManager] Reload probe failed; keeping current app shell", error);
     return false;

@@ -237,7 +237,7 @@ const PWAUpdatePrompt = () => {
                     size="sm"
                     className="mt-3 w-full text-xs font-semibold"
                     disabled={isUpdating}
-                    title="Force a full refresh, bypassing caches, snooze, and offline guards"
+                    title="Force a full refresh after confirming the app domain is reachable"
                   >
                     <RefreshCw className="mr-2 h-3.5 w-3.5" />
                     Refresh to latest (manual)
