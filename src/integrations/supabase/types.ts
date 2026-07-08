@@ -7952,6 +7952,7 @@ export type Database = {
         Args: { _message_id: string }
         Returns: boolean
       }
+      is_proximity_participant: { Args: { _user_id: string }; Returns: boolean }
       is_standard_forms_restricted: {
         Args: { _user_id: string }
         Returns: boolean
