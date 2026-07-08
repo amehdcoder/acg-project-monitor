@@ -76,6 +76,7 @@ interface QuizQuestion {
 
 const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
   const { user, isAdmin } = useAuth();
+  const { language } = useLanguage();
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [currentIdx, setCurrentIdx] = useState(0);
