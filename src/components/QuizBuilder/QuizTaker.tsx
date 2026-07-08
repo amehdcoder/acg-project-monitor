@@ -64,75 +64,79 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
   const [result, setResult] = useState<{ score: number; total: number; percentage: number; passed: boolean } | null>(null);
   const [attemptType, setAttemptType] = useState<"pre_test" | "post_test">("pre_test");
   const [existingAttempts, setExistingAttempts] = useState<any[]>([]);
-  const [canTakePostTest, setCanTakePostTest] = useState(false);
-  const [postTestDate, setPostTestDate] = useState<Date | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [startedAt] = useState(new Date());
+  const [closedForMembers, setClosedForMembers] = useState(false);
+  const [alreadyTaken, setAlreadyTaken] = useState(false);
+
+  const openType: "pre_test" | "post_test" | null =
+    quiz.open_test_type === "pre_test" || quiz.open_test_type === "post_test"
+      ? quiz.open_test_type
+      : null;
 
   useEffect(() => {
     const init = async () => {
       setLoading(true);
-      // Fetch questions via secure RPC (correct_answer is never sent to the client).
-      const { data: qData } = await supabase
-        .rpc("get_quiz_questions_for_attempt", { p_quiz_id: quiz.id });
-      if (qData) setQuestions((qData as any[]).map(q => ({ ...q, options: q.options as any, points: Number(q.points), correct_answer: "" })));
 
-      // Fetch existing attempts
+      // Fetch existing attempts first — needed for gating decisions.
       const { data: attempts } = await supabase
         .from("quiz_attempts")
         .select("*")
         .eq("quiz_id", quiz.id)
         .eq("user_id", user!.id)
         .order("created_at");
+      if (attempts) setExistingAttempts(attempts);
 
-      if (attempts && attempts.length > 0) {
-        setExistingAttempts(attempts);
-        const preTest = attempts.find((a: any) => a.attempt_type === "pre_test");
-        const postTest = attempts.find((a: any) => a.attempt_type === "post_test");
+      const preTest = (attempts || []).find((a: any) => a.attempt_type === "pre_test");
+      const postTest = (attempts || []).find((a: any) => a.attempt_type === "post_test");
 
-        if (preTest && postTest) {
-          // Both done — show results
+      // Gate: the quiz is closed for members until an admin opens a test type.
+      if (!openType && !isAdmin) {
+        setClosedForMembers(true);
+        // If the member already has a result, show their latest one.
+        const latest = postTest || preTest;
+        if (latest) {
           setSubmitted(true);
           setResult({
-            score: Number(postTest.score),
-            total: Number(postTest.total_points),
-            percentage: Number(postTest.percentage),
-            passed: Number(postTest.percentage) >= quiz.passing_score,
+            score: Number(latest.score),
+            total: Number(latest.total_points),
+            percentage: Number(latest.percentage),
+            passed: Number(latest.percentage) >= quiz.passing_score,
           });
-          setLoading(false);
-          return;
         }
-
-        if (preTest) {
-          // Determine post-test availability
-          let postAvailable: Date;
-          if (quiz.post_test_datetime) {
-            postAvailable = new Date(quiz.post_test_datetime);
-          } else {
-            const preDate = new Date(preTest.completed_at || preTest.created_at);
-            postAvailable = new Date(preDate.getTime() + quiz.post_test_delay_days * 86400000);
-          }
-          setPostTestDate(postAvailable);
-          if (isAdmin || new Date() >= postAvailable) {
-            setAttemptType("post_test");
-            setCanTakePostTest(true);
-          } else {
-            setAttemptType("post_test");
-            setCanTakePostTest(false);
-            setSubmitted(true);
-            setResult({
-              score: Number(preTest.score),
-              total: Number(preTest.total_points),
-              percentage: Number(preTest.percentage),
-              passed: Number(preTest.percentage) >= quiz.passing_score,
-            });
-          }
-        }
+        setLoading(false);
+        return;
       }
+
+      // Which test are we taking? The one the admin opened (admins default to pre-test).
+      const activeType: "pre_test" | "post_test" = openType || "pre_test";
+      setAttemptType(activeType);
+
+      // Fetch questions via secure RPC (correct_answer is never sent to the client).
+      const { data: qData } = await supabase
+        .rpc("get_quiz_questions_for_attempt", { p_quiz_id: quiz.id });
+      if (qData) setQuestions((qData as any[]).map(q => ({ ...q, options: q.options as any, points: Number(q.points), correct_answer: "" })));
+
+      // Members can take the open test only once. If already done, show the result.
+      const existingForType = activeType === "pre_test" ? preTest : postTest;
+      if (existingForType && !isAdmin) {
+        setAlreadyTaken(true);
+        setSubmitted(true);
+        setResult({
+          score: Number(existingForType.score),
+          total: Number(existingForType.total_points),
+          percentage: Number(existingForType.percentage),
+          passed: Number(existingForType.percentage) >= quiz.passing_score,
+        });
+        setLoading(false);
+        return;
+      }
+
       setLoading(false);
     };
     init();
-  }, [quiz.id, user, isAdmin]);
+  }, [quiz.id, user, isAdmin, openType]);
+
 
   // Timer
   useEffect(() => {
