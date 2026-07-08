@@ -460,22 +460,35 @@ const QuizBuilder = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <BookOpen className="h-6 w-6 text-primary" />
-            {isAdmin ? "Quiz Manager" : "My Quizzes"}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {isAdmin ? "Create quizzes with Pre-test & Post-test analysis" : "Take assigned quizzes"}
-          </p>
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-fuchsia-600 to-amber-500 p-5 shadow-lg sm:p-6">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-12 left-1/3 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
+        <div className="relative flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+          <div className="flex items-start gap-3">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 ring-1 ring-white/30 backdrop-blur-sm">
+              <BookOpen className="h-6 w-6 text-white" />
+            </span>
+            <div>
+              <h1 className="text-xl font-extrabold text-white drop-shadow sm:text-2xl">
+                {isAdmin ? "Quiz Manager" : "My Quizzes"}
+              </h1>
+              <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-white/85">
+                <Sparkles className="h-3.5 w-3.5 text-amber-200" />
+                {isAdmin ? "Create quizzes with Pre-test & Post-test analysis" : "Take your assigned assessments"}
+              </p>
+            </div>
+          </div>
+          {isAdmin && (
+            <Button
+              onClick={() => setShowCreateDialog(true)}
+              className="gap-2 bg-white text-indigo-700 shadow-md hover:bg-white/90"
+            >
+              <Plus className="h-4 w-4" /> Create Quiz
+            </Button>
+          )}
         </div>
-        {isAdmin && (
-          <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
-            <Plus className="h-4 w-4" /> Create Quiz
-          </Button>
-        )}
       </div>
+
 
       {selectedQuiz ? (
         <div className="space-y-4">
