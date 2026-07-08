@@ -169,7 +169,7 @@ export function quizT(
   let str = STRINGS[lang]?.[key] || STRINGS.en[key] || key;
   if (vars) {
     for (const [k, v] of Object.entries(vars)) {
-      str = str.replaceAll(`{${k}}`, v);
+      str = str.split(`{${k}}`).join(v);
     }
   }
   return str;
