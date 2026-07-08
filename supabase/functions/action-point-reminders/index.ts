@@ -2,6 +2,7 @@
 // as the due date approaches, on the due date, and once it is past due.
 // Designed to be invoked daily by a cron schedule.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { guardRequest } from "../_shared/authGuard.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
