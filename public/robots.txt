@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://acgcollect.lovable.app/sitemap.xml
+Sitemap: https://www.amehnities.org/sitemap.xml

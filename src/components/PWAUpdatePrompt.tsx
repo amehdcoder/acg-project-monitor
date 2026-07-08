@@ -12,6 +12,8 @@ import {
   subscribeToAppUpdates,
   getAppUpdateState,
   isAutoUpdateEnabled,
+  APPLIED_BUILD_AT_KEY,
+  APPLIED_BUILD_ID_KEY,
 } from "@/lib/appUpdateManager";
 import { hasActiveUserFormProgress, prepareSilentFormRestoreForUpdate } from "@/lib/formProgressPersistence";
 
@@ -38,14 +40,6 @@ const SwRegistrar = ({ onAvailable, registerSelf }: InnerProps) => {
 
   useEffect(() => {
     registerSelf(async () => {
-      try {
-        if ("caches" in window) {
-          const names = await caches.keys();
-          await Promise.all(names.map((name) => caches.delete(name)));
-        }
-      } catch (error) {
-        console.warn("Unable to clear caches before service worker update", error);
-      }
       updateServiceWorker(true);
     });
   }, [registerSelf, updateServiceWorker]);
@@ -97,8 +91,8 @@ const PWAUpdatePrompt = () => {
     let lastApplied = "";
     let lastAppliedAt = 0;
     try {
-      lastApplied = localStorage.getItem("app_last_applied_build_id") || "";
-      lastAppliedAt = Number(localStorage.getItem("app_last_applied_at") || "0") || 0;
+      lastApplied = localStorage.getItem(APPLIED_BUILD_ID_KEY) || "";
+      lastAppliedAt = Number(localStorage.getItem(APPLIED_BUILD_AT_KEY) || "0") || 0;
     } catch (error) {
       console.warn("Unable to read last applied app update", error);
     }
@@ -116,8 +110,8 @@ const PWAUpdatePrompt = () => {
 
     if (isAutoUpdateEnabled() && !inCooldown && !isOffline && !shouldSkipServiceWorker && !hasActiveUserFormProgress()) {
       try {
-        localStorage.setItem("app_last_applied_build_id", latestId);
-        localStorage.setItem("app_last_applied_at", String(Date.now()));
+        localStorage.setItem(APPLIED_BUILD_ID_KEY, latestId);
+        localStorage.setItem(APPLIED_BUILD_AT_KEY, String(Date.now()));
       } catch (error) {
         console.warn("Unable to persist last applied app update", error);
       }
@@ -139,6 +133,7 @@ const PWAUpdatePrompt = () => {
     // cache purge / service-worker swap hangs. After 6s force a cache-busted reload.
     const watchdog = setTimeout(() => {
       try {
+        if (navigator.onLine === false) return;
         const url = new URL(window.location.href);
         url.searchParams.set("__v", String(Date.now()));
         window.location.replace(url.toString());
@@ -153,8 +148,10 @@ const PWAUpdatePrompt = () => {
     } catch (err) {
       console.error("Update failed", err);
       // Let the watchdog recover instead of leaving the user stuck.
+    } finally {
+      clearTimeout(watchdog);
+      setIsUpdating(false);
     }
-    void watchdog;
   };
 
   const handleSnooze = () => {
@@ -222,28 +219,19 @@ const PWAUpdatePrompt = () => {
                   </Button>
                   <Button
                     onClick={async () => {
-                      // Manual force-refresh: bypass auto-apply guard, cooldowns, and offline checks.
-                      // Clears every cache + storage flag and hard-reloads with a cache-buster.
+                      // Manual force-refresh: bypass auto-apply guard and cooldowns,
+                      // but keep the offline shell intact until the domain is reachable.
                       setIsUpdating(true);
                       try {
                         prepareSilentFormRestoreForUpdate();
-                        try { localStorage.removeItem("app_last_applied_build_id"); } catch {}
-                        try { localStorage.removeItem("app_last_applied_at"); } catch {}
+                        try { localStorage.removeItem(APPLIED_BUILD_ID_KEY); } catch {}
+                        try { localStorage.removeItem(APPLIED_BUILD_AT_KEY); } catch {}
                         try { sessionStorage.removeItem("app_html_build_id_v1"); } catch {}
-                        if ("caches" in window) {
-                          const names = await caches.keys();
-                          await Promise.all(names.map((n) => caches.delete(n)));
-                        }
-                        try {
-                          const regs = await navigator.serviceWorker?.getRegistrations();
-                          await Promise.all((regs || []).map((r) => r.unregister()));
-                        } catch {}
+                        await hardReloadToLatest();
                       } catch (err) {
                         console.warn("Force refresh prep error", err);
+                        setIsUpdating(false);
                       }
-                      const url = new URL(window.location.href);
-                      url.searchParams.set("__app_update", String(Date.now()));
-                      window.location.replace(url.toString());
                     }}
                     variant="outline"
                     size="sm"
