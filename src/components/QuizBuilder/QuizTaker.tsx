@@ -39,6 +39,7 @@ interface QuizTakerProps {
     post_test_datetime: string | null;
     time_limit_minutes: number | null;
     passing_score: number;
+    open_test_type?: "pre_test" | "post_test" | null;
   };
   onClose: () => void;
 }
