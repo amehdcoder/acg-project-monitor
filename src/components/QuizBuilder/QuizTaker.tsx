@@ -256,53 +256,61 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
           <ArrowLeft className="h-4 w-4" /> Back to Quizzes
         </Button>
 
-        <Card className="form-card">
-          <CardHeader className="text-center">
-            <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${result.passed ? "bg-green-100 text-green-600" : "bg-orange-100 text-orange-600"}`}>
-              {result.passed ? <CheckCircle className="h-8 w-8" /> : <Award className="h-8 w-8" />}
+        <Card className="form-card overflow-hidden">
+          <div
+            className={`relative overflow-hidden px-6 pb-6 pt-8 text-center ${
+              result.passed
+                ? "bg-gradient-to-br from-emerald-500 via-teal-500 to-green-400"
+                : "bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500"
+            }`}
+          >
+            <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/15 blur-xl" />
+            <div className="pointer-events-none absolute -bottom-10 -left-6 h-28 w-28 rounded-full bg-white/10 blur-xl" />
+            <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/20 ring-4 ring-white/30 backdrop-blur-sm">
+              {result.passed ? <Trophy className="h-10 w-10 text-white" /> : <Target className="h-10 w-10 text-white" />}
             </div>
-            <CardTitle className="text-xl mt-3">
-              {attemptType === "pre_test" && !postAttempt ? "Pre-test Complete!" : 
+            <h3 className="relative mt-4 text-xl font-extrabold text-white drop-shadow">
+              {attemptType === "pre_test" && !postAttempt ? "Pre-test Complete!" :
                postAttempt ? "Quiz Complete!" : "Results"}
-            </CardTitle>
-            <CardDescription>
-              {result.passed ? "Congratulations! You passed!" : `You need ${quiz.passing_score}% to pass.`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-center">
-              <div className="text-4xl font-bold text-foreground">{Math.round(result.percentage)}%</div>
-              <p className="text-sm text-muted-foreground">{result.score} / {result.total} points</p>
+            </h3>
+            <p className="relative mt-1 text-sm font-medium text-white/90">
+              {result.passed ? "Congratulations! You passed! 🎉" : `You need ${quiz.passing_score}% to pass — keep going!`}
+            </p>
+            <div className="relative mt-5 text-6xl font-black leading-none text-white drop-shadow-md">
+              {Math.round(result.percentage)}%
             </div>
+            <p className="relative mt-1 text-xs font-semibold uppercase tracking-wider text-white/80">
+              {result.score} / {result.total} points
+            </p>
+          </div>
+          <CardContent className="space-y-4 pt-5">
             <Progress value={result.percentage} className="h-3" />
 
             {alreadyTaken && (
-              <Card className="bg-muted/50 border-dashed">
-                <CardContent className="py-4 text-center">
-                  <Lock className="h-5 w-5 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">
-                    You have already completed the <strong>{attemptType === "pre_test" ? "Pre-test" : "Post-test"}</strong>.
-                    The next test will appear here once an administrator opens it.
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="rounded-xl border border-dashed border-border bg-muted/40 py-4 text-center">
+                <Lock className="mx-auto mb-2 h-5 w-5 text-muted-foreground" />
+                <p className="px-4 text-sm text-muted-foreground">
+                  You have already completed the <strong>{attemptType === "pre_test" ? "Pre-test" : "Post-test"}</strong>.
+                  The next test will appear here once an administrator opens it.
+                </p>
+              </div>
             )}
-
 
             {preAttempt && postAttempt && (
               <div className="grid grid-cols-2 gap-3">
-                <Card className="bg-muted/30">
-                  <CardContent className="py-3 text-center">
-                    <p className="text-xs text-muted-foreground">Pre-test</p>
-                    <p className="text-lg font-bold">{Math.round(Number(preAttempt.percentage))}%</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-primary/5">
-                  <CardContent className="py-3 text-center">
-                    <p className="text-xs text-muted-foreground">Post-test</p>
-                    <p className="text-lg font-bold">{Math.round(Number(postAttempt.percentage))}%</p>
-                  </CardContent>
-                </Card>
+                <div className="rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 p-4 text-center ring-1 ring-slate-200 dark:from-slate-800 dark:to-slate-800/50 dark:ring-slate-700">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pre-test</p>
+                  <p className="mt-1 text-2xl font-extrabold text-slate-600 dark:text-slate-300">{Math.round(Number(preAttempt.percentage))}%</p>
+                </div>
+                <div className="rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-50 p-4 text-center ring-1 ring-emerald-200 dark:from-emerald-900/40 dark:to-teal-900/20 dark:ring-emerald-800">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">Post-test</p>
+                  <p className="mt-1 text-2xl font-extrabold text-emerald-600 dark:text-emerald-300">{Math.round(Number(postAttempt.percentage))}%</p>
+                  {Number(postAttempt.percentage) > Number(preAttempt.percentage) && (
+                    <p className="mt-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                      +{Math.round(Number(postAttempt.percentage) - Number(preAttempt.percentage))}% improvement
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </CardContent>
