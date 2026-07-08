@@ -8,27 +8,46 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   ArrowLeft, ArrowRight, CheckCircle, XCircle, Clock, Award, BookOpen, Loader2, Lock,
+  Sparkles, Trophy, Target,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import quizHero from "@/assets/community-health-worker.jpg.asset.json";
 
-const QuizHeroBanner = ({ title, subtitle }: { title: string; subtitle?: string }) => (
-  <div className="relative overflow-hidden rounded-2xl border border-primary/20 shadow-sm">
-    <img
-      src={quizHero.url}
-      alt="Community health worker engaging a family"
-      className="h-32 w-full object-cover object-center sm:h-44"
-      loading="lazy"
-    />
-    <div className="absolute inset-0 bg-gradient-to-t from-primary/85 via-primary/40 to-transparent" />
-    <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
-      <h2 className="text-base font-bold leading-tight text-primary-foreground drop-shadow sm:text-lg">{title}</h2>
-      {subtitle && <p className="mt-0.5 text-xs text-primary-foreground/90 sm:text-sm">{subtitle}</p>}
+const QuizHeroBanner = ({
+  title,
+  subtitle,
+  badge,
+}: {
+  title: string;
+  subtitle?: string;
+  badge?: string;
+}) => (
+  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-fuchsia-500 to-amber-400 p-[2px] shadow-lg sm:rounded-3xl">
+    <div className="relative overflow-hidden rounded-[calc(1rem-2px)] bg-slate-900 sm:rounded-[calc(1.5rem-2px)]">
+      {/* Full image — displayed at its natural aspect ratio so it is never cropped and stays responsive on every screen */}
+      <img
+        src={quizHero.url}
+        alt="Community health worker engaging a family"
+        className="block h-auto w-full object-contain"
+        loading="lazy"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-indigo-950/25 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
+        <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 ring-1 ring-white/25 backdrop-blur-sm">
+          <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-white/95 sm:text-[11px]">
+            {badge || "Knowledge Assessment"}
+          </span>
+        </div>
+        <h2 className="text-lg font-extrabold leading-tight text-white drop-shadow-lg sm:text-2xl">{title}</h2>
+        {subtitle && <p className="mt-1 text-xs font-medium text-white/85 sm:text-sm">{subtitle}</p>}
+      </div>
     </div>
   </div>
 );
+
 
 interface QuizTakerProps {
   quiz: {
@@ -237,53 +256,61 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
           <ArrowLeft className="h-4 w-4" /> Back to Quizzes
         </Button>
 
-        <Card className="form-card">
-          <CardHeader className="text-center">
-            <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${result.passed ? "bg-green-100 text-green-600" : "bg-orange-100 text-orange-600"}`}>
-              {result.passed ? <CheckCircle className="h-8 w-8" /> : <Award className="h-8 w-8" />}
+        <Card className="form-card overflow-hidden">
+          <div
+            className={`relative overflow-hidden px-6 pb-6 pt-8 text-center ${
+              result.passed
+                ? "bg-gradient-to-br from-emerald-500 via-teal-500 to-green-400"
+                : "bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500"
+            }`}
+          >
+            <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/15 blur-xl" />
+            <div className="pointer-events-none absolute -bottom-10 -left-6 h-28 w-28 rounded-full bg-white/10 blur-xl" />
+            <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/20 ring-4 ring-white/30 backdrop-blur-sm">
+              {result.passed ? <Trophy className="h-10 w-10 text-white" /> : <Target className="h-10 w-10 text-white" />}
             </div>
-            <CardTitle className="text-xl mt-3">
-              {attemptType === "pre_test" && !postAttempt ? "Pre-test Complete!" : 
+            <h3 className="relative mt-4 text-xl font-extrabold text-white drop-shadow">
+              {attemptType === "pre_test" && !postAttempt ? "Pre-test Complete!" :
                postAttempt ? "Quiz Complete!" : "Results"}
-            </CardTitle>
-            <CardDescription>
-              {result.passed ? "Congratulations! You passed!" : `You need ${quiz.passing_score}% to pass.`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-center">
-              <div className="text-4xl font-bold text-foreground">{Math.round(result.percentage)}%</div>
-              <p className="text-sm text-muted-foreground">{result.score} / {result.total} points</p>
+            </h3>
+            <p className="relative mt-1 text-sm font-medium text-white/90">
+              {result.passed ? "Congratulations! You passed! 🎉" : `You need ${quiz.passing_score}% to pass — keep going!`}
+            </p>
+            <div className="relative mt-5 text-6xl font-black leading-none text-white drop-shadow-md">
+              {Math.round(result.percentage)}%
             </div>
+            <p className="relative mt-1 text-xs font-semibold uppercase tracking-wider text-white/80">
+              {result.score} / {result.total} points
+            </p>
+          </div>
+          <CardContent className="space-y-4 pt-5">
             <Progress value={result.percentage} className="h-3" />
 
             {alreadyTaken && (
-              <Card className="bg-muted/50 border-dashed">
-                <CardContent className="py-4 text-center">
-                  <Lock className="h-5 w-5 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">
-                    You have already completed the <strong>{attemptType === "pre_test" ? "Pre-test" : "Post-test"}</strong>.
-                    The next test will appear here once an administrator opens it.
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="rounded-xl border border-dashed border-border bg-muted/40 py-4 text-center">
+                <Lock className="mx-auto mb-2 h-5 w-5 text-muted-foreground" />
+                <p className="px-4 text-sm text-muted-foreground">
+                  You have already completed the <strong>{attemptType === "pre_test" ? "Pre-test" : "Post-test"}</strong>.
+                  The next test will appear here once an administrator opens it.
+                </p>
+              </div>
             )}
-
 
             {preAttempt && postAttempt && (
               <div className="grid grid-cols-2 gap-3">
-                <Card className="bg-muted/30">
-                  <CardContent className="py-3 text-center">
-                    <p className="text-xs text-muted-foreground">Pre-test</p>
-                    <p className="text-lg font-bold">{Math.round(Number(preAttempt.percentage))}%</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-primary/5">
-                  <CardContent className="py-3 text-center">
-                    <p className="text-xs text-muted-foreground">Post-test</p>
-                    <p className="text-lg font-bold">{Math.round(Number(postAttempt.percentage))}%</p>
-                  </CardContent>
-                </Card>
+                <div className="rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 p-4 text-center ring-1 ring-slate-200 dark:from-slate-800 dark:to-slate-800/50 dark:ring-slate-700">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pre-test</p>
+                  <p className="mt-1 text-2xl font-extrabold text-slate-600 dark:text-slate-300">{Math.round(Number(preAttempt.percentage))}%</p>
+                </div>
+                <div className="rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-50 p-4 text-center ring-1 ring-emerald-200 dark:from-emerald-900/40 dark:to-teal-900/20 dark:ring-emerald-800">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">Post-test</p>
+                  <p className="mt-1 text-2xl font-extrabold text-emerald-600 dark:text-emerald-300">{Math.round(Number(postAttempt.percentage))}%</p>
+                  {Number(postAttempt.percentage) > Number(preAttempt.percentage) && (
+                    <p className="mt-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                      +{Math.round(Number(postAttempt.percentage) - Number(preAttempt.percentage))}% improvement
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </CardContent>
@@ -298,7 +325,11 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
 
   return (
     <div className="space-y-4 animate-fade-in max-w-2xl mx-auto">
-      <QuizHeroBanner title={quiz.title} subtitle={quiz.description || "Every Child Healthy. Every Future Bright."} />
+      <QuizHeroBanner
+        title={quiz.title}
+        subtitle={quiz.description || "Every Child Healthy. Every Future Bright."}
+        badge={attemptType === "pre_test" ? "Pre-test Assessment" : "Post-test Assessment"}
+      />
       <div className="flex items-center justify-between">
         <Button variant="outline" size="sm" onClick={onClose} className="gap-1">
           <ArrowLeft className="h-4 w-4" /> Exit
@@ -324,39 +355,50 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
       </div>
 
       {currentQ && (
-        <Card className="form-card">
-          <CardContent className="pt-6 space-y-5">
-            <div className="flex gap-3 items-start">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
+        <Card className="form-card overflow-hidden border-t-4 border-t-primary">
+          <CardContent className="space-y-5 pt-6">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-sm font-bold text-white shadow-sm">
                 {currentIdx + 1}
               </span>
-              <p className="text-base font-medium text-foreground pt-1">{currentQ.question_text}</p>
+              <p className="pt-1 text-base font-semibold text-foreground">{currentQ.question_text}</p>
             </div>
 
             <RadioGroup
               value={answers[currentQ.id] || ""}
               onValueChange={val => setAnswers(prev => ({ ...prev, [currentQ.id]: val }))}
-              className="ml-11 space-y-2"
+              className="space-y-2.5 sm:ml-12"
             >
-              {currentQ.options.map((opt, i) => (
-                <label
-                  key={opt.value}
-                  className={`flex items-center gap-3 rounded-xl border-2 p-3.5 cursor-pointer transition-all ${
-                    answers[currentQ.id] === opt.value
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "border-border hover:border-primary/30 hover:bg-muted/30"
-                  }`}
-                >
-                  <RadioGroupItem value={opt.value} id={`q-${currentQ.id}-${opt.value}`} />
-                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-muted text-xs font-bold text-muted-foreground">
-                    {String.fromCharCode(65 + i)}
-                  </span>
-                  <Label htmlFor={`q-${currentQ.id}-${opt.value}`} className="flex-1 cursor-pointer text-sm">
-                    {opt.label}
-                  </Label>
-                </label>
-              ))}
+              {currentQ.options.map((opt, i) => {
+                const selected = answers[currentQ.id] === opt.value;
+                return (
+                  <label
+                    key={opt.value}
+                    className={`flex cursor-pointer items-center gap-3 rounded-2xl border-2 p-3.5 transition-all ${
+                      selected
+                        ? "border-primary bg-gradient-to-r from-primary/10 to-fuchsia-500/5 shadow-sm"
+                        : "border-border hover:border-primary/40 hover:bg-muted/40"
+                    }`}
+                  >
+                    <RadioGroupItem value={opt.value} id={`q-${currentQ.id}-${opt.value}`} />
+                    <span
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold transition-colors ${
+                        selected
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {String.fromCharCode(65 + i)}
+                    </span>
+                    <Label htmlFor={`q-${currentQ.id}-${opt.value}`} className="flex-1 cursor-pointer text-sm font-medium">
+                      {opt.label}
+                    </Label>
+                    {selected && <CheckCircle className="h-4 w-4 shrink-0 text-primary" />}
+                  </label>
+                );
+              })}
             </RadioGroup>
+
 
             <div className="flex items-center justify-between pt-2">
               <Button
