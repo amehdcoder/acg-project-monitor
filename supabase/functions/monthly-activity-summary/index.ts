@@ -1,6 +1,7 @@
 // Compiles a professional monthly summary of all platform activity and emails
 // it to the owner (amehjoey1@gmail.com). Triggered by a monthly cron job.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { guardRequest } from "../_shared/authGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
