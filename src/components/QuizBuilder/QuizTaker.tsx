@@ -232,22 +232,18 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
             </div>
             <Progress value={result.percentage} className="h-3" />
 
-            {preAttempt && !postAttempt && !canTakePostTest && postTestDate && (
+            {alreadyTaken && (
               <Card className="bg-muted/50 border-dashed">
                 <CardContent className="py-4 text-center">
-                   <Lock className="h-5 w-5 mx-auto text-muted-foreground mb-2" />
+                  <Lock className="h-5 w-5 mx-auto text-muted-foreground mb-2" />
                   <p className="text-sm text-muted-foreground">
-                    Post-test available on <strong>{format(postTestDate, "PPP 'at' p")}</strong>
+                    You have already completed the <strong>{attemptType === "pre_test" ? "Pre-test" : "Post-test"}</strong>.
+                    The next test will appear here once an administrator opens it.
                   </p>
                 </CardContent>
               </Card>
             )}
 
-            {canTakePostTest && !postAttempt && (
-              <Button onClick={() => { setSubmitted(false); setAnswers({}); setCurrentIdx(0); }} className="w-full gap-2">
-                <BookOpen className="h-4 w-4" /> Start Post-test
-              </Button>
-            )}
 
             {preAttempt && postAttempt && (
               <div className="grid grid-cols-2 gap-3">
