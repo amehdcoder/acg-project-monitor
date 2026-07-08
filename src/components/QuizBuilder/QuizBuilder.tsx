@@ -278,7 +278,7 @@ const QuizBuilder = () => {
   const [openStateBusy, setOpenStateBusy] = useState(false);
   const setOpenTestType = async (quiz: Quiz, type: "pre_test" | "post_test" | null) => {
     setOpenStateBusy(true);
-    const patch: Record<string, any> = { open_test_type: type };
+    const patch: { open_test_type: "pre_test" | "post_test" | null; is_published?: boolean } = { open_test_type: type };
     // Opening a test implies the quiz must be live for members to see it.
     if (type && !quiz.is_published) patch.is_published = true;
     const { error } = await supabase.from("quizzes").update(patch).eq("id", quiz.id);
