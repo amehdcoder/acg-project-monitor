@@ -54,6 +54,8 @@ interface Quiz {
   passing_score: number;
   is_published: boolean;
   open_test_type: "pre_test" | "post_test" | null;
+  pass_message: string | null;
+  fail_message: string | null;
   created_at: string;
 }
 
