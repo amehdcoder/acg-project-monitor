@@ -411,6 +411,115 @@ const QuizBuilder = () => {
     }
   };
 
+  // Admin-only: open settings dialog prefilled from the selected quiz.
+  const openSettings = (quiz: Quiz) => {
+    setSettingsScore(Math.round(Number(quiz.passing_score ?? 70)));
+    setSettingsPass(quiz.pass_message ?? "");
+    setSettingsFail(quiz.fail_message ?? "");
+    setShowSettings(true);
+  };
+
+  // Admin-only: save pass mark & custom pass/fail messages (works on published quizzes).
+  const saveQuizSettings = async () => {
+    if (!selectedQuiz) return;
+    const score = Math.max(0, Math.min(100, settingsScore || 0));
+    setSettingsBusy(true);
+    try {
+      const { error } = await supabase
+        .from("quizzes")
+        .update({
+          passing_score: score,
+          pass_message: settingsPass.trim() || null,
+          fail_message: settingsFail.trim() || null,
+        })
+        .eq("id", selectedQuiz.id);
+      if (error) throw error;
+      setSelectedQuiz({ ...selectedQuiz, passing_score: score, pass_message: settingsPass.trim() || null, fail_message: settingsFail.trim() || null });
+      toast({ title: "Quiz settings saved", description: `Passing score set to ${score}%.` });
+      setShowSettings(false);
+      fetchQuizzes();
+    } catch (e: any) {
+      toast({ title: "Could not save settings", description: e.message, variant: "destructive" });
+    } finally {
+      setSettingsBusy(false);
+    }
+  };
+
+  // Admin-only: load assigned members and whether they have Pre/Post attempts.
+  const openReleaseDialog = async () => {
+    if (!selectedQuiz) return;
+    setShowRelease(true);
+    setReleaseLoading(true);
+    setReleaseSearch("");
+    setReleaseSelected(new Set());
+    try {
+      const { data: assignments } = await supabase
+        .from("quiz_user_assignments")
+        .select("user_id")
+        .eq("quiz_id", selectedQuiz.id);
+      const ids = (assignments || []).map((a) => a.user_id);
+      if (ids.length === 0) { setReleaseUsers([]); setReleaseLoading(false); return; }
+
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name, email")
+        .in("user_id", ids);
+      const { data: attempts } = await supabase
+        .from("quiz_attempts")
+        .select("user_id, attempt_type")
+        .eq("quiz_id", selectedQuiz.id)
+        .in("user_id", ids);
+
+      const preSet = new Set((attempts || []).filter((a) => a.attempt_type === "pre_test").map((a) => a.user_id));
+      const postSet = new Set((attempts || []).filter((a) => a.attempt_type === "post_test").map((a) => a.user_id));
+      const rows = (profiles || []).map((p) => ({
+        user_id: p.user_id,
+        name: `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.email,
+        email: p.email,
+        hasPre: preSet.has(p.user_id),
+        hasPost: postSet.has(p.user_id),
+      }));
+      setReleaseUsers(rows);
+    } catch (e: any) {
+      toast({ title: "Could not load members", description: e.message, variant: "destructive" });
+    } finally {
+      setReleaseLoading(false);
+    }
+  };
+
+  const toggleRelease = (userId: string) => {
+    setReleaseSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId); else next.add(userId);
+      return next;
+    });
+  };
+
+  // Admin-only: send result emails (with pre/post statistical inference) to selected members.
+  const releaseResults = async () => {
+    if (!selectedQuiz || releaseSelected.size === 0) return;
+    setReleaseBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("release-quiz-results", {
+        body: { quizId: selectedQuiz.id, userIds: Array.from(releaseSelected) },
+      });
+      if (error) throw error;
+      const sent = (data as any)?.sent ?? 0;
+      toast({
+        title: "Results released",
+        description: `${sent} result email${sent === 1 ? "" : "s"} sent successfully.`,
+      });
+      setShowRelease(false);
+    } catch (e: any) {
+      toast({ title: "Could not send results", description: e.message, variant: "destructive" });
+    } finally {
+      setReleaseBusy(false);
+    }
+  };
+
+
+
+
 
   const getPostTestDisplay = (quiz: Quiz) => {
     if (quiz.post_test_datetime) {
