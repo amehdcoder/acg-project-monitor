@@ -839,6 +839,37 @@ const QuizBuilder = () => {
             );
           })()}
 
+          {/* ── Grading & Results (Admin) ── */}
+          {isAdmin && (
+            <Card className="form-card overflow-hidden border-0 bg-gradient-to-br from-indigo-500/10 via-fuchsia-500/5 to-transparent ring-1 ring-indigo-500/30">
+              <CardContent className="p-4 sm:p-5 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-600 text-white shadow-sm">
+                    <Award className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground flex items-center gap-1.5">
+                      Grading & Results <Sparkles className="h-3.5 w-3.5 text-primary/60" />
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Pass mark <strong>{selectedQuiz.passing_score}%</strong> — editable anytime, even after publishing.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => openSettings(selectedQuiz)} className="gap-1.5 text-indigo-600">
+                    <Save className="h-3.5 w-3.5" /> Pass mark & messages
+                  </Button>
+                  <Button size="sm" onClick={openReleaseDialog} className="gap-1.5 bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white hover:opacity-90">
+                    <Send className="h-3.5 w-3.5" /> Release results by email
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+
+
 
           {isAdmin && (
             <div className="space-y-3">
