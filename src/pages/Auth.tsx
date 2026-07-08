@@ -20,8 +20,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, RefreshCw } from "lucide-react";
 import acgLogo from "@/assets/acg-logo.png";
+import { recoverAuthAndReload } from "@/lib/authRecovery";
 
 const NIGERIAN_STATES = [
   "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
@@ -98,7 +99,26 @@ const Auth = () => {
   const [activeTab, setActiveTab] = useState("login");
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [signupStep, setSignupStep] = useState<1 | 2 | 3>(1);
+  const [isRecovering, setIsRecovering] = useState(false);
   const { trackFailedLogin, trackLoginLocation } = useSurveillanceTracking(user?.id);
+
+  const handleRecoverApp = async () => {
+    setIsRecovering(true);
+    try {
+      const outcome = await recoverAuthAndReload();
+      if (outcome === "offline") {
+        toast({
+          title: "You're offline",
+          description:
+            "Your saved app is still safe on this device. Reconnect to the internet, then tap Recover again.",
+          variant: "destructive",
+        });
+      }
+      // "reloading" navigates away, no further action needed.
+    } finally {
+      setIsRecovering(false);
+    }
+  };
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -670,6 +690,27 @@ const Auth = () => {
             </TabsContent>
           </Tabs>
         </CardContent>
+        <div className="border-t px-4 sm:px-6 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] leading-tight text-muted-foreground">
+              Trouble loading or signing in? Recover safely — your offline data stays on this device.
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleRecoverApp}
+              disabled={isRecovering}
+              className="shrink-0 text-xs text-primary hover:text-primary"
+            >
+              {isRecovering ? (
+                <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Recovering…</>
+              ) : (
+                <><RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Recover app</>
+              )}
+            </Button>
+          </div>
+        </div>
       </Card>
     </div>
   );

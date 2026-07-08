@@ -40,6 +40,7 @@ import {
   saveHouseholdOffline, syncCESOfflineQueue, getPendingCount, getPendingHouseholds,
   registerCESSyncOnReconnect, getDeviceId, generateUUID, saveSurveyOffline, getOfflineSurvey, type OfflineHousehold,
 } from "@/lib/ces/offlineHouseholds";
+import { getLastPrewarmCenter } from "@/lib/ces/satellitePrewarm";
 import StreetViewPanel from "./StreetViewPanel";
 import {
   getResidentialMask,
@@ -121,6 +122,22 @@ const readLastKnownMapSeed = (): InstantMapSeed | null => {
   } catch { /* ignore */ }
   return null;
 };
+
+// The satellite pre-warmer (primed while the MDA checklist captured GPS) persists
+// the device's ACTUAL warmed location. That is exactly what the CES satellite map
+// should lock onto the instant this page opens — even before a fresh fix resolves
+// and regardless of how coarse (>15 m) that fix is. Field teams must never wait.
+const readPrewarmMapSeed = (): InstantMapSeed | null => {
+  try {
+    const c = getLastPrewarmCenter();
+    if (c && finiteCoord(c.lat) !== null && finiteCoord(c.lng) !== null) {
+      // Accept coarse accuracy: locking must not be gated on a <15 m fix.
+      return { lat: c.lat, lng: c.lng, accuracy: 60, source: "last_known" };
+    }
+  } catch { /* ignore */ }
+  return null;
+};
+
 
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
@@ -295,7 +312,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   // Step 1 — Locate & boundaries
   const [gps, setGps] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
-  const [mapSeed, setMapSeed] = useState<InstantMapSeed>(() => seedFromPrefill(readCesLocationPrefill().prefill) ?? readLastKnownMapSeed() ?? CES_DEFAULT_MAP_SEED);
+  const [mapSeed, setMapSeed] = useState<InstantMapSeed>(() => seedFromPrefill(readCesLocationPrefill().prefill) ?? readPrewarmMapSeed() ?? readLastKnownMapSeed() ?? CES_DEFAULT_MAP_SEED);
   const [gpsWatching, setGpsWatching] = useState(false);
   const [perimeter, setPerimeter] = useState<LatLng[]>([]);
   const [recordingPerimeter, setRecordingPerimeter] = useState(false);
