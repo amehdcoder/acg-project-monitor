@@ -254,10 +254,13 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
     { name: "No Change", value: analysis.noChangeCount, color: COLORS.accent },
   ].filter(d => d.value > 0), [analysis]);
 
-  const passRateComparison = useMemo(() => [
-    { name: "Pre-test", Passed: analysis.prePassRate, Failed: 100 - analysis.prePassRate },
-    { name: "Post-test", Passed: analysis.postPassRate, Failed: 100 - analysis.postPassRate },
-  ], [analysis]);
+  const passRateComparison = useMemo(() => {
+    const rows: any[] = [];
+    if (analysis.hasPre) rows.push({ name: "Pre-test", Passed: analysis.prePassRate, Failed: 100 - analysis.prePassRate });
+    if (analysis.hasPost) rows.push({ name: "Post-test", Passed: analysis.postPassRate, Failed: 100 - analysis.postPassRate });
+    return rows;
+  }, [analysis]);
+
 
   const scatterData = useMemo(() =>
     analysis.pairedData.map(p => ({
