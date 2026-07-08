@@ -25,7 +25,7 @@ import { format } from "date-fns";
 import {
   Plus, Trash2, Save, Eye, Send, ChevronUp, ChevronDown,
   BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, CalendarIcon, Users, UserPlus, Archive, Eraser,
-  Lock, LockOpen, DoorOpen, DoorClosed, Sparkles,
+  Lock, LockOpen, DoorOpen, DoorClosed, Sparkles, RotateCcw,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,6 +61,8 @@ const QuizBuilder = () => {
   const { user, isAdmin, isOwner } = useAuth();
   const [confirmDeleteQuiz, setConfirmDeleteQuiz] = useState<Quiz | null>(null);
   const [confirmClearQuiz, setConfirmClearQuiz] = useState<Quiz | null>(null);
+  const [confirmReset, setConfirmReset] = useState<{ quiz: Quiz; type: "pre_test" | "post_test" | null } | null>(null);
+  const [resetBusy, setResetBusy] = useState(false);
   const [submissionAction, setSubmissionAction] = useState(false);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
@@ -80,7 +82,7 @@ const QuizBuilder = () => {
   const [newPostTestDate, setNewPostTestDate] = useState<Date | undefined>(undefined);
   const [newPostTestTime, setNewPostTestTime] = useState("09:00");
   const [newTimeLimit, setNewTimeLimit] = useState<number | "">("");
-  const [newPassingScore, setNewPassingScore] = useState(50);
+  const [newPassingScore, setNewPassingScore] = useState(70);
 
   // Assignment state
   const [allUsers, setAllUsers] = useState<{ user_id: string; first_name: string; last_name: string; email: string }[]>([]);
@@ -369,6 +371,29 @@ const QuizBuilder = () => {
     }
   };
 
+  // Admin-only: reset a specific test type (or both) so authorized members can
+  // retake it. Previous attempts are archived server-side before removal.
+  const resetAttempts = async (quiz: Quiz, type: "pre_test" | "post_test" | null) => {
+    setResetBusy(true);
+    try {
+      const { data, error } = await supabase.rpc("reset_quiz_attempts", {
+        p_quiz_id: quiz.id,
+        p_attempt_type: type,
+      });
+      if (error) throw error;
+      const label = type === "pre_test" ? "Pre-test" : type === "post_test" ? "Post-test" : "Pre-test & Post-test";
+      toast({
+        title: `${label} reset`,
+        description: `${data ?? 0} attempt${data === 1 ? "" : "s"} archived and cleared. Assigned members can retake it now.`,
+      });
+    } catch (e: any) {
+      toast({ title: "Could not reset attempts", description: e.message, variant: "destructive" });
+    } finally {
+      setResetBusy(false);
+      setConfirmReset(null);
+    }
+  };
+
 
   const getPostTestDisplay = (quiz: Quiz) => {
     if (quiz.post_test_datetime) {
@@ -649,6 +674,40 @@ const QuizBuilder = () => {
                       <Loader2 className="h-3 w-3 animate-spin" /> Updating access…
                     </div>
                   )}
+
+                  {/* Reset a test type so authorized members can retake it (attempts are archived first). */}
+                  <div className="rounded-2xl border border-dashed border-border/70 bg-background/50 p-3.5">
+                    <div className="flex items-center gap-2">
+                      <RotateCcw className="h-4 w-4 text-amber-600" />
+                      <span className="text-sm font-semibold text-foreground">Reset attempts</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1 mb-2.5">
+                      Archive & clear a test so assigned members can take it again when authorized.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm" variant="outline" disabled={resetBusy}
+                        onClick={() => setConfirmReset({ quiz: selectedQuiz, type: "pre_test" })}
+                        className="gap-1 text-blue-600"
+                      >
+                        <RotateCcw className="h-3 w-3" /> Reset Pre-test
+                      </Button>
+                      <Button
+                        size="sm" variant="outline" disabled={resetBusy}
+                        onClick={() => setConfirmReset({ quiz: selectedQuiz, type: "post_test" })}
+                        className="gap-1 text-emerald-600"
+                      >
+                        <RotateCcw className="h-3 w-3" /> Reset Post-test
+                      </Button>
+                      <Button
+                        size="sm" variant="outline" disabled={resetBusy}
+                        onClick={() => setConfirmReset({ quiz: selectedQuiz, type: null })}
+                        className="gap-1 text-amber-600"
+                      >
+                        <RotateCcw className="h-3 w-3" /> Reset Both
+                      </Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             );
@@ -963,7 +1022,7 @@ const QuizBuilder = () => {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="form-label">Passing Score (%)</Label>
-                <Input type="number" min={0} max={100} value={newPassingScore} onChange={e => setNewPassingScore(parseInt(e.target.value) || 50)} className="form-input" />
+                <Input type="number" min={0} max={100} value={newPassingScore} onChange={e => setNewPassingScore(parseInt(e.target.value) || 70)} className="form-input" />
               </div>
               <div className="space-y-2">
                 <Label className="form-label">Time Limit (min)</Label>
@@ -1082,7 +1141,32 @@ const QuizBuilder = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={!!confirmReset} onOpenChange={(o) => !o && setConfirmReset(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Reset {confirmReset?.type === "pre_test" ? "Pre-test" : confirmReset?.type === "post_test" ? "Post-test" : "both tests"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This archives and clears the {confirmReset?.type === "pre_test" ? "Pre-test" : confirmReset?.type === "post_test" ? "Post-test" : "Pre-test and Post-test"} attempts
+              for <strong>{confirmReset?.quiz.title}</strong>, so assigned members can take it again. Archived
+              results remain available for reference.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={resetBusy}
+              onClick={() => confirmReset && resetAttempts(confirmReset.quiz, confirmReset.type)}
+            >
+              {resetBusy ? "Resetting…" : "Reset"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+
 
   );
 };
