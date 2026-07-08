@@ -767,6 +767,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     }
   }, [selectedProjectId]);
 
+  // Never leave the Forms page stuck on the loading skeleton when offline. The
+  // network fetches are skipped offline, so if auth resolution is slow the
+  // `loading` flag would otherwise stay true forever and hide the cached forms.
+  // Force it false as soon as we know we're offline so mergedForms (the cached
+  // copies) render immediately — exactly like KoboCollect opening downloaded
+  // forms with no connection.
+  useEffect(() => {
+    if (!isOnline) setLoading(false);
+  }, [isOnline]);
+
+
   useEffect(() => {
     if (authLoading) return;
     if (currentProjectId) {
