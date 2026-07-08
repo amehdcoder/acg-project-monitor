@@ -1112,7 +1112,82 @@ const QuizBuilder = () => {
         </div>
       )}
 
+      {/* Quiz Settings Dialog (pass mark + custom messages) */}
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-indigo-600" /> Grading settings</DialogTitle>
+            <DialogDescription>Adjust the pass mark and the messages members see on their result screen.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div>
+              <Label className="form-label">Passing Score (%)</Label>
+              <Input type="number" min={0} max={100} value={settingsScore} onChange={(e) => setSettingsScore(parseInt(e.target.value) || 0)} className="form-input" />
+            </div>
+            <div>
+              <Label className="form-label">Pass message (optional)</Label>
+              <Textarea value={settingsPass} onChange={(e) => setSettingsPass(e.target.value)} placeholder="e.g. Congratulations! You've demonstrated strong knowledge." className="form-input" />
+            </div>
+            <div>
+              <Label className="form-label">Fail message (optional)</Label>
+              <Textarea value={settingsFail} onChange={(e) => setSettingsFail(e.target.value)} placeholder="e.g. Keep going — review the material and try again when authorized." className="form-input" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSettings(false)}>Cancel</Button>
+            <Button onClick={saveQuizSettings} disabled={settingsBusy} className="gap-1.5">
+              {settingsBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save settings
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Release Results Dialog */}
+      <Dialog open={showRelease} onOpenChange={setShowRelease}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Send className="h-5 w-5 text-fuchsia-600" /> Release results by email</DialogTitle>
+            <DialogDescription>Selected members receive a colorful summary with their Pre-test vs Post-test statistical analysis.</DialogDescription>
+          </DialogHeader>
+          <Input value={releaseSearch} onChange={(e) => setReleaseSearch(e.target.value)} placeholder="Search members…" className="form-input" />
+          <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+            <span>{releaseSelected.size} selected</span>
+            <button type="button" className="text-primary font-medium" onClick={() => setReleaseSelected(new Set(releaseUsers.map((u) => u.user_id)))}>Select all</button>
+          </div>
+          <div className="flex-1 overflow-y-auto space-y-1.5 -mx-1 px-1">
+            {releaseLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center"><Loader2 className="h-4 w-4 animate-spin" /> Loading members…</div>
+            ) : releaseUsers.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">No members are assigned to this quiz yet.</p>
+            ) : (
+              releaseUsers
+                .filter((u) => !releaseSearch.trim() || u.name.toLowerCase().includes(releaseSearch.toLowerCase()) || (u.email ?? "").toLowerCase().includes(releaseSearch.toLowerCase()))
+                .map((u) => (
+                  <label key={u.user_id} className="flex items-center gap-3 rounded-xl border border-border bg-background/60 p-2.5 cursor-pointer hover:bg-muted/40">
+                    <Checkbox checked={releaseSelected.has(u.user_id)} onCheckedChange={() => toggleRelease(u.user_id)} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-foreground truncate">{u.name}</div>
+                      <div className="text-[11px] text-muted-foreground truncate">{u.email || "no email on file"}</div>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold", u.hasPre ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground")}>Pre</span>
+                      <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold", u.hasPost ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground")}>Post</span>
+                    </div>
+                  </label>
+                ))
+            )}
+          </div>
+          <DialogFooter className="pt-2 border-t">
+            <Button variant="outline" onClick={() => setShowRelease(false)}>Cancel</Button>
+            <Button onClick={releaseResults} disabled={releaseBusy || releaseSelected.size === 0} className="gap-1.5 bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white hover:opacity-90">
+              {releaseBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send results
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Create Quiz Dialog */}
+
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
