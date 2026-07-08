@@ -981,13 +981,19 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     // Priority: app-wide GPS warmer cache → cross-session LKG → checklist
     // handoff seed. The live high-accuracy watch below then refines it.
     const warm = getFreshWarmFix() ?? getBestWarmFix();
+    // Persisted pre-warm centre from the checklist GPS capture — used so the map
+    // locks to the device's real location even after a cold start with no in-memory
+    // warm fix. Coarse accuracy is fine: locking must never wait for a <15 m fix.
+    const prewarm = getLastPrewarmCenter();
     const instantSeed =
       warm ??
       (lkgRef.current
         ? { lat: lkgRef.current.lat, lng: lkgRef.current.lng, accuracy: Math.max(lkgRef.current.accuracy, 25), timestamp: Date.now() }
-        : (mapSeed.source === "handoff" || mapSeed.source === "last_known")
-          ? { lat: mapSeed.lat, lng: mapSeed.lng, accuracy: Math.max(mapSeed.accuracy, 50), timestamp: Date.now() }
-          : null);
+        : prewarm
+          ? { lat: prewarm.lat, lng: prewarm.lng, accuracy: 60, timestamp: prewarm.ts || Date.now() }
+          : (mapSeed.source === "handoff" || mapSeed.source === "last_known")
+            ? { lat: mapSeed.lat, lng: mapSeed.lng, accuracy: Math.max(mapSeed.accuracy, 50), timestamp: Date.now() }
+            : null);
     if (instantSeed) {
       applyFix(
         {
