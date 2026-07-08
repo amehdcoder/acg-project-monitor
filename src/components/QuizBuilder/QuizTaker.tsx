@@ -201,6 +201,31 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
     );
   }
 
+  // Quiz is closed for members until an admin opens a test type.
+  if (closedForMembers && !(submitted && result)) {
+    return (
+      <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
+        <Button variant="outline" size="sm" onClick={onClose} className="gap-1">
+          <ArrowLeft className="h-4 w-4" /> Back to Quizzes
+        </Button>
+        <QuizHeroBanner title={quiz.title} subtitle={quiz.description || "Every Child Healthy. Every Future Bright."} />
+        <Card className="form-card">
+          <CardContent className="py-12 text-center space-y-3">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <Lock className="h-8 w-8" />
+            </div>
+            <CardTitle className="text-lg">This quiz is currently closed</CardTitle>
+            <CardDescription className="max-w-sm mx-auto">
+              An administrator has not opened this quiz yet. Please check back — the Pre-test or
+              Post-test will appear here the moment it is opened.
+            </CardDescription>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+
   // Show results after submission or when can't take post-test yet
   if (submitted && result) {
     const preAttempt = existingAttempts.find((a: any) => a.attempt_type === "pre_test");
