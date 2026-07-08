@@ -767,6 +767,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     }
   }, [selectedProjectId]);
 
+  // Never leave the Forms page stuck on the loading skeleton when offline. The
+  // network fetches are skipped offline, so if auth resolution is slow the
+  // `loading` flag would otherwise stay true forever and hide the cached forms.
+  // Force it false as soon as we know we're offline so mergedForms (the cached
+  // copies) render immediately — exactly like KoboCollect opening downloaded
+  // forms with no connection.
+  useEffect(() => {
+    if (!isOnline) setLoading(false);
+  }, [isOnline]);
+
+
   useEffect(() => {
     if (authLoading) return;
     if (currentProjectId) {
@@ -3182,7 +3193,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 description: form.description,
                                 status: form.status,
                                 project_id: form.project_id,
-                                questions: form.questions,
+                                // Recombine grouped + ungrouped items so the
+                                // offline copy is COMPLETE. `form` is a
+                                // renderable form whose `questions` holds only
+                                // ungrouped items and whose grouped sections
+                                // live in `form.groups`; saving `form.questions`
+                                // alone silently dropped every grouped section
+                                // and made grouped forms open empty offline.
+                                questions: [
+                                  ...(((form.groups as unknown) as any[]) || []),
+                                  ...(((form.questions as unknown) as any[]) || []),
+                                ] as any,
                                 geofence: form.geofence,
                                 settings: form.settings,
                                 updated_at: form.updated_at,
