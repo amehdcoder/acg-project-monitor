@@ -7,6 +7,9 @@
 // Uses DSS Internal AI Gateway (Gemini 2.5 Flash) vision on Esri World Imagery
 // (no API key required).
 
+import { guardRequest } from "../_shared/authGuard.ts";
+
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
