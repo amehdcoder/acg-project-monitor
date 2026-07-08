@@ -80,7 +80,7 @@ const QuizBuilder = () => {
   const [newPostTestDate, setNewPostTestDate] = useState<Date | undefined>(undefined);
   const [newPostTestTime, setNewPostTestTime] = useState("09:00");
   const [newTimeLimit, setNewTimeLimit] = useState<number | "">("");
-  const [newPassingScore, setNewPassingScore] = useState(50);
+  const [newPassingScore, setNewPassingScore] = useState(70);
 
   // Assignment state
   const [allUsers, setAllUsers] = useState<{ user_id: string; first_name: string; last_name: string; email: string }[]>([]);
@@ -963,7 +963,7 @@ const QuizBuilder = () => {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="form-label">Passing Score (%)</Label>
-                <Input type="number" min={0} max={100} value={newPassingScore} onChange={e => setNewPassingScore(parseInt(e.target.value) || 50)} className="form-input" />
+                <Input type="number" min={0} max={100} value={newPassingScore} onChange={e => setNewPassingScore(parseInt(e.target.value) || 70)} className="form-input" />
               </div>
               <div className="space-y-2">
                 <Label className="form-label">Time Limit (min)</Label>
