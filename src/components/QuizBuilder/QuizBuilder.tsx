@@ -892,7 +892,6 @@ const QuizBuilder = () => {
               </Card>
               );
             })
-            ))
           )}
         </div>
       )}
