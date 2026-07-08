@@ -347,10 +347,11 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
         {[
           { icon: Users, label: "Participants", value: analysis.totalParticipants, color: "text-primary", bg: "bg-primary/10" },
           { icon: BarChart3, label: "Pre-test Mean", value: `${analysis.preMean}%`, color: "text-blue-600", bg: "bg-blue-100 dark:bg-blue-900/30" },
-          { icon: TrendingUp, label: "Post-test Mean", value: `${analysis.postMean}%`, color: "text-emerald-600", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
+          { icon: TrendingUp, label: "Post-test Mean", value: analysis.hasPost ? `${analysis.postMean}%` : "—", color: "text-emerald-600", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
           { icon: Target, label: "Paired Tests", value: analysis.pairedCount, color: "text-amber-600", bg: "bg-amber-100 dark:bg-amber-900/30" },
-          { icon: Percent, label: "Pre Pass Rate", value: `${analysis.prePassRate}%`, color: "text-violet-600", bg: "bg-violet-100 dark:bg-violet-900/30" },
-          { icon: Award, label: "Post Pass Rate", value: `${analysis.postPassRate}%`, color: "text-rose-600", bg: "bg-rose-100 dark:bg-rose-900/30" },
+          { icon: Percent, label: "Pre Pass Rate", value: analysis.hasPre ? `${analysis.prePassRate}%` : "—", color: "text-violet-600", bg: "bg-violet-100 dark:bg-violet-900/30" },
+          { icon: Award, label: "Post Pass Rate", value: analysis.hasPost ? `${analysis.postPassRate}%` : "—", color: "text-rose-600", bg: "bg-rose-100 dark:bg-rose-900/30" },
+
         ].map((kpi, i) => (
           <Card key={i} className="form-card border-0 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="py-4 text-center">
