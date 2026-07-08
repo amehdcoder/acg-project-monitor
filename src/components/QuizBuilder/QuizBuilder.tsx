@@ -371,6 +371,29 @@ const QuizBuilder = () => {
     }
   };
 
+  // Admin-only: reset a specific test type (or both) so authorized members can
+  // retake it. Previous attempts are archived server-side before removal.
+  const resetAttempts = async (quiz: Quiz, type: "pre_test" | "post_test" | null) => {
+    setResetBusy(true);
+    try {
+      const { data, error } = await supabase.rpc("reset_quiz_attempts", {
+        p_quiz_id: quiz.id,
+        p_attempt_type: type,
+      });
+      if (error) throw error;
+      const label = type === "pre_test" ? "Pre-test" : type === "post_test" ? "Post-test" : "Pre-test & Post-test";
+      toast({
+        title: `${label} reset`,
+        description: `${data ?? 0} attempt${data === 1 ? "" : "s"} archived and cleared. Assigned members can retake it now.`,
+      });
+    } catch (e: any) {
+      toast({ title: "Could not reset attempts", description: e.message, variant: "destructive" });
+    } finally {
+      setResetBusy(false);
+      setConfirmReset(null);
+    }
+  };
+
 
   const getPostTestDisplay = (quiz: Quiz) => {
     if (quiz.post_test_datetime) {
