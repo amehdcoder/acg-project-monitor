@@ -812,18 +812,34 @@ const QuizBuilder = () => {
               </CardContent>
             </Card>
           ) : (
-            quizzes.map(quiz => (
+            quizzes.map((quiz, idx) => {
+              const accents = [
+                "from-indigo-500 to-fuchsia-500",
+                "from-emerald-500 to-teal-500",
+                "from-amber-500 to-orange-500",
+                "from-sky-500 to-blue-600",
+                "from-rose-500 to-pink-500",
+                "from-violet-500 to-purple-600",
+              ];
+              const accent = accents[idx % accents.length];
+              return (
               <Card
                 key={quiz.id}
-                className="form-card cursor-pointer hover:shadow-card transition-shadow"
+                className="form-card group relative cursor-pointer overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-card"
                 onClick={() => { setSelectedQuiz(quiz); if (isAdmin) fetchQuestions(quiz.id); }}
               >
-                <CardHeader className="pb-2">
+                <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${accent}`} />
+                <CardHeader className="pb-2 pt-5">
                   <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-base">{quiz.title}</CardTitle>
+                    <div className="flex items-start gap-2.5">
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${accent} text-white shadow-sm`}>
+                        <BookOpen className="h-4.5 w-4.5" />
+                      </span>
+                      <CardTitle className="text-base leading-snug">{quiz.title}</CardTitle>
+                    </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       {quiz.open_test_type ? (
-                        <Badge className="gap-1 text-[10px] bg-emerald-600 hover:bg-emerald-600">
+                        <Badge className="gap-1 bg-emerald-600 text-[10px] hover:bg-emerald-600">
                           <LockOpen className="h-2.5 w-2.5" />
                           {quiz.open_test_type === "pre_test" ? "Pre-test open" : "Post-test open"}
                         </Badge>
@@ -836,23 +852,27 @@ const QuizBuilder = () => {
                   </div>
 
                   {quiz.description && (
-                    <CardDescription className="line-clamp-2">{quiz.description}</CardDescription>
+                    <CardDescription className="line-clamp-2 pt-1">{quiz.description}</CardDescription>
                   )}
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-1 font-medium text-muted-foreground">
                       <CalendarIcon className="h-3 w-3" />
-                      Post-test: {getPostTestDisplay(quiz)}
+                      {getPostTestDisplay(quiz)}
                     </span>
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                       <Award className="h-3 w-3" />
                       {quiz.passing_score}% pass
                     </span>
                   </div>
-                  <div className="flex gap-2 mt-3">
+                  <div className="mt-3 flex gap-2">
                     {quiz.is_published && (
-                      <Button size="sm" variant="outline" onClick={e => { e.stopPropagation(); setShowTaker(quiz); }} className="gap-1 text-xs">
+                      <Button
+                        size="sm"
+                        onClick={e => { e.stopPropagation(); setShowTaker(quiz); }}
+                        className={`gap-1 bg-gradient-to-r ${accent} text-xs text-white shadow-sm hover:opacity-90`}
+                      >
                         <Eye className="h-3 w-3" /> Take
                       </Button>
                     )}
@@ -870,6 +890,8 @@ const QuizBuilder = () => {
                   </div>
                 </CardContent>
               </Card>
+              );
+            })
             ))
           )}
         </div>
