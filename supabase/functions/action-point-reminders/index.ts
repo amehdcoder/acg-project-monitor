@@ -28,6 +28,11 @@ function stageFor(days: number): "approaching" | "due" | "overdue" | "none" {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
 
+  const guard = await guardRequest(req, cors);
+  if (guard.response) return guard.response;
+
+
+
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
