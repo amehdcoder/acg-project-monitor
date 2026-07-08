@@ -250,16 +250,58 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
 
   // Member has already taken this test type — show a rich, celebratory "already completed" screen.
   if (alreadyTaken && submitted && result) {
-    const label = attemptType === "pre_test" ? "Pre-test" : "Post-test";
-    const otherLabel = attemptType === "pre_test" ? "Post-test" : "Pre-test";
+    const label = quizT(language, attemptType === "pre_test" ? "preLabel" : "postLabel");
+    const otherLabel = quizT(language, attemptType === "pre_test" ? "postLabel" : "preLabel");
+    const preLabel = quizT(language, "preLabel");
+    const postLabel = quizT(language, "postLabel");
+    const preAttempt = existingAttempts.find((a: any) => a.attempt_type === "pre_test");
+    const postAttempt = existingAttempts.find((a: any) => a.attempt_type === "post_test");
+
+    const fmtDate = (iso?: string | null) => {
+      if (!iso) return null;
+      try {
+        return new Intl.DateTimeFormat(language, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(new Date(iso));
+      } catch {
+        return new Date(iso).toLocaleString();
+      }
+    };
+
+    const HistoryRow = ({ rowLabel, attempt, accent }: { rowLabel: string; attempt: any; accent: string }) => (
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/60 p-3">
+        <div className="min-w-0">
+          <p className={`text-xs font-bold uppercase tracking-wide ${accent}`}>{rowLabel}</p>
+          {attempt ? (
+            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+              {fmtDate(attempt.completed_at || attempt.created_at)}
+            </p>
+          ) : (
+            <p className="mt-0.5 text-[11px] italic text-muted-foreground">{quizT(language, "notTakenYet")}</p>
+          )}
+        </div>
+        <div className="flex-none text-right">
+          {attempt ? (
+            <>
+              <p className="text-base font-extrabold text-foreground">{Math.round(Number(attempt.percentage))}%</p>
+              <p className="text-[10px] text-muted-foreground">{Number(attempt.score)}/{Number(attempt.total_points)}</p>
+            </>
+          ) : (
+            <p className="text-base font-bold text-muted-foreground/50">—</p>
+          )}
+        </div>
+      </div>
+    );
+
     return (
       <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
         <Button variant="outline" size="sm" onClick={onClose} className="gap-1">
-          <ArrowLeft className="h-4 w-4" /> Back to Quizzes
+          <ArrowLeft className="h-4 w-4" /> {quizT(language, "back")}
         </Button>
 
         <Card className="form-card overflow-hidden">
-          <div className="relative overflow-hidden bg-gradient-to-br from-violet-600 via-indigo-500 to-sky-400 px-6 pb-8 pt-9 text-center">
+          <div className="relative overflow-hidden bg-gradient-to-br from-violet-600 via-indigo-500 to-sky-400 px-4 pb-8 pt-9 text-center sm:px-6">
             <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
             <div className="pointer-events-none absolute -bottom-12 -left-8 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
             <div className="pointer-events-none absolute right-6 top-6 opacity-40">
@@ -268,14 +310,13 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
             <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/20 ring-4 ring-white/30 backdrop-blur-sm">
               <ShieldCheck className="h-10 w-10 text-white" />
             </div>
-            <h3 className="relative mt-4 text-2xl font-extrabold text-white drop-shadow">
-              {label} Already Completed
+            <h3 className="relative mt-4 text-xl font-extrabold leading-tight text-white drop-shadow sm:text-2xl">
+              {quizT(language, "completedTitle", { label })}
             </h3>
             <p className="relative mx-auto mt-2 max-w-sm text-sm font-medium text-white/90">
-              You have already submitted your {label.toLowerCase()} for <strong>{quiz.title}</strong>.
-              Each participant may take the {label.toLowerCase()} only <strong>once</strong>, so it can’t be retaken.
+              {quizT(language, "completedDesc", { label, title: quiz.title })}
             </p>
-            <div className="relative mt-5 inline-flex items-center gap-2 rounded-full bg-white/20 px-5 py-2 backdrop-blur-sm ring-1 ring-white/30">
+            <div className="relative mt-5 inline-flex flex-wrap items-center justify-center gap-2 rounded-full bg-white/20 px-5 py-2 backdrop-blur-sm ring-1 ring-white/30">
               <Trophy className="h-4 w-4 text-white" />
               <span className="text-lg font-black text-white">{Math.round(result.percentage)}%</span>
               <span className="text-xs font-semibold uppercase tracking-wider text-white/80">
@@ -285,23 +326,34 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
           </div>
           <CardContent className="space-y-4 pt-6">
             <Progress value={result.percentage} className="h-3" />
+
+            {/* Attempt history for both test types (date/time + score). */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <CalendarClock className="h-4 w-4 text-indigo-500" />
+                <p className="text-sm font-semibold text-foreground">{quizT(language, "history")}</p>
+              </div>
+              <HistoryRow rowLabel={preLabel} attempt={preAttempt} accent="text-blue-600 dark:text-blue-400" />
+              <HistoryRow rowLabel={postLabel} attempt={postAttempt} accent="text-emerald-600 dark:text-emerald-400" />
+            </div>
+
             <div className="flex items-start gap-3 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-sky-50 p-4 dark:border-indigo-900/50 dark:from-indigo-950/40 dark:to-sky-950/20">
               <div className="mt-0.5 flex h-9 w-9 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/60 dark:text-indigo-300">
                 <CalendarClock className="h-5 w-5" />
               </div>
               <div className="text-sm text-muted-foreground">
-                Your {label.toLowerCase()} result is safely recorded. The <strong>{otherLabel}</strong> will
-                appear here automatically the moment an administrator opens it.
+                {quizT(language, "nextInfo", { label, other: otherLabel })}
               </div>
             </div>
             <Button variant="outline" className="w-full" onClick={onClose}>
-              Return to Quizzes
+              {quizT(language, "back")}
             </Button>
           </CardContent>
         </Card>
       </div>
     );
   }
+
 
 
   if (submitted && result) {
