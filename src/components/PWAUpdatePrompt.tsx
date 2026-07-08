@@ -109,12 +109,6 @@ const PWAUpdatePrompt = () => {
     const isOffline = typeof navigator !== "undefined" && navigator.onLine === false;
 
     if (isAutoUpdateEnabled() && !inCooldown && !isOffline && !shouldSkipServiceWorker && !hasActiveUserFormProgress()) {
-      try {
-        localStorage.setItem(APPLIED_BUILD_ID_KEY, latestId);
-        localStorage.setItem(APPLIED_BUILD_AT_KEY, String(Date.now()));
-      } catch (error) {
-        console.warn("Unable to persist last applied app update", error);
-      }
       hardReloadToLatest().catch((err) => {
         console.error("Auto-update failed, falling back to manual prompt", err);
         if (!isSnoozed(latestId)) setShowModal(true);
