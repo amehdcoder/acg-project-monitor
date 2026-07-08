@@ -219,6 +219,28 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
 export const APPLIED_BUILD_AT_KEY = "app_last_applied_at_v1";
 export const APPLIED_BUILD_ID_KEY = "app_last_applied_build_v1";
 
+const reloadProbe = async (): Promise<boolean> => {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
+  try {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 7000);
+    try {
+      const res = await fetch(`/version.json?__reload_probe=${Date.now()}`, {
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { "Cache-Control": "no-cache" },
+        signal: controller.signal,
+      });
+      return res.ok;
+    } finally {
+      window.clearTimeout(timer);
+    }
+  } catch (error) {
+    console.warn("[UpdateManager] Reload probe failed; keeping current app shell", error);
+    return false;
+  }
+};
+
 export const getLastAppliedAt = (): number | null => {
   try {
     const raw = localStorage.getItem(APPLIED_BUILD_AT_KEY);
@@ -254,14 +276,20 @@ try {
 export const hardReloadToLatest = async () => {
   setState({ status: "updating", error: null });
   prepareSilentFormRestoreForUpdate();
-  try {
-    if ("caches" in window) {
-      const names = await caches.keys();
-      await Promise.all(names.map((name) => caches.delete(name)));
-    }
-  } catch (error) {
-    console.warn("[UpdateManager] Unable to clear caches before update", error);
+
+  // Never delete the app-shell/precache before a navigation. On weak Android
+  // networks that can strand users on Chrome's generic "site can't be reached"
+  // page. First prove the branded domain is reachable; if it is not, keep the
+  // currently running shell intact and retry from the normal polling loop.
+  const canReload = await reloadProbe();
+  if (!canReload) {
+    setState({
+      status: "error",
+      error: "The app will update automatically when the connection is stable.",
+    });
+    return;
   }
+
   try {
     localStorage.removeItem(SNOOZE_KEY);
   } catch (error) {
@@ -279,9 +307,9 @@ export const hardReloadToLatest = async () => {
 
   try {
     const registrations = await navigator.serviceWorker?.getRegistrations();
-    await Promise.all((registrations || []).map((registration) => registration.unregister()));
+    await Promise.all((registrations || []).map((registration) => registration.update().catch(() => {})));
   } catch (error) {
-    console.warn("[UpdateManager] Unable to unregister service workers", error);
+    console.warn("[UpdateManager] Unable to refresh service workers", error);
   }
 
   try {

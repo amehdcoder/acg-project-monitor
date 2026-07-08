@@ -43,25 +43,46 @@ window.addEventListener("error", (e) => {
           <div style="font-size:42px;">⚠️</div>
           <h1 style="font-size:20px;margin:8px 0;">App failed to start</h1>
           <p style="font-size:13px;color:#64748b;margin:0 0 16px;">${(e?.message || "Unknown error").toString().slice(0, 200)}</p>
-          <button onclick="(async()=>{try{const a=JSON.parse(localStorage.getItem('amehnities_active_form_fill_v1')||'null');if(a&&a.formId&&a.hasUserProgress===true){sessionStorage.setItem('amehnities_silent_update_restore_v1',JSON.stringify({formId:a.formId,draftKey:'form_draft_'+a.formId,at:Date.now()}));}}catch(_){}try{const n=await caches.keys();await Promise.all(n.map(x=>caches.delete(x)));const r=await navigator.serviceWorker?.getRegistrations();await Promise.all((r||[]).map(x=>x.unregister()));}catch(_){};const u=new URL(location.href);u.searchParams.set('__app_update',Date.now());location.replace(u.toString());})()" style="padding:10px 18px;border:none;border-radius:8px;background:#2563eb;color:white;font-weight:600;cursor:pointer;">Refresh to latest</button>
+          <button onclick="(async()=>{try{const a=JSON.parse(localStorage.getItem('amehnities_active_form_fill_v1')||'null');if(a&&a.formId&&a.hasUserProgress===true){sessionStorage.setItem('amehnities_silent_update_restore_v1',JSON.stringify({formId:a.formId,draftKey:'form_draft_'+a.formId,at:Date.now()}));}}catch(_){}if(navigator.onLine===false){alert('Your saved app is still available. Connect to the internet before refreshing to the latest version.');return;}const u=new URL(location.href);u.searchParams.set('__app_update',Date.now());location.replace(u.toString());})()" style="padding:10px 18px;border:none;border-radius:8px;background:#2563eb;color:white;font-weight:600;cursor:pointer;">Refresh to latest</button>
         </div>
       </div>`;
   }
 });
 
 // Self-heal stale chunks after a deploy: if a dynamic import fails because
-// the old chunk hash no longer exists, purge caches and reload once.
+// the old chunk hash no longer exists, reload once only after proving the
+// branded domain is reachable. This avoids stranding weak-network Android
+// users on Chrome's generic "site can't be reached" page.
 const CHUNK_RELOAD_KEY = "__chunk_global_reload__";
 const isChunkErr = (msg: string) =>
   /Loading chunk|Failed to fetch dynamically imported|ChunkLoadError|Importing a module script failed|error loading dynamically imported module/i.test(msg || "");
+
+const canReachAppShell = async () => {
+  if (navigator.onLine === false) return false;
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 7000);
+  try {
+    const res = await fetch(`/version.json?__shell_probe=${Date.now()}`, {
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { "Cache-Control": "no-cache" },
+      signal: controller.signal,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    window.clearTimeout(timer);
+  }
+};
 
 const tryChunkRecover = async (msg: string) => {
   if (!isChunkErr(msg)) return;
   try {
     if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) return;
+    if (!(await canReachAppShell())) return;
     sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
     prepareSilentFormRestoreForUpdate();
-    try { const k = await caches.keys(); await Promise.all(k.map((x) => caches.delete(x))); } catch {}
     const u = new URL(location.href);
     u.searchParams.set("__chunk_retry", String(Date.now()));
     location.replace(u.toString());
@@ -134,11 +155,8 @@ createRoot(document.getElementById("root")!).render(
 );
 
 // First-paint watchdog: if React never paints anything into #root within
-// 8 seconds (stale service worker hijacked a fetch, broken cached chunk,
-// failed module preload, etc.), purge every cache + unregister every SW
-// and hard-reload to the latest index.html. This is the eternal cure for
-// the "white screen of death" after a deploy on any host (Lovable preview,
-// acgcollect.lovable.app, or the Hostinger mirror).
+// 8 seconds, recover without deleting the offline app shell. Reload only when
+// the branded host is reachable; otherwise show a local recovery panel.
 const WHITE_SCREEN_GUARD_KEY = "__white_screen_recovery_attempted__";
 setTimeout(async () => {
   const root = document.getElementById("root");
@@ -148,14 +166,18 @@ setTimeout(async () => {
     sessionStorage.setItem(WHITE_SCREEN_GUARD_KEY, "1");
     prepareSilentFormRestoreForUpdate();
     try { recordError("error", new Error("white-screen-watchdog: #root empty after 8s"), {}); } catch {}
-    try {
-      const regs = await navigator.serviceWorker?.getRegistrations();
-      await Promise.all((regs || []).map((r) => r.unregister()));
-    } catch {}
-    try {
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
-    } catch {}
+    if (!(await canReachAppShell())) {
+      root.innerHTML = `
+        <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui;padding:24px;background:#f5f7fa;color:#0f172a;">
+          <div style="max-width:420px;text-align:center;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 18px 45px rgba(15,23,42,.12);">
+            <div style="font-size:42px;">📡</div>
+            <h1 style="font-size:20px;margin:8px 0;">Connection unavailable</h1>
+            <p style="font-size:13px;color:#64748b;margin:0 0 16px;">Reconnect to the internet, then reopen Amehnities. Your saved offline data remains protected on this device.</p>
+            <button onclick="location.reload()" style="padding:10px 18px;border:none;border-radius:8px;background:#2563eb;color:white;font-weight:600;cursor:pointer;">Try again</button>
+          </div>
+        </div>`;
+      return;
+    }
     const u = new URL(location.href);
     u.searchParams.set("__white_screen_recovery", String(Date.now()));
     location.replace(u.toString());
