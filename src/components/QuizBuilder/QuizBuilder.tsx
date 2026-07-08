@@ -25,7 +25,7 @@ import { format } from "date-fns";
 import {
   Plus, Trash2, Save, Eye, Send, ChevronUp, ChevronDown,
   BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, CalendarIcon, Users, UserPlus, Archive, Eraser,
-  Lock, LockOpen, DoorOpen, DoorClosed, Sparkles,
+  Lock, LockOpen, DoorOpen, DoorClosed, Sparkles, RotateCcw,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
