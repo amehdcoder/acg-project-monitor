@@ -50,15 +50,37 @@ window.addEventListener("error", (e) => {
 });
 
 // Self-heal stale chunks after a deploy: if a dynamic import fails because
-// the old chunk hash no longer exists, purge caches and reload once.
+// the old chunk hash no longer exists, reload once only after proving the
+// branded domain is reachable. This avoids stranding weak-network Android
+// users on Chrome's generic "site can't be reached" page.
 const CHUNK_RELOAD_KEY = "__chunk_global_reload__";
 const isChunkErr = (msg: string) =>
   /Loading chunk|Failed to fetch dynamically imported|ChunkLoadError|Importing a module script failed|error loading dynamically imported module/i.test(msg || "");
+
+const canReachAppShell = async () => {
+  if (navigator.onLine === false) return false;
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 7000);
+  try {
+    const res = await fetch(`/version.json?__shell_probe=${Date.now()}`, {
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { "Cache-Control": "no-cache" },
+      signal: controller.signal,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    window.clearTimeout(timer);
+  }
+};
 
 const tryChunkRecover = async (msg: string) => {
   if (!isChunkErr(msg)) return;
   try {
     if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) return;
+    if (!(await canReachAppShell())) return;
     sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
     prepareSilentFormRestoreForUpdate();
     const u = new URL(location.href);
@@ -133,11 +155,8 @@ createRoot(document.getElementById("root")!).render(
 );
 
 // First-paint watchdog: if React never paints anything into #root within
-// 8 seconds (stale service worker hijacked a fetch, broken cached chunk,
-// failed module preload, etc.), purge every cache + unregister every SW
-// and hard-reload to the latest index.html. This is the eternal cure for
-// the "white screen of death" after a deploy on any host (Lovable preview,
-// acgcollect.lovable.app, or the Hostinger mirror).
+// 8 seconds, recover without deleting the offline app shell. Reload only when
+// the branded host is reachable; otherwise show a local recovery panel.
 const WHITE_SCREEN_GUARD_KEY = "__white_screen_recovery_attempted__";
 setTimeout(async () => {
   const root = document.getElementById("root");
@@ -147,7 +166,7 @@ setTimeout(async () => {
     sessionStorage.setItem(WHITE_SCREEN_GUARD_KEY, "1");
     prepareSilentFormRestoreForUpdate();
     try { recordError("error", new Error("white-screen-watchdog: #root empty after 8s"), {}); } catch {}
-    if (navigator.onLine === false) {
+    if (!(await canReachAppShell())) {
       root.innerHTML = `
         <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui;padding:24px;background:#f5f7fa;color:#0f172a;">
           <div style="max-width:420px;text-align:center;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 18px 45px rgba(15,23,42,.12);">
