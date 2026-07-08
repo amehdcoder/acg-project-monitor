@@ -1,6 +1,7 @@
 // Emails admins to follow up on an after-hours (night) form submission anomaly.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendMailRaw } from "../_shared/rawSmtp.ts";
+import { guardRequest } from "../_shared/authGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
