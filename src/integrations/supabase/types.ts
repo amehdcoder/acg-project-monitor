@@ -6116,6 +6116,7 @@ export type Database = {
           description: string | null
           id: string
           is_published: boolean | null
+          open_test_type: string | null
           passing_score: number | null
           post_test_datetime: string | null
           post_test_delay_days: number
@@ -6130,6 +6131,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_published?: boolean | null
+          open_test_type?: string | null
           passing_score?: number | null
           post_test_datetime?: string | null
           post_test_delay_days?: number
@@ -6144,6 +6146,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_published?: boolean | null
+          open_test_type?: string | null
           passing_score?: number | null
           post_test_datetime?: string | null
           post_test_delay_days?: number
