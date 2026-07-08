@@ -54,6 +54,8 @@ interface Quiz {
   passing_score: number;
   is_published: boolean;
   open_test_type: "pre_test" | "post_test" | null;
+  pass_message: string | null;
+  fail_message: string | null;
   created_at: string;
 }
 
@@ -89,6 +91,21 @@ const QuizBuilder = () => {
   const [assignedUserIds, setAssignedUserIds] = useState<Set<string>>(new Set());
   const [assignSearch, setAssignSearch] = useState("");
   const [assignLoading, setAssignLoading] = useState(false);
+
+  // Quiz settings (pass mark + custom messages) — editable on published quizzes
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsScore, setSettingsScore] = useState(70);
+  const [settingsPass, setSettingsPass] = useState("");
+  const [settingsFail, setSettingsFail] = useState("");
+  const [settingsBusy, setSettingsBusy] = useState(false);
+
+  // Release results by email
+  const [showRelease, setShowRelease] = useState(false);
+  const [releaseUsers, setReleaseUsers] = useState<{ user_id: string; name: string; email: string; hasPre: boolean; hasPost: boolean }[]>([]);
+  const [releaseSelected, setReleaseSelected] = useState<Set<string>>(new Set());
+  const [releaseSearch, setReleaseSearch] = useState("");
+  const [releaseLoading, setReleaseLoading] = useState(false);
+  const [releaseBusy, setReleaseBusy] = useState(false);
 
   useEffect(() => {
     fetchQuizzes();
@@ -393,6 +410,115 @@ const QuizBuilder = () => {
       setConfirmReset(null);
     }
   };
+
+  // Admin-only: open settings dialog prefilled from the selected quiz.
+  const openSettings = (quiz: Quiz) => {
+    setSettingsScore(Math.round(Number(quiz.passing_score ?? 70)));
+    setSettingsPass(quiz.pass_message ?? "");
+    setSettingsFail(quiz.fail_message ?? "");
+    setShowSettings(true);
+  };
+
+  // Admin-only: save pass mark & custom pass/fail messages (works on published quizzes).
+  const saveQuizSettings = async () => {
+    if (!selectedQuiz) return;
+    const score = Math.max(0, Math.min(100, settingsScore || 0));
+    setSettingsBusy(true);
+    try {
+      const { error } = await supabase
+        .from("quizzes")
+        .update({
+          passing_score: score,
+          pass_message: settingsPass.trim() || null,
+          fail_message: settingsFail.trim() || null,
+        })
+        .eq("id", selectedQuiz.id);
+      if (error) throw error;
+      setSelectedQuiz({ ...selectedQuiz, passing_score: score, pass_message: settingsPass.trim() || null, fail_message: settingsFail.trim() || null });
+      toast({ title: "Quiz settings saved", description: `Passing score set to ${score}%.` });
+      setShowSettings(false);
+      fetchQuizzes();
+    } catch (e: any) {
+      toast({ title: "Could not save settings", description: e.message, variant: "destructive" });
+    } finally {
+      setSettingsBusy(false);
+    }
+  };
+
+  // Admin-only: load assigned members and whether they have Pre/Post attempts.
+  const openReleaseDialog = async () => {
+    if (!selectedQuiz) return;
+    setShowRelease(true);
+    setReleaseLoading(true);
+    setReleaseSearch("");
+    setReleaseSelected(new Set());
+    try {
+      const { data: assignments } = await supabase
+        .from("quiz_user_assignments")
+        .select("user_id")
+        .eq("quiz_id", selectedQuiz.id);
+      const ids = (assignments || []).map((a) => a.user_id);
+      if (ids.length === 0) { setReleaseUsers([]); setReleaseLoading(false); return; }
+
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name, email")
+        .in("user_id", ids);
+      const { data: attempts } = await supabase
+        .from("quiz_attempts")
+        .select("user_id, attempt_type")
+        .eq("quiz_id", selectedQuiz.id)
+        .in("user_id", ids);
+
+      const preSet = new Set((attempts || []).filter((a) => a.attempt_type === "pre_test").map((a) => a.user_id));
+      const postSet = new Set((attempts || []).filter((a) => a.attempt_type === "post_test").map((a) => a.user_id));
+      const rows = (profiles || []).map((p) => ({
+        user_id: p.user_id,
+        name: `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.email,
+        email: p.email,
+        hasPre: preSet.has(p.user_id),
+        hasPost: postSet.has(p.user_id),
+      }));
+      setReleaseUsers(rows);
+    } catch (e: any) {
+      toast({ title: "Could not load members", description: e.message, variant: "destructive" });
+    } finally {
+      setReleaseLoading(false);
+    }
+  };
+
+  const toggleRelease = (userId: string) => {
+    setReleaseSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId); else next.add(userId);
+      return next;
+    });
+  };
+
+  // Admin-only: send result emails (with pre/post statistical inference) to selected members.
+  const releaseResults = async () => {
+    if (!selectedQuiz || releaseSelected.size === 0) return;
+    setReleaseBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("release-quiz-results", {
+        body: { quizId: selectedQuiz.id, userIds: Array.from(releaseSelected) },
+      });
+      if (error) throw error;
+      const sent = (data as any)?.sent ?? 0;
+      toast({
+        title: "Results released",
+        description: `${sent} result email${sent === 1 ? "" : "s"} sent successfully.`,
+      });
+      setShowRelease(false);
+    } catch (e: any) {
+      toast({ title: "Could not send results", description: e.message, variant: "destructive" });
+    } finally {
+      setReleaseBusy(false);
+    }
+  };
+
+
+
 
 
   const getPostTestDisplay = (quiz: Quiz) => {
@@ -713,6 +839,37 @@ const QuizBuilder = () => {
             );
           })()}
 
+          {/* ── Grading & Results (Admin) ── */}
+          {isAdmin && (
+            <Card className="form-card overflow-hidden border-0 bg-gradient-to-br from-indigo-500/10 via-fuchsia-500/5 to-transparent ring-1 ring-indigo-500/30">
+              <CardContent className="p-4 sm:p-5 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-600 text-white shadow-sm">
+                    <Award className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground flex items-center gap-1.5">
+                      Grading & Results <Sparkles className="h-3.5 w-3.5 text-primary/60" />
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Pass mark <strong>{selectedQuiz.passing_score}%</strong> — editable anytime, even after publishing.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => openSettings(selectedQuiz)} className="gap-1.5 text-indigo-600">
+                    <Save className="h-3.5 w-3.5" /> Pass mark & messages
+                  </Button>
+                  <Button size="sm" onClick={openReleaseDialog} className="gap-1.5 bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white hover:opacity-90">
+                    <Send className="h-3.5 w-3.5" /> Release results by email
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+
+
 
           {isAdmin && (
             <div className="space-y-3">
@@ -955,7 +1112,82 @@ const QuizBuilder = () => {
         </div>
       )}
 
+      {/* Quiz Settings Dialog (pass mark + custom messages) */}
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-indigo-600" /> Grading settings</DialogTitle>
+            <DialogDescription>Adjust the pass mark and the messages members see on their result screen.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div>
+              <Label className="form-label">Passing Score (%)</Label>
+              <Input type="number" min={0} max={100} value={settingsScore} onChange={(e) => setSettingsScore(parseInt(e.target.value) || 0)} className="form-input" />
+            </div>
+            <div>
+              <Label className="form-label">Pass message (optional)</Label>
+              <Textarea value={settingsPass} onChange={(e) => setSettingsPass(e.target.value)} placeholder="e.g. Congratulations! You've demonstrated strong knowledge." className="form-input" />
+            </div>
+            <div>
+              <Label className="form-label">Fail message (optional)</Label>
+              <Textarea value={settingsFail} onChange={(e) => setSettingsFail(e.target.value)} placeholder="e.g. Keep going — review the material and try again when authorized." className="form-input" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSettings(false)}>Cancel</Button>
+            <Button onClick={saveQuizSettings} disabled={settingsBusy} className="gap-1.5">
+              {settingsBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save settings
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Release Results Dialog */}
+      <Dialog open={showRelease} onOpenChange={setShowRelease}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Send className="h-5 w-5 text-fuchsia-600" /> Release results by email</DialogTitle>
+            <DialogDescription>Selected members receive a colorful summary with their Pre-test vs Post-test statistical analysis.</DialogDescription>
+          </DialogHeader>
+          <Input value={releaseSearch} onChange={(e) => setReleaseSearch(e.target.value)} placeholder="Search members…" className="form-input" />
+          <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+            <span>{releaseSelected.size} selected</span>
+            <button type="button" className="text-primary font-medium" onClick={() => setReleaseSelected(new Set(releaseUsers.map((u) => u.user_id)))}>Select all</button>
+          </div>
+          <div className="flex-1 overflow-y-auto space-y-1.5 -mx-1 px-1">
+            {releaseLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center"><Loader2 className="h-4 w-4 animate-spin" /> Loading members…</div>
+            ) : releaseUsers.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">No members are assigned to this quiz yet.</p>
+            ) : (
+              releaseUsers
+                .filter((u) => !releaseSearch.trim() || u.name.toLowerCase().includes(releaseSearch.toLowerCase()) || (u.email ?? "").toLowerCase().includes(releaseSearch.toLowerCase()))
+                .map((u) => (
+                  <label key={u.user_id} className="flex items-center gap-3 rounded-xl border border-border bg-background/60 p-2.5 cursor-pointer hover:bg-muted/40">
+                    <Checkbox checked={releaseSelected.has(u.user_id)} onCheckedChange={() => toggleRelease(u.user_id)} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-foreground truncate">{u.name}</div>
+                      <div className="text-[11px] text-muted-foreground truncate">{u.email || "no email on file"}</div>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold", u.hasPre ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground")}>Pre</span>
+                      <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold", u.hasPost ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground")}>Post</span>
+                    </div>
+                  </label>
+                ))
+            )}
+          </div>
+          <DialogFooter className="pt-2 border-t">
+            <Button variant="outline" onClick={() => setShowRelease(false)}>Cancel</Button>
+            <Button onClick={releaseResults} disabled={releaseBusy || releaseSelected.size === 0} className="gap-1.5 bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white hover:opacity-90">
+              {releaseBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send results
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Create Quiz Dialog */}
+
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
