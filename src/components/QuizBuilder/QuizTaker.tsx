@@ -228,7 +228,7 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
     setSubmitted(true);
     setSubmitting(false);
     toast({ title: `${attemptType === "pre_test" ? "Pre-test" : "Post-test"} completed!` });
-  }, [answers, quiz, attemptType, startedAt, submitting]);
+  }, [answers, quiz, attemptType, startedAt, submitting, user, language]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
