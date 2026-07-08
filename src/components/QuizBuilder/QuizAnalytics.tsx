@@ -204,6 +204,8 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
       totalParticipants: new Set(attempts.map(a => a.user_id)).size,
       preCount: preAttempts.length,
       postCount: postAttempts.length,
+      hasPre: allPreScores.length > 0,
+      hasPost: allPostScores.length > 0,
       pairedCount: n,
       preMean: allPreScores.length > 0 ? Math.round(mean(allPreScores) * 100) / 100 : 0,
       postMean: allPostScores.length > 0 ? Math.round(mean(allPostScores) * 100) / 100 : 0,
