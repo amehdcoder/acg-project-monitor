@@ -8,27 +8,46 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   ArrowLeft, ArrowRight, CheckCircle, XCircle, Clock, Award, BookOpen, Loader2, Lock,
+  Sparkles, Trophy, Target,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import quizHero from "@/assets/community-health-worker.jpg.asset.json";
 
-const QuizHeroBanner = ({ title, subtitle }: { title: string; subtitle?: string }) => (
-  <div className="relative overflow-hidden rounded-2xl border border-primary/20 shadow-sm">
-    <img
-      src={quizHero.url}
-      alt="Community health worker engaging a family"
-      className="h-32 w-full object-cover object-center sm:h-44"
-      loading="lazy"
-    />
-    <div className="absolute inset-0 bg-gradient-to-t from-primary/85 via-primary/40 to-transparent" />
-    <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
-      <h2 className="text-base font-bold leading-tight text-primary-foreground drop-shadow sm:text-lg">{title}</h2>
-      {subtitle && <p className="mt-0.5 text-xs text-primary-foreground/90 sm:text-sm">{subtitle}</p>}
+const QuizHeroBanner = ({
+  title,
+  subtitle,
+  badge,
+}: {
+  title: string;
+  subtitle?: string;
+  badge?: string;
+}) => (
+  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-fuchsia-500 to-amber-400 p-[2px] shadow-lg sm:rounded-3xl">
+    <div className="relative overflow-hidden rounded-[calc(1rem-2px)] bg-slate-900 sm:rounded-[calc(1.5rem-2px)]">
+      {/* Full image — displayed at its natural aspect ratio so it is never cropped and stays responsive on every screen */}
+      <img
+        src={quizHero.url}
+        alt="Community health worker engaging a family"
+        className="block h-auto w-full object-contain"
+        loading="lazy"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-indigo-950/25 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
+        <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 ring-1 ring-white/25 backdrop-blur-sm">
+          <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-white/95 sm:text-[11px]">
+            {badge || "Knowledge Assessment"}
+          </span>
+        </div>
+        <h2 className="text-lg font-extrabold leading-tight text-white drop-shadow-lg sm:text-2xl">{title}</h2>
+        {subtitle && <p className="mt-1 text-xs font-medium text-white/85 sm:text-sm">{subtitle}</p>}
+      </div>
     </div>
   </div>
 );
+
 
 interface QuizTakerProps {
   quiz: {
