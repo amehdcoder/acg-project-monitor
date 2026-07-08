@@ -103,6 +103,9 @@ async function callVision(systemPrompt: string, userContent: any[]): Promise<any
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const guard = await guardRequest(req, corsHeaders, { requireAdmin: false });
+  if (guard.response) return guard.response;
+
   try {
     const body = await req.json();
     const { lat, lng, zoom = 18, polygon } = body ?? {};
