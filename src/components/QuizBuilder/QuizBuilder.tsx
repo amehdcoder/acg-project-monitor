@@ -833,7 +833,7 @@ const QuizBuilder = () => {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-2.5">
                       <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${accent} text-white shadow-sm`}>
-                        <BookOpen className="h-4.5 w-4.5" />
+                        <BookOpen className="h-5 w-5" />
                       </span>
                       <CardTitle className="text-base leading-snug">{quiz.title}</CardTitle>
                     </div>
