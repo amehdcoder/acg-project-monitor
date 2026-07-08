@@ -17,6 +17,11 @@ const FROM_NAME = "The Amehnities Team";
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const guard = await guardRequest(req, corsHeaders);
+  if (guard.response) return guard.response;
+
+
+
   try {
     const { anomaly_id } = await req.json();
     if (!anomaly_id) {
