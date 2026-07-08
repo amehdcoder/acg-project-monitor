@@ -189,8 +189,29 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
     });
 
     if (error) {
-      if ((error as any).code === "23505") {
-        toast({ title: "You have already completed this test", variant: "destructive" });
+      const msg = (error as any).message || "";
+      if ((error as any).code === "23505" || msg.includes("ALREADY_COMPLETED")) {
+        // Another device/tab already recorded this attempt — refresh and show the
+        // localized "already completed" screen with the recorded result & history.
+        const { data: attempts } = await supabase
+          .from("quiz_attempts")
+          .select("*")
+          .eq("quiz_id", quiz.id)
+          .eq("user_id", user!.id)
+          .order("created_at");
+        if (attempts) setExistingAttempts(attempts);
+        const existing = (attempts || []).find((a: any) => a.attempt_type === attemptType);
+        if (existing) {
+          setResult({
+            score: Number(existing.score),
+            total: Number(existing.total_points),
+            percentage: Number(existing.percentage),
+            passed: Number(existing.percentage) >= quiz.passing_score,
+          });
+          setAlreadyTaken(true);
+          setSubmitted(true);
+        }
+        toast({ title: quizT(language, "onlyOnce"), variant: "destructive" });
       } else {
         toast({ title: "Error submitting quiz", description: error.message, variant: "destructive" });
       }
