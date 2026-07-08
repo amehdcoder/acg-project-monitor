@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Question, FormGroup } from "@/components/FormBuilder/types";
 import { evaluateRelevant, type NameToIdMap } from "@/lib/skipLogic";
 import { buildCesLocationUrl } from "@/lib/mda/cesLocationBridge";
-import { prewarmSatelliteAround, prewarmSatelliteOnMove } from "@/lib/ces/satellitePrewarm";
+import { prewarmSatelliteAround, startSatellitePrewarmFromGps } from "@/lib/ces/satellitePrewarm";
 import {
   getMdaFollowUpGroupName,
   isMdaFollowUpGroup,
