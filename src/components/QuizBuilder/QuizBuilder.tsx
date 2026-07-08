@@ -92,6 +92,21 @@ const QuizBuilder = () => {
   const [assignSearch, setAssignSearch] = useState("");
   const [assignLoading, setAssignLoading] = useState(false);
 
+  // Quiz settings (pass mark + custom messages) — editable on published quizzes
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsScore, setSettingsScore] = useState(70);
+  const [settingsPass, setSettingsPass] = useState("");
+  const [settingsFail, setSettingsFail] = useState("");
+  const [settingsBusy, setSettingsBusy] = useState(false);
+
+  // Release results by email
+  const [showRelease, setShowRelease] = useState(false);
+  const [releaseUsers, setReleaseUsers] = useState<{ user_id: string; name: string; email: string; hasPre: boolean; hasPost: boolean }[]>([]);
+  const [releaseSelected, setReleaseSelected] = useState<Set<string>>(new Set());
+  const [releaseSearch, setReleaseSearch] = useState("");
+  const [releaseLoading, setReleaseLoading] = useState(false);
+  const [releaseBusy, setReleaseBusy] = useState(false);
+
   useEffect(() => {
     fetchQuizzes();
     if (isAdmin) fetchProjects();
