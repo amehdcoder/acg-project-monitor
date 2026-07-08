@@ -8082,6 +8082,10 @@ export type Database = {
         }
         Returns: string
       }
+      reset_quiz_attempts: {
+        Args: { p_attempt_type?: string; p_quiz_id: string }
+        Returns: number
+      }
       set_proximity_conversation_flag: {
         Args: { _action: string; _conversation_id: string }
         Returns: undefined
