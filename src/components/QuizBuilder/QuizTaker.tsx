@@ -60,6 +60,8 @@ interface QuizTakerProps {
     post_test_datetime: string | null;
     time_limit_minutes: number | null;
     passing_score: number;
+    pass_message?: string | null;
+    fail_message?: string | null;
     open_test_type?: "pre_test" | "post_test" | null;
   };
   onClose: () => void;
@@ -405,7 +407,9 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
                postAttempt ? "Quiz Complete!" : "Results"}
             </h3>
             <p className="relative mt-1 text-sm font-medium text-white/90">
-              {result.passed ? "Congratulations! You passed! 🎉" : `You need ${quiz.passing_score}% to pass — keep going!`}
+              {result.passed
+                ? (quiz.pass_message?.trim() || "Congratulations! You passed! 🎉")
+                : (quiz.fail_message?.trim() || `You need ${quiz.passing_score}% to pass — keep going!`)}
             </p>
             <div className="relative mt-5 text-6xl font-black leading-none text-white drop-shadow-md">
               {Math.round(result.percentage)}%
