@@ -3182,7 +3182,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 description: form.description,
                                 status: form.status,
                                 project_id: form.project_id,
-                                questions: form.questions,
+                                // Recombine grouped + ungrouped items so the
+                                // offline copy is COMPLETE. `form` is a
+                                // renderable form whose `questions` holds only
+                                // ungrouped items and whose grouped sections
+                                // live in `form.groups`; saving `form.questions`
+                                // alone silently dropped every grouped section
+                                // and made grouped forms open empty offline.
+                                questions: [
+                                  ...(((form.groups as unknown) as any[]) || []),
+                                  ...(((form.questions as unknown) as any[]) || []),
+                                ] as any,
                                 geofence: form.geofence,
                                 settings: form.settings,
                                 updated_at: form.updated_at,
