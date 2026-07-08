@@ -1141,7 +1141,32 @@ const QuizBuilder = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={!!confirmReset} onOpenChange={(o) => !o && setConfirmReset(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Reset {confirmReset?.type === "pre_test" ? "Pre-test" : confirmReset?.type === "post_test" ? "Post-test" : "both tests"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This archives and clears the {confirmReset?.type === "pre_test" ? "Pre-test" : confirmReset?.type === "post_test" ? "Post-test" : "Pre-test and Post-test"} attempts
+              for <strong>{confirmReset?.quiz.title}</strong>, so assigned members can take it again. Archived
+              results remain available for reference.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={resetBusy}
+              onClick={() => confirmReset && resetAttempts(confirmReset.quiz, confirmReset.type)}
+            >
+              {resetBusy ? "Resetting…" : "Reset"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+
 
   );
 };
