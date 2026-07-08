@@ -270,13 +270,17 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
     })),
   [analysis.pairedData, profiles]);
 
-  const descriptiveStats = useMemo(() => [
-    { metric: "Mean", pre: `${analysis.preMean}%`, post: `${analysis.postMean}%` },
-    { metric: "Median", pre: `${analysis.preMedian}%`, post: `${analysis.postMedian}%` },
-    { metric: "Std Dev", pre: `${analysis.preStd}`, post: `${analysis.postStd}` },
-    { metric: "Pass Rate", pre: `${analysis.prePassRate}%`, post: `${analysis.postPassRate}%` },
-    { metric: "Sample Size", pre: `${analysis.preCount}`, post: `${analysis.postCount}` },
-  ], [analysis]);
+  const descriptiveStats = useMemo(() => {
+    const post = (v: string) => (analysis.hasPost ? v : "—");
+    return [
+      { metric: "Mean", pre: `${analysis.preMean}%`, post: post(`${analysis.postMean}%`) },
+      { metric: "Median", pre: `${analysis.preMedian}%`, post: post(`${analysis.postMedian}%`) },
+      { metric: "Std Dev", pre: `${analysis.preStd}`, post: post(`${analysis.postStd}`) },
+      { metric: "Pass Rate", pre: `${analysis.prePassRate}%`, post: post(`${analysis.postPassRate}%`) },
+      { metric: "Sample Size", pre: `${analysis.preCount}`, post: `${analysis.postCount}` },
+    ];
+  }, [analysis]);
+
 
   // Pagination for individual scores
   const pagination = useTablePagination(analysis.pairedData, 10);
