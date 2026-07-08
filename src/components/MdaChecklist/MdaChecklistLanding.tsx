@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Question, FormGroup } from "@/components/FormBuilder/types";
 import { evaluateRelevant, type NameToIdMap } from "@/lib/skipLogic";
 import { buildCesLocationUrl } from "@/lib/mda/cesLocationBridge";
-import { prewarmSatelliteAround, prewarmSatelliteOnMove } from "@/lib/ces/satellitePrewarm";
+import { prewarmSatelliteAround, startSatellitePrewarmFromGps } from "@/lib/ces/satellitePrewarm";
 import {
   getMdaFollowUpGroupName,
   isMdaFollowUpGroup,
@@ -227,23 +227,11 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   // app — by the time the Household Coverage Survey is opened, the satellite map
   // is already cached and locks instantly. Fully client-side, per-device.
   useEffect(() => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) return;
-    let watchId: number | null = null;
-    try {
-      watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          prewarmSatelliteOnMove(latitude, longitude);
-        },
-        () => { /* denied / unavailable — CES will fetch normally later */ },
-        { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 },
-      );
-    } catch { /* noop */ }
-    return () => {
-      if (watchId != null) {
-        try { navigator.geolocation.clearWatch(watchId); } catch { /* noop */ }
-      }
-    };
+    // Piggyback on the single shared GPS warmer — no extra geolocation watch —
+    // so tiles are primed from the checklist's captured fix and refined as the
+    // device moves, without adding any battery/CPU cost or blocking the app.
+    const stop = startSatellitePrewarmFromGps();
+    return () => { try { stop(); } catch { /* noop */ } };
   }, []);
 
 
