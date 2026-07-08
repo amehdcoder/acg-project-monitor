@@ -801,10 +801,20 @@ const QuizBuilder = () => {
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-base">{quiz.title}</CardTitle>
-                    <Badge variant={quiz.is_published ? "default" : "secondary"} className="shrink-0 text-[10px]">
-                      {quiz.is_published ? "Live" : "Draft"}
-                    </Badge>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      {quiz.open_test_type ? (
+                        <Badge className="gap-1 text-[10px] bg-emerald-600 hover:bg-emerald-600">
+                          <LockOpen className="h-2.5 w-2.5" />
+                          {quiz.open_test_type === "pre_test" ? "Pre-test open" : "Post-test open"}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="gap-1 text-[10px]">
+                          <Lock className="h-2.5 w-2.5" /> Closed
+                        </Badge>
+                      )}
+                    </div>
                   </div>
+
                   {quiz.description && (
                     <CardDescription className="line-clamp-2">{quiz.description}</CardDescription>
                   )}
