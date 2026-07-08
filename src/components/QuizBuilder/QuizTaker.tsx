@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { format } from "date-fns";
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -39,6 +39,7 @@ interface QuizTakerProps {
     post_test_datetime: string | null;
     time_limit_minutes: number | null;
     passing_score: number;
+    open_test_type?: "pre_test" | "post_test" | null;
   };
   onClose: () => void;
 }
@@ -63,75 +64,79 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
   const [result, setResult] = useState<{ score: number; total: number; percentage: number; passed: boolean } | null>(null);
   const [attemptType, setAttemptType] = useState<"pre_test" | "post_test">("pre_test");
   const [existingAttempts, setExistingAttempts] = useState<any[]>([]);
-  const [canTakePostTest, setCanTakePostTest] = useState(false);
-  const [postTestDate, setPostTestDate] = useState<Date | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [startedAt] = useState(new Date());
+  const [closedForMembers, setClosedForMembers] = useState(false);
+  const [alreadyTaken, setAlreadyTaken] = useState(false);
+
+  const openType: "pre_test" | "post_test" | null =
+    quiz.open_test_type === "pre_test" || quiz.open_test_type === "post_test"
+      ? quiz.open_test_type
+      : null;
 
   useEffect(() => {
     const init = async () => {
       setLoading(true);
-      // Fetch questions via secure RPC (correct_answer is never sent to the client).
-      const { data: qData } = await supabase
-        .rpc("get_quiz_questions_for_attempt", { p_quiz_id: quiz.id });
-      if (qData) setQuestions((qData as any[]).map(q => ({ ...q, options: q.options as any, points: Number(q.points), correct_answer: "" })));
 
-      // Fetch existing attempts
+      // Fetch existing attempts first — needed for gating decisions.
       const { data: attempts } = await supabase
         .from("quiz_attempts")
         .select("*")
         .eq("quiz_id", quiz.id)
         .eq("user_id", user!.id)
         .order("created_at");
+      if (attempts) setExistingAttempts(attempts);
 
-      if (attempts && attempts.length > 0) {
-        setExistingAttempts(attempts);
-        const preTest = attempts.find((a: any) => a.attempt_type === "pre_test");
-        const postTest = attempts.find((a: any) => a.attempt_type === "post_test");
+      const preTest = (attempts || []).find((a: any) => a.attempt_type === "pre_test");
+      const postTest = (attempts || []).find((a: any) => a.attempt_type === "post_test");
 
-        if (preTest && postTest) {
-          // Both done — show results
+      // Gate: the quiz is closed for members until an admin opens a test type.
+      if (!openType && !isAdmin) {
+        setClosedForMembers(true);
+        // If the member already has a result, show their latest one.
+        const latest = postTest || preTest;
+        if (latest) {
           setSubmitted(true);
           setResult({
-            score: Number(postTest.score),
-            total: Number(postTest.total_points),
-            percentage: Number(postTest.percentage),
-            passed: Number(postTest.percentage) >= quiz.passing_score,
+            score: Number(latest.score),
+            total: Number(latest.total_points),
+            percentage: Number(latest.percentage),
+            passed: Number(latest.percentage) >= quiz.passing_score,
           });
-          setLoading(false);
-          return;
         }
-
-        if (preTest) {
-          // Determine post-test availability
-          let postAvailable: Date;
-          if (quiz.post_test_datetime) {
-            postAvailable = new Date(quiz.post_test_datetime);
-          } else {
-            const preDate = new Date(preTest.completed_at || preTest.created_at);
-            postAvailable = new Date(preDate.getTime() + quiz.post_test_delay_days * 86400000);
-          }
-          setPostTestDate(postAvailable);
-          if (isAdmin || new Date() >= postAvailable) {
-            setAttemptType("post_test");
-            setCanTakePostTest(true);
-          } else {
-            setAttemptType("post_test");
-            setCanTakePostTest(false);
-            setSubmitted(true);
-            setResult({
-              score: Number(preTest.score),
-              total: Number(preTest.total_points),
-              percentage: Number(preTest.percentage),
-              passed: Number(preTest.percentage) >= quiz.passing_score,
-            });
-          }
-        }
+        setLoading(false);
+        return;
       }
+
+      // Which test are we taking? The one the admin opened (admins default to pre-test).
+      const activeType: "pre_test" | "post_test" = openType || "pre_test";
+      setAttemptType(activeType);
+
+      // Fetch questions via secure RPC (correct_answer is never sent to the client).
+      const { data: qData } = await supabase
+        .rpc("get_quiz_questions_for_attempt", { p_quiz_id: quiz.id });
+      if (qData) setQuestions((qData as any[]).map(q => ({ ...q, options: q.options as any, points: Number(q.points), correct_answer: "" })));
+
+      // Members can take the open test only once. If already done, show the result.
+      const existingForType = activeType === "pre_test" ? preTest : postTest;
+      if (existingForType && !isAdmin) {
+        setAlreadyTaken(true);
+        setSubmitted(true);
+        setResult({
+          score: Number(existingForType.score),
+          total: Number(existingForType.total_points),
+          percentage: Number(existingForType.percentage),
+          passed: Number(existingForType.percentage) >= quiz.passing_score,
+        });
+        setLoading(false);
+        return;
+      }
+
       setLoading(false);
     };
     init();
-  }, [quiz.id, user, isAdmin]);
+  }, [quiz.id, user, isAdmin, openType]);
+
 
   // Timer
   useEffect(() => {
@@ -196,6 +201,31 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
     );
   }
 
+  // Quiz is closed for members until an admin opens a test type.
+  if (closedForMembers && !(submitted && result)) {
+    return (
+      <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
+        <Button variant="outline" size="sm" onClick={onClose} className="gap-1">
+          <ArrowLeft className="h-4 w-4" /> Back to Quizzes
+        </Button>
+        <QuizHeroBanner title={quiz.title} subtitle={quiz.description || "Every Child Healthy. Every Future Bright."} />
+        <Card className="form-card">
+          <CardContent className="py-12 text-center space-y-3">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <Lock className="h-8 w-8" />
+            </div>
+            <CardTitle className="text-lg">This quiz is currently closed</CardTitle>
+            <CardDescription className="max-w-sm mx-auto">
+              An administrator has not opened this quiz yet. Please check back — the Pre-test or
+              Post-test will appear here the moment it is opened.
+            </CardDescription>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+
   // Show results after submission or when can't take post-test yet
   if (submitted && result) {
     const preAttempt = existingAttempts.find((a: any) => a.attempt_type === "pre_test");
@@ -227,22 +257,18 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
             </div>
             <Progress value={result.percentage} className="h-3" />
 
-            {preAttempt && !postAttempt && !canTakePostTest && postTestDate && (
+            {alreadyTaken && (
               <Card className="bg-muted/50 border-dashed">
                 <CardContent className="py-4 text-center">
-                   <Lock className="h-5 w-5 mx-auto text-muted-foreground mb-2" />
+                  <Lock className="h-5 w-5 mx-auto text-muted-foreground mb-2" />
                   <p className="text-sm text-muted-foreground">
-                    Post-test available on <strong>{format(postTestDate, "PPP 'at' p")}</strong>
+                    You have already completed the <strong>{attemptType === "pre_test" ? "Pre-test" : "Post-test"}</strong>.
+                    The next test will appear here once an administrator opens it.
                   </p>
                 </CardContent>
               </Card>
             )}
 
-            {canTakePostTest && !postAttempt && (
-              <Button onClick={() => { setSubmitted(false); setAnswers({}); setCurrentIdx(0); }} className="w-full gap-2">
-                <BookOpen className="h-4 w-4" /> Start Post-test
-              </Button>
-            )}
 
             {preAttempt && postAttempt && (
               <div className="grid grid-cols-2 gap-3">

@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Question, FormGroup } from "@/components/FormBuilder/types";
 import { evaluateRelevant, type NameToIdMap } from "@/lib/skipLogic";
 import { buildCesLocationUrl } from "@/lib/mda/cesLocationBridge";
-import { prewarmSatelliteAround } from "@/lib/ces/satellitePrewarm";
+import { prewarmSatelliteAround, prewarmSatelliteOnMove } from "@/lib/ces/satellitePrewarm";
 import {
   getMdaFollowUpGroupName,
   isMdaFollowUpGroup,
@@ -219,6 +219,34 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   const [selected, setSelected] = useState<VisitedCommunity | null>(null);
   const [builderGroup, setBuilderGroup] = useState<FormGroup | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
+
+  // ── CES satellite background pre-warm ──
+  // While the MDA checklist is open, quietly prime the Coverage Evaluation 3D
+  // satellite tiles around the device's live GPS position (refined as the device
+  // moves). This is idle-scheduled, capped and deduped, so it never blocks the
+  // app — by the time the Household Coverage Survey is opened, the satellite map
+  // is already cached and locks instantly. Fully client-side, per-device.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    let watchId: number | null = null;
+    try {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          prewarmSatelliteOnMove(latitude, longitude);
+        },
+        () => { /* denied / unavailable — CES will fetch normally later */ },
+        { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 },
+      );
+    } catch { /* noop */ }
+    return () => {
+      if (watchId != null) {
+        try { navigator.geolocation.clearWatch(watchId); } catch { /* noop */ }
+      }
+    };
+  }, []);
+
+
 
   useEffect(() => {
     setLocalGroups(props.groups || []);

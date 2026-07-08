@@ -25,6 +25,7 @@ import { format } from "date-fns";
 import {
   Plus, Trash2, Save, Eye, Send, ChevronUp, ChevronDown,
   BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, CalendarIcon, Users, UserPlus, Archive, Eraser,
+  Lock, LockOpen, DoorOpen, DoorClosed, Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -52,6 +53,7 @@ interface Quiz {
   time_limit_minutes: number | null;
   passing_score: number;
   is_published: boolean;
+  open_test_type: "pre_test" | "post_test" | null;
   created_at: string;
 }
 
@@ -270,6 +272,31 @@ const QuizBuilder = () => {
       if (selectedQuiz?.id === quiz.id) setSelectedQuiz({ ...quiz, is_published: !quiz.is_published });
     }
   };
+
+  // Admin control: open the quiz for a specific test type (Pre-test/Post-test),
+  // or close it for all members. Publishing is auto-enabled when opening.
+  const [openStateBusy, setOpenStateBusy] = useState(false);
+  const setOpenTestType = async (quiz: Quiz, type: "pre_test" | "post_test" | null) => {
+    setOpenStateBusy(true);
+    const patch: { open_test_type: "pre_test" | "post_test" | null; is_published?: boolean } = { open_test_type: type };
+    // Opening a test implies the quiz must be live for members to see it.
+    if (type && !quiz.is_published) patch.is_published = true;
+    const { error } = await supabase.from("quizzes").update(patch).eq("id", quiz.id);
+    setOpenStateBusy(false);
+    if (error) {
+      toast({ title: "Could not update quiz status", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({
+      title: type
+        ? `${type === "pre_test" ? "Pre-test" : "Post-test"} is now OPEN for all members`
+        : "Quiz closed for all members",
+    });
+    const updated = { ...quiz, open_test_type: type, is_published: patch.is_published ?? quiz.is_published };
+    setQuizzes((prev) => prev.map((q) => (q.id === quiz.id ? updated : q)));
+    if (selectedQuiz?.id === quiz.id) setSelectedQuiz(updated);
+  };
+
 
   const deleteQuiz = async (quizId: string) => {
     const { error } = await supabase.from("quizzes").delete().eq("id", quizId);
@@ -510,6 +537,111 @@ const QuizBuilder = () => {
             </CardHeader>
           </Card>
 
+          {/* ── Beautiful Test Access Control (Admin) ── */}
+          {isAdmin && (() => {
+            const openType = selectedQuiz.open_test_type;
+            const isOpen = openType === "pre_test" || openType === "post_test";
+            return (
+              <Card className={cn(
+                "form-card overflow-hidden border-0 relative",
+                isOpen
+                  ? "bg-gradient-to-br from-emerald-500/10 via-emerald-400/5 to-transparent ring-1 ring-emerald-500/30"
+                  : "bg-gradient-to-br from-muted/60 via-muted/30 to-transparent ring-1 ring-border"
+              )}>
+                <CardContent className="p-4 sm:p-5 space-y-4">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-sm transition-colors",
+                        isOpen ? "bg-emerald-500 text-white" : "bg-muted-foreground/10 text-muted-foreground"
+                      )}>
+                        {isOpen ? <DoorOpen className="h-6 w-6" /> : <DoorClosed className="h-6 w-6" />}
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground flex items-center gap-1.5">
+                          Test Access Control
+                          <Sparkles className="h-3.5 w-3.5 text-primary/60" />
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {isOpen
+                            ? `The ${openType === "pre_test" ? "Pre-test" : "Post-test"} is OPEN — all members can take it now.`
+                            : "Closed for all members. Open a test to let members take it."}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge
+                      variant={isOpen ? "default" : "secondary"}
+                      className={cn("gap-1", isOpen && "bg-emerald-600 hover:bg-emerald-600")}
+                    >
+                      {isOpen ? <LockOpen className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+                      {isOpen ? "Open" : "Closed"}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <button
+                      type="button"
+                      disabled={openStateBusy}
+                      onClick={() => setOpenTestType(selectedQuiz, "pre_test")}
+                      className={cn(
+                        "group rounded-2xl border-2 p-3.5 text-left transition-all disabled:opacity-60",
+                        openType === "pre_test"
+                          ? "border-blue-500 bg-blue-500/10 shadow-sm"
+                          : "border-border bg-background/60 hover:border-blue-400/60 hover:bg-blue-500/5"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <BookOpen className={cn("h-4 w-4", openType === "pre_test" ? "text-blue-600" : "text-muted-foreground")} />
+                        <span className="text-sm font-semibold text-foreground">Open Pre-test</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1">Members take the Pre-test only.</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={openStateBusy}
+                      onClick={() => setOpenTestType(selectedQuiz, "post_test")}
+                      className={cn(
+                        "group rounded-2xl border-2 p-3.5 text-left transition-all disabled:opacity-60",
+                        openType === "post_test"
+                          ? "border-emerald-500 bg-emerald-500/10 shadow-sm"
+                          : "border-border bg-background/60 hover:border-emerald-400/60 hover:bg-emerald-500/5"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Award className={cn("h-4 w-4", openType === "post_test" ? "text-emerald-600" : "text-muted-foreground")} />
+                        <span className="text-sm font-semibold text-foreground">Open Post-test</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1">Members take the Post-test only.</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={openStateBusy || !isOpen}
+                      onClick={() => setOpenTestType(selectedQuiz, null)}
+                      className={cn(
+                        "group rounded-2xl border-2 p-3.5 text-left transition-all disabled:opacity-40",
+                        "border-border bg-background/60 hover:border-rose-400/60 hover:bg-rose-500/5"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Lock className="h-4 w-4 text-rose-500" />
+                        <span className="text-sm font-semibold text-foreground">Close Quiz</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1">Mark closed for all members.</p>
+                    </button>
+                  </div>
+                  {openStateBusy && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Updating access…
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
+
+
           {isAdmin && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -669,10 +801,20 @@ const QuizBuilder = () => {
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-base">{quiz.title}</CardTitle>
-                    <Badge variant={quiz.is_published ? "default" : "secondary"} className="shrink-0 text-[10px]">
-                      {quiz.is_published ? "Live" : "Draft"}
-                    </Badge>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      {quiz.open_test_type ? (
+                        <Badge className="gap-1 text-[10px] bg-emerald-600 hover:bg-emerald-600">
+                          <LockOpen className="h-2.5 w-2.5" />
+                          {quiz.open_test_type === "pre_test" ? "Pre-test open" : "Post-test open"}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="gap-1 text-[10px]">
+                          <Lock className="h-2.5 w-2.5" /> Closed
+                        </Badge>
+                      )}
+                    </div>
                   </div>
+
                   {quiz.description && (
                     <CardDescription className="line-clamp-2">{quiz.description}</CardDescription>
                   )}

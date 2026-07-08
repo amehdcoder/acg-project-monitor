@@ -204,6 +204,8 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
       totalParticipants: new Set(attempts.map(a => a.user_id)).size,
       preCount: preAttempts.length,
       postCount: postAttempts.length,
+      hasPre: allPreScores.length > 0,
+      hasPost: allPostScores.length > 0,
       pairedCount: n,
       preMean: allPreScores.length > 0 ? Math.round(mean(allPreScores) * 100) / 100 : 0,
       postMean: allPostScores.length > 0 ? Math.round(mean(allPostScores) * 100) / 100 : 0,
@@ -252,10 +254,13 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
     { name: "No Change", value: analysis.noChangeCount, color: COLORS.accent },
   ].filter(d => d.value > 0), [analysis]);
 
-  const passRateComparison = useMemo(() => [
-    { name: "Pre-test", Passed: analysis.prePassRate, Failed: 100 - analysis.prePassRate },
-    { name: "Post-test", Passed: analysis.postPassRate, Failed: 100 - analysis.postPassRate },
-  ], [analysis]);
+  const passRateComparison = useMemo(() => {
+    const rows: any[] = [];
+    if (analysis.hasPre) rows.push({ name: "Pre-test", Passed: analysis.prePassRate, Failed: 100 - analysis.prePassRate });
+    if (analysis.hasPost) rows.push({ name: "Post-test", Passed: analysis.postPassRate, Failed: 100 - analysis.postPassRate });
+    return rows;
+  }, [analysis]);
+
 
   const scatterData = useMemo(() =>
     analysis.pairedData.map(p => ({
@@ -265,13 +270,17 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
     })),
   [analysis.pairedData, profiles]);
 
-  const descriptiveStats = useMemo(() => [
-    { metric: "Mean", pre: `${analysis.preMean}%`, post: `${analysis.postMean}%` },
-    { metric: "Median", pre: `${analysis.preMedian}%`, post: `${analysis.postMedian}%` },
-    { metric: "Std Dev", pre: `${analysis.preStd}`, post: `${analysis.postStd}` },
-    { metric: "Pass Rate", pre: `${analysis.prePassRate}%`, post: `${analysis.postPassRate}%` },
-    { metric: "Sample Size", pre: `${analysis.preCount}`, post: `${analysis.postCount}` },
-  ], [analysis]);
+  const descriptiveStats = useMemo(() => {
+    const post = (v: string) => (analysis.hasPost ? v : "—");
+    return [
+      { metric: "Mean", pre: `${analysis.preMean}%`, post: post(`${analysis.postMean}%`) },
+      { metric: "Median", pre: `${analysis.preMedian}%`, post: post(`${analysis.postMedian}%`) },
+      { metric: "Std Dev", pre: `${analysis.preStd}`, post: post(`${analysis.postStd}`) },
+      { metric: "Pass Rate", pre: `${analysis.prePassRate}%`, post: post(`${analysis.postPassRate}%`) },
+      { metric: "Sample Size", pre: `${analysis.preCount}`, post: `${analysis.postCount}` },
+    ];
+  }, [analysis]);
+
 
   // Pagination for individual scores
   const pagination = useTablePagination(analysis.pairedData, 10);
@@ -338,10 +347,11 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
         {[
           { icon: Users, label: "Participants", value: analysis.totalParticipants, color: "text-primary", bg: "bg-primary/10" },
           { icon: BarChart3, label: "Pre-test Mean", value: `${analysis.preMean}%`, color: "text-blue-600", bg: "bg-blue-100 dark:bg-blue-900/30" },
-          { icon: TrendingUp, label: "Post-test Mean", value: `${analysis.postMean}%`, color: "text-emerald-600", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
+          { icon: TrendingUp, label: "Post-test Mean", value: analysis.hasPost ? `${analysis.postMean}%` : "—", color: "text-emerald-600", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
           { icon: Target, label: "Paired Tests", value: analysis.pairedCount, color: "text-amber-600", bg: "bg-amber-100 dark:bg-amber-900/30" },
-          { icon: Percent, label: "Pre Pass Rate", value: `${analysis.prePassRate}%`, color: "text-violet-600", bg: "bg-violet-100 dark:bg-violet-900/30" },
-          { icon: Award, label: "Post Pass Rate", value: `${analysis.postPassRate}%`, color: "text-rose-600", bg: "bg-rose-100 dark:bg-rose-900/30" },
+          { icon: Percent, label: "Pre Pass Rate", value: analysis.hasPre ? `${analysis.prePassRate}%` : "—", color: "text-violet-600", bg: "bg-violet-100 dark:bg-violet-900/30" },
+          { icon: Award, label: "Post Pass Rate", value: analysis.hasPost ? `${analysis.postPassRate}%` : "—", color: "text-rose-600", bg: "bg-rose-100 dark:bg-rose-900/30" },
+
         ].map((kpi, i) => (
           <Card key={i} className="form-card border-0 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="py-4 text-center">
