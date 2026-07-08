@@ -52,6 +52,7 @@ interface Quiz {
   time_limit_minutes: number | null;
   passing_score: number;
   is_published: boolean;
+  open_test_type: "pre_test" | "post_test" | null;
   created_at: string;
 }
 
