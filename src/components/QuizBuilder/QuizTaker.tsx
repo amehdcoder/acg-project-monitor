@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   ArrowLeft, ArrowRight, CheckCircle, XCircle, Clock, Award, BookOpen, Loader2, Lock,
-  Sparkles, Trophy, Target,
+  Sparkles, Trophy, Target, ShieldCheck, CalendarClock,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -245,7 +245,62 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
   }
 
 
-  // Show results after submission or when can't take post-test yet
+  // Member has already taken this test type — show a rich, celebratory "already completed" screen.
+  if (alreadyTaken && submitted && result) {
+    const label = attemptType === "pre_test" ? "Pre-test" : "Post-test";
+    const otherLabel = attemptType === "pre_test" ? "Post-test" : "Pre-test";
+    return (
+      <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
+        <Button variant="outline" size="sm" onClick={onClose} className="gap-1">
+          <ArrowLeft className="h-4 w-4" /> Back to Quizzes
+        </Button>
+
+        <Card className="form-card overflow-hidden">
+          <div className="relative overflow-hidden bg-gradient-to-br from-violet-600 via-indigo-500 to-sky-400 px-6 pb-8 pt-9 text-center">
+            <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
+            <div className="pointer-events-none absolute -bottom-12 -left-8 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
+            <div className="pointer-events-none absolute right-6 top-6 opacity-40">
+              <Sparkles className="h-6 w-6 text-white" />
+            </div>
+            <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/20 ring-4 ring-white/30 backdrop-blur-sm">
+              <ShieldCheck className="h-10 w-10 text-white" />
+            </div>
+            <h3 className="relative mt-4 text-2xl font-extrabold text-white drop-shadow">
+              {label} Already Completed
+            </h3>
+            <p className="relative mx-auto mt-2 max-w-sm text-sm font-medium text-white/90">
+              You have already submitted your {label.toLowerCase()} for <strong>{quiz.title}</strong>.
+              Each participant may take the {label.toLowerCase()} only <strong>once</strong>, so it can’t be retaken.
+            </p>
+            <div className="relative mt-5 inline-flex items-center gap-2 rounded-full bg-white/20 px-5 py-2 backdrop-blur-sm ring-1 ring-white/30">
+              <Trophy className="h-4 w-4 text-white" />
+              <span className="text-lg font-black text-white">{Math.round(result.percentage)}%</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-white/80">
+                • {result.score}/{result.total} pts
+              </span>
+            </div>
+          </div>
+          <CardContent className="space-y-4 pt-6">
+            <Progress value={result.percentage} className="h-3" />
+            <div className="flex items-start gap-3 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-sky-50 p-4 dark:border-indigo-900/50 dark:from-indigo-950/40 dark:to-sky-950/20">
+              <div className="mt-0.5 flex h-9 w-9 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/60 dark:text-indigo-300">
+                <CalendarClock className="h-5 w-5" />
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Your {label.toLowerCase()} result is safely recorded. The <strong>{otherLabel}</strong> will
+                appear here automatically the moment an administrator opens it.
+              </div>
+            </div>
+            <Button variant="outline" className="w-full" onClick={onClose}>
+              Return to Quizzes
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+
   if (submitted && result) {
     const preAttempt = existingAttempts.find((a: any) => a.attempt_type === "pre_test");
     const postAttempt = existingAttempts.find((a: any) => a.attempt_type === "post_test");
