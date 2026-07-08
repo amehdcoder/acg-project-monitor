@@ -6114,9 +6114,11 @@ export type Database = {
           created_at: string | null
           created_by: string
           description: string | null
+          fail_message: string | null
           id: string
           is_published: boolean | null
           open_test_type: string | null
+          pass_message: string | null
           passing_score: number | null
           post_test_datetime: string | null
           post_test_delay_days: number
@@ -6129,9 +6131,11 @@ export type Database = {
           created_at?: string | null
           created_by: string
           description?: string | null
+          fail_message?: string | null
           id?: string
           is_published?: boolean | null
           open_test_type?: string | null
+          pass_message?: string | null
           passing_score?: number | null
           post_test_datetime?: string | null
           post_test_delay_days?: number
@@ -6144,9 +6148,11 @@ export type Database = {
           created_at?: string | null
           created_by?: string
           description?: string | null
+          fail_message?: string | null
           id?: string
           is_published?: boolean | null
           open_test_type?: string | null
+          pass_message?: string | null
           passing_score?: number | null
           post_test_datetime?: string | null
           post_test_delay_days?: number
