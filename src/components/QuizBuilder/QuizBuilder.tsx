@@ -61,6 +61,8 @@ const QuizBuilder = () => {
   const { user, isAdmin, isOwner } = useAuth();
   const [confirmDeleteQuiz, setConfirmDeleteQuiz] = useState<Quiz | null>(null);
   const [confirmClearQuiz, setConfirmClearQuiz] = useState<Quiz | null>(null);
+  const [confirmReset, setConfirmReset] = useState<{ quiz: Quiz; type: "pre_test" | "post_test" | null } | null>(null);
+  const [resetBusy, setResetBusy] = useState(false);
   const [submissionAction, setSubmissionAction] = useState(false);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
