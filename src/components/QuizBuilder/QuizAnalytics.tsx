@@ -284,6 +284,55 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
     }));
   }, [analysis]);
 
+  // ───── Per-question difficulty analysis ─────
+  // For each question, count how many attempts answered it correctly vs incorrectly.
+  // Post-test answers are used when available, otherwise all attempts.
+  const questionStats = useMemo(() => {
+    if (questions.length === 0) return [];
+    const post = attempts.filter(a => a.attempt_type === "post_test");
+    const source = post.length > 0 ? post : attempts;
+    return questions
+      .map((q, idx) => {
+        let correct = 0;
+        let answered = 0;
+        for (const a of source) {
+          const given = a.answers?.[q.id];
+          if (given === undefined || given === null || given === "") continue;
+          answered += 1;
+          if (String(given) === String(q.correct_answer)) correct += 1;
+        }
+        const incorrect = answered - correct;
+        const correctRate = answered > 0 ? Math.round((correct / answered) * 100) : 0;
+        const correctLabel =
+          q.options.find(o => String(o.value) === String(q.correct_answer))?.label ??
+          q.correct_answer;
+        return {
+          id: q.id,
+          number: idx + 1,
+          text: q.question_text,
+          correctLabel,
+          answered,
+          correct,
+          incorrect,
+          correctRate,
+          failRate: 100 - correctRate,
+        };
+      })
+      .filter(q => q.answered > 0);
+  }, [questions, attempts]);
+
+  const questionSource = attempts.some(a => a.attempt_type === "post_test") ? "Post-test" : "All attempts";
+  const mostPassed = useMemo(
+    () => [...questionStats].sort((a, b) => b.correctRate - a.correctRate).slice(0, 5),
+    [questionStats],
+  );
+  const mostFailed = useMemo(
+    () => [...questionStats].sort((a, b) => a.correctRate - b.correctRate).slice(0, 5),
+    [questionStats],
+  );
+
+
+
   const improvementPie = useMemo(() => [
     { name: "Improved", value: analysis.improvedCount, color: COLORS.post },
     { name: "Declined", value: analysis.declinedCount, color: COLORS.danger },
