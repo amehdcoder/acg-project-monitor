@@ -20,9 +20,9 @@ import { checkOfflineLock, registerOfflineFailure, clearOfflineFailures } from "
 
 type AppRole = "super_admin" | "systems_admin" | "user";
 
-const withTimeout = <T,>(p: Promise<T>, ms: number, label = "request_timeout"): Promise<T> =>
+const withTimeout = <T,>(p: PromiseLike<T>, ms: number, label = "request_timeout"): Promise<T> =>
   Promise.race([
-    p,
+    Promise.resolve(p),
     new Promise<T>((_, reject) => setTimeout(() => reject(new Error(label)), ms)),
   ]);
 
@@ -327,16 +327,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const isAdminRole =
             roleRes.data?.role === "super_admin" || roleRes.data?.role === "systems_admin";
           if (!isAdminRole) {
-            const [projAssign, formAssign] = await Promise.all([
-              supabase
-                .from("user_project_assignments")
-                .select("id", { count: "exact", head: true })
-                .eq("user_id", userId),
-              supabase
-                .from("user_form_assignments")
-                .select("id", { count: "exact", head: true })
-                .eq("user_id", userId),
-            ]);
+            const [projAssign, formAssign] = await withTimeout(
+              Promise.all([
+                supabase
+                  .from("user_project_assignments")
+                  .select("id", { count: "exact", head: true })
+                  .eq("user_id", userId),
+                supabase
+                  .from("user_form_assignments")
+                  .select("id", { count: "exact", head: true })
+                  .eq("user_id", userId),
+              ]),
+              6000,
+              "oauth_assignment_check_timeout",
+            ).catch(() => [{ count: 1 }, { count: 0 }] as any);
             const hasAssignment = (projAssign.count ?? 0) > 0 || (formAssign.count ?? 0) > 0;
             const isApprovedProfile = p.approval_status === "approved";
             if (!hasAssignment || !isApprovedProfile) {
@@ -570,7 +574,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const t = setTimeout(() => {
       void warmCacheUserForms({ userId: user.id, isAdmin: isAdminRole, role });
       void prewarmBloombergOffline(user.id);
-    }, 1500);
+    }, 30000);
     return () => clearTimeout(t);
   }, [user?.id, isOfflineMode, role, profile?.is_owner, user?.email]);
 

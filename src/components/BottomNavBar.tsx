@@ -4,6 +4,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useAuth } from "@/hooks/useAuth";
 import { useAudioCues } from "@/hooks/useAudioCues";
 import { supabase } from "@/integrations/supabase/client";
+import { withTimeoutFallback } from "@/lib/withTimeout";
 
 interface BottomNavBarProps {
   activeTab: string;
@@ -89,11 +90,15 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin, isAdhoc }:
 
   const fetchBadgeCounts = useCallback(async () => {
     if (!user?.id) return;
-    const [notifRes, formsRes, casesRes] = await Promise.all([
-      supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("read", false),
-      supabase.from("form_submissions").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("status", "draft"),
-      supabase.from("cases").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("status", "open"),
-    ]);
+    const [notifRes, formsRes, casesRes] = await withTimeoutFallback(
+      Promise.all([
+        supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("read", false),
+        supabase.from("form_submissions").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("status", "draft"),
+        supabase.from("cases").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("status", "open"),
+      ]),
+      7000,
+      [{ count: 0 }, { count: 0 }, { count: 0 }] as any,
+    );
     const newCounts: Record<string, number> = {
       dashboard: notifRes.count ?? 0,
       forms: formsRes.count ?? 0,
@@ -118,7 +123,7 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin, isAdhoc }:
 
   useEffect(() => {
     if (!user?.id) return;
-    const channel = supabase.channel('bottom-nav-badges')
+    const channel = supabase.channel(`bottom-nav-badges-${user.id}-${Math.random().toString(36).slice(2, 8)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => fetchBadgeCounts())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'form_submissions', filter: `user_id=eq.${user.id}` }, () => fetchBadgeCounts())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cases', filter: `owner_id=eq.${user.id}` }, () => fetchBadgeCounts())

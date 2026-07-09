@@ -41,7 +41,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import { ProjectChatDialog } from "@/components/ProjectChat";
-import { useProjectUnreadCount } from "@/hooks/useProjectChat";
 import ProjectScopeSelector from "@/components/ProjectsView/ProjectScopeSelector";
 import { EMPTY_SCOPE, fetchProjectScope, type ProjectScope } from "@/lib/projectScope";
 import { withTimeoutFallback } from "@/lib/withTimeout";
@@ -68,8 +67,6 @@ function ProjectChatButton({ projectId, projectName, onOpenChat }: {
   projectName: string;
   onOpenChat: (project: { id: string; name: string }) => void;
 }) {
-  const unreadCount = useProjectUnreadCount(projectId);
-  
   return (
     <Button
       variant="ghost"
@@ -79,11 +76,6 @@ function ProjectChatButton({ projectId, projectName, onOpenChat }: {
       title="Project Chat"
     >
       <MessageCircle className="h-5 w-5 text-primary" />
-      {unreadCount > 0 && (
-        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-medium">
-          {unreadCount > 99 ? "99+" : unreadCount}
-        </span>
-      )}
     </Button>
   );
 }
