@@ -528,7 +528,9 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
           <TabsTrigger value="distribution" className="gap-1"><Activity className="h-3 w-3" /> Distribution</TabsTrigger>
           <TabsTrigger value="scatter" className="gap-1"><Target className="h-3 w-3" /> Scatter</TabsTrigger>
           <TabsTrigger value="individual" className="gap-1"><Users className="h-3 w-3" /> Individual</TabsTrigger>
+          <TabsTrigger value="questions" className="gap-1"><BookOpen className="h-3 w-3" /> Questions</TabsTrigger>
           <TabsTrigger value="insights" className="gap-1"><Lightbulb className="h-3 w-3" /> Insights</TabsTrigger>
+
         </TabsList>
 
         {/* Comparison Tab */}
