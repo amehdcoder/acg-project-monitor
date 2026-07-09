@@ -127,6 +127,7 @@ import {
 } from "@/lib/formProgressPersistence";
 import { isMdaChecklistLike } from "@/lib/mdaFollowUp";
 import { buildCesLocationUrl } from "@/lib/mda/cesLocationBridge";
+import RepeatHouseholdCoverageSurvey from "@/components/HouseholdCoverageSurvey/RepeatHouseholdCoverageSurvey";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
 
 // Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
@@ -251,6 +252,10 @@ interface FormSettings {
   isMdaChecklist?: boolean;
   /** When true, offer the linked Coverage Evaluation Survey (3D) after submission. */
   coverageEvaluation?: boolean;
+  /** When true, launch the Repeat Household Coverage Survey after an MDA checklist is submitted. */
+  householdSurvey?: boolean;
+  /** Admin-set number of households the field user must sample & interview. */
+  householdSampleSize?: number;
   /**
    * When true, the State → LGA → Ward → FLHF → Community → Settlement geography
    * questions are driven by the microplan via <MdaLocationCascade>, including
@@ -488,6 +493,13 @@ const FormFiller = ({
   // Thank you state
   const [showThankYou, setShowThankYou] = useState(false);
   const [showCoverageOptIn, setShowCoverageOptIn] = useState(false);
+  // Repeat Household Coverage Survey launch context (replaces the old 3D flow).
+  const [householdSurveyCtx, setHouseholdSurveyCtx] = useState<null | {
+    submissionId: string;
+    target: number;
+    location: { state?: string; lga?: string; ward?: string; flhf_name?: string; community_name?: string; settlement_name?: string };
+    gps: { lat: number; lng: number; accuracy?: number } | null;
+  }>(null);
   const navigate = useNavigate();
   // Integrated MDA Supervisory Checklist branded experience + Coverage Evaluation linkage.
   // Also detect by name so older/offline saved copies that missed the settings
@@ -505,6 +517,10 @@ const FormFiller = ({
   // Coverage Evaluation linkage is MDA-only; the supervisory checklist opts out.
   const offerCoverageEvaluation =
     isMdaChecklist && !isSupervisoryChecklist && !!settings.coverageEvaluation && !previewMode;
+  // Repeat Household Coverage Survey — available on any MDA/supervisory checklist
+  // whose admin enabled it and set a household sample size.
+  const offerHouseholdSurvey =
+    isMdaChecklist && !!(settings as any).householdSurvey && !previewMode;
 
   // Treatment Data Reporting Tools drive their geography from the microplan via
   // <MdaLocationCascade> (with the off-microplan provision), without the full
@@ -2284,9 +2300,35 @@ const FormFiller = ({
         clearDraft();
         markResponsesSaved();
         setLastSubmissionOffline(!!result.offline);
-        // MDA Supervisory Checklist → offer the linked Coverage Evaluation
-        // Survey (3D) as a shared post-submit flow; otherwise show thank-you.
-        if (offerCoverageEvaluation) {
+        // MDA Supervisory Checklist → launch the Repeat Household Coverage
+        // Survey (repeatable, sampled) if enabled; else the legacy 3D opt-in;
+        // otherwise show the thank-you dialog.
+        if (offerHouseholdSurvey) {
+          const answer = (...names: string[]) => {
+            for (const name of names) {
+              const direct = responses[name];
+              if (direct !== undefined && direct !== null && String(direct).trim() !== "") return String(direct);
+              const id = nameToIdMap[name];
+              const byId = id ? responses[id] : undefined;
+              if (byId !== undefined && byId !== null && String(byId).trim() !== "") return String(byId);
+            }
+            return "";
+          };
+          const handoffGps = gpsQuestionAnswer || gpsPosition || locEnforcement.autoGps || backgroundLocation || null;
+          setHouseholdSurveyCtx({
+            submissionId: result.id,
+            target: Math.max(1, Number((settings as any).householdSampleSize) || 1),
+            location: {
+              state: answer("state", "state_name", "admin_state"),
+              lga: answer("lga", "lga_name", "local_government", "local_government_area"),
+              ward: answer("ward", "ward_name"),
+              flhf_name: answer("flhf_name", "flhf", "health_facility", "facility", "facility_name"),
+              community_name: answer("community_name", "community"),
+              settlement_name: answer("settlement_name", "settlement"),
+            },
+            gps: handoffGps ? { lat: handoffGps.lat, lng: handoffGps.lng, accuracy: (handoffGps as any).accuracy } : null,
+          });
+        } else if (offerCoverageEvaluation) {
           setShowCoverageOptIn(true);
         } else {
           setShowThankYou(true);
@@ -4011,6 +4053,25 @@ const FormFiller = ({
           onClose();
         }}
       />
+
+      {/* Repeat Household Coverage Survey — full-screen, launched after an MDA
+          checklist submission. Replaces the old "Coverage Evaluation 3D" flow. */}
+      {householdSurveyCtx && (
+        <div className="fixed inset-0 z-[70] overflow-y-auto bg-background">
+          <RepeatHouseholdCoverageSurvey
+            projectId={projectId}
+            formId={formId}
+            checklistSubmissionId={householdSurveyCtx.submissionId}
+            targetHouseholds={householdSurveyCtx.target}
+            location={householdSurveyCtx.location}
+            initialGps={householdSurveyCtx.gps}
+            onClose={() => {
+              setHouseholdSurveyCtx(null);
+              onClose();
+            }}
+          />
+        </div>
+      )}
 
       {/* MDA → Coverage Evaluation 3D opt-in (shared post-submit flow) */}
       <AlertDialog open={showCoverageOptIn} onOpenChange={setShowCoverageOptIn}>
