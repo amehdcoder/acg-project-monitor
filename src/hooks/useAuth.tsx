@@ -97,6 +97,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // offline flaps) run SILENTLY and must NOT flip the global loader — otherwise
   // the whole app unmounts to a full-screen spinner and "blinks" on navigation.
   const initialLoadDoneRef = useRef(false);
+  // Set to true ONLY when the user explicitly clicks "Sign out". Any other
+  // SIGNED_OUT event (e.g. a token refresh that failed on a poor network) is
+  // treated as spurious so we never bounce a working field user to /auth.
+  const userSignOutRef = useRef(false);
   const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
 
   // --- Offline Crypto Helpers ---
