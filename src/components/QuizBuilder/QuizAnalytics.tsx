@@ -38,7 +38,17 @@ interface Attempt {
   total_points: number;
   percentage: number;
   completed_at: string;
+  answers: Record<string, string>;
 }
+
+interface QuestionRow {
+  id: string;
+  question_text: string;
+  correct_answer: string;
+  options: { label: string; value: string }[];
+  sort_order: number;
+}
+
 
 // ───── Statistical helpers ─────
 function mean(arr: number[]) { return arr.reduce((s, v) => s + v, 0) / arr.length; }
