@@ -171,6 +171,7 @@ export function ProjectChatDialog({
   const [showSearch, setShowSearch] = useState(false);
   const [callType, setCallType] = useState<"voice" | "video" | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCallHistory, setShowCallHistory] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
