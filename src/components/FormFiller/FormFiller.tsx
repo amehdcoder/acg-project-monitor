@@ -2299,9 +2299,35 @@ const FormFiller = ({
         clearDraft();
         markResponsesSaved();
         setLastSubmissionOffline(!!result.offline);
-        // MDA Supervisory Checklist → offer the linked Coverage Evaluation
-        // Survey (3D) as a shared post-submit flow; otherwise show thank-you.
-        if (offerCoverageEvaluation) {
+        // MDA Supervisory Checklist → launch the Repeat Household Coverage
+        // Survey (repeatable, sampled) if enabled; else the legacy 3D opt-in;
+        // otherwise show the thank-you dialog.
+        if (offerHouseholdSurvey) {
+          const answer = (...names: string[]) => {
+            for (const name of names) {
+              const direct = responses[name];
+              if (direct !== undefined && direct !== null && String(direct).trim() !== "") return String(direct);
+              const id = nameToIdMap[name];
+              const byId = id ? responses[id] : undefined;
+              if (byId !== undefined && byId !== null && String(byId).trim() !== "") return String(byId);
+            }
+            return "";
+          };
+          const handoffGps = gpsQuestionAnswer || gpsPosition || locEnforcement.autoGps || backgroundLocation || null;
+          setHouseholdSurveyCtx({
+            submissionId: result.id,
+            target: Math.max(1, Number((settings as any).householdSampleSize) || 1),
+            location: {
+              state: answer("state", "state_name", "admin_state"),
+              lga: answer("lga", "lga_name", "local_government", "local_government_area"),
+              ward: answer("ward", "ward_name"),
+              flhf_name: answer("flhf_name", "flhf", "health_facility", "facility", "facility_name"),
+              community_name: answer("community_name", "community"),
+              settlement_name: answer("settlement_name", "settlement"),
+            },
+            gps: handoffGps ? { lat: handoffGps.lat, lng: handoffGps.lng, accuracy: (handoffGps as any).accuracy } : null,
+          });
+        } else if (offerCoverageEvaluation) {
           setShowCoverageOptIn(true);
         } else {
           setShowThankYou(true);
