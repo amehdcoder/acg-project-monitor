@@ -119,6 +119,10 @@ export function ChatHeader({
               <Users className="mr-2 h-4 w-4" />
               View Members
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={onCallHistory}>
+              <History className="mr-2 h-4 w-4" />
+              Call History
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={onVoiceCall} className="sm:hidden">
               <Phone className="mr-2 h-4 w-4" />
               Voice Call
