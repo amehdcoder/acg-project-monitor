@@ -26,6 +26,8 @@ interface FormSettingsProps {
     autoSaveInterval?: number;
     conversationalVoice?: boolean;
     coverageEvaluation?: boolean;
+    householdSurvey?: boolean;
+    householdSampleSize?: number;
     campaignType?: string;
     isMdaChecklist?: boolean;
     mdaStateScope?: string[];
