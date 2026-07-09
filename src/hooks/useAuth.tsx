@@ -785,6 +785,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    // Mark this as an explicit, user-initiated sign-out so the auth listener
+    // does NOT treat the resulting SIGNED_OUT as a spurious network drop.
+    userSignOutRef.current = true;
     // 1. Clear Supabase session
     await supabase.auth.signOut();
     
