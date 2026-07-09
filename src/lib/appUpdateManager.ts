@@ -224,11 +224,22 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
       error: null,
       source: source === "html" ? "html" : "version",
     });
-    // Auto-apply when stale build is detected with a high-confidence version.json
-    // probe AND the user has not snoozed and auto-update is enabled.
+    // Auto-apply when a stale build is detected with a high-confidence version.json
+    // probe AND the user has not snoozed and auto-update is enabled. Guarded by the
+    // applied-build id + a cooldown so a deploy mismatch can never loop-reload.
     if (changed && source === "version" && isAutoUpdateEnabled() && !isSnoozed(latestBuildId) && !hasActiveUserFormProgress()) {
-      try { console.info("[UpdateManager] Stale build detected — forcing hard refresh", { currentBuildId, latestBuildId }); } catch {}
-      void hardReloadToLatest();
+      let lastApplied = "";
+      let lastAppliedAt = 0;
+      try {
+        lastApplied = localStorage.getItem(APPLIED_BUILD_ID_KEY) || "";
+        lastAppliedAt = Number(localStorage.getItem(APPLIED_BUILD_AT_KEY) || "0") || 0;
+      } catch { /* ignore */ }
+      const COOLDOWN_MS = 2 * 60 * 1000;
+      const inCooldown = lastAppliedAt > 0 && Date.now() - lastAppliedAt < COOLDOWN_MS;
+      if (lastApplied !== latestBuildId && !inCooldown) {
+        try { console.info("[UpdateManager] Stale build detected — forcing hard refresh", { currentBuildId, latestBuildId }); } catch {}
+        void hardReloadToLatest();
+      }
     }
     return state;
   } catch (error: unknown) {
