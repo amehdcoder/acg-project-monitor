@@ -96,6 +96,7 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
   const [startedAt] = useState(new Date());
   const [closedForMembers, setClosedForMembers] = useState(false);
   const [alreadyTaken, setAlreadyTaken] = useState(false);
+  const [userName, setUserName] = useState("");
 
   const openType: "pre_test" | "post_test" | null =
     quiz.open_test_type === "pre_test" || quiz.open_test_type === "post_test"
