@@ -56,6 +56,9 @@ const PWAUpdatePrompt = () => {
   const [showModal, setShowModal] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [activeFormProgress, setActiveFormProgress] = useState(false);
+  // Build id the user explicitly dismissed the top banner for. The banner stays
+  // hidden for that build; a genuinely NEW build resets it and shows again.
+  const [dismissedBuild, setDismissedBuild] = useState("");
   const lastPromptedBuildRef = useRef("");
 
   useEffect(() => subscribeToAppUpdates(() => setUpdateState(getAppUpdateState())), []);
