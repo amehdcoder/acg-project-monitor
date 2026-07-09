@@ -222,6 +222,12 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   const [builderGroup, setBuilderGroup] = useState<FormGroup | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
 
+  // Household Coverage Survey is under active development. It is locked for
+  // everyone except Owner / Co-owner / Super Admin (who preview it), and a
+  // clear "under development" notice is shown to everyone else.
+  const canAccessHcs = isOwnerLevel || isSuperAdmin;
+  const [hcsNoticeOpen, setHcsNoticeOpen] = useState(false);
+
   // ── CES satellite background pre-warm ──
   // While the MDA checklist is open, quietly prime the Coverage Evaluation 3D
   // satellite tiles around the device's live GPS position (refined as the device
