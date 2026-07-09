@@ -2320,7 +2320,7 @@ const FormFiller = ({
           const handoffGps = gpsQuestionAnswer || gpsPosition || locEnforcement.autoGps || backgroundLocation || null;
           setHouseholdSurveyCtx({
             submissionId: result.id,
-            target: Math.max(1, Number((settings as any).householdSampleSize) || 1),
+            target: Math.max(1, Number((settings as any).householdSampleSize) || 10),
             location: {
               state: answer("state", "state_name", "admin_state"),
               lga: answer("lga", "lga_name", "local_government", "local_government_area"),
