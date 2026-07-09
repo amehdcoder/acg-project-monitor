@@ -221,8 +221,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const queue = JSON.parse(localStorage.getItem("ces_inactive_attempt_queue") || "[]");
       if (queue.length === 0) return;
-      const { error } = await supabase.from("inactive_login_attempts").insert(queue);
-      if (!error) localStorage.setItem("ces_inactive_attempt_queue", "[]");
+      // Flush each queued record through the validated RPC (direct table
+      // inserts are no longer permitted).
+      const results = await Promise.allSettled(
+        queue.map((item: any) =>
+          supabase.rpc("record_inactive_login_attempt" as any, {
+            _email: item.email,
+            _reason: item.reason,
+            _mode: item.mode,
+            _attempted_user_id: item.attempted_user_id ?? null,
+            _user_agent: item.user_agent ?? null,
+            _metadata: item.metadata ?? {},
+            _created_at: item.created_at ?? new Date().toISOString(),
+          }),
+        ),
+      );
+      if (results.every((r) => r.status === "fulfilled")) {
+        localStorage.setItem("ces_inactive_attempt_queue", "[]");
+      }
     } catch (e) {
       console.warn("Inactive attempt queue sync failed:", e);
     }
