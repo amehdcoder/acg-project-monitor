@@ -364,6 +364,7 @@ export function ProjectChatDialog({
                       onVoiceCall={() => setCallType("voice")}
                       onVideoCall={() => setCallType("video")}
                       onSettings={() => setShowSettings(true)}
+                      onCallHistory={() => setShowCallHistory(true)}
                       isAdmin={isAdmin}
                     />
                     <MessageSearch
