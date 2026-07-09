@@ -2304,8 +2304,8 @@ const FormFiller = ({
         markResponsesSaved();
         setLastSubmissionOffline(!!result.offline);
         // MDA Supervisory Checklist → launch the Repeat Household Coverage
-        // Survey (repeatable, sampled) if enabled; else the legacy 3D opt-in;
-        // otherwise show the thank-you dialog.
+        // Survey (repeatable, sampled) when enabled or when the legacy coverage
+        // evaluation linkage is on; otherwise show the thank-you dialog.
         if (offerHouseholdSurvey) {
           const answer = (...names: string[]) => {
             for (const name of names) {
@@ -2331,8 +2331,6 @@ const FormFiller = ({
             },
             gps: handoffGps ? { lat: handoffGps.lat, lng: handoffGps.lng, accuracy: (handoffGps as any).accuracy } : null,
           });
-        } else if (offerCoverageEvaluation) {
-          setShowCoverageOptIn(true);
         } else {
           setShowThankYou(true);
         }
