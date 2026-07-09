@@ -13,6 +13,8 @@ import {
   Link2,
   ShieldCheck,
   ShieldAlert,
+  Lock,
+  Wrench,
 
 } from "lucide-react";
 import { FormFiller } from "@/components/FormFiller";
@@ -186,7 +188,7 @@ async function fileToIconDataUrl(file: File, size = 256): Promise<string> {
 export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   const { formId, formName, projectId, onClose } = props;
   const navigate = useNavigate();
-  const { user, isOwner, isOwnerLevel, role } = useAuth();
+  const { user, isOwner, isOwnerLevel, isSuperAdmin, role } = useAuth();
   const { toast } = useToast();
   const [localGroups, setLocalGroups] = useState<FormGroup[]>(props.groups || []);
   const groups = localGroups;
@@ -219,6 +221,12 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   const [selected, setSelected] = useState<VisitedCommunity | null>(null);
   const [builderGroup, setBuilderGroup] = useState<FormGroup | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
+
+  // Household Coverage Survey is under active development. It is locked for
+  // everyone except Owner / Co-owner / Super Admin (who preview it), and a
+  // clear "under development" notice is shown to everyone else.
+  const canAccessHcs = isOwnerLevel || isSuperAdmin;
+  const [hcsNoticeOpen, setHcsNoticeOpen] = useState(false);
 
   // ── CES satellite background pre-warm ──
   // While the MDA checklist is open, quietly prime the Coverage Evaluation 3D
@@ -800,10 +808,17 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
           {TILES.map((t) => {
             const busy = uploadingKey === t.key;
             const hasCustom = !!iconUrls[t.key];
+            const isHcs = t.key === "hcs";
+            const locked = isHcs && !canAccessHcs;
+            const handleTileClick = () => {
+              if (editingIcons) return triggerUpload(t.key);
+              if (locked) return setHcsNoticeOpen(true);
+              setView(t.view);
+            };
             return (
               <div key={t.key} className="relative flex flex-col items-center">
                 <button
-                  onClick={() => (editingIcons ? triggerUpload(t.key) : setView(t.view))}
+                  onClick={handleTileClick}
                   disabled={busy}
                   className="group flex w-full flex-col items-center gap-3 rounded-3xl p-4 text-center transition-colors hover:bg-white/40"
                 >
@@ -815,7 +830,9 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
                         src={imgFor(t)}
                         alt={t.title}
                         loading="lazy"
-                        className="h-full w-full object-contain drop-shadow-sm"
+                        className={`h-full w-full object-contain drop-shadow-sm ${
+                          isHcs ? "opacity-60 grayscale" : ""
+                        }`}
                       />
                     )}
                     {editingIcons && !busy && (
@@ -823,8 +840,20 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
                         <Upload className="h-4 w-4" />
                       </span>
                     )}
+                    {isHcs && !busy && !editingIcons && (
+                      <span className="absolute -right-1 -top-1 flex h-9 w-9 items-center justify-center rounded-full bg-amber-500 text-white shadow-lg ring-2 ring-white">
+                        <Lock className="h-4 w-4" />
+                      </span>
+                    )}
                   </span>
-                  <span className="text-[15px] font-medium leading-tight text-slate-800">{t.title}</span>
+                  <span className="flex flex-col items-center gap-1">
+                    <span className="text-[15px] font-medium leading-tight text-slate-800">{t.title}</span>
+                    {isHcs && !editingIcons && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
+                        <Wrench className="h-3 w-3" /> Under development
+                      </span>
+                    )}
+                  </span>
                 </button>
 
                 {editingIcons && hasCustom && !busy && (
@@ -843,6 +872,41 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
       </main>
 
       {builderDialog}
+      {hcsNoticeOpen && <HcsUnderDevelopmentNotice onClose={() => setHcsNoticeOpen(false)} />}
+    </div>
+  );
+}
+
+// Professional "under development" lock notice for the Household Coverage Survey.
+function HcsUnderDevelopmentNotice({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="alertdialog" aria-modal="true">
+      <div className="w-full max-w-sm overflow-hidden rounded-3xl bg-white text-center shadow-2xl">
+        <div className="bg-gradient-to-br from-amber-400 to-amber-600 px-6 py-7">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/20 ring-4 ring-white/30">
+            <Lock className="h-8 w-8 text-white" />
+          </div>
+          <h2 className="mt-4 text-lg font-bold text-white">Household Coverage Survey</h2>
+          <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/20 px-3 py-0.5 text-xs font-semibold text-white">
+            <Wrench className="h-3.5 w-3.5" /> Under development
+          </p>
+        </div>
+        <div className="px-6 py-6">
+          <p className="text-sm leading-relaxed text-slate-600">
+            This module is currently being built and refined. For now, please conduct
+            the household coverage survey <span className="font-semibold text-slate-800">within the Community Checklist</span>.
+          </p>
+          <p className="mt-3 text-xs leading-relaxed text-slate-400">
+            Full access will be limited to Owners, Co-owners, and Super Admins once it goes live.
+          </p>
+          <button
+            onClick={onClose}
+            className="mt-5 w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 active:scale-[0.99]"
+          >
+            Got it
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
