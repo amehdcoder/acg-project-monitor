@@ -1252,6 +1252,22 @@ const QuizBuilder = () => {
               <p className="mt-1 opacity-80">Example: “Well done {"{name}"}! You scored {"{percentage}"}% on the {"{test}"}.”</p>
             </div>
 
+            {messageTokenReport.unknown.length > 0 ? (
+              <div className="flex items-start gap-2 rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-bold">Unknown token{messageTokenReport.unknown.length > 1 ? "s" : ""} detected — fix before releasing results.</p>
+                  <p className="mt-0.5 font-mono">{messageTokenReport.unknown.map((t) => `{${t}}`).join(" · ")}</p>
+                  <p className="mt-1 opacity-80">These will be sent to members literally. Use only: {KNOWN_QUIZ_TOKENS.map((t) => `{${t}}`).join(" · ")}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-2.5 text-xs font-semibold text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
+                <CheckCircle className="h-4 w-4 shrink-0" />
+                All tokens valid.{!messageTokenReport.anyNameToken && " Tip: add {name} to personalize the message."}
+              </div>
+            )}
+
             <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 dark:border-blue-900/50 dark:bg-blue-950/20">
               <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300"><BookOpen className="h-3.5 w-3.5" /> Pre-test messages</p>
               <div className="space-y-3">
