@@ -2212,6 +2212,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   <SelectItem value="all">
                     <span className="font-semibold text-foreground">All Projects</span>
                   </SelectItem>
+                  {projects.length === 0 && projectsLoadError && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">
+                      Reconnecting to project list…
+                    </div>
+                  )}
                   {projects.map((project) => (
                     <SelectItem key={project.id} value={project.id}>
                       <span
