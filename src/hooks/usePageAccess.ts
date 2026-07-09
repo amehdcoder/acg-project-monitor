@@ -140,11 +140,12 @@ export const usePageAccess = () => {
     let cancelled = false;
     (async () => {
       const { data } = await withTimeoutFallback(
-        supabase
-          .from("microplan_form_access")
-          .select("id")
-          .eq("user_id", user.id)
-          .limit(1),
+        (async () =>
+          await supabase
+            .from("microplan_form_access")
+            .select("id")
+            .eq("user_id", user.id)
+            .limit(1))(),
         8000,
         { data: [] } as any,
       );
@@ -161,11 +162,12 @@ export const usePageAccess = () => {
     let cancelled = false;
     (async () => {
       const { data } = await withTimeoutFallback(
-        supabase
-          .from("user_minimal_access" as any)
-          .select("id")
-          .eq("user_id", user.id)
-          .limit(1),
+        (async () =>
+          await supabase
+            .from("user_minimal_access" as any)
+            .select("id")
+            .eq("user_id", user.id)
+            .limit(1))(),
         8000,
         { data: [] } as any,
       );
