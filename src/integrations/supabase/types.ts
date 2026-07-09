@@ -6120,8 +6120,12 @@ export type Database = {
           open_test_type: string | null
           pass_message: string | null
           passing_score: number | null
+          post_fail_message: string | null
+          post_pass_message: string | null
           post_test_datetime: string | null
           post_test_delay_days: number
+          pre_fail_message: string | null
+          pre_pass_message: string | null
           project_id: string
           time_limit_minutes: number | null
           title: string
@@ -6137,8 +6141,12 @@ export type Database = {
           open_test_type?: string | null
           pass_message?: string | null
           passing_score?: number | null
+          post_fail_message?: string | null
+          post_pass_message?: string | null
           post_test_datetime?: string | null
           post_test_delay_days?: number
+          pre_fail_message?: string | null
+          pre_pass_message?: string | null
           project_id: string
           time_limit_minutes?: number | null
           title: string
@@ -6154,8 +6162,12 @@ export type Database = {
           open_test_type?: string | null
           pass_message?: string | null
           passing_score?: number | null
+          post_fail_message?: string | null
+          post_pass_message?: string | null
           post_test_datetime?: string | null
           post_test_delay_days?: number
+          pre_fail_message?: string | null
+          pre_pass_message?: string | null
           project_id?: string
           time_limit_minutes?: number | null
           title?: string

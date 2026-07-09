@@ -178,14 +178,40 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
 
   try {
     const source = opts.source || "version";
-    const latestBuildId = (source === "html" ? await fetchHtmlBuildId() : await fetchVersionBuildId()) ||
-      (await fetchHtmlBuildId());
 
-    if (!latestBuildId) throw new Error("Unable to read latest app version");
+    // IMPORTANT: never mix probe sources. Comparing an HTML asset-hash against the
+    // compiled build id (CURRENT_BUILD_ID) can NEVER match, which used to flag a
+    // permanent, false "update available" (stuck banner + unresponsive button)
+    // whenever version.json was momentarily unreachable. Each source is now
+    // compared only against its own baseline.
+    let latestBuildId: string | null;
+    let currentBuildId: string;
 
-    const currentBuildId = source === "html" ? sessionStorage.getItem("app_html_build_id_v1") || latestBuildId : CURRENT_BUILD_ID;
-    if (source === "html" && !sessionStorage.getItem("app_html_build_id_v1")) {
-      sessionStorage.setItem("app_html_build_id_v1", latestBuildId);
+    if (source === "html") {
+      latestBuildId = await fetchHtmlBuildId();
+      // If the HTML probe genuinely fails, treat it as "unknown" and DO NOT flag
+      // an update — a transient network blip must never surface the banner.
+      if (!latestBuildId) {
+        setState({ lastCheckedAt: Date.now(), error: null });
+        return state;
+      }
+      currentBuildId = sessionStorage.getItem("app_html_build_id_v1") || latestBuildId;
+      if (!sessionStorage.getItem("app_html_build_id_v1")) {
+        sessionStorage.setItem("app_html_build_id_v1", latestBuildId);
+      }
+    } else {
+      latestBuildId = await fetchVersionBuildId();
+      // version.json unreachable → unknown, not "update available". Keep current
+      // state so the banner never appears on a false positive.
+      if (!latestBuildId) {
+        setState({
+          status: state.updateAvailable ? state.status : "current",
+          lastCheckedAt: Date.now(),
+          error: null,
+        });
+        return state;
+      }
+      currentBuildId = CURRENT_BUILD_ID;
     }
 
     const changed = latestBuildId !== currentBuildId;
@@ -198,11 +224,22 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
       error: null,
       source: source === "html" ? "html" : "version",
     });
-    // Auto-apply when stale build is detected with a high-confidence version.json
-    // probe AND the user has not snoozed and auto-update is enabled.
+    // Auto-apply when a stale build is detected with a high-confidence version.json
+    // probe AND the user has not snoozed and auto-update is enabled. Guarded by the
+    // applied-build id + a cooldown so a deploy mismatch can never loop-reload.
     if (changed && source === "version" && isAutoUpdateEnabled() && !isSnoozed(latestBuildId) && !hasActiveUserFormProgress()) {
-      try { console.info("[UpdateManager] Stale build detected — forcing hard refresh", { currentBuildId, latestBuildId }); } catch {}
-      void hardReloadToLatest();
+      let lastApplied = "";
+      let lastAppliedAt = 0;
+      try {
+        lastApplied = localStorage.getItem(APPLIED_BUILD_ID_KEY) || "";
+        lastAppliedAt = Number(localStorage.getItem(APPLIED_BUILD_AT_KEY) || "0") || 0;
+      } catch { /* ignore */ }
+      const COOLDOWN_MS = 2 * 60 * 1000;
+      const inCooldown = lastAppliedAt > 0 && Date.now() - lastAppliedAt < COOLDOWN_MS;
+      if (lastApplied !== latestBuildId && !inCooldown) {
+        try { console.info("[UpdateManager] Stale build detected — forcing hard refresh", { currentBuildId, latestBuildId }); } catch {}
+        void hardReloadToLatest();
+      }
     }
     return state;
   } catch (error: unknown) {

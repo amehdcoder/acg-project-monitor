@@ -62,6 +62,10 @@ interface QuizTakerProps {
     passing_score: number;
     pass_message?: string | null;
     fail_message?: string | null;
+    pre_pass_message?: string | null;
+    pre_fail_message?: string | null;
+    post_pass_message?: string | null;
+    post_fail_message?: string | null;
     open_test_type?: "pre_test" | "post_test" | null;
   };
   onClose: () => void;
@@ -92,6 +96,7 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
   const [startedAt] = useState(new Date());
   const [closedForMembers, setClosedForMembers] = useState(false);
   const [alreadyTaken, setAlreadyTaken] = useState(false);
+  const [userName, setUserName] = useState("");
 
   const openType: "pre_test" | "post_test" | null =
     quiz.open_test_type === "pre_test" || quiz.open_test_type === "post_test"
@@ -101,6 +106,20 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
   useEffect(() => {
     const init = async () => {
       setLoading(true);
+
+      // Load the member's display name so pass/fail messages can address them by name.
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("first_name, last_name")
+          .eq("user_id", user!.id)
+          .maybeSingle();
+        const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim();
+        setUserName(name || (user?.email ? user.email.split("@")[0] : ""));
+      } catch {
+        setUserName(user?.email ? user.email.split("@")[0] : "");
+      }
+
 
       // Fetch existing attempts first — needed for gating decisions.
       const { data: attempts } = await supabase
@@ -383,6 +402,26 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
     const preAttempt = existingAttempts.find((a: any) => a.attempt_type === "pre_test");
     const postAttempt = existingAttempts.find((a: any) => a.attempt_type === "post_test");
 
+    // Resolve the admin-authored message for THIS test type, with graceful
+    // fallback to the generic message, then a sensible default. Tokens let the
+    // admin reference the member and their real-time score.
+    const testLabel = attemptType === "pre_test" ? "Pre-test" : "Post-test";
+    const interpolate = (tpl: string) =>
+      tpl
+        .replace(/\{name\}/gi, userName || "there")
+        .replace(/\{score\}/gi, String(result.score))
+        .replace(/\{percentage\}/gi, String(Math.round(result.percentage)))
+        .replace(/\{total\}/gi, String(result.total))
+        .replace(/\{passing\}/gi, String(quiz.passing_score))
+        .replace(/\{test\}/gi, testLabel);
+
+    const specificPass = attemptType === "pre_test" ? quiz.pre_pass_message : quiz.post_pass_message;
+    const specificFail = attemptType === "pre_test" ? quiz.pre_fail_message : quiz.post_fail_message;
+    const rawMessage = result.passed
+      ? (specificPass?.trim() || quiz.pass_message?.trim() || "Congratulations{comma} you passed! 🎉".replace("{comma}", userName ? `, ${userName}` : ""))
+      : (specificFail?.trim() || quiz.fail_message?.trim() || `You need ${quiz.passing_score}% to pass — keep going${userName ? `, ${userName}` : ""}!`);
+    const resolvedMessage = interpolate(rawMessage);
+
     return (
       <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
         <Button variant="outline" size="sm" onClick={onClose} className="gap-1">
@@ -391,27 +430,32 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
 
         <Card className="form-card overflow-hidden">
           <div
-            className={`relative overflow-hidden px-6 pb-6 pt-8 text-center ${
+            className={`relative overflow-hidden px-6 pb-7 pt-9 text-center ${
               result.passed
                 ? "bg-gradient-to-br from-emerald-500 via-teal-500 to-green-400"
                 : "bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500"
             }`}
           >
-            <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/15 blur-xl" />
-            <div className="pointer-events-none absolute -bottom-10 -left-6 h-28 w-28 rounded-full bg-white/10 blur-xl" />
-            <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/20 ring-4 ring-white/30 backdrop-blur-sm">
+            {/* Ambient animated glows */}
+            <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/15 blur-xl animate-pulse" />
+            <div className="pointer-events-none absolute -bottom-10 -left-6 h-28 w-28 rounded-full bg-white/10 blur-xl animate-pulse" style={{ animationDelay: "0.6s" }} />
+            {result.passed && (
+              <div className="pointer-events-none absolute right-5 top-5 opacity-70">
+                <Sparkles className="h-6 w-6 text-white animate-pulse" />
+              </div>
+            )}
+            <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/20 ring-4 ring-white/30 backdrop-blur-sm animate-in zoom-in-50 duration-500">
               {result.passed ? <Trophy className="h-10 w-10 text-white" /> : <Target className="h-10 w-10 text-white" />}
             </div>
-            <h3 className="relative mt-4 text-xl font-extrabold text-white drop-shadow">
+            <h3 className="relative mt-4 text-xl font-extrabold text-white drop-shadow animate-in slide-in-from-bottom-3 duration-500">
               {attemptType === "pre_test" && !postAttempt ? "Pre-test Complete!" :
                postAttempt ? "Quiz Complete!" : "Results"}
             </h3>
-            <p className="relative mt-1 text-sm font-medium text-white/90">
-              {result.passed
-                ? (quiz.pass_message?.trim() || "Congratulations! You passed! 🎉")
-                : (quiz.fail_message?.trim() || `You need ${quiz.passing_score}% to pass — keep going!`)}
+            {/* Personalized, animated pass/fail message */}
+            <p className="relative mx-auto mt-2 max-w-md whitespace-pre-line text-sm font-semibold leading-relaxed text-white/95 drop-shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700">
+              {resolvedMessage}
             </p>
-            <div className="relative mt-5 text-6xl font-black leading-none text-white drop-shadow-md">
+            <div className="relative mt-5 text-6xl font-black leading-none text-white drop-shadow-md animate-in zoom-in-75 duration-700">
               {Math.round(result.percentage)}%
             </div>
             <p className="relative mt-1 text-xs font-semibold uppercase tracking-wider text-white/80">
