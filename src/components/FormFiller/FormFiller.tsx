@@ -126,7 +126,7 @@ import {
   hasMeaningfulFormResponses,
 } from "@/lib/formProgressPersistence";
 import { isMdaChecklistLike } from "@/lib/mdaFollowUp";
-import { buildCesLocationUrl } from "@/lib/mda/cesLocationBridge";
+
 import RepeatHouseholdCoverageSurvey from "@/components/HouseholdCoverageSurvey/RepeatHouseholdCoverageSurvey";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
 
@@ -492,7 +492,7 @@ const FormFiller = ({
   const [showResumeDialog, setShowResumeDialog] = useState(false);
   // Thank you state
   const [showThankYou, setShowThankYou] = useState(false);
-  const [showCoverageOptIn, setShowCoverageOptIn] = useState(false);
+  
   // Repeat Household Coverage Survey launch context (replaces the old 3D flow).
   const [householdSurveyCtx, setHouseholdSurveyCtx] = useState<null | {
     submissionId: string;
@@ -517,10 +517,13 @@ const FormFiller = ({
   // Coverage Evaluation linkage is MDA-only; the supervisory checklist opts out.
   const offerCoverageEvaluation =
     isMdaChecklist && !isSupervisoryChecklist && !!settings.coverageEvaluation && !previewMode;
-  // Repeat Household Coverage Survey — available on any MDA/supervisory checklist
-  // whose admin enabled it and set a household sample size.
+  // Repeat Household Coverage Survey — the modern replacement for the old
+  // "Coverage Evaluation 3D" opt-in. It launches on any MDA/supervisory checklist
+  // whose admin enabled the household survey OR the legacy coverage evaluation
+  // linkage, so existing checklists seamlessly get the new sampled survey.
   const offerHouseholdSurvey =
-    isMdaChecklist && !!(settings as any).householdSurvey && !previewMode;
+    isMdaChecklist && !previewMode &&
+    (!!(settings as any).householdSurvey || offerCoverageEvaluation);
 
   // Treatment Data Reporting Tools drive their geography from the microplan via
   // <MdaLocationCascade> (with the off-microplan provision), without the full
@@ -2301,8 +2304,8 @@ const FormFiller = ({
         markResponsesSaved();
         setLastSubmissionOffline(!!result.offline);
         // MDA Supervisory Checklist → launch the Repeat Household Coverage
-        // Survey (repeatable, sampled) if enabled; else the legacy 3D opt-in;
-        // otherwise show the thank-you dialog.
+        // Survey (repeatable, sampled) when enabled or when the legacy coverage
+        // evaluation linkage is on; otherwise show the thank-you dialog.
         if (offerHouseholdSurvey) {
           const answer = (...names: string[]) => {
             for (const name of names) {
@@ -2317,7 +2320,7 @@ const FormFiller = ({
           const handoffGps = gpsQuestionAnswer || gpsPosition || locEnforcement.autoGps || backgroundLocation || null;
           setHouseholdSurveyCtx({
             submissionId: result.id,
-            target: Math.max(1, Number((settings as any).householdSampleSize) || 1),
+            target: Math.max(1, Number((settings as any).householdSampleSize) || 10),
             location: {
               state: answer("state", "state_name", "admin_state"),
               lga: answer("lga", "lga_name", "local_government", "local_government_area"),
@@ -2328,8 +2331,6 @@ const FormFiller = ({
             },
             gps: handoffGps ? { lat: handoffGps.lat, lng: handoffGps.lng, accuracy: (handoffGps as any).accuracy } : null,
           });
-        } else if (offerCoverageEvaluation) {
-          setShowCoverageOptIn(true);
         } else {
           setShowThankYou(true);
         }
@@ -4073,75 +4074,7 @@ const FormFiller = ({
         </div>
       )}
 
-      {/* MDA → Coverage Evaluation 3D opt-in (shared post-submit flow) */}
-      <AlertDialog open={showCoverageOptIn} onOpenChange={setShowCoverageOptIn}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <div className="flex items-center gap-3 mb-1">
-              <img src={fgnEmblem} alt="" className="h-9 w-9 object-contain" />
-              <AlertDialogTitle>Supervision recorded — proceed to Coverage Evaluation?</AlertDialogTitle>
-            </div>
-            <AlertDialogDescription>
-              Your MDA supervisory checklist was submitted successfully. You can now
-              run the linked Coverage Evaluation Survey (3D) for this community to
-              independently verify treatment coverage, or finish for now.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              onClick={() => {
-                setShowCoverageOptIn(false);
-                onClose();
-              }}
-            >
-              Finish for now
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setShowCoverageOptIn(false);
-                // Carry the supervisory checklist's location identification across
-                // to the Coverage Evaluation 3D page, where it will be prefilled
-                // and locked (not user-editable).
-                try {
-                  const answer = (...names: string[]) => {
-                    for (const name of names) {
-                      const direct = responses[name];
-                      if (direct !== undefined && direct !== null && String(direct).trim() !== "") return direct;
-                      const id = nameToIdMap[name];
-                      const byId = id ? responses[id] : undefined;
-                      if (byId !== undefined && byId !== null && String(byId).trim() !== "") return byId;
-                    }
-                    return "";
-                  };
-                  const handoffGps = gpsQuestionAnswer || gpsPosition || locEnforcement.autoGps || backgroundLocation || null;
-                  const url = buildCesLocationUrl({
-                    state: answer("state", "state_name", "admin_state"),
-                    lga: answer("lga", "lga_name", "local_government", "local_government_area"),
-                    ward: answer("ward", "ward_name"),
-                    flhf_name: answer("flhf_name", "flhf", "health_facility", "facility", "facility_name"),
-                    community_name: answer("community_name", "community"),
-                    settlement_name: answer("settlement_name", "settlement"),
-                    ...(handoffGps ? { lat: handoffGps.lat, lng: handoffGps.lng, accuracy: (handoffGps as any).accuracy } : {}),
-                    projectId: projectId ?? "",
-                    formId,
-                    source: "mda_checklist",
-                    ts: Date.now(),
-                  });
-                  window.dispatchEvent(new CustomEvent("amehnities:navigate-tab", { detail: { tab: "coverage-eval" } }));
-                  navigate(url, { replace: true });
-                  requestAnimationFrame(() => onClose());
-                  return;
-                } catch { /* fall back to plain tab navigation */ }
-                window.dispatchEvent(new CustomEvent("amehnities:navigate-tab", { detail: { tab: "coverage-eval" } }));
-                navigate("/?tab=coverage-eval", { replace: true });
-                requestAnimationFrame(() => onClose());
-              }}
-            >
-              Proceed with Coverage Evaluation 3D
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+
 
 
       {/* Leave without saving confirmation */}
