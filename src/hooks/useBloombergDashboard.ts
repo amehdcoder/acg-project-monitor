@@ -71,11 +71,12 @@ async function fetchAll<T>(table: string, columns: string): Promise<T[]> {
   const all: T[] = [];
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
-    const { data, error } = await withTimeout(
-      supabase
-        .from(table as any)
-        .select(columns)
-        .range(from, from + PAGE - 1),
+    const { data, error } = await withTimeout<any>(
+      (async () =>
+        await supabase
+          .from(table as any)
+          .select(columns)
+          .range(from, from + PAGE - 1))(),
       12000,
       `${table}_page_timeout`,
     );
