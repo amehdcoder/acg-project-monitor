@@ -35,7 +35,7 @@ export const findUnknownTokens = (template: string): string[] => {
 };
 
 /** Supported tokens that the template does not use (informational, not errors). */
-export const findMissingTokens = (template: string): string[] => {
+export const findMissingTokens = (template: string): QuizToken[] => {
   const used = new Set(extractTokens(template));
   return KNOWN_QUIZ_TOKENS.filter((t) => !used.has(t));
 };
