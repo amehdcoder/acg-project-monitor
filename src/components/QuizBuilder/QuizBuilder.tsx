@@ -483,42 +483,57 @@ const QuizBuilder = () => {
 
   const loadPreviewMember = async (quiz: Quiz) => {
     setPreviewMember(null);
+    setPreviewMemberB(null);
     try {
+      // Prefer assigned quiz members; fall back to any current project members.
       const { data: assignments } = await supabase
         .from("quiz_user_assignments")
         .select("user_id")
         .eq("quiz_id", quiz.id)
-        .limit(1);
+        .limit(2);
 
-      let userId = assignments?.[0]?.user_id as string | undefined;
+      let userIds = (assignments || []).map((a) => a.user_id as string);
       let source = "Assigned quiz member";
 
-      if (!userId) {
-        const { data: projectMember } = await supabase
+      if (userIds.length < 2) {
+        const { data: projectMembers } = await supabase
           .from("user_project_assignments")
           .select("user_id")
           .eq("project_id", quiz.project_id)
-          .limit(1);
-        userId = projectMember?.[0]?.user_id as string | undefined;
-        source = "Current project member";
+          .limit(4);
+        const extra = (projectMembers || [])
+          .map((p) => p.user_id as string)
+          .filter((id) => !userIds.includes(id));
+        if (userIds.length === 0 && extra.length > 0) source = "Current project member";
+        userIds = [...userIds, ...extra].slice(0, 2);
       }
 
-      if (!userId) return;
-      const { data: profile } = await supabase
+      if (userIds.length === 0) return;
+
+      const { data: profiles } = await supabase
         .from("profiles")
-        .select("first_name, last_name, email")
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (!profile) return;
-      setPreviewMember({
-        name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email || "Project member",
-        email: profile.email || "No email on file",
-        source,
-      });
+        .select("user_id, first_name, last_name, email")
+        .in("user_id", userIds);
+
+      const toMember = (uid: string) => {
+        const p = (profiles || []).find((pr) => pr.user_id === uid);
+        if (!p) return null;
+        return {
+          name: `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.email || "Project member",
+          email: p.email || "No email on file",
+          source,
+        };
+      };
+
+      const a = toMember(userIds[0]);
+      const b = userIds[1] ? toMember(userIds[1]) : null;
+      if (a) setPreviewMember(a);
+      if (b) setPreviewMemberB(b);
     } catch (error) {
-      console.warn("Could not load quiz preview member", error);
+      console.warn("Could not load quiz preview members", error);
     }
   };
+
 
   // Admin-only: save pass mark & custom pass/fail messages (works on published quizzes).
   const saveQuizSettings = async () => {
