@@ -40,7 +40,14 @@ const AppUpdateButton = () => {
   const purgeServiceWorkers = async () => {
     try {
       const regs = await navigator.serviceWorker?.getRegistrations();
-      await Promise.all((regs || []).map((r) => r.unregister()));
+      await Promise.allSettled(
+        (regs || [])
+          .filter((r) => {
+            const script = r.active?.scriptURL || r.waiting?.scriptURL || r.installing?.scriptURL || "";
+            return !script.includes("push-sw.js");
+          })
+          .map((r) => r.unregister()),
+      );
     } catch { /* best-effort */ }
   };
 
