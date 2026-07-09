@@ -92,10 +92,15 @@ export const usePageAccess = () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from("admin_page_access")
-        .select("page_id")
-        .eq("user_id", user.id);
+      // Race the grant query against a hard timeout so a slow/wedged network can
+      // never leave `loadingAccess` stuck true (which freezes the page on a
+      // spinner forever). On timeout we proceed with no extra grants — the user
+      // still gets their always-on pages and can retry.
+      const { data, error } = await withTimeoutFallback(
+        supabase.from("admin_page_access").select("page_id").eq("user_id", user.id),
+        10000,
+        { data: [], error: null } as any,
+      );
 
       if (error) {
         console.error("Error fetching page access grants:", error);
@@ -116,6 +121,15 @@ export const usePageAccess = () => {
   useEffect(() => {
     fetchAccess();
   }, [fetchAccess]);
+
+  // Absolute safety net: no matter what stalls, never leave the page trapped on
+  // the access spinner. If grants haven't resolved within 12s, open the gate.
+  useEffect(() => {
+    if (!loadingAccess) return;
+    const t = setTimeout(() => setLoadingAccess(false), 12000);
+    return () => clearTimeout(t);
+  }, [loadingAccess]);
+
 
   // Fetch the user's microplanning form-access grant (Tier 2 → full dashboard).
   useEffect(() => {
