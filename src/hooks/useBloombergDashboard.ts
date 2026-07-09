@@ -4,6 +4,7 @@ import { ALL_CLASSES, NOT_FOUND_REASONS, OPERATIONAL_STATUS } from "@/lib/bloomb
 import { buildAccountability, type ProfileLite } from "@/lib/accountability";
 import { prettyAdminLabel } from "@/lib/formLabelUtils";
 import { meanConfidenceInterval, oneWayAnova } from "@/lib/statisticalInference";
+import { withTimeout } from "@/lib/withTimeout";
 
 export interface ValidationVerification {
   school_exists?: "yes" | "no" | "";
@@ -70,10 +71,15 @@ async function fetchAll<T>(table: string, columns: string): Promise<T[]> {
   const all: T[] = [];
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase
-      .from(table as any)
-      .select(columns)
-      .range(from, from + PAGE - 1);
+    const { data, error } = await withTimeout<any>(
+      (async () =>
+        await supabase
+          .from(table as any)
+          .select(columns)
+          .range(from, from + PAGE - 1))(),
+      12000,
+      `${table}_page_timeout`,
+    );
     if (error) throw error;
     if (!data || data.length === 0) break;
     all.push(...(data as T[]));
@@ -160,6 +166,11 @@ export const useBloombergDashboard = () => {
       setSchools(s);
       setSchoolCount(count || 0);
       setProfileMap(pm);
+    } catch (error) {
+      // Never leave the Bloomberg dashboard locked on a spinner when the backend
+      // is busy or a weak network drops a page of the large register. Keep the
+      // last good state (or empty initial state) and let the user retry/refresh.
+      console.warn("Bloomberg dashboard load timed out or failed:", error);
     } finally {
       if (myReq === reqIdRef.current) setLoading(false);
     }

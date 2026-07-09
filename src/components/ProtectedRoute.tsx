@@ -1,4 +1,4 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading, isApproved, isAdmin, profile, isOwner, signOut } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -60,9 +61,13 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  // Allow admins regardless of approval status (admins are the ones who approve)
-  if (!isApproved && !isAdmin) {
-    return <Navigate to="/" replace />; // Index.tsx handles the "Pending Approval" UI
+  // Allow admins regardless of approval status (admins are the ones who approve).
+  // IMPORTANT: the root route itself is wrapped by ProtectedRoute and Index.tsx
+  // renders the pending/rejected/recovery UI. Redirecting "/" to "/" here causes
+  // a self-navigation loop whenever profile approval is still resolving after a
+  // slow auth refresh, which looks like the app is loading forever.
+  if (profile && !isApproved && !isAdmin && location.pathname !== "/") {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

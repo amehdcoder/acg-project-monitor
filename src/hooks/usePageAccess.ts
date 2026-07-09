@@ -139,11 +139,16 @@ export const usePageAccess = () => {
     if (!user) { setHasMicroplanFormAccess(false); return; }
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from("microplan_form_access")
-        .select("id")
-        .eq("user_id", user.id)
-        .limit(1);
+      const { data } = await withTimeoutFallback(
+        (async () =>
+          await supabase
+            .from("microplan_form_access")
+            .select("id")
+            .eq("user_id", user.id)
+            .limit(1))(),
+        8000,
+        { data: [] } as any,
+      );
       if (!cancelled) setHasMicroplanFormAccess(!!data && data.length > 0);
     })();
     return () => { cancelled = true; };
@@ -156,11 +161,16 @@ export const usePageAccess = () => {
     if (!user || isAdmin || isOwner) { setMinimalAccess(false); return; }
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from("user_minimal_access" as any)
-        .select("id")
-        .eq("user_id", user.id)
-        .limit(1);
+      const { data } = await withTimeoutFallback(
+        (async () =>
+          await supabase
+            .from("user_minimal_access" as any)
+            .select("id")
+            .eq("user_id", user.id)
+            .limit(1))(),
+        8000,
+        { data: [] } as any,
+      );
       if (!cancelled) setMinimalAccess(!!data && data.length > 0);
     })();
     return () => { cancelled = true; };
