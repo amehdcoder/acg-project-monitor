@@ -107,6 +107,20 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
     const init = async () => {
       setLoading(true);
 
+      // Load the member's display name so pass/fail messages can address them by name.
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("first_name, last_name")
+          .eq("user_id", user!.id)
+          .maybeSingle();
+        const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim();
+        setUserName(name || (user?.email ? user.email.split("@")[0] : ""));
+      } catch {
+        setUserName(user?.email ? user.email.split("@")[0] : "");
+      }
+
+
       // Fetch existing attempts first — needed for gating decisions.
       const { data: attempts } = await supabase
         .from("quiz_attempts")
