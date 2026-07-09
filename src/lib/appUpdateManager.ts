@@ -162,24 +162,16 @@ export const markServiceWorkerUpdateAvailable = () => {
     // Only surface the update UI after the same-origin version manifest proves
     // that a newer code build exists for this device.
     const latestBuildId = await fetchVersionBuildId();
-    if (!latestBuildId || latestBuildId === CURRENT_BUILD_ID) {
-      setState({
-        status: "current",
-        updateAvailable: false,
-        currentBuildId: CURRENT_BUILD_ID,
-        latestBuildId: latestBuildId || CURRENT_BUILD_ID,
-        lastCheckedAt: Date.now(),
-        error: null,
-        source: "service-worker",
-      });
-      return;
-    }
-
-    setState({
-      status: "available",
-      updateAvailable: true,
+    const decision = decideUpdate({
       currentBuildId: CURRENT_BUILD_ID,
       latestBuildId,
+      source: "service-worker",
+    });
+    setState({
+      status: decision.status,
+      updateAvailable: decision.updateAvailable,
+      currentBuildId: decision.currentBuildId,
+      latestBuildId: decision.latestBuildId,
       lastCheckedAt: Date.now(),
       error: null,
       source: "service-worker",
