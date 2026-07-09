@@ -375,7 +375,7 @@ try {
   }
 } catch {}
 
-export const hardReloadToLatest = async () => {
+export const hardReloadToLatest = async (opts: { force?: boolean } = {}) => {
   setState({ status: "updating", error: null });
   prepareSilentFormRestoreForUpdate();
 
@@ -383,7 +383,7 @@ export const hardReloadToLatest = async () => {
   // networks that can strand users on Chrome's generic "site can't be reached"
   // page. First prove the branded domain is reachable; if it is not, keep the
   // currently running shell intact and retry from the normal polling loop.
-  const canReload = await reloadProbe();
+  const canReload = opts.force ? true : await reloadProbe();
   if (!canReload) {
     setState({
       status: "error",

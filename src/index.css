@@ -64,6 +64,8 @@
     /* Custom ACG tokens */
     --acg-green-dark: 220 70% 35%;
     --acg-green-light: 220 50% 55%;
+    --update-green: 150 72% 32%;
+    --update-green-foreground: 0 0% 100%;
     --acg-gold: 36 90% 55%;
     --acg-gold-light: 40 95% 70%;
     --acg-cream: 40 40% 96%;

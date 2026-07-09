@@ -62,6 +62,16 @@ const AppUpdateButton = () => {
       updateState.updateAvailable ? "Updating the app…" : "Checking for updates…",
     );
 
+    // Any tap on Update must result in a latest-shell reload, even when the
+    // version probe says the app is current. This prevents users on cached
+    // mobile/desktop shells from getting stuck without the newest build.
+    const forceLatestReload = async (message = "Refreshing latest version…") => {
+      setStatusText("Reloading…");
+      toast.loading(message, { id: optimisticId });
+      await purgeServiceWorkers();
+      await hardReloadToLatest({ force: true });
+    };
+
 
     // If there is no known update yet, make the button a fast, reliable manual
     // check instead of hiding it. This keeps the header control visible and
@@ -76,13 +86,7 @@ const AppUpdateButton = () => {
         ]);
         setUpdateState(next);
         if (!next.updateAvailable) {
-          setStatusText("Latest");
-          toast.success("You're on the latest version", { id: optimisticId });
-          window.setTimeout(() => {
-            setInstalling(false);
-            setStatusText(null);
-            setAppliedAt(getLastAppliedAt());
-          }, 900);
+          await forceLatestReload("No pending update found — refreshing latest version…");
           return;
         }
         toast.loading("New version found — updating…", { id: optimisticId });
@@ -141,7 +145,7 @@ const AppUpdateButton = () => {
       toast.loading("Applying update — reloading…", { id: optimisticId });
 
       await purgeServiceWorkers();
-      await hardReloadToLatest();
+      await hardReloadToLatest({ force: true });
     } catch {
       // even if everything failed, the watchdog reload will recover.
       setStatusText("Finishing…");
@@ -159,15 +163,15 @@ const AppUpdateButton = () => {
   return (
     <Button
       type="button"
-      variant={hasUpdate ? "gold" : "acg"}
+      variant="update"
       size="sm"
       onClick={handleClick}
       disabled={isBusy}
-      className={`h-9 shrink-0 gap-1.5 px-3 text-xs font-bold shadow-glow whitespace-nowrap sm:h-8 ${
-        hasUpdate ? "animate-pulse ring-2 ring-primary/40" : ""
+      className={`h-9 min-w-[84px] shrink-0 gap-1.5 px-2.5 text-xs font-bold shadow-glow whitespace-nowrap sm:h-8 sm:min-w-[92px] sm:px-3 ${
+        hasUpdate ? "animate-pulse ring-2 ring-primary/40" : "ring-1 ring-primary/25"
       }`}
-      aria-label={hasUpdate ? "A new version is available — tap to update" : stamp}
-      title={hasUpdate ? "A new version is available — tap to update" : stamp}
+      aria-label={hasUpdate ? "A new version is available — tap to update" : `Force refresh latest version. ${stamp}`}
+      title={hasUpdate ? "A new version is available — tap to update" : `Force refresh latest version. ${stamp}`}
     >
       {isBusy ? (
         <RefreshCw className="h-4 w-4 shrink-0 animate-spin" />
@@ -179,7 +183,7 @@ const AppUpdateButton = () => {
       {/* Always render a readable label so the control is fully visible on
           every screen width — including small Android and iPhone widths. */}
       <span>
-        {isBusy ? busyLabel : hasUpdate ? "Update now" : "Update"}
+        {isBusy ? busyLabel : hasUpdate ? "Update" : "Update"}
       </span>
     </Button>
   );

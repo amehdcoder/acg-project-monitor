@@ -96,9 +96,9 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
         )}
 
         <header className="sticky top-0 z-40 border-b border-border bg-card/98 backdrop-blur-md supports-[backdrop-filter]:bg-card/90" style={isImpersonating ? { top: 0 } : undefined}>
-          <div className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-5">
+          <div className="grid h-14 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 px-2 sm:h-16 sm:px-5 lg:flex lg:justify-between">
             {/* Left — Amehnities branding */}
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
               <Button
                 variant="ghost"
                 size="icon"
@@ -114,7 +114,7 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
                   alt="Amehnities Consulting Group Logo"
                   className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl ring-1 ring-border bg-card object-contain p-0.5"
                 />
-                <div className="hidden sm:block">
+                <div className="hidden min-w-0 sm:block">
                   <div className="text-base font-bold text-foreground leading-tight tracking-tight">
                     Amehnities
                   </div>
@@ -126,8 +126,10 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
             </div>
 
             {/* Right — controls + HANDS logo */}
-            <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
-              <InstallAppButton />
+            <div className="flex min-w-0 items-center justify-end gap-1 sm:gap-2 lg:gap-3">
+              <div className="hidden md:block">
+                <InstallAppButton />
+              </div>
               <AppUpdateButton />
               <div className="hidden sm:flex">
                 <LanguageSwitcher />
