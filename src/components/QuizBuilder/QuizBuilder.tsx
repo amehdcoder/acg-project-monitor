@@ -1125,23 +1125,51 @@ const QuizBuilder = () => {
 
       {/* Quiz Settings Dialog (pass mark + custom messages) */}
       <Dialog open={showSettings} onOpenChange={setShowSettings}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-indigo-600" /> Grading settings</DialogTitle>
-            <DialogDescription>Adjust the pass mark and the messages members see on their result screen.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-indigo-600" /> Grading & result messages</DialogTitle>
+            <DialogDescription>Set the pass mark and personalize what members see after each test.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-1">
             <div>
               <Label className="form-label">Passing Score (%)</Label>
               <Input type="number" min={0} max={100} value={settingsScore} onChange={(e) => setSettingsScore(parseInt(e.target.value) || 0)} className="form-input" />
             </div>
-            <div>
-              <Label className="form-label">Pass message (optional)</Label>
-              <Textarea value={settingsPass} onChange={(e) => setSettingsPass(e.target.value)} placeholder="e.g. Congratulations! You've demonstrated strong knowledge." className="form-input" />
+
+            <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-fuchsia-50 p-3 text-[11px] leading-relaxed text-indigo-900 dark:border-indigo-900/50 dark:from-indigo-950/40 dark:to-fuchsia-950/20 dark:text-indigo-200">
+              <p className="font-semibold">Personalize with these tokens:</p>
+              <p className="mt-1 font-mono">
+                {"{name}"} · {"{score}"} · {"{percentage}"} · {"{total}"} · {"{passing}"} · {"{test}"}
+              </p>
+              <p className="mt-1 opacity-80">Example: “Well done {"{name}"}! You scored {"{percentage}"}% on the {"{test}"}.”</p>
             </div>
-            <div>
-              <Label className="form-label">Fail message (optional)</Label>
-              <Textarea value={settingsFail} onChange={(e) => setSettingsFail(e.target.value)} placeholder="e.g. Keep going — review the material and try again when authorized." className="form-input" />
+
+            <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 dark:border-blue-900/50 dark:bg-blue-950/20">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300"><BookOpen className="h-3.5 w-3.5" /> Pre-test messages</p>
+              <div className="space-y-3">
+                <div>
+                  <Label className="form-label">Pass message</Label>
+                  <Textarea value={settingsPrePass} onChange={(e) => setSettingsPrePass(e.target.value)} placeholder="e.g. Great start, {name}! You scored {percentage}%." className="form-input min-h-[60px]" />
+                </div>
+                <div>
+                  <Label className="form-label">Fail message</Label>
+                  <Textarea value={settingsPreFail} onChange={(e) => setSettingsPreFail(e.target.value)} placeholder="e.g. {name}, you scored {percentage}% — the post-test is your chance to shine." className="form-input min-h-[60px]" />
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300"><Award className="h-3.5 w-3.5" /> Post-test messages</p>
+              <div className="space-y-3">
+                <div>
+                  <Label className="form-label">Pass message</Label>
+                  <Textarea value={settingsPostPass} onChange={(e) => setSettingsPostPass(e.target.value)} placeholder="e.g. Congratulations {name}! You passed with {percentage}%." className="form-input min-h-[60px]" />
+                </div>
+                <div>
+                  <Label className="form-label">Fail message</Label>
+                  <Textarea value={settingsPostFail} onChange={(e) => setSettingsPostFail(e.target.value)} placeholder="e.g. Keep going, {name} — review the material and retry when authorized." className="form-input min-h-[60px]" />
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>
