@@ -1,4 +1,5 @@
 import { hasActiveUserFormProgress, prepareSilentFormRestoreForUpdate } from "@/lib/formProgressPersistence";
+import { decideUpdate } from "@/lib/appUpdateDecision";
 
 export type AppUpdateStatus = "idle" | "checking" | "current" | "available" | "updating" | "error";
 
