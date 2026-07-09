@@ -133,7 +133,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
-import { warmCacheUserForms, warmCacheUserFormsDetailed } from "@/lib/offlineFormCache";
+import { warmCacheUserFormsDetailed } from "@/lib/offlineFormCache";
 import { startTimer } from "@/lib/metrics";
 import FormQRCode from "@/components/FormQRCode";
 import QRCodeScanner from "@/components/QRCodeScanner";

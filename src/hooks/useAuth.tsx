@@ -711,8 +711,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         roleRes.data?.role === "systems_admin" ||
         profileRes.data?.is_owner === true ||
         email.toLowerCase() === "amehjoey1@gmail.com";
-      void warmCacheUserForms({ userId: data.user.id, isAdmin: isAdminRole, role: roleRes.data?.role });
-      void prewarmBloombergOffline(data.user.id);
+      window.setTimeout(() => {
+        void warmCacheUserForms({ userId: data.user.id, isAdmin: isAdminRole, role: roleRes.data?.role });
+        void prewarmBloombergOffline(data.user.id);
+      }, 30000);
     }
 
     return { error: error as Error | null };
