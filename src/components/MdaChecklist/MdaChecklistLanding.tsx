@@ -15,6 +15,7 @@ import {
   ShieldAlert,
   Lock,
   Wrench,
+  ArrowRight,
 
 } from "lucide-react";
 import { FormFiller } from "@/components/FormFiller";
@@ -872,13 +873,27 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
       </main>
 
       {builderDialog}
-      {hcsNoticeOpen && <HcsUnderDevelopmentNotice onClose={() => setHcsNoticeOpen(false)} />}
+      {hcsNoticeOpen && (
+        <HcsUnderDevelopmentNotice
+          onClose={() => setHcsNoticeOpen(false)}
+          onGoToCommunity={() => {
+            setHcsNoticeOpen(false);
+            setView("community");
+          }}
+        />
+      )}
     </div>
   );
 }
 
 // Professional "under development" lock notice for the Household Coverage Survey.
-function HcsUnderDevelopmentNotice({ onClose }: { onClose: () => void }) {
+function HcsUnderDevelopmentNotice({
+  onClose,
+  onGoToCommunity,
+}: {
+  onClose: () => void;
+  onGoToCommunity: () => void;
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="alertdialog" aria-modal="true">
       <div className="w-full max-w-sm overflow-hidden rounded-3xl bg-white text-center shadow-2xl">
@@ -893,17 +908,25 @@ function HcsUnderDevelopmentNotice({ onClose }: { onClose: () => void }) {
         </div>
         <div className="px-6 py-6">
           <p className="text-sm leading-relaxed text-slate-600">
-            This module is currently being built and refined. For now, please conduct
-            the household coverage survey <span className="font-semibold text-slate-800">within the Community Checklist</span>.
+            This module is currently being built and refined. In the meantime, please complete the
+            household coverage survey <span className="font-semibold text-slate-800">within the Community Checklist</span>,
+            which fully supports capturing household coverage today.
           </p>
           <p className="mt-3 text-xs leading-relaxed text-slate-400">
             Full access will be limited to Owners, Co-owners, and Super Admins once it goes live.
           </p>
           <button
-            onClick={onClose}
-            className="mt-5 w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 active:scale-[0.99]"
+            onClick={onGoToCommunity}
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 active:scale-[0.99]"
           >
-            Got it
+            <ArrowRight className="h-4 w-4" />
+            Go to Community Checklist
+          </button>
+          <button
+            onClick={onClose}
+            className="mt-2 w-full rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 active:scale-[0.99]"
+          >
+            Not now
           </button>
         </div>
       </div>
