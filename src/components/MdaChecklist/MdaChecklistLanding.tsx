@@ -808,10 +808,18 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
           {TILES.map((t) => {
             const busy = uploadingKey === t.key;
             const hasCustom = !!iconUrls[t.key];
+            const isHcs = t.key === "hcs";
+            const locked = isHcs && !canAccessHcs;
+            const handleTileClick = () => {
+              if (editingIcons) return triggerUpload(t.key);
+              if (locked) return setHcsNoticeOpen(true);
+              if (isHcs) return setHcsNoticeOpen(true);
+              setView(t.view);
+            };
             return (
               <div key={t.key} className="relative flex flex-col items-center">
                 <button
-                  onClick={() => (editingIcons ? triggerUpload(t.key) : setView(t.view))}
+                  onClick={handleTileClick}
                   disabled={busy}
                   className="group flex w-full flex-col items-center gap-3 rounded-3xl p-4 text-center transition-colors hover:bg-white/40"
                 >
@@ -823,7 +831,9 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
                         src={imgFor(t)}
                         alt={t.title}
                         loading="lazy"
-                        className="h-full w-full object-contain drop-shadow-sm"
+                        className={`h-full w-full object-contain drop-shadow-sm ${
+                          isHcs ? "opacity-60 grayscale" : ""
+                        }`}
                       />
                     )}
                     {editingIcons && !busy && (
@@ -831,8 +841,20 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
                         <Upload className="h-4 w-4" />
                       </span>
                     )}
+                    {isHcs && !busy && !editingIcons && (
+                      <span className="absolute -right-1 -top-1 flex h-9 w-9 items-center justify-center rounded-full bg-amber-500 text-white shadow-lg ring-2 ring-white">
+                        <Lock className="h-4 w-4" />
+                      </span>
+                    )}
                   </span>
-                  <span className="text-[15px] font-medium leading-tight text-slate-800">{t.title}</span>
+                  <span className="flex flex-col items-center gap-1">
+                    <span className="text-[15px] font-medium leading-tight text-slate-800">{t.title}</span>
+                    {isHcs && !editingIcons && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
+                        <Wrench className="h-3 w-3" /> Under development
+                      </span>
+                    )}
+                  </span>
                 </button>
 
                 {editingIcons && hasCustom && !busy && (
