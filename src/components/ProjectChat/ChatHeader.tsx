@@ -7,6 +7,7 @@ import {
   Video,
   Settings,
   UserPlus,
+  History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -29,6 +30,7 @@ interface ChatHeaderProps {
   onVoiceCall: () => void;
   onVideoCall: () => void;
   onSettings: () => void;
+  onCallHistory: () => void;
   isAdmin: boolean;
 }
 
@@ -42,6 +44,7 @@ export function ChatHeader({
   onVoiceCall,
   onVideoCall,
   onSettings,
+  onCallHistory,
   isAdmin,
 }: ChatHeaderProps) {
   const memberCount = members.length;
