@@ -234,10 +234,17 @@ export const usePageAccess = () => {
       // including the restricted ones, just like the Owner.
       if (isOwnerLevel) return true;
       // Minimal-access lock (non-admins only): ONLY Forms, Project Chat and My
-      // Submissions, regardless of designation or any other grant.
+      // Submissions — PLUS any page explicitly granted to the user via
+      // user_page_access (an explicit owner grant always overrides the lock).
       if (minimalAccess && !isAdmin) {
-        return pageId === "forms" || pageId === "project-chat" || pageId === "my-submissions";
+        return (
+          pageId === "forms" ||
+          pageId === "project-chat" ||
+          pageId === "my-submissions" ||
+          canAccessUserPage(pageId)
+        );
       }
+
       // Owner-granted, time-bounded per-user access works for any page id.
       if (canAccessUserPage(pageId)) return true;
       // Field designations (FLHF Supervisor, Enumerator, CDD) get default

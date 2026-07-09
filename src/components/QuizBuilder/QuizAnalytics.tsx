@@ -38,7 +38,17 @@ interface Attempt {
   total_points: number;
   percentage: number;
   completed_at: string;
+  answers: Record<string, string>;
 }
+
+interface QuestionRow {
+  id: string;
+  question_text: string;
+  correct_answer: string;
+  options: { label: string; value: string }[];
+  sort_order: number;
+}
+
 
 // ───── Statistical helpers ─────
 function mean(arr: number[]) { return arr.reduce((s, v) => s + v, 0) / arr.length; }
@@ -140,6 +150,7 @@ const PIE_COLORS = ["hsl(150, 60%, 45%)", "hsl(0, 70%, 55%)"];
 
 const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
   const [attempts, setAttempts] = useState<Attempt[]>([]);
+  const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [profiles, setProfiles] = useState<Record<string, { first_name: string; last_name: string }>>({});
   const [loading, setLoading] = useState(true);
 
@@ -151,8 +162,32 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
         .select("*")
         .eq("quiz_id", quiz.id)
         .order("created_at");
+
+      const { data: qData } = await supabase
+        .from("quiz_questions")
+        .select("id, question_text, correct_answer, options, sort_order")
+        .eq("quiz_id", quiz.id)
+        .order("sort_order");
+      if (qData) {
+        setQuestions(qData.map(q => ({
+          id: q.id,
+          question_text: q.question_text,
+          correct_answer: q.correct_answer,
+          options: (q.options as any) || [],
+          sort_order: q.sort_order ?? 0,
+        })));
+      }
+
       if (data) {
-        setAttempts(data.map(a => ({ ...a, score: Number(a.score), total_points: Number(a.total_points), percentage: Number(a.percentage) })));
+        setAttempts(data.map(a => ({
+          ...a,
+          score: Number(a.score),
+          total_points: Number(a.total_points),
+          percentage: Number(a.percentage),
+          answers: (a.answers && typeof a.answers === "object" && !Array.isArray(a.answers)
+            ? a.answers
+            : {}) as Record<string, string>,
+        })));
         const userIds = [...new Set(data.map(a => a.user_id))];
         if (userIds.length > 0) {
           const { data: profs } = await supabase
@@ -169,6 +204,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
       setLoading(false);
     };
     fetch();
+
   }, [quiz.id]);
 
   const analysis = useMemo(() => {
@@ -247,6 +283,55 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
       "Post-test": analysis.postAttempts.filter(a => a.percentage >= ranges[i][0] && a.percentage <= ranges[i][1]).length,
     }));
   }, [analysis]);
+
+  // ───── Per-question difficulty analysis ─────
+  // For each question, count how many attempts answered it correctly vs incorrectly.
+  // Post-test answers are used when available, otherwise all attempts.
+  const questionStats = useMemo(() => {
+    if (questions.length === 0) return [];
+    const post = attempts.filter(a => a.attempt_type === "post_test");
+    const source = post.length > 0 ? post : attempts;
+    return questions
+      .map((q, idx) => {
+        let correct = 0;
+        let answered = 0;
+        for (const a of source) {
+          const given = a.answers?.[q.id];
+          if (given === undefined || given === null || given === "") continue;
+          answered += 1;
+          if (String(given) === String(q.correct_answer)) correct += 1;
+        }
+        const incorrect = answered - correct;
+        const correctRate = answered > 0 ? Math.round((correct / answered) * 100) : 0;
+        const correctLabel =
+          q.options.find(o => String(o.value) === String(q.correct_answer))?.label ??
+          q.correct_answer;
+        return {
+          id: q.id,
+          number: idx + 1,
+          text: q.question_text,
+          correctLabel,
+          answered,
+          correct,
+          incorrect,
+          correctRate,
+          failRate: 100 - correctRate,
+        };
+      })
+      .filter(q => q.answered > 0);
+  }, [questions, attempts]);
+
+  const questionSource = attempts.some(a => a.attempt_type === "post_test") ? "Post-test" : "All attempts";
+  const mostPassed = useMemo(
+    () => [...questionStats].sort((a, b) => b.correctRate - a.correctRate).slice(0, 5),
+    [questionStats],
+  );
+  const mostFailed = useMemo(
+    () => [...questionStats].sort((a, b) => a.correctRate - b.correctRate).slice(0, 5),
+    [questionStats],
+  );
+
+
 
   const improvementPie = useMemo(() => [
     { name: "Improved", value: analysis.improvedCount, color: COLORS.post },
@@ -443,7 +528,9 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
           <TabsTrigger value="distribution" className="gap-1"><Activity className="h-3 w-3" /> Distribution</TabsTrigger>
           <TabsTrigger value="scatter" className="gap-1"><Target className="h-3 w-3" /> Scatter</TabsTrigger>
           <TabsTrigger value="individual" className="gap-1"><Users className="h-3 w-3" /> Individual</TabsTrigger>
+          <TabsTrigger value="questions" className="gap-1"><BookOpen className="h-3 w-3" /> Questions</TabsTrigger>
           <TabsTrigger value="insights" className="gap-1"><Lightbulb className="h-3 w-3" /> Insights</TabsTrigger>
+
         </TabsList>
 
         {/* Comparison Tab */}
@@ -697,6 +784,138 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Questions Tab — most passed & most failed */}
+        <TabsContent value="questions" className="mt-4 space-y-4">
+          {questionStats.length === 0 ? (
+            <Card className="form-card bg-muted/30 border-dashed">
+              <CardContent className="py-10 text-center">
+                <BookOpen className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
+                <p className="text-muted-foreground text-sm font-medium">No question-level data yet</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Once participants submit their answers, the most passed and most failed questions will appear here.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <p className="text-[11px] text-muted-foreground -mb-1">
+                Based on <span className="font-semibold text-foreground">{questionSource}</span> responses across {questionStats[0]?.answered ?? 0} participants.
+              </p>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Most Passed */}
+                <Card className="form-card border-l-4 border-l-emerald-500 overflow-hidden">
+                  <CardHeader className="pb-3 bg-gradient-to-r from-emerald-50 to-transparent dark:from-emerald-950/30">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/40">
+                        <CheckCircle className="h-4 w-4 text-emerald-600" />
+                      </div>
+                      Most Passed Questions
+                      <Badge className="ml-auto bg-emerald-600 hover:bg-emerald-600 text-white text-[10px]">Top {mostPassed.length}</Badge>
+                    </CardTitle>
+                    <CardDescription className="text-xs">Highest correct-answer rates — concepts learners grasped well.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3 pt-4">
+                    {mostPassed.map((q, i) => (
+                      <div key={q.id} className="space-y-1.5">
+                        <div className="flex items-start gap-2">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">
+                            {i + 1}
+                          </span>
+                          <p className="text-xs font-medium text-foreground leading-snug flex-1">
+                            <span className="text-muted-foreground">Q{q.number}.</span> {q.text}
+                          </p>
+                          <span className="font-mono text-sm font-bold text-emerald-600 shrink-0">{q.correctRate}%</span>
+                        </div>
+                        <div className="ml-7">
+                          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-all" style={{ width: `${q.correctRate}%` }} />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {q.correct}/{q.answered} correct · Answer: <span className="font-medium text-foreground">{q.correctLabel}</span>
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                {/* Most Failed */}
+                <Card className="form-card border-l-4 border-l-rose-500 overflow-hidden">
+                  <CardHeader className="pb-3 bg-gradient-to-r from-rose-50 to-transparent dark:from-rose-950/30">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-100 dark:bg-rose-900/40">
+                        <XCircle className="h-4 w-4 text-rose-600" />
+                      </div>
+                      Most Failed Questions
+                      <Badge className="ml-auto bg-rose-600 hover:bg-rose-600 text-white text-[10px]">Top {mostFailed.length}</Badge>
+                    </CardTitle>
+                    <CardDescription className="text-xs">Lowest correct-answer rates — priority topics for retraining.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3 pt-4">
+                    {mostFailed.map((q, i) => (
+                      <div key={q.id} className="space-y-1.5">
+                        <div className="flex items-start gap-2">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900/40 text-[10px] font-bold text-rose-700 dark:text-rose-300 mt-0.5">
+                            {i + 1}
+                          </span>
+                          <p className="text-xs font-medium text-foreground leading-snug flex-1">
+                            <span className="text-muted-foreground">Q{q.number}.</span> {q.text}
+                          </p>
+                          <span className="font-mono text-sm font-bold text-rose-600 shrink-0">{q.failRate}%</span>
+                        </div>
+                        <div className="ml-7">
+                          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full bg-gradient-to-r from-rose-400 to-rose-600 transition-all" style={{ width: `${q.failRate}%` }} />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {q.incorrect}/{q.answered} missed · Correct: <span className="font-medium text-foreground">{q.correctLabel}</span>
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Full ranking chart */}
+              <Card className="form-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-primary" />
+                    Correct-Answer Rate by Question
+                  </CardTitle>
+                  <CardDescription className="text-xs">Every question ranked by how many participants answered correctly.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={Math.max(240, questionStats.length * 34)}>
+                    <BarChart
+                      layout="vertical"
+                      data={[...questionStats].sort((a, b) => b.correctRate - a.correctRate).map(q => ({ name: `Q${q.number}`, "Correct %": q.correctRate }))}
+                      margin={{ left: 8, right: 24 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} horizontal={false} />
+                      <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={44} />
+                      <Tooltip
+                        contentStyle={{ borderRadius: "12px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
+                        formatter={(value: number) => [`${value}%`, "Correct"]}
+                      />
+                      <Bar dataKey="Correct %" radius={[0, 6, 6, 0]}>
+                        {[...questionStats].sort((a, b) => b.correctRate - a.correctRate).map((q, i) => (
+                          <Cell key={i} fill={q.correctRate >= 70 ? COLORS.post : q.correctRate >= 40 ? COLORS.accent : COLORS.danger} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
+
+
 
         {/* Insights Tab */}
         <TabsContent value="insights" className="mt-4 space-y-4">
