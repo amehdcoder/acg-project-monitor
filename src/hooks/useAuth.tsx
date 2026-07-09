@@ -447,8 +447,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session: existingSession } }) => {
+    const recoverFromCachedCredential = async (reason: string) => {
+      try {
+        const latest = await getLatestOfflineCredential();
+        if (latest?.user) {
+          await hydrateOfflineCredential(latest, reason);
+          return true;
+        }
+      } catch (e) {
+        console.warn("Cached credential recovery failed:", e);
+      }
+      return false;
+    };
+
+    // THEN check for existing session. Supabase may try to refresh an expired
+    // token inside getSession(); on poor networks that request can hang. Race it
+    // so boot always resolves and use the encrypted offline profile if available.
+    withTimeout(
+      supabase.auth.getSession(),
+      9000,
+      "initial_session_timeout",
+    ).then(async ({ data: { session: existingSession } }) => {
       initialSessionHandled = true;
       setSession(existingSession);
       setUser(existingSession?.user ?? null);
@@ -460,10 +479,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // most recently cached account so the app boots logged-in.
         // Sync to the server will still require re-auth when online.
         try {
-          const latest = await getLatestOfflineCredential();
-          if (latest?.user) {
-            await hydrateOfflineCredential(latest, "auto_login_offline_boot");
-          }
+          await recoverFromCachedCredential("auto_login_offline_boot");
         } catch (e) {
           console.warn("Offline auto-login failed:", e);
         }
@@ -475,10 +491,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Mark the first full auth resolution as complete so every later auth
       // event refreshes the profile in the background without blinking.
       initialLoadDoneRef.current = true;
-    }).catch((e) => {
-      // getSession itself failed (network/storage error). Don't hang the boot —
-      // release the gates so the app can render and route to /auth.
+    }).catch(async (e) => {
+      // getSession itself failed or timed out (network/storage/refresh error).
+      // Don't hang the boot. If this device has a saved active profile, hydrate
+      // it so field users can continue working under poor connectivity.
       console.warn("getSession failed during boot:", e);
+      const recovered = await recoverFromCachedCredential("initial_session_failed");
+      if (recovered) {
+        initialLoadDoneRef.current = true;
+        return;
+      }
       setProfileLoading(false);
       setLoading(false);
       initialLoadDoneRef.current = true;
