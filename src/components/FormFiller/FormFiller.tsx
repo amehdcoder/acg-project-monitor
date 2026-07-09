@@ -492,7 +492,7 @@ const FormFiller = ({
   const [showResumeDialog, setShowResumeDialog] = useState(false);
   // Thank you state
   const [showThankYou, setShowThankYou] = useState(false);
-  const [showCoverageOptIn, setShowCoverageOptIn] = useState(false);
+  
   // Repeat Household Coverage Survey launch context (replaces the old 3D flow).
   const [householdSurveyCtx, setHouseholdSurveyCtx] = useState<null | {
     submissionId: string;
