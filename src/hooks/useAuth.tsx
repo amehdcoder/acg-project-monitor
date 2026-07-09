@@ -447,7 +447,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       setProfileLoading(false);
       initialLoadDoneRef.current = true;
-      void fetchProfile(bootStoredSession.user.id, { silent: true });
+      window.setTimeout(() => {
+        void fetchProfile(bootStoredSession.user.id, { silent: true });
+      }, 6000);
     }
 
     // Absolute safety net: no matter what stalls (getSession hanging, a wedged
