@@ -56,6 +56,10 @@ interface Quiz {
   open_test_type: "pre_test" | "post_test" | null;
   pass_message: string | null;
   fail_message: string | null;
+  pre_pass_message: string | null;
+  pre_fail_message: string | null;
+  post_pass_message: string | null;
+  post_fail_message: string | null;
   created_at: string;
 }
 
