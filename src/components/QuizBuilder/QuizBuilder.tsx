@@ -25,8 +25,9 @@ import { format } from "date-fns";
 import {
   Plus, Trash2, Save, Eye, Send, ChevronUp, ChevronDown,
   BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, CalendarIcon, Users, UserPlus, Archive, Eraser,
-  Lock, LockOpen, DoorOpen, DoorClosed, Sparkles, RotateCcw, Mail, TrendingUp,
+  Lock, LockOpen, DoorOpen, DoorClosed, Sparkles, RotateCcw, Mail, TrendingUp, AlertTriangle,
 } from "lucide-react";
+import { validateMessageTokens, KNOWN_QUIZ_TOKENS } from "@/lib/quizTokens";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -105,6 +106,7 @@ const QuizBuilder = () => {
   const [settingsPostFail, setSettingsPostFail] = useState("");
   const [settingsBusy, setSettingsBusy] = useState(false);
   const [previewMember, setPreviewMember] = useState<{ name: string; email: string; source: string } | null>(null);
+  const [previewMemberB, setPreviewMemberB] = useState<{ name: string; email: string; source: string } | null>(null);
 
   // Release results by email
   const [showRelease, setShowRelease] = useState(false);
@@ -115,18 +117,42 @@ const QuizBuilder = () => {
   const [releaseBusy, setReleaseBusy] = useState(false);
 
   const sampleMember = previewMember ?? { name: "Amina Yusuf", email: "amina.yusuf@example.org", source: "Sample project member" };
+  const sampleMemberB = previewMemberB ?? { name: "Chidi Okonkwo", email: "chidi.okonkwo@example.org", source: "Sample project member" };
+
+  // Two representative profiles so admins can see how name/score fields render
+  // for different users. The second profile also uses a lower score band.
+  const previewProfiles = [
+    { member: sampleMember, highBand: true },
+    { member: sampleMemberB, highBand: false },
+  ];
+
+  // Aggregate token validation across all four configured messages.
+  const messageTokenReport = (() => {
+    const templates = [settingsPrePass, settingsPreFail, settingsPostPass, settingsPostFail];
+    const unknown = new Set<string>();
+    let anyNameToken = false;
+    for (const t of templates) {
+      const v = validateMessageTokens(t || "");
+      v.unknown.forEach((u) => unknown.add(u));
+      if (v.hasNameToken) anyNameToken = true;
+    }
+    return { unknown: Array.from(unknown), ok: unknown.size === 0, anyNameToken };
+  })();
 
   const renderConfiguredMessage = (
     template: string,
     fallback: string,
     testLabel: "Pre-test" | "Post-test",
     passed: boolean,
+    who: { name: string; email: string; source: string } = sampleMember,
+    highBand = true,
   ) => {
     const total = 10;
-    const percentage = passed ? Math.max(settingsScore, 70) : Math.max(0, Math.min(settingsScore - 12, 58));
+    const base = passed ? Math.max(settingsScore, 70) : Math.max(0, Math.min(settingsScore - 12, 58));
+    const percentage = highBand ? base : Math.max(0, base - 9);
     const score = Math.round((percentage / 100) * total);
     return (template.trim() || fallback)
-      .replace(/\{name\}/gi, sampleMember.name)
+      .replace(/\{name\}/gi, who.name)
       .replace(/\{score\}/gi, String(score))
       .replace(/\{percentage\}/gi, String(percentage))
       .replace(/\{total\}/gi, String(total))
@@ -457,42 +483,57 @@ const QuizBuilder = () => {
 
   const loadPreviewMember = async (quiz: Quiz) => {
     setPreviewMember(null);
+    setPreviewMemberB(null);
     try {
+      // Prefer assigned quiz members; fall back to any current project members.
       const { data: assignments } = await supabase
         .from("quiz_user_assignments")
         .select("user_id")
         .eq("quiz_id", quiz.id)
-        .limit(1);
+        .limit(2);
 
-      let userId = assignments?.[0]?.user_id as string | undefined;
+      let userIds = (assignments || []).map((a) => a.user_id as string);
       let source = "Assigned quiz member";
 
-      if (!userId) {
-        const { data: projectMember } = await supabase
+      if (userIds.length < 2) {
+        const { data: projectMembers } = await supabase
           .from("user_project_assignments")
           .select("user_id")
           .eq("project_id", quiz.project_id)
-          .limit(1);
-        userId = projectMember?.[0]?.user_id as string | undefined;
-        source = "Current project member";
+          .limit(4);
+        const extra = (projectMembers || [])
+          .map((p) => p.user_id as string)
+          .filter((id) => !userIds.includes(id));
+        if (userIds.length === 0 && extra.length > 0) source = "Current project member";
+        userIds = [...userIds, ...extra].slice(0, 2);
       }
 
-      if (!userId) return;
-      const { data: profile } = await supabase
+      if (userIds.length === 0) return;
+
+      const { data: profiles } = await supabase
         .from("profiles")
-        .select("first_name, last_name, email")
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (!profile) return;
-      setPreviewMember({
-        name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email || "Project member",
-        email: profile.email || "No email on file",
-        source,
-      });
+        .select("user_id, first_name, last_name, email")
+        .in("user_id", userIds);
+
+      const toMember = (uid: string) => {
+        const p = (profiles || []).find((pr) => pr.user_id === uid);
+        if (!p) return null;
+        return {
+          name: `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.email || "Project member",
+          email: p.email || "No email on file",
+          source,
+        };
+      };
+
+      const a = toMember(userIds[0]);
+      const b = userIds[1] ? toMember(userIds[1]) : null;
+      if (a) setPreviewMember(a);
+      if (b) setPreviewMemberB(b);
     } catch (error) {
-      console.warn("Could not load quiz preview member", error);
+      console.warn("Could not load quiz preview members", error);
     }
   };
+
 
   // Admin-only: save pass mark & custom pass/fail messages (works on published quizzes).
   const saveQuizSettings = async () => {
@@ -576,6 +617,14 @@ const QuizBuilder = () => {
   // Admin-only: send result emails (with pre/post statistical inference) to selected members.
   const releaseResults = async () => {
     if (!selectedQuiz || releaseSelected.size === 0) return;
+    if (!messageTokenReport.ok) {
+      toast({
+        title: "Fix message tokens first",
+        description: `Unknown token${messageTokenReport.unknown.length > 1 ? "s" : ""}: ${messageTokenReport.unknown.map((t) => `{${t}}`).join(", ")}. Update the quiz messages before releasing results.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setReleaseBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("release-quiz-results", {
@@ -1211,6 +1260,22 @@ const QuizBuilder = () => {
               <p className="mt-1 opacity-80">Example: “Well done {"{name}"}! You scored {"{percentage}"}% on the {"{test}"}.”</p>
             </div>
 
+            {messageTokenReport.unknown.length > 0 ? (
+              <div className="flex items-start gap-2 rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-bold">Unknown token{messageTokenReport.unknown.length > 1 ? "s" : ""} detected — fix before releasing results.</p>
+                  <p className="mt-0.5 font-mono">{messageTokenReport.unknown.map((t) => `{${t}}`).join(" · ")}</p>
+                  <p className="mt-1 opacity-80">These will be sent to members literally. Use only: {KNOWN_QUIZ_TOKENS.map((t) => `{${t}}`).join(" · ")}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-2.5 text-xs font-semibold text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
+                <CheckCircle className="h-4 w-4 shrink-0" />
+                All tokens valid.{!messageTokenReport.anyNameToken && " Tip: add {name} to personalize the message."}
+              </div>
+            )}
+
             <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 dark:border-blue-900/50 dark:bg-blue-950/20">
               <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300"><BookOpen className="h-3.5 w-3.5" /> Pre-test messages</p>
               <div className="space-y-3">
@@ -1249,38 +1314,44 @@ const QuizBuilder = () => {
                   <Sparkles className="h-5 w-5 shrink-0 text-white" />
                 </div>
               </div>
-              <div className="space-y-3 p-4">
-                <div className="rounded-xl border border-dashed border-border bg-muted/40 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Preview user source</p>
-                  <p className="mt-1 text-sm font-bold text-foreground">{sampleMember.name}</p>
-                  <p className="text-xs text-muted-foreground">{sampleMember.email} · {sampleMember.source}</p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-                    <Badge className="mb-2 bg-emerald-600 text-white hover:bg-emerald-600">Pre-test pass</Badge>
-                    <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-emerald-950 dark:text-emerald-100">
-                      {renderConfiguredMessage(settingsPrePass, "Excellent work, {name}! You scored {percentage}% on the {test} and met the {passing}% pass mark.", "Pre-test", true)}
-                    </p>
+              <div className="space-y-4 p-4">
+                {previewProfiles.map(({ member, highBand }, idx) => (
+                  <div key={idx} className="space-y-3">
+                    <div className="rounded-xl border border-dashed border-border bg-muted/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Sample user {idx + 1} of {previewProfiles.length} · {highBand ? "higher score band" : "lower score band"}
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-foreground">{member.name}</p>
+                      <p className="text-xs text-muted-foreground">{member.email} · {member.source}</p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                        <Badge className="mb-2 bg-emerald-600 text-white hover:bg-emerald-600">Pre-test pass</Badge>
+                        <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-emerald-950 dark:text-emerald-100">
+                          {renderConfiguredMessage(settingsPrePass, "Excellent work, {name}! You scored {percentage}% on the {test} and met the {passing}% pass mark.", "Pre-test", true, member, highBand)}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+                        <Badge className="mb-2 bg-amber-600 text-white hover:bg-amber-600">Pre-test fail</Badge>
+                        <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-amber-950 dark:text-amber-100">
+                          {renderConfiguredMessage(settingsPreFail, "Thank you, {name}. You scored {percentage}% on the {test}; review the learning points before the Post-test.", "Pre-test", false, member, highBand)}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 dark:border-teal-900/50 dark:bg-teal-950/20">
+                        <Badge className="mb-2 bg-teal-600 text-white hover:bg-teal-600">Post-test pass</Badge>
+                        <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-teal-950 dark:text-teal-100">
+                          {renderConfiguredMessage(settingsPostPass, "Congratulations, {name}! Your {test} score is {percentage}% ({score}/{total}), above the {passing}% pass mark.", "Post-test", true, member, highBand)}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/50 dark:bg-rose-950/20">
+                        <Badge className="mb-2 bg-rose-600 text-white hover:bg-rose-600">Post-test fail</Badge>
+                        <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-rose-950 dark:text-rose-100">
+                          {renderConfiguredMessage(settingsPostFail, "Keep going, {name}. You scored {percentage}% on the {test}; an admin can authorize a retake after review.", "Post-test", false, member, highBand)}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
-                    <Badge className="mb-2 bg-amber-600 text-white hover:bg-amber-600">Pre-test fail</Badge>
-                    <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-amber-950 dark:text-amber-100">
-                      {renderConfiguredMessage(settingsPreFail, "Thank you, {name}. You scored {percentage}% on the {test}; review the learning points before the Post-test.", "Pre-test", false)}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 dark:border-teal-900/50 dark:bg-teal-950/20">
-                    <Badge className="mb-2 bg-teal-600 text-white hover:bg-teal-600">Post-test pass</Badge>
-                    <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-teal-950 dark:text-teal-100">
-                      {renderConfiguredMessage(settingsPostPass, "Congratulations, {name}! Your {test} score is {percentage}% ({score}/{total}), above the {passing}% pass mark.", "Post-test", true)}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/50 dark:bg-rose-950/20">
-                    <Badge className="mb-2 bg-rose-600 text-white hover:bg-rose-600">Post-test fail</Badge>
-                    <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-rose-950 dark:text-rose-100">
-                      {renderConfiguredMessage(settingsPostFail, "Keep going, {name}. You scored {percentage}% on the {test}; an admin can authorize a retake after review.", "Post-test", false)}
-                    </p>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           </div>
@@ -1365,12 +1436,19 @@ const QuizBuilder = () => {
                 ))
             )}
           </div>
+          {!messageTokenReport.ok && (
+            <div className="flex items-start gap-2 rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>Unknown token{messageTokenReport.unknown.length > 1 ? "s" : ""} in the quiz messages ({messageTokenReport.unknown.map((t) => `{${t}}`).join(", ")}). Fix them in Settings before sending.</span>
+            </div>
+          )}
           <DialogFooter className="pt-2 border-t">
             <Button variant="outline" onClick={() => setShowRelease(false)}>Cancel</Button>
-            <Button onClick={releaseResults} disabled={releaseBusy || releaseSelected.size === 0} className="gap-1.5 bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white hover:opacity-90">
+            <Button onClick={releaseResults} disabled={releaseBusy || releaseSelected.size === 0 || !messageTokenReport.ok} className="gap-1.5 bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white hover:opacity-90">
               {releaseBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send results
             </Button>
           </DialogFooter>
+
         </DialogContent>
       </Dialog>
 
