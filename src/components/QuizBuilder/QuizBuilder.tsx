@@ -106,6 +106,7 @@ const QuizBuilder = () => {
   const [settingsPostFail, setSettingsPostFail] = useState("");
   const [settingsBusy, setSettingsBusy] = useState(false);
   const [previewMember, setPreviewMember] = useState<{ name: string; email: string; source: string } | null>(null);
+  const [previewMemberB, setPreviewMemberB] = useState<{ name: string; email: string; source: string } | null>(null);
 
   // Release results by email
   const [showRelease, setShowRelease] = useState(false);
@@ -116,18 +117,42 @@ const QuizBuilder = () => {
   const [releaseBusy, setReleaseBusy] = useState(false);
 
   const sampleMember = previewMember ?? { name: "Amina Yusuf", email: "amina.yusuf@example.org", source: "Sample project member" };
+  const sampleMemberB = previewMemberB ?? { name: "Chidi Okonkwo", email: "chidi.okonkwo@example.org", source: "Sample project member" };
+
+  // Two representative profiles so admins can see how name/score fields render
+  // for different users. The second profile also uses a lower score band.
+  const previewProfiles = [
+    { member: sampleMember, highBand: true },
+    { member: sampleMemberB, highBand: false },
+  ];
+
+  // Aggregate token validation across all four configured messages.
+  const messageTokenReport = (() => {
+    const templates = [settingsPrePass, settingsPreFail, settingsPostPass, settingsPostFail];
+    const unknown = new Set<string>();
+    let anyNameToken = false;
+    for (const t of templates) {
+      const v = validateMessageTokens(t || "");
+      v.unknown.forEach((u) => unknown.add(u));
+      if (v.hasNameToken) anyNameToken = true;
+    }
+    return { unknown: Array.from(unknown), ok: unknown.size === 0, anyNameToken };
+  })();
 
   const renderConfiguredMessage = (
     template: string,
     fallback: string,
     testLabel: "Pre-test" | "Post-test",
     passed: boolean,
+    who: { name: string; email: string; source: string } = sampleMember,
+    highBand = true,
   ) => {
     const total = 10;
-    const percentage = passed ? Math.max(settingsScore, 70) : Math.max(0, Math.min(settingsScore - 12, 58));
+    const base = passed ? Math.max(settingsScore, 70) : Math.max(0, Math.min(settingsScore - 12, 58));
+    const percentage = highBand ? base : Math.max(0, base - 9);
     const score = Math.round((percentage / 100) * total);
     return (template.trim() || fallback)
-      .replace(/\{name\}/gi, sampleMember.name)
+      .replace(/\{name\}/gi, who.name)
       .replace(/\{score\}/gi, String(score))
       .replace(/\{percentage\}/gi, String(percentage))
       .replace(/\{total\}/gi, String(total))
