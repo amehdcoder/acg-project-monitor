@@ -150,6 +150,7 @@ const PIE_COLORS = ["hsl(150, 60%, 45%)", "hsl(0, 70%, 55%)"];
 
 const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
   const [attempts, setAttempts] = useState<Attempt[]>([]);
+  const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [profiles, setProfiles] = useState<Record<string, { first_name: string; last_name: string }>>({});
   const [loading, setLoading] = useState(true);
 
@@ -161,8 +162,32 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
         .select("*")
         .eq("quiz_id", quiz.id)
         .order("created_at");
+
+      const { data: qData } = await supabase
+        .from("quiz_questions")
+        .select("id, question_text, correct_answer, options, sort_order")
+        .eq("quiz_id", quiz.id)
+        .order("sort_order");
+      if (qData) {
+        setQuestions(qData.map(q => ({
+          id: q.id,
+          question_text: q.question_text,
+          correct_answer: q.correct_answer,
+          options: (q.options as any) || [],
+          sort_order: q.sort_order ?? 0,
+        })));
+      }
+
       if (data) {
-        setAttempts(data.map(a => ({ ...a, score: Number(a.score), total_points: Number(a.total_points), percentage: Number(a.percentage) })));
+        setAttempts(data.map(a => ({
+          ...a,
+          score: Number(a.score),
+          total_points: Number(a.total_points),
+          percentage: Number(a.percentage),
+          answers: (a.answers && typeof a.answers === "object" && !Array.isArray(a.answers)
+            ? a.answers
+            : {}) as Record<string, string>,
+        })));
         const userIds = [...new Set(data.map(a => a.user_id))];
         if (userIds.length > 0) {
           const { data: profs } = await supabase
@@ -179,6 +204,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
       setLoading(false);
     };
     fetch();
+
   }, [quiz.id]);
 
   const analysis = useMemo(() => {
