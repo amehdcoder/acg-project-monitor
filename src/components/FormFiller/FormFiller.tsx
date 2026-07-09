@@ -516,6 +516,10 @@ const FormFiller = ({
   // Coverage Evaluation linkage is MDA-only; the supervisory checklist opts out.
   const offerCoverageEvaluation =
     isMdaChecklist && !isSupervisoryChecklist && !!settings.coverageEvaluation && !previewMode;
+  // Repeat Household Coverage Survey — available on any MDA/supervisory checklist
+  // whose admin enabled it and set a household sample size.
+  const offerHouseholdSurvey =
+    isMdaChecklist && !!(settings as any).householdSurvey && !previewMode;
 
   // Treatment Data Reporting Tools drive their geography from the microplan via
   // <MdaLocationCascade> (with the off-microplan provision), without the full
