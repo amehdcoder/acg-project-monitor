@@ -149,6 +149,7 @@ import { FileSpreadsheet, KeyRound, GanttChartSquare, NotebookPen, Copy, EyeOff 
 import CopyMdaChecklistDialog from "@/components/MdaChecklist/CopyMdaChecklistDialog";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { withTimeoutFallback } from "@/lib/withTimeout";
+import { fetchProjectsWithRetry, writeProjectCaches } from "@/lib/prefetchProjects";
 
 interface FormSettings {
   requireLocation?: boolean;
@@ -347,20 +348,31 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     if (!projectCacheKey) return [];
     try {
       const cached = JSON.parse(localStorage.getItem(projectCacheKey) || "[]");
-      return Array.isArray(cached) ? cached : [];
+      if (Array.isArray(cached) && cached.length > 0) return cached;
+      // Fallback to the richer Projects page cache if the Forms-only cache has
+      // not been warmed yet. This prevents an empty dropdown after sign-in when
+      // one cache write succeeds before the other under a slow connection.
+      if (user?.id) {
+        const fullCached = JSON.parse(localStorage.getItem(`amehnities:projects:list:${user.id}`) || "[]");
+        return Array.isArray(fullCached)
+          ? fullCached.filter((p: any) => p?.id && p?.name).map((p: any) => ({ id: p.id, name: p.name }))
+          : [];
+      }
+      return [];
     } catch {
       return [];
     }
-  }, [projectCacheKey]);
+  }, [projectCacheKey, user?.id]);
 
   const writeProjectCache = useCallback((items: Project[]) => {
     if (!projectCacheKey) return;
     try {
       localStorage.setItem(projectCacheKey, JSON.stringify(items));
+      if (user?.id) writeProjectCaches(user.id, items);
     } catch {
       /* ignore storage failures */
     }
-  }, [projectCacheKey]);
+  }, [projectCacheKey, user?.id]);
   const [assignedStandardCodes, setAssignedStandardCodes] = useState<Set<string>>(new Set());
   // Owner/Admin-only: exact submission count per form so the owner can tell at a
   // glance which checklists actually have data (and how much) without opening
@@ -895,17 +907,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       // One policy-scoped query is the source of truth. The old role/assignment
       // branching could execute before role hydration completed and leave admins
       // with an empty dropdown until a hard refresh.
-      const { data, error } = await withTimeout(
-        supabase
-          .from("projects")
-          .select("id, name")
-          .order("name"),
-        12000,
-        "projects_timeout",
-      );
-      if (error) throw error;
-
-      const nextProjects = data || [];
+      const nextProjects = await fetchProjectsWithRetry("lite", { attempts: 3, timeoutMs: 18000 });
       setProjects(nextProjects);
       writeProjectCache(nextProjects);
       setProjectsLoadError(null);
@@ -913,7 +915,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       console.error("Error fetching projects:", error);
       const cached = readProjectCache();
       if (cached.length > 0) setProjects(cached);
-      setProjectsLoadError(error?.message || "Projects are temporarily unavailable");
+      setProjectsLoadError(cached.length > 0 ? null : (error?.message || "Projects are temporarily unavailable"));
     }
   };
 
