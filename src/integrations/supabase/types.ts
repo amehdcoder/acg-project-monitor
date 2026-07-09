@@ -8086,6 +8086,18 @@ export type Database = {
         Returns: Json
       }
       owner_restore_records: { Args: { _record_ids: string[] }; Returns: Json }
+      record_inactive_login_attempt: {
+        Args: {
+          _attempted_user_id?: string
+          _created_at?: string
+          _email: string
+          _metadata?: Json
+          _mode?: string
+          _reason: string
+          _user_agent?: string
+        }
+        Returns: string
+      }
       reject_after_hours_request: {
         Args: { p_id: string; p_note?: string }
         Returns: undefined
