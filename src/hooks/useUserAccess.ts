@@ -12,6 +12,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { withTimeoutFallback } from "@/lib/withTimeout";
+
 
 interface Grant {
   page_id: string;
@@ -36,15 +38,30 @@ export function useUserAccess() {
       setLoading(false);
       return;
     }
-    const { data } = await supabase
-      .from("user_page_access")
-      .select("page_id, starts_at, expires_at")
-      .eq("user_id", user.id);
+    // Timeout-guarded so poor connectivity can never leave the app gated on this
+    // read. On a stall we proceed with no per-user grants (safe default).
+    const { data } = await withTimeoutFallback(
+      (async () =>
+        await supabase
+          .from("user_page_access")
+          .select("page_id, starts_at, expires_at")
+          .eq("user_id", user.id))(),
+      10000,
+      { data: [] } as any,
+    );
     setGrants((data ?? []) as Grant[]);
     setLoading(false);
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Safety net: never leave `loadingUserAccess` stuck true.
+  useEffect(() => {
+    if (!loading) return;
+    const t = setTimeout(() => setLoading(false), 12000);
+    return () => clearTimeout(t);
+  }, [loading]);
+
 
   useEffect(() => {
     if (!user) return;
