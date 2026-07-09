@@ -179,7 +179,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       // after a slow auth/profile refresh, incorrectly showing Super Admins an
       // empty assigned-only project list. A single guarded projects query is both
       // faster and more reliable under high activity.
-      const { data: projectsData, error } = await withTimeout(
+      const { data, error } = await withTimeout(
         supabase
           .from("projects")
           .select("*")
@@ -189,6 +189,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       );
       if (error) throw error;
 
+      let projectsData = data;
       if (!projectsData) projectsData = [];
       const baseProjects = (projectsData || []).map((project: Project) => ({
         ...project,
