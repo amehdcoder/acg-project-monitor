@@ -4001,6 +4001,72 @@ export type Database = {
         }
         Relationships: []
       }
+      household_coverage_surveys: {
+        Row: {
+          checklist_submission_id: string | null
+          community_name: string | null
+          completed_households: number
+          created_at: string
+          flhf_name: string | null
+          form_id: string | null
+          gps: Json | null
+          households: Json
+          id: string
+          lga: string | null
+          metadata: Json
+          project_id: string | null
+          settlement_name: string | null
+          shortfall_reason: string | null
+          state: string | null
+          target_households: number
+          updated_at: string
+          user_id: string
+          ward: string | null
+        }
+        Insert: {
+          checklist_submission_id?: string | null
+          community_name?: string | null
+          completed_households?: number
+          created_at?: string
+          flhf_name?: string | null
+          form_id?: string | null
+          gps?: Json | null
+          households?: Json
+          id?: string
+          lga?: string | null
+          metadata?: Json
+          project_id?: string | null
+          settlement_name?: string | null
+          shortfall_reason?: string | null
+          state?: string | null
+          target_households?: number
+          updated_at?: string
+          user_id: string
+          ward?: string | null
+        }
+        Update: {
+          checklist_submission_id?: string | null
+          community_name?: string | null
+          completed_households?: number
+          created_at?: string
+          flhf_name?: string | null
+          form_id?: string | null
+          gps?: Json | null
+          households?: Json
+          id?: string
+          lga?: string | null
+          metadata?: Json
+          project_id?: string | null
+          settlement_name?: string | null
+          shortfall_reason?: string | null
+          state?: string | null
+          target_households?: number
+          updated_at?: string
+          user_id?: string
+          ward?: string | null
+        }
+        Relationships: []
+      }
       inactive_login_attempts: {
         Row: {
           attempted_user_id: string | null
