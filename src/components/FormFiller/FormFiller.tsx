@@ -517,10 +517,13 @@ const FormFiller = ({
   // Coverage Evaluation linkage is MDA-only; the supervisory checklist opts out.
   const offerCoverageEvaluation =
     isMdaChecklist && !isSupervisoryChecklist && !!settings.coverageEvaluation && !previewMode;
-  // Repeat Household Coverage Survey — available on any MDA/supervisory checklist
-  // whose admin enabled it and set a household sample size.
+  // Repeat Household Coverage Survey — the modern replacement for the old
+  // "Coverage Evaluation 3D" opt-in. It launches on any MDA/supervisory checklist
+  // whose admin enabled the household survey OR the legacy coverage evaluation
+  // linkage, so existing checklists seamlessly get the new sampled survey.
   const offerHouseholdSurvey =
-    isMdaChecklist && !!(settings as any).householdSurvey && !previewMode;
+    isMdaChecklist && !previewMode &&
+    (!!(settings as any).householdSurvey || offerCoverageEvaluation);
 
   // Treatment Data Reporting Tools drive their geography from the microplan via
   // <MdaLocationCascade> (with the off-microplan provision), without the full
