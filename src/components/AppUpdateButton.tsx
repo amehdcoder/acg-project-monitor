@@ -138,6 +138,8 @@ const AppUpdateButton = () => {
     try {
       await probeWithRetry();
       setStatusText("Applying…");
+      toast.loading("Applying update — reloading…", { id: optimisticId });
+
       await purgeServiceWorkers();
       await hardReloadToLatest();
     } catch {
