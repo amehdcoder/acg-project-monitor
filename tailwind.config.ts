@@ -75,6 +75,10 @@ export default {
           },
           cream: "hsl(var(--acg-cream))",
         },
+        update: {
+          DEFAULT: "hsl(var(--update-green))",
+          foreground: "hsl(var(--update-green-foreground))",
+        },
         status: {
           success: "hsl(var(--status-success))",
           warning: "hsl(var(--status-warning))",

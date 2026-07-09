@@ -16,6 +16,7 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         acg: "bg-primary text-primary-foreground hover:bg-acg-green-light shadow-soft hover:shadow-card active:scale-[0.98]",
+        update: "bg-update text-update-foreground hover:bg-update/90 shadow-soft hover:shadow-card active:scale-[0.98]",
         gold: "bg-acg-gold text-acg-green-dark font-semibold hover:bg-acg-gold-light shadow-glow active:scale-[0.98]",
         "gold-outline": "border-2 border-acg-gold text-acg-gold bg-transparent hover:bg-acg-gold hover:text-acg-green-dark",
       },

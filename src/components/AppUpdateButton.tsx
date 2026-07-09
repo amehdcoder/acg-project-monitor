@@ -163,7 +163,7 @@ const AppUpdateButton = () => {
   return (
     <Button
       type="button"
-      variant="acg"
+      variant="update"
       size="sm"
       onClick={handleClick}
       disabled={isBusy}
