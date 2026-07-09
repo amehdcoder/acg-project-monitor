@@ -420,8 +420,10 @@ const QuizBuilder = () => {
   // Admin-only: open settings dialog prefilled from the selected quiz.
   const openSettings = (quiz: Quiz) => {
     setSettingsScore(Math.round(Number(quiz.passing_score ?? 70)));
-    setSettingsPass(quiz.pass_message ?? "");
-    setSettingsFail(quiz.fail_message ?? "");
+    setSettingsPrePass(quiz.pre_pass_message ?? quiz.pass_message ?? "");
+    setSettingsPreFail(quiz.pre_fail_message ?? quiz.fail_message ?? "");
+    setSettingsPostPass(quiz.post_pass_message ?? quiz.pass_message ?? "");
+    setSettingsPostFail(quiz.post_fail_message ?? quiz.fail_message ?? "");
     setShowSettings(true);
   };
 
@@ -431,16 +433,19 @@ const QuizBuilder = () => {
     const score = Math.max(0, Math.min(100, settingsScore || 0));
     setSettingsBusy(true);
     try {
+      const patch = {
+        passing_score: score,
+        pre_pass_message: settingsPrePass.trim() || null,
+        pre_fail_message: settingsPreFail.trim() || null,
+        post_pass_message: settingsPostPass.trim() || null,
+        post_fail_message: settingsPostFail.trim() || null,
+      };
       const { error } = await supabase
         .from("quizzes")
-        .update({
-          passing_score: score,
-          pass_message: settingsPass.trim() || null,
-          fail_message: settingsFail.trim() || null,
-        })
+        .update(patch)
         .eq("id", selectedQuiz.id);
       if (error) throw error;
-      setSelectedQuiz({ ...selectedQuiz, passing_score: score, pass_message: settingsPass.trim() || null, fail_message: settingsFail.trim() || null });
+      setSelectedQuiz({ ...selectedQuiz, ...patch });
       toast({ title: "Quiz settings saved", description: `Passing score set to ${score}%.` });
       setShowSettings(false);
       fetchQuizzes();
