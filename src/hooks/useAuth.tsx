@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { warmCacheUserForms } from "@/lib/offlineFormCache";
 import { prewarmBloombergOffline } from "@/lib/bloomberg/offlineSchoolCache";
+import { prefetchProjects } from "@/lib/prefetchProjects";
 import { startTimer } from "@/lib/metrics";
 import {
   getLatestOfflineCredential,
