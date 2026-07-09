@@ -419,13 +419,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Absolute safety net: no matter what stalls (getSession hanging, a wedged
     // network layer, a service worker intercepting the auth request), never
-    // leave the user staring at the boot spinner. After 15s force the gates
-    // open so the app renders and can route to /auth or the pending screen.
+    // leave the user staring at the boot spinner. Keep this short so the app
+    // paints quickly even on weak field connectivity.
     const bootWatchdog = setTimeout(() => {
       setLoading(false);
       setProfileLoading(false);
       initialLoadDoneRef.current = true;
-    }, 15000);
+    }, 6500);
 
 
 
@@ -499,7 +499,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // so boot always resolves and use the encrypted offline profile if available.
     withTimeout(
       supabase.auth.getSession(),
-      9000,
+      4500,
       "initial_session_timeout",
     ).then(async ({ data: { session: existingSession } }) => {
       initialSessionHandled = true;

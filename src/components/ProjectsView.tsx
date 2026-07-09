@@ -419,17 +419,6 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
     return colors[index % colors.length];
   };
 
-  // Only show the full-screen spinner on the very FIRST load (when there is
-  // no cached project data yet). Subsequent re-fetches keep the previous list
-  // visible to avoid a perceived "blink" when navigating into this tab.
-  if (loading && projects.length === 0) {
-    return (
-      <div className="flex h-96 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 p-4 lg:p-6">
       {/* Header */}
@@ -673,14 +662,16 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
         </Card>
       </div>
 
-      {filteredProjects.length === 0 && !loading && (
+      {filteredProjects.length === 0 && (
         <div className="flex h-48 flex-col items-center justify-center text-center">
           <FolderOpen className="h-12 w-12 text-muted-foreground/50" />
           <h2 className="mt-4 font-display text-lg font-semibold text-foreground">
-            No projects found
+            {loading ? "Loading projects…" : "No projects found"}
           </h2>
           <p className="mt-1 text-muted-foreground">
-            Create your first project to get started
+            {loading
+              ? "The page is ready; project data will appear as soon as the backend responds."
+              : "Create your first project to get started"}
           </p>
         </div>
       )}
