@@ -785,6 +785,138 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
           </Card>
         </TabsContent>
 
+        {/* Questions Tab — most passed & most failed */}
+        <TabsContent value="questions" className="mt-4 space-y-4">
+          {questionStats.length === 0 ? (
+            <Card className="form-card bg-muted/30 border-dashed">
+              <CardContent className="py-10 text-center">
+                <BookOpen className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
+                <p className="text-muted-foreground text-sm font-medium">No question-level data yet</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Once participants submit their answers, the most passed and most failed questions will appear here.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <p className="text-[11px] text-muted-foreground -mb-1">
+                Based on <span className="font-semibold text-foreground">{questionSource}</span> responses across {questionStats[0]?.answered ?? 0} participants.
+              </p>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Most Passed */}
+                <Card className="form-card border-l-4 border-l-emerald-500 overflow-hidden">
+                  <CardHeader className="pb-3 bg-gradient-to-r from-emerald-50 to-transparent dark:from-emerald-950/30">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/40">
+                        <CheckCircle className="h-4 w-4 text-emerald-600" />
+                      </div>
+                      Most Passed Questions
+                      <Badge className="ml-auto bg-emerald-600 hover:bg-emerald-600 text-white text-[10px]">Top {mostPassed.length}</Badge>
+                    </CardTitle>
+                    <CardDescription className="text-xs">Highest correct-answer rates — concepts learners grasped well.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3 pt-4">
+                    {mostPassed.map((q, i) => (
+                      <div key={q.id} className="space-y-1.5">
+                        <div className="flex items-start gap-2">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">
+                            {i + 1}
+                          </span>
+                          <p className="text-xs font-medium text-foreground leading-snug flex-1">
+                            <span className="text-muted-foreground">Q{q.number}.</span> {q.text}
+                          </p>
+                          <span className="font-mono text-sm font-bold text-emerald-600 shrink-0">{q.correctRate}%</span>
+                        </div>
+                        <div className="ml-7">
+                          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-all" style={{ width: `${q.correctRate}%` }} />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {q.correct}/{q.answered} correct · Answer: <span className="font-medium text-foreground">{q.correctLabel}</span>
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                {/* Most Failed */}
+                <Card className="form-card border-l-4 border-l-rose-500 overflow-hidden">
+                  <CardHeader className="pb-3 bg-gradient-to-r from-rose-50 to-transparent dark:from-rose-950/30">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-100 dark:bg-rose-900/40">
+                        <XCircle className="h-4 w-4 text-rose-600" />
+                      </div>
+                      Most Failed Questions
+                      <Badge className="ml-auto bg-rose-600 hover:bg-rose-600 text-white text-[10px]">Top {mostFailed.length}</Badge>
+                    </CardTitle>
+                    <CardDescription className="text-xs">Lowest correct-answer rates — priority topics for retraining.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3 pt-4">
+                    {mostFailed.map((q, i) => (
+                      <div key={q.id} className="space-y-1.5">
+                        <div className="flex items-start gap-2">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900/40 text-[10px] font-bold text-rose-700 dark:text-rose-300 mt-0.5">
+                            {i + 1}
+                          </span>
+                          <p className="text-xs font-medium text-foreground leading-snug flex-1">
+                            <span className="text-muted-foreground">Q{q.number}.</span> {q.text}
+                          </p>
+                          <span className="font-mono text-sm font-bold text-rose-600 shrink-0">{q.failRate}%</span>
+                        </div>
+                        <div className="ml-7">
+                          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full bg-gradient-to-r from-rose-400 to-rose-600 transition-all" style={{ width: `${q.failRate}%` }} />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {q.incorrect}/{q.answered} missed · Correct: <span className="font-medium text-foreground">{q.correctLabel}</span>
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Full ranking chart */}
+              <Card className="form-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-primary" />
+                    Correct-Answer Rate by Question
+                  </CardTitle>
+                  <CardDescription className="text-xs">Every question ranked by how many participants answered correctly.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={Math.max(240, questionStats.length * 34)}>
+                    <BarChart
+                      layout="vertical"
+                      data={[...questionStats].sort((a, b) => b.correctRate - a.correctRate).map(q => ({ name: `Q${q.number}`, "Correct %": q.correctRate }))}
+                      margin={{ left: 8, right: 24 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} horizontal={false} />
+                      <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={44} />
+                      <Tooltip
+                        contentStyle={{ borderRadius: "12px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
+                        formatter={(value: number) => [`${value}%`, "Correct"]}
+                      />
+                      <Bar dataKey="Correct %" radius={[0, 6, 6, 0]}>
+                        {[...questionStats].sort((a, b) => b.correctRate - a.correctRate).map((q, i) => (
+                          <Cell key={i} fill={q.correctRate >= 70 ? COLORS.post : q.correctRate >= 40 ? COLORS.accent : COLORS.danger} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
+
+
+
         {/* Insights Tab */}
         <TabsContent value="insights" className="mt-4 space-y-4">
           {interpretation ? (
