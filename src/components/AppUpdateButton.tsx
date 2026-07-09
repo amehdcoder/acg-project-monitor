@@ -163,7 +163,9 @@ const AppUpdateButton = () => {
       size="sm"
       onClick={handleClick}
       disabled={isBusy}
-      className="h-8 shrink-0 gap-1 px-2 text-xs font-bold shadow-glow whitespace-nowrap sm:px-3"
+      className={`h-9 shrink-0 gap-1.5 px-3 text-xs font-bold shadow-glow whitespace-nowrap sm:h-8 ${
+        hasUpdate ? "animate-pulse ring-2 ring-primary/40" : ""
+      }`}
       aria-label={hasUpdate ? "A new version is available — tap to update" : stamp}
       title={hasUpdate ? "A new version is available — tap to update" : stamp}
     >
@@ -175,13 +177,13 @@ const AppUpdateButton = () => {
         <CheckCircle2 className="h-4 w-4 shrink-0" />
       )}
       {/* Always render a readable label so the control is fully visible on
-          every Android width — no cryptic single-letter fallback. */}
-      <span className="hidden sm:inline">
+          every screen width — including small Android and iPhone widths. */}
+      <span>
         {isBusy ? busyLabel : hasUpdate ? "Update now" : "Update"}
       </span>
-      <span className="sm:hidden">{isBusy ? "…" : hasUpdate ? "Update" : "Latest"}</span>
     </Button>
   );
 };
+
 
 export default AppUpdateButton;
