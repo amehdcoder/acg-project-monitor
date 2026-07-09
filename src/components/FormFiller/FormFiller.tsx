@@ -4074,75 +4074,7 @@ const FormFiller = ({
         </div>
       )}
 
-      {/* MDA → Coverage Evaluation 3D opt-in (shared post-submit flow) */}
-      <AlertDialog open={showCoverageOptIn} onOpenChange={setShowCoverageOptIn}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <div className="flex items-center gap-3 mb-1">
-              <img src={fgnEmblem} alt="" className="h-9 w-9 object-contain" />
-              <AlertDialogTitle>Supervision recorded — proceed to Coverage Evaluation?</AlertDialogTitle>
-            </div>
-            <AlertDialogDescription>
-              Your MDA supervisory checklist was submitted successfully. You can now
-              run the linked Coverage Evaluation Survey (3D) for this community to
-              independently verify treatment coverage, or finish for now.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              onClick={() => {
-                setShowCoverageOptIn(false);
-                onClose();
-              }}
-            >
-              Finish for now
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setShowCoverageOptIn(false);
-                // Carry the supervisory checklist's location identification across
-                // to the Coverage Evaluation 3D page, where it will be prefilled
-                // and locked (not user-editable).
-                try {
-                  const answer = (...names: string[]) => {
-                    for (const name of names) {
-                      const direct = responses[name];
-                      if (direct !== undefined && direct !== null && String(direct).trim() !== "") return direct;
-                      const id = nameToIdMap[name];
-                      const byId = id ? responses[id] : undefined;
-                      if (byId !== undefined && byId !== null && String(byId).trim() !== "") return byId;
-                    }
-                    return "";
-                  };
-                  const handoffGps = gpsQuestionAnswer || gpsPosition || locEnforcement.autoGps || backgroundLocation || null;
-                  const url = buildCesLocationUrl({
-                    state: answer("state", "state_name", "admin_state"),
-                    lga: answer("lga", "lga_name", "local_government", "local_government_area"),
-                    ward: answer("ward", "ward_name"),
-                    flhf_name: answer("flhf_name", "flhf", "health_facility", "facility", "facility_name"),
-                    community_name: answer("community_name", "community"),
-                    settlement_name: answer("settlement_name", "settlement"),
-                    ...(handoffGps ? { lat: handoffGps.lat, lng: handoffGps.lng, accuracy: (handoffGps as any).accuracy } : {}),
-                    projectId: projectId ?? "",
-                    formId,
-                    source: "mda_checklist",
-                    ts: Date.now(),
-                  });
-                  window.dispatchEvent(new CustomEvent("amehnities:navigate-tab", { detail: { tab: "coverage-eval" } }));
-                  navigate(url, { replace: true });
-                  requestAnimationFrame(() => onClose());
-                  return;
-                } catch { /* fall back to plain tab navigation */ }
-                window.dispatchEvent(new CustomEvent("amehnities:navigate-tab", { detail: { tab: "coverage-eval" } }));
-                navigate("/?tab=coverage-eval", { replace: true });
-                requestAnimationFrame(() => onClose());
-              }}
-            >
-              Proceed with Coverage Evaluation 3D
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+
 
 
       {/* Leave without saving confirmation */}
