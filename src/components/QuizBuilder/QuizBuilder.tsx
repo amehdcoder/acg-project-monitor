@@ -1306,38 +1306,44 @@ const QuizBuilder = () => {
                   <Sparkles className="h-5 w-5 shrink-0 text-white" />
                 </div>
               </div>
-              <div className="space-y-3 p-4">
-                <div className="rounded-xl border border-dashed border-border bg-muted/40 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Preview user source</p>
-                  <p className="mt-1 text-sm font-bold text-foreground">{sampleMember.name}</p>
-                  <p className="text-xs text-muted-foreground">{sampleMember.email} · {sampleMember.source}</p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-                    <Badge className="mb-2 bg-emerald-600 text-white hover:bg-emerald-600">Pre-test pass</Badge>
-                    <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-emerald-950 dark:text-emerald-100">
-                      {renderConfiguredMessage(settingsPrePass, "Excellent work, {name}! You scored {percentage}% on the {test} and met the {passing}% pass mark.", "Pre-test", true)}
-                    </p>
+              <div className="space-y-4 p-4">
+                {previewProfiles.map(({ member, highBand }, idx) => (
+                  <div key={idx} className="space-y-3">
+                    <div className="rounded-xl border border-dashed border-border bg-muted/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Sample user {idx + 1} of {previewProfiles.length} · {highBand ? "higher score band" : "lower score band"}
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-foreground">{member.name}</p>
+                      <p className="text-xs text-muted-foreground">{member.email} · {member.source}</p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                        <Badge className="mb-2 bg-emerald-600 text-white hover:bg-emerald-600">Pre-test pass</Badge>
+                        <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-emerald-950 dark:text-emerald-100">
+                          {renderConfiguredMessage(settingsPrePass, "Excellent work, {name}! You scored {percentage}% on the {test} and met the {passing}% pass mark.", "Pre-test", true, member, highBand)}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+                        <Badge className="mb-2 bg-amber-600 text-white hover:bg-amber-600">Pre-test fail</Badge>
+                        <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-amber-950 dark:text-amber-100">
+                          {renderConfiguredMessage(settingsPreFail, "Thank you, {name}. You scored {percentage}% on the {test}; review the learning points before the Post-test.", "Pre-test", false, member, highBand)}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 dark:border-teal-900/50 dark:bg-teal-950/20">
+                        <Badge className="mb-2 bg-teal-600 text-white hover:bg-teal-600">Post-test pass</Badge>
+                        <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-teal-950 dark:text-teal-100">
+                          {renderConfiguredMessage(settingsPostPass, "Congratulations, {name}! Your {test} score is {percentage}% ({score}/{total}), above the {passing}% pass mark.", "Post-test", true, member, highBand)}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/50 dark:bg-rose-950/20">
+                        <Badge className="mb-2 bg-rose-600 text-white hover:bg-rose-600">Post-test fail</Badge>
+                        <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-rose-950 dark:text-rose-100">
+                          {renderConfiguredMessage(settingsPostFail, "Keep going, {name}. You scored {percentage}% on the {test}; an admin can authorize a retake after review.", "Post-test", false, member, highBand)}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
-                    <Badge className="mb-2 bg-amber-600 text-white hover:bg-amber-600">Pre-test fail</Badge>
-                    <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-amber-950 dark:text-amber-100">
-                      {renderConfiguredMessage(settingsPreFail, "Thank you, {name}. You scored {percentage}% on the {test}; review the learning points before the Post-test.", "Pre-test", false)}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 dark:border-teal-900/50 dark:bg-teal-950/20">
-                    <Badge className="mb-2 bg-teal-600 text-white hover:bg-teal-600">Post-test pass</Badge>
-                    <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-teal-950 dark:text-teal-100">
-                      {renderConfiguredMessage(settingsPostPass, "Congratulations, {name}! Your {test} score is {percentage}% ({score}/{total}), above the {passing}% pass mark.", "Post-test", true)}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/50 dark:bg-rose-950/20">
-                    <Badge className="mb-2 bg-rose-600 text-white hover:bg-rose-600">Post-test fail</Badge>
-                    <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-rose-950 dark:text-rose-100">
-                      {renderConfiguredMessage(settingsPostFail, "Keep going, {name}. You scored {percentage}% on the {test}; an admin can authorize a retake after review.", "Post-test", false)}
-                    </p>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           </div>
