@@ -156,15 +156,34 @@ const fetchHtmlBuildId = async (): Promise<string | null> => {
 };
 
 export const markServiceWorkerUpdateAvailable = () => {
-  const buildId = `sw-${Date.now()}`;
-  setState({
-    status: "available",
-    updateAvailable: true,
-    latestBuildId: buildId,
-    lastCheckedAt: Date.now(),
-    error: null,
-    source: "service-worker",
-  });
+  void (async () => {
+    // A service-worker refresh event can be stale/noisy after repeated deploys.
+    // Only surface the update UI after the same-origin version manifest proves
+    // that a newer code build exists for this device.
+    const latestBuildId = await fetchVersionBuildId();
+    if (!latestBuildId || latestBuildId === CURRENT_BUILD_ID) {
+      setState({
+        status: "current",
+        updateAvailable: false,
+        currentBuildId: CURRENT_BUILD_ID,
+        latestBuildId: latestBuildId || CURRENT_BUILD_ID,
+        lastCheckedAt: Date.now(),
+        error: null,
+        source: "service-worker",
+      });
+      return;
+    }
+
+    setState({
+      status: "available",
+      updateAvailable: true,
+      currentBuildId: CURRENT_BUILD_ID,
+      latestBuildId,
+      lastCheckedAt: Date.now(),
+      error: null,
+      source: "service-worker",
+    });
+  })();
 };
 
 export const registerServiceWorkerUpdater = (fn: () => Promise<void>) => {
@@ -192,7 +211,14 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
       // If the HTML probe genuinely fails, treat it as "unknown" and DO NOT flag
       // an update — a transient network blip must never surface the banner.
       if (!latestBuildId) {
-        setState({ lastCheckedAt: Date.now(), error: null });
+        setState({
+          status: "current",
+          updateAvailable: false,
+          currentBuildId: CURRENT_BUILD_ID,
+          latestBuildId: CURRENT_BUILD_ID,
+          lastCheckedAt: Date.now(),
+          error: null,
+        });
         return state;
       }
       currentBuildId = sessionStorage.getItem("app_html_build_id_v1") || latestBuildId;
@@ -205,7 +231,10 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
       // state so the banner never appears on a false positive.
       if (!latestBuildId) {
         setState({
-          status: state.updateAvailable ? state.status : "current",
+          status: "current",
+          updateAvailable: false,
+          currentBuildId: CURRENT_BUILD_ID,
+          latestBuildId: CURRENT_BUILD_ID,
           lastCheckedAt: Date.now(),
           error: null,
         });
@@ -244,8 +273,10 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
     return state;
   } catch (error: unknown) {
     setState({
-      status: "error",
-      updateAvailable: state.updateAvailable,
+      status: "current",
+      updateAvailable: false,
+      currentBuildId: CURRENT_BUILD_ID,
+      latestBuildId: CURRENT_BUILD_ID,
       lastCheckedAt: Date.now(),
       error: error instanceof Error ? error.message : "Update check failed",
     });
