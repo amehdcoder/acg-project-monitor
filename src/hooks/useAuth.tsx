@@ -431,6 +431,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Skip the initial INITIAL_SESSION if we already handled getSession
         if (event === "INITIAL_SESSION" && initialSessionHandled) return;
 
+        // A live session arrived — this device is genuinely signed in, so clear
+        // any stale "user pressed sign out" intent from a previous cycle.
+        if (currentSession?.user) userSignOutRef.current = false;
+
+        // ── Spurious sign-out guard ───────────────────────────────────────
+        // On flaky field networks, `_refreshAccessToken` can fail ("Failed to
+        // fetch") and Supabase then emits SIGNED_OUT even though the user never
+        // asked to log out. Bouncing them to /auth (losing presence, projects
+        // and in-progress work) is the intermittent-logout bug. Unless the user
+        // explicitly signed out, recover from the encrypted device credential
+        // and keep working; a later successful refresh restores the live session.
+        if (event === "SIGNED_OUT" && !userSignOutRef.current) {
+          setSession(null);
+          setTimeout(async () => {
+            const recovered = await recoverFromCachedCredential("token_refresh_lost");
+            if (!recovered) {
+              setUser(null);
+              setProfile(null);
+              setRole(null);
+            }
+            setProfileLoading(false);
+            setLoading(false);
+          }, 0);
+          return;
+        }
+
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
 
