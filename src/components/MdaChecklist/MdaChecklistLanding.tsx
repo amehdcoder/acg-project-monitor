@@ -13,6 +13,8 @@ import {
   Link2,
   ShieldCheck,
   ShieldAlert,
+  Lock,
+  Wrench,
 
 } from "lucide-react";
 import { FormFiller } from "@/components/FormFiller";
