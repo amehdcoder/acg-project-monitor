@@ -188,7 +188,7 @@ async function fileToIconDataUrl(file: File, size = 256): Promise<string> {
 export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
   const { formId, formName, projectId, onClose } = props;
   const navigate = useNavigate();
-  const { user, isOwner, isOwnerLevel, role } = useAuth();
+  const { user, isOwner, isOwnerLevel, isSuperAdmin, role } = useAuth();
   const { toast } = useToast();
   const [localGroups, setLocalGroups] = useState<FormGroup[]>(props.groups || []);
   const groups = localGroups;
