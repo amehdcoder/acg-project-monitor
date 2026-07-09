@@ -25,7 +25,7 @@ import { format } from "date-fns";
 import {
   Plus, Trash2, Save, Eye, Send, ChevronUp, ChevronDown,
   BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, CalendarIcon, Users, UserPlus, Archive, Eraser,
-  Lock, LockOpen, DoorOpen, DoorClosed, Sparkles, RotateCcw,
+  Lock, LockOpen, DoorOpen, DoorClosed, Sparkles, RotateCcw, Mail, TrendingUp,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -104,6 +104,7 @@ const QuizBuilder = () => {
   const [settingsPostPass, setSettingsPostPass] = useState("");
   const [settingsPostFail, setSettingsPostFail] = useState("");
   const [settingsBusy, setSettingsBusy] = useState(false);
+  const [previewMember, setPreviewMember] = useState<{ name: string; email: string; source: string } | null>(null);
 
   // Release results by email
   const [showRelease, setShowRelease] = useState(false);
@@ -112,6 +113,32 @@ const QuizBuilder = () => {
   const [releaseSearch, setReleaseSearch] = useState("");
   const [releaseLoading, setReleaseLoading] = useState(false);
   const [releaseBusy, setReleaseBusy] = useState(false);
+
+  const sampleMember = previewMember ?? { name: "Amina Yusuf", email: "amina.yusuf@example.org", source: "Sample project member" };
+
+  const renderConfiguredMessage = (
+    template: string,
+    fallback: string,
+    testLabel: "Pre-test" | "Post-test",
+    passed: boolean,
+  ) => {
+    const total = 10;
+    const percentage = passed ? Math.max(settingsScore, 70) : Math.max(0, Math.min(settingsScore - 12, 58));
+    const score = Math.round((percentage / 100) * total);
+    return (template.trim() || fallback)
+      .replace(/\{name\}/gi, sampleMember.name)
+      .replace(/\{score\}/gi, String(score))
+      .replace(/\{percentage\}/gi, String(percentage))
+      .replace(/\{total\}/gi, String(total))
+      .replace(/\{passing\}/gi, String(settingsScore))
+      .replace(/\{test\}/gi, testLabel);
+  };
+
+  const releasePreviewUser = (() => {
+    const selected = releaseUsers.find((u) => releaseSelected.has(u.user_id));
+    const first = selected || releaseUsers[0];
+    return first ? { name: first.name, email: first.email, source: first.hasPre || first.hasPost ? "Selected quiz member" : "Assigned member" } : sampleMember;
+  })();
 
   useEffect(() => {
     fetchQuizzes();
@@ -425,6 +452,46 @@ const QuizBuilder = () => {
     setSettingsPostPass(quiz.post_pass_message ?? quiz.pass_message ?? "");
     setSettingsPostFail(quiz.post_fail_message ?? quiz.fail_message ?? "");
     setShowSettings(true);
+    loadPreviewMember(quiz);
+  };
+
+  const loadPreviewMember = async (quiz: Quiz) => {
+    setPreviewMember(null);
+    try {
+      const { data: assignments } = await supabase
+        .from("quiz_user_assignments")
+        .select("user_id")
+        .eq("quiz_id", quiz.id)
+        .limit(1);
+
+      let userId = assignments?.[0]?.user_id as string | undefined;
+      let source = "Assigned quiz member";
+
+      if (!userId) {
+        const { data: projectMember } = await supabase
+          .from("user_project_assignments")
+          .select("user_id")
+          .eq("project_id", quiz.project_id)
+          .limit(1);
+        userId = projectMember?.[0]?.user_id as string | undefined;
+        source = "Current project member";
+      }
+
+      if (!userId) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("first_name, last_name, email")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!profile) return;
+      setPreviewMember({
+        name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email || "Project member",
+        email: profile.email || "No email on file",
+        source,
+      });
+    } catch (error) {
+      console.warn("Could not load quiz preview member", error);
+    }
   };
 
   // Admin-only: save pass mark & custom pass/fail messages (works on published quizzes).

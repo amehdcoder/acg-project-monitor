@@ -104,6 +104,8 @@ const AppUpdateButton = () => {
   const stamp = formatRelative(appliedAt);
   const busyLabel = statusText || "Updating…";
 
+  if (!hasUpdate && !installing) return null;
+
   return (
     <Button
       type="button"

@@ -146,7 +146,9 @@ const PWAUpdatePrompt = () => {
       console.error("Update failed", err);
       // Let the watchdog recover instead of leaving the user stuck.
     } finally {
-      clearTimeout(watchdog);
+      // Do not clear the watchdog. A successful hard reload navigates away;
+      // if navigation is blocked by a stale service worker race, the watchdog
+      // guarantees one final cache-busted reload instead of a dead button.
       setIsUpdating(false);
     }
   };

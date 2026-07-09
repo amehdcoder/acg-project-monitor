@@ -278,6 +278,45 @@ const reloadProbe = async (): Promise<boolean> => {
   }
 };
 
+const clearFreshShellCaches = async () => {
+  // Keep field/offline data caches intact. Only remove app-shell/runtime caches
+  // that can serve an old HTML shell or stale JS/CSS chunks after a deployment.
+  try {
+    const cacheNames = await caches.keys();
+    const shellCacheNames = cacheNames.filter((name) => {
+      const n = name.toLowerCase();
+      if (n.includes("map-tiles") || n.includes("grid3") || n.includes("font") || n.includes("location")) return false;
+      return (
+        n.includes("workbox-precache") ||
+        n.includes("html-cache") ||
+        n.includes("app-shell") ||
+        n.includes("precache") ||
+        n.includes("runtime") ||
+        n.includes("vite")
+      );
+    });
+    await Promise.allSettled(shellCacheNames.map((name) => caches.delete(name)));
+  } catch (error) {
+    console.warn("[UpdateManager] Unable to clear stale app shell caches", error);
+  }
+};
+
+const unregisterAppShellWorkers = async () => {
+  try {
+    const registrations = await navigator.serviceWorker?.getRegistrations();
+    await Promise.allSettled(
+      (registrations || [])
+        .filter((registration) => {
+          const script = registration.active?.scriptURL || registration.waiting?.scriptURL || registration.installing?.scriptURL || "";
+          return !script.includes("push-sw.js");
+        })
+        .map((registration) => registration.unregister()),
+    );
+  } catch (error) {
+    console.warn("[UpdateManager] Unable to unregister stale app service workers", error);
+  }
+};
+
 export const getLastAppliedAt = (): number | null => {
   try {
     const raw = localStorage.getItem(APPLIED_BUILD_AT_KEY);
@@ -336,18 +375,13 @@ export const hardReloadToLatest = async () => {
   if (swUpdater) {
     try {
       await swUpdater();
-      return;
     } catch (error) {
       console.warn("[UpdateManager] Service worker updater failed; falling back to hard reload", error);
     }
   }
 
-  try {
-    const registrations = await navigator.serviceWorker?.getRegistrations();
-    await Promise.all((registrations || []).map((registration) => registration.update().catch(() => {})));
-  } catch (error) {
-    console.warn("[UpdateManager] Unable to refresh service workers", error);
-  }
+  await clearFreshShellCaches();
+  await unregisterAppShellWorkers();
 
   try {
     sessionStorage.setItem("app_html_build_id_v1", state.latestBuildId || state.currentBuildId);
