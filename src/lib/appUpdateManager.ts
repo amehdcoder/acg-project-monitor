@@ -156,15 +156,34 @@ const fetchHtmlBuildId = async (): Promise<string | null> => {
 };
 
 export const markServiceWorkerUpdateAvailable = () => {
-  const buildId = `sw-${Date.now()}`;
-  setState({
-    status: "available",
-    updateAvailable: true,
-    latestBuildId: buildId,
-    lastCheckedAt: Date.now(),
-    error: null,
-    source: "service-worker",
-  });
+  void (async () => {
+    // A service-worker refresh event can be stale/noisy after repeated deploys.
+    // Only surface the update UI after the same-origin version manifest proves
+    // that a newer code build exists for this device.
+    const latestBuildId = await fetchVersionBuildId();
+    if (!latestBuildId || latestBuildId === CURRENT_BUILD_ID) {
+      setState({
+        status: "current",
+        updateAvailable: false,
+        currentBuildId: CURRENT_BUILD_ID,
+        latestBuildId: latestBuildId || CURRENT_BUILD_ID,
+        lastCheckedAt: Date.now(),
+        error: null,
+        source: "service-worker",
+      });
+      return;
+    }
+
+    setState({
+      status: "available",
+      updateAvailable: true,
+      currentBuildId: CURRENT_BUILD_ID,
+      latestBuildId,
+      lastCheckedAt: Date.now(),
+      error: null,
+      source: "service-worker",
+    });
+  })();
 };
 
 export const registerServiceWorkerUpdater = (fn: () => Promise<void>) => {
@@ -192,7 +211,14 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
       // If the HTML probe genuinely fails, treat it as "unknown" and DO NOT flag
       // an update — a transient network blip must never surface the banner.
       if (!latestBuildId) {
-        setState({ lastCheckedAt: Date.now(), error: null });
+        setState({
+          status: "current",
+          updateAvailable: false,
+          currentBuildId: CURRENT_BUILD_ID,
+          latestBuildId: CURRENT_BUILD_ID,
+          lastCheckedAt: Date.now(),
+          error: null,
+        });
         return state;
       }
       currentBuildId = sessionStorage.getItem("app_html_build_id_v1") || latestBuildId;
@@ -205,7 +231,10 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
       // state so the banner never appears on a false positive.
       if (!latestBuildId) {
         setState({
-          status: state.updateAvailable ? state.status : "current",
+          status: "current",
+          updateAvailable: false,
+          currentBuildId: CURRENT_BUILD_ID,
+          latestBuildId: CURRENT_BUILD_ID,
           lastCheckedAt: Date.now(),
           error: null,
         });
@@ -244,8 +273,10 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
     return state;
   } catch (error: unknown) {
     setState({
-      status: "error",
-      updateAvailable: state.updateAvailable,
+      status: "current",
+      updateAvailable: false,
+      currentBuildId: CURRENT_BUILD_ID,
+      latestBuildId: CURRENT_BUILD_ID,
       lastCheckedAt: Date.now(),
       error: error instanceof Error ? error.message : "Update check failed",
     });
@@ -275,6 +306,45 @@ const reloadProbe = async (): Promise<boolean> => {
   } catch (error) {
     console.warn("[UpdateManager] Reload probe failed; keeping current app shell", error);
     return false;
+  }
+};
+
+const clearFreshShellCaches = async () => {
+  // Keep field/offline data caches intact. Only remove app-shell/runtime caches
+  // that can serve an old HTML shell or stale JS/CSS chunks after a deployment.
+  try {
+    const cacheNames = await caches.keys();
+    const shellCacheNames = cacheNames.filter((name) => {
+      const n = name.toLowerCase();
+      if (n.includes("map-tiles") || n.includes("grid3") || n.includes("font") || n.includes("location")) return false;
+      return (
+        n.includes("workbox-precache") ||
+        n.includes("html-cache") ||
+        n.includes("app-shell") ||
+        n.includes("precache") ||
+        n.includes("runtime") ||
+        n.includes("vite")
+      );
+    });
+    await Promise.allSettled(shellCacheNames.map((name) => caches.delete(name)));
+  } catch (error) {
+    console.warn("[UpdateManager] Unable to clear stale app shell caches", error);
+  }
+};
+
+const unregisterAppShellWorkers = async () => {
+  try {
+    const registrations = await navigator.serviceWorker?.getRegistrations();
+    await Promise.allSettled(
+      (registrations || [])
+        .filter((registration) => {
+          const script = registration.active?.scriptURL || registration.waiting?.scriptURL || registration.installing?.scriptURL || "";
+          return !script.includes("push-sw.js");
+        })
+        .map((registration) => registration.unregister()),
+    );
+  } catch (error) {
+    console.warn("[UpdateManager] Unable to unregister stale app service workers", error);
   }
 };
 
@@ -336,18 +406,13 @@ export const hardReloadToLatest = async () => {
   if (swUpdater) {
     try {
       await swUpdater();
-      return;
     } catch (error) {
       console.warn("[UpdateManager] Service worker updater failed; falling back to hard reload", error);
     }
   }
 
-  try {
-    const registrations = await navigator.serviceWorker?.getRegistrations();
-    await Promise.all((registrations || []).map((registration) => registration.update().catch(() => {})));
-  } catch (error) {
-    console.warn("[UpdateManager] Unable to refresh service workers", error);
-  }
+  await clearFreshShellCaches();
+  await unregisterAppShellWorkers();
 
   try {
     sessionStorage.setItem("app_html_build_id_v1", state.latestBuildId || state.currentBuildId);

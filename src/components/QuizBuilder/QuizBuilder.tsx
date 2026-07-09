@@ -25,7 +25,7 @@ import { format } from "date-fns";
 import {
   Plus, Trash2, Save, Eye, Send, ChevronUp, ChevronDown,
   BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, CalendarIcon, Users, UserPlus, Archive, Eraser,
-  Lock, LockOpen, DoorOpen, DoorClosed, Sparkles, RotateCcw,
+  Lock, LockOpen, DoorOpen, DoorClosed, Sparkles, RotateCcw, Mail, TrendingUp,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -104,6 +104,7 @@ const QuizBuilder = () => {
   const [settingsPostPass, setSettingsPostPass] = useState("");
   const [settingsPostFail, setSettingsPostFail] = useState("");
   const [settingsBusy, setSettingsBusy] = useState(false);
+  const [previewMember, setPreviewMember] = useState<{ name: string; email: string; source: string } | null>(null);
 
   // Release results by email
   const [showRelease, setShowRelease] = useState(false);
@@ -112,6 +113,32 @@ const QuizBuilder = () => {
   const [releaseSearch, setReleaseSearch] = useState("");
   const [releaseLoading, setReleaseLoading] = useState(false);
   const [releaseBusy, setReleaseBusy] = useState(false);
+
+  const sampleMember = previewMember ?? { name: "Amina Yusuf", email: "amina.yusuf@example.org", source: "Sample project member" };
+
+  const renderConfiguredMessage = (
+    template: string,
+    fallback: string,
+    testLabel: "Pre-test" | "Post-test",
+    passed: boolean,
+  ) => {
+    const total = 10;
+    const percentage = passed ? Math.max(settingsScore, 70) : Math.max(0, Math.min(settingsScore - 12, 58));
+    const score = Math.round((percentage / 100) * total);
+    return (template.trim() || fallback)
+      .replace(/\{name\}/gi, sampleMember.name)
+      .replace(/\{score\}/gi, String(score))
+      .replace(/\{percentage\}/gi, String(percentage))
+      .replace(/\{total\}/gi, String(total))
+      .replace(/\{passing\}/gi, String(settingsScore))
+      .replace(/\{test\}/gi, testLabel);
+  };
+
+  const releasePreviewUser = (() => {
+    const selected = releaseUsers.find((u) => releaseSelected.has(u.user_id));
+    const first = selected || releaseUsers[0];
+    return first ? { name: first.name, email: first.email, source: first.hasPre || first.hasPost ? "Selected quiz member" : "Assigned member" } : sampleMember;
+  })();
 
   useEffect(() => {
     fetchQuizzes();
@@ -223,7 +250,7 @@ const QuizBuilder = () => {
     }
     toast({ title: "Quiz created!" });
     setShowCreateDialog(false);
-    setNewTitle(""); setNewDesc(""); setNewProjectId(""); setNewPostTestDate(undefined); setNewPostTestTime("09:00"); setNewTimeLimit(""); setNewPassingScore(50);
+    setNewTitle(""); setNewDesc(""); setNewProjectId(""); setNewPostTestDate(undefined); setNewPostTestTime("09:00"); setNewTimeLimit(""); setNewPassingScore(70);
     fetchQuizzes();
     if (data) {
       setSelectedQuiz(data as Quiz);
@@ -425,6 +452,46 @@ const QuizBuilder = () => {
     setSettingsPostPass(quiz.post_pass_message ?? quiz.pass_message ?? "");
     setSettingsPostFail(quiz.post_fail_message ?? quiz.fail_message ?? "");
     setShowSettings(true);
+    loadPreviewMember(quiz);
+  };
+
+  const loadPreviewMember = async (quiz: Quiz) => {
+    setPreviewMember(null);
+    try {
+      const { data: assignments } = await supabase
+        .from("quiz_user_assignments")
+        .select("user_id")
+        .eq("quiz_id", quiz.id)
+        .limit(1);
+
+      let userId = assignments?.[0]?.user_id as string | undefined;
+      let source = "Assigned quiz member";
+
+      if (!userId) {
+        const { data: projectMember } = await supabase
+          .from("user_project_assignments")
+          .select("user_id")
+          .eq("project_id", quiz.project_id)
+          .limit(1);
+        userId = projectMember?.[0]?.user_id as string | undefined;
+        source = "Current project member";
+      }
+
+      if (!userId) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("first_name, last_name, email")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!profile) return;
+      setPreviewMember({
+        name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email || "Project member",
+        email: profile.email || "No email on file",
+        source,
+      });
+    } catch (error) {
+      console.warn("Could not load quiz preview member", error);
+    }
   };
 
   // Admin-only: save pass mark & custom pass/fail messages (works on published quizzes).
@@ -1171,6 +1238,51 @@ const QuizBuilder = () => {
                 </div>
               </div>
             </div>
+
+            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+              <div className="bg-gradient-to-r from-sky-600 via-indigo-600 to-fuchsia-600 px-4 py-3 text-white">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-white/80">Admin live preview</p>
+                    <p className="text-sm font-extrabold">Configured member result messages</p>
+                  </div>
+                  <Sparkles className="h-5 w-5 shrink-0 text-white" />
+                </div>
+              </div>
+              <div className="space-y-3 p-4">
+                <div className="rounded-xl border border-dashed border-border bg-muted/40 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Preview user source</p>
+                  <p className="mt-1 text-sm font-bold text-foreground">{sampleMember.name}</p>
+                  <p className="text-xs text-muted-foreground">{sampleMember.email} · {sampleMember.source}</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                    <Badge className="mb-2 bg-emerald-600 text-white hover:bg-emerald-600">Pre-test pass</Badge>
+                    <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-emerald-950 dark:text-emerald-100">
+                      {renderConfiguredMessage(settingsPrePass, "Excellent work, {name}! You scored {percentage}% on the {test} and met the {passing}% pass mark.", "Pre-test", true)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+                    <Badge className="mb-2 bg-amber-600 text-white hover:bg-amber-600">Pre-test fail</Badge>
+                    <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-amber-950 dark:text-amber-100">
+                      {renderConfiguredMessage(settingsPreFail, "Thank you, {name}. You scored {percentage}% on the {test}; review the learning points before the Post-test.", "Pre-test", false)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 dark:border-teal-900/50 dark:bg-teal-950/20">
+                    <Badge className="mb-2 bg-teal-600 text-white hover:bg-teal-600">Post-test pass</Badge>
+                    <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-teal-950 dark:text-teal-100">
+                      {renderConfiguredMessage(settingsPostPass, "Congratulations, {name}! Your {test} score is {percentage}% ({score}/{total}), above the {passing}% pass mark.", "Post-test", true)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/50 dark:bg-rose-950/20">
+                    <Badge className="mb-2 bg-rose-600 text-white hover:bg-rose-600">Post-test fail</Badge>
+                    <p className="whitespace-pre-line text-sm font-semibold leading-relaxed text-rose-950 dark:text-rose-100">
+                      {renderConfiguredMessage(settingsPostFail, "Keep going, {name}. You scored {percentage}% on the {test}; an admin can authorize a retake after review.", "Post-test", false)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowSettings(false)}>Cancel</Button>
@@ -1183,11 +1295,48 @@ const QuizBuilder = () => {
 
       {/* Release Results Dialog */}
       <Dialog open={showRelease} onOpenChange={setShowRelease}>
-        <DialogContent className="max-w-md max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Send className="h-5 w-5 text-fuchsia-600" /> Release results by email</DialogTitle>
             <DialogDescription>Selected members receive a colorful summary with their Pre-test vs Post-test statistical analysis.</DialogDescription>
           </DialogHeader>
+          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            <div className="bg-gradient-to-r from-indigo-600 via-fuchsia-600 to-rose-500 px-4 py-3 text-white">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-white/80">Admin email preview</p>
+                  <p className="text-base font-extrabold">Hello {releasePreviewUser.name}, here is your assessment summary</p>
+                  <p className="mt-1 text-xs text-white/80">Previewing with {releasePreviewUser.source}: {releasePreviewUser.email || "No email on file"}</p>
+                </div>
+                <Mail className="h-5 w-5 shrink-0 text-white" />
+              </div>
+            </div>
+            <div className="space-y-3 p-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-center dark:border-blue-900/50 dark:bg-blue-950/20">
+                  <p className="text-[11px] font-bold uppercase text-blue-700 dark:text-blue-300">Pre-test</p>
+                  <p className="mt-1 text-2xl font-black text-blue-900 dark:text-blue-100">62%</p>
+                  <p className="text-[11px] text-blue-700/80 dark:text-blue-200/80">6/10 pts</p>
+                </div>
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                  <p className="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-300">Post-test</p>
+                  <p className="mt-1 text-2xl font-black text-emerald-900 dark:text-emerald-100">84%</p>
+                  <p className="text-[11px] text-emerald-700/80 dark:text-emerald-200/80">8/10 pts</p>
+                </div>
+                <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50 p-3 text-center dark:border-fuchsia-900/50 dark:bg-fuchsia-950/20">
+                  <p className="text-[11px] font-bold uppercase text-fuchsia-700 dark:text-fuchsia-300">Change</p>
+                  <p className="mt-1 flex items-center justify-center gap-1 text-2xl font-black text-fuchsia-900 dark:text-fuchsia-100"><TrendingUp className="h-5 w-5" /> +22</p>
+                  <p className="text-[11px] text-fuchsia-700/80 dark:text-fuchsia-200/80">points</p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-sky-50 p-3 dark:border-indigo-900/50 dark:from-indigo-950/30 dark:to-sky-950/20">
+                <p className="text-xs font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">Plain-language inference</p>
+                <p className="mt-1 text-sm leading-relaxed text-indigo-950 dark:text-indigo-100">
+                  {releasePreviewUser.name}'s score improved from 62% to 84%. This preview explains whether the improvement is statistically significant, highlights questions improved or declined, and keeps the message personal, respectful, and easy to understand.
+                </p>
+              </div>
+            </div>
+          </div>
           <Input value={releaseSearch} onChange={(e) => setReleaseSearch(e.target.value)} placeholder="Search members…" className="form-input" />
           <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
             <span>{releaseSelected.size} selected</span>
