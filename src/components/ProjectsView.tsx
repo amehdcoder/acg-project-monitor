@@ -192,8 +192,15 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   }, [chatProject]);
 
   const fetchProjects = async () => {
+    const cached = readProjectCache();
     try {
-      setLoading(true);
+      if (cached.length > 0) {
+        setProjects(cached);
+        setLoadError(null);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
 
       // Let backend access rules decide which projects this user can see. The
       // previous client-side role branch could run while `role` was still null
@@ -237,7 +244,6 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       })();
     } catch (error: any) {
       console.error("Error fetching projects:", error);
-      const cached = readProjectCache();
       if (cached.length > 0) {
         setProjects(cached);
         setLoadError(null);
@@ -647,13 +653,11 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
         <div className="flex h-48 flex-col items-center justify-center text-center">
           <FolderOpen className="h-12 w-12 text-muted-foreground/50" />
           <h2 className="mt-4 font-display text-lg font-semibold text-foreground">
-            {loading ? "Loading projects…" : loadError ? "Reconnecting to projects…" : "No projects found"}
+            {loading ? "Loading projects…" : "No projects found"}
           </h2>
           <p className="mt-1 text-muted-foreground">
             {loading
               ? "The page is ready; project data will appear as soon as the backend responds."
-              : loadError
-                ? "Your projects still exist; the app is retrying instead of replacing them with an empty list."
               : "Create your first project to get started"}
           </p>
         </div>

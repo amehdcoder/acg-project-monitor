@@ -903,6 +903,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
 
   const fetchProjects = async () => {
+    const cached = readProjectCache();
+    if (cached.length > 0) {
+      setProjects(cached);
+      setProjectsLoadError(null);
+    }
     try {
       // One policy-scoped query is the source of truth. The old role/assignment
       // branching could execute before role hydration completed and leave admins
@@ -913,7 +918,6 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       setProjectsLoadError(null);
     } catch (error: any) {
       console.error("Error fetching projects:", error);
-      const cached = readProjectCache();
       if (cached.length > 0) setProjects(cached);
       setProjectsLoadError(cached.length > 0 ? null : (error?.message || "Projects are temporarily unavailable"));
     }
@@ -2216,7 +2220,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   </SelectItem>
                   {projects.length === 0 && projectsLoadError && (
                     <div className="px-3 py-2 text-xs text-muted-foreground">
-                      Reconnecting to project list…
+                      Project list will appear automatically when the connection responds.
                     </div>
                   )}
                   {projects.map((project) => (
