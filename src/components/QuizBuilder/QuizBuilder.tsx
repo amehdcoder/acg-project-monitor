@@ -617,6 +617,14 @@ const QuizBuilder = () => {
   // Admin-only: send result emails (with pre/post statistical inference) to selected members.
   const releaseResults = async () => {
     if (!selectedQuiz || releaseSelected.size === 0) return;
+    if (!messageTokenReport.ok) {
+      toast({
+        title: "Fix message tokens first",
+        description: `Unknown token${messageTokenReport.unknown.length > 1 ? "s" : ""}: ${messageTokenReport.unknown.map((t) => `{${t}}`).join(", ")}. Update the quiz messages before releasing results.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setReleaseBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("release-quiz-results", {
