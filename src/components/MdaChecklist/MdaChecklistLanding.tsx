@@ -872,6 +872,7 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
       </main>
 
       {builderDialog}
+      {hcsNoticeOpen && <HcsUnderDevelopmentNotice onClose={() => setHcsNoticeOpen(false)} />}
     </div>
   );
 }
