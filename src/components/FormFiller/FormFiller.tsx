@@ -251,6 +251,10 @@ interface FormSettings {
   isMdaChecklist?: boolean;
   /** When true, offer the linked Coverage Evaluation Survey (3D) after submission. */
   coverageEvaluation?: boolean;
+  /** When true, launch the Repeat Household Coverage Survey after an MDA checklist is submitted. */
+  householdSurvey?: boolean;
+  /** Admin-set number of households the field user must sample & interview. */
+  householdSampleSize?: number;
   /**
    * When true, the State → LGA → Ward → FLHF → Community → Settlement geography
    * questions are driven by the microplan via <MdaLocationCascade>, including
