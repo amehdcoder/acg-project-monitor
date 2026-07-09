@@ -1436,12 +1436,19 @@ const QuizBuilder = () => {
                 ))
             )}
           </div>
+          {!messageTokenReport.ok && (
+            <div className="flex items-start gap-2 rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>Unknown token{messageTokenReport.unknown.length > 1 ? "s" : ""} in the quiz messages ({messageTokenReport.unknown.map((t) => `{${t}}`).join(", ")}). Fix them in Settings before sending.</span>
+            </div>
+          )}
           <DialogFooter className="pt-2 border-t">
             <Button variant="outline" onClick={() => setShowRelease(false)}>Cancel</Button>
-            <Button onClick={releaseResults} disabled={releaseBusy || releaseSelected.size === 0} className="gap-1.5 bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white hover:opacity-90">
+            <Button onClick={releaseResults} disabled={releaseBusy || releaseSelected.size === 0 || !messageTokenReport.ok} className="gap-1.5 bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white hover:opacity-90">
               {releaseBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send results
             </Button>
           </DialogFooter>
+
         </DialogContent>
       </Dialog>
 
