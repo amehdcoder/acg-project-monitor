@@ -273,16 +273,14 @@ export default function RepeatHouseholdCoverageSurvey({
   }, [current.gps, geo.position]);
 
   // When a fresh geo position arrives and the household has none yet, adopt it.
-  if (geo.position && !current.gps) {
-    // safe: setState during render guarded by condition that flips immediately
-    setTimeout(
-      () =>
-        setCurrent((c) =>
-          c.gps ? c : { ...c, gps: { lat: geo.position!.lat, lng: geo.position!.lng, accuracy: geo.position!.accuracy } },
-        ),
-      0,
-    );
-  }
+  useEffect(() => {
+    if (geo.position && !current.gps) {
+      setCurrent((c) =>
+        c.gps ? c : { ...c, gps: { lat: geo.position!.lat, lng: geo.position!.lng, accuracy: geo.position!.accuracy } },
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geo.position]);
 
   const householdValid = current.cdd_came !== "";
 
