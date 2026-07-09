@@ -492,6 +492,13 @@ const FormFiller = ({
   // Thank you state
   const [showThankYou, setShowThankYou] = useState(false);
   const [showCoverageOptIn, setShowCoverageOptIn] = useState(false);
+  // Repeat Household Coverage Survey launch context (replaces the old 3D flow).
+  const [householdSurveyCtx, setHouseholdSurveyCtx] = useState<null | {
+    submissionId: string;
+    target: number;
+    location: { state?: string; lga?: string; ward?: string; flhf_name?: string; community_name?: string; settlement_name?: string };
+    gps: { lat: number; lng: number; accuracy?: number } | null;
+  }>(null);
   const navigate = useNavigate();
   // Integrated MDA Supervisory Checklist branded experience + Coverage Evaluation linkage.
   // Also detect by name so older/offline saved copies that missed the settings
