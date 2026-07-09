@@ -77,6 +77,7 @@ const AppUpdateButton = () => {
         setUpdateState(next);
         if (!next.updateAvailable) {
           setStatusText("Latest");
+          toast.success("You're on the latest version", { id: optimisticId });
           window.setTimeout(() => {
             setInstalling(false);
             setStatusText(null);
@@ -84,8 +85,10 @@ const AppUpdateButton = () => {
           }, 900);
           return;
         }
+        toast.loading("New version found — updating…", { id: optimisticId });
       } catch {
         setStatusText("Retry");
+        toast.error("Couldn't check for updates — tap to retry", { id: optimisticId });
         window.setTimeout(() => {
           setInstalling(false);
           setStatusText(null);
@@ -93,6 +96,7 @@ const AppUpdateButton = () => {
         return;
       }
     }
+
 
     // Single click with a known update = guaranteed install. Show feedback
     // instantly, then run the real update with a hard watchdog so a hung
