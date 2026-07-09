@@ -530,6 +530,26 @@ export function ProjectChatDialog({
           onGroupDeleted={handleGroupDeleted}
         />
       )}
+
+      <Dialog open={showCallHistory} onOpenChange={setShowCallHistory}>
+        <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-4 py-3 border-b border-border">
+            <DialogTitle className="text-base">Call History</DialogTitle>
+          </DialogHeader>
+          <CallHistoryPanel
+            groups={chatGroups.map((g) => ({ id: g.id, name: g.name }))}
+            onAction={(groupId, ct) => {
+              const target = chatGroups.find((g) => g.id === groupId);
+              if (target) {
+                setSelectedDirect(null);
+                setSelectedGroup(target);
+                setCallType(ct);
+              }
+              setShowCallHistory(false);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
