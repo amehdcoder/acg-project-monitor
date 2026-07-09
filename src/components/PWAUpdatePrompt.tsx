@@ -162,7 +162,7 @@ const PWAUpdatePrompt = () => {
     <>
       {!shouldSkipServiceWorker && <SwRegistrar onAvailable={handleAvailable} registerSelf={registerSelf} />}
 
-      {updateState.updateAvailable && !activeFormProgress && (
+      {updateState.updateAvailable && !activeFormProgress && dismissedBuild !== updateState.latestBuildId && (
         <>
           <div
             className="fixed inset-x-0 top-0 z-[10000] flex items-center justify-center gap-3 border-b-2 border-primary bg-gradient-to-r from-primary/95 via-primary to-primary/95 px-4 py-2 text-primary-foreground shadow-lg animate-in slide-in-from-top duration-300"
@@ -176,14 +176,19 @@ const PWAUpdatePrompt = () => {
               {isUpdating ? "Updating..." : "Update now"}
             </Button>
             <button
-              onClick={() => setShowModal(false)}
+              onClick={() => {
+                // Truly dismiss the banner for this build (not just the modal).
+                setShowModal(false);
+                setDismissedBuild(updateState.latestBuildId);
+              }}
               className="ml-1 rounded-full p-1 text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
               aria-label="Hide update popup"
-              title="Hide popup; the header update button stays available"
+              title="Hide this banner; it will reappear only when a newer version ships"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
+
 
           {showModal && (
             <div
