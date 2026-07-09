@@ -7,9 +7,9 @@
  * Error labelled `label`, so callers can fall back to cached/empty data instead
  * of hanging forever on a slow or wedged network.
  */
-export function withTimeout<T>(p: Promise<T>, ms = 12000, label = "request_timeout"): Promise<T> {
+export function withTimeout<T>(p: PromiseLike<T>, ms = 12000, label = "request_timeout"): Promise<T> {
   return Promise.race([
-    p,
+    Promise.resolve(p),
     new Promise<T>((_, reject) => setTimeout(() => reject(new Error(label)), ms)),
   ]);
 }
@@ -19,9 +19,9 @@ export function withTimeout<T>(p: Promise<T>, ms = 12000, label = "request_timeo
  * rejecting. Ideal for read queries that gate a loading spinner: the UI always
  * proceeds with a safe default (usually empty data) when the network stalls.
  */
-export function withTimeoutFallback<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+export function withTimeoutFallback<T>(p: PromiseLike<T>, ms: number, fallback: T): Promise<T> {
   return Promise.race([
-    p.catch(() => fallback),
+    Promise.resolve(p).catch(() => fallback),
     new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
   ]);
 }
