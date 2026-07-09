@@ -99,8 +99,10 @@ const QuizBuilder = () => {
   // Quiz settings (pass mark + custom messages) — editable on published quizzes
   const [showSettings, setShowSettings] = useState(false);
   const [settingsScore, setSettingsScore] = useState(70);
-  const [settingsPass, setSettingsPass] = useState("");
-  const [settingsFail, setSettingsFail] = useState("");
+  const [settingsPrePass, setSettingsPrePass] = useState("");
+  const [settingsPreFail, setSettingsPreFail] = useState("");
+  const [settingsPostPass, setSettingsPostPass] = useState("");
+  const [settingsPostFail, setSettingsPostFail] = useState("");
   const [settingsBusy, setSettingsBusy] = useState(false);
 
   // Release results by email
