@@ -62,6 +62,10 @@ interface QuizTakerProps {
     passing_score: number;
     pass_message?: string | null;
     fail_message?: string | null;
+    pre_pass_message?: string | null;
+    pre_fail_message?: string | null;
+    post_pass_message?: string | null;
+    post_fail_message?: string | null;
     open_test_type?: "pre_test" | "post_test" | null;
   };
   onClose: () => void;
