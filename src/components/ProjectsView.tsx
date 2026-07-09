@@ -44,6 +44,7 @@ import { ProjectChatDialog } from "@/components/ProjectChat";
 import ProjectScopeSelector from "@/components/ProjectsView/ProjectScopeSelector";
 import { EMPTY_SCOPE, fetchProjectScope, type ProjectScope } from "@/lib/projectScope";
 import { withTimeout, withTimeoutFallback } from "@/lib/withTimeout";
+import { fetchProjectsWithRetry, writeProjectCaches } from "@/lib/prefetchProjects";
 
 interface Project {
   id: string;
@@ -111,7 +112,26 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
     if (!projectCacheKey) return [];
     try {
       const cached = JSON.parse(localStorage.getItem(projectCacheKey) || "[]");
-      return Array.isArray(cached) ? cached : [];
+      if (Array.isArray(cached) && cached.length > 0) return cached;
+      if (user?.id) {
+        const liteCached = JSON.parse(localStorage.getItem(`amehnities:forms:projects:${user.id}`) || "[]");
+        return Array.isArray(liteCached)
+          ? liteCached.map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              description: null,
+              status: "active",
+              start_date: null,
+              end_date: null,
+              created_at: new Date().toISOString(),
+              forms_count: 0,
+              members_count: 0,
+              entries_count: 0,
+              recent_entries_count: 0,
+            }))
+          : [];
+      }
+      return [];
     } catch {
       return [];
     }
@@ -121,6 +141,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
     if (!projectCacheKey) return;
     try {
       localStorage.setItem(projectCacheKey, JSON.stringify(items));
+      if (user?.id) writeProjectCaches(user.id, items);
     } catch {
       /* storage can be unavailable; network data still renders */
     }
@@ -179,25 +200,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       // after a slow auth/profile refresh, incorrectly showing Super Admins an
       // empty assigned-only project list. A single guarded projects query is both
       // faster and more reliable under high activity.
-      const { data, error } = await withTimeout(
-        supabase
-          .from("projects")
-          .select("*")
-          .order("created_at", { ascending: false }),
-        12000,
-        "projects_timeout",
-      );
-      if (error) throw error;
-
-      let projectsData = data;
-      if (!projectsData) projectsData = [];
-      const baseProjects = (projectsData || []).map((project: Project) => ({
-        ...project,
-        forms_count: project.forms_count ?? 0,
-        members_count: project.members_count ?? 0,
-        entries_count: project.entries_count ?? 0,
-        recent_entries_count: project.recent_entries_count ?? 0,
-      }));
+      const baseProjects = await fetchProjectsWithRetry("full", { attempts: 3, timeoutMs: 18000 }) as Project[];
       setProjects(baseProjects);
       writeProjectCache(baseProjects);
       setLoadError(null);
@@ -237,11 +240,13 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       const cached = readProjectCache();
       if (cached.length > 0) {
         setProjects(cached);
+        setLoadError(null);
+        return;
       }
       setLoadError(error?.message || "Project data is temporarily unavailable");
       toast({
         title: "Error loading projects",
-        description: cached.length > 0 ? "Showing the last loaded project list while reconnecting." : error.message,
+        description: error.message,
         variant: "destructive",
       });
     } finally {
