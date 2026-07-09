@@ -94,7 +94,7 @@ export function usePresenceTracking(enabled: boolean) {
         .subscribe(async (status) => {
           if (status === "SUBSCRIBED") {
             const self = buildSelf();
-            if (self) await ch.track(self);
+            if (self) void ch.track(self).catch((err) => console.warn("[presence] track failed", err));
           }
         });
     });
@@ -114,7 +114,7 @@ export function usePresenceTracking(enabled: boolean) {
   useEffect(() => {
     if (!enabled || !channelRef.current) return;
     const self = buildSelf();
-    if (self) channelRef.current.track(self);
+    if (self) void channelRef.current.track(self).catch((err) => console.warn("[presence] refresh failed", err));
   }, [enabled, buildSelf]);
 
   return { collaborators };

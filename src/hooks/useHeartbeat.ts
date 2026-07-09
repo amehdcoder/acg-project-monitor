@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { withTimeoutFallback } from "@/lib/withTimeout";
 
 const HEARTBEAT_INTERVAL = 60_000; // 1 minute
 const IMPERSONATION_KEY = "acg_impersonation_admin_session";
@@ -135,20 +137,25 @@ function getDeviceFingerprint(): string {
  * Skips heartbeat when the session is an impersonation.
  */
 export function useHeartbeat() {
+  const { user } = useAuth();
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const cachedIpRef = useRef<string | null>(null);
   const sessionRecordedRef = useRef(false);
+  const inFlightRef = useRef(false);
 
   useEffect(() => {
+    if (!user?.id) return;
     let cancelled = false;
 
     const beat = async () => {
       // Don't update heartbeat during impersonation sessions
       if (sessionStorage.getItem(IMPERSONATION_KEY)) return;
+      if (inFlightRef.current) return;
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
 
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user || cancelled) return;
+        inFlightRef.current = true;
+        if (cancelled) return;
 
         const deviceType = getDeviceType();
         const deviceDescription = getDeviceDescription();
@@ -177,10 +184,14 @@ export function useHeartbeat() {
         }
 
         // Update profile with device info immediately
-        const { error: updateError } = await supabase
-          .from("profiles")
-          .update(updateData as any)
-          .eq("user_id", user.id);
+        const { error: updateError } = await withTimeoutFallback(
+          supabase
+            .from("profiles")
+            .update(updateData as any)
+            .eq("user_id", user.id),
+          6000,
+          { error: null } as any,
+        );
 
         if (updateError) {
           console.warn("[Heartbeat] Profile update failed:", updateError.message);
@@ -188,14 +199,15 @@ export function useHeartbeat() {
 
         // Fetch IP in background if not cached, then update separately
         if (!cachedIpRef.current && !cancelled) {
-          const ip = await fetchClientIp();
-          if (ip && !cancelled) {
+          void fetchClientIp().then((ip) => {
+            if (!ip || cancelled) return;
             cachedIpRef.current = ip;
-            await supabase
-              .from("profiles")
-              .update({ last_ip_address: ip } as any)
-              .eq("user_id", user.id);
-          }
+            void withTimeoutFallback(
+              supabase.from("profiles").update({ last_ip_address: ip } as any).eq("user_id", user.id),
+              6000,
+              { error: null } as any,
+            );
+          });
         }
 
         // Record / update device session
@@ -203,49 +215,65 @@ export function useHeartbeat() {
           sessionRecordedRef.current = true;
           const fingerprint = getDeviceFingerprint();
           // Check if there's an existing active session for this fingerprint
-          const { data: existing } = await supabase
-            .from("device_sessions" as any)
-            .select("id")
-            .eq("user_id", user.id)
-            .eq("device_description", deviceDescription)
-            .eq("is_active", true)
-            .maybeSingle();
+          const { data: existing } = await withTimeoutFallback(
+            supabase
+              .from("device_sessions" as any)
+              .select("id")
+              .eq("user_id", user.id)
+              .eq("device_description", deviceDescription)
+              .eq("is_active", true)
+              .maybeSingle(),
+            5000,
+            { data: null } as any,
+          );
 
           if (existing) {
             // Update last_seen_at on existing session
-            await supabase
+            await withTimeoutFallback(
+              supabase
+                .from("device_sessions" as any)
+                .update({
+                  last_seen_at: new Date().toISOString(),
+                  ip_address: cachedIpRef.current || null,
+                })
+                .eq("id", (existing as any).id),
+              5000,
+              { error: null } as any,
+            );
+          } else {
+            // Insert new session
+            await withTimeoutFallback(
+              supabase.from("device_sessions" as any).insert({
+                user_id: user.id,
+                session_id: fingerprint,
+                device_type: deviceType,
+                device_description: deviceDescription,
+                ip_address: cachedIpRef.current || null,
+                user_agent: navigator.userAgent,
+                browser,
+                os,
+                screen_resolution: screenRes,
+                is_active: true,
+              }),
+              5000,
+              { error: null } as any,
+            );
+          }
+        } else if (sessionRecordedRef.current && !cancelled) {
+          // Periodically update last_seen_at on session record (every heartbeat)
+          await withTimeoutFallback(
+            supabase
               .from("device_sessions" as any)
               .update({
                 last_seen_at: new Date().toISOString(),
                 ip_address: cachedIpRef.current || null,
               })
-              .eq("id", (existing as any).id);
-          } else {
-            // Insert new session
-            await supabase.from("device_sessions" as any).insert({
-              user_id: user.id,
-              session_id: fingerprint,
-              device_type: deviceType,
-              device_description: deviceDescription,
-              ip_address: cachedIpRef.current || null,
-              user_agent: navigator.userAgent,
-              browser,
-              os,
-              screen_resolution: screenRes,
-              is_active: true,
-            });
-          }
-        } else if (sessionRecordedRef.current && !cancelled) {
-          // Periodically update last_seen_at on session record (every heartbeat)
-          await supabase
-            .from("device_sessions" as any)
-            .update({
-              last_seen_at: new Date().toISOString(),
-              ip_address: cachedIpRef.current || null,
-            })
-            .eq("user_id", user.id)
-            .eq("device_description", getDeviceDescription())
-            .eq("is_active", true);
+              .eq("user_id", user.id)
+              .eq("device_description", getDeviceDescription())
+              .eq("is_active", true),
+            5000,
+            { error: null } as any,
+          );
         }
 
         // Refresh IP every 10 minutes (every 10th heartbeat)
@@ -260,6 +288,8 @@ export function useHeartbeat() {
         }
       } catch (err) {
         console.warn("[Heartbeat] Error:", err);
+      } finally {
+        inFlightRef.current = false;
       }
     };
     beat._lastIpRefresh = 0 as number;
@@ -272,5 +302,5 @@ export function useHeartbeat() {
       cancelled = true;
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, []);
+  }, [user?.id]);
 }

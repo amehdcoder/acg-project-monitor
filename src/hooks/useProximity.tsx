@@ -10,10 +10,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { authorizeRealtimeSubscription } from "@/lib/realtimeGuard";
+import { withTimeoutFallback } from "@/lib/withTimeout";
 
 const PROXIMITY_RADIUS_KM = 10;
-const PRESENCE_PUSH_MS = 20000; // upsert own location at most every 20s
-const NEARBY_REFRESH_MS = 25000; // re-scan nearby users
+const PRESENCE_PUSH_MS = 60000; // upsert own location at most every minute
+const NEARBY_REFRESH_MS = 60000; // re-scan nearby users at a backend-friendly pace
 const PRESENCE_FRESH_MS = 5 * 60 * 1000; // ignore stale presence (>5 min)
 
 export interface NearbyUser {
@@ -138,16 +139,20 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const pushPresence = useCallback(
     async (lat: number, lng: number, isEnabled: boolean) => {
       if (!user?.id) return;
-      await supabase.from("proximity_presence").upsert(
-        {
-          user_id: user.id,
-          display_name: displayName(),
-          lat,
-          lng,
-          enabled: isEnabled,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" }
+      await withTimeoutFallback(
+        supabase.from("proximity_presence").upsert(
+          {
+            user_id: user.id,
+            display_name: displayName(),
+            lat,
+            lng,
+            enabled: isEnabled,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" }
+        ),
+        6000,
+        { error: null } as any,
       );
     },
     [user?.id, displayName]
@@ -179,7 +184,7 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const now = Date.now();
         if (now - lastPushRef.current > PRESENCE_PUSH_MS) {
           lastPushRef.current = now;
-          pushPresence(lat, lng, true);
+          void pushPresence(lat, lng, true);
         }
       },
       () => {
@@ -201,12 +206,16 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!user?.id || !enabled || !posRef.current) return;
     const { lat, lng } = posRef.current;
     const since = new Date(Date.now() - PRESENCE_FRESH_MS).toISOString();
-    const { data, error } = await supabase
-      .from("proximity_presence")
-      .select("user_id, display_name, lat, lng, updated_at")
-      .eq("enabled", true)
-      .neq("user_id", user.id)
-      .gte("updated_at", since);
+    const { data, error } = await withTimeoutFallback(
+      supabase
+        .from("proximity_presence")
+        .select("user_id, display_name, lat, lng, updated_at")
+        .eq("enabled", true)
+        .neq("user_id", user.id)
+        .gte("updated_at", since),
+      6000,
+      { data: [], error: null } as any,
+    );
     if (error || !data) return;
 
     const list: NearbyUser[] = [];

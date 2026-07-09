@@ -38,6 +38,13 @@ export async function authorizeRealtimeSubscription(
   if (!isWellFormedTopic(topic)) {
     return { allowed: false, reason: "malformed_topic_client" };
   }
+  // The global collaborator-presence channel is ephemeral and intentionally
+  // mounted for every signed-in user so admins can see who is currently using
+  // the app. Do not put a database RPC in front of this hot path: under load or
+  // weak connectivity that single RPC failure made everyone appear offline.
+  if (topic === "app-collaborator-presence") {
+    return { allowed: true, reason: "global_presence" };
+  }
   try {
     const { data, error } = await supabase.rpc("authorize_realtime_subscription", {
       _topic: topic,
