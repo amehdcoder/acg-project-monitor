@@ -22,6 +22,7 @@ import { DirectChatView } from "./DirectChatView";
 import { MembersPanel } from "./MembersPanel";
 import { MessageSearch } from "./MessageSearch";
 import { CallDialog, ActiveCallBanner } from "./CallDialog";
+import { CallHistoryPanel } from "./CallHistoryPanel";
 import { GroupSettingsDialog } from "./GroupSettingsDialog";
 import { TypingIndicator, useTypingIndicator } from "./TypingIndicator";
 
