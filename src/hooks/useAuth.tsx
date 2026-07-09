@@ -20,9 +20,9 @@ import { checkOfflineLock, registerOfflineFailure, clearOfflineFailures } from "
 
 type AppRole = "super_admin" | "systems_admin" | "user";
 
-const withTimeout = <T,>(p: Promise<T>, ms: number, label = "request_timeout"): Promise<T> =>
+const withTimeout = <T,>(p: PromiseLike<T>, ms: number, label = "request_timeout"): Promise<T> =>
   Promise.race([
-    p,
+    Promise.resolve(p),
     new Promise<T>((_, reject) => setTimeout(() => reject(new Error(label)), ms)),
   ]);
 
@@ -114,6 +114,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!navigator.onLine) return true;
     if (status && [400, 401, 403, 422].includes(status)) return false;
     return /failed to fetch|network|timeout|load failed|fetch failed|connection|offline/i.test(message);
+  };
+
+  const getStoredAuthSession = (): Session | null => {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || !/^sb-.*-auth-token/i.test(key)) continue;
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        const stored = parsed?.currentSession ?? parsed;
+        if (stored?.user?.id) return stored as Session;
+      }
+    } catch {
+      /* storage can be blocked in private mode */
+    }
+    return null;
   };
 
   const hydrateOfflineCredential = async (
@@ -267,9 +284,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           Promise.all([
             supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
             supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
-            supabase.auth.getUser(),
+            supabase.auth.getUser().catch(() => ({ data: { user: null }, error: null } as any)),
           ]),
-          12000,
+          7000,
           "profile_fetch_timeout",
         );
       } catch (timeoutErr) {
@@ -327,16 +344,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const isAdminRole =
             roleRes.data?.role === "super_admin" || roleRes.data?.role === "systems_admin";
           if (!isAdminRole) {
-            const [projAssign, formAssign] = await Promise.all([
-              supabase
-                .from("user_project_assignments")
-                .select("id", { count: "exact", head: true })
-                .eq("user_id", userId),
-              supabase
-                .from("user_form_assignments")
-                .select("id", { count: "exact", head: true })
-                .eq("user_id", userId),
-            ]);
+            const [projAssign, formAssign] = await withTimeout(
+              Promise.all([
+                supabase
+                  .from("user_project_assignments")
+                  .select("id", { count: "exact", head: true })
+                  .eq("user_id", userId),
+                supabase
+                  .from("user_form_assignments")
+                  .select("id", { count: "exact", head: true })
+                  .eq("user_id", userId),
+              ]),
+              6000,
+              "oauth_assignment_check_timeout",
+            ).catch(() => [{ count: 1 }, { count: 0 }] as any);
             const hasAssignment = (projAssign.count ?? 0) > 0 || (formAssign.count ?? 0) > 0;
             const isApprovedProfile = p.approval_status === "approved";
             if (!hasAssignment || !isApprovedProfile) {
@@ -415,13 +436,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Absolute safety net: no matter what stalls (getSession hanging, a wedged
     // network layer, a service worker intercepting the auth request), never
-    // leave the user staring at the boot spinner. After 15s force the gates
-    // open so the app renders and can route to /auth or the pending screen.
+    // leave the user staring at the boot spinner. Keep this short so the app
+    // paints quickly even on weak field connectivity.
     const bootWatchdog = setTimeout(() => {
+      const stored = getStoredAuthSession();
+      if (stored?.user) {
+        setSession(stored);
+        setUser(stored.user);
+        void fetchProfile(stored.user.id, { silent: true });
+      }
       setLoading(false);
       setProfileLoading(false);
       initialLoadDoneRef.current = true;
-    }, 15000);
+    }, 6500);
 
 
 
@@ -447,9 +474,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setTimeout(async () => {
             const recovered = await recoverFromCachedCredential("token_refresh_lost");
             if (!recovered) {
-              setUser(null);
-              setProfile(null);
-              setRole(null);
+              const stored = getStoredAuthSession();
+              if (stored?.user) {
+                setSession(stored);
+                setUser(stored.user);
+                void fetchProfile(stored.user.id, { silent: true });
+              } else {
+                setUser(null);
+                setProfile(null);
+                setRole(null);
+              }
             }
             setProfileLoading(false);
             setLoading(false);
@@ -495,7 +529,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // so boot always resolves and use the encrypted offline profile if available.
     withTimeout(
       supabase.auth.getSession(),
-      9000,
+      4500,
       "initial_session_timeout",
     ).then(async ({ data: { session: existingSession } }) => {
       initialSessionHandled = true;
@@ -529,6 +563,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const recovered = await recoverFromCachedCredential("initial_session_failed");
       if (recovered) {
         initialLoadDoneRef.current = true;
+        return;
+      }
+      const stored = getStoredAuthSession();
+      if (stored?.user) {
+        setSession(stored);
+        setUser(stored.user);
+        setProfileLoading(false);
+        setLoading(false);
+        initialLoadDoneRef.current = true;
+        void fetchProfile(stored.user.id, { silent: true });
         return;
       }
       setProfileLoading(false);
@@ -570,7 +614,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const t = setTimeout(() => {
       void warmCacheUserForms({ userId: user.id, isAdmin: isAdminRole, role });
       void prewarmBloombergOffline(user.id);
-    }, 1500);
+    }, 30000);
     return () => clearTimeout(t);
   }, [user?.id, isOfflineMode, role, profile?.is_owner, user?.email]);
 
@@ -707,8 +751,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         roleRes.data?.role === "systems_admin" ||
         profileRes.data?.is_owner === true ||
         email.toLowerCase() === "amehjoey1@gmail.com";
-      void warmCacheUserForms({ userId: data.user.id, isAdmin: isAdminRole, role: roleRes.data?.role });
-      void prewarmBloombergOffline(data.user.id);
+      window.setTimeout(() => {
+        void warmCacheUserForms({ userId: data.user.id, isAdmin: isAdminRole, role: roleRes.data?.role });
+        void prewarmBloombergOffline(data.user.id);
+      }, 30000);
     }
 
     return { error: error as Error | null };

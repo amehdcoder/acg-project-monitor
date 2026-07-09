@@ -216,15 +216,9 @@ const Index = () => {
 
   const renderContent = () => {
     const guardedPage = (pageId: string, component: JSX.Element) => {
-      // While access grants are still loading, show a spinner — never flash the Dashboard,
-      // which used to cause every guarded page to "blink" back to Dashboard on click.
-      if (loadingAccess) {
-        return (
-          <div className="flex h-96 items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        );
-      }
+      // Never block a page behind an endless access spinner. If a grant query is
+      // slow, render the normal access decision; explicit grants refresh in the
+      // background and the user can retry without the whole app freezing.
       if (canAccessPage(pageId)) return component;
       return (
         <div className="flex h-96 items-center justify-center p-6">
@@ -256,7 +250,7 @@ const Index = () => {
       case "supervisor": return isAdmin ? <SupervisorDashboard /> : guardedPage("__admin_only__", <></>);
       case "dashboard-builder": return isAdmin ? <AdminDashboardBuilder onBack={() => setActiveTab("dashboard")} /> : guardedPage("__admin_only__", <></>);
       case "dashboard-studio": return canEditDashboards ? <StudioLauncher onBack={() => setActiveTab("dashboard")} /> : guardedPage("__admin_only__", <></>);
-      case "forms": return <FormsView />;
+      case "forms": return <FormsView selectedProjectId={selectedProjectId} />;
       case "project-chat": return <AdhocProjectChatView />;
       case "my-submissions": return <SubmissionHistory onClose={() => setActiveTab("forms")} />;
       case "cases": return <CasesView />;

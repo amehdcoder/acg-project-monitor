@@ -133,7 +133,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
-import { warmCacheUserForms, warmCacheUserFormsDetailed } from "@/lib/offlineFormCache";
+import { warmCacheUserFormsDetailed } from "@/lib/offlineFormCache";
 import { startTimer } from "@/lib/metrics";
 import FormQRCode from "@/components/FormQRCode";
 import QRCodeScanner from "@/components/QRCodeScanner";
@@ -148,6 +148,7 @@ import { getOrCreateSingletonForm, insertToolFormsOnce } from "@/lib/mda/singlet
 import { FileSpreadsheet, KeyRound, GanttChartSquare, NotebookPen, Copy, EyeOff } from "lucide-react";
 import CopyMdaChecklistDialog from "@/components/MdaChecklist/CopyMdaChecklistDialog";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { withTimeoutFallback } from "@/lib/withTimeout";
 
 interface FormSettings {
   requireLocation?: boolean;
@@ -359,17 +360,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     let cancelled = false;
     (async () => {
       try {
-        const results = await Promise.all(
-          ids.map(async (id) => {
-            const { count } = await supabase
-              .from("form_submissions")
-              .select("id", { count: "exact", head: true })
-              .eq("form_id", id);
-            return [id, count ?? 0] as const;
-          }),
+        const { data } = await withTimeoutFallback(
+          supabase
+            .from("form_submissions")
+            .select("form_id")
+            .in("form_id", ids)
+            .limit(5000),
+          8000,
+          { data: [] } as any,
         );
         if (cancelled) return;
-        setSubmissionCounts(Object.fromEntries(results));
+        const counts: Record<string, number> = {};
+        ids.forEach((id) => { counts[id] = 0; });
+        (data || []).forEach((row: any) => { counts[row.form_id] = (counts[row.form_id] || 0) + 1; });
+        setSubmissionCounts(counts);
       } catch (e) {
         console.warn("Failed to load submission counts:", e);
       }
@@ -385,11 +389,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     if (!user?.id || isAdmin) { setStandardRestricted(false); return; }
     let cancelled = false;
     (async () => {
-      const { data } = await (supabase as any)
-        .from("standard_form_user_restrictions")
-        .select("user_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      const { data } = await withTimeoutFallback(
+        (supabase as any)
+          .from("standard_form_user_restrictions")
+          .select("user_id")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+        7000,
+        { data: null } as any,
+      );
       if (!cancelled) setStandardRestricted(!!data);
     })();
     return () => { cancelled = true; };
@@ -402,10 +410,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     if (!user?.id) return;
     let cancelled = false;
     (async () => {
-      const { data } = await (supabase as any)
-        .from("user_standard_form_assignments")
-        .select("form_code")
-        .eq("user_id", user.id);
+      const { data } = await withTimeoutFallback(
+        (supabase as any)
+          .from("user_standard_form_assignments")
+          .select("form_code")
+          .eq("user_id", user.id),
+        7000,
+        { data: [] } as any,
+      );
       if (!cancelled) setAssignedStandardCodes(new Set((data || []).map((r: any) => r.form_code)));
     })();
     return () => { cancelled = true; };
@@ -419,11 +431,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     if (!currentProjectId) { setCopyFeatureHidden(true); return; }
     let cancelled = false;
     (async () => {
-      const { data } = await (supabase as any)
-        .from("mda_checklist_copy_hidden")
-        .select("hidden")
-        .eq("project_id", currentProjectId)
-        .maybeSingle();
+      const { data } = await withTimeoutFallback(
+        (supabase as any)
+          .from("mda_checklist_copy_hidden")
+          .select("hidden")
+          .eq("project_id", currentProjectId)
+          .maybeSingle(),
+        7000,
+        { data: null } as any,
+      );
       if (!cancelled) setCopyFeatureHidden(data ? !!(data as any).hidden : true);
     })();
     return () => { cancelled = true; };
@@ -718,7 +734,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   useEffect(() => {
     let active = true;
     (async () => {
-      const { data } = await supabase.from("standard_form_disabled" as any).select("form_code");
+      const { data } = await withTimeoutFallback(
+        supabase.from("standard_form_disabled" as any).select("form_code"),
+        7000,
+        { data: [] } as any,
+      );
       if (active && data) {
         setDisabledStandardCodes(new Set((data as any[]).map((r) => r.form_code as StandardFormCode)));
       }
@@ -742,11 +762,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   useEffect(() => {
     const checkMicroplanAccess = async () => {
       if (!user?.id) return;
-      const { data } = await supabase
-        .from("microplan_form_access")
-        .select("id")
-        .eq("user_id", user.id)
-        .limit(1);
+      const { data } = await withTimeoutFallback(
+        supabase
+          .from("microplan_form_access")
+          .select("id")
+          .eq("user_id", user.id)
+          .limit(1),
+        7000,
+        { data: [] } as any,
+      );
       setHasMicroplanAccess(!!data && data.length > 0);
     };
     checkMicroplanAccess();

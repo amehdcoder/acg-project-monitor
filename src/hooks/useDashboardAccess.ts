@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { withTimeoutFallback } from "@/lib/withTimeout";
 
 export interface DashboardMeta {
   id: string;
@@ -55,13 +56,23 @@ export function useDashboardAccess() {
 
   const load = useCallback(async () => {
     if (!user?.id) { setGrants([]); setLoading(false); return; }
-    const { data } = await supabase
-      .from("dashboard_access")
-      .select("dashboard_id, project_id")
-      .eq("user_id", user.id);
+    const { data } = await withTimeoutFallback(
+      supabase
+        .from("dashboard_access")
+        .select("dashboard_id, project_id")
+        .eq("user_id", user.id),
+      8000,
+      { data: [] } as any,
+    );
     setGrants((data ?? []) as Grant[]);
     setLoading(false);
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!loading) return;
+    const t = setTimeout(() => setLoading(false), 9000);
+    return () => clearTimeout(t);
+  }, [loading]);
 
   useEffect(() => { void load(); }, [load]);
 

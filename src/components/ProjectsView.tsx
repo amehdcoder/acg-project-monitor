@@ -41,9 +41,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import { ProjectChatDialog } from "@/components/ProjectChat";
-import { useProjectUnreadCount } from "@/hooks/useProjectChat";
 import ProjectScopeSelector from "@/components/ProjectsView/ProjectScopeSelector";
 import { EMPTY_SCOPE, fetchProjectScope, type ProjectScope } from "@/lib/projectScope";
+import { withTimeoutFallback } from "@/lib/withTimeout";
 
 interface Project {
   id: string;
@@ -67,8 +67,6 @@ function ProjectChatButton({ projectId, projectName, onOpenChat }: {
   projectName: string;
   onOpenChat: (project: { id: string; name: string }) => void;
 }) {
-  const unreadCount = useProjectUnreadCount(projectId);
-  
   return (
     <Button
       variant="ghost"
@@ -78,11 +76,6 @@ function ProjectChatButton({ projectId, projectName, onOpenChat }: {
       title="Project Chat"
     >
       <MessageCircle className="h-5 w-5 text-primary" />
-      {unreadCount > 0 && (
-        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-medium">
-          {unreadCount > 99 ? "99+" : unreadCount}
-        </span>
-      )}
     </Button>
   );
 }
@@ -129,11 +122,15 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
     }
 
     const fetchForms = async () => {
-      const { data } = await supabase
-        .from("forms")
-        .select("id, name")
-        .eq("project_id", chatProject.id)
-        .order("name", { ascending: true });
+      const { data } = await withTimeoutFallback(
+        supabase
+          .from("forms")
+          .select("id, name")
+          .eq("project_id", chatProject.id)
+          .order("name", { ascending: true }),
+        7000,
+        { data: [] } as any,
+      );
       // The Geo-enabled Microplanning Entry form is a built-in tool (not a
       // forms-table row), so add it explicitly with a sentinel id so it can be
       // linked to a chat group like any other form.
@@ -154,28 +151,40 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       
       // Super admins see all projects; Systems admins only see assigned projects
       if (isSuperAdmin || isOwnerLevel) {
-        const { data, error } = await supabase
-          .from("projects")
-          .select("*")
-          .order("created_at", { ascending: false });
+        const { data, error } = await withTimeoutFallback(
+          supabase
+            .from("projects")
+            .select("*")
+            .order("created_at", { ascending: false }),
+          9000,
+          { data: [], error: null } as any,
+        );
         if (error) throw error;
         projectsData = data;
       } else if (role === "systems_admin") {
         // Systems admins see only projects they are assigned to
-        const { data: assignments, error: assignError } = await supabase
-          .from("user_project_assignments")
-          .select("project_id")
-          .eq("user_id", user?.id);
+        const { data: assignments, error: assignError } = await withTimeoutFallback(
+          supabase
+            .from("user_project_assignments")
+            .select("project_id")
+            .eq("user_id", user?.id),
+          8000,
+          { data: [], error: null } as any,
+        );
         
         if (assignError) throw assignError;
         
         if (assignments && assignments.length > 0) {
           const projectIds = assignments.map(a => a.project_id);
-          const { data, error } = await supabase
-            .from("projects")
-            .select("*")
-            .in("id", projectIds)
-            .order("created_at", { ascending: false });
+          const { data, error } = await withTimeoutFallback(
+            supabase
+              .from("projects")
+              .select("*")
+              .in("id", projectIds)
+              .order("created_at", { ascending: false }),
+            9000,
+            { data: [], error: null } as any,
+          );
           if (error) throw error;
           projectsData = data;
         } else {
@@ -183,20 +192,28 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
         }
       } else {
         // Regular users also only see assigned projects
-        const { data: assignments, error: assignError } = await supabase
-          .from("user_project_assignments")
-          .select("project_id")
-          .eq("user_id", user?.id);
+        const { data: assignments, error: assignError } = await withTimeoutFallback(
+          supabase
+            .from("user_project_assignments")
+            .select("project_id")
+            .eq("user_id", user?.id),
+          8000,
+          { data: [], error: null } as any,
+        );
         
         if (assignError) throw assignError;
         
         if (assignments && assignments.length > 0) {
           const projectIds = assignments.map(a => a.project_id);
-          const { data, error } = await supabase
-            .from("projects")
-            .select("*")
-            .in("id", projectIds)
-            .order("created_at", { ascending: false });
+          const { data, error } = await withTimeoutFallback(
+            supabase
+              .from("projects")
+              .select("*")
+              .in("id", projectIds)
+              .order("created_at", { ascending: false }),
+            9000,
+            { data: [], error: null } as any,
+          );
           if (error) throw error;
           projectsData = data;
         } else {
@@ -205,114 +222,45 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       }
 
       if (!projectsData) projectsData = [];
+      const baseProjects = (projectsData || []).map((project: Project) => ({
+        ...project,
+        forms_count: project.forms_count ?? 0,
+        members_count: project.members_count ?? 0,
+        entries_count: project.entries_count ?? 0,
+        recent_entries_count: project.recent_entries_count ?? 0,
+      }));
+      setProjects(baseProjects);
+      setLoading(false);
 
-      // Calculate date for recent submissions (last 30 days)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-      // Get detailed counts for each project
-      const projectsWithCounts = await Promise.all(
-        (projectsData || []).map(async (project) => {
-          // Get forms for this project
-          const { data: formsData } = await supabase
-            .from("forms")
-            .select("id")
-            .eq("project_id", project.id);
-          
-          const formIds = formsData?.map(f => f.id) || [];
-          
-          // Count unique members from BOTH direct project assignments and
-          // form assignments (a user counts once even if both exist).
-          const memberIds = new Set<string>();
-
-          const { data: projectAssignments } = await supabase
-            .from("user_project_assignments")
-            .select("user_id")
-            .eq("project_id", project.id);
-          (projectAssignments || []).forEach((a: any) => memberIds.add(a.user_id));
-
-          if (formIds.length > 0) {
-            const { data: formAssignments } = await supabase
-              .from("user_form_assignments")
-              .select("user_id")
-              .in("form_id", formIds);
-            (formAssignments || []).forEach((a: any) => memberIds.add(a.user_id));
-          }
-
-          const uniqueMembersCount = memberIds.size;
-
-          // Get submissions count and recent submissions
-          let entriesCount = 0;
-          let recentEntriesCount = 0;
-          let lastSubmissionAt: string | null = null;
-          let locationInfo: string | null = null;
-
-          if (formIds.length > 0) {
-            // Total submissions
-            const { count: totalCount } = await supabase
-              .from("form_submissions")
-              .select("id", { count: "exact" })
-              .in("form_id", formIds)
-              .eq("status", "sent");
-            
-            entriesCount = totalCount || 0;
-
-            // Recent submissions (last 30 days)
-            const { count: recentCount } = await supabase
-              .from("form_submissions")
-              .select("id", { count: "exact" })
-              .in("form_id", formIds)
-              .eq("status", "sent")
-              .gte("submitted_at", thirtyDaysAgo.toISOString());
-            
-            recentEntriesCount = recentCount || 0;
-
-            // Get most recent submission for date and location
-            const { data: latestSubmissions } = await supabase
-              .from("form_submissions")
-              .select("submitted_at, data, location")
-              .in("form_id", formIds)
-              .eq("status", "sent")
-              .order("submitted_at", { ascending: false })
-              .limit(1);
-
-            const latestSubmission = latestSubmissions?.[0];
-            if (latestSubmission) {
-              lastSubmissionAt = latestSubmission.submitted_at;
-              
-              // Try to extract location from form data (State, LGA, Ward)
-              const formData = latestSubmission.data as Record<string, any>;
-              const state = formData?.state || formData?.State;
-              const lga = formData?.lga || formData?.LGA;
-              const ward = formData?.ward || formData?.Ward;
-              const community = formData?.community || formData?.Community || formData?.settlement || formData?.Settlement;
-              
-              if (state || lga || ward || community) {
-                const locationParts = [state, lga, ward, community].filter(Boolean);
-                locationInfo = locationParts.slice(0, 2).join(", ");
-              } else if (latestSubmission.location) {
-                // Fall back to GPS coordinates display
-                const loc = latestSubmission.location as Record<string, any>;
-                if (loc.latitude && loc.longitude) {
-                  locationInfo = `${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}`;
-                }
-              }
-            }
-          }
-
-          return {
-            ...project,
-            forms_count: formIds.length,
-            members_count: uniqueMembersCount,
-            entries_count: entriesCount,
-            recent_entries_count: recentEntriesCount,
-            last_submission_at: lastSubmissionAt,
-            location_info: locationInfo,
-          };
-        })
-      );
-
-      setProjects(projectsWithCounts);
+      // Best-effort lightweight enrichment. The project list must remain usable
+      // even if analytics/count queries are slow during heavy traffic.
+      void (async () => {
+        const projectIds = baseProjects.map((p) => p.id);
+        if (projectIds.length === 0) return;
+        const [formsRes, membersRes] = await withTimeoutFallback(
+          Promise.all([
+            supabase.from("forms").select("id, project_id").in("project_id", projectIds),
+            supabase.from("user_project_assignments").select("project_id, user_id").in("project_id", projectIds),
+          ]),
+          8000,
+          [{ data: [] }, { data: [] }] as any,
+        );
+        const formRows = (formsRes.data || []) as Array<{ id: string; project_id: string }>;
+        const memberRows = (membersRes.data || []) as Array<{ project_id: string; user_id: string }>;
+        const formsByProject = new Map<string, number>();
+        formRows.forEach((f) => formsByProject.set(f.project_id, (formsByProject.get(f.project_id) || 0) + 1));
+        const membersByProject = new Map<string, Set<string>>();
+        memberRows.forEach((m) => {
+          const set = membersByProject.get(m.project_id) || new Set<string>();
+          set.add(m.user_id);
+          membersByProject.set(m.project_id, set);
+        });
+        setProjects((prev) => prev.map((p) => ({
+          ...p,
+          forms_count: formsByProject.get(p.id) ?? p.forms_count ?? 0,
+          members_count: membersByProject.get(p.id)?.size ?? p.members_count ?? 0,
+        })));
+      })();
     } catch (error: any) {
       console.error("Error fetching projects:", error);
       toast({
@@ -470,17 +418,6 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
     const colors = ["bg-green-500", "bg-blue-500", "bg-acg-gold", "bg-purple-500", "bg-pink-500"];
     return colors[index % colors.length];
   };
-
-  // Only show the full-screen spinner on the very FIRST load (when there is
-  // no cached project data yet). Subsequent re-fetches keep the previous list
-  // visible to avoid a perceived "blink" when navigating into this tab.
-  if (loading && projects.length === 0) {
-    return (
-      <div className="flex h-96 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
@@ -725,14 +662,16 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
         </Card>
       </div>
 
-      {filteredProjects.length === 0 && !loading && (
+      {filteredProjects.length === 0 && (
         <div className="flex h-48 flex-col items-center justify-center text-center">
           <FolderOpen className="h-12 w-12 text-muted-foreground/50" />
           <h2 className="mt-4 font-display text-lg font-semibold text-foreground">
-            No projects found
+            {loading ? "Loading projects…" : "No projects found"}
           </h2>
           <p className="mt-1 text-muted-foreground">
-            Create your first project to get started
+            {loading
+              ? "The page is ready; project data will appear as soon as the backend responds."
+              : "Create your first project to get started"}
           </p>
         </div>
       )}

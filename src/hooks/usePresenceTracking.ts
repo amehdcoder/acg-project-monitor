@@ -55,6 +55,9 @@ export function usePresenceTracking(enabled: boolean) {
       return;
     }
 
+    const initialSelf = buildSelf();
+    if (initialSelf) setCollaborators([initialSelf]);
+
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let cancelled = false;
 
@@ -83,6 +86,8 @@ export function usePresenceTracking(enabled: boolean) {
             flat.push(latest);
           }
         });
+        const self = buildSelf();
+        if (self && !seen.has(self.user_id)) flat.push(self);
         flat.sort((a, b) => a.name.localeCompare(b.name));
         setCollaborators(flat);
       };
@@ -94,7 +99,7 @@ export function usePresenceTracking(enabled: boolean) {
         .subscribe(async (status) => {
           if (status === "SUBSCRIBED") {
             const self = buildSelf();
-            if (self) await ch.track(self);
+            if (self) void ch.track(self).catch((err) => console.warn("[presence] track failed", err));
           }
         });
     });
@@ -114,7 +119,13 @@ export function usePresenceTracking(enabled: boolean) {
   useEffect(() => {
     if (!enabled || !channelRef.current) return;
     const self = buildSelf();
-    if (self) channelRef.current.track(self);
+    if (self) {
+      setCollaborators((prev) => {
+        const rest = prev.filter((c) => c.user_id !== self.user_id);
+        return [...rest, self].sort((a, b) => a.name.localeCompare(b.name));
+      });
+      void channelRef.current.track(self).catch((err) => console.warn("[presence] refresh failed", err));
+    }
   }, [enabled, buildSelf]);
 
   return { collaborators };

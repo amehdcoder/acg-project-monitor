@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { withTimeoutFallback } from "@/lib/withTimeout";
 
 interface UseDirectUnreadOptions {
   /** When true, show an in-app toast whenever a new 1:1 message arrives. */
@@ -24,7 +25,11 @@ export function useDirectUnread({ withToast = false }: UseDirectUnreadOptions = 
 
   const refetch = useCallback(async () => {
     if (!user?.id) return;
-    const { data, error } = await supabase.rpc("get_direct_unread_by_user");
+    const { data, error } = await withTimeoutFallback(
+      supabase.rpc("get_direct_unread_by_user"),
+      7000,
+      { data: [], error: null } as any,
+    );
     if (error || !data) return;
     const map: Record<string, number> = {};
     let sum = 0;
@@ -61,7 +66,7 @@ export function useDirectUnread({ withToast = false }: UseDirectUnreadOptions = 
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel(`direct-unread-${user.id}${withToast ? "-toast" : ""}`)
+      .channel(`direct-unread-${user.id}${withToast ? "-toast" : ""}-${Math.random().toString(36).slice(2, 8)}`)
       .on(
         "postgres_changes",
         {

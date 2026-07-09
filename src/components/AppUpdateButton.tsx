@@ -111,6 +111,11 @@ const AppUpdateButton = () => {
   const stamp = formatRelative(appliedAt);
   const busyLabel = statusText || "Updating…";
 
+  // In Lovable preview/iframe environments update checks can be noisy because
+  // the preview shell changes independently of the published app. Never show an
+  // app-level update button there; the published/PWA app still gets real update
+  // prompts from the version manifest.
+  if (shouldSkipServiceWorker) return null;
   if (!hasUpdate && !installing) return null;
 
   return (

@@ -8,6 +8,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { sealRecord } from "@/lib/deviceCrypto";
+import { withTimeoutFallback } from "@/lib/withTimeout";
 
 const DB_NAME = "acg_monitor_offline";
 const DB_VERSION = 4;
@@ -87,17 +88,25 @@ export const warmCacheUserFormsDetailed = async (ctx: WarmCacheCtx): Promise<War
 
     if (!ctx.isAdmin) {
       // Regular users: forms assigned directly + forms from assigned projects.
-      const [formAssign, projAssign, sarmaanAssign] = await Promise.all([
-        supabase.from("user_form_assignments").select("form_id").eq("user_id", ctx.userId),
-        supabase.from("user_project_assignments").select("project_id").eq("user_id", ctx.userId),
-        supabase.from("sarmaan_form_access" as any).select("form_id").eq("user_id", ctx.userId),
-      ]);
+      const [formAssign, projAssign, sarmaanAssign] = await withTimeoutFallback(
+        Promise.all([
+          supabase.from("user_form_assignments").select("form_id").eq("user_id", ctx.userId),
+          supabase.from("user_project_assignments").select("project_id").eq("user_id", ctx.userId),
+          supabase.from("sarmaan_form_access" as any).select("form_id").eq("user_id", ctx.userId),
+        ]),
+        9000,
+        [{ data: [] }, { data: [] }, { data: [] }] as any,
+      );
       const direct = (formAssign.data || []).map((a: any) => a.form_id);
       const sarmaan = ((sarmaanAssign.data as any[] | null) || []).map((a: any) => a.form_id);
       const projectIds = (projAssign.data || []).map((a: any) => a.project_id);
       let fromProjects: string[] = [];
       if (projectIds.length > 0) {
-        const { data } = await supabase.from("forms").select("id").in("project_id", projectIds);
+        const { data } = await withTimeoutFallback(
+          supabase.from("forms").select("id").in("project_id", projectIds),
+          9000,
+          { data: [] } as any,
+        );
         fromProjects = (data || []).map((f: any) => f.id);
       }
       formIds = [...new Set([...direct, ...sarmaan, ...fromProjects])];
@@ -106,7 +115,11 @@ export const warmCacheUserFormsDetailed = async (ctx: WarmCacheCtx): Promise<War
 
     let query = supabase.from("forms").select("*");
     if (formIds) query = query.in("id", formIds);
-    const { data: formsData, error } = await query;
+    const { data: formsData, error } = await withTimeoutFallback(
+      query,
+      12000,
+      { data: [], error: null } as any,
+    );
     if (error || !formsData) return empty;
 
     const db = await openDB();
