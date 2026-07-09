@@ -116,6 +116,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return /failed to fetch|network|timeout|load failed|fetch failed|connection|offline/i.test(message);
   };
 
+  const getStoredAuthSession = (): Session | null => {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || !/^sb-.*-auth-token/i.test(key)) continue;
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        const stored = parsed?.currentSession ?? parsed;
+        if (stored?.user?.id) return stored as Session;
+      }
+    } catch {
+      /* storage can be blocked in private mode */
+    }
+    return null;
+  };
+
   const hydrateOfflineCredential = async (
     cache: OfflineAuthCredential,
     reason: string,
@@ -267,9 +284,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           Promise.all([
             supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
             supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
-            supabase.auth.getUser(),
+            supabase.auth.getUser().catch(() => ({ data: { user: null }, error: null } as any)),
           ]),
-          12000,
+          7000,
           "profile_fetch_timeout",
         );
       } catch (timeoutErr) {
@@ -422,6 +439,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // leave the user staring at the boot spinner. Keep this short so the app
     // paints quickly even on weak field connectivity.
     const bootWatchdog = setTimeout(() => {
+      const stored = getStoredAuthSession();
+      if (stored?.user) {
+        setSession(stored);
+        setUser(stored.user);
+        void fetchProfile(stored.user.id, { silent: true });
+      }
       setLoading(false);
       setProfileLoading(false);
       initialLoadDoneRef.current = true;
@@ -451,9 +474,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setTimeout(async () => {
             const recovered = await recoverFromCachedCredential("token_refresh_lost");
             if (!recovered) {
-              setUser(null);
-              setProfile(null);
-              setRole(null);
+              const stored = getStoredAuthSession();
+              if (stored?.user) {
+                setSession(stored);
+                setUser(stored.user);
+                void fetchProfile(stored.user.id, { silent: true });
+              } else {
+                setUser(null);
+                setProfile(null);
+                setRole(null);
+              }
             }
             setProfileLoading(false);
             setLoading(false);
@@ -533,6 +563,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const recovered = await recoverFromCachedCredential("initial_session_failed");
       if (recovered) {
         initialLoadDoneRef.current = true;
+        return;
+      }
+      const stored = getStoredAuthSession();
+      if (stored?.user) {
+        setSession(stored);
+        setUser(stored.user);
+        setProfileLoading(false);
+        setLoading(false);
+        initialLoadDoneRef.current = true;
+        void fetchProfile(stored.user.id, { silent: true });
         return;
       }
       setProfileLoading(false);
