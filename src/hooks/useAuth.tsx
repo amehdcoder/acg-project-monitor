@@ -682,13 +682,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (!error && data.user) {
-      // Fetch profile to ensure we cache the latest data AND enforce deactivation
+      // Keep sign-in fast: auth success should navigate immediately. Profile /
+      // role hydration is also handled by the auth listener; this short best-
+      // effort read is only for deactivation enforcement and offline cache
+      // freshness, so it must never hold the login screen for a long time.
       const [profileRes, roleRes] = await withTimeout(
         Promise.all([
           supabase.from("profiles").select("*").eq("user_id", data.user.id).maybeSingle(),
           supabase.from("user_roles").select("role").eq("user_id", data.user.id).maybeSingle(),
         ]),
-        12000,
+        3500,
         "post_login_profile_timeout",
       ).catch(() => [{ data: null, error: null }, { data: null, error: null }] as any);
 
@@ -743,6 +746,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // A verified online login clears any offline brute-force lockout.
       void clearOfflineFailures(email);
       logOfflineEvent("login", { mode: "online", email });
+
+      // If the quick post-login profile read timed out, refresh it silently now
+      // that the UI is allowed to proceed. This avoids the "login forever" feel
+      // during backend congestion while still reconciling account status.
+      if (!profileRes.data) {
+        window.setTimeout(() => {
+          void fetchProfile(data.user.id, { silent: true });
+        }, 0);
+      }
 
       // Warm-cache this user's accessible forms so they can collect data offline
       // immediately, even without opening the Forms page while online.
