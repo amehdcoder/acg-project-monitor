@@ -278,15 +278,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // hard timeout so the app ALWAYS opens. On timeout we fall back to the
       // encrypted cached profile (if any) and keep the app usable, while a
       // silent background refresh reconciles once the network recovers.
-      let profileRes: any, roleRes: any, userRes: any;
+      let profileRes: any, roleRes: any;
       try {
-        [profileRes, roleRes, userRes] = await withTimeout(
+        [profileRes, roleRes] = await withTimeout(
           Promise.all([
             supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
             supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
-            supabase.auth.getUser().catch(() => ({ data: { user: null }, error: null } as any)),
           ]),
-          3500,
+          5000,
           "profile_fetch_timeout",
         );
       } catch (timeoutErr) {
@@ -305,8 +304,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-
-      const authUser = userRes.data?.user ?? null;
+      // Do NOT call auth.getUser() during app boot. On poor networks it can
+      // trigger a token-refresh fetch and hold Supabase's internal auth lock,
+      // which in turn blocks project/form queries and creates the apparent
+      // endless loading / empty projects issue. The locally restored session user
+      // is enough for profile enrichment; the auth listener reconciles later.
+      const authUser = session?.user ?? user ?? getStoredAuthSession()?.user ?? null;
       const isOAuth =
         (authUser?.app_metadata as any)?.provider === "google" ||
         (Array.isArray((authUser as any)?.identities) &&
