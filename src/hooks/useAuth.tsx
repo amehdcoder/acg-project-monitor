@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { warmCacheUserForms } from "@/lib/offlineFormCache";
 import { prewarmBloombergOffline } from "@/lib/bloomberg/offlineSchoolCache";
+import { prefetchProjects } from "@/lib/prefetchProjects";
 import { startTimer } from "@/lib/metrics";
 import {
   getLatestOfflineCredential,
@@ -635,6 +636,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, 30000);
     return () => clearTimeout(t);
   }, [user?.id, isOfflineMode, role, profile?.is_owner, user?.email]);
+
+  // Warm the projects cache right after sign-in / session restore so the Forms
+  // page "All projects" dropdown and the Projects grid render instantly from
+  // cache, then update in the background once the fresh read lands.
+  useEffect(() => {
+    if (!user?.id || isOfflineMode) return;
+    void prefetchProjects(user.id);
+  }, [user?.id, isOfflineMode]);
+
 
 
   const signInImpl = async (email: string, password: string) => {
