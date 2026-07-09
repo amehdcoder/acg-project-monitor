@@ -53,11 +53,43 @@ const AppUpdateButton = () => {
 
   const handleClick = async () => {
     if (installing) return;
-    // Single click = guaranteed install. Show feedback instantly so the control
-    // never feels frozen, then run the real update with a hard watchdog so a
-    // hung cache/probe can never leave the user stuck.
     setInstalling(true);
     setStatusText("Checking…");
+
+    // If there is no known update yet, make the button a fast, reliable manual
+    // check instead of hiding it. This keeps the header control visible and
+    // responsive in preview, published, and installed-app contexts.
+    if (!updateState.updateAvailable) {
+      try {
+        const next = await Promise.race([
+          checkForAppUpdate({ force: true, source: shouldSkipServiceWorker ? "html" : "version" }),
+          new Promise<ReturnType<typeof getAppUpdateState>>((resolve) =>
+            setTimeout(() => resolve(getAppUpdateState()), 2500),
+          ),
+        ]);
+        setUpdateState(next);
+        if (!next.updateAvailable) {
+          setStatusText("Latest");
+          window.setTimeout(() => {
+            setInstalling(false);
+            setStatusText(null);
+            setAppliedAt(getLastAppliedAt());
+          }, 900);
+          return;
+        }
+      } catch {
+        setStatusText("Retry");
+        window.setTimeout(() => {
+          setInstalling(false);
+          setStatusText(null);
+        }, 900);
+        return;
+      }
+    }
+
+    // Single click with a known update = guaranteed install. Show feedback
+    // instantly, then run the real update with a hard watchdog so a hung
+    // cache/probe can never leave the user stuck.
 
     // Watchdog: no matter what happens below (probe hang, cache API stall,
     // service-worker timeout), unregister any stale worker and force a
@@ -109,14 +141,7 @@ const AppUpdateButton = () => {
   const isBusy = installing || updateState.status === "updating";
   const hasUpdate = updateState.updateAvailable;
   const stamp = formatRelative(appliedAt);
-  const busyLabel = statusText || "Updating…";
-
-  // In Lovable preview/iframe environments update checks can be noisy because
-  // the preview shell changes independently of the published app. Never show an
-  // app-level update button there; the published/PWA app still gets real update
-  // prompts from the version manifest.
-  if (shouldSkipServiceWorker) return null;
-  if (!hasUpdate && !installing) return null;
+  const busyLabel = statusText || (hasUpdate ? "Updating…" : "Checking…");
 
   return (
     <Button
@@ -129,17 +154,17 @@ const AppUpdateButton = () => {
       aria-label={hasUpdate ? "A new version is available — tap to update" : stamp}
       title={hasUpdate ? "A new version is available — tap to update" : stamp}
     >
-      {hasUpdate ? (
-        <Sparkles className="h-4 w-4 shrink-0" />
-      ) : isBusy ? (
+      {isBusy ? (
         <RefreshCw className="h-4 w-4 shrink-0 animate-spin" />
+      ) : hasUpdate ? (
+        <Sparkles className="h-4 w-4 shrink-0" />
       ) : (
         <CheckCircle2 className="h-4 w-4 shrink-0" />
       )}
       {/* Always render a readable label so the control is fully visible on
           every Android width — no cryptic single-letter fallback. */}
       <span className="hidden sm:inline">
-        {isBusy ? busyLabel : hasUpdate ? "Update now" : stamp}
+        {isBusy ? busyLabel : hasUpdate ? "Update now" : "Update"}
       </span>
       <span className="sm:hidden">{isBusy ? "…" : hasUpdate ? "Update" : "Latest"}</span>
     </Button>
