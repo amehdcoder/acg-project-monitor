@@ -574,71 +574,81 @@ const FormSettings = ({
         </Card>
 
 
-        {/* Coverage Evaluation Survey 3D Mapping */}
+        {/* Repeat Household Coverage Survey (replaces the old 3D flow) */}
         <Card className="border-0 shadow-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 font-display">
-              <Boxes className="h-5 w-5 text-primary" />
-              Coverage Evaluation Survey (3D Mapping)
+              <ClipboardCheck className="h-5 w-5 text-primary" />
+              Repeat Household Coverage Survey
             </CardTitle>
             <CardDescription>
-              For MDA, ITN, immunization and other campaigns. Surveyors walk the village perimeter
-              once, then tap roofs in a 3D map to flag missed households with intervention commodities.
+              When this MDA supervisory checklist is submitted, the field user is guided into a
+              repeatable, household-by-household coverage &amp; quality survey for the same community.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/50">
               <div className="flex items-start gap-3">
-                <Boxes className="h-5 w-5 mt-0.5 text-muted-foreground" />
+                <ClipboardCheck className="h-5 w-5 mt-0.5 text-muted-foreground" />
                 <div>
                   <div className="flex items-center gap-2">
-                    <Label htmlFor="coverage-eval">Enable 3D Coverage Evaluation</Label>
+                    <Label htmlFor="household-survey">Enable Household Coverage Survey</Label>
                     <Tooltip>
                       <TooltipTrigger>
                         <Info className="h-3.5 w-3.5 text-muted-foreground" />
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs">
                         <p>
-                          Adds a "Capture Village in 3D" action to this form. Surveyors walk the
-                          perimeter with their camera, the app builds a tappable 3D map, and they
-                          mark missed households with color-coded roofs (green=covered, red=missed,
-                          yellow=refused, orange=revisit).
+                          After submitting the checklist, the user samples the number of households
+                          you set below, interviewing each one in turn. If they can't reach the
+                          target they must give a reason before submitting.
                         </p>
                       </TooltipContent>
                     </Tooltip>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Walk perimeter once → tap missed roofs during Coverage Evaluation
+                    Pops up automatically on checklist submission
                   </p>
-                  {settings.coverageEvaluation && (
-                    <Badge variant="outline" className="mt-2 text-purple-600 border-purple-300 bg-purple-50">
-                      3D mapping enabled
+                  {settings.householdSurvey && (
+                    <Badge variant="outline" className="mt-2 text-teal-600 border-teal-300 bg-teal-50">
+                      {settings.householdSampleSize ?? 10} households to sample
                     </Badge>
                   )}
                 </div>
               </div>
               <Switch
-                id="coverage-eval"
-                checked={settings.coverageEvaluation ?? false}
-                onCheckedChange={(value) => updateSetting("coverageEvaluation", value)}
+                id="household-survey"
+                checked={settings.householdSurvey ?? false}
+                onCheckedChange={(value) =>
+                  onSettingsChange({
+                    ...settings,
+                    householdSurvey: value,
+                    householdSampleSize: settings.householdSampleSize ?? 10,
+                  })
+                }
               />
             </div>
 
-            {settings.coverageEvaluation && (
+            {settings.householdSurvey && (
               <div className="space-y-2">
-                <Label htmlFor="campaign-type">Campaign Type</Label>
+                <Label htmlFor="household-sample">Households to sample &amp; interview</Label>
                 <Input
-                  id="campaign-type"
-                  value={settings.campaignType ?? ""}
-                  onChange={(e) => updateSetting("campaignType", e.target.value)}
-                  placeholder="e.g. MDA Ivermectin, ITN distribution, OPV immunization"
+                  id="household-sample"
+                  type="number"
+                  min={1}
+                  max={200}
+                  value={settings.householdSampleSize ?? 10}
+                  onChange={(e) =>
+                    updateSetting("householdSampleSize", Math.max(1, parseInt(e.target.value || "1", 10)))
+                  }
+                  placeholder="e.g. 10"
+                  className="max-w-[160px]"
                 />
                 <Alert>
-                  <Boxes className="h-4 w-4" />
+                  <ClipboardCheck className="h-4 w-4" />
                   <AlertDescription>
-                    Surveyors filling this form will see a "Open 3D Coverage Map" button. The 3D
-                    village mapping page is also available globally from <strong>Coverage Evaluation 3D</strong>{" "}
-                    in the sidebar.
+                    Field users must add households one after another until they reach this target.
+                    A reason is required if the target is not met.
                   </AlertDescription>
                 </Alert>
               </div>
