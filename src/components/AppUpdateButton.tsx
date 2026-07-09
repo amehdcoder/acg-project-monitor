@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { RefreshCw, Sparkles, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import {
   checkForAppUpdate,
@@ -55,6 +57,11 @@ const AppUpdateButton = () => {
     if (installing) return;
     setInstalling(true);
     setStatusText("Checking…");
+    // Optimistic UI: acknowledge the tap instantly, before any network work.
+    const optimisticId = toast.loading(
+      updateState.updateAvailable ? "Updating the app…" : "Checking for updates…",
+    );
+
 
     // If there is no known update yet, make the button a fast, reliable manual
     // check instead of hiding it. This keeps the header control visible and
@@ -70,6 +77,7 @@ const AppUpdateButton = () => {
         setUpdateState(next);
         if (!next.updateAvailable) {
           setStatusText("Latest");
+          toast.success("You're on the latest version", { id: optimisticId });
           window.setTimeout(() => {
             setInstalling(false);
             setStatusText(null);
@@ -77,8 +85,10 @@ const AppUpdateButton = () => {
           }, 900);
           return;
         }
+        toast.loading("New version found — updating…", { id: optimisticId });
       } catch {
         setStatusText("Retry");
+        toast.error("Couldn't check for updates — tap to retry", { id: optimisticId });
         window.setTimeout(() => {
           setInstalling(false);
           setStatusText(null);
@@ -86,6 +96,7 @@ const AppUpdateButton = () => {
         return;
       }
     }
+
 
     // Single click with a known update = guaranteed install. Show feedback
     // instantly, then run the real update with a hard watchdog so a hung
@@ -127,6 +138,8 @@ const AppUpdateButton = () => {
     try {
       await probeWithRetry();
       setStatusText("Applying…");
+      toast.loading("Applying update — reloading…", { id: optimisticId });
+
       await purgeServiceWorkers();
       await hardReloadToLatest();
     } catch {
@@ -150,7 +163,9 @@ const AppUpdateButton = () => {
       size="sm"
       onClick={handleClick}
       disabled={isBusy}
-      className="h-8 shrink-0 gap-1 px-2 text-xs font-bold shadow-glow whitespace-nowrap sm:px-3"
+      className={`h-9 shrink-0 gap-1.5 px-3 text-xs font-bold shadow-glow whitespace-nowrap sm:h-8 ${
+        hasUpdate ? "animate-pulse ring-2 ring-primary/40" : ""
+      }`}
       aria-label={hasUpdate ? "A new version is available — tap to update" : stamp}
       title={hasUpdate ? "A new version is available — tap to update" : stamp}
     >
@@ -162,13 +177,13 @@ const AppUpdateButton = () => {
         <CheckCircle2 className="h-4 w-4 shrink-0" />
       )}
       {/* Always render a readable label so the control is fully visible on
-          every Android width — no cryptic single-letter fallback. */}
-      <span className="hidden sm:inline">
+          every screen width — including small Android and iPhone widths. */}
+      <span>
         {isBusy ? busyLabel : hasUpdate ? "Update now" : "Update"}
       </span>
-      <span className="sm:hidden">{isBusy ? "…" : hasUpdate ? "Update" : "Latest"}</span>
     </Button>
   );
 };
+
 
 export default AppUpdateButton;
