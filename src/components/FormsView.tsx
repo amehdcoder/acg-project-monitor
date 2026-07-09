@@ -268,6 +268,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [forms, setForms] = useState<Form[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsLoadError, setProjectsLoadError] = useState<string | null>(null);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(selectedProjectId || null);
   const [rollupExporting, setRollupExporting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -340,6 +341,26 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showBulkAccess, setShowBulkAccess] = useState(false);
   const { user, profile, isAdmin, isSuperAdmin, isOwner, isOwnerLevel, role, isAdhoc, loading: authLoading } = useAuth();
   const { hasDashboardAccess } = useDashboardAccess();
+  const projectCacheKey = user?.id ? `amehnities:forms:projects:${user.id}` : null;
+
+  const readProjectCache = useCallback((): Project[] => {
+    if (!projectCacheKey) return [];
+    try {
+      const cached = JSON.parse(localStorage.getItem(projectCacheKey) || "[]");
+      return Array.isArray(cached) ? cached : [];
+    } catch {
+      return [];
+    }
+  }, [projectCacheKey]);
+
+  const writeProjectCache = useCallback((items: Project[]) => {
+    if (!projectCacheKey) return;
+    try {
+      localStorage.setItem(projectCacheKey, JSON.stringify(items));
+    } catch {
+      /* ignore storage failures */
+    }
+  }, [projectCacheKey]);
   const [assignedStandardCodes, setAssignedStandardCodes] = useState<Set<string>>(new Set());
   // Owner/Admin-only: exact submission count per form so the owner can tell at a
   // glance which checklists actually have data (and how much) without opening
@@ -781,6 +802,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   // queries ran while `role` was still null.
   useEffect(() => {
     if (authLoading) return;
+    const cached = readProjectCache();
+    if (cached.length > 0) setProjects(cached);
     fetchProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user?.id, role, isSuperAdmin, isOwnerLevel, isAdmin]);
@@ -869,48 +892,28 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   const fetchProjects = async () => {
     try {
-      let projectsData;
-      
-      // Super admins and owner-level users (Owner + Co-owner) see all projects;
-      // Systems admins only see assigned projects
-      if (isSuperAdmin || isOwnerLevel) {
-        const { data, error } = await withTimeout(supabase
+      // One policy-scoped query is the source of truth. The old role/assignment
+      // branching could execute before role hydration completed and leave admins
+      // with an empty dropdown until a hard refresh.
+      const { data, error } = await withTimeout(
+        supabase
           .from("projects")
           .select("id, name")
-          .order("name"), 9000, "projects_timeout");
-        if (error) throw error;
-        projectsData = data;
-      } else if (role === "systems_admin" || !isAdmin) {
-        // Systems admins and regular users see only assigned projects
-        const { data: assignments, error: assignError } = await withTimeout(supabase
-          .from("user_project_assignments")
-          .select("project_id")
-          .eq("user_id", user?.id), 9000, "project_assignments_timeout");
-        
-        if (assignError) throw assignError;
-        
-        if (assignments && assignments.length > 0) {
-          const projectIds = assignments.map(a => a.project_id);
-          const { data, error } = await withTimeout(supabase
-            .from("projects")
-            .select("id, name")
-            .in("id", projectIds)
-            .order("name"), 9000, "assigned_projects_timeout");
-          if (error) throw error;
-          projectsData = data;
-        } else {
-          projectsData = [];
-        }
-      } else {
-        projectsData = [];
-      }
-      
-      setProjects(projectsData || []);
+          .order("name"),
+        12000,
+        "projects_timeout",
+      );
+      if (error) throw error;
+
+      const nextProjects = data || [];
+      setProjects(nextProjects);
+      writeProjectCache(nextProjects);
+      setProjectsLoadError(null);
     } catch (error: any) {
       console.error("Error fetching projects:", error);
-      // Do not block the Forms page just because project names failed to load.
-      // Cached/offline forms below remain usable under All Projects.
-      setProjects((prev) => prev);
+      const cached = readProjectCache();
+      if (cached.length > 0) setProjects(cached);
+      setProjectsLoadError(error?.message || "Projects are temporarily unavailable");
     }
   };
 
