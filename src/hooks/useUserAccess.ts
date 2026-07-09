@@ -12,6 +12,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { withTimeoutFallback } from "@/lib/withTimeout";
+
 
 interface Grant {
   page_id: string;
