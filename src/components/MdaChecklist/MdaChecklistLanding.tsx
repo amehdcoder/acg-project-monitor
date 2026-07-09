@@ -813,7 +813,6 @@ export default function MdaChecklistLanding(props: MdaChecklistLandingProps) {
             const handleTileClick = () => {
               if (editingIcons) return triggerUpload(t.key);
               if (locked) return setHcsNoticeOpen(true);
-              if (isHcs) return setHcsNoticeOpen(true);
               setView(t.view);
             };
             return (
