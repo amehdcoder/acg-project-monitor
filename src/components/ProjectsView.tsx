@@ -43,7 +43,7 @@ import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import { ProjectChatDialog } from "@/components/ProjectChat";
 import ProjectScopeSelector from "@/components/ProjectsView/ProjectScopeSelector";
 import { EMPTY_SCOPE, fetchProjectScope, type ProjectScope } from "@/lib/projectScope";
-import { withTimeoutFallback } from "@/lib/withTimeout";
+import { withTimeout, withTimeoutFallback } from "@/lib/withTimeout";
 
 interface Project {
   id: string;
@@ -101,8 +101,30 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const [settingsProject, setSettingsProject] = useState<Project | null>(null);
   const [settingsForm, setSettingsForm] = useState<{ status: string }>({ status: "active" });
   const [savingSettings, setSavingSettings] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const { user, role, isSuperAdmin, isOwnerLevel, loading: authLoading } = useAuth();
   const { logAction } = useAdminSurveillance();
+
+  const projectCacheKey = user?.id ? `amehnities:projects:list:${user.id}` : null;
+
+  const readProjectCache = (): Project[] => {
+    if (!projectCacheKey) return [];
+    try {
+      const cached = JSON.parse(localStorage.getItem(projectCacheKey) || "[]");
+      return Array.isArray(cached) ? cached : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const writeProjectCache = (items: Project[]) => {
+    if (!projectCacheKey) return;
+    try {
+      localStorage.setItem(projectCacheKey, JSON.stringify(items));
+    } catch {
+      /* storage can be unavailable; network data still renders */
+    }
+  };
 
   // Wait for auth (role / owner status) to resolve before the first fetch and
   // re-fetch when it changes. Fetching on mount alone ran the query while
@@ -110,6 +132,11 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   // scoped to the assigned-only branch and see an empty project list.
   useEffect(() => {
     if (authLoading) return;
+    const cached = readProjectCache();
+    if (cached.length > 0) {
+      setProjects(cached);
+      setLoading(false);
+    }
     fetchProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user?.id, role, isSuperAdmin, isOwnerLevel]);
@@ -146,81 +173,23 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const fetchProjects = async () => {
     try {
       setLoading(true);
-      
-      let projectsData;
-      
-      // Super admins see all projects; Systems admins only see assigned projects
-      if (isSuperAdmin || isOwnerLevel) {
-        const { data, error } = await withTimeoutFallback(
-          supabase
-            .from("projects")
-            .select("*")
-            .order("created_at", { ascending: false }),
-          9000,
-          { data: [], error: null } as any,
-        );
-        if (error) throw error;
-        projectsData = data;
-      } else if (role === "systems_admin") {
-        // Systems admins see only projects they are assigned to
-        const { data: assignments, error: assignError } = await withTimeoutFallback(
-          supabase
-            .from("user_project_assignments")
-            .select("project_id")
-            .eq("user_id", user?.id),
-          8000,
-          { data: [], error: null } as any,
-        );
-        
-        if (assignError) throw assignError;
-        
-        if (assignments && assignments.length > 0) {
-          const projectIds = assignments.map(a => a.project_id);
-          const { data, error } = await withTimeoutFallback(
-            supabase
-              .from("projects")
-              .select("*")
-              .in("id", projectIds)
-              .order("created_at", { ascending: false }),
-            9000,
-            { data: [], error: null } as any,
-          );
-          if (error) throw error;
-          projectsData = data;
-        } else {
-          projectsData = [];
-        }
-      } else {
-        // Regular users also only see assigned projects
-        const { data: assignments, error: assignError } = await withTimeoutFallback(
-          supabase
-            .from("user_project_assignments")
-            .select("project_id")
-            .eq("user_id", user?.id),
-          8000,
-          { data: [], error: null } as any,
-        );
-        
-        if (assignError) throw assignError;
-        
-        if (assignments && assignments.length > 0) {
-          const projectIds = assignments.map(a => a.project_id);
-          const { data, error } = await withTimeoutFallback(
-            supabase
-              .from("projects")
-              .select("*")
-              .in("id", projectIds)
-              .order("created_at", { ascending: false }),
-            9000,
-            { data: [], error: null } as any,
-          );
-          if (error) throw error;
-          projectsData = data;
-        } else {
-          projectsData = [];
-        }
-      }
 
+      // Let backend access rules decide which projects this user can see. The
+      // previous client-side role branch could run while `role` was still null
+      // after a slow auth/profile refresh, incorrectly showing Super Admins an
+      // empty assigned-only project list. A single guarded projects query is both
+      // faster and more reliable under high activity.
+      const { data, error } = await withTimeout(
+        supabase
+          .from("projects")
+          .select("*")
+          .order("created_at", { ascending: false }),
+        12000,
+        "projects_timeout",
+      );
+      if (error) throw error;
+
+      let projectsData = data;
       if (!projectsData) projectsData = [];
       const baseProjects = (projectsData || []).map((project: Project) => ({
         ...project,
@@ -230,6 +199,8 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
         recent_entries_count: project.recent_entries_count ?? 0,
       }));
       setProjects(baseProjects);
+      writeProjectCache(baseProjects);
+      setLoadError(null);
       setLoading(false);
 
       // Best-effort lightweight enrichment. The project list must remain usable
@@ -263,9 +234,14 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       })();
     } catch (error: any) {
       console.error("Error fetching projects:", error);
+      const cached = readProjectCache();
+      if (cached.length > 0) {
+        setProjects(cached);
+      }
+      setLoadError(error?.message || "Project data is temporarily unavailable");
       toast({
         title: "Error loading projects",
-        description: error.message,
+        description: cached.length > 0 ? "Showing the last loaded project list while reconnecting." : error.message,
         variant: "destructive",
       });
     } finally {
@@ -666,11 +642,13 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
         <div className="flex h-48 flex-col items-center justify-center text-center">
           <FolderOpen className="h-12 w-12 text-muted-foreground/50" />
           <h2 className="mt-4 font-display text-lg font-semibold text-foreground">
-            {loading ? "Loading projects…" : "No projects found"}
+            {loading ? "Loading projects…" : loadError ? "Reconnecting to projects…" : "No projects found"}
           </h2>
           <p className="mt-1 text-muted-foreground">
             {loading
               ? "The page is ready; project data will appear as soon as the backend responds."
+              : loadError
+                ? "Your projects still exist; the app is retrying instead of replacing them with an empty list."
               : "Create your first project to get started"}
           </p>
         </div>

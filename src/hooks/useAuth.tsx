@@ -278,15 +278,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // hard timeout so the app ALWAYS opens. On timeout we fall back to the
       // encrypted cached profile (if any) and keep the app usable, while a
       // silent background refresh reconciles once the network recovers.
-      let profileRes: any, roleRes: any, userRes: any;
+      let profileRes: any, roleRes: any;
       try {
-        [profileRes, roleRes, userRes] = await withTimeout(
+        [profileRes, roleRes] = await withTimeout(
           Promise.all([
             supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
             supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
-            supabase.auth.getUser().catch(() => ({ data: { user: null }, error: null } as any)),
           ]),
-          7000,
+          5000,
           "profile_fetch_timeout",
         );
       } catch (timeoutErr) {
@@ -305,8 +304,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-
-      const authUser = userRes.data?.user ?? null;
+      // Do NOT call auth.getUser() during app boot. On poor networks it can
+      // trigger a token-refresh fetch and hold Supabase's internal auth lock,
+      // which in turn blocks project/form queries and creates the apparent
+      // endless loading / empty projects issue. The locally restored session user
+      // is enough for profile enrichment; the auth listener reconciles later.
+      const authUser = session?.user ?? user ?? getStoredAuthSession()?.user ?? null;
       const isOAuth =
         (authUser?.app_metadata as any)?.provider === "google" ||
         (Array.isArray((authUser as any)?.identities) &&
@@ -434,6 +437,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let initialSessionHandled = false;
 
+    // Paint the app immediately from the stored browser session, then reconcile
+    // with the live auth service in the background. This prevents a slow token
+    // refresh/profile read from holding the entire app on the boot spinner.
+    const bootStoredSession = getStoredAuthSession();
+    if (bootStoredSession?.user) {
+      setSession(bootStoredSession);
+      setUser(bootStoredSession.user);
+      setLoading(false);
+      setProfileLoading(false);
+      initialLoadDoneRef.current = true;
+      window.setTimeout(() => {
+        void fetchProfile(bootStoredSession.user.id, { silent: true });
+      }, 6000);
+    }
+
     // Absolute safety net: no matter what stalls (getSession hanging, a wedged
     // network layer, a service worker intercepting the auth request), never
     // leave the user staring at the boot spinner. Keep this short so the app
@@ -448,7 +466,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       setProfileLoading(false);
       initialLoadDoneRef.current = true;
-    }, 6500);
+    }, 3000);
 
 
 
@@ -529,7 +547,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // so boot always resolves and use the encrypted offline profile if available.
     withTimeout(
       supabase.auth.getSession(),
-      4500,
+      2500,
       "initial_session_timeout",
     ).then(async ({ data: { session: existingSession } }) => {
       initialSessionHandled = true;
@@ -682,13 +700,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (!error && data.user) {
-      // Fetch profile to ensure we cache the latest data AND enforce deactivation
+      // Keep sign-in fast: auth success should navigate immediately. Profile /
+      // role hydration is also handled by the auth listener; this short best-
+      // effort read is only for deactivation enforcement and offline cache
+      // freshness, so it must never hold the login screen for a long time.
       const [profileRes, roleRes] = await withTimeout(
         Promise.all([
           supabase.from("profiles").select("*").eq("user_id", data.user.id).maybeSingle(),
           supabase.from("user_roles").select("role").eq("user_id", data.user.id).maybeSingle(),
         ]),
-        12000,
+        3500,
         "post_login_profile_timeout",
       ).catch(() => [{ data: null, error: null }, { data: null, error: null }] as any);
 
@@ -743,6 +764,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // A verified online login clears any offline brute-force lockout.
       void clearOfflineFailures(email);
       logOfflineEvent("login", { mode: "online", email });
+
+      // If the quick post-login profile read timed out, refresh it silently now
+      // that the UI is allowed to proceed. This avoids the "login forever" feel
+      // during backend congestion while still reconciling account status.
+      if (!profileRes.data) {
+        window.setTimeout(() => {
+          void fetchProfile(data.user.id, { silent: true });
+        }, 0);
+      }
 
       // Warm-cache this user's accessible forms so they can collect data offline
       // immediately, even without opening the Forms page while online.
@@ -883,7 +913,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const isApproved = profile?.approval_status === "approved" || isOwner;
   const isPendingApproval = profile?.approval_status === "pending";
-  const isFullyLoaded = !loading && !profileLoading;
+  // The app shell should not be blocked by profile/role refreshes. Those can be
+  // slow under poor connectivity and are already reconciled in the background;
+  // pages that require profile details react when `profile` arrives.
+  const isFullyLoaded = !loading;
 
   return (
     <AuthContext.Provider
