@@ -7955,6 +7955,7 @@ export type Database = {
       is_co_owner: { Args: { _user_id: string }; Returns: boolean }
       is_email_deleted: { Args: { _email: string }; Returns: boolean }
       is_irf_admin: { Args: never; Returns: boolean }
+      is_mesh_room_member: { Args: { _room_id: string }; Returns: boolean }
       is_office_approver: {
         Args: { _role: string; _user_id: string }
         Returns: boolean
