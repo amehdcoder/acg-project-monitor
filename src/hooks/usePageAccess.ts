@@ -97,10 +97,12 @@ export const usePageAccess = () => {
       // spinner forever). On timeout we proceed with no extra grants — the user
       // still gets their always-on pages and can retry.
       const { data, error } = await withTimeoutFallback(
-        supabase.from("admin_page_access").select("page_id").eq("user_id", user.id),
+        (async () =>
+          await supabase.from("admin_page_access").select("page_id").eq("user_id", user.id))(),
         10000,
         { data: [], error: null } as any,
       );
+
 
       if (error) {
         console.error("Error fetching page access grants:", error);
