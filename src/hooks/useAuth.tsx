@@ -286,7 +286,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
             supabase.auth.getUser().catch(() => ({ data: { user: null }, error: null } as any)),
           ]),
-          7000,
+          3500,
           "profile_fetch_timeout",
         );
       } catch (timeoutErr) {
@@ -434,6 +434,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let initialSessionHandled = false;
 
+    // Paint the app immediately from the stored browser session, then reconcile
+    // with the live auth service in the background. This prevents a slow token
+    // refresh/profile read from holding the entire app on the boot spinner.
+    const bootStoredSession = getStoredAuthSession();
+    if (bootStoredSession?.user) {
+      setSession(bootStoredSession);
+      setUser(bootStoredSession.user);
+      setLoading(false);
+      setProfileLoading(false);
+      initialLoadDoneRef.current = true;
+      void fetchProfile(bootStoredSession.user.id, { silent: true });
+    }
+
     // Absolute safety net: no matter what stalls (getSession hanging, a wedged
     // network layer, a service worker intercepting the auth request), never
     // leave the user staring at the boot spinner. Keep this short so the app
@@ -448,7 +461,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       setProfileLoading(false);
       initialLoadDoneRef.current = true;
-    }, 6500);
+    }, 3000);
 
 
 
@@ -529,7 +542,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // so boot always resolves and use the encrypted offline profile if available.
     withTimeout(
       supabase.auth.getSession(),
-      4500,
+      2500,
       "initial_session_timeout",
     ).then(async ({ data: { session: existingSession } }) => {
       initialSessionHandled = true;
@@ -895,7 +908,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const isApproved = profile?.approval_status === "approved" || isOwner;
   const isPendingApproval = profile?.approval_status === "pending";
-  const isFullyLoaded = !loading && !profileLoading;
+  // The app shell should not be blocked by profile/role refreshes. Those can be
+  // slow under poor connectivity and are already reconciled in the background;
+  // pages that require profile details react when `profile` arrives.
+  const isFullyLoaded = !loading;
 
   return (
     <AuthContext.Provider
