@@ -99,7 +99,7 @@ const AppUpdateButton = () => {
     void watchdog;
   };
 
-  const isBusy = installing || updateState.status === "checking" || updateState.status === "updating";
+  const isBusy = installing || updateState.status === "updating";
   const hasUpdate = updateState.updateAvailable;
   const stamp = formatRelative(appliedAt);
   const busyLabel = statusText || "Updating…";
