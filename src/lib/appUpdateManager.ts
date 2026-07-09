@@ -178,14 +178,40 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
 
   try {
     const source = opts.source || "version";
-    const latestBuildId = (source === "html" ? await fetchHtmlBuildId() : await fetchVersionBuildId()) ||
-      (await fetchHtmlBuildId());
 
-    if (!latestBuildId) throw new Error("Unable to read latest app version");
+    // IMPORTANT: never mix probe sources. Comparing an HTML asset-hash against the
+    // compiled build id (CURRENT_BUILD_ID) can NEVER match, which used to flag a
+    // permanent, false "update available" (stuck banner + unresponsive button)
+    // whenever version.json was momentarily unreachable. Each source is now
+    // compared only against its own baseline.
+    let latestBuildId: string | null;
+    let currentBuildId: string;
 
-    const currentBuildId = source === "html" ? sessionStorage.getItem("app_html_build_id_v1") || latestBuildId : CURRENT_BUILD_ID;
-    if (source === "html" && !sessionStorage.getItem("app_html_build_id_v1")) {
-      sessionStorage.setItem("app_html_build_id_v1", latestBuildId);
+    if (source === "html") {
+      latestBuildId = await fetchHtmlBuildId();
+      // If the HTML probe genuinely fails, treat it as "unknown" and DO NOT flag
+      // an update — a transient network blip must never surface the banner.
+      if (!latestBuildId) {
+        setState({ lastCheckedAt: Date.now(), error: null });
+        return state;
+      }
+      currentBuildId = sessionStorage.getItem("app_html_build_id_v1") || latestBuildId;
+      if (!sessionStorage.getItem("app_html_build_id_v1")) {
+        sessionStorage.setItem("app_html_build_id_v1", latestBuildId);
+      }
+    } else {
+      latestBuildId = await fetchVersionBuildId();
+      // version.json unreachable → unknown, not "update available". Keep current
+      // state so the banner never appears on a false positive.
+      if (!latestBuildId) {
+        setState({
+          status: state.updateAvailable ? state.status : "current",
+          lastCheckedAt: Date.now(),
+          error: null,
+        });
+        return state;
+      }
+      currentBuildId = CURRENT_BUILD_ID;
     }
 
     const changed = latestBuildId !== currentBuildId;
