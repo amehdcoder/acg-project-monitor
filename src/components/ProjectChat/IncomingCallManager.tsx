@@ -6,15 +6,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { CallDialog } from "./CallDialog";
 import type { ChatGroup, ChatGroupMember } from "@/hooks/useProjectChat";
+import {
+  CALL_OVERLAY_Z_INDEX,
+  shouldRingForCall,
+  enqueueIncoming,
+  dequeueIncoming,
+  normalizeCallType,
+  type IncomingCallItem,
+} from "@/lib/calls/incomingCall";
 
-interface IncomingCall {
-  id: string; // active_calls row id
-  chatGroupId: string;
-  callType: "voice" | "video";
-  callerName: string;
-  callerAvatar: string | null;
-  groupName: string;
-}
+type IncomingCall = IncomingCallItem;
 
 interface ActiveCall {
   type: "voice" | "video";
@@ -116,16 +117,20 @@ export function IncomingCallManager() {
   // Shared ingest: turns a raw active_calls row into a ringing prompt (idempotent).
   const ingestCall = useCallback(
     async (call: Record<string, unknown> | null) => {
-      if (!call || !user?.id) return;
-      const callId = call.id as string;
-      if (!callId) return;
-      if (call.started_by === user.id || promptedRef.current.has(callId) || dismissedRef.current.has(callId)) return;
-      if (call.is_active === false) return;
-      // Ignore stale rows from previous, never-ended sessions.
-      const startedAt = call.started_at ? new Date(call.started_at as string).getTime() : Date.now();
-      if (Date.now() - startedAt > 10 * 60 * 1000) return;
-
-      const chatGroupId = call.chat_group_id as string;
+      if (!user?.id) return;
+      // Deterministic, unit-tested ring decision (own calls, dupes, declined,
+      // ended and stale rows are all filtered out here).
+      if (
+        !shouldRingForCall(call as any, {
+          currentUserId: user.id,
+          prompted: promptedRef.current,
+          dismissed: dismissedRef.current,
+        })
+      ) {
+        return;
+      }
+      const callId = call!.id as string;
+      const chatGroupId = call!.chat_group_id as string;
 
       // Only ring if the user is a member of the group.
       const { data: membership, error: membershipError } = await supabase
@@ -144,7 +149,7 @@ export function IncomingCallManager() {
         supabase
           .from("profiles")
           .select("first_name, last_name, avatar_url")
-          .eq("user_id", call.started_by as string)
+          .eq("user_id", call!.started_by as string)
           .maybeSingle(),
         supabase
           .from("chat_groups")
@@ -160,19 +165,14 @@ export function IncomingCallManager() {
       promptedRef.current.add(callId);
 
       setIncoming((prev) =>
-        prev.some((c) => c.id === callId)
-          ? prev
-          : [
-              ...prev,
-              {
-                id: callId,
-                chatGroupId,
-                callType: (call.call_type as "voice" | "video") || "voice",
-                callerName,
-                callerAvatar: callerRes.data?.avatar_url ?? null,
-                groupName: groupRes.data?.name || "Group call",
-              },
-            ]
+        enqueueIncoming(prev, {
+          id: callId,
+          chatGroupId,
+          callType: normalizeCallType(call!.call_type),
+          callerName,
+          callerAvatar: callerRes.data?.avatar_url ?? null,
+          groupName: groupRes.data?.name || "Group call",
+        })
       );
     },
     [user?.id]
@@ -245,13 +245,13 @@ export function IncomingCallManager() {
   const handleDecline = useCallback(() => {
     if (!current) return;
     dismissedRef.current.add(current.id);
-    setIncoming((prev) => prev.filter((c) => c.id !== current.id));
+    setIncoming((prev) => dequeueIncoming(prev, current.id));
   }, [current]);
 
   const handleAccept = useCallback(async () => {
     if (!current) return;
     const callToAnswer = current;
-    setIncoming((prev) => prev.filter((c) => c.id !== callToAnswer.id));
+    setIncoming((prev) => dequeueIncoming(prev, callToAnswer.id));
     stopRingtone();
 
     // Load the group + its members so the call UI is fully populated.
@@ -290,7 +290,10 @@ export function IncomingCallManager() {
     <>
       {/* Incoming call ringing overlay */}
       {current && !activeCall && (
-        <div className="fixed inset-0 z-[200] flex flex-col items-center justify-between bg-gradient-to-b from-card via-background to-card px-6 py-16 animate-in fade-in">
+        <div
+          style={{ zIndex: CALL_OVERLAY_Z_INDEX }}
+          className="fixed inset-0 flex flex-col items-center justify-between bg-gradient-to-b from-card via-background to-card px-6 py-16 animate-in fade-in"
+        >
           <div className="flex flex-col items-center gap-4 mt-8">
             <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">
               Incoming {current.callType === "video" ? "video" : "voice"} call

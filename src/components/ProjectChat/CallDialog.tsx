@@ -51,6 +51,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import type { ChatGroup, ChatGroupMember } from "@/hooks/useProjectChat";
 import { useWebRTCCall, type Participant } from "@/hooks/useWebRTCCall";
+import { computeVideoGridLayout } from "@/lib/calls/callLayout";
 import { useVirtualBackground } from "@/hooks/useVirtualBackground";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -833,7 +834,109 @@ function ParticipantActions({
   );
 }
 
-/** Video grid with local + remote participants */
+/** Local participant tile (used in grid and featured layouts) */
+function LocalTile({
+  localStream,
+  userName,
+  isMuted,
+  isVideoOff,
+  isScreenSharing,
+  isHandRaised,
+  compact = false,
+}: {
+  localStream: MediaStream | null;
+  userName: string;
+  isMuted: boolean;
+  isVideoOff: boolean;
+  isScreenSharing?: boolean;
+  isHandRaised: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <div className="relative rounded-lg overflow-hidden bg-muted border border-border w-full h-full transition-all duration-300 ease-out">
+      {localStream && (!isVideoOff || isScreenSharing) ? (
+        <LocalVideo stream={localStream} mirror={!isScreenSharing} />
+      ) : (
+        <div className="flex items-center justify-center h-full">
+          <Avatar className={compact ? "h-10 w-10" : "h-20 w-20"}>
+            <AvatarFallback className="bg-primary/20 text-primary text-xl">
+              {userName.slice(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        </div>
+      )}
+      <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-background/80 rounded-md px-2 py-1">
+        <span className="text-xs text-foreground font-medium truncate max-w-[100px]">
+          {isScreenSharing ? "You · Sharing" : "You"}
+        </span>
+        {isMuted && <MicOff className="h-3 w-3 text-destructive" />}
+        {isHandRaised && <Hand className="h-3 w-3 text-amber-500" />}
+      </div>
+      {isScreenSharing && (
+        <div className="absolute top-2 left-2 flex items-center gap-1 bg-primary text-primary-foreground rounded-md px-2 py-0.5">
+          <Monitor className="h-3 w-3" />
+          <span className="text-[10px] font-semibold">Screen</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Remote participant tile (used in grid and featured layouts) */
+function RemoteTile({
+  participant: p,
+  handRaisedUsers,
+  isHost,
+  onGrantScreenShare,
+  onRevokeScreenShare,
+}: {
+  participant: Participant;
+  handRaisedUsers: Map<string, string>;
+  isHost: boolean;
+  onGrantScreenShare: (id: string, name: string) => void;
+  onRevokeScreenShare: (id: string, name: string) => void;
+}) {
+  return (
+    <ParticipantActions
+      participant={p}
+      isHost={isHost}
+      onGrant={onGrantScreenShare}
+      onRevoke={onRevokeScreenShare}
+    >
+      <div className="relative rounded-lg overflow-hidden bg-muted border border-border w-full h-full transition-all duration-300 ease-out">
+        {p.stream && (!p.isVideoOff || p.isScreenSharing) ? (
+          <RemoteVideo stream={p.stream} contain={p.isScreenSharing} />
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <Avatar className="h-20 w-20">
+              <AvatarFallback className="bg-primary/20 text-primary text-xl">
+                {p.name.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            {/* Keep audio flowing even when this peer's video is off */}
+            {p.stream && <RemoteAudio stream={p.stream} />}
+          </div>
+        )}
+        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-background/80 rounded-md px-2 py-1">
+          <span className="text-xs text-foreground font-medium truncate max-w-[100px]">{p.name}</span>
+          {p.isMuted && <MicOff className="h-3 w-3 text-destructive" />}
+          {handRaisedUsers.has(p.id) && <Hand className="h-3 w-3 text-amber-500" />}
+        </div>
+        {p.isScreenSharing && (
+          <div className="absolute top-2 left-2 flex items-center gap-1 bg-primary text-primary-foreground rounded-md px-2 py-0.5">
+            <Monitor className="h-3 w-3" />
+            <span className="text-[10px] font-semibold">Screen</span>
+          </div>
+        )}
+        {p.isSpeaking && (
+          <div className="absolute inset-0 border-2 border-primary rounded-lg pointer-events-none" />
+        )}
+      </div>
+    </ParticipantActions>
+  );
+}
+
+/** Video grid with local + remote participants (WhatsApp-style responsive) */
 function VideoGrid({
   localStream,
   participants,
@@ -859,88 +962,63 @@ function VideoGrid({
   onGrantScreenShare: (id: string, name: string) => void;
   onRevokeScreenShare: (id: string, name: string) => void;
 }) {
-  const totalParticipants = participants.size + 1;
-  const gridCols = totalParticipants <= 1 ? 1 : totalParticipants <= 4 ? 2 : totalParticipants <= 9 ? 3 : 4;
+  const remotes = Array.from(participants.values());
+  const layout = computeVideoGridLayout(remotes.length + 1);
+
+  const localTile = (
+    <LocalTile
+      localStream={localStream}
+      userName={userName}
+      isMuted={isMuted}
+      isVideoOff={isVideoOff}
+      isScreenSharing={isScreenSharing}
+      isHandRaised={isHandRaised}
+    />
+  );
+
+  // 1:1 featured layout — remote peer full-bleed, local camera as a floating PiP.
+  if (layout.featured && remotes.length === 1) {
+    return (
+      <div className="relative h-full w-full transition-all duration-300 ease-out">
+        <RemoteTile
+          participant={remotes[0]}
+          handRaisedUsers={handRaisedUsers}
+          isHost={isHost}
+          onGrantScreenShare={onGrantScreenShare}
+          onRevokeScreenShare={onRevokeScreenShare}
+        />
+        <div className="absolute bottom-3 right-3 w-24 sm:w-40 aspect-[3/4] sm:aspect-video rounded-lg overflow-hidden shadow-xl ring-2 ring-background transition-all duration-300 ease-out">
+          <LocalTile
+            localStream={localStream}
+            userName={userName}
+            isMuted={isMuted}
+            isVideoOff={isVideoOff}
+            isScreenSharing={isScreenSharing}
+            isHandRaised={isHandRaised}
+            compact
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div
-      className="grid gap-2 h-full"
-      style={{
-        gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-        gridAutoRows: "1fr",
-      }}
-    >
-      {/* Local video */}
-      <div className="relative rounded-lg overflow-hidden bg-muted border border-border">
-        {localStream && (!isVideoOff || isScreenSharing) ? (
-          <LocalVideo stream={localStream} mirror={!isScreenSharing} />
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <Avatar className="h-20 w-20">
-              <AvatarFallback className="bg-primary/20 text-primary text-xl">
-                {userName.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-          </div>
-        )}
-        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-background/80 rounded-md px-2 py-1">
-          <span className="text-xs text-foreground font-medium truncate max-w-[100px]">
-            {isScreenSharing ? "You · Sharing" : "You"}
-          </span>
-          {isMuted && <MicOff className="h-3 w-3 text-destructive" />}
-          {isHandRaised && <Hand className="h-3 w-3 text-amber-500" />}
-        </div>
-        {isScreenSharing && (
-          <div className="absolute top-2 left-2 flex items-center gap-1 bg-primary text-primary-foreground rounded-md px-2 py-0.5">
-            <Monitor className="h-3 w-3" />
-            <span className="text-[10px] font-semibold">Screen</span>
-          </div>
-        )}
-      </div>
-
-      {/* Remote participants */}
-      {Array.from(participants.values()).map((p) => (
-        <ParticipantActions
+    <div className={`grid gap-2 h-full auto-rows-fr transition-all duration-300 ease-out ${layout.containerClass}`}>
+      {localTile}
+      {remotes.map((p) => (
+        <RemoteTile
           key={p.id}
           participant={p}
+          handRaisedUsers={handRaisedUsers}
           isHost={isHost}
-          onGrant={onGrantScreenShare}
-          onRevoke={onRevokeScreenShare}
-        >
-          <div className="relative rounded-lg overflow-hidden bg-muted border border-border">
-            {p.stream && (!p.isVideoOff || p.isScreenSharing) ? (
-              <RemoteVideo stream={p.stream} contain={p.isScreenSharing} />
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <Avatar className="h-20 w-20">
-                  <AvatarFallback className="bg-primary/20 text-primary text-xl">
-                    {p.name.slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                {/* Keep audio flowing even when this peer's video is off */}
-                {p.stream && <RemoteAudio stream={p.stream} />}
-              </div>
-            )}
-            <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-background/80 rounded-md px-2 py-1">
-              <span className="text-xs text-foreground font-medium truncate max-w-[100px]">{p.name}</span>
-              {p.isMuted && <MicOff className="h-3 w-3 text-destructive" />}
-              {handRaisedUsers.has(p.id) && <Hand className="h-3 w-3 text-amber-500" />}
-            </div>
-            {p.isScreenSharing && (
-              <div className="absolute top-2 left-2 flex items-center gap-1 bg-primary text-primary-foreground rounded-md px-2 py-0.5">
-                <Monitor className="h-3 w-3" />
-                <span className="text-[10px] font-semibold">Screen</span>
-              </div>
-            )}
-            {p.isSpeaking && (
-              <div className="absolute inset-0 border-2 border-primary rounded-lg pointer-events-none" />
-            )}
-          </div>
-        </ParticipantActions>
+          onGrantScreenShare={onGrantScreenShare}
+          onRevokeScreenShare={onRevokeScreenShare}
+        />
       ))}
     </div>
   );
 }
+
 
 /** Voice-only grid with avatar circles */
 function VoiceGrid({

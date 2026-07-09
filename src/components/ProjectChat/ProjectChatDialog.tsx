@@ -22,6 +22,7 @@ import { DirectChatView } from "./DirectChatView";
 import { MembersPanel } from "./MembersPanel";
 import { MessageSearch } from "./MessageSearch";
 import { CallDialog, ActiveCallBanner } from "./CallDialog";
+import { CallHistoryPanel } from "./CallHistoryPanel";
 import { GroupSettingsDialog } from "./GroupSettingsDialog";
 import { TypingIndicator, useTypingIndicator } from "./TypingIndicator";
 
@@ -170,6 +171,7 @@ export function ProjectChatDialog({
   const [showSearch, setShowSearch] = useState(false);
   const [callType, setCallType] = useState<"voice" | "video" | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCallHistory, setShowCallHistory] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -362,6 +364,7 @@ export function ProjectChatDialog({
                       onVoiceCall={() => setCallType("voice")}
                       onVideoCall={() => setCallType("video")}
                       onSettings={() => setShowSettings(true)}
+                      onCallHistory={() => setShowCallHistory(true)}
                       isAdmin={isAdmin}
                     />
                     <MessageSearch
@@ -527,6 +530,26 @@ export function ProjectChatDialog({
           onGroupDeleted={handleGroupDeleted}
         />
       )}
+
+      <Dialog open={showCallHistory} onOpenChange={setShowCallHistory}>
+        <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-4 py-3 border-b border-border">
+            <DialogTitle className="text-base">Call History</DialogTitle>
+          </DialogHeader>
+          <CallHistoryPanel
+            groups={chatGroups.map((g) => ({ id: g.id, name: g.name }))}
+            onAction={(groupId, ct) => {
+              const target = chatGroups.find((g) => g.id === groupId);
+              if (target) {
+                setSelectedDirect(null);
+                setSelectedGroup(target);
+                setCallType(ct);
+              }
+              setShowCallHistory(false);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
