@@ -57,6 +57,11 @@ const AppUpdateButton = () => {
     if (installing) return;
     setInstalling(true);
     setStatusText("Checking…");
+    // Optimistic UI: acknowledge the tap instantly, before any network work.
+    const optimisticId = toast.loading(
+      updateState.updateAvailable ? "Updating the app…" : "Checking for updates…",
+    );
+
 
     // If there is no known update yet, make the button a fast, reliable manual
     // check instead of hiding it. This keeps the header control visible and
