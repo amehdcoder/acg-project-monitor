@@ -4054,6 +4054,25 @@ const FormFiller = ({
         }}
       />
 
+      {/* Repeat Household Coverage Survey — full-screen, launched after an MDA
+          checklist submission. Replaces the old "Coverage Evaluation 3D" flow. */}
+      {householdSurveyCtx && (
+        <div className="fixed inset-0 z-[70] overflow-y-auto bg-background">
+          <RepeatHouseholdCoverageSurvey
+            projectId={projectId}
+            formId={formId}
+            checklistSubmissionId={householdSurveyCtx.submissionId}
+            targetHouseholds={householdSurveyCtx.target}
+            location={householdSurveyCtx.location}
+            initialGps={householdSurveyCtx.gps}
+            onClose={() => {
+              setHouseholdSurveyCtx(null);
+              onClose();
+            }}
+          />
+        </div>
+      )}
+
       {/* MDA → Coverage Evaluation 3D opt-in (shared post-submit flow) */}
       <AlertDialog open={showCoverageOptIn} onOpenChange={setShowCoverageOptIn}>
         <AlertDialogContent>
