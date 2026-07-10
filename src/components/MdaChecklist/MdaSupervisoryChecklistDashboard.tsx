@@ -395,6 +395,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   const [fState, setFState] = useState(ALL);
   const [fLga, setFLga] = useState(ALL);
   const [fWard, setFWard] = useState(ALL);
+  const [fCommunities, setFCommunities] = useState<string[]>([]);
   const [fStatus, setFStatus] = useState(ALL);
   const [fModule, setFModule] = useState(ALL);
   const [fFrom, setFFrom] = useState("");
