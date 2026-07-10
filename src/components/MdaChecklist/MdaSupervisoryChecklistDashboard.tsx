@@ -1345,21 +1345,16 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         )}
       </SectionErrorBoundary>
 
-      {/* ── Household coverage survey map (Coverage Evaluation 3D outcomes) ── */}
+      {/* ── Household coverage survey map (Repeat Household Coverage Survey outcomes) ── */}
       <SectionErrorBoundary label="Household coverage survey map">
-        <HouseholdCoverageSurveyMap
-          key={hcaReloadKey}
+        <HouseholdSurveyCoverageMap
           projectId={projectId}
           formName={formName}
-          linkedCommunityKeys={linkedCommunityKeys}
           stateFilter={fState === ALL ? null : fState}
-          defaultState={householdMapDefaultState}
           dateFrom={fFrom ? fFrom + "T00:00:00" : null}
           dateTo={fTo ? fTo + "T23:59:59" : null}
+          communityFilter={fCommunities}
           onSelectCommunity={openMapCommunityDrill}
-          onSelectLga={openMapLgaDrill}
-          onPointsLoaded={handleHcaPoints}
-          onLoadStateChange={handleHcaLoadState}
         />
       </SectionErrorBoundary>
 
