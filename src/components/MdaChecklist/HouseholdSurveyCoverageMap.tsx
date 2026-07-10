@@ -517,16 +517,16 @@ function GeoAnalysis({ a }: { a: any }) {
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-3">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${SLATE}1a`, color: SLATE }}>
+      <div className="flex items-center gap-2 border-b bg-muted/40 px-3 py-3 sm:px-4">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: `${SLATE}1a`, color: SLATE }}>
           <Sigma className="h-4 w-4" />
         </span>
-        <div>
+        <div className="min-w-0">
           <h3 className="text-sm font-semibold text-foreground">Geospatial Coverage Analysis</h3>
           <p className="text-[11px] text-muted-foreground">Where treatment reached households, how it is distributed in space, and where the gaps cluster.</p>
         </div>
       </div>
-      <CardContent className="space-y-4 p-4">
+      <CardContent className="space-y-4 p-3 sm:p-4">
         {/* KPI row */}
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           <div className="rounded-xl border border-border p-3" style={{ background: `linear-gradient(135deg, ${txV.c}12, transparent 70%)` }}>
