@@ -106,3 +106,94 @@ describe("markServiceWorkerUpdateAvailable (stale SW integration)", () => {
     expect(mgr.getAppUpdateState().updateAvailable).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// No self-initiated reload contract.
+//
+// Publishing a new build must NEVER refresh a user's tab on its own — that was
+// causing users to lose in-progress work. A newer build may only surface the
+// "Update" button (updateAvailable = true); the actual navigation happens
+// exclusively when the user taps it (hardReloadToLatest). These tests lock that
+// contract down so the auto-reload regression can never silently return.
+// ---------------------------------------------------------------------------
+describe("no automatic reload after a new build is published", () => {
+  let replaceSpy: ReturnType<typeof vi.fn>;
+  let originalLocation: Location;
+
+  beforeEach(() => {
+    vi.resetModules();
+    localStorage.clear();
+    sessionStorage.clear();
+    replaceSpy = vi.fn();
+    originalLocation = window.location;
+    // jsdom's location.replace is a no-op that warns; swap in a spy we can assert on.
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      writable: true,
+      value: { href: "http://app.example.com/", search: "", hostname: "app.example.com", replace: replaceSpy } as unknown as Location,
+    });
+    // Provide the browser caches / service-worker surfaces hardReloadToLatest touches.
+    vi.stubGlobal("caches", { keys: vi.fn(async () => []), delete: vi.fn(async () => true) });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, "location", { configurable: true, writable: true, value: originalLocation });
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  const mockNewerBuild = () =>
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (String(url).includes("version.json")) {
+          return { ok: true, json: async () => ({ buildId: "build-brand-new-777" }), text: async () => "" } as unknown as Response;
+        }
+        return { ok: true, json: async () => ({}), text: async () => "" } as unknown as Response;
+      }),
+    );
+
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it("detecting a newer build flags the banner but does NOT navigate", async () => {
+    mockNewerBuild();
+    // Auto-update enabled: even so, no reload may happen without a user tap.
+    localStorage.setItem("app_settings", JSON.stringify({ autoUpdateApp: true }));
+    const mgr = await import("@/lib/appUpdateManager");
+
+    await mgr.checkForAppUpdate({ force: true, source: "version" });
+    await flush();
+
+    const state = mgr.getAppUpdateState();
+    expect(state.updateAvailable).toBe(true);
+    expect(state.latestBuildId).toBe("build-brand-new-777");
+    expect(replaceSpy).not.toHaveBeenCalled();
+  });
+
+  it("polling that discovers a newer build never navigates on its own", async () => {
+    mockNewerBuild();
+    localStorage.setItem("app_settings", JSON.stringify({ autoUpdateApp: true }));
+    const mgr = await import("@/lib/appUpdateManager");
+
+    const stop = mgr.startAppUpdatePolling();
+    await flush();
+    await flush();
+    stop();
+
+    expect(replaceSpy).not.toHaveBeenCalled();
+  });
+
+  it("only an explicit user-triggered hardReloadToLatest navigates", async () => {
+    mockNewerBuild();
+    const mgr = await import("@/lib/appUpdateManager");
+
+    await mgr.checkForAppUpdate({ force: true, source: "version" });
+    await flush();
+    expect(replaceSpy).not.toHaveBeenCalled();
+
+    // Simulate the user tapping the "Update" button.
+    await mgr.hardReloadToLatest({ force: true });
+    expect(replaceSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
