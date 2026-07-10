@@ -8,10 +8,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Home, MapPin, Loader2, RotateCcw, AlertTriangle, Layers, Satellite,
   ShieldCheck, TrendingDown, TrendingUp, Target, Sigma, Crosshair, Radar,
+  Download, FileText, FileSpreadsheet, X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { exportDashboardPdf } from "@/lib/mda/dashboardPdf";
+import { toCsv, downloadCsv } from "@/lib/mda/csvExport";
 
 /**
  * Household Survey Coverage Map
@@ -137,6 +144,7 @@ export default function HouseholdSurveyCoverageMap({
   const lightRef = useRef<L.TileLayer | null>(null);
   const satRef = useRef<L.TileLayer | null>(null);
   const fittedRef = useRef(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const [rows, setRows] = useState<SurveyRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -144,6 +152,7 @@ export default function HouseholdSurveyCoverageMap({
   const [reloadKey, setReloadKey] = useState(0);
   const [basemap, setBasemap] = useState<"light" | "satellite">("light");
   const [show, setShow] = useState<{ treated: boolean; not: boolean }>({ treated: true, not: true });
+  const [exporting, setExporting] = useState(false);
 
   /* ── load survey rows ── */
   useEffect(() => {
@@ -330,11 +339,68 @@ export default function HouseholdSurveyCoverageMap({
 
   const a = analytics;
 
+  /* ── CSV export of the full geospatial analysis ── */
+  const exportCsv = () => {
+    try {
+      const hh = a.ci, tx = a.txCi;
+      const lines: (string | number)[][] = [];
+      const push = (...cells: (string | number)[]) => lines.push(cells);
+
+      push("Section", "Metric", "Value", "Detail");
+      push("Summary", "Households mapped", a.total, `${a.communities} communities`);
+      push("Summary", "Households treated", a.treated, `${hh.p.toFixed(1)}% (95% CI ${hh.lo.toFixed(1)}–${hh.hi.toFixed(1)}%)`);
+      push("Summary", "Households not treated", a.notTreated, "");
+      push("Summary", "Therapeutic coverage", `${tx.p.toFixed(1)}%`, `95% CI ${tx.lo.toFixed(1)}–${tx.hi.toFixed(1)}% · ${a.swallowed}/${a.offered} swallowed`);
+      push("Spatial", "Extent (km²)", a.extentKm2.toFixed(2), "");
+      push("Spatial", "Mean nearest-neighbour distance", a.meanNn < 1 ? `${(a.meanNn * 1000).toFixed(0)} m` : `${a.meanNn.toFixed(2)} km`, "");
+      if (a.centroid) push("Spatial", "Centroid", `${a.centroid.lat.toFixed(5)}, ${a.centroid.lng.toFixed(5)}`, "");
+      push("Spatial", "Households without valid GPS", a.badGps, "");
+      lines.push([]);
+
+      push("Cold-spots (mop-up targets)", "Community", "Coverage %", "Treated / Total");
+      if (a.coldSpots.length === 0) push("Cold-spots (mop-up targets)", "None below 50%", "", "");
+      for (const g of a.coldSpots) push("Cold-spot", `${g.label} · ${g.sub}`, g.cov.toFixed(0), `${g.treated}/${g.total}`);
+      lines.push([]);
+
+      push("Coverage by community (lowest first)", "Community", "Coverage %", "Treated / Total");
+      for (const g of a.geoRows) push("Community", `${g.label} · ${g.sub}`, g.cov.toFixed(0), `${g.treated}/${g.total}`);
+
+      downloadCsv(
+        `household-coverage-analysis-${new Date().toISOString().slice(0, 10)}`,
+        toCsv(lines[0].map(String), lines.slice(1)),
+      );
+      toast.success("Analysis exported as CSV");
+    } catch (e: any) {
+      toast.error("Failed to export CSV");
+    }
+  };
+
+  /* ── PDF export of the map + full analysis ── */
+  const exportPdf = async () => {
+    if (!rootRef.current) return;
+    setExporting(true);
+    toast.info("Preparing PDF…");
+    try {
+      await exportDashboardPdf(rootRef.current, {
+        title: "Household Coverage Survey — Geospatial Analysis",
+        subtitle: `${a.total} households · ${a.communities} communities`,
+        fileName: "household-coverage-analysis",
+      });
+      toast.success("Analysis exported as PDF");
+    } catch (e: any) {
+      toast.error("Failed to export PDF");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const legendFiltered = !show.treated || !show.not;
+
   return (
-    <div className="space-y-3">
+    <div ref={rootRef} className="space-y-3">
       {/* header */}
       <Card className="overflow-hidden">
-        <div className="flex flex-wrap items-center gap-2 border-b bg-gradient-to-r from-emerald-500/10 to-rose-500/10 p-4">
+        <div className="flex flex-wrap items-center gap-2 border-b bg-gradient-to-r from-emerald-500/10 to-rose-500/10 p-3 sm:p-4">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${GREEN}1a`, color: GREEN }}>
             <MapPin className="h-4 w-4" />
           </span>
@@ -344,20 +410,37 @@ export default function HouseholdSurveyCoverageMap({
               Every surveyed household plotted at its unique GPS — green where therapeutic coverage was achieved, red where it was not.
             </p>
           </div>
-          <div className="ml-auto flex items-center gap-1.5">
-            <Button variant={basemap === "light" ? "secondary" : "outline"} size="sm" className="h-8 px-2 text-xs" onClick={() => setBasemap("light")}>
+          <div className="ml-auto flex w-full flex-wrap items-center gap-1.5 sm:w-auto" data-pdf-exclude="true">
+            <Button variant={basemap === "light" ? "secondary" : "outline"} size="sm" className="h-8 flex-1 px-2 text-xs sm:flex-none" onClick={() => setBasemap("light")}>
               <Layers className="mr-1 h-3.5 w-3.5" /> Map
             </Button>
-            <Button variant={basemap === "satellite" ? "secondary" : "outline"} size="sm" className="h-8 px-2 text-xs" onClick={() => setBasemap("satellite")}>
+            <Button variant={basemap === "satellite" ? "secondary" : "outline"} size="sm" className="h-8 flex-1 px-2 text-xs sm:flex-none" onClick={() => setBasemap("satellite")}>
               <Satellite className="mr-1 h-3.5 w-3.5" /> Satellite
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 flex-1 px-2 text-xs sm:flex-none" disabled={exporting || a.total === 0}>
+                  {exporting ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1 h-3.5 w-3.5" />}
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={exportPdf}>
+                  <FileText className="mr-2 h-4 w-4" /> PDF (map + analysis)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportCsv}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" /> CSV (analysis data)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
         {/* legend / filter */}
-        <div className="flex flex-wrap items-center gap-2 px-4 py-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs sm:px-4">
           <button
             type="button" onClick={() => setShow((s) => ({ ...s, treated: !s.treated }))}
+            aria-pressed={show.treated}
             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition ${show.treated ? "border-transparent" : "opacity-40"}`}
             style={{ background: `${GREEN}14` }}
           >
@@ -366,12 +449,22 @@ export default function HouseholdSurveyCoverageMap({
           </button>
           <button
             type="button" onClick={() => setShow((s) => ({ ...s, not: !s.not }))}
+            aria-pressed={show.not}
             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition ${show.not ? "border-transparent" : "opacity-40"}`}
             style={{ background: `${RED}14` }}
           >
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: RED }} />
             Not treated <span className="font-semibold tabular-nums">{a.notTreated}</span>
           </button>
+          {legendFiltered && (
+            <button
+              type="button" onClick={() => setShow({ treated: true, not: true })}
+              className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-muted-foreground transition hover:text-foreground"
+              data-pdf-exclude="true"
+            >
+              <X className="h-3 w-3" /> Clear
+            </button>
+          )}
           <Badge variant="secondary" className="ml-auto text-[10px]">{a.total} households · {a.communities} communities</Badge>
         </div>
 
@@ -395,7 +488,7 @@ export default function HouseholdSurveyCoverageMap({
               No geolocated households in the Repeat Household Coverage Survey for this scope yet.
             </div>
           ) : (
-            <div ref={containerRef} className="h-[460px] w-full" style={{ background: "#eef2f6" }} />
+            <div ref={containerRef} className="h-[320px] w-full sm:h-[420px] lg:h-[460px]" style={{ background: "#eef2f6" }} />
           )}
         </div>
       </Card>
@@ -424,16 +517,16 @@ function GeoAnalysis({ a }: { a: any }) {
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-3">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${SLATE}1a`, color: SLATE }}>
+      <div className="flex items-center gap-2 border-b bg-muted/40 px-3 py-3 sm:px-4">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: `${SLATE}1a`, color: SLATE }}>
           <Sigma className="h-4 w-4" />
         </span>
-        <div>
+        <div className="min-w-0">
           <h3 className="text-sm font-semibold text-foreground">Geospatial Coverage Analysis</h3>
           <p className="text-[11px] text-muted-foreground">Where treatment reached households, how it is distributed in space, and where the gaps cluster.</p>
         </div>
       </div>
-      <CardContent className="space-y-4 p-4">
+      <CardContent className="space-y-4 p-3 sm:p-4">
         {/* KPI row */}
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           <div className="rounded-xl border border-border p-3" style={{ background: `linear-gradient(135deg, ${txV.c}12, transparent 70%)` }}>
