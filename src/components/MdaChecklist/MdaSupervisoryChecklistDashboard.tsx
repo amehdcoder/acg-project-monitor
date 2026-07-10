@@ -47,7 +47,7 @@ import { exportMdaDashboard } from "@/lib/mda/dashboardExport";
 import JigawaSupervisoryMap from "./JigawaSupervisoryMap";
 import FctSupervisoryMap from "./FctSupervisoryMap";
 import KanoSupervisoryMap from "./KanoSupervisoryMap";
-import HouseholdCoverageSurveyMap from "./HouseholdCoverageSurveyMap";
+import HouseholdSurveyCoverageMap from "./HouseholdSurveyCoverageMap";
 import { type HCAPoint } from "./HouseholdCoverageAnalysis";
 import RepeatHcsAnalysis from "./RepeatHcsAnalysis";
 import CommunityMultiSelect, { type CommunityOption } from "./CommunityMultiSelect";
