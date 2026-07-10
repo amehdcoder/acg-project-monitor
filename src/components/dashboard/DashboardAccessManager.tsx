@@ -71,6 +71,7 @@ export default function DashboardAccessManager({ open, onOpenChange, dashboardId
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [justGranted, setJustGranted] = useState<Set<string>>(new Set());
 
   const loadGrants = async () => {
     let q = supabase.from("dashboard_access").select("id, user_id, project_id").eq("dashboard_id", dashboardId);
