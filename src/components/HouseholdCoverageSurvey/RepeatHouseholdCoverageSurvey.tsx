@@ -79,7 +79,6 @@ interface HouseholdRecord {
   side_effects_detail: string;
   ae_reported: boolean;
   f1_asked_height: "yes" | "no" | "na" | "";
-  f2_finger_marked: "yes" | "no" | "dont_remember" | "";
   f3_satisfied: "very" | "satisfied" | "not" | "no_opinion" | "";
   f4_why: string;
   suggestions: string;
