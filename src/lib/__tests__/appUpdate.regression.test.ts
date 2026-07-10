@@ -130,7 +130,7 @@ describe("no automatic reload after a new build is published", () => {
     Object.defineProperty(window, "location", {
       configurable: true,
       writable: true,
-      value: { href: "http://localhost/", search: "", replace: replaceSpy } as unknown as Location,
+      value: { href: "http://app.example.com/", search: "", hostname: "app.example.com", replace: replaceSpy } as unknown as Location,
     });
     // Provide the browser caches / service-worker surfaces hardReloadToLatest touches.
     vi.stubGlobal("caches", { keys: vi.fn(async () => []), delete: vi.fn(async () => true) });
