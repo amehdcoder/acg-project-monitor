@@ -460,6 +460,29 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     return Array.from(new Set(pool.map((s) => pickGeo(s, "ward")).filter(Boolean))).sort();
   }, [submissions, fState, fLga]);
 
+  // Real community names available under the current State/LGA/Ward selection.
+  // Value = "state|lga|ward|community" identity so names that repeat across
+  // wards never collide. An empty `fCommunities` selection = all communities.
+  const communityOptions = useMemo<CommunityOption[]>(() => {
+    const pool = submissions.filter(
+      (s) =>
+        (fState === ALL || pickGeo(s, "state") === fState) &&
+        (fLga === ALL || pickGeo(s, "lga") === fLga) &&
+        (fWard === ALL || pickGeo(s, "ward") === fWard),
+    );
+    const map = new Map<string, CommunityOption>();
+    for (const s of pool) {
+      const name = pickGeo(s, "community");
+      if (!name) continue;
+      const st = pickGeo(s, "state"), lg = pickGeo(s, "lga"), wd = pickGeo(s, "ward");
+      const value = commIdentity(st, lg, wd, name);
+      if (!map.has(value)) {
+        map.set(value, { value, label: name, sub: [wd, lg, st].filter(Boolean).join(" · ") });
+      }
+    }
+    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
+  }, [submissions, fState, fLga, fWard]);
+
   // ── Apply geography / status / date / search filters to raw rows ──
   const filtered = useMemo(() => {
     const q = norm(search);
