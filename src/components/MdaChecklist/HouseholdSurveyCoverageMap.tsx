@@ -144,6 +144,7 @@ export default function HouseholdSurveyCoverageMap({
   const clusterRef = useRef<any>(null);
   const lightRef = useRef<L.TileLayer | null>(null);
   const satRef = useRef<L.TileLayer | null>(null);
+  const boundaryRef = useRef<L.GeoJSON | null>(null);
   const fittedRef = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
