@@ -50,6 +50,7 @@ import KanoSupervisoryMap from "./KanoSupervisoryMap";
 import HouseholdCoverageSurveyMap from "./HouseholdCoverageSurveyMap";
 import { type HCAPoint } from "./HouseholdCoverageAnalysis";
 import RepeatHcsAnalysis from "./RepeatHcsAnalysis";
+import CommunityMultiSelect, { type CommunityOption } from "./CommunityMultiSelect";
 import SupervisorSignatureGallery from "./SupervisorSignatureGallery";
 import SectionErrorBoundary from "./SectionErrorBoundary";
 import MdaAdvancedAnalyses from "./MdaAdvancedAnalyses";
