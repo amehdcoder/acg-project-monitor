@@ -111,10 +111,15 @@ export default defineConfig(({ mode }) => {
         globPatterns: ["**/*.{js,css,ico,png,svg,woff2,html}"],
         maximumFileSizeToCacheInBytes: 16 * 1024 * 1024, // 16 MiB
         navigateFallbackDenylist: [/^\/~oauth/],
-        // Always activate the new service worker immediately and take control
-        // of all open tabs so users never see a stale (e.g. old green-bg) build.
-        skipWaiting: true,
-        clientsClaim: true,
+        // Do NOT let a freshly published service worker take over on its own.
+        // skipWaiting/clientsClaim would activate the new SW immediately, purge
+        // the outdated precache (old chunk hashes) and cause the running tab to
+        // hit chunk-load failures → an involuntary reload that destroys the
+        // user's in-progress work. Instead the new SW stays in "waiting" until
+        // the user taps "Update" (updateServiceWorker(true) → SKIP_WAITING),
+        // guaranteeing no self-initiated refresh on publish.
+        skipWaiting: false,
+        clientsClaim: false,
         cleanupOutdatedCaches: true,
         navigateFallback: "index.html",
         runtimeCaching: [
