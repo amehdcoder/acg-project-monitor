@@ -47,9 +47,10 @@ import { exportMdaDashboard } from "@/lib/mda/dashboardExport";
 import JigawaSupervisoryMap from "./JigawaSupervisoryMap";
 import FctSupervisoryMap from "./FctSupervisoryMap";
 import KanoSupervisoryMap from "./KanoSupervisoryMap";
-import HouseholdCoverageSurveyMap from "./HouseholdCoverageSurveyMap";
+import HouseholdSurveyCoverageMap from "./HouseholdSurveyCoverageMap";
 import { type HCAPoint } from "./HouseholdCoverageAnalysis";
 import RepeatHcsAnalysis from "./RepeatHcsAnalysis";
+import CommunityMultiSelect, { type CommunityOption } from "./CommunityMultiSelect";
 import SupervisorSignatureGallery from "./SupervisorSignatureGallery";
 import SectionErrorBoundary from "./SectionErrorBoundary";
 import MdaAdvancedAnalyses from "./MdaAdvancedAnalyses";
@@ -104,6 +105,9 @@ const SLATE = "#64748b";
 // ───────────────────────── Helpers ─────────────────────────
 const stripTags = (s?: string) => String(s || "").replace(/<[^>]*>/g, "").trim();
 const norm = (v: any) => String(v ?? "").trim().toLowerCase();
+/** Stable "state|lga|ward|community" identity for community-level filtering. */
+const commIdentity = (state?: string, lga?: string, ward?: string, community?: string) =>
+  [norm(state), norm(lga), norm(ward), norm(community)].join("|");
 const POSITIVE = new Set(["yes", "true", "1", "available", "present", "good", "done", "complete", "completed", "compliant", "adequate", "trained", "passed", "okay"]);
 const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
 const fmt = (n: number) => n.toLocaleString();
@@ -394,6 +398,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   const [fState, setFState] = useState(ALL);
   const [fLga, setFLga] = useState(ALL);
   const [fWard, setFWard] = useState(ALL);
+  const [fCommunities, setFCommunities] = useState<string[]>([]);
   const [fStatus, setFStatus] = useState(ALL);
   const [fModule, setFModule] = useState(ALL);
   const [fFrom, setFFrom] = useState("");
@@ -458,6 +463,29 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     return Array.from(new Set(pool.map((s) => pickGeo(s, "ward")).filter(Boolean))).sort();
   }, [submissions, fState, fLga]);
 
+  // Real community names available under the current State/LGA/Ward selection.
+  // Value = "state|lga|ward|community" identity so names that repeat across
+  // wards never collide. An empty `fCommunities` selection = all communities.
+  const communityOptions = useMemo<CommunityOption[]>(() => {
+    const pool = submissions.filter(
+      (s) =>
+        (fState === ALL || pickGeo(s, "state") === fState) &&
+        (fLga === ALL || pickGeo(s, "lga") === fLga) &&
+        (fWard === ALL || pickGeo(s, "ward") === fWard),
+    );
+    const map = new Map<string, CommunityOption>();
+    for (const s of pool) {
+      const name = pickGeo(s, "community");
+      if (!name) continue;
+      const st = pickGeo(s, "state"), lg = pickGeo(s, "lga"), wd = pickGeo(s, "ward");
+      const value = commIdentity(st, lg, wd, name);
+      if (!map.has(value)) {
+        map.set(value, { value, label: name, sub: [wd, lg, st].filter(Boolean).join(" · ") });
+      }
+    }
+    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
+  }, [submissions, fState, fLga, fWard]);
+
   // ── Apply geography / status / date / search filters to raw rows ──
   const filtered = useMemo(() => {
     const q = norm(search);
@@ -467,6 +495,10 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       if (fState !== ALL && pickGeo(s, "state") !== fState) return false;
       if (fLga !== ALL && pickGeo(s, "lga") !== fLga) return false;
       if (fWard !== ALL && pickGeo(s, "ward") !== fWard) return false;
+      if (fCommunities.length > 0) {
+        const id = commIdentity(pickGeo(s, "state"), pickGeo(s, "lga"), pickGeo(s, "ward"), pickGeo(s, "community"));
+        if (!fCommunities.includes(id)) return false;
+      }
       if (fStatus !== ALL && norm(s.status) !== fStatus) return false;
       if (fromTs || toTs) {
         const t = s.submittedAt ? new Date(s.submittedAt).getTime() : null;
@@ -483,7 +515,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       }
       return true;
     });
-  }, [submissions, fState, fLga, fWard, fStatus, fFrom, fTo, search]);
+  }, [submissions, fState, fLga, fWard, fCommunities, fStatus, fFrom, fTo, search]);
 
   // Normalized submissions for the plain-language narrative engine.
   const narrativeSubs = useMemo(
@@ -658,9 +690,9 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
 
 
   const filtersActive =
-    fState !== ALL || fLga !== ALL || fWard !== ALL || fStatus !== ALL || fModule !== ALL || !!fFrom || !!fTo || !!search;
+    fState !== ALL || fLga !== ALL || fWard !== ALL || fCommunities.length > 0 || fStatus !== ALL || fModule !== ALL || !!fFrom || !!fTo || !!search;
   const resetFilters = () => {
-    setFState(ALL); setFLga(ALL); setFWard(ALL); setFStatus(ALL); setFModule(ALL);
+    setFState(ALL); setFLga(ALL); setFWard(ALL); setFCommunities([]); setFStatus(ALL); setFModule(ALL);
     setFFrom(""); setFTo(""); setSearch("");
   };
 
@@ -1039,27 +1071,33 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
             )}
           </div>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
-            <Select value={fState} onValueChange={(v) => { setFState(v); setFLga(ALL); setFWard(ALL); }}>
+            <Select value={fState} onValueChange={(v) => { setFState(v); setFLga(ALL); setFWard(ALL); setFCommunities([]); }}>
               <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="State" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All states</SelectItem>
                 {states.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={fLga} onValueChange={(v) => { setFLga(v); setFWard(ALL); }}>
+            <Select value={fLga} onValueChange={(v) => { setFLga(v); setFWard(ALL); setFCommunities([]); }}>
               <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="LGA" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All LGAs</SelectItem>
                 {lgas.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={fWard} onValueChange={setFWard}>
+            <Select value={fWard} onValueChange={(v) => { setFWard(v); setFCommunities([]); }}>
               <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Ward" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All wards</SelectItem>
                 {wards.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
+            <CommunityMultiSelect
+              options={communityOptions}
+              selected={fCommunities}
+              onChange={setFCommunities}
+              placeholder="All communities"
+            />
             <Select value={fStatus} onValueChange={setFStatus}>
               <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
@@ -1307,21 +1345,16 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         )}
       </SectionErrorBoundary>
 
-      {/* ── Household coverage survey map (Coverage Evaluation 3D outcomes) ── */}
+      {/* ── Household coverage survey map (Repeat Household Coverage Survey outcomes) ── */}
       <SectionErrorBoundary label="Household coverage survey map">
-        <HouseholdCoverageSurveyMap
-          key={hcaReloadKey}
+        <HouseholdSurveyCoverageMap
           projectId={projectId}
           formName={formName}
-          linkedCommunityKeys={linkedCommunityKeys}
           stateFilter={fState === ALL ? null : fState}
-          defaultState={householdMapDefaultState}
           dateFrom={fFrom ? fFrom + "T00:00:00" : null}
           dateTo={fTo ? fTo + "T23:59:59" : null}
+          communityFilter={fCommunities}
           onSelectCommunity={openMapCommunityDrill}
-          onSelectLga={openMapLgaDrill}
-          onPointsLoaded={handleHcaPoints}
-          onLoadStateChange={handleHcaLoadState}
         />
       </SectionErrorBoundary>
 
