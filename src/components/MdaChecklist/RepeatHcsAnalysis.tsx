@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { testAgainstBenchmark, type BenchmarkTest } from "@/lib/ces/coverageStats";
+import MdaCoverageMatrix from "./MdaCoverageMatrix";
 
 /* ─────────────────────────── palette ─────────────────────────── */
 const EMERALD = "#10b981";
@@ -317,7 +318,21 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
       reach: Math.round(pct(r.cddYes, r.households) * 10) / 10,
     }));
 
+    // Households sampled per community (colourful read-out).
+    const commMap = new Map<string, { label: string; sub: string; count: number }>();
+    for (const s of rows) {
+      const key = `${norm(s.state)}|${norm(s.lga)}|${norm(s.community_name)}`;
+      let c = commMap.get(key);
+      if (!c) {
+        c = { label: s.community_name || "Unspecified", sub: `${s.ward || "—"} · ${s.lga || "—"}`, count: 0 };
+        commMap.set(key, c);
+      }
+      c.count += (s.households || []).length;
+    }
+    const communitySampled = [...commMap.values()].sort((a, b) => b.count - a.count);
+
     return {
+      communitySampled,
       totalSurveys: rows.length, totalHh, cddYes, treatedYes, offered, swallowed,
       reachPct: pct(cddYes, totalHh), txPct: pct(swallowed, offered), treatPct: pct(treatedYes, totalHh),
       txTest, hhTest, satisfaction, height, sideEffects, cdd,
@@ -490,6 +505,46 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
           </table>
         </div>
       </Section>
+
+      {/* Full ward-level coverage matrix (LGA × Ward) */}
+      <MdaCoverageMatrix surveys={rows as any} txTarget={txBenchmark} />
+
+      {/* Households sampled per community */}
+      <Section title="Households Sampled per Community" icon={Home} tint={TEAL} badge={`${a.communitySampled.length} communities`}>
+        <div className="pt-3">
+          {a.communitySampled.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground">No communities captured yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {a.communitySampled.map((c, i) => {
+                const max = a.communitySampled[0]?.count || 1;
+                const p = pct(c.count, max);
+                const tint = [TEAL, BLUE, EMERALD, PURPLE, AMBER][i % 5];
+                return (
+                  <div key={`${c.label}-${i}`} className="rounded-lg border border-border/60 p-2.5"
+                    style={{ background: `linear-gradient(135deg, ${tint}0d, transparent 70%)` }}>
+                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                      <span className="min-w-0">
+                        <span className="font-semibold text-foreground">{c.label}</span>
+                        <span className="ml-1.5 text-muted-foreground">{c.sub}</span>
+                      </span>
+                      <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
+                        style={{ background: `${tint}1a`, color: tint }}>
+                        {c.count.toLocaleString()} HH
+                      </span>
+                    </div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full" style={{ width: `${Math.max(4, p)}%`, background: tint }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </Section>
+
+
 
       {/* Question distributions */}
       <Section title="Survey Question Read-out" icon={Activity} tint={PURPLE}>

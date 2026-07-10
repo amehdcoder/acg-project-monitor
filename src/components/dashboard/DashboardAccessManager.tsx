@@ -184,25 +184,26 @@ export default function DashboardAccessManager({ open, onOpenChange, dashboardId
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90dvh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-lg w-[calc(100vw-1.5rem)] max-h-[90dvh] overflow-hidden flex flex-col p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> Grant dashboard access</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg"><ShieldCheck className="h-5 w-5 text-primary" /> Grant dashboard access</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             Grant project members access to the <strong>{meta?.name}</strong>. Each member is emailed a professional invitation.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Search members…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
           </div>
-          <Button size="sm" variant="secondary" onClick={grantAll} disabled={busy === "__all"}>
+          <Button size="sm" variant="secondary" onClick={grantAll} disabled={busy === "__all"} className="shrink-0">
             {busy === "__all" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />} Grant all shown
           </Button>
         </div>
 
-        <ScrollArea className="h-[52vh] pr-3">
+
+        <ScrollArea className="h-[50vh] min-h-[220px] flex-1 pr-3">
           {loadingMembers ? (
             <div className="flex h-32 items-center justify-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
           ) : filteredMembers.length === 0 ? (
