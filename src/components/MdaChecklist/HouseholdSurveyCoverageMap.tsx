@@ -8,10 +8,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Home, MapPin, Loader2, RotateCcw, AlertTriangle, Layers, Satellite,
   ShieldCheck, TrendingDown, TrendingUp, Target, Sigma, Crosshair, Radar,
+  Download, FileText, FileSpreadsheet, X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { exportDashboardPdf } from "@/lib/mda/dashboardPdf";
+import { toCsv, downloadCsv, slugify } from "@/lib/mda/csvExport";
 
 /**
  * Household Survey Coverage Map
