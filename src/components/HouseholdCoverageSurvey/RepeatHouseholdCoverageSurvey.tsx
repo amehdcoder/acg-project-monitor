@@ -267,22 +267,26 @@ export default function RepeatHouseholdCoverageSurvey({
   // Commit incoming geo fix onto the current household when captured.
   const gpsLabel = useMemo(() => {
     const g = current.gps;
-    if (g) return `${g.lat.toFixed(6)}, ${g.lng.toFixed(6)}`;
-    if (geo.position) return `${geo.position.lat.toFixed(6)}, ${geo.position.lng.toFixed(6)}`;
+    if (g) return `${g.lat.toFixed(6)}, ${g.lng.toFixed(6)} · ±${Math.round(g.accuracy)}m`;
     return null;
-  }, [current.gps, geo.position]);
+  }, [current.gps]);
 
-  // When a fresh geo position arrives and the household has none yet, adopt it.
+  // Each household MUST capture its own unique geopoint. We track the last
+  // consumed GPS timestamp so a fresh fix (from tapping "Capture Geopoint" on
+  // the new household) is always adopted, while a stale fix carried over from a
+  // previous household is never silently re-used.
+  const lastGpsTsRef = useRef<number | null>(null);
   useEffect(() => {
-    if (geo.position && !current.gps) {
-      setCurrent((c) =>
-        c.gps ? c : { ...c, gps: { lat: geo.position!.lat, lng: geo.position!.lng, accuracy: geo.position!.accuracy } },
-      );
-    }
+    const pos = geo.position;
+    if (!pos) return;
+    if (pos.timestamp === lastGpsTsRef.current) return;
+    lastGpsTsRef.current = pos.timestamp;
+    setCurrent((c) => ({ ...c, gps: { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy } }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geo.position]);
 
   const householdValid = current.cdd_came !== "";
+  const hasGps = !!current.gps;
 
   const saveCurrentHousehold = (): HouseholdRecord[] => {
     const snapshot = [...completed, current];
@@ -295,6 +299,10 @@ export default function RepeatHouseholdCoverageSurvey({
       toast({ title: "Answer the first question", description: "Please record whether a drug distributor visited this household.", variant: "destructive" });
       return;
     }
+    if (!hasGps) {
+      toast({ title: "Capture the household GPS", description: "Each household must have its own geopoint. Tap “Capture Geopoint” before saving.", variant: "destructive" });
+      return;
+    }
     const snapshot = saveCurrentHousehold();
     if (snapshot.length >= target) {
       // Target reached — go straight to submit.
@@ -302,7 +310,7 @@ export default function RepeatHouseholdCoverageSurvey({
       return;
     }
     setCurrent(emptyHousehold(snapshot.length + 1));
-    toast({ title: `Household ${snapshot.length} saved`, description: `${snapshot.length} of ${target} completed.` });
+    toast({ title: `Household ${snapshot.length} saved`, description: `${snapshot.length} of ${target} completed. Capture a new geopoint for household ${snapshot.length + 1}.` });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
