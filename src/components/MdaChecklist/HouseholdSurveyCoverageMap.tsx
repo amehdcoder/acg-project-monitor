@@ -238,7 +238,33 @@ export default function HouseholdSurveyCoverageMap({
     clusterRef.current = cluster;
     map.addLayer(cluster);
     mapRef.current = map;
-    return () => { map.remove(); mapRef.current = null; };
+
+    // Draw the full Nigeria state / LGA boundaries underneath the household dots
+    // (same source as the LGA Supervision Map) so the geographic context of every
+    // point is always visible, even before/without any markers.
+    loadNigeriaGeo()
+      .then((geo) => {
+        try {
+          if (!mapRef.current) return;
+          const boundary = L.geoJSON(geo, {
+            style: {
+              fillColor: "#eef2f7",
+              fillOpacity: 0.15,
+              color: "#64748b",
+              weight: 0.7,
+              opacity: 0.85,
+            } as L.PathOptions,
+            interactive: false,
+          });
+          boundary.addTo(mapRef.current);
+          boundaryRef.current = boundary;
+          // Keep boundaries beneath the household markers.
+          boundary.bringToBack();
+        } catch { /* noop */ }
+      })
+      .catch(() => {});
+
+    return () => { map.remove(); mapRef.current = null; boundaryRef.current = null; };
   }, []);
 
   /* ── basemap switch ── */
