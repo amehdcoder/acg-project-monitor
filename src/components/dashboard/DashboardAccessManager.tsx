@@ -203,7 +203,7 @@ export default function DashboardAccessManager({ open, onOpenChange, dashboardId
         </div>
 
 
-        <ScrollArea className="h-[52vh] pr-3">
+        <ScrollArea className="h-[50vh] min-h-[220px] flex-1 pr-3">
           {loadingMembers ? (
             <div className="flex h-32 items-center justify-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
           ) : filteredMembers.length === 0 ? (
