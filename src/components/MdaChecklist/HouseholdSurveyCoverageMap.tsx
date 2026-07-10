@@ -144,6 +144,7 @@ export default function HouseholdSurveyCoverageMap({
   const lightRef = useRef<L.TileLayer | null>(null);
   const satRef = useRef<L.TileLayer | null>(null);
   const fittedRef = useRef(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const [rows, setRows] = useState<SurveyRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,6 +152,7 @@ export default function HouseholdSurveyCoverageMap({
   const [reloadKey, setReloadKey] = useState(0);
   const [basemap, setBasemap] = useState<"light" | "satellite">("light");
   const [show, setShow] = useState<{ treated: boolean; not: boolean }>({ treated: true, not: true });
+  const [exporting, setExporting] = useState(false);
 
   /* ── load survey rows ── */
   useEffect(() => {
