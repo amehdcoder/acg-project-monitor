@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Home,
   MapPin,
@@ -79,7 +79,6 @@ interface HouseholdRecord {
   side_effects_detail: string;
   ae_reported: boolean;
   f1_asked_height: "yes" | "no" | "na" | "";
-  f2_finger_marked: "yes" | "no" | "dont_remember" | "";
   f3_satisfied: "very" | "satisfied" | "not" | "no_opinion" | "";
   f4_why: string;
   suggestions: string;
@@ -113,7 +112,7 @@ const emptyHousehold = (n: number): HouseholdRecord => ({
   side_effects_detail: "",
   ae_reported: false,
   f1_asked_height: "",
-  f2_finger_marked: "",
+  
   f3_satisfied: "",
   f4_why: "",
   suggestions: "",
@@ -267,22 +266,26 @@ export default function RepeatHouseholdCoverageSurvey({
   // Commit incoming geo fix onto the current household when captured.
   const gpsLabel = useMemo(() => {
     const g = current.gps;
-    if (g) return `${g.lat.toFixed(6)}, ${g.lng.toFixed(6)}`;
-    if (geo.position) return `${geo.position.lat.toFixed(6)}, ${geo.position.lng.toFixed(6)}`;
+    if (g) return `${g.lat.toFixed(6)}, ${g.lng.toFixed(6)} · ±${Math.round(g.accuracy)}m`;
     return null;
-  }, [current.gps, geo.position]);
+  }, [current.gps]);
 
-  // When a fresh geo position arrives and the household has none yet, adopt it.
+  // Each household MUST capture its own unique geopoint. We track the last
+  // consumed GPS timestamp so a fresh fix (from tapping "Capture Geopoint" on
+  // the new household) is always adopted, while a stale fix carried over from a
+  // previous household is never silently re-used.
+  const lastGpsTsRef = useRef<number | null>(null);
   useEffect(() => {
-    if (geo.position && !current.gps) {
-      setCurrent((c) =>
-        c.gps ? c : { ...c, gps: { lat: geo.position!.lat, lng: geo.position!.lng, accuracy: geo.position!.accuracy } },
-      );
-    }
+    const pos = geo.position;
+    if (!pos) return;
+    if (pos.timestamp === lastGpsTsRef.current) return;
+    lastGpsTsRef.current = pos.timestamp;
+    setCurrent((c) => ({ ...c, gps: { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy } }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geo.position]);
 
   const householdValid = current.cdd_came !== "";
+  const hasGps = !!current.gps;
 
   const saveCurrentHousehold = (): HouseholdRecord[] => {
     const snapshot = [...completed, current];
@@ -295,6 +298,10 @@ export default function RepeatHouseholdCoverageSurvey({
       toast({ title: "Answer the first question", description: "Please record whether a drug distributor visited this household.", variant: "destructive" });
       return;
     }
+    if (!hasGps) {
+      toast({ title: "Capture the household GPS", description: "Each household must have its own geopoint. Tap “Capture Geopoint” before saving.", variant: "destructive" });
+      return;
+    }
     const snapshot = saveCurrentHousehold();
     if (snapshot.length >= target) {
       // Target reached — go straight to submit.
@@ -302,7 +309,7 @@ export default function RepeatHouseholdCoverageSurvey({
       return;
     }
     setCurrent(emptyHousehold(snapshot.length + 1));
-    toast({ title: `Household ${snapshot.length} saved`, description: `${snapshot.length} of ${target} completed.` });
+    toast({ title: `Household ${snapshot.length} saved`, description: `${snapshot.length} of ${target} completed. Capture a new geopoint for household ${snapshot.length + 1}.` });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -431,19 +438,27 @@ export default function RepeatHouseholdCoverageSurvey({
               <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Auto-generated</span>
             </div>
           </div>
-          <div className="rounded-xl border bg-card p-4">
+          <div className={`rounded-xl border bg-card p-4 transition-colors ${hasGps ? "border-teal-300" : "border-amber-300"}`}>
             <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-              <MapPin className="h-4 w-4 text-teal-600" /> GPS of Household
+              <MapPin className="h-4 w-4 text-teal-600" /> GPS of Household <span className="text-destructive">*</span>
             </div>
             <div className="mt-2 flex items-center gap-3">
               <Button type="button" size="sm" onClick={captureGps} disabled={geo.isLoading} style={{ background: TEAL }} className="text-white">
                 {geo.isLoading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Crosshair className="h-4 w-4 mr-1.5" />}
-                Capture Geopoint
+                {hasGps ? "Re-capture" : "Capture Geopoint"}
               </Button>
-              <span className="text-xs text-muted-foreground">{gpsLabel ?? "Not captured"}</span>
+              {hasGps ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-700">
+                  <CheckCircle2 className="h-4 w-4" /> {gpsLabel}
+                </span>
+              ) : (
+                <span className="text-xs text-amber-600">{geo.isLoading ? "Acquiring fix…" : "Required — capture a unique point at this house"}</span>
+              )}
             </div>
+            {geo.error && !hasGps && <p className="mt-1.5 text-[11px] text-destructive">{geo.error}</p>}
           </div>
         </div>
+
 
         {/* Q1 */}
         <Section>
@@ -597,19 +612,7 @@ export default function RepeatHouseholdCoverageSurvey({
                 ]}
               />
             </FRow>
-            <FRow code="F2" text="Was your finger marked with ink after taking the drugs?">
-              <PillOptions
-                color="#7c3aed"
-                value={current.f2_finger_marked}
-                onChange={(v) => update({ f2_finger_marked: v })}
-                options={[
-                  { value: "yes", label: "Yes" },
-                  { value: "no", label: "No" },
-                  { value: "dont_remember", label: "Don't remember" },
-                ]}
-              />
-            </FRow>
-            <FRow code="F3" text="Are you satisfied with how the drug distribution was done in your community?">
+            <FRow code="F2" text="Are you satisfied with how the drug distribution was done in your community?">
               <PillOptions
                 color="#7c3aed"
                 value={current.f3_satisfied}
@@ -622,9 +625,10 @@ export default function RepeatHouseholdCoverageSurvey({
                 ]}
               />
             </FRow>
-            <FRow code="F4" text="Why?">
+            <FRow code="F3" text="Why?">
               <Input value={current.f4_why} onChange={(e) => update({ f4_why: e.target.value })} placeholder="Enter your response…" />
             </FRow>
+
           </div>
         </div>
 
