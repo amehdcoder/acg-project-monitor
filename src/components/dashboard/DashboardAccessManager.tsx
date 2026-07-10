@@ -219,12 +219,20 @@ export default function DashboardAccessManager({ open, onOpenChange, dashboardId
             <div className="space-y-1.5">
               {filteredMembers.map((m) => {
                 const isGranted = !!granted[m.user_id];
+                const isNew = justGranted.has(m.user_id);
                 const name = `${m.first_name ?? ""} ${m.last_name ?? ""}`.trim() || m.email || "Member";
                 return (
-                  <div key={m.user_id} className="flex items-center justify-between gap-2 rounded-lg border p-2.5">
+                  <div key={m.user_id}
+                    className={`flex items-center justify-between gap-2 rounded-lg border p-2.5 transition-colors ${isNew ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30" : ""}`}>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{name}</p>
-                      <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><Mail className="h-3 w-3" />{m.email || "no email"}</p>
+                      {isNew ? (
+                        <p className="flex items-center gap-1 truncate text-xs font-medium text-emerald-600">
+                          <ShieldCheck className="h-3 w-3" /> Access confirmed
+                        </p>
+                      ) : (
+                        <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><Mail className="h-3 w-3" />{m.email || "no email"}</p>
+                      )}
                     </div>
                     {isGranted ? (
                       <Button size="sm" variant="ghost" className="text-destructive" disabled={busy === m.user_id} onClick={() => revoke(m)}>
