@@ -87,22 +87,13 @@ export default function CommunityMultiSelect({
             <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
               {allSelected ? "All selected" : `${selected.length} of ${options.length}`}
             </span>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost" size="sm" className="h-6 px-2 text-[10px]"
-                onClick={() => onChange([])}
-              >
-                Select all
-              </Button>
-              <Button
-                variant="ghost" size="sm" className="h-6 px-2 text-[10px]"
-                disabled={allSelected}
-                onClick={() => onChange(allValues)}
-                title="Select only the first, then refine"
-              >
-                <X className="mr-0.5 h-3 w-3" /> Clear
-              </Button>
-            </div>
+            <Button
+              variant="ghost" size="sm" className="h-6 px-2 text-[10px]"
+              disabled={allSelected}
+              onClick={() => onChange([])}
+            >
+              <X className="mr-0.5 h-3 w-3" /> Reset to all
+            </Button>
           </div>
           <CommandList>
             <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
