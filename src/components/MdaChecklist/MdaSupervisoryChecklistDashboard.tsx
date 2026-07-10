@@ -105,6 +105,9 @@ const SLATE = "#64748b";
 // ───────────────────────── Helpers ─────────────────────────
 const stripTags = (s?: string) => String(s || "").replace(/<[^>]*>/g, "").trim();
 const norm = (v: any) => String(v ?? "").trim().toLowerCase();
+/** Stable "state|lga|ward|community" identity for community-level filtering. */
+const commIdentity = (state?: string, lga?: string, ward?: string, community?: string) =>
+  [norm(state), norm(lga), norm(ward), norm(community)].join("|");
 const POSITIVE = new Set(["yes", "true", "1", "available", "present", "good", "done", "complete", "completed", "compliant", "adequate", "trained", "passed", "okay"]);
 const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
 const fmt = (n: number) => n.toLocaleString();
