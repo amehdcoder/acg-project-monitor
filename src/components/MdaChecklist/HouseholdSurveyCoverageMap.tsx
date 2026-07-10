@@ -339,11 +339,65 @@ export default function HouseholdSurveyCoverageMap({
 
   const a = analytics;
 
+  /* ── CSV export of the full geospatial analysis ── */
+  const exportCsv = () => {
+    try {
+      const hh = a.ci, tx = a.txCi;
+      const lines: (string | number)[][] = [];
+      const push = (...cells: (string | number)[]) => lines.push(cells);
+
+      push("Section", "Metric", "Value", "Detail");
+      push("Summary", "Households mapped", a.total, `${a.communities} communities`);
+      push("Summary", "Households treated", a.treated, `${hh.p.toFixed(1)}% (95% CI ${hh.lo.toFixed(1)}–${hh.hi.toFixed(1)}%)`);
+      push("Summary", "Households not treated", a.notTreated, "");
+      push("Summary", "Therapeutic coverage", `${tx.p.toFixed(1)}%`, `95% CI ${tx.lo.toFixed(1)}–${tx.hi.toFixed(1)}% · ${a.swallowed}/${a.offered} swallowed`);
+      push("Spatial", "Extent (km²)", a.extentKm2.toFixed(2), "");
+      push("Spatial", "Mean nearest-neighbour distance", a.meanNn < 1 ? `${(a.meanNn * 1000).toFixed(0)} m` : `${a.meanNn.toFixed(2)} km`, "");
+      if (a.centroid) push("Spatial", "Centroid", `${a.centroid.lat.toFixed(5)}, ${a.centroid.lng.toFixed(5)}`, "");
+      push("Spatial", "Households without valid GPS", a.badGps, "");
+      lines.push([]);
+
+      push("Cold-spots (mop-up targets)", "Community", "Coverage %", "Treated / Total");
+      if (a.coldSpots.length === 0) push("Cold-spots (mop-up targets)", "None below 50%", "", "");
+      for (const g of a.coldSpots) push("Cold-spot", `${g.label} · ${g.sub}`, g.cov.toFixed(0), `${g.treated}/${g.total}`);
+      lines.push([]);
+
+      push("Coverage by community (lowest first)", "Community", "Coverage %", "Treated / Total");
+      for (const g of a.geoRows) push("Community", `${g.label} · ${g.sub}`, g.cov.toFixed(0), `${g.treated}/${g.total}`);
+
+      downloadCsv(`household-coverage-analysis-${new Date().toISOString().slice(0, 10)}`, toCsv(["A", "B", "C", "D"], lines).replace(/^A,B,C,D\r\n/, ""));
+      toast.success("Analysis exported as CSV");
+    } catch (e: any) {
+      toast.error("Failed to export CSV");
+    }
+  };
+
+  /* ── PDF export of the map + full analysis ── */
+  const exportPdf = async () => {
+    if (!rootRef.current) return;
+    setExporting(true);
+    toast.info("Preparing PDF…");
+    try {
+      await exportDashboardPdf(rootRef.current, {
+        title: "Household Coverage Survey — Geospatial Analysis",
+        subtitle: `${a.total} households · ${a.communities} communities`,
+        fileName: "household-coverage-analysis",
+      });
+      toast.success("Analysis exported as PDF");
+    } catch (e: any) {
+      toast.error("Failed to export PDF");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const legendFiltered = !show.treated || !show.not;
+
   return (
-    <div className="space-y-3">
+    <div ref={rootRef} className="space-y-3">
       {/* header */}
       <Card className="overflow-hidden">
-        <div className="flex flex-wrap items-center gap-2 border-b bg-gradient-to-r from-emerald-500/10 to-rose-500/10 p-4">
+        <div className="flex flex-wrap items-center gap-2 border-b bg-gradient-to-r from-emerald-500/10 to-rose-500/10 p-3 sm:p-4">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${GREEN}1a`, color: GREEN }}>
             <MapPin className="h-4 w-4" />
           </span>
