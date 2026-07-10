@@ -14,7 +14,7 @@ import {
 import {
   Activity, ChevronDown, Home, Users2, Percent, Sigma, Pill, Ruler,
   TrendingDown, TrendingUp, CheckCircle2, AlertTriangle, Target, ShieldAlert,
-  RotateCcw, Loader2, Smile, Lightbulb, HeartPulse, MapPinned,
+  RotateCcw, Loader2, Smile, Lightbulb, HeartPulse, MapPinned, Search,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { testAgainstBenchmark, type BenchmarkTest } from "@/lib/ces/coverageStats";
