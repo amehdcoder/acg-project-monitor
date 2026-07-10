@@ -1071,27 +1071,33 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
             )}
           </div>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
-            <Select value={fState} onValueChange={(v) => { setFState(v); setFLga(ALL); setFWard(ALL); }}>
+            <Select value={fState} onValueChange={(v) => { setFState(v); setFLga(ALL); setFWard(ALL); setFCommunities([]); }}>
               <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="State" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All states</SelectItem>
                 {states.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={fLga} onValueChange={(v) => { setFLga(v); setFWard(ALL); }}>
+            <Select value={fLga} onValueChange={(v) => { setFLga(v); setFWard(ALL); setFCommunities([]); }}>
               <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="LGA" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All LGAs</SelectItem>
                 {lgas.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={fWard} onValueChange={setFWard}>
+            <Select value={fWard} onValueChange={(v) => { setFWard(v); setFCommunities([]); }}>
               <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Ward" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All wards</SelectItem>
                 {wards.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
+            <CommunityMultiSelect
+              options={communityOptions}
+              selected={fCommunities}
+              onChange={setFCommunities}
+              placeholder="All communities"
+            />
             <Select value={fStatus} onValueChange={setFStatus}>
               <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
