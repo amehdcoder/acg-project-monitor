@@ -488,7 +488,7 @@ export default function HouseholdSurveyCoverageMap({
               No geolocated households in the Repeat Household Coverage Survey for this scope yet.
             </div>
           ) : (
-            <div ref={containerRef} className="h-[460px] w-full" style={{ background: "#eef2f6" }} />
+            <div ref={containerRef} className="h-[320px] w-full sm:h-[420px] lg:h-[460px]" style={{ background: "#eef2f6" }} />
           )}
         </div>
       </Card>
