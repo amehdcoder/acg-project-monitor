@@ -184,7 +184,9 @@ export default function HouseholdSurveyCoverageMap({
     for (const s of rows) {
       const state = stripTags(s.state), lga = stripTags(s.lga), ward = stripTags(s.ward), community = stripTags(s.community_name);
       if (commSet) {
-        const id = [norm(state), norm(lga), norm(ward), norm(community)].join("|");
+        // Must match the dashboard's commIdentity (trim + lowercase).
+        const idNorm = (v: string) => v.trim().toLowerCase();
+        const id = [idNorm(state), idNorm(lga), idNorm(ward), idNorm(community)].join("|");
         if (!commSet.has(id)) continue;
       }
       (s.households || []).forEach((h, i) => {
