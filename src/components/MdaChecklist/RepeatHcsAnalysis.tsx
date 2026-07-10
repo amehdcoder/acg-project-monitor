@@ -317,7 +317,21 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
       reach: Math.round(pct(r.cddYes, r.households) * 10) / 10,
     }));
 
+    // Households sampled per community (colourful read-out).
+    const commMap = new Map<string, { label: string; sub: string; count: number }>();
+    for (const s of rows) {
+      const key = `${norm(s.state)}|${norm(s.lga)}|${norm(s.community_name)}`;
+      let c = commMap.get(key);
+      if (!c) {
+        c = { label: s.community_name || "Unspecified", sub: `${s.ward || "—"} · ${s.lga || "—"}`, count: 0 };
+        commMap.set(key, c);
+      }
+      c.count += (s.households || []).length;
+    }
+    const communitySampled = [...commMap.values()].sort((a, b) => b.count - a.count);
+
     return {
+      communitySampled,
       totalSurveys: rows.length, totalHh, cddYes, treatedYes, offered, swallowed,
       reachPct: pct(cddYes, totalHh), txPct: pct(swallowed, offered), treatPct: pct(treatedYes, totalHh),
       txTest, hhTest, satisfaction, height, sideEffects, cdd,
