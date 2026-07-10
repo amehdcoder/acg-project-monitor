@@ -233,6 +233,8 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
   const [txBenchmark, setTxBenchmark] = useState(DEFAULT_TX_BENCHMARK);
   const [hhBenchmark, setHhBenchmark] = useState(DEFAULT_HH_BENCHMARK);
   const [geoLevel, setGeoLevel] = useState<"lga" | "community">("lga");
+  const [commSearch, setCommSearch] = useState("");
+  const [commSort, setCommSort] = useState<"count-desc" | "count-asc" | "name">("count-desc");
 
   useEffect(() => {
     let cancelled = false;
