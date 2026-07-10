@@ -612,19 +612,8 @@ export default function RepeatHouseholdCoverageSurvey({
                 ]}
               />
             </FRow>
-            <FRow code="F2" text="Was your finger marked with ink after taking the drugs?">
-              <PillOptions
-                color="#7c3aed"
-                value={current.f2_finger_marked}
-                onChange={(v) => update({ f2_finger_marked: v })}
-                options={[
-                  { value: "yes", label: "Yes" },
-                  { value: "no", label: "No" },
-                  { value: "dont_remember", label: "Don't remember" },
-                ]}
-              />
-            </FRow>
-            <FRow code="F3" text="Are you satisfied with how the drug distribution was done in your community?">
+            <FRow code="F2" text="Are you satisfied with how the drug distribution was done in your community?">
+
               <PillOptions
                 color="#7c3aed"
                 value={current.f3_satisfied}
