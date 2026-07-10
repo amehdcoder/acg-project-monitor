@@ -11,7 +11,7 @@ import {
   startAppUpdatePolling,
   subscribeToAppUpdates,
   getAppUpdateState,
-  isAutoUpdateEnabled,
+  
   APPLIED_BUILD_AT_KEY,
   APPLIED_BUILD_ID_KEY,
 } from "@/lib/appUpdateManager";
