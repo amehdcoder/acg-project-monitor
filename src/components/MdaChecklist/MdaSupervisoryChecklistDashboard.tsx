@@ -690,9 +690,9 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
 
 
   const filtersActive =
-    fState !== ALL || fLga !== ALL || fWard !== ALL || fStatus !== ALL || fModule !== ALL || !!fFrom || !!fTo || !!search;
+    fState !== ALL || fLga !== ALL || fWard !== ALL || fCommunities.length > 0 || fStatus !== ALL || fModule !== ALL || !!fFrom || !!fTo || !!search;
   const resetFilters = () => {
-    setFState(ALL); setFLga(ALL); setFWard(ALL); setFStatus(ALL); setFModule(ALL);
+    setFState(ALL); setFLga(ALL); setFWard(ALL); setFCommunities([]); setFStatus(ALL); setFModule(ALL);
     setFFrom(""); setFTo(""); setSearch("");
   };
 
