@@ -515,7 +515,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       }
       return true;
     });
-  }, [submissions, fState, fLga, fWard, fStatus, fFrom, fTo, search]);
+  }, [submissions, fState, fLga, fWard, fCommunities, fStatus, fFrom, fTo, search]);
 
   // Normalized submissions for the plain-language narrative engine.
   const narrativeSubs = useMemo(
