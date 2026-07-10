@@ -495,6 +495,10 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       if (fState !== ALL && pickGeo(s, "state") !== fState) return false;
       if (fLga !== ALL && pickGeo(s, "lga") !== fLga) return false;
       if (fWard !== ALL && pickGeo(s, "ward") !== fWard) return false;
+      if (fCommunities.length > 0) {
+        const id = commIdentity(pickGeo(s, "state"), pickGeo(s, "lga"), pickGeo(s, "ward"), pickGeo(s, "community"));
+        if (!fCommunities.includes(id)) return false;
+      }
       if (fStatus !== ALL && norm(s.status) !== fStatus) return false;
       if (fromTs || toTs) {
         const t = s.submittedAt ? new Date(s.submittedAt).getTime() : null;
