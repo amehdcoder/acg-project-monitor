@@ -18,7 +18,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { exportDashboardPdf } from "@/lib/mda/dashboardPdf";
-import { toCsv, downloadCsv, slugify } from "@/lib/mda/csvExport";
+import { toCsv, downloadCsv } from "@/lib/mda/csvExport";
 
 /**
  * Household Survey Coverage Map
