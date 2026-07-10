@@ -506,6 +506,46 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
         </div>
       </Section>
 
+      {/* Full ward-level coverage matrix (LGA × Ward) */}
+      <MdaCoverageMatrix surveys={rows as any} txTarget={txBenchmark} />
+
+      {/* Households sampled per community */}
+      <Section title="Households Sampled per Community" icon={Home} tint={TEAL} badge={`${a.communitySampled.length} communities`}>
+        <div className="pt-3">
+          {a.communitySampled.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground">No communities captured yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {a.communitySampled.map((c, i) => {
+                const max = a.communitySampled[0]?.count || 1;
+                const p = pct(c.count, max);
+                const tint = [TEAL, BLUE, EMERALD, PURPLE, AMBER][i % 5];
+                return (
+                  <div key={`${c.label}-${i}`} className="rounded-lg border border-border/60 p-2.5"
+                    style={{ background: `linear-gradient(135deg, ${tint}0d, transparent 70%)` }}>
+                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                      <span className="min-w-0">
+                        <span className="font-semibold text-foreground">{c.label}</span>
+                        <span className="ml-1.5 text-muted-foreground">{c.sub}</span>
+                      </span>
+                      <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
+                        style={{ background: `${tint}1a`, color: tint }}>
+                        {c.count.toLocaleString()} HH
+                      </span>
+                    </div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full" style={{ width: `${Math.max(4, p)}%`, background: tint }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </Section>
+
+
+
       {/* Question distributions */}
       <Section title="Survey Question Read-out" icon={Activity} tint={PURPLE}>
         <div className="grid gap-3 pt-3 sm:grid-cols-2">
