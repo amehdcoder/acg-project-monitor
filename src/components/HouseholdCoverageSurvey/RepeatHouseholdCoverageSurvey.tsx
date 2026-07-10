@@ -415,7 +415,7 @@ export default function RepeatHouseholdCoverageSurvey({
         </div>
       </div>
 
-      <div className="mx-auto max-w-4xl p-4 space-y-4 pb-32">
+      <div className="mx-auto max-w-4xl p-4 space-y-4 pb-44 sm:pb-32">
         {/* Location + progress banner */}
         <div className="rounded-xl border bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-4">
           <ProgressRing done={completed.length} total={target} />
