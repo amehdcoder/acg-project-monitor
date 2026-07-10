@@ -365,7 +365,10 @@ export default function HouseholdSurveyCoverageMap({
       push("Coverage by community (lowest first)", "Community", "Coverage %", "Treated / Total");
       for (const g of a.geoRows) push("Community", `${g.label} · ${g.sub}`, g.cov.toFixed(0), `${g.treated}/${g.total}`);
 
-      downloadCsv(`household-coverage-analysis-${new Date().toISOString().slice(0, 10)}`, toCsv(["A", "B", "C", "D"], lines).replace(/^A,B,C,D\r\n/, ""));
+      downloadCsv(
+        `household-coverage-analysis-${new Date().toISOString().slice(0, 10)}`,
+        toCsv(lines[0].map(String), lines.slice(1)),
+      );
       toast.success("Analysis exported as CSV");
     } catch (e: any) {
       toast.error("Failed to export CSV");
