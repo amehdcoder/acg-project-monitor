@@ -1325,15 +1325,16 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         />
       </SectionErrorBoundary>
 
-      {/* ── Robust household coverage statistical analysis ── */}
-      <SectionErrorBoundary label="Household coverage analysis">
-        <HouseholdCoverageAnalysis
-          points={hcaPoints}
-          loading={hcaState.loading}
-          error={hcaState.error}
-          onRetry={() => setHcaReloadKey((k) => k + 1)}
+      {/* ── Repeat Household Coverage Survey statistical analysis ── */}
+      <SectionErrorBoundary label="Repeat household coverage survey analysis">
+        <RepeatHcsAnalysis
+          projectId={projectId}
+          stateFilter={fState === ALL ? null : fState}
+          dateFrom={fFrom ? fFrom + "T00:00:00" : null}
+          dateTo={fTo ? fTo + "T23:59:59" : null}
         />
       </SectionErrorBoundary>
+
 
       {/* ── Supervisor signatures register (collapsed by default) ── */}
       <SectionErrorBoundary label="Supervisor signature gallery">
