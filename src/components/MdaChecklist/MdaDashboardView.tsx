@@ -393,7 +393,7 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
               <OwnerSubmissionManager
                 table="form_submissions"
                 title="MDA checklist submissions"
-                labelColumns={["data.state", "data.lga", "status"]}
+                labelColumns={["data.state", "data.lga", "data.ward", "data.flhf_name", "data.community_name"]}
                 filter={{ column: "form_id", value: form.id }}
                 onMutation={handleOwnerMutation}
                 onChanged={handleDataChanged}
