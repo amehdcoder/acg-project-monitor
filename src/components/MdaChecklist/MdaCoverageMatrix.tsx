@@ -1,7 +1,12 @@
-import { useMemo } from "react";
-import { Home, Users2, ShieldCheck, Download, Info } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Home, Users2, ShieldCheck, Download, Info, Search, ArrowUpDown, ArrowUp, ArrowDown, FileText, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { testAgainstBenchmark } from "@/lib/ces/coverageStats";
+import { exportCoverageCsv, exportCoveragePdf } from "@/lib/mda/coverageTableExport";
 
 /* ─────────────────────────── palette (matches brand table) ─────────────────────────── */
 const NAVY = "#0c2340";
@@ -58,7 +63,7 @@ interface LgaGroup {
   wards: WardRow[];
 }
 
-function build(surveys: CoverageSurveyRow[]): { groups: LgaGroup[]; totals: WardRow } {
+function buildWards(surveys: CoverageSurveyRow[]): WardRow[] {
   const map = new Map<string, WardRow>();
   for (const s of surveys) {
     const lga = s.lga || "—";
@@ -78,7 +83,10 @@ function build(surveys: CoverageSurveyRow[]): { groups: LgaGroup[]; totals: Ward
       r.swallowed += personsSwallowed(h);
     }
   }
-  const rows = [...map.values()];
+  return [...map.values()];
+}
+
+function groupWards(rows: WardRow[]): LgaGroup[] {
   const groupMap = new Map<string, LgaGroup>();
   for (const r of rows) {
     const gk = norm(r.lga);
@@ -86,10 +94,13 @@ function build(surveys: CoverageSurveyRow[]): { groups: LgaGroup[]; totals: Ward
     if (!g) { g = { lga: r.lga, wards: [] }; groupMap.set(gk, g); }
     g.wards.push(r);
   }
-  const groups = [...groupMap.values()]
+  return [...groupMap.values()]
     .map((g) => ({ ...g, wards: g.wards.sort((a, b) => a.ward.localeCompare(b.ward)) }))
     .sort((a, b) => a.lga.localeCompare(b.lga));
-  const totals = rows.reduce<WardRow>(
+}
+
+function totalsOf(rows: WardRow[]): WardRow {
+  return rows.reduce<WardRow>(
     (acc, r) => {
       acc.sampled += r.sampled; acc.interviewed += r.interviewed; acc.treatedHh += r.treatedHh;
       acc.eligible += r.eligible; acc.swallowed += r.swallowed;
@@ -97,7 +108,6 @@ function build(surveys: CoverageSurveyRow[]): { groups: LgaGroup[]; totals: Ward
     },
     { key: "total", lga: "", ward: "", sampled: 0, interviewed: 0, treatedHh: 0, eligible: 0, swallowed: 0 },
   );
-  return { groups, totals };
 }
 
 function ci(successes: number, total: number): [number, number] | null {
@@ -123,16 +133,73 @@ function GroupCell({ children, bg }: { children: React.ReactNode; bg: string }) 
   );
 }
 
+/* ─────────────────────────── sorting ─────────────────────────── */
+type SortKey =
+  | "lga" | "ward" | "sampled" | "interviewed" | "treatedHh" | "hhCov"
+  | "eligible" | "swallowed" | "txCov";
+type SortDir = "asc" | "desc" | null;
+
+const sortValue = (r: WardRow, key: SortKey): number | string => {
+  switch (key) {
+    case "lga": return r.lga.toLowerCase();
+    case "ward": return r.ward.toLowerCase();
+    case "sampled": return r.sampled;
+    case "interviewed": return r.interviewed;
+    case "treatedHh": return r.treatedHh;
+    case "hhCov": return pct(r.treatedHh, r.interviewed);
+    case "eligible": return r.eligible;
+    case "swallowed": return r.swallowed;
+    case "txCov": return pct(r.swallowed, r.eligible);
+  }
+};
+
 interface Props {
   surveys: CoverageSurveyRow[];
   txTarget?: number;
   onExport?: () => void;
 }
 
-export default function MdaCoverageMatrix({ surveys, txTarget = 75, onExport }: Props) {
-  const { groups, totals } = useMemo(() => build(surveys), [surveys]);
+export default function MdaCoverageMatrix({ surveys, txTarget = 75 }: Props) {
+  const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>(null);
 
-  if (!groups.length) {
+  const allWards = useMemo(() => buildWards(surveys), [surveys]);
+
+  const filtered = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    if (!s) return allWards;
+    return allWards.filter((w) => `${w.lga} ${w.ward}`.toLowerCase().includes(s));
+  }, [allWards, search]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey !== key) { setSortKey(key); setSortDir("asc"); return; }
+    if (sortDir === "asc") { setSortDir("desc"); return; }
+    setSortKey(null); setSortDir(null);
+  };
+
+  const sortedFlat = useMemo(() => {
+    if (!sortKey || !sortDir) return null;
+    return [...filtered].sort((a, b) => {
+      const av = sortValue(a, sortKey);
+      const bv = sortValue(b, sortKey);
+      let cmp = 0;
+      if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
+      else cmp = String(av).localeCompare(String(bv));
+      return sortDir === "desc" ? -cmp : cmp;
+    });
+  }, [filtered, sortKey, sortDir]);
+
+  const groups = useMemo(() => (sortedFlat ? null : groupWards(filtered)), [sortedFlat, filtered]);
+  const totals = useMemo(() => totalsOf(filtered), [filtered]);
+
+  const totalHhCov = pct(totals.treatedHh, totals.interviewed);
+  const totalTxCov = pct(totals.swallowed, totals.eligible);
+  const totalHhCI = ci(totals.treatedHh, totals.interviewed);
+  const totalTxCI = ci(totals.swallowed, totals.eligible);
+  const totalQ = quality(totalTxCov, txTarget);
+
+  if (!allWards.length) {
     return (
       <div className="rounded-xl border border-border p-6 text-center text-sm text-muted-foreground">
         No ward-level coverage data captured yet.
@@ -140,12 +207,16 @@ export default function MdaCoverageMatrix({ surveys, txTarget = 75, onExport }: 
     );
   }
 
-  const hhCovCell = (r: WardRow) => pct(r.treatedHh, r.interviewed);
-  const txCovCell = (r: WardRow) => pct(r.swallowed, r.eligible);
+  const SortIcon = ({ k }: { k: SortKey }) => {
+    if (sortKey !== k) return <ArrowUpDown className="ml-0.5 inline h-3 w-3 opacity-50" />;
+    return sortDir === "asc"
+      ? <ArrowUp className="ml-0.5 inline h-3 w-3" />
+      : <ArrowDown className="ml-0.5 inline h-3 w-3" />;
+  };
 
   const renderRow = (r: WardRow, showLga: boolean, rowspan: number, zebra: boolean) => {
-    const hhCov = hhCovCell(r);
-    const txCov = txCovCell(r);
+    const hhCov = pct(r.treatedHh, r.interviewed);
+    const txCov = pct(r.swallowed, r.eligible);
     const hhCI = ci(r.treatedHh, r.interviewed);
     const txCI = ci(r.swallowed, r.eligible);
     const q = quality(txCov, txTarget);
@@ -188,12 +259,6 @@ export default function MdaCoverageMatrix({ surveys, txTarget = 75, onExport }: 
     );
   };
 
-  const totalHhCov = pct(totals.treatedHh, totals.interviewed);
-  const totalTxCov = pct(totals.swallowed, totals.eligible);
-  const totalHhCI = ci(totals.treatedHh, totals.interviewed);
-  const totalTxCI = ci(totals.swallowed, totals.eligible);
-  const totalQ = quality(totalTxCov, txTarget);
-
   return (
     <div className="overflow-hidden rounded-2xl border border-border shadow-sm">
       {/* Banner */}
@@ -203,16 +268,41 @@ export default function MdaCoverageMatrix({ surveys, txTarget = 75, onExport }: 
           <h3 className="font-display text-base font-bold text-white">MDA Coverage by LGA and Ward</h3>
           <p className="text-[11px] text-blue-200">Household &amp; Therapeutic Coverage Summary — Repeat Household Coverage Survey</p>
         </div>
-        <div className="ml-auto flex items-center gap-3 text-white/90">
-          <span className="hidden items-center gap-1 text-[11px] sm:flex"><Home className="h-3.5 w-3.5" /> Household</span>
-          <span className="hidden items-center gap-1 text-[11px] sm:flex"><Users2 className="h-3.5 w-3.5" /> Therapeutic</span>
-          <span className="hidden items-center gap-1 text-[11px] sm:flex"><ShieldCheck className="h-3.5 w-3.5" /> Quality</span>
-          {onExport && (
-            <Button size="sm" variant="secondary" onClick={onExport} className="h-8 gap-1.5">
-              <Download className="h-3.5 w-3.5" /> Export
-            </Button>
-          )}
+        <div className="ml-auto flex items-center gap-2 text-white/90">
+          <span className="hidden items-center gap-1 text-[11px] lg:flex"><Home className="h-3.5 w-3.5" /> Household</span>
+          <span className="hidden items-center gap-1 text-[11px] lg:flex"><Users2 className="h-3.5 w-3.5" /> Therapeutic</span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="secondary" className="h-8 gap-1.5">
+                <Download className="h-3.5 w-3.5" /> Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => exportCoverageCsv(surveys as any, txTarget)}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Download CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportCoveragePdf(surveys as any, txTarget)}>
+                <FileText className="mr-2 h-4 w-4" /> Download PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
+      </div>
+
+      {/* Search bar */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-3 py-2">
+        <div className="relative min-w-[180px] flex-1">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search LGA or ward…"
+            className="h-8 pl-8 text-xs" />
+        </div>
+        <span className="text-[11px] text-muted-foreground">{filtered.length} ward(s)</span>
+        {(sortKey || search) && (
+          <Button size="sm" variant="ghost" className="h-8 text-[11px]"
+            onClick={() => { setSearch(""); setSortKey(null); setSortDir(null); }}>
+            Reset
+          </Button>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -232,29 +322,35 @@ export default function MdaCoverageMatrix({ surveys, txTarget = 75, onExport }: 
               <th className="px-2 py-2" style={{ background: NAVY }} />
             </tr>
             <tr>
-              <th className="px-3 py-2 text-left text-[10px] uppercase" style={{ background: NAVY, ...HDR }}>LGA</th>
-              <th className="px-3 py-2 text-left text-[10px] uppercase" style={{ background: NAVY, ...HDR }}>Ward</th>
-              <th className="px-2 py-2 text-center text-[10px]" style={{ background: BLUE, ...HDR }}>Sampled HH</th>
-              <th className="px-2 py-2 text-center text-[10px]" style={{ background: BLUE, ...HDR }}>Interviewed HH</th>
-              <th className="px-2 py-2 text-center text-[10px]" style={{ background: BLUE, ...HDR }}>Treatment Took Place</th>
-              <th className="px-2 py-2 text-center text-[10px]" style={{ background: BLUE, ...HDR }}>Coverage (%)</th>
+              <th onClick={() => toggleSort("lga")} className="cursor-pointer select-none px-3 py-2 text-left text-[10px] uppercase" style={{ background: NAVY, ...HDR }}>LGA<SortIcon k="lga" /></th>
+              <th onClick={() => toggleSort("ward")} className="cursor-pointer select-none px-3 py-2 text-left text-[10px] uppercase" style={{ background: NAVY, ...HDR }}>Ward<SortIcon k="ward" /></th>
+              <th onClick={() => toggleSort("sampled")} className="cursor-pointer select-none px-2 py-2 text-center text-[10px]" style={{ background: BLUE, ...HDR }}>Sampled HH<SortIcon k="sampled" /></th>
+              <th onClick={() => toggleSort("interviewed")} className="cursor-pointer select-none px-2 py-2 text-center text-[10px]" style={{ background: BLUE, ...HDR }}>Interviewed HH<SortIcon k="interviewed" /></th>
+              <th onClick={() => toggleSort("treatedHh")} className="cursor-pointer select-none px-2 py-2 text-center text-[10px]" style={{ background: BLUE, ...HDR }}>Treatment Took Place<SortIcon k="treatedHh" /></th>
+              <th onClick={() => toggleSort("hhCov")} className="cursor-pointer select-none px-2 py-2 text-center text-[10px]" style={{ background: BLUE, ...HDR }}>Coverage (%)<SortIcon k="hhCov" /></th>
               <th className="px-2 py-2 text-center text-[10px]" style={{ background: PURPLE, ...HDR }}>Lower (%)</th>
               <th className="px-2 py-2 text-center text-[10px]" style={{ background: PURPLE, ...HDR }}>Upper (%)</th>
-              <th className="px-2 py-2 text-center text-[10px]" style={{ background: TEAL, ...HDR }}>Eligible Persons</th>
-              <th className="px-2 py-2 text-center text-[10px]" style={{ background: GREEN, ...HDR }}>Offered &amp; Swallowed</th>
-              <th className="px-2 py-2 text-center text-[10px]" style={{ background: GREEN, ...HDR }}>Coverage (%)</th>
+              <th onClick={() => toggleSort("eligible")} className="cursor-pointer select-none px-2 py-2 text-center text-[10px]" style={{ background: TEAL, ...HDR }}>Eligible Persons<SortIcon k="eligible" /></th>
+              <th onClick={() => toggleSort("swallowed")} className="cursor-pointer select-none px-2 py-2 text-center text-[10px]" style={{ background: GREEN, ...HDR }}>Offered &amp; Swallowed<SortIcon k="swallowed" /></th>
+              <th onClick={() => toggleSort("txCov")} className="cursor-pointer select-none px-2 py-2 text-center text-[10px]" style={{ background: GREEN, ...HDR }}>Coverage (%)<SortIcon k="txCov" /></th>
               <th className="px-2 py-2 text-center text-[10px]" style={{ background: ORANGE, ...HDR }}>Lower (%)</th>
               <th className="px-2 py-2 text-center text-[10px]" style={{ background: ORANGE, ...HDR }}>Upper (%)</th>
               <th className="px-2 py-2 text-center text-[10px]" style={{ background: NAVY, ...HDR }}>Data Quality</th>
             </tr>
           </thead>
           <tbody>
-            {groups.map((g, gi) =>
-              g.wards.map((w, wi) => renderRow(w, wi === 0, g.wards.length, gi % 2 === 1)),
+            {filtered.length === 0 ? (
+              <tr><td colSpan={14} className="px-3 py-6 text-center text-muted-foreground">No wards match “{search}”.</td></tr>
+            ) : sortedFlat ? (
+              sortedFlat.map((w, i) => renderRow(w, true, 1, i % 2 === 1))
+            ) : (
+              groups!.map((g, gi) =>
+                g.wards.map((w, wi) => renderRow(w, wi === 0, g.wards.length, gi % 2 === 1)),
+              )
             )}
             {/* Totals */}
             <tr className="font-bold text-white" style={{ background: NAVY }}>
-              <td className="px-3 py-2" colSpan={2}>TOTAL (ALL LGAs)</td>
+              <td className="px-3 py-2" colSpan={2}>TOTAL (FILTERED)</td>
               <td className="px-2 py-2 text-center tabular-nums">{fmt(totals.sampled)}</td>
               <td className="px-2 py-2 text-center tabular-nums">{fmt(totals.interviewed)}</td>
               <td className="px-2 py-2 text-center tabular-nums">{fmt(totals.treatedHh)}</td>

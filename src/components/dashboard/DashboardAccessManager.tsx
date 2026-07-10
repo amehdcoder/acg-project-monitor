@@ -71,6 +71,7 @@ export default function DashboardAccessManager({ open, onOpenChange, dashboardId
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [justGranted, setJustGranted] = useState<Set<string>>(new Set());
 
   const loadGrants = async () => {
     let q = supabase.from("dashboard_access").select("id, user_id, project_id").eq("dashboard_id", dashboardId);
@@ -143,8 +144,14 @@ export default function DashboardAccessManager({ open, onOpenChange, dashboardId
         granted_by: user?.id ?? null,
       });
       if (error) throw error;
+      // Optimistic confirmation: reflect the new member immediately, then
+      // re-verify against the server so the grant is provably persisted.
+      setGranted((g) => ({ ...g, [m.user_id]: "pending" }));
       await loadGrants();
-      toast.success("Dashboard access granted.");
+      setJustGranted((s) => new Set(s).add(m.user_id));
+      setTimeout(() => setJustGranted((s) => { const n = new Set(s); n.delete(m.user_id); return n; }), 4000);
+      const name = `${m.first_name ?? ""} ${m.last_name ?? ""}`.trim() || "Member";
+      toast.success(`${name} now has access — showing in the list.`);
       void sendAccessEmail(m);
     } catch (e: any) {
       toast.error(e?.message || "Could not grant access.");
@@ -212,12 +219,20 @@ export default function DashboardAccessManager({ open, onOpenChange, dashboardId
             <div className="space-y-1.5">
               {filteredMembers.map((m) => {
                 const isGranted = !!granted[m.user_id];
+                const isNew = justGranted.has(m.user_id);
                 const name = `${m.first_name ?? ""} ${m.last_name ?? ""}`.trim() || m.email || "Member";
                 return (
-                  <div key={m.user_id} className="flex items-center justify-between gap-2 rounded-lg border p-2.5">
+                  <div key={m.user_id}
+                    className={`flex items-center justify-between gap-2 rounded-lg border p-2.5 transition-colors ${isNew ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30" : ""}`}>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{name}</p>
-                      <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><Mail className="h-3 w-3" />{m.email || "no email"}</p>
+                      {isNew ? (
+                        <p className="flex items-center gap-1 truncate text-xs font-medium text-emerald-600">
+                          <ShieldCheck className="h-3 w-3" /> Access confirmed
+                        </p>
+                      ) : (
+                        <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><Mail className="h-3 w-3" />{m.email || "no email"}</p>
+                      )}
                     </div>
                     {isGranted ? (
                       <Button size="sm" variant="ghost" className="text-destructive" disabled={busy === m.user_id} onClick={() => revoke(m)}>
