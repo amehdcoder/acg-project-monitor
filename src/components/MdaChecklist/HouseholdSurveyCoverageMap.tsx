@@ -407,20 +407,37 @@ export default function HouseholdSurveyCoverageMap({
               Every surveyed household plotted at its unique GPS — green where therapeutic coverage was achieved, red where it was not.
             </p>
           </div>
-          <div className="ml-auto flex items-center gap-1.5">
-            <Button variant={basemap === "light" ? "secondary" : "outline"} size="sm" className="h-8 px-2 text-xs" onClick={() => setBasemap("light")}>
+          <div className="ml-auto flex w-full flex-wrap items-center gap-1.5 sm:w-auto" data-pdf-exclude="true">
+            <Button variant={basemap === "light" ? "secondary" : "outline"} size="sm" className="h-8 flex-1 px-2 text-xs sm:flex-none" onClick={() => setBasemap("light")}>
               <Layers className="mr-1 h-3.5 w-3.5" /> Map
             </Button>
-            <Button variant={basemap === "satellite" ? "secondary" : "outline"} size="sm" className="h-8 px-2 text-xs" onClick={() => setBasemap("satellite")}>
+            <Button variant={basemap === "satellite" ? "secondary" : "outline"} size="sm" className="h-8 flex-1 px-2 text-xs sm:flex-none" onClick={() => setBasemap("satellite")}>
               <Satellite className="mr-1 h-3.5 w-3.5" /> Satellite
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 flex-1 px-2 text-xs sm:flex-none" disabled={exporting || a.total === 0}>
+                  {exporting ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1 h-3.5 w-3.5" />}
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={exportPdf}>
+                  <FileText className="mr-2 h-4 w-4" /> PDF (map + analysis)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportCsv}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" /> CSV (analysis data)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
         {/* legend / filter */}
-        <div className="flex flex-wrap items-center gap-2 px-4 py-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs sm:px-4">
           <button
             type="button" onClick={() => setShow((s) => ({ ...s, treated: !s.treated }))}
+            aria-pressed={show.treated}
             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition ${show.treated ? "border-transparent" : "opacity-40"}`}
             style={{ background: `${GREEN}14` }}
           >
@@ -429,12 +446,22 @@ export default function HouseholdSurveyCoverageMap({
           </button>
           <button
             type="button" onClick={() => setShow((s) => ({ ...s, not: !s.not }))}
+            aria-pressed={show.not}
             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition ${show.not ? "border-transparent" : "opacity-40"}`}
             style={{ background: `${RED}14` }}
           >
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: RED }} />
             Not treated <span className="font-semibold tabular-nums">{a.notTreated}</span>
           </button>
+          {legendFiltered && (
+            <button
+              type="button" onClick={() => setShow({ treated: true, not: true })}
+              className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-muted-foreground transition hover:text-foreground"
+              data-pdf-exclude="true"
+            >
+              <X className="h-3 w-3" /> Clear
+            </button>
+          )}
           <Badge variant="secondary" className="ml-auto text-[10px]">{a.total} households · {a.communities} communities</Badge>
         </div>
 
