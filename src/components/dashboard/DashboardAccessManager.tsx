@@ -144,8 +144,14 @@ export default function DashboardAccessManager({ open, onOpenChange, dashboardId
         granted_by: user?.id ?? null,
       });
       if (error) throw error;
+      // Optimistic confirmation: reflect the new member immediately, then
+      // re-verify against the server so the grant is provably persisted.
+      setGranted((g) => ({ ...g, [m.user_id]: "pending" }));
       await loadGrants();
-      toast.success("Dashboard access granted.");
+      setJustGranted((s) => new Set(s).add(m.user_id));
+      setTimeout(() => setJustGranted((s) => { const n = new Set(s); n.delete(m.user_id); return n; }), 4000);
+      const name = `${m.first_name ?? ""} ${m.last_name ?? ""}`.trim() || "Member";
+      toast.success(`${name} now has access — showing in the list.`);
       void sendAccessEmail(m);
     } catch (e: any) {
       toast.error(e?.message || "Could not grant access.");
