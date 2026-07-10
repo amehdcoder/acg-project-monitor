@@ -513,37 +513,65 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
 
       {/* Households sampled per community */}
       <Section title="Households Sampled per Community" icon={Home} tint={TEAL} badge={`${a.communitySampled.length} communities`}>
-        <div className="pt-3">
-          {a.communitySampled.length === 0 ? (
-            <p className="text-[11px] text-muted-foreground">No communities captured yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {a.communitySampled.map((c, i) => {
-                const max = a.communitySampled[0]?.count || 1;
-                const p = pct(c.count, max);
-                const tint = [TEAL, BLUE, EMERALD, PURPLE, AMBER][i % 5];
-                return (
-                  <div key={`${c.label}-${i}`} className="rounded-lg border border-border/60 p-2.5"
-                    style={{ background: `linear-gradient(135deg, ${tint}0d, transparent 70%)` }}>
-                    <div className="flex items-center justify-between gap-2 text-[11px]">
-                      <span className="min-w-0">
-                        <span className="font-semibold text-foreground">{c.label}</span>
-                        <span className="ml-1.5 text-muted-foreground">{c.sub}</span>
-                      </span>
-                      <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
-                        style={{ background: `${tint}1a`, color: tint }}>
-                        {c.count.toLocaleString()} HH
-                      </span>
-                    </div>
-                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full" style={{ width: `${Math.max(4, p)}%`, background: tint }} />
-                    </div>
-                  </div>
-                );
-              })}
+        {(() => {
+          const s = commSearch.trim().toLowerCase();
+          let list = s
+            ? a.communitySampled.filter((c) => `${c.label} ${c.sub}`.toLowerCase().includes(s))
+            : a.communitySampled;
+          list = [...list].sort((x, y) =>
+            commSort === "name" ? x.label.localeCompare(y.label)
+              : commSort === "count-asc" ? x.count - y.count
+              : y.count - x.count);
+          const max = a.communitySampled[0]?.count || 1;
+          return (
+            <div className="pt-3">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <div className="relative min-w-[180px] flex-1">
+                  <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input value={commSearch} onChange={(e) => setCommSearch(e.target.value)}
+                    placeholder="Search community, ward or LGA…" className="h-8 pl-8 text-xs" />
+                </div>
+                <div className="flex items-center gap-1">
+                  {([["count-desc", "Most HH"], ["count-asc", "Least HH"], ["name", "A–Z"]] as const).map(([k, lbl]) => (
+                    <button key={k} type="button" onClick={() => setCommSort(k)}
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${commSort === k ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[11px] text-muted-foreground">{list.length} shown</span>
+              </div>
+              {list.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">No communities match your search.</p>
+              ) : (
+                <div className="space-y-2">
+                  {list.map((c, i) => {
+                    const p = pct(c.count, max);
+                    const tint = [TEAL, BLUE, EMERALD, PURPLE, AMBER][i % 5];
+                    return (
+                      <div key={`${c.label}-${i}`} className="rounded-lg border border-border/60 p-2.5"
+                        style={{ background: `linear-gradient(135deg, ${tint}0d, transparent 70%)` }}>
+                        <div className="flex items-center justify-between gap-2 text-[11px]">
+                          <span className="min-w-0">
+                            <span className="font-semibold text-foreground">{c.label}</span>
+                            <span className="ml-1.5 text-muted-foreground">{c.sub}</span>
+                          </span>
+                          <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
+                            style={{ background: `${tint}1a`, color: tint }}>
+                            {c.count.toLocaleString()} HH
+                          </span>
+                        </div>
+                        <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
+                          <div className="h-full rounded-full" style={{ width: `${Math.max(4, p)}%`, background: tint }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          );
+        })()}
       </Section>
 
 
