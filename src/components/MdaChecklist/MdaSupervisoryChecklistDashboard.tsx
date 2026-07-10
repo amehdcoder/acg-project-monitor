@@ -126,12 +126,18 @@ const FU_TINTS: Record<string, string> = {
 
 
 
-function pickGeo(s: MdaSubmission, kind: "state" | "lga" | "ward" | "community"): string {
+function pickGeo(s: MdaSubmission, kind: "state" | "lga" | "ward" | "flhf" | "community" | "settlement"): string {
   const d = s.data || {};
   if (kind === "state") return stripTags(s.state || d.state || d.state_name) || "";
   if (kind === "lga") return stripTags(s.lga || d.lga || d.LGA || d.local_government || d.local_government_area) || "";
   if (kind === "ward") return stripTags(s.ward || d.ward || d.ward_name) || "";
+  if (kind === "flhf") return stripTags(d.flhf_name || d.flhf || d.health_facility || d.facility || d.facility_name) || "";
+  if (kind === "settlement") return stripTags(d.settlement_name || d.settlement) || "";
   return stripTags(d.community || d.community_name || d.settlement_name || d.settlement) || "";
+}
+/** Supervisor / submitter display name for a submission. */
+function pickSubmitter(s: MdaSubmission): string {
+  return stripTags(s.submitter || s.data?.supervisor_name || s.data?.submitted_by) || "";
 }
 
 // ───────────────────────── Small UI atoms ─────────────────────────
@@ -398,7 +404,10 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   const [fState, setFState] = useState(ALL);
   const [fLga, setFLga] = useState(ALL);
   const [fWard, setFWard] = useState(ALL);
+  const [fFlhf, setFFlhf] = useState(ALL);
   const [fCommunities, setFCommunities] = useState<string[]>([]);
+  const [fSettlement, setFSettlement] = useState(ALL);
+  const [fSubmitter, setFSubmitter] = useState(ALL);
   const [fStatus, setFStatus] = useState(ALL);
   const [fModule, setFModule] = useState(ALL);
   const [fFrom, setFFrom] = useState("");
@@ -462,8 +471,17 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     );
     return Array.from(new Set(pool.map((s) => pickGeo(s, "ward")).filter(Boolean))).sort();
   }, [submissions, fState, fLga]);
+  const flhfs = useMemo(() => {
+    const pool = submissions.filter(
+      (s) =>
+        (fState === ALL || pickGeo(s, "state") === fState) &&
+        (fLga === ALL || pickGeo(s, "lga") === fLga) &&
+        (fWard === ALL || pickGeo(s, "ward") === fWard),
+    );
+    return Array.from(new Set(pool.map((s) => pickGeo(s, "flhf")).filter(Boolean))).sort();
+  }, [submissions, fState, fLga, fWard]);
 
-  // Real community names available under the current State/LGA/Ward selection.
+  // Real community names available under the current State/LGA/Ward/FLHF selection.
   // Value = "state|lga|ward|community" identity so names that repeat across
   // wards never collide. An empty `fCommunities` selection = all communities.
   const communityOptions = useMemo<CommunityOption[]>(() => {
@@ -471,7 +489,8 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       (s) =>
         (fState === ALL || pickGeo(s, "state") === fState) &&
         (fLga === ALL || pickGeo(s, "lga") === fLga) &&
-        (fWard === ALL || pickGeo(s, "ward") === fWard),
+        (fWard === ALL || pickGeo(s, "ward") === fWard) &&
+        (fFlhf === ALL || pickGeo(s, "flhf") === fFlhf),
     );
     const map = new Map<string, CommunityOption>();
     for (const s of pool) {
@@ -484,7 +503,28 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       }
     }
     return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
-  }, [submissions, fState, fLga, fWard]);
+  }, [submissions, fState, fLga, fWard, fFlhf]);
+
+  const settlements = useMemo(() => {
+    const selectedComms = new Set(fCommunities);
+    const pool = submissions.filter(
+      (s) =>
+        (fState === ALL || pickGeo(s, "state") === fState) &&
+        (fLga === ALL || pickGeo(s, "lga") === fLga) &&
+        (fWard === ALL || pickGeo(s, "ward") === fWard) &&
+        (fFlhf === ALL || pickGeo(s, "flhf") === fFlhf) &&
+        (selectedComms.size === 0 ||
+          selectedComms.has(commIdentity(pickGeo(s, "state"), pickGeo(s, "lga"), pickGeo(s, "ward"), pickGeo(s, "community")))),
+    );
+    return Array.from(new Set(pool.map((s) => pickGeo(s, "settlement")).filter(Boolean))).sort();
+  }, [submissions, fState, fLga, fWard, fFlhf, fCommunities]);
+
+  // Supervisors / submitters — this filter applies globally across the whole dashboard.
+  const submitters = useMemo(
+    () => Array.from(new Set(submissions.map((s) => pickSubmitter(s)).filter(Boolean))).sort(),
+    [submissions],
+  );
+
 
   // ── Apply geography / status / date / search filters to raw rows ──
   const filtered = useMemo(() => {
@@ -495,10 +535,13 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       if (fState !== ALL && pickGeo(s, "state") !== fState) return false;
       if (fLga !== ALL && pickGeo(s, "lga") !== fLga) return false;
       if (fWard !== ALL && pickGeo(s, "ward") !== fWard) return false;
+      if (fFlhf !== ALL && pickGeo(s, "flhf") !== fFlhf) return false;
       if (fCommunities.length > 0) {
         const id = commIdentity(pickGeo(s, "state"), pickGeo(s, "lga"), pickGeo(s, "ward"), pickGeo(s, "community"));
         if (!fCommunities.includes(id)) return false;
       }
+      if (fSettlement !== ALL && pickGeo(s, "settlement") !== fSettlement) return false;
+      if (fSubmitter !== ALL && pickSubmitter(s) !== fSubmitter) return false;
       if (fStatus !== ALL && norm(s.status) !== fStatus) return false;
       if (fromTs || toTs) {
         const t = s.submittedAt ? new Date(s.submittedAt).getTime() : null;
@@ -509,13 +552,14 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       if (q) {
         const hay = [
           pickGeo(s, "community"), pickGeo(s, "ward"), pickGeo(s, "lga"), pickGeo(s, "state"),
-          stripTags(s.submitter || s.data?.supervisor_name),
+          pickGeo(s, "flhf"), pickGeo(s, "settlement"), pickSubmitter(s),
         ].join(" ").toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [submissions, fState, fLga, fWard, fCommunities, fStatus, fFrom, fTo, search]);
+  }, [submissions, fState, fLga, fWard, fFlhf, fCommunities, fSettlement, fSubmitter, fStatus, fFrom, fTo, search]);
+
 
   // Normalized submissions for the plain-language narrative engine.
   const narrativeSubs = useMemo(
@@ -690,9 +734,11 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
 
 
   const filtersActive =
-    fState !== ALL || fLga !== ALL || fWard !== ALL || fCommunities.length > 0 || fStatus !== ALL || fModule !== ALL || !!fFrom || !!fTo || !!search;
+    fState !== ALL || fLga !== ALL || fWard !== ALL || fFlhf !== ALL || fCommunities.length > 0 ||
+    fSettlement !== ALL || fSubmitter !== ALL || fStatus !== ALL || fModule !== ALL || !!fFrom || !!fTo || !!search;
   const resetFilters = () => {
-    setFState(ALL); setFLga(ALL); setFWard(ALL); setFCommunities([]); setFStatus(ALL); setFModule(ALL);
+    setFState(ALL); setFLga(ALL); setFWard(ALL); setFFlhf(ALL); setFCommunities([]); setFSettlement(ALL);
+    setFSubmitter(ALL); setFStatus(ALL); setFModule(ALL);
     setFFrom(""); setFTo(""); setSearch("");
   };
 
@@ -1071,33 +1117,55 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
             )}
           </div>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
-            <Select value={fState} onValueChange={(v) => { setFState(v); setFLga(ALL); setFWard(ALL); setFCommunities([]); }}>
+            <Select value={fState} onValueChange={(v) => { setFState(v); setFLga(ALL); setFWard(ALL); setFFlhf(ALL); setFCommunities([]); setFSettlement(ALL); }}>
               <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="State" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All states</SelectItem>
                 {states.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={fLga} onValueChange={(v) => { setFLga(v); setFWard(ALL); setFCommunities([]); }}>
+            <Select value={fLga} onValueChange={(v) => { setFLga(v); setFWard(ALL); setFFlhf(ALL); setFCommunities([]); setFSettlement(ALL); }}>
               <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="LGA" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All LGAs</SelectItem>
                 {lgas.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={fWard} onValueChange={(v) => { setFWard(v); setFCommunities([]); }}>
+            <Select value={fWard} onValueChange={(v) => { setFWard(v); setFFlhf(ALL); setFCommunities([]); setFSettlement(ALL); }}>
               <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Ward" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All wards</SelectItem>
                 {wards.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Select value={fFlhf} onValueChange={(v) => { setFFlhf(v); setFCommunities([]); setFSettlement(ALL); }}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="FLHF" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All FLHFs</SelectItem>
+                {flhfs.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <CommunityMultiSelect
               options={communityOptions}
               selected={fCommunities}
-              onChange={setFCommunities}
+              onChange={(v) => { setFCommunities(v); setFSettlement(ALL); }}
               placeholder="All communities"
             />
+            <Select value={fSettlement} onValueChange={setFSettlement}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Settlement" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All settlements</SelectItem>
+                {settlements.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={fSubmitter} onValueChange={setFSubmitter}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="User" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All users</SelectItem>
+                {submitters.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
             <Select value={fStatus} onValueChange={setFStatus}>
               <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
@@ -1351,11 +1419,13 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
           projectId={projectId}
           formName={formName}
           stateFilter={fState === ALL ? null : fState}
+          highlightState={householdMapDefaultState}
           dateFrom={fFrom ? fFrom + "T00:00:00" : null}
           dateTo={fTo ? fTo + "T23:59:59" : null}
           communityFilter={fCommunities}
           onSelectCommunity={openMapCommunityDrill}
         />
+
       </SectionErrorBoundary>
 
       {/* ── Repeat Household Coverage Survey statistical analysis ── */}

@@ -129,6 +129,8 @@ interface Props {
   projectId?: string | null;
   formName?: string;
   stateFilter?: string | null;
+  /** State the linked checklist is locked to — its boundaries are drawn boldly. */
+  highlightState?: string | null;
   dateFrom?: string | null;
   dateTo?: string | null;
   /** "state|lga|ward|community" identities to keep; empty = all. */
@@ -137,7 +139,7 @@ interface Props {
 }
 
 export default function HouseholdSurveyCoverageMap({
-  projectId, formName, stateFilter, dateFrom, dateTo, communityFilter, onSelectCommunity,
+  projectId, formName, stateFilter, highlightState, dateFrom, dateTo, communityFilter, onSelectCommunity,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -145,6 +147,7 @@ export default function HouseholdSurveyCoverageMap({
   const lightRef = useRef<L.TileLayer | null>(null);
   const satRef = useRef<L.TileLayer | null>(null);
   const boundaryRef = useRef<L.GeoJSON | null>(null);
+  const highlightRef = useRef<L.GeoJSON | null>(null);
   const fittedRef = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -240,33 +243,72 @@ export default function HouseholdSurveyCoverageMap({
     map.addLayer(cluster);
     mapRef.current = map;
 
-    // Draw the full Nigeria state / LGA boundaries underneath the household dots
-    // (same source as the LGA Supervision Map) so the geographic context of every
-    // point is always visible, even before/without any markers.
+    return () => { map.remove(); mapRef.current = null; boundaryRef.current = null; highlightRef.current = null; };
+  }, []);
+
+  /* ── draw boundaries: faint national + BOLD highlighted state ── */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    let cancelled = false;
     loadNigeriaGeo()
       .then((geo) => {
+        if (cancelled || !mapRef.current) return;
         try {
-          if (!mapRef.current) return;
-          const boundary = L.geoJSON(geo, {
-            style: {
-              fillColor: "#eef2f7",
-              fillOpacity: 0.15,
-              color: "#64748b",
-              weight: 0.7,
-              opacity: 0.85,
-            } as L.PathOptions,
-            interactive: false,
-          });
-          boundary.addTo(mapRef.current);
-          boundaryRef.current = boundary;
-          // Keep boundaries beneath the household markers.
-          boundary.bringToBack();
+          // Clear any previous boundary layers before redrawing.
+          if (boundaryRef.current) { try { map.removeLayer(boundaryRef.current); } catch { /* noop */ } boundaryRef.current = null; }
+          if (highlightRef.current) { try { map.removeLayer(highlightRef.current); } catch { /* noop */ } highlightRef.current = null; }
+
+          const wanted = norm(highlightState);
+          const feats: any[] = geo?.features || [];
+          const inState = (f: any) => wanted && norm(f?.properties?.state) === wanted;
+
+          // Faint national context for every LGA not in the locked state.
+          const context = L.geoJSON(
+            { type: "FeatureCollection", features: wanted ? feats.filter((f) => !inState(f)) : feats } as any,
+            {
+              style: { fillColor: "#eef2f7", fillOpacity: 0.12, color: "#94a3b8", weight: 0.6, opacity: 0.6 } as L.PathOptions,
+              interactive: false,
+            },
+          );
+          context.addTo(map);
+          context.bringToBack();
+          boundaryRef.current = context;
+
+          if (wanted) {
+            const stateFeats = feats.filter(inState);
+            if (stateFeats.length) {
+              const group = L.layerGroup();
+              // Bold glow underlay so the locked-state boundary reads strongly (like the LGA Supervision Map).
+              const glow = L.geoJSON(
+                { type: "FeatureCollection", features: stateFeats } as any,
+                { style: () => ({ color: "#0d9488", weight: 6, opacity: 0.25, fill: false } as L.PathOptions), interactive: false },
+              );
+              group.addLayer(glow);
+              // Crisp LGA outlines with a light teal wash.
+              const outline = L.geoJSON(
+                { type: "FeatureCollection", features: stateFeats } as any,
+                { style: () => ({ color: "#0f766e", weight: 1.8, fillColor: "#14b8a6", fillOpacity: 0.06 } as L.PathOptions), interactive: false },
+              );
+              group.addLayer(outline);
+              group.addTo(map);
+              highlightRef.current = group as unknown as L.GeoJSON;
+
+              // If no household points have been fitted yet, frame the locked state.
+              if (!fittedRef.current) {
+                try {
+                  const b = outline.getBounds();
+                  if (b.isValid()) map.fitBounds(b.pad(0.05));
+                } catch { /* noop */ }
+              }
+            }
+          }
         } catch { /* noop */ }
       })
       .catch(() => {});
+    return () => { cancelled = true; };
+  }, [highlightState]);
 
-    return () => { map.remove(); mapRef.current = null; boundaryRef.current = null; };
-  }, []);
 
   /* ── basemap switch ── */
   useEffect(() => {

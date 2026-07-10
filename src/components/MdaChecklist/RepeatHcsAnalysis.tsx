@@ -442,7 +442,16 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
               <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-25} textAnchor="end" height={54} />
               <YAxis tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" />
               <RTooltip formatter={(v: any) => `${v}%`} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Legend
+                wrapperStyle={{ fontSize: 11 }}
+                payload={[
+                  { value: `Therapeutic coverage ≥ ${txBenchmark}% target`, type: "square", id: "tx-ok", color: EMERALD },
+                  { value: `Therapeutic coverage < ${txBenchmark}% target`, type: "square", id: "tx-low", color: RED },
+                  { value: "Household reach", type: "square", id: "reach", color: BLUE },
+                  { value: `${txBenchmark}% target line`, type: "plainline", id: "target", color: EMERALD, payload: { strokeDasharray: "4 4" } as any },
+                ]}
+              />
+
               <ReferenceLine y={txBenchmark} stroke={EMERALD} strokeDasharray="4 4" />
               <Bar dataKey="tx" name="Therapeutic coverage" radius={[3, 3, 0, 0]}>
                 {a.chartRows.map((r, i) => <Cell key={i} fill={r.tx < txBenchmark ? RED : EMERALD} />)}
