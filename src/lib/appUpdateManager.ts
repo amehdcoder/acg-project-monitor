@@ -1,4 +1,4 @@
-import { hasActiveUserFormProgress, prepareSilentFormRestoreForUpdate } from "@/lib/formProgressPersistence";
+import { prepareSilentFormRestoreForUpdate } from "@/lib/formProgressPersistence";
 import { decideUpdate } from "@/lib/appUpdateDecision";
 
 export type AppUpdateStatus = "idle" | "checking" | "current" | "available" | "updating" | "error";
@@ -248,24 +248,14 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
       error: null,
       source: source === "html" ? "html" : "version",
     });
-    // Auto-apply when a stale build is detected with a high-confidence version.json
-    // probe AND the user has not snoozed and auto-update is enabled. Guarded by the
-    // applied-build id + a cooldown so a deploy mismatch can never loop-reload.
-    if (changed && source === "version" && isAutoUpdateEnabled() && !isSnoozed(latestBuildId) && !hasActiveUserFormProgress()) {
-      let lastApplied = "";
-      let lastAppliedAt = 0;
-      try {
-        lastApplied = localStorage.getItem(APPLIED_BUILD_ID_KEY) || "";
-        lastAppliedAt = Number(localStorage.getItem(APPLIED_BUILD_AT_KEY) || "0") || 0;
-      } catch { /* ignore */ }
-      const COOLDOWN_MS = 2 * 60 * 1000;
-      const inCooldown = lastAppliedAt > 0 && Date.now() - lastAppliedAt < COOLDOWN_MS;
-      if (lastApplied !== latestBuildId && !inCooldown) {
-        try { console.info("[UpdateManager] Stale build detected — forcing hard refresh", { currentBuildId, latestBuildId }); } catch {}
-        void hardReloadToLatest();
-      }
-    }
+    // NOTE: We intentionally do NOT auto-apply updates here. A published build
+    // must never refresh a user's app on its own — that was causing users to
+    // lose in-progress work when the Owner published a build. The new build is
+    // only surfaced via the "Update" button (updateAvailable = true); the reload
+    // happens exclusively when the user taps it (see AppUpdateButton →
+    // hardReloadToLatest). This guarantees zero self-initiated refreshes.
     return state;
+
   } catch (error: unknown) {
     setState({
       status: "current",

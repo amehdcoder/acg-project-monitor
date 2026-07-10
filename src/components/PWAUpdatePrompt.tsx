@@ -11,7 +11,7 @@ import {
   startAppUpdatePolling,
   subscribeToAppUpdates,
   getAppUpdateState,
-  isAutoUpdateEnabled,
+  
   APPLIED_BUILD_AT_KEY,
   APPLIED_BUILD_ID_KEY,
 } from "@/lib/appUpdateManager";
@@ -90,36 +90,13 @@ const PWAUpdatePrompt = () => {
       return;
     }
 
-    // Loop guard: if we already auto-applied this exact build id, never re-apply it.
-    let lastApplied = "";
-    let lastAppliedAt = 0;
-    try {
-      lastApplied = localStorage.getItem(APPLIED_BUILD_ID_KEY) || "";
-      lastAppliedAt = Number(localStorage.getItem(APPLIED_BUILD_AT_KEY) || "0") || 0;
-    } catch (error) {
-      console.warn("Unable to read last applied app update", error);
-    }
-    if (lastApplied && lastApplied === latestId) return;
-
-    // Cooldown: never auto-reload more than once every 2 minutes (covers reload races
-    // where the freshly-loaded bundle still reports a different buildId than version.json).
-    const COOLDOWN_MS = 2 * 60 * 1000;
-    const sinceLast = Date.now() - lastAppliedAt;
-    const inCooldown = lastAppliedAt > 0 && sinceLast < COOLDOWN_MS;
-
-    // Offline queue: if we can't actually fetch a fresh bundle, defer until 'online' fires.
-    // The polling layer also re-runs the check on the 'online' event.
-    const isOffline = typeof navigator !== "undefined" && navigator.onLine === false;
-
-    if (isAutoUpdateEnabled() && !inCooldown && !isOffline && !shouldSkipServiceWorker && !hasActiveUserFormProgress()) {
-      hardReloadToLatest().catch((err) => {
-        console.error("Auto-update failed, falling back to manual prompt", err);
-        if (!isSnoozed(latestId)) setShowModal(true);
-      });
-      return;
-    }
-
+    // IMPORTANT: never auto-reload. A published build must only be applied when
+    // the user explicitly taps "Update now". Auto-apply was intermittently
+    // refreshing users' apps on publish and destroying in-progress work. Here we
+    // only surface the (non-intrusive) update banner/modal; the actual reload is
+    // triggered exclusively by handleUpdate() from a user click.
     if (!isSnoozed(latestId)) setShowModal(true);
+
   }, [updateState.latestBuildId, updateState.updateAvailable]);
 
   const handleAvailable = () => markServiceWorkerUpdateAvailable();
