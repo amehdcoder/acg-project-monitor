@@ -663,28 +663,52 @@ export default function RepeatHouseholdCoverageSurvey({
         </div>
       </div>
 
-      {/* Sticky footer */}
-      <div className="fixed bottom-0 inset-x-0 z-30 border-t bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-4xl px-4 py-3 flex items-center gap-3">
-          <Button variant="outline" onClick={handleFinishEarly} disabled={submitting} className="gap-1.5">
-            <ArrowLeft className="h-4 w-4" /> Finish &amp; submit
-          </Button>
-          <div className="flex-1 text-center text-xs text-muted-foreground">
+      {/* Sticky footer — always fully visible, including on small iPhones.
+          Buttons share the row and shrink to fit; the counter moves above them
+          on narrow screens, and iOS safe-area inset keeps them above the home bar. */}
+      <div
+        className="fixed bottom-0 inset-x-0 z-30 border-t bg-background/95 backdrop-blur"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="mx-auto max-w-4xl px-3 py-2.5 sm:px-4 sm:py-3">
+          {/* Counter shown above the buttons on small screens to free horizontal room */}
+          <div className="mb-2 text-center text-[11px] font-medium text-muted-foreground sm:hidden">
             Household {hhNo} of {target}
           </div>
-          <Button onClick={handleSaveAndNext} disabled={submitting} style={{ background: TEAL }} className="text-white gap-1.5">
-            {submitting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : completed.length + 1 >= target ? (
-              <>
-                <Send className="h-4 w-4" /> Save &amp; submit
-              </>
-            ) : (
-              <>
-                Save &amp; next household <ArrowRight className="h-4 w-4" />
-              </>
-            )}
-          </Button>
+          <div className="flex items-stretch gap-2 sm:gap-3">
+            <Button
+              variant="outline"
+              onClick={handleFinishEarly}
+              disabled={submitting}
+              className="flex-1 min-w-0 gap-1.5 px-2 text-xs sm:flex-none sm:px-4 sm:text-sm"
+            >
+              <ArrowLeft className="h-4 w-4 shrink-0" />
+              <span className="truncate">Finish &amp; submit</span>
+            </Button>
+            <div className="hidden flex-1 text-center text-xs text-muted-foreground sm:block sm:self-center">
+              Household {hhNo} of {target}
+            </div>
+            <Button
+              onClick={handleSaveAndNext}
+              disabled={submitting}
+              style={{ background: TEAL }}
+              className="flex-1 min-w-0 gap-1.5 px-2 text-xs text-white sm:flex-none sm:px-4 sm:text-sm"
+            >
+              {submitting ? (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+              ) : completed.length + 1 >= target ? (
+                <>
+                  <Send className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Save &amp; submit</span>
+                </>
+              ) : (
+                <>
+                  <span className="truncate">Save &amp; next household</span>
+                  <ArrowRight className="h-4 w-4 shrink-0" />
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 
