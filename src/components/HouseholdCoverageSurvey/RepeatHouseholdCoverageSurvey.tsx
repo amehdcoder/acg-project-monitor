@@ -613,7 +613,6 @@ export default function RepeatHouseholdCoverageSurvey({
               />
             </FRow>
             <FRow code="F2" text="Are you satisfied with how the drug distribution was done in your community?">
-
               <PillOptions
                 color="#7c3aed"
                 value={current.f3_satisfied}
@@ -626,9 +625,10 @@ export default function RepeatHouseholdCoverageSurvey({
                 ]}
               />
             </FRow>
-            <FRow code="F4" text="Why?">
+            <FRow code="F3" text="Why?">
               <Input value={current.f4_why} onChange={(e) => update({ f4_why: e.target.value })} placeholder="Enter your response…" />
             </FRow>
+
           </div>
         </div>
 
