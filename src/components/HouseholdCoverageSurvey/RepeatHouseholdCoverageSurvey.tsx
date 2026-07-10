@@ -40,10 +40,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { supabase } from "@/integrations/supabase/client";
+
 import { useAuth } from "@/hooks/useAuth";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { toast } from "@/hooks/use-toast";
+import { queueOrInsert } from "@/lib/offlineSubmissions";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -326,27 +327,44 @@ export default function RepeatHouseholdCoverageSurvey({
     setSubmitting(true);
     try {
       const gps = records.find((r) => r.gps)?.gps ?? initialGps ?? null;
-      const { error } = await supabase.from("household_coverage_surveys" as any).insert({
-        checklist_submission_id: checklistSubmissionId ?? null,
-        form_id: formId ?? null,
-        project_id: projectId ?? null,
-        user_id: user.id,
-        state: location?.state ?? null,
-        lga: location?.lga ?? null,
-        ward: location?.ward ?? null,
-        flhf_name: location?.flhf_name ?? null,
-        community_name: location?.community_name ?? null,
-        settlement_name: location?.settlement_name ?? null,
-        target_households: target,
-        completed_households: records.length,
-        shortfall_reason: reason.trim() || null,
-        households: records,
-        gps,
-        metadata: { source: "mda_checklist", submitted_at: new Date().toISOString() },
-      } as any);
-      if (error) throw error;
+      const submissionId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // Offline-first: insert immediately when online, otherwise persist in the
+      // IndexedDB queue and auto-sync to the server (and dashboard) on reconnect.
+      // The client-generated id + upsert-on-id keeps replays idempotent so a
+      // lost network ack never creates a duplicate survey.
+      const { queued } = await queueOrInsert(
+        "household_coverage_surveys",
+        {
+          id: submissionId,
+          checklist_submission_id: checklistSubmissionId ?? null,
+          form_id: formId ?? null,
+          project_id: projectId ?? null,
+          user_id: user.id,
+          state: location?.state ?? null,
+          lga: location?.lga ?? null,
+          ward: location?.ward ?? null,
+          flhf_name: location?.flhf_name ?? null,
+          community_name: location?.community_name ?? null,
+          settlement_name: location?.settlement_name ?? null,
+          target_households: target,
+          completed_households: records.length,
+          shortfall_reason: reason.trim() || null,
+          households: records,
+          gps,
+          metadata: { source: "mda_checklist", submitted_at: new Date().toISOString() },
+        },
+        true,
+      );
       setDone(true);
-      toast({ title: "Coverage survey submitted", description: `${records.length} household${records.length === 1 ? "" : "s"} recorded.` });
+      toast({
+        title: queued ? "Saved offline" : "Coverage survey submitted",
+        description: queued
+          ? `${records.length} household${records.length === 1 ? "" : "s"} saved on this device. It will sync automatically when you're back online.`
+          : `${records.length} household${records.length === 1 ? "" : "s"} recorded.`,
+      });
     } catch (e: any) {
       toast({ title: "Submission failed", description: e.message, variant: "destructive" });
     } finally {
@@ -397,7 +415,7 @@ export default function RepeatHouseholdCoverageSurvey({
         </div>
       </div>
 
-      <div className="mx-auto max-w-4xl p-4 space-y-4 pb-32">
+      <div className="mx-auto max-w-4xl p-4 space-y-4 pb-44 sm:pb-32">
         {/* Location + progress banner */}
         <div className="rounded-xl border bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-4">
           <ProgressRing done={completed.length} total={target} />
@@ -645,28 +663,52 @@ export default function RepeatHouseholdCoverageSurvey({
         </div>
       </div>
 
-      {/* Sticky footer */}
-      <div className="fixed bottom-0 inset-x-0 z-30 border-t bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-4xl px-4 py-3 flex items-center gap-3">
-          <Button variant="outline" onClick={handleFinishEarly} disabled={submitting} className="gap-1.5">
-            <ArrowLeft className="h-4 w-4" /> Finish &amp; submit
-          </Button>
-          <div className="flex-1 text-center text-xs text-muted-foreground">
+      {/* Sticky footer — always fully visible, including on small iPhones.
+          Buttons share the row and shrink to fit; the counter moves above them
+          on narrow screens, and iOS safe-area inset keeps them above the home bar. */}
+      <div
+        className="fixed bottom-0 inset-x-0 z-30 border-t bg-background/95 backdrop-blur"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="mx-auto max-w-4xl px-3 py-2.5 sm:px-4 sm:py-3">
+          {/* Counter shown above the buttons on small screens to free horizontal room */}
+          <div className="mb-2 text-center text-[11px] font-medium text-muted-foreground sm:hidden">
             Household {hhNo} of {target}
           </div>
-          <Button onClick={handleSaveAndNext} disabled={submitting} style={{ background: TEAL }} className="text-white gap-1.5">
-            {submitting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : completed.length + 1 >= target ? (
-              <>
-                <Send className="h-4 w-4" /> Save &amp; submit
-              </>
-            ) : (
-              <>
-                Save &amp; next household <ArrowRight className="h-4 w-4" />
-              </>
-            )}
-          </Button>
+          <div className="flex items-stretch gap-2 sm:gap-3">
+            <Button
+              variant="outline"
+              onClick={handleFinishEarly}
+              disabled={submitting}
+              className="flex-1 min-w-0 gap-1.5 px-2 text-xs sm:flex-none sm:px-4 sm:text-sm"
+            >
+              <ArrowLeft className="h-4 w-4 shrink-0" />
+              <span className="truncate">Finish &amp; submit</span>
+            </Button>
+            <div className="hidden flex-1 text-center text-xs text-muted-foreground sm:block sm:self-center">
+              Household {hhNo} of {target}
+            </div>
+            <Button
+              onClick={handleSaveAndNext}
+              disabled={submitting}
+              style={{ background: TEAL }}
+              className="flex-1 min-w-0 gap-1.5 px-2 text-xs text-white sm:flex-none sm:px-4 sm:text-sm"
+            >
+              {submitting ? (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+              ) : completed.length + 1 >= target ? (
+                <>
+                  <Send className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Save &amp; submit</span>
+                </>
+              ) : (
+                <>
+                  <span className="truncate">Save &amp; next household</span>
+                  <ArrowRight className="h-4 w-4 shrink-0" />
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 
