@@ -326,27 +326,44 @@ export default function RepeatHouseholdCoverageSurvey({
     setSubmitting(true);
     try {
       const gps = records.find((r) => r.gps)?.gps ?? initialGps ?? null;
-      const { error } = await supabase.from("household_coverage_surveys" as any).insert({
-        checklist_submission_id: checklistSubmissionId ?? null,
-        form_id: formId ?? null,
-        project_id: projectId ?? null,
-        user_id: user.id,
-        state: location?.state ?? null,
-        lga: location?.lga ?? null,
-        ward: location?.ward ?? null,
-        flhf_name: location?.flhf_name ?? null,
-        community_name: location?.community_name ?? null,
-        settlement_name: location?.settlement_name ?? null,
-        target_households: target,
-        completed_households: records.length,
-        shortfall_reason: reason.trim() || null,
-        households: records,
-        gps,
-        metadata: { source: "mda_checklist", submitted_at: new Date().toISOString() },
-      } as any);
-      if (error) throw error;
+      const submissionId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // Offline-first: insert immediately when online, otherwise persist in the
+      // IndexedDB queue and auto-sync to the server (and dashboard) on reconnect.
+      // The client-generated id + upsert-on-id keeps replays idempotent so a
+      // lost network ack never creates a duplicate survey.
+      const { queued } = await queueOrInsert(
+        "household_coverage_surveys",
+        {
+          id: submissionId,
+          checklist_submission_id: checklistSubmissionId ?? null,
+          form_id: formId ?? null,
+          project_id: projectId ?? null,
+          user_id: user.id,
+          state: location?.state ?? null,
+          lga: location?.lga ?? null,
+          ward: location?.ward ?? null,
+          flhf_name: location?.flhf_name ?? null,
+          community_name: location?.community_name ?? null,
+          settlement_name: location?.settlement_name ?? null,
+          target_households: target,
+          completed_households: records.length,
+          shortfall_reason: reason.trim() || null,
+          households: records,
+          gps,
+          metadata: { source: "mda_checklist", submitted_at: new Date().toISOString() },
+        },
+        true,
+      );
       setDone(true);
-      toast({ title: "Coverage survey submitted", description: `${records.length} household${records.length === 1 ? "" : "s"} recorded.` });
+      toast({
+        title: queued ? "Saved offline" : "Coverage survey submitted",
+        description: queued
+          ? `${records.length} household${records.length === 1 ? "" : "s"} saved on this device. It will sync automatically when you're back online.`
+          : `${records.length} household${records.length === 1 ? "" : "s"} recorded.`,
+      });
     } catch (e: any) {
       toast({ title: "Submission failed", description: e.message, variant: "destructive" });
     } finally {
