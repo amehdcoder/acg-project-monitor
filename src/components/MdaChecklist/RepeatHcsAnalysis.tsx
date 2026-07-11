@@ -57,7 +57,10 @@ interface SurveyRow {
   state: string | null;
   lga: string | null;
   ward: string | null;
+  flhf_name: string | null;
   community_name: string | null;
+  settlement_name: string | null;
+  user_id: string | null;
   target_households: number | null;
   completed_households: number | null;
   shortfall_reason: string | null;
