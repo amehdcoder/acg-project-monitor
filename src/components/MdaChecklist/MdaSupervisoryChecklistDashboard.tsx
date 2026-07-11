@@ -1346,7 +1346,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
 
       {/* ── Insightful, conditionally-formatted analyses ── */}
       <MdaAdvancedAnalyses
-        submissions={filtered as any}
+        submissions={deduped as any}
         questions={questions as any}
         projectName={projectName}
         followUpFields={new Set(Object.values(moduleQuestions).flatMap((s) => Array.from(s)))}
@@ -1355,7 +1355,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
 
       {/* ── Corrective Actions section: themes, word cloud & accountability ── */}
       <SectionErrorBoundary label="Corrective actions analysis">
-        <MdaCorrectiveActionsAnalysis submissions={filtered as any} />
+        <MdaCorrectiveActionsAnalysis submissions={deduped as any} />
       </SectionErrorBoundary>
 
       {/* ── Longitudinal follow-up outcome trend + duplicate community flags ── */}
