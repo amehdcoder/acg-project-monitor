@@ -234,9 +234,68 @@ export interface PreparedMdaData<T extends RawSubmission = RawSubmission> {
 }
 
 /**
+ * Deduplicate duplicate community checklist submissions.
+ *
+ * The Integrated MDA Supervisory Checklist can end up with several primary
+ * submissions for the SAME community (re-submissions, offline replays, multiple
+ * supervisors). Left unchecked these duplicates inflate every count and skew
+ * every gauge. This collapses them to ONE authoritative record per community —
+ * keeping the submission whose linked Repeat Household Coverage Survey captured
+ * the MOST households (richest visit), with the most recent submission as a
+ * tiebreaker. Follow-up submissions are always preserved untouched so the
+ * downstream follow-up merge in `prepareMdaData` still works.
+ *
+ * The result feeds every analysis on the dashboard so they all read a single,
+ * unique set of communities.
+ */
+export function dedupeMdaSubmissions<T extends RawSubmission>(
+  submissions: T[],
+  questions: RawQuestion[],
+  householdCountBySubmissionId?: Record<string, number>,
+): T[] {
+  const { followUp, checklistKeys } = collectGroups(questions);
+  const hasFollowUpGroups = followUp.length > 0;
+  const followUpOnly = new Set<string>();
+  for (const g of followUp) {
+    for (const n of g.questionNames) if (!checklistKeys.has(n)) followUpOnly.add(n);
+  }
+
+  const hc = householdCountBySubmissionId || {};
+  const followUpIds = new Set<string>();
+  const primaries: T[] = [];
+  for (const s of submissions) {
+    const keys = Object.keys(s.data || {});
+    const isFollowUp = hasFollowUpGroups && keys.some((k) => followUpOnly.has(k));
+    if (isFollowUp) followUpIds.add(s.id);
+    else primaries.push(s);
+  }
+
+  const best = new Map<string, T>();
+  for (const s of primaries) {
+    const k = communityKey(s);
+    const prev = best.get(k);
+    if (!prev) { best.set(k, s); continue; }
+    const cntS = hc[s.id] ?? -1;
+    const cntPrev = hc[prev.id] ?? -1;
+    if (cntS > cntPrev) best.set(k, s);
+    else if (
+      cntS === cntPrev &&
+      new Date(s.submittedAt || 0).getTime() > new Date(prev.submittedAt || 0).getTime()
+    ) {
+      best.set(k, s);
+    }
+  }
+  const keptIds = new Set(Array.from(best.values()).map((s) => s.id));
+
+  // Preserve original ordering; drop only the losing duplicate primaries.
+  return submissions.filter((s) => followUpIds.has(s.id) || keptIds.has(s.id));
+}
+
+/**
  * Classify and merge MDA submissions so the dashboard reflects reality:
  * one record per community visit, updated with the latest follow-up answers.
  */
+
 export function prepareMdaData<T extends RawSubmission>(
   submissions: T[],
   questions: RawQuestion[],

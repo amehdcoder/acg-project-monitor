@@ -33,7 +33,7 @@ import {
   ChevronDown, PenLine,
 } from "lucide-react";
 import { toast } from "sonner";
-import { prepareMdaData, communityKey, linkedCommunityKey } from "@/lib/mda/dashboardData";
+import { prepareMdaData, dedupeMdaSubmissions, communityKey, linkedCommunityKey } from "@/lib/mda/dashboardData";
 
 import { computeMdaKpis, buildMdaModel, type Heatmap as KHeatmap } from "@/lib/mda/kpis";
 import { exportKpiWorkbook, type KpiId } from "@/lib/mda/kpiExport";
@@ -428,6 +428,45 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   }, []);
   const handleHcaLoadState = useCallback((s: { loading: boolean; error: string | null }) => setHcaState(s), []);
 
+  // ── Linked Repeat Household Coverage Survey counts, keyed by the checklist
+  // submission they were captured against. Used to automatically deduplicate
+  // duplicate community checklist submissions: when the same community was
+  // submitted more than once, we keep the submission whose linked household
+  // survey captured MORE households so every analysis reflects the richest visit.
+  const [hhCountBySubmission, setHhCountBySubmission] = useState<Record<string, number>>({});
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const ids = Array.from(new Set(submissions.map((s) => s.id).filter(Boolean)));
+      if (ids.length === 0) { setHhCountBySubmission({}); return; }
+      try {
+        const map: Record<string, number> = {};
+        // Chunk the IN() filter to stay within URL limits on large datasets.
+        for (let i = 0; i < ids.length; i += 200) {
+          const chunk = ids.slice(i, i + 200);
+          const { data, error } = await supabase
+            .from("household_coverage_surveys")
+            .select("checklist_submission_id, completed_households, households")
+            .in("checklist_submission_id", chunk);
+          if (error) throw error;
+          for (const row of (data as any[]) || []) {
+            const key = row.checklist_submission_id;
+            if (!key) continue;
+            const count = Number(row.completed_households) ||
+              (Array.isArray(row.households) ? row.households.length : 0);
+            // A community may have several linked surveys — keep the largest.
+            map[key] = Math.max(map[key] ?? 0, count);
+          }
+        }
+        if (!cancelled) setHhCountBySubmission(map);
+      } catch {
+        if (!cancelled) setHhCountBySubmission({});
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [submissions]);
+
+
   // Module → question-name set (for classifying follow-up submissions).
   const moduleQuestions = useMemo(() => {
     const map: Record<string, Set<string>> = {};
@@ -560,10 +599,21 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     });
   }, [submissions, fState, fLga, fWard, fFlhf, fCommunities, fSettlement, fSubmitter, fStatus, fFrom, fTo, search]);
 
+  // Deduplicated view of the filtered submissions: one authoritative record per
+  // community (the visit with the most linked household-survey data). EVERY
+  // analysis below reads from this so counts, gauges, heatmaps, maps and the
+  // narrative engine all reflect unique communities only. The raw `filtered`
+  // list is retained solely for the duplicate-management UI, which must still
+  // see the duplicates in order to resolve them.
+  const deduped = useMemo(
+    () => dedupeMdaSubmissions(filtered as any, questions as any, hhCountBySubmission) as typeof filtered,
+    [filtered, questions, hhCountBySubmission],
+  );
+
 
   // Normalized submissions for the plain-language narrative engine.
   const narrativeSubs = useMemo(
-    () => filtered.map((s) => ({
+    () => deduped.map((s) => ({
       id: s.id,
       state: pickGeo(s, "state") || null,
       lga: pickGeo(s, "lga") || null,
@@ -572,27 +622,29 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       submitted_at: s.submittedAt || null,
       data: s.data || {},
     })),
-    [filtered],
+    [deduped],
   );
 
   // Clone the rows before merging so the KPI engine below always reads clean,
   // un-mutated first-visit answers (prepareMdaData overwrites linked fields).
   const prepared = useMemo(
-    () => prepareMdaData(filtered.map((s) => ({ ...s, data: { ...(s.data || {}) } })), questions as any),
-    [filtered, questions],
+    () => prepareMdaData(deduped.map((s) => ({ ...s, data: { ...(s.data || {}) } })), questions as any),
+    [deduped, questions],
   );
   const checklist = prepared.checklist;
   const followUps = prepared.followUps;
   const total = checklist.length;
 
   // Owner-defined KPI engine (resolves every determinant by question LABEL).
-  const kpis = useMemo(() => computeMdaKpis(filtered as any, questions as any), [filtered, questions]);
+  const kpis = useMemo(() => computeMdaKpis(deduped as any, questions as any), [deduped, questions]);
 
   // Shared authoritative model (resolves every determinant by question LABEL with
   // legacy-key fallbacks). Reused so the Longitudinal Linkage register reconciles
   // exactly with the headline KPIs/heatmaps instead of reading hard-coded fields
   // that break on copied projects whose question keys differ.
-  const mdaModel = useMemo(() => buildMdaModel(filtered as any, questions as any), [filtered, questions]);
+  const mdaModel = useMemo(() => buildMdaModel(deduped as any, questions as any), [deduped, questions]);
+
+
 
   // Follow-up determinant keys resolved by LABEL (work across projects):
   //  • commodity "available/sufficient now" answer in the Commodities module
@@ -647,7 +699,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     if (kpiExporting) return;
     setKpiExporting(id);
     try {
-      await exportKpiWorkbook(id, filtered as any, questions as any, formName || "Integrated MDA Supervisory Checklist", projectName);
+      await exportKpiWorkbook(id, deduped as any, questions as any, formName || "Integrated MDA Supervisory Checklist", projectName);
       toast.success("KPI data exported to Excel");
     } catch (e: any) {
       console.error("KPI export failed", e);
@@ -655,20 +707,20 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
     } finally {
       setKpiExporting(null);
     }
-  }, [kpiExporting, filtered, questions, formName, projectName]);
+  }, [kpiExporting, deduped, questions, formName, projectName]);
 
   // ── Heatmap cell drill-down ──────────────────────────────────
   const [drill, setDrill] = useState<DrillData | null>(null);
   const comRows = useMemo(() => {
     const m = new Map<string, MdaSubmission[]>();
-    for (const s of filtered) {
+    for (const s of deduped) {
       const k = communityKey(s as any);
       let arr = m.get(k);
       if (!arr) { arr = []; m.set(k, arr); }
       arr.push(s);
     }
     return m;
-  }, [filtered]);
+  }, [deduped]);
   const followUpFieldSet = useMemo(() => {
     const set = new Set<string>();
     for (const names of Object.values(moduleQuestions)) for (const n of names) set.add(n);
@@ -994,7 +1046,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   const handleExport = async () => {
     setExporting(true);
     try {
-      await exportMdaDashboard(filtered as any, questions as any, formName || "Integrated MDA Supervisory Checklist", projectName);
+      await exportMdaDashboard(deduped as any, questions as any, formName || "Integrated MDA Supervisory Checklist", projectName);
       toast.success("Dashboard exported to Excel");
     } catch (e: any) {
       toast.error(e?.message || "Could not export dashboard");
