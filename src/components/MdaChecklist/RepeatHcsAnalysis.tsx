@@ -515,6 +515,10 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
       {/* Full ward-level coverage matrix (LGA × Ward) */}
       <MdaCoverageMatrix surveys={rows as any} txTarget={txBenchmark} />
 
+      {/* Duplicate submissions — side-by-side comparison with owner delete */}
+      <RepeatHcsDuplicates surveys={rows as any} onDeleted={() => setReloadKey((k) => k + 1)} />
+
+
       {/* Households sampled per community */}
       <Section title="Households Sampled per Community" icon={Home} tint={TEAL} badge={`${a.communitySampled.length} communities`}>
         {(() => {
