@@ -58,7 +58,17 @@ export function useCustomBanks() {
       const { error } = await supabase
         .from("custom_banks")
         .insert({ value, label: name, code: code ?? null, created_by: user?.id ?? null });
-      if (error && !/duplicate|unique/i.test(error.message)) throw error;
+      // Persisting a new bank now requires admin/owner privileges. For non-admin
+      // field users the insert is rejected by RLS — that must NOT break the form,
+      // so we swallow permission/duplicate errors and fall back to the local
+      // slugified value. Only unexpected errors are surfaced.
+      if (
+        error &&
+        !/duplicate|unique/i.test(error.message) &&
+        !/row-level security|permission|policy|not authorized|denied/i.test(error.message)
+      ) {
+        throw error;
+      }
       await load();
       return value;
     },
