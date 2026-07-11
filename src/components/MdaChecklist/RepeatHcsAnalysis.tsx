@@ -247,7 +247,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
       try {
         let q = supabase
           .from("household_coverage_surveys" as any)
-          .select("id,state,lga,ward,community_name,target_households,completed_households,shortfall_reason,households,created_at")
+          .select("id,state,lga,ward,flhf_name,community_name,settlement_name,user_id,target_households,completed_households,shortfall_reason,households,created_at")
           .order("created_at", { ascending: false })
           .limit(2000);
         if (projectId) q = q.eq("project_id", projectId);
