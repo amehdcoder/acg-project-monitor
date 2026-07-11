@@ -9,11 +9,13 @@ import { startTimer } from "@/lib/metrics";
 import {
   getLatestOfflineCredential,
   getOfflineCredential,
+  listOfflineCredentials,
   refreshOfflineCredentialSnapshot,
   removeOfflineCredential,
   saveOfflineCredential,
   verifyOfflineCredentialPassword,
   type OfflineAuthCredential,
+
 } from "@/lib/offlineAuthCache";
 import { logOfflineAuditEvent, flushOfflineAuditQueue } from "@/lib/offlineAuditLog";
 import { checkOfflineLock, registerOfflineFailure, clearOfflineFailures } from "@/lib/offlineAuthThrottle";
@@ -267,11 +269,59 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
 
+  // Hydrate profile + role for a given user id straight from the encrypted
+  // device credential cache. Returns true when a matching cached profile was
+  // applied. Used for fully-offline subsequent opens and as a fallback when a
+  // live profile read is impossible. Matches by the resolved auth user id so a
+  // shared device with multiple cached accounts always restores the right one.
+  const hydrateCachedProfileFor = async (userId: string): Promise<boolean> => {
+    try {
+      const latest = await getLatestOfflineCredential();
+      let match = latest?.user?.id === userId ? latest : null;
+      if (!match) {
+        const all = await listOfflineCredentials();
+        match = all.find((c) => c.user?.id === userId) ?? null;
+      }
+      if (!match) return false;
+      if (match.profile) setProfile(match.profile as Profile);
+      if (match.role) setRole(match.role as AppRole);
+      return !!(match.profile || match.role);
+    } catch {
+      return false;
+    }
+  };
+
+
+
+
+
   const fetchProfile = async (userId: string, opts?: { silent?: boolean }) => {
     // Background refreshes keep the existing UI mounted — never gate the app.
     const silent = opts?.silent ?? false;
     try {
       if (!silent) setProfileLoading(true);
+
+      // ── Fully-offline subsequent open ────────────────────────────────────
+      // When there is no connectivity we must NOT fire the online profile/role
+      // reads (they can only fail after a wasted timeout, leaving profile/role
+      // null and silently breaking role-gated forms offline). Instead hydrate
+      // the encrypted device profile immediately so the user is dropped into a
+      // fully-usable, correctly-permissioned app with zero network. A later
+      // online boot reconciles fresh data via the normal path.
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        try {
+          const cached = await hydrateCachedProfileFor(userId);
+          if (cached) {
+            setProfileLoading(false);
+            return;
+          }
+        } catch {
+          /* fall through — nothing more we can do offline */
+        }
+        setProfileLoading(false);
+        return;
+      }
+
 
       // CRITICAL: the whole app is gated behind this fetch on first load. On a
       // slow/flaky field connection these queries can hang indefinitely, which
@@ -448,10 +498,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       setProfileLoading(false);
       initialLoadDoneRef.current = true;
-      window.setTimeout(() => {
-        void fetchProfile(bootStoredSession.user.id, { silent: true });
-      }, 6000);
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        // Fully offline: paint the correctly-permissioned app instantly from the
+        // encrypted device profile — no network wait, no null-role flicker.
+        void hydrateCachedProfileFor(bootStoredSession.user.id);
+      } else {
+        window.setTimeout(() => {
+          void fetchProfile(bootStoredSession.user.id, { silent: true });
+        }, 6000);
+      }
     }
+
 
     // Absolute safety net: no matter what stalls (getSession hanging, a wedged
     // network layer, a service worker intercepting the auth request), never
