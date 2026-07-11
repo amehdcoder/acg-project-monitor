@@ -19,6 +19,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { testAgainstBenchmark, type BenchmarkTest } from "@/lib/ces/coverageStats";
 import MdaCoverageMatrix from "./MdaCoverageMatrix";
+import RepeatHcsDuplicates from "./RepeatHcsDuplicates";
 
 /* ─────────────────────────── palette ─────────────────────────── */
 const EMERALD = "#10b981";
@@ -57,7 +58,10 @@ interface SurveyRow {
   state: string | null;
   lga: string | null;
   ward: string | null;
+  flhf_name: string | null;
   community_name: string | null;
+  settlement_name: string | null;
+  user_id: string | null;
   target_households: number | null;
   completed_households: number | null;
   shortfall_reason: string | null;
@@ -244,7 +248,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
       try {
         let q = supabase
           .from("household_coverage_surveys" as any)
-          .select("id,state,lga,ward,community_name,target_households,completed_households,shortfall_reason,households,created_at")
+          .select("id,state,lga,ward,flhf_name,community_name,settlement_name,user_id,target_households,completed_households,shortfall_reason,households,created_at")
           .order("created_at", { ascending: false })
           .limit(2000);
         if (projectId) q = q.eq("project_id", projectId);
@@ -510,6 +514,10 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
 
       {/* Full ward-level coverage matrix (LGA × Ward) */}
       <MdaCoverageMatrix surveys={rows as any} txTarget={txBenchmark} />
+
+      {/* Duplicate submissions — side-by-side comparison with owner delete */}
+      <RepeatHcsDuplicates surveys={rows as any} onDeleted={() => setReloadKey((k) => k + 1)} />
+
 
       {/* Households sampled per community */}
       <Section title="Households Sampled per Community" icon={Home} tint={TEAL} badge={`${a.communitySampled.length} communities`}>
