@@ -113,11 +113,14 @@ export default function RepeatHcsDuplicates({ surveys, onDeleted }: Props) {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, full_name, email")
+        .select("id, first_name, last_name, email")
         .in("id", ids);
       if (cancelled || !data) return;
       const map: Record<string, string> = {};
-      for (const p of data as any[]) map[p.id] = p.full_name || p.email || "Unknown";
+      for (const p of data as any[]) {
+        const full = [p.first_name, p.last_name].filter(Boolean).join(" ").trim();
+        map[p.id] = full || p.email || "Unknown";
+      }
       setNames(map);
     })();
     return () => { cancelled = true; };
