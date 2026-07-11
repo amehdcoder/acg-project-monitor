@@ -267,6 +267,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
 
+  // Hydrate profile + role for a given user id straight from the encrypted
+  // device credential cache. Returns true when a matching cached profile was
+  // applied. Used for fully-offline subsequent opens and as a fallback when a
+  // live profile read is impossible. Matches by the resolved auth user id so a
+  // shared device with multiple cached accounts always restores the right one.
+  const hydrateCachedProfileFor = async (userId: string): Promise<boolean> => {
+    try {
+      const latest = await getLatestOfflineCredential();
+      let match = latest?.user?.id === userId ? latest : null;
+      if (!match) {
+        const all = await listOfflineCredentials();
+        match = all.find((c) => c.user?.id === userId) ?? null;
+      }
+      if (!match) return false;
+      if (match.profile) setProfile(match.profile as Profile);
+      if (match.role) setRole(match.role as AppRole);
+      return !!(match.profile || match.role);
+    } catch {
+      return false;
+    }
+  };
+
+
+
+
+
   const fetchProfile = async (userId: string, opts?: { silent?: boolean }) => {
     // Background refreshes keep the existing UI mounted — never gate the app.
     const silent = opts?.silent ?? false;
