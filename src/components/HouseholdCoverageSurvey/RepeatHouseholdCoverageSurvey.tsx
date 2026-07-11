@@ -121,6 +121,37 @@ const emptyHousehold = (n: number): HouseholdRecord => ({
 
 const TEAL = "#0d9488";
 
+/* ------------------------------------------------------------------ */
+/* Draft persistence                                                   */
+/* Keeps in-progress households on the device so a reload / crash /     */
+/* accidental close never loses previously captured households. The     */
+/* draft is cleared only once the survey is successfully submitted.     */
+/* ------------------------------------------------------------------ */
+
+const HCS_DRAFT_PREFIX = "hcs_repeat_draft_";
+
+const normDraftKey = (v: any) => String(v ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+function buildHcsDraftKey(
+  checklistSubmissionId: string | null | undefined,
+  location: HcsLocation | undefined,
+): string {
+  if (checklistSubmissionId) return `${HCS_DRAFT_PREFIX}${checklistSubmissionId}`;
+  const loc = location || {};
+  return (
+    HCS_DRAFT_PREFIX +
+    [loc.state, loc.lga, loc.ward, loc.flhf_name, loc.community_name, loc.settlement_name]
+      .map(normDraftKey)
+      .join("|")
+  );
+}
+
+interface HcsDraft {
+  completed: HouseholdRecord[];
+  current: HouseholdRecord;
+  savedAt: string;
+}
+
 /** Small pill radio used throughout the form. */
 function PillOptions<T extends string>({
   value,
@@ -243,12 +274,45 @@ export default function RepeatHouseholdCoverageSurvey({
   const geo = useGeolocation();
 
   const target = Math.max(1, targetHouseholds || 1);
-  const [completed, setCompleted] = useState<HouseholdRecord[]>([]);
-  const [current, setCurrent] = useState<HouseholdRecord>(() => emptyHousehold(1));
+  const draftKey = useMemo(
+    () => buildHcsDraftKey(checklistSubmissionId, location),
+    [checklistSubmissionId, location],
+  );
+
+  // Restore any previously captured (but unsubmitted) households for this
+  // community so a reload / crash / accidental close never loses work.
+  const restoredDraft = useRef<HcsDraft | null>(null);
+  if (restoredDraft.current === null) {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      restoredDraft.current = raw ? (JSON.parse(raw) as HcsDraft) : ({} as HcsDraft);
+    } catch {
+      restoredDraft.current = {} as HcsDraft;
+    }
+  }
+
+  const [completed, setCompleted] = useState<HouseholdRecord[]>(
+    () => restoredDraft.current?.completed ?? [],
+  );
+  const [current, setCurrent] = useState<HouseholdRecord>(
+    () => restoredDraft.current?.current ?? emptyHousehold(1),
+  );
   const [submitting, setSubmitting] = useState(false);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const [shortfallReason, setShortfallReason] = useState("");
   const [done, setDone] = useState(false);
+
+  // Persist in-progress households whenever they change (until submitted).
+  useEffect(() => {
+    if (done) return;
+    try {
+      const draft: HcsDraft = { completed, current, savedAt: new Date().toISOString() };
+      localStorage.setItem(draftKey, JSON.stringify(draft));
+    } catch {
+      /* ignore quota / serialization errors */
+    }
+  }, [completed, current, done, draftKey]);
+
 
   const reachedTarget = completed.length >= target;
 
@@ -359,6 +423,10 @@ export default function RepeatHouseholdCoverageSurvey({
         true,
       );
       setDone(true);
+      // Survey submitted (online or offline) — clear the on-device draft so it
+      // never prompts to resume previously captured households again.
+      try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
+
       toast({
         title: queued ? "Saved offline" : "Coverage survey submitted",
         description: queued
