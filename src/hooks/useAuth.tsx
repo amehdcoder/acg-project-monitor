@@ -273,6 +273,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       if (!silent) setProfileLoading(true);
 
+      // ── Fully-offline subsequent open ────────────────────────────────────
+      // When there is no connectivity we must NOT fire the online profile/role
+      // reads (they can only fail after a wasted timeout, leaving profile/role
+      // null and silently breaking role-gated forms offline). Instead hydrate
+      // the encrypted device profile immediately so the user is dropped into a
+      // fully-usable, correctly-permissioned app with zero network. A later
+      // online boot reconciles fresh data via the normal path.
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        try {
+          const cached = await hydrateCachedProfileFor(userId);
+          if (cached) {
+            setProfileLoading(false);
+            return;
+          }
+        } catch {
+          /* fall through — nothing more we can do offline */
+        }
+        setProfileLoading(false);
+        return;
+      }
+
+
       // CRITICAL: the whole app is gated behind this fetch on first load. On a
       // slow/flaky field connection these queries can hang indefinitely, which
       // left the user stuck on the boot spinner forever. Race them against a
