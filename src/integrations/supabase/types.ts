@@ -3723,6 +3723,7 @@ export type Database = {
           synced_at: string | null
           updated_at: string
           user_id: string
+          version: number
           within_geofence: boolean | null
         }
         Insert: {
@@ -3739,6 +3740,7 @@ export type Database = {
           synced_at?: string | null
           updated_at?: string
           user_id: string
+          version?: number
           within_geofence?: boolean | null
         }
         Update: {
@@ -3755,6 +3757,7 @@ export type Database = {
           synced_at?: string | null
           updated_at?: string
           user_id?: string
+          version?: number
           within_geofence?: boolean | null
         }
         Relationships: [
@@ -8412,6 +8415,28 @@ export type Database = {
           today_max: string
           today_min: string
           user_id: string
+        }[]
+      }
+      update_submission_guarded: {
+        Args: {
+          p_data: Json
+          p_expected_version: number
+          p_id: string
+          p_location?: Json
+          p_status?: string
+          p_within_geofence?: boolean
+        }
+        Returns: {
+          conflict: boolean
+          data: Json
+          form_id: string
+          id: string
+          location: Json
+          status: string
+          updated_at: string
+          user_id: string
+          version: number
+          within_geofence: boolean
         }[]
       }
       user_can_access_chat_group: {
