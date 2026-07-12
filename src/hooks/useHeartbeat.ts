@@ -166,6 +166,7 @@ export function useHeartbeat() {
         // Always update device info and last_seen_at first (don't wait for IP)
         const updateData: Record<string, unknown> = {
           last_seen_at: new Date().toISOString(),
+          current_version: LATEST_PUBLISHED_VERSION,
           last_device_type: deviceDescription,
           device_info: {
             type: deviceType,
