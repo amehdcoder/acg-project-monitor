@@ -116,6 +116,7 @@ const App = () => (
                  <Route path="/data-cleaner" element={<ProtectedRoute><DataCleaner /></ProtectedRoute>} />
                  <Route path="/learning-log" element={<ProtectedRoute><LearningLog /></ProtectedRoute>} />
                   <Route path="/__test/mda-analyses" element={<MdaAnalysesHarness />} />
+                  <Route path="/shared/dashboard/:token" element={<SharedDashboard />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </ImpersonationProvider>
