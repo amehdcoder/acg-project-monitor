@@ -34,7 +34,8 @@ const NAVY = "#0c2340";
 const NAVY_SOFT = "#173a63";
 
 const DEFAULT_TX_BENCHMARK = 75; // therapeutic coverage target (%)
-const DEFAULT_HH_BENCHMARK = 90; // household reach target (%)
+/** Household reach target is a fixed, non-editable 100% threshold. */
+const HH_BENCHMARK = 100; // household reach target (%) — static, uneditable
 
 const norm = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const pct = (a: number, b: number) => (b > 0 ? (a / b) * 100 : 0);
@@ -74,9 +75,16 @@ interface SurveyRow {
 
 /* ─────────────────────────── metrics ─────────────────────────── */
 const personsOffered = (h: HouseholdRecord) =>
-  Math.max(Number(h.offered_count) || 0, (h.people || []).filter((p) => norm(p.offered) === "y").length);
-const personsSwallowed = (h: HouseholdRecord) =>
-  Math.max(Number(h.swallowed_count) || 0, (h.people || []).filter((p) => norm(p.swallowed) === "y").length);
+  Math.max(0, Math.round(Math.max(Number(h.offered_count) || 0, (h.people || []).filter((p) => norm(p.offered) === "y").length)));
+/**
+ * Treated (swallowed) persons can never exceed the eligible persons offered
+ * treatment — clamp to the offered count to keep therapeutic coverage ≤ 100%
+ * and prevent impossible >100% aggregates at community/LGA level.
+ */
+const personsSwallowed = (h: HouseholdRecord) => {
+  const raw = Math.max(0, Math.round(Math.max(Number(h.swallowed_count) || 0, (h.people || []).filter((p) => norm(p.swallowed) === "y").length)));
+  return Math.min(raw, personsOffered(h));
+};
 
 interface GeoRow {
   key: string; label: string; sub: string;
@@ -262,7 +270,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [txBenchmark, setTxBenchmark] = useState(DEFAULT_TX_BENCHMARK);
-  const [hhBenchmark, setHhBenchmark] = useState(DEFAULT_HH_BENCHMARK);
+  const hhBenchmark = HH_BENCHMARK; // fixed 100% household reach target — not user-editable
   const [geoLevel, setGeoLevel] = useState<"lga" | "community">("lga");
   const [commSearch, setCommSearch] = useState("");
   const [commSort, setCommSort] = useState<"count-desc" | "count-asc" | "name">("count-desc");
@@ -430,12 +438,15 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Reach target %</Label>
-              <Input type="number" value={hhBenchmark} min={1} max={100}
-                onChange={(e) => setHhBenchmark(Math.max(1, Math.min(100, Number(e.target.value) || 0)))}
-                className="h-8 w-20" />
+              <div className="flex h-8 w-20 items-center justify-center gap-1 rounded-md border border-border bg-muted/60 text-sm font-semibold text-foreground"
+                title="Household reach benchmark is fixed at 100% and cannot be changed.">
+                <Target className="h-3.5 w-3.5 text-emerald-600" />
+                {HH_BENCHMARK}%
+              </div>
             </div>
           </div>
         </div>
+
         <CardContent className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-3 lg:grid-cols-6">
           <Kpi label="Surveys" value={a.totalSurveys.toLocaleString()} sub={`${a.communities} communities · ${a.lgas} LGAs`} icon={MapPinned} tint={SLATE} />
           <Kpi label="Households" value={a.totalHh.toLocaleString()} icon={Home} tint={TEAL} />
