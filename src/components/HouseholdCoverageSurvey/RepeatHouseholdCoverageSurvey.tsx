@@ -786,7 +786,7 @@ export default function RepeatHouseholdCoverageSurvey({
             SECTION F: ADHERENCE &amp; QUALITY
           </div>
           <div className="p-4 space-y-4 bg-purple-50/40">
-            <FRow code="F1" text="Were you asked your height before receiving the medicine?">
+            <FRow code="F1" text="Was your height measured using a dose pole/tape before receiving the medicine?">
               <PillOptions
                 color="#7c3aed"
                 value={current.f1_asked_height}
@@ -797,6 +797,58 @@ export default function RepeatHouseholdCoverageSurvey({
                   { value: "na", label: "Not applicable" },
                 ]}
               />
+            </FRow>
+            <FRow code="F1b" text="Medicine Received">
+              <Select
+                value={current.medicine_received}
+                onValueChange={(v) => update({ medicine_received: v as HouseholdRecord["medicine_received"] })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select medicine received" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mectizan_only">Mectizan Only</SelectItem>
+                  <SelectItem value="mectizan_albendazole">Mectizan &amp; Albendazole</SelectItem>
+                  <SelectItem value="praziquantel">Praziquantel</SelectItem>
+                  <SelectItem value="azt_tabs">AZT Tabs</SelectItem>
+                  <SelectItem value="azt_pos">AZT POS</SelectItem>
+                  <SelectItem value="teo">TEO</SelectItem>
+                </SelectContent>
+              </Select>
+            </FRow>
+            <FRow code="F1c" text="Taste of the Medicine">
+              <Select
+                value={current.taste_of_medicine}
+                onValueChange={(v) =>
+                  update({
+                    taste_of_medicine: v as HouseholdRecord["taste_of_medicine"],
+                    ...(v !== "other" ? { taste_other: "" } : {}),
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select taste" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sweet">Sweet</SelectItem>
+                  <SelectItem value="bitter">Bitter</SelectItem>
+                  <SelectItem value="sour">Sour</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+              {current.taste_of_medicine === "other" && (
+                <div className="mt-3">
+                  <Label className="text-xs font-medium">
+                    Please specify other taste <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    className="mt-1"
+                    value={current.taste_other}
+                    onChange={(e) => update({ taste_other: e.target.value })}
+                    placeholder="Describe the taste…"
+                  />
+                </div>
+              )}
             </FRow>
             <FRow code="F2" text="Are you satisfied with how the drug distribution was done in your community?">
               <PillOptions
