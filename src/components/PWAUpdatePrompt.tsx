@@ -102,6 +102,12 @@ const PWAUpdatePrompt = () => {
 
   const handleUpdate = async () => {
     setIsUpdating(true);
+    // Immediately skip the waiting service worker so the newest build takes
+    // control before we reload — this flash-mounts the latest shell instantly.
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration();
+      reg?.waiting?.postMessage({ type: "SKIP_WAITING" });
+    } catch { /* best-effort */ }
     // Watchdog: guarantee the update completes from a single click even if the
     // cache purge / service-worker swap hangs. After 6s force a cache-busted reload.
     const watchdog = setTimeout(() => {
