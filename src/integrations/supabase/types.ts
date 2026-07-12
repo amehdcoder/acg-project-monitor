@@ -4646,6 +4646,48 @@ export type Database = {
           },
         ]
       }
+      mda_sync_job_runs: {
+        Row: {
+          details: Json
+          error: string | null
+          finished_at: string | null
+          forms_scanned: number
+          id: string
+          references_promoted: number
+          references_scanned: number
+          started_at: string
+          status: string
+          submissions_rewritten: number
+          submissions_scanned: number
+        }
+        Insert: {
+          details?: Json
+          error?: string | null
+          finished_at?: string | null
+          forms_scanned?: number
+          id?: string
+          references_promoted?: number
+          references_scanned?: number
+          started_at?: string
+          status?: string
+          submissions_rewritten?: number
+          submissions_scanned?: number
+        }
+        Update: {
+          details?: Json
+          error?: string | null
+          finished_at?: string | null
+          forms_scanned?: number
+          id?: string
+          references_promoted?: number
+          references_scanned?: number
+          started_at?: string
+          status?: string
+          submissions_rewritten?: number
+          submissions_scanned?: number
+        }
+        Relationships: []
+      }
       mda_tile_icons: {
         Row: {
           form_id: string
@@ -8249,6 +8291,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      invoke_mda_sync_job: { Args: never; Returns: undefined }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_assignment_active: {
         Args: { _expires_at: string; _starts_at: string }
@@ -8266,6 +8309,10 @@ export type Database = {
       is_dashboard_admin: { Args: { _user_id: string }; Returns: boolean }
       is_email_deleted: { Args: { _email: string }; Returns: boolean }
       is_irf_admin: { Args: never; Returns: boolean }
+      is_mda_checklist_form: {
+        Args: { _name: string; _settings: Json }
+        Returns: boolean
+      }
       is_mesh_room_member: { Args: { _room_id: string }; Returns: boolean }
       is_office_approver: {
         Args: { _role: string; _user_id: string }
@@ -8290,6 +8337,10 @@ export type Database = {
       is_standard_forms_restricted: {
         Args: { _user_id: string }
         Returns: boolean
+      }
+      jsonb_replace_local_reference_ids: {
+        Args: { _value: Json }
+        Returns: Json
       }
       log_access_attempt: {
         Args: {
@@ -8494,6 +8545,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      sync_mda_offline_rewritten_keys: { Args: never; Returns: Json }
       update_submission_guarded: {
         Args: {
           p_data: Json
