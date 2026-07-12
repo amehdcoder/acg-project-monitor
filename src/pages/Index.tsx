@@ -292,6 +292,7 @@ const Index = () => {
       case "offline-form-share": return <OfflineFormShare />;
       case "version-history": return <VersionHistoryViewer />;
       case "security-audit": return <SecurityAuditView />;
+      case "version-audit": return isAdmin ? <AppVersionAuditView /> : guardedPage("__admin_only__", <></>);
       case "image-recognition": return guardedPage("image-recognition", <ImageRecognitionCapture />);
       case "nfc-rfid": return <NfcRfidCollector />;
       case "social-share": return <SocialShareView />;
