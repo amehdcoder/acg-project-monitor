@@ -48,6 +48,8 @@ import {
   MapPinned, Lock, PlusCircle, Loader2, Info, CheckCircle2, DownloadCloud, WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useInstantLocation } from "@/hooks/useInstantLocation";
+import LocationStatusBadge from "@/components/LocationStatusBadge";
 
 interface GeoRow {
   state: string | null;
