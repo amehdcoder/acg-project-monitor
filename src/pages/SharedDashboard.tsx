@@ -141,7 +141,7 @@ export default function SharedDashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent className="pb-8">
-              <Button className="w-full" onClick={() => { window.location.href = `/auth?returnTo=${returnTo}`; }}>
+              <Button className="w-full" onClick={goSignIn}>
                 Sign in
               </Button>
             </CardContent>
