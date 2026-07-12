@@ -602,9 +602,11 @@ export const useOfflineStorage = () => {
               location,
               within_geofence: withinGeofence,
               status: "sent",
-              submitted_at: new Date().toISOString(),
+              submitted_at: capturedAt,
               synced_at: new Date().toISOString(),
               submission_type: submissionType,
+              submission_uuid: submissionId,
+              client_submitted_at: capturedAt,
             })
             .select()
             .single();
