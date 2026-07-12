@@ -419,6 +419,27 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
         {canManageAccess && (
           <DashboardAccessManager open={showAccess} onOpenChange={setShowAccess} dashboardId="mda_supervisory" projectId={form.project_id} />
         )}
+        {canShare && (
+          <DashboardShareManager
+            open={showShare}
+            onOpenChange={setShowShare}
+            dashboardId="mda_supervisory"
+            dashboardName="Integrated MDA Supervisory Dashboard"
+            projectId={form.project_id}
+            form={{
+              id: form.id,
+              name: form.name,
+              snapshot: {
+                id: form.id,
+                name: form.name,
+                questions: form.questions ?? [],
+                groups: form.groups ?? [],
+                settings: form.settings ?? {},
+                status: (form as any).status ?? "published",
+              },
+            }}
+          />
+        )}
 
       </div>
 
