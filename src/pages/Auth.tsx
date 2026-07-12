@@ -122,7 +122,7 @@ const Auth = () => {
 
   useEffect(() => {
     if (user && !authLoading) {
-      navigate("/");
+      navigate(consumeDeepLink("/"), { replace: true });
     }
   }, [user, authLoading, navigate]);
 
