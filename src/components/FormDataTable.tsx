@@ -162,12 +162,25 @@ const FormDataTable = ({
     });
     setEditData(editable);
     setIsEditing(true);
+    // Snapshot the current server version so a concurrent edit is detectable.
+    if (usesGuardedUpdate && !isPending) {
+      baseVersionRef.current = null;
+      void supabase
+        .from("form_submissions")
+        .select("version")
+        .eq("id", submissionId)
+        .maybeSingle()
+        .then(({ data: row }) => {
+          baseVersionRef.current = (row as any)?.version ?? null;
+        });
+    }
   };
 
   const cancelEditing = () => {
     setIsEditing(false);
     setEditData({});
   };
+
 
   const handleFieldChange = (entry: Entry, newValue: string) => {
     const type = entry.descriptor?.type;
