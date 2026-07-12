@@ -380,9 +380,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   // each one. Populated with a single batched query (no N+1).
   const [submissionCounts, setSubmissionCounts] = useState<Record<string, number>>({});
   const canSeeSubmissionCounts = isOwnerLevel || isAdmin;
-  // Load exact submission counts (owner/admin only). One head-count request per
-  // form, batched with Promise.all so the Forms list can badge every checklist
-  // with how many submissions it actually holds.
+  // Load exact submission counts (owner/admin only) through the same backend
+  // scope used by dashboard lists. This avoids the old direct 5,000-row capped
+  // read, which could disagree with the MDA dashboard count after RLS changes.
   const formIdsKey = forms.map((f) => f.id).join(",");
   useEffect(() => {
     if (!canSeeSubmissionCounts || !navigator.onLine) return;
@@ -395,18 +395,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     (async () => {
       try {
         const { data } = await withTimeoutFallback(
-          supabase
-            .from("form_submissions")
-            .select("form_id")
-            .in("form_id", ids)
-            .limit(5000),
+          (supabase as any).rpc("visible_form_submission_counts", { _form_ids: ids }),
           8000,
           { data: [] } as any,
         );
         if (cancelled) return;
         const counts: Record<string, number> = {};
         ids.forEach((id) => { counts[id] = 0; });
-        (data || []).forEach((row: any) => { counts[row.form_id] = (counts[row.form_id] || 0) + 1; });
+        (data || []).forEach((row: any) => { counts[row.form_id] = Number(row.total || 0); });
         setSubmissionCounts(counts);
       } catch (e) {
         console.warn("Failed to load submission counts:", e);
