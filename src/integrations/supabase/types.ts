@@ -8061,6 +8061,8 @@ export type Database = {
           uid: string
         }[]
       }
+      accessible_form_ids: { Args: { _user_id: string }; Returns: string[] }
+      accessible_project_ids: { Args: { _user_id: string }; Returns: string[] }
       approve_after_hours_request: {
         Args: { p_id: string }
         Returns: undefined
