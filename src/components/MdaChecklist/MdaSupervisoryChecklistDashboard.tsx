@@ -1153,6 +1153,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         }}
         afterHoursLog
         afterHoursTables={["form_submissions"]}
+        collapsibleIssues
 
       />
       {/* Hypothesis testing for Therapeutic & Household coverage lives in the
