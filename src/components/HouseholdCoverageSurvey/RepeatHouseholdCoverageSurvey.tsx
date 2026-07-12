@@ -274,6 +274,7 @@ export default function RepeatHouseholdCoverageSurvey({
   projectId,
   formId,
   checklistSubmissionId,
+  onFinalizeChecklist,
   targetHouseholds,
   location,
   initialGps,
