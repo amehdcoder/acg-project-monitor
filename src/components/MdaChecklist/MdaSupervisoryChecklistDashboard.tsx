@@ -55,6 +55,7 @@ import SupervisorSignatureGallery from "./SupervisorSignatureGallery";
 import SectionErrorBoundary from "./SectionErrorBoundary";
 import MdaAdvancedAnalyses from "./MdaAdvancedAnalyses";
 import MdaCorrectiveActionsAnalysis from "./MdaCorrectiveActionsAnalysis";
+import { labelPillStyle } from "@/lib/lgaColors";
 import MdaLongitudinalInsights from "./MdaLongitudinalInsights";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import { useAuth } from "@/hooks/useAuth";
@@ -93,6 +94,7 @@ interface Props {
 
 // ───────────────────────── Palette ─────────────────────────
 const NAVY = "#0c2340";
+const NAVY_SOFT = "#173a63";
 const BLUE = "#2563eb";
 const TEAL = "#14b8a6";
 const EMERALD = "#10b981";
@@ -1378,27 +1380,30 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         <CardContent className="p-0">
           <div className="max-h-[460px] overflow-auto">
             <table className="w-full text-xs">
-              <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
-                <tr className="text-left text-[11px] text-muted-foreground">
-                  <th className="px-3 py-2 font-semibold">Community</th>
-                  <th className="px-3 py-2 font-semibold">Ward · LGA</th>
-                  <th className="px-3 py-2 font-semibold">Visit</th>
-                  <th className="px-3 py-2 font-semibold">MDA Completion</th>
-                  <th className="px-3 py-2 font-semibold">Commodities</th>
-                  <th className="px-3 py-2 font-semibold">Adverse</th>
-                  <th className="px-3 py-2 font-semibold">Supervisor</th>
+              <thead className="sticky top-0 z-10" style={{ background: `linear-gradient(135deg, ${NAVY}, ${NAVY_SOFT})` }}>
+                <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-white">
+                  <th className="px-3 py-2">Community</th>
+                  <th className="px-3 py-2">Ward · LGA</th>
+                  <th className="px-3 py-2">Visit</th>
+                  <th className="px-3 py-2">MDA Completion</th>
+                  <th className="px-3 py-2">Commodities</th>
+                  <th className="px-3 py-2">Adverse</th>
+                  <th className="px-3 py-2">Supervisor</th>
                 </tr>
               </thead>
               <tbody>
                 {linkage.length === 0 ? (
                   <tr><td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">No communities match the current filters.</td></tr>
-                ) : register.paginatedData.map((r) => (
-                  <tr key={r.id} className="border-t border-border/60 hover:bg-muted/40">
+                ) : register.paginatedData.map((r, ri) => (
+                  <tr key={r.id} className={`border-t border-border/60 hover:bg-primary/5 ${ri % 2 ? "bg-muted/40" : ""}`}>
                     <td className="px-3 py-2">
                       <div className="font-semibold text-foreground">{r.community}</div>
                       {r.risk && <span className="text-[10px]" style={{ color: norm(r.risk) === "high" ? RED : SLATE }}>{r.risk} risk</span>}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">{r.ward} · {r.lga}</td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      <span className="text-foreground">{r.ward}</span>
+                      {r.lga && <span className="ml-1.5 inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold align-middle" style={labelPillStyle(r.lga)}>{r.lga}</span>}
+                    </td>
                     <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{r.visitDate}</td>
                     <td className="px-3 py-2">
                       {r.hasCompletion
@@ -1530,20 +1535,20 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         <CardContent className="p-0">
           <div className="max-h-[320px] overflow-auto">
             <table className="w-full text-xs">
-              <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
-                <tr className="text-left text-[11px] text-muted-foreground">
-                  <th className="px-3 py-2 font-semibold">Field worker</th>
-                  <th className="px-3 py-2 text-right font-semibold">Checklist</th>
-                  <th className="px-3 py-2 text-right font-semibold">Follow-ups</th>
-                  <th className="px-3 py-2 text-right font-semibold">Total</th>
-                  <th className="px-3 py-2 text-right font-semibold">Communities</th>
-                  <th className="px-3 py-2 text-right font-semibold">Days worked</th>
-                  <th className="px-3 py-2 text-right font-semibold">Last active</th>
+              <thead className="sticky top-0 z-10" style={{ background: `linear-gradient(135deg, ${NAVY}, ${NAVY_SOFT})` }}>
+                <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-white">
+                  <th className="px-3 py-2">Field worker</th>
+                  <th className="px-3 py-2 text-right">Checklist</th>
+                  <th className="px-3 py-2 text-right">Follow-ups</th>
+                  <th className="px-3 py-2 text-right">Total</th>
+                  <th className="px-3 py-2 text-right">Communities</th>
+                  <th className="px-3 py-2 text-right">Days worked</th>
+                  <th className="px-3 py-2 text-right">Last active</th>
                 </tr>
               </thead>
               <tbody>
-                {workers.map((w) => (
-                  <tr key={w.name} className="border-t border-border/60 hover:bg-muted/40">
+                {workers.map((w, wi) => (
+                  <tr key={w.name} className={`border-t border-border/60 hover:bg-primary/5 ${wi % 2 ? "bg-muted/40" : ""}`}>
                     <td className="px-3 py-2 font-medium text-foreground">{w.name}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmt(w.checklist)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmt(w.followups)}</td>

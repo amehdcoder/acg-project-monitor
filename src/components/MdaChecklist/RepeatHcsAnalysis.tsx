@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { testAgainstBenchmark, type BenchmarkTest } from "@/lib/ces/coverageStats";
 import MdaCoverageMatrix from "./MdaCoverageMatrix";
 import RepeatHcsDuplicates from "./RepeatHcsDuplicates";
+import { labelPillStyle } from "@/lib/lgaColors";
 
 /* ─────────────────────────── palette ─────────────────────────── */
 const EMERALD = "#10b981";
@@ -29,6 +30,8 @@ const BLUE = "#2563eb";
 const TEAL = "#14b8a6";
 const PURPLE = "#7c3aed";
 const SLATE = "#64748b";
+const NAVY = "#0c2340";
+const NAVY_SOFT = "#173a63";
 
 const DEFAULT_TX_BENCHMARK = 75; // therapeutic coverage target (%)
 const DEFAULT_HH_BENCHMARK = 90; // household reach target (%)
@@ -510,32 +513,46 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
           </ResponsiveContainer>
           </div>
         </div>
-        <div className="mt-3 max-h-[360px] overflow-auto rounded-lg border border-border/60">
+        <div className="mt-3 max-h-[360px] overflow-auto rounded-lg border border-border/60 shadow-sm">
           <table className="w-full text-xs">
-            <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
-              <tr className="text-left text-[11px] text-muted-foreground">
-                <th className="px-3 py-2 font-semibold">{geoLevel === "lga" ? "LGA" : "Community"}</th>
-                <th className="px-3 py-2 text-right font-semibold">HH</th>
-                <th className="px-3 py-2 text-right font-semibold">Reach</th>
-                <th className="px-3 py-2 text-right font-semibold">Therapeutic</th>
-                <th className="px-3 py-2 font-semibold">Verdict</th>
+            <thead className="sticky top-0 z-10" style={{ background: `linear-gradient(135deg, ${NAVY}, ${NAVY_SOFT})` }}>
+              <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-white">
+                <th className="px-3 py-2">{geoLevel === "lga" ? "LGA" : "Community"}</th>
+                <th className="px-3 py-2 text-right">HH</th>
+                <th className="px-3 py-2 text-right">Reach</th>
+                <th className="px-3 py-2 text-right">Therapeutic</th>
+                <th className="px-3 py-2">Verdict</th>
               </tr>
             </thead>
             <tbody>
-              {a.geoRows.map((r) => (
-                <tr key={r.key} className="border-t border-border/60 hover:bg-muted/40">
+              {a.geoRows.map((r, i) => {
+                const reachV = pct(r.cddYes, r.households);
+                const txV = pct(r.swallowed, r.offered);
+                const txOk = txV >= txBenchmark;
+                const reachOk = reachV >= hhBenchmark;
+                return (
+                <tr key={r.key} className={`border-t border-border/60 hover:bg-primary/5 ${i % 2 ? "bg-muted/40" : ""}`}>
                   <td className="px-3 py-2">
-                    <div className="font-semibold text-foreground">{r.label}</div>
-                    <div className="text-[10px] text-muted-foreground">{r.sub}</div>
+                    <span className="inline-block max-w-[220px] truncate rounded-md px-2 py-0.5 text-[11px] font-semibold align-middle" style={labelPillStyle(r.label)}>{r.label}</span>
+                    <div className="mt-0.5 text-[10px] text-muted-foreground">{r.sub}</div>
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{r.households}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{pct(r.cddYes, r.households).toFixed(0)}%</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-semibold" style={{ color: pct(r.swallowed, r.offered) < txBenchmark ? RED : EMERALD }}>
-                    {r.offered > 0 ? `${pct(r.swallowed, r.offered).toFixed(0)}%` : "—"}
+                  <td className="px-3 py-2 text-right">
+                    <span className="inline-block rounded-md px-2 py-0.5 text-[11px] font-bold tabular-nums" style={{ background: `${(reachOk ? EMERALD : AMBER)}1a`, color: reachOk ? EMERALD : AMBER }}>
+                      {reachV.toFixed(0)}%
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {r.offered > 0 ? (
+                      <span className="inline-block rounded-md px-2 py-0.5 text-[11px] font-bold tabular-nums" style={{ background: `${(txOk ? EMERALD : RED)}1a`, color: txOk ? EMERALD : RED }}>
+                        {txV.toFixed(0)}%
+                      </span>
+                    ) : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-3 py-2"><Verdict test={r.txTest} /></td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
