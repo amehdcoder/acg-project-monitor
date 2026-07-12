@@ -318,8 +318,11 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
     const aeDetails = analyzeText(aeYes.map((h) => h.side_effects_detail || ""));
 
     const geoRows = aggregateGeo(rows, geoLevel, txBenchmark, hhBenchmark);
-    const chartRows = geoRows.slice(0, 14).map((r) => ({
-      name: r.label.length > 14 ? r.label.slice(0, 13) + "…" : r.label,
+    // Plot EVERY geography (all LGAs, or all communities) — never a subset.
+    const chartRows = geoRows.map((r) => ({
+      name: r.label.length > 16 ? r.label.slice(0, 15) + "…" : r.label,
+      fullName: r.label,
+      sub: r.sub,
       tx: Math.round(pct(r.swallowed, r.offered) * 10) / 10,
       reach: Math.round(pct(r.cddYes, r.households) * 10) / 10,
     }));
