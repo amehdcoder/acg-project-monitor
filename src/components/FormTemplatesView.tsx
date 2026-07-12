@@ -134,6 +134,9 @@ const FormTemplatesView = () => {
   // Preview dialog
   const [previewTemplate, setPreviewTemplate] = useState<FormTemplate | null>(null);
 
+  // Quick device preview (Super Admin only)
+  const [devicePreview, setDevicePreview] = useState<{ template: FormTemplate; device: PreviewDevice } | null>(null);
+
   // Save from existing form dialog
   const [showSaveFromForm, setShowSaveFromForm] = useState(false);
   const [existingForms, setExistingForms] = useState<{ id: string; name: string; questions: any[]; settings: any; project_name?: string }[]>([]);
