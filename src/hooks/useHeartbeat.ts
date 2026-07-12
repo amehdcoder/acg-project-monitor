@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { withTimeoutFallback } from "@/lib/withTimeout";
+import { LATEST_PUBLISHED_VERSION } from "@/config/appVersion";
 
 const HEARTBEAT_INTERVAL = 60_000; // 1 minute
 const IMPERSONATION_KEY = "acg_impersonation_admin_session";
