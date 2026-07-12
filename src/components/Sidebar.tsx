@@ -5,7 +5,7 @@ import {
   Repeat, Globe, Navigation, ShieldCheck, MapPin, BookOpen,
   ArrowRightLeft, Stethoscope, Accessibility, HandMetal, Sparkles, Satellite,
   PanelLeftClose, PanelLeftOpen, History, ScanLine, Nfc,
-  Share2, FlaskConical, Watch, Bluetooth, Boxes, SatelliteDish, Brush, Mail,
+  Share2, FlaskConical, Watch, Bluetooth, Boxes, SatelliteDish, Brush, Mail, TabletSmartphone,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
