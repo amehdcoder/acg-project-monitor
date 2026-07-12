@@ -383,8 +383,8 @@ export default function MdaAdvancedAnalyses({ submissions, questions, projectNam
     }
     return [...map.values()]
       .map((r) => ({ name: r.name, communities: r.communities, days: r.days.size }))
-      .sort((a, b) => b.communities - a.communities)
-      .slice(0, 12);
+      .sort((a, b) => b.communities - a.communities);
+    // Show EVERY active supervisor — never truncate the accountability roster.
   }, [communities]);
   const workerChart = useMemo(
     () => workers.map((w) => ({ name: w.name, Communities: w.communities, Days: w.days })),
