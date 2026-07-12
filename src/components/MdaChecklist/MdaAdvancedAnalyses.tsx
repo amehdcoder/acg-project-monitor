@@ -133,16 +133,27 @@ function DrillCue({ count, label = "View submissions" }: { count?: number; label
 
 function SectionTable({ headers, children, align }: { headers: string[]; children: React.ReactNode; align?: Record<number, "right" | "center"> }) {
   return (
-    <div className="max-h-[420px] overflow-auto rounded-lg border border-border">
+    <div className="max-h-[420px] overflow-auto rounded-lg border border-border shadow-sm">
       <table className="w-full text-xs">
-        <thead className="sticky top-0 z-10" style={{ background: NAVY }}>
-          <tr className="text-left text-[11px] font-semibold text-white">
+        <thead
+          className="sticky top-0 z-10"
+          style={{ background: `linear-gradient(135deg, ${NAVY}, ${NAVY_SOFT})` }}
+        >
+          <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-white">
             {headers.map((h, i) => (
-              <th key={h} className={`px-3 py-2 ${align?.[i] === "right" ? "text-right" : align?.[i] === "center" ? "text-center" : ""}`}>{h}</th>
+              <th
+                key={h}
+                className={`px-3 py-2 ${align?.[i] === "right" ? "text-right" : align?.[i] === "center" ? "text-center" : ""}`}
+                style={i === 0 ? undefined : { boxShadow: "inset 1px 0 0 rgba(255,255,255,.12)" }}
+              >
+                {h}
+              </th>
             ))}
           </tr>
         </thead>
-        <tbody>{children}</tbody>
+        <tbody className="[&>tr]:border-t [&>tr]:border-border/60 [&>tr:nth-child(even)]:bg-muted/40 [&>tr:hover]:bg-primary/5">
+          {children}
+        </tbody>
       </table>
     </div>
   );
