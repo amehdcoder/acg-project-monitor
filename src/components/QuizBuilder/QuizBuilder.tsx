@@ -116,6 +116,12 @@ const QuizBuilder = () => {
   const [releaseLoading, setReleaseLoading] = useState(false);
   const [releaseBusy, setReleaseBusy] = useState(false);
 
+  // Copy quiz to another project
+  const [copyQuiz, setCopyQuiz] = useState<Quiz | null>(null);
+  const [copyTargetProject, setCopyTargetProject] = useState("");
+  const [copyBusy, setCopyBusy] = useState(false);
+  const [copyResult, setCopyResult] = useState<{ quiz: Quiz; projectName: string } | null>(null);
+
   const sampleMember = previewMember ?? { name: "Amina Yusuf", email: "amina.yusuf@example.org", source: "Sample project member" };
   const sampleMemberB = previewMemberB ?? { name: "Chidi Okonkwo", email: "chidi.okonkwo@example.org", source: "Sample project member" };
 
