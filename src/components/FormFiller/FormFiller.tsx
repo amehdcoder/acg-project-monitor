@@ -2311,45 +2311,33 @@ const FormFiller = ({
         // MDA Supervisory Checklist → launch the Repeat Household Coverage
         // Survey (repeatable, sampled) when enabled or when the legacy coverage
         // evaluation linkage is on; otherwise show the thank-you dialog.
+        // In the unified journey the checklist is persisted from INSIDE the
+        // survey's single Submit button, so `deferHouseholdSurvey` skips any
+        // launch/thank-you here and simply returns the new submission id.
+        if (opts?.deferHouseholdSurvey) {
+          onSubmitSuccess?.(result.id);
+          return result.id;
+        }
         if (offerHouseholdSurvey) {
-          const answer = (...names: string[]) => {
-            for (const name of names) {
-              const direct = responses[name];
-              if (direct !== undefined && direct !== null && String(direct).trim() !== "") return String(direct);
-              const id = nameToIdMap[name];
-              const byId = id ? responses[id] : undefined;
-              if (byId !== undefined && byId !== null && String(byId).trim() !== "") return String(byId);
-            }
-            return "";
-          };
-          const handoffGps = gpsQuestionAnswer || gpsPosition || locEnforcement.autoGps || backgroundLocation || null;
-          setHouseholdSurveyCtx({
-            submissionId: result.id,
-            target: Math.max(1, Number((settings as any).householdSampleSize) || 10),
-            location: {
-              state: answer("state", "state_name", "admin_state"),
-              lga: answer("lga", "lga_name", "local_government", "local_government_area"),
-              ward: answer("ward", "ward_name"),
-              flhf_name: answer("flhf_name", "flhf", "health_facility", "facility", "facility_name"),
-              community_name: answer("community_name", "community"),
-              settlement_name: answer("settlement_name", "settlement"),
-            },
-            gps: handoffGps ? { lat: handoffGps.lat, lng: handoffGps.lng, accuracy: (handoffGps as any).accuracy } : null,
-          });
+          setHouseholdSurveyCtx(buildHouseholdSurveyCtx(result.id));
         } else {
           setShowThankYou(true);
         }
         // Notify the parent that submission succeeded but DON'T auto-close —
         // the user will dismiss the thank-you dialog, which then closes the form.
         onSubmitSuccess?.(result.id);
+        return result.id;
       }
+      return null;
     } catch (error) {
       console.error("Submission error:", error);
       toast({ title: "Submission Failed", description: "An error occurred. Please try again.", variant: "destructive" });
+      return null;
     } finally {
       setIsSubmitting(false);
     }
   };
+
 
   // Bind handleSubmit to the ref for the voice engine
   handleSubmitRef.current = handleSubmit;
