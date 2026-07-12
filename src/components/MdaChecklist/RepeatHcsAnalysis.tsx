@@ -29,6 +29,8 @@ const BLUE = "#2563eb";
 const TEAL = "#14b8a6";
 const PURPLE = "#7c3aed";
 const SLATE = "#64748b";
+const NAVY = "#0c2340";
+const NAVY_SOFT = "#173a63";
 
 const DEFAULT_TX_BENCHMARK = 75; // therapeutic coverage target (%)
 const DEFAULT_HH_BENCHMARK = 90; // household reach target (%)
