@@ -494,12 +494,17 @@ const FormFiller = ({
   const [showThankYou, setShowThankYou] = useState(false);
   
   // Repeat Household Coverage Survey launch context (replaces the old 3D flow).
+  // In the unified journey the checklist is NOT persisted up-front — the survey's
+  // single "Submit" button persists BOTH the checklist and the household survey
+  // as one linked package, so `submissionId` stays null until then.
   const [householdSurveyCtx, setHouseholdSurveyCtx] = useState<null | {
-    submissionId: string;
+    submissionId: string | null;
     target: number;
     location: { state?: string; lga?: string; ward?: string; flhf_name?: string; community_name?: string; settlement_name?: string };
     gps: { lat: number; lng: number; accuracy?: number } | null;
   }>(null);
+  // Disclaimer gate shown immediately after the final checklist question.
+  const [showSurveyDisclaimer, setShowSurveyDisclaimer] = useState(false);
   const navigate = useNavigate();
   // Integrated MDA Supervisory Checklist branded experience + Coverage Evaluation linkage.
   // Also detect by name so older/offline saved copies that missed the settings
