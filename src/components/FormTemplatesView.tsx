@@ -647,6 +647,29 @@ const FormTemplatesView = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                        {isSuperAdmin && (
+                          <>
+                            <DropdownMenuLabel className="text-[11px] text-muted-foreground">Quick Preview</DropdownMenuLabel>
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
+                                <MonitorSmartphone className="h-4 w-4 mr-2" />
+                                Preview on device
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>
+                                {DEVICE_ORDER.map((d) => (
+                                  <DropdownMenuItem
+                                    key={d}
+                                    onClick={() => setDevicePreview({ template, device: d })}
+                                  >
+                                    <span className="mr-2">{DEVICE_SPECS[d].icon}</span>
+                                    {DEVICE_SPECS[d].label}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                            <DropdownMenuSeparator />
+                          </>
+                        )}
                         <DropdownMenuItem onClick={() => openEditor(template)}>
                           <Edit className="h-4 w-4 mr-2" />
                           Edit Details
