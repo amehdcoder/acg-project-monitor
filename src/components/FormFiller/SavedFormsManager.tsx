@@ -109,8 +109,27 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   const [viewing, setViewing] = useState<SavedFormEntry | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [search, setSearch] = useState("");
 
   const selectable = mode === "send" || mode === "delete";
+
+  // Fully-offline search across form name, respondent, community and any text
+  // response value. No network requests — filters the in-memory list.
+  const visibleEntries = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return entries;
+    return entries.filter((e) => {
+      const responseText = Object.values(e.responses || {})
+        .map((v) => (typeof v === "string" || typeof v === "number" ? String(v) : ""))
+        .join(" ");
+      const hay = [e.formName, e.displayName, e.respondentName, responseText]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [entries, search]);
+
 
   const load = async () => {
     setLoading(true);
