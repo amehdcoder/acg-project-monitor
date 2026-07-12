@@ -239,13 +239,40 @@ export const setSavedEntryStatus = async (
 ): Promise<void> => {
   const existing = await getSavedEntry(id);
   if (!existing) return;
-  await saveSavedEntry({
+  const merged = {
     ...existing,
     ...patch,
     status,
     updatedAt: new Date().toISOString(),
-  });
+  };
+  await saveSavedEntry(merged);
+  // Record the lifecycle transition in the immutable audit ledger.
+  if (status === "finalized" || status === "sent") {
+    try {
+      const { appendSyncAudit } = await import("@/lib/syncAuditLog");
+      const isSent = status === "sent";
+      void appendSyncAudit({
+        formUuid: merged.id,
+        formName: merged.formName,
+        // A finalized entry is "queued" (ready to send); a sent entry that is
+        // still flagged offline is queued on the server-bound queue, otherwise
+        // it has fully synced.
+        action: isSent && !merged.offline ? "synced" : "queued",
+        status: isSent && !merged.offline ? 200 : null,
+        meta: {
+          communityName: null,
+          medicineType: null,
+          userName: merged.respondentName || merged.displayName || null,
+          clientSubmittedAt: merged.finalizedAt || merged.createdAt || null,
+          serverSyncedAt: merged.sentAt || null,
+        },
+      });
+    } catch {
+      /* auditing must never break the status transition */
+    }
+  }
 };
+
 
 export const newEntryId = (): string => crypto.randomUUID();
 
