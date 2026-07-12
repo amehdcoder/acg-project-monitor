@@ -335,6 +335,45 @@ const FormDataTable = ({
     }
   };
 
+  // Apply the supervisor's chosen conflict resolution. The expected version is
+  // now the server's current version, so this write always lands cleanly.
+  const applyConflictResolution = async (
+    _strategy: ConflictStrategy,
+    payload: Record<string, any>,
+  ) => {
+    if (!conflict) return;
+    setSaving(true);
+    try {
+      const { data: rpcRows, error } = await supabase.rpc("update_submission_guarded", {
+        p_id: submissionId,
+        p_expected_version: conflict.serverVersion,
+        p_data: payload,
+      });
+      if (error) throw error;
+      const result = Array.isArray(rpcRows) ? (rpcRows[0] as any) : (rpcRows as any);
+      if (result?.conflict) {
+        // The record changed AGAIN — refresh the dialog with the newer server copy.
+        setConflict({
+          serverData: (result.data as Record<string, any>) || {},
+          serverVersion: (result.version as number) ?? conflict.serverVersion,
+          localData: payload,
+        });
+        return;
+      }
+      baseVersionRef.current = (result?.version as number) ?? null;
+      onDataUpdate?.(payload);
+      setConflict(null);
+      setIsEditing(false);
+      setEditData({});
+      toast({ title: "Conflict resolved", description: "Your resolution has been saved." });
+    } catch (err: any) {
+      toast({ title: "Resolution failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+
   const renderEditor = (entry: Entry) => {
     const desc = entry.descriptor;
     const current = editData[entry.key];
