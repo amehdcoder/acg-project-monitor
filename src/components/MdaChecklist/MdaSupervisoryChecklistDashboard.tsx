@@ -93,6 +93,7 @@ interface Props {
 
 // ───────────────────────── Palette ─────────────────────────
 const NAVY = "#0c2340";
+const NAVY_SOFT = "#173a63";
 const BLUE = "#2563eb";
 const TEAL = "#14b8a6";
 const EMERALD = "#10b981";
