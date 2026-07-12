@@ -5777,6 +5777,7 @@ export type Database = {
           approval_status: string
           avatar_url: string | null
           created_at: string
+          current_version: string | null
           designation: Database["public"]["Enums"]["user_designation"]
           device_info: Json | null
           device_phone_number: string | null
@@ -5807,6 +5808,7 @@ export type Database = {
           approval_status?: string
           avatar_url?: string | null
           created_at?: string
+          current_version?: string | null
           designation?: Database["public"]["Enums"]["user_designation"]
           device_info?: Json | null
           device_phone_number?: string | null
@@ -5837,6 +5839,7 @@ export type Database = {
           approval_status?: string
           avatar_url?: string | null
           created_at?: string
+          current_version?: string | null
           designation?: Database["public"]["Enums"]["user_designation"]
           device_info?: Json | null
           device_phone_number?: string | null
