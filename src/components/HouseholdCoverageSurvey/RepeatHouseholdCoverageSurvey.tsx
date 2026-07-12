@@ -331,7 +331,7 @@ export default function RepeatHouseholdCoverageSurvey({
     }));
 
   const captureGps = () => {
-    geo.getCurrentPosition();
+    void geo.refresh();
   };
 
   // Commit incoming geo fix onto the current household when captured.
@@ -347,13 +347,13 @@ export default function RepeatHouseholdCoverageSurvey({
   // previous household is never silently re-used.
   const lastGpsTsRef = useRef<number | null>(null);
   useEffect(() => {
-    const pos = geo.position;
+    const pos = geo.coord;
     if (!pos) return;
     if (pos.timestamp === lastGpsTsRef.current) return;
     lastGpsTsRef.current = pos.timestamp;
     setCurrent((c) => ({ ...c, gps: { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy } }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geo.position]);
+  }, [geo.coord]);
 
   const householdValid = current.cdd_came !== "";
   const hasGps = !!current.gps;
