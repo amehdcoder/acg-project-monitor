@@ -1455,11 +1455,23 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
     let cancelled = false;
     (async () => {
-      const { data, error } = await (supabase as any).rpc("visible_form_submission_counts", { _form_ids: ids });
-      if (cancelled || error) return;
-      setMdaDashboardCounts(
-        Object.fromEntries((data || []).map((row: any) => [row.form_id, Number(row.total || 0)])),
-      );
+      try {
+        const { data, error } = await withTimeoutFallback(
+          (supabase as any).rpc("visible_form_submission_counts", { _form_ids: ids }),
+          8000,
+          { data: [], error: null } as any,
+        );
+        if (cancelled || error) return;
+        const nextCounts: Record<string, number> = {};
+        ids.forEach((id) => { nextCounts[id] = 0; });
+        (data || []).forEach((row: any) => { nextCounts[row.form_id] = Number(row.total || 0); });
+        setMdaDashboardCounts(nextCounts);
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("MDA dashboard counts unavailable; falling back to zero counts", error);
+          setMdaDashboardCounts(Object.fromEntries(ids.map((id) => [id, 0])));
+        }
+      }
     })();
 
     return () => { cancelled = true; };
