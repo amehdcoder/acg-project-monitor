@@ -2210,7 +2210,30 @@ const FormFiller = ({
       }
     }
 
+    // Unified journey: on an MDA checklist that links to the household survey,
+    // do NOT persist the checklist here. Show the disclaimer gate first; the
+    // checklist is submitted together with the survey via one Submit button.
+    if (offerHouseholdSurvey) {
+      setShowSurveyDisclaimer(true);
+      return;
+    }
+
     await doSubmit();
+  };
+
+  // User acknowledged the disclaimer → advance into the household survey without
+  // persisting the checklist yet. The survey's single Submit button will persist
+  // both datasets as one linked package.
+  const handleProceedToHouseholdSurvey = () => {
+    setShowSurveyDisclaimer(false);
+    setHouseholdSurveyCtx(buildHouseholdSurveyCtx(null));
+  };
+
+  // Called from inside the survey's Submit handler: persists the checklist
+  // (offline-capable) and returns the new submission id so the survey can link
+  // its household records to it in the same cohesive package.
+  const finalizeChecklistFromSurvey = async (): Promise<string | null> => {
+    return await doSubmit({ deferHouseholdSurvey: true });
   };
 
   // Resolve the household survey launch context (target, geography, GPS) from the
