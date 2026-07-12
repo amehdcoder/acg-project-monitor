@@ -95,7 +95,7 @@ function aggregateGeo(surveys: SurveyRow[], level: "community" | "lga", txB: num
       r = {
         key,
         label: level === "lga" ? (s.lga || "—") : (s.community_name || "Unspecified"),
-        sub: level === "lga" ? (s.state || "—") : `${s.ward || "—"} · ${s.lga || "—"}`,
+        sub: level === "lga" ? (s.state || "—") : `${s.lga || "—"} · ${s.ward || "—"} · ${s.flhf_name || "—"}`,
         households: 0, cddYes: 0, treatedYes: 0, offered: 0, swallowed: 0, txTest: null, hhTest: null,
       };
       map.set(key, r);
