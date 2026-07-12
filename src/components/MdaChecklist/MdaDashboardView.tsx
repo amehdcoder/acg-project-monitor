@@ -156,9 +156,11 @@ function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm, questions:
 }
 
 export default function MdaDashboardView({ form, projects = [], onClose, embedded = false }: Props) {
-  const { isOwner, isAdmin, isOwnerLevel } = useAuth();
+  const { isOwner, isAdmin, isOwnerLevel, isSuperAdmin } = useAuth();
   const canManageAccess = isAdmin || isOwnerLevel;
   const canManageLifecycle = isAdmin || isOwnerLevel;
+  const canShare = !!isSuperAdmin || isOwnerLevel;
+  const [showShare, setShowShare] = useState(false);
   const [showAccess, setShowAccess] = useState(false);
   const { submissions, loading, loadFailed, refresh } = useDataAnalytics({ formId: form.id });
   const [refreshing, setRefreshing] = useState(false);
