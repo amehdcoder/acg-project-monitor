@@ -23,6 +23,7 @@ import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
 import OffGridSatelliteMessenger from "./components/SatelliteMessenger/OffGridSatelliteMessenger";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import AfterHoursGate from "./components/afterHours/AfterHoursGate";
 import AfterHoursApprovalCenter from "./components/afterHours/AfterHoursApprovalCenter";
 import MyAfterHoursRequests from "./components/afterHours/MyAfterHoursRequests";
@@ -105,20 +106,22 @@ const App = () => (
                 <MyAfterHoursRequests />
                 <AfterHoursDecisionOverlay />
 
-                <Routes>
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route path="/auth/confirm" element={<ConfirmEmail />} />
-                  <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-                  <Route path="/install" element={<ProtectedRoute><Install /></ProtectedRoute>} />
-                  <Route path="/witness/:surveyId/:hhId" element={<CESWitnessForm />} />
-                  <Route path="/satellite-messenger" element={<ProtectedRoute><OffGridSatelliteMessenger /></ProtectedRoute>} />
-                 <Route path="/data-cleaner" element={<ProtectedRoute><DataCleaner /></ProtectedRoute>} />
-                 <Route path="/learning-log" element={<ProtectedRoute><LearningLog /></ProtectedRoute>} />
-                  <Route path="/__test/mda-analyses" element={<MdaAnalysesHarness />} />
-                  <Route path="/shared/dashboard/:token" element={<SharedDashboard />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
+                <RouteErrorBoundary>
+                  <Routes>
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/auth/confirm" element={<ConfirmEmail />} />
+                    <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                    <Route path="/install" element={<ProtectedRoute><Install /></ProtectedRoute>} />
+                    <Route path="/witness/:surveyId/:hhId" element={<CESWitnessForm />} />
+                    <Route path="/satellite-messenger" element={<ProtectedRoute><OffGridSatelliteMessenger /></ProtectedRoute>} />
+                   <Route path="/data-cleaner" element={<ProtectedRoute><DataCleaner /></ProtectedRoute>} />
+                   <Route path="/learning-log" element={<ProtectedRoute><LearningLog /></ProtectedRoute>} />
+                    <Route path="/__test/mda-analyses" element={<MdaAnalysesHarness />} />
+                    <Route path="/shared/dashboard/:token" element={<SharedDashboard />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </RouteErrorBoundary>
               </ImpersonationProvider>
             </AuthProvider>
           </BrowserRouter>

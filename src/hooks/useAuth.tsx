@@ -666,13 +666,57 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    const handleOnline = () => { setIsOfflineMode(false); syncAuditQueue(); syncInactiveAttemptQueue(); };
+    // Proactively re-establish a valid access token whenever the app regains
+    // connectivity or returns to the foreground. Supabase's built-in
+    // autoRefreshToken can miss its window while the tab is backgrounded or the
+    // device was offline; a single failed refresh must NOT drop the session.
+    // We retry with exponential backoff and NEVER clear the session on failure —
+    // the encrypted device credential + spurious-sign-out guard keep the user in.
+    let refreshing = false;
+    const refreshSessionWithRetry = async (attempts = 4) => {
+      if (refreshing || !navigator.onLine) return;
+      refreshing = true;
+      try {
+        for (let i = 0; i < attempts; i++) {
+          try {
+            const { data, error } = await supabase.auth.refreshSession();
+            if (!error && data?.session) {
+              setSession(data.session);
+              setUser(data.session.user ?? null);
+              userSignOutRef.current = false;
+              return;
+            }
+            // A definitive auth failure (revoked/invalid) — stop retrying but do
+            // not force a client-side sign-out; let the server-driven flow decide.
+            const status = (error as any)?.status;
+            if (status && [400, 401, 403, 422].includes(status)) return;
+          } catch {
+            /* network blip — fall through to backoff */
+          }
+          await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** i, 8000)));
+        }
+      } finally {
+        refreshing = false;
+      }
+    };
+
+    const handleOnline = () => {
+      setIsOfflineMode(false);
+      syncAuditQueue();
+      syncInactiveAttemptQueue();
+      void refreshSessionWithRetry();
+    };
     const handleOffline = () => { setIsOfflineMode(true); };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") void refreshSessionWithRetry();
+    };
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+    document.addEventListener("visibilitychange", handleVisibility);
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
 
