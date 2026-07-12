@@ -455,7 +455,7 @@ export default function RepeatHouseholdCoverageSurvey({
       // so the household survey can reference it — one Submit, one linked package.
       // If the checklist fails to persist we abort and keep the local draft.
       let linkedChecklistId = checklistSubmissionId ?? null;
-      if (onFinalizeChecklist) {
+      if (onFinalizeChecklist && !checklistSubmissionId) {
         linkedChecklistId = await onFinalizeChecklist();
         if (!linkedChecklistId) {
           toast({
