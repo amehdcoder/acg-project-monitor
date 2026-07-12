@@ -212,6 +212,9 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
           `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</div>`,
       );
       group.addLayer(m);
+      // Ensure every valid GPS point is inside the fitted view — even if it
+      // falls just outside the LGA polygons (e.g. edge-of-boundary captures).
+      try { bounds.extend([p.lat, p.lng]); } catch { /* noop */ }
     }
 
     group.addTo(map);
