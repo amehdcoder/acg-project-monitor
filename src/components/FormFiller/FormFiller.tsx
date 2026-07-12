@@ -4103,14 +4103,45 @@ const FormFiller = ({
         }}
       />
 
-      {/* Repeat Household Coverage Survey — full-screen, launched after an MDA
-          checklist submission. Replaces the old "Coverage Evaluation 3D" flow. */}
+      {/* Disclaimer gate — shown immediately after the final checklist question
+          ("Status of MDA"), before the household survey. Dynamically greets the
+          active user by name. */}
+      <AlertDialog open={showSurveyDisclaimer} onOpenChange={setShowSurveyDisclaimer}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="mx-auto mb-1 flex h-12 w-12 items-center justify-center rounded-full bg-teal-100 text-teal-700">
+              <Home className="h-6 w-6" />
+            </div>
+            <AlertDialogTitle className="text-center">Household Coverage Survey</AlertDialogTitle>
+            <AlertDialogDescription className="text-center leading-relaxed">
+              Hi{" "}
+              <strong className="text-foreground">
+                {[profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim() || profile?.email || "there"}
+              </strong>
+              , you are about to proceed to sample and interview households to assess
+              coverage &amp; compliance with MDA standards. This process fully supports
+              offline data capture.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go back</AlertDialogCancel>
+            <AlertDialogAction onClick={handleProceedToHouseholdSurvey} className="gap-2 bg-gradient-to-r from-teal-600 to-cyan-600">
+              Proceed <ArrowRight className="h-4 w-4" />
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Repeat Household Coverage Survey — full-screen. In the unified journey the
+          checklist is persisted together with the survey by ONE Submit button
+          inside the survey (via onFinalizeChecklist). */}
       {householdSurveyCtx && (
         <div className="fixed inset-0 z-[70] overflow-y-auto bg-background">
           <RepeatHouseholdCoverageSurvey
             projectId={projectId}
             formId={formId}
             checklistSubmissionId={householdSurveyCtx.submissionId}
+            onFinalizeChecklist={finalizeChecklistFromSurvey}
             targetHouseholds={householdSurveyCtx.target}
             location={householdSurveyCtx.location}
             initialGps={householdSurveyCtx.gps}
@@ -4121,6 +4152,7 @@ const FormFiller = ({
           />
         </div>
       )}
+
 
 
 
