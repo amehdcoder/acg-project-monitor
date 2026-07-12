@@ -167,6 +167,65 @@ const SHARED_FILTER_METHODS = new Set<string>([
   "contains", "containedBy", "overlaps", "not", "filter", "or", "match",
 ]);
 
+// For each shareable table, the column that scopes rows to a project. Every
+// query is force-filtered to the share's own project_id on this column so a
+// share link can never read another project's rows. `projects` is scoped by
+// its own primary key. Tables without a project dimension (lookup/config only)
+// are listed with `null` and must never expose per-user PII.
+const TABLE_PROJECT_COLUMN: Record<string, string | null> = {
+  irf_reports: "project_id",
+  acsm_reports: "project_id",
+  sbc_reports: "project_id",
+  seeclear_monitoring: "project_id",
+  form_submissions: "project_id",
+  forms: "project_id",
+  projects: "id",
+  household_coverage_surveys: "project_id",
+  user_project_assignments: "project_id",
+  sarmaan_acsm_archived_submissions: "project_id",
+  ces_household_visits: "project_id",
+  ces_surveys: "project_id",
+  profiles: null,
+  mda_tile_icons: null,
+};
+
+// Columns that must never be returned to an external/public shared viewer,
+// per table. Sensitive PII (emails, phone numbers) is stripped from any
+// selection so it cannot leak through a share link.
+const TABLE_BLOCKED_COLUMNS: Record<string, Set<string>> = {
+  profiles: new Set([
+    "email", "phone", "phone_number", "personal_email", "whatsapp",
+    "date_of_birth", "address", "nin", "bvn", "bank_account",
+  ]),
+};
+
+// Only these columns of `profiles` may be read via a share link (names used to
+// label charts). Everything else — especially contact details — is withheld.
+const PROFILES_ALLOWED_COLUMNS = new Set<string>([
+  "id", "user_id", "first_name", "last_name", "full_name", "display_name",
+  "designation", "role", "project_id", "avatar_url",
+]);
+
+function sanitizeColumns(table: string, columns: string): string {
+  if (columns === "*" || columns.trim() === "") {
+    if (table === "profiles") return [...PROFILES_ALLOWED_COLUMNS].join(",");
+    return "*";
+  }
+  const blocked = TABLE_BLOCKED_COLUMNS[table];
+  const requested = columns.split(",").map((c) => c.trim()).filter(Boolean);
+  let allowed = requested;
+  if (table === "profiles") {
+    allowed = requested.filter((c) => {
+      const base = c.split(":")[0].trim();
+      return PROFILES_ALLOWED_COLUMNS.has(base);
+    });
+    if (!allowed.length) allowed = [...PROFILES_ALLOWED_COLUMNS];
+  } else if (blocked) {
+    allowed = requested.filter((c) => !blocked.has(c.split(":")[0].trim()));
+  }
+  return allowed.join(",");
+}
+
 // Decide whether a request carries a valid, live grant for this share.
 async function isShareGranted(
   share: any,
@@ -256,14 +315,34 @@ Deno.serve(async (req) => {
       return json({ error: `Table "${table}" is not shareable`, data: null }, 403);
     }
 
-    const columns = typeof body?.columns === "string" ? body.columns : "*";
+    // Column selection is sanitized so sensitive PII (profile emails/phones)
+    // can never be returned through a share link.
+    const rawColumns = typeof body?.columns === "string" ? body.columns : "*";
+    const columns = sanitizeColumns(table, rawColumns);
     const selectOptions = body?.selectOptions && typeof body.selectOptions === "object"
       ? body.selectOptions : undefined;
     const filters = Array.isArray(body?.filters) ? body.filters : [];
     const order = Array.isArray(body?.order) ? body.order : [];
 
+    // Every query is scoped to the share's own project. Tables without a
+    // project dimension that could expose per-user PII (e.g. profiles) are
+    // rejected unless the share is tied to a project we can join against.
+    const scopeColumn = TABLE_PROJECT_COLUMN[table];
+    const shareProjectId = share.project_id ?? null;
+
+    if (scopeColumn && !shareProjectId) {
+      return json({ error: "This share is not scoped to a project", data: null }, 403);
+    }
+
     try {
       let q: any = admin.from(table).select(columns, selectOptions);
+
+      // Force project scoping server-side so a viewer can never widen the
+      // query to another project's rows.
+      if (scopeColumn && shareProjectId) {
+        q = q.eq(scopeColumn, shareProjectId);
+      }
+
       for (const f of filters) {
         const method = String(f?.method ?? "");
         if (!SHARED_FILTER_METHODS.has(method)) {
