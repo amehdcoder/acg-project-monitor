@@ -154,6 +154,25 @@ createRoot(document.getElementById("root")!).render(
   </RootErrorBoundary>
 );
 
+// Background geography hydration: after first paint, quietly warm the GRID3
+// manifest + state-name index (only when online) so the cascading location
+// dropdowns in the MDA checklists open instantly with no network wait. Runs
+// during idle time and never blocks the UI.
+{
+  const warmGeo = () => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    import("./lib/grid3NigeriaData")
+      .then((m) => m.hydrateGrid3Cache())
+      .catch(() => { /* best-effort, never throws */ });
+  };
+  const ric = (window as any).requestIdleCallback as
+    | ((cb: () => void, opts?: { timeout: number }) => number)
+    | undefined;
+  if (ric) ric(warmGeo, { timeout: 6000 });
+  else setTimeout(warmGeo, 3000);
+}
+
+
 // First-paint watchdog: if React never paints anything into #root within
 // 8 seconds, recover without deleting the offline app shell. Reload only when
 // the branded host is reachable; otherwise show a local recovery panel.
