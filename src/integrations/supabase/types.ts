@@ -8227,6 +8227,10 @@ export type Database = {
         Returns: boolean
       }
       has_field_designation: { Args: { _user_id: string }; Returns: boolean }
+      has_form_assignment: {
+        Args: { _form_id: string; _user_id: string }
+        Returns: boolean
+      }
       has_microplan_form_access: {
         Args: { _user_id: string }
         Returns: boolean
@@ -8277,6 +8281,10 @@ export type Database = {
         Returns: boolean
       }
       is_proximity_participant: { Args: { _user_id: string }; Returns: boolean }
+      is_sarmaan_form_grantee: {
+        Args: { _form_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_standard_forms_restricted: {
         Args: { _user_id: string }
         Returns: boolean
