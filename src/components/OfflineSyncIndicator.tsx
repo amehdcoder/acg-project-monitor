@@ -30,10 +30,42 @@ const OfflineSyncIndicator = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [satOpen, setSatOpen] = useState(false);
   const [pendingForSat, setPendingForSat] = useState<any[]>([]);
+  const [master, setMaster] = useState<MasterSyncMeta[]>([]);
+  const [refreshingMaster, setRefreshingMaster] = useState(false);
+
+  const loadMaster = async () => {
+    try {
+      setMaster(await getMasterSyncStatus());
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) void loadMaster();
+  }, [isOpen]);
+
+  const handleRefreshMaster = async () => {
+    setRefreshingMaster(true);
+    try {
+      setMaster(await runMasterDataDeltaSync());
+    } finally {
+      setRefreshingMaster(false);
+    }
+  };
+
+  const masterCount = master.reduce((n, m) => n + (m.count || 0), 0);
+  const lastMasterSync = master
+    .map((m) => m.syncedAt)
+    .filter(Boolean)
+    .sort()
+    .pop();
 
   const handleSync = async () => {
     await syncPendingSubmissions();
   };
+
+
 
   const handleSatelliteSync = async () => {
     const pending = await getPending();
