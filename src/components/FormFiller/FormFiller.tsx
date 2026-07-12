@@ -1764,33 +1764,12 @@ const FormFiller = ({
       // If no value provided and not required, skip further validation
       if (value === undefined || value === null || value === "") continue;
 
-      // Only check min/max if validation object has actual values set
-      if (question.type === "number" && question.validation) {
-        const numValue = parseFloat(value);
-        if (!isNaN(numValue)) {
-          if (question.validation.min !== undefined && question.validation.min !== null && numValue < question.validation.min) {
-            errors[question.id] = `Value must be at least ${question.validation.min}`;
-            trackValidationFailure(question.id, question.label, `min:${question.validation.min}`, String(value));
-          }
-          if (question.validation.max !== undefined && question.validation.max !== null && numValue > question.validation.max) {
-            errors[question.id] = `Value must be at most ${question.validation.max}`;
-            trackValidationFailure(question.id, question.label, `max:${question.validation.max}`, String(value));
-          }
-        }
-      }
-
-      // Only check regex if it's a non-empty string
-      if (question.validation?.regex && typeof question.validation.regex === "string" && question.validation.regex.trim()) {
-        try {
-          const regex = new RegExp(question.validation.regex);
-          if (!regex.test(String(value))) {
-            errors[question.id] = question.constraintMessage || "Invalid format";
-            trackValidationFailure(question.id, question.label, `regex:${question.validation.regex}`, String(value));
-          }
-        } catch {
-          // Invalid regex pattern — skip validation rather than blocking
-          console.warn(`Invalid regex pattern for question ${question.id}: ${question.validation.regex}`);
-        }
+      // Self-contained field rules: no negatives, numeric bounds, no future
+      // dates, regex format — all evaluated locally (offline-safe).
+      const fieldResult = validateFieldValue(question, value);
+      if (fieldResult.error) {
+        errors[question.id] = fieldResult.error;
+        trackValidationFailure(question.id, question.label, "field", String(value));
       }
     }
 
