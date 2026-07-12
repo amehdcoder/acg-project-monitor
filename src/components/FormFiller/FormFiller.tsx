@@ -35,6 +35,7 @@ import {
   ChevronUp,
   ChevronLeft,
   ChevronRight,
+  ArrowRight,
   BookOpen,
   ClipboardCheck,
   Repeat,
