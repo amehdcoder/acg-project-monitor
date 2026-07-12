@@ -75,9 +75,16 @@ interface SurveyRow {
 
 /* ─────────────────────────── metrics ─────────────────────────── */
 const personsOffered = (h: HouseholdRecord) =>
-  Math.max(Number(h.offered_count) || 0, (h.people || []).filter((p) => norm(p.offered) === "y").length);
-const personsSwallowed = (h: HouseholdRecord) =>
-  Math.max(Number(h.swallowed_count) || 0, (h.people || []).filter((p) => norm(p.swallowed) === "y").length);
+  Math.max(0, Math.round(Math.max(Number(h.offered_count) || 0, (h.people || []).filter((p) => norm(p.offered) === "y").length)));
+/**
+ * Treated (swallowed) persons can never exceed the eligible persons offered
+ * treatment — clamp to the offered count to keep therapeutic coverage ≤ 100%
+ * and prevent impossible >100% aggregates at community/LGA level.
+ */
+const personsSwallowed = (h: HouseholdRecord) => {
+  const raw = Math.max(0, Math.round(Math.max(Number(h.swallowed_count) || 0, (h.people || []).filter((p) => norm(p.swallowed) === "y").length)));
+  return Math.min(raw, personsOffered(h));
+};
 
 interface GeoRow {
   key: string; label: string; sub: string;
