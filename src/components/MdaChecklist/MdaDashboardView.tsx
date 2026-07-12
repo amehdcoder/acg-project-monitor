@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, BarChart3, ChevronUp, Loader2, RefreshCw, WifiOff, UserPlus, Eye, EyeOff, Lock, CheckCircle2 } from "lucide-react";
 import DashboardAccessManager from "@/components/dashboard/DashboardAccessManager";
+import DashboardShareManager from "@/components/dashboard/DashboardShareManager";
+import { Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
