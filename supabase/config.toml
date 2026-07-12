@@ -72,3 +72,6 @@ verify_jwt = false
 
 [functions.action-point-reminders]
 verify_jwt = false
+
+[functions.dashboard-share]
+verify_jwt = false

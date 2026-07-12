@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, BarChart3, ChevronUp, Loader2, RefreshCw, WifiOff, UserPlus, Eye, EyeOff, Lock, CheckCircle2 } from "lucide-react";
 import DashboardAccessManager from "@/components/dashboard/DashboardAccessManager";
+import DashboardShareManager from "@/components/dashboard/DashboardShareManager";
+import { Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
@@ -154,9 +156,11 @@ function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm, questions:
 }
 
 export default function MdaDashboardView({ form, projects = [], onClose, embedded = false }: Props) {
-  const { isOwner, isAdmin, isOwnerLevel } = useAuth();
+  const { isOwner, isAdmin, isOwnerLevel, isSuperAdmin } = useAuth();
   const canManageAccess = isAdmin || isOwnerLevel;
   const canManageLifecycle = isAdmin || isOwnerLevel;
+  const canShare = !!isSuperAdmin || isOwnerLevel;
+  const [showShare, setShowShare] = useState(false);
   const [showAccess, setShowAccess] = useState(false);
   const { submissions, loading, loadFailed, refresh } = useDataAnalytics({ formId: form.id });
   const [refreshing, setRefreshing] = useState(false);
@@ -388,6 +392,17 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
               </Button>
             )}
 
+            {canShare && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowShare(true)}
+                className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5"
+              >
+                <Share2 className="h-4 w-4" /> Share &amp; permissions
+              </Button>
+            )}
+
 
             {isOwner && (
               <OwnerSubmissionManager
@@ -403,6 +418,27 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
         </div>
         {canManageAccess && (
           <DashboardAccessManager open={showAccess} onOpenChange={setShowAccess} dashboardId="mda_supervisory" projectId={form.project_id} />
+        )}
+        {canShare && (
+          <DashboardShareManager
+            open={showShare}
+            onOpenChange={setShowShare}
+            dashboardId="mda_supervisory"
+            dashboardName="Integrated MDA Supervisory Dashboard"
+            projectId={form.project_id}
+            form={{
+              id: form.id,
+              name: form.name,
+              snapshot: {
+                id: form.id,
+                name: form.name,
+                questions: form.questions ?? [],
+                groups: form.groups ?? [],
+                settings: form.settings ?? {},
+                status: (form as any).status ?? "published",
+              },
+            }}
+          />
         )}
 
       </div>

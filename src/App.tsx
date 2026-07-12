@@ -17,6 +17,7 @@ import Install from "./pages/Install";
 import DataCleaner from "./pages/DataCleaner";
 import MdaAnalysesHarness from "./pages/MdaAnalysesHarness";
 import LearningLog from "./pages/LearningLog";
+import SharedDashboard from "./pages/SharedDashboard";
 import InstallBanner from "./components/InstallBanner";
 import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
@@ -115,6 +116,7 @@ const App = () => (
                  <Route path="/data-cleaner" element={<ProtectedRoute><DataCleaner /></ProtectedRoute>} />
                  <Route path="/learning-log" element={<ProtectedRoute><LearningLog /></ProtectedRoute>} />
                   <Route path="/__test/mda-analyses" element={<MdaAnalysesHarness />} />
+                  <Route path="/shared/dashboard/:token" element={<SharedDashboard />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </ImpersonationProvider>
