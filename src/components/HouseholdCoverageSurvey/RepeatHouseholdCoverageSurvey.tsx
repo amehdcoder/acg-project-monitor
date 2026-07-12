@@ -83,6 +83,9 @@ interface HouseholdRecord {
   side_effects_detail: string;
   ae_reported: boolean;
   f1_asked_height: "yes" | "no" | "na" | "";
+  medicine_received: "mectizan_only" | "mectizan_albendazole" | "praziquantel" | "azt_tabs" | "azt_pos" | "teo" | "";
+  taste_of_medicine: "sweet" | "bitter" | "sour" | "other" | "";
+  taste_other: string;
   f3_satisfied: "very" | "satisfied" | "not" | "no_opinion" | "";
   f4_why: string;
   suggestions: string;
