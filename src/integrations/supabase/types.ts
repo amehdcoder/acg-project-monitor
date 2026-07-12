@@ -8536,6 +8536,33 @@ export type Database = {
         }
         Returns: boolean
       }
+      visible_form_submission_counts: {
+        Args: { _form_ids: string[] }
+        Returns: {
+          form_id: string
+          total: number
+        }[]
+      }
+      visible_form_submissions: {
+        Args: { _form_id: string; _limit?: number; _offset?: number }
+        Returns: {
+          client_submitted_at: string
+          created_at: string
+          data: Json
+          form_id: string
+          id: string
+          location: Json
+          status: string
+          submission_type: string
+          submission_uuid: string
+          submitted_at: string
+          synced_at: string
+          updated_at: string
+          user_id: string
+          version: number
+          within_geofence: boolean
+        }[]
+      }
     }
     Enums: {
       app_role: "super_admin" | "systems_admin" | "user"
