@@ -438,12 +438,15 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Reach target %</Label>
-              <Input type="number" value={hhBenchmark} min={1} max={100}
-                onChange={(e) => setHhBenchmark(Math.max(1, Math.min(100, Number(e.target.value) || 0)))}
-                className="h-8 w-20" />
+              <div className="flex h-8 w-20 items-center justify-center gap-1 rounded-md border border-border bg-muted/60 text-sm font-semibold text-foreground"
+                title="Household reach benchmark is fixed at 100% and cannot be changed.">
+                <Target className="h-3.5 w-3.5 text-emerald-600" />
+                {HH_BENCHMARK}%
+              </div>
             </div>
           </div>
         </div>
+
         <CardContent className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-3 lg:grid-cols-6">
           <Kpi label="Surveys" value={a.totalSurveys.toLocaleString()} sub={`${a.communities} communities · ${a.lgas} LGAs`} icon={MapPinned} tint={SLATE} />
           <Kpi label="Households" value={a.totalHh.toLocaleString()} icon={Home} tint={TEAL} />
