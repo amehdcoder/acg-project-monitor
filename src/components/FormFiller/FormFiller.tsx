@@ -3935,7 +3935,7 @@ const FormFiller = ({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={doSubmit}>Yes, Submit</AlertDialogAction>
+            <AlertDialogAction onClick={() => { void doSubmit(); }}>Yes, Submit</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
