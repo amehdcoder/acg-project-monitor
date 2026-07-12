@@ -177,7 +177,7 @@ const Auth = () => {
       // Track login location
       trackLoginLocation();
       toast({ title: "Welcome back!", description: "You have been logged in successfully." });
-      navigate("/");
+      navigate(consumeDeepLink("/"), { replace: true });
     }
   };
 
