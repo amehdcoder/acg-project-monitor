@@ -104,6 +104,15 @@ const FormDataTable = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
+  // Optimistic-concurrency baseline: the version this device saw when editing
+  // began. Used to detect a conflicting edit made by someone else meanwhile.
+  const baseVersionRef = useRef<number | null>(null);
+  const [conflict, setConflict] = useState<
+    { serverData: Record<string, any>; serverVersion: number; localData: Record<string, any> } | null
+  >(null);
+
+  const usesGuardedUpdate = table === "form_submissions" && dataColumn === "data";
+
 
   // Resolve the current value for a field (from a column or the JSON blob).
   const resolveValue = (f: FieldDescriptor): any =>
