@@ -392,6 +392,17 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
               </Button>
             )}
 
+            {canShare && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowShare(true)}
+                className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5"
+              >
+                <Share2 className="h-4 w-4" /> Share &amp; permissions
+              </Button>
+            )}
+
 
             {isOwner && (
               <OwnerSubmissionManager
