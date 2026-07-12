@@ -690,11 +690,31 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
       </div>
 
       {loading || scope.loading ? (
-        <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading geography…
+        // Skeleton that mirrors the real field grid so the cascade container
+        // keeps its footprint while geography loads — no layout shift / jump.
+        <div className="space-y-3" aria-busy="true" aria-live="polite">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading geography…
+          </div>
+          <div className={cn("grid grid-cols-1 gap-3 sm:grid-cols-2", big && "gap-4")}>
+            {LEVELS
+              .filter(({ key }) => !visibleLevels || visibleLevels.includes(key))
+              .map(({ key, label }) => (
+                <div
+                  key={key}
+                  className={cn("space-y-1.5", key === "settlement_name" && "sm:col-span-2")}
+                >
+                  <Label className={cn("font-semibold text-foreground/70", big ? "text-sm sm:text-base" : "text-xs")}>
+                    {label}
+                  </Label>
+                  <div className={cn("w-full animate-pulse rounded-md border border-border bg-muted/60", big ? "h-12" : "h-10")} />
+                </div>
+              ))}
+          </div>
         </div>
       ) : (
         <>
+
           {/* GRID3 vs microplan switch — ENABLED BY DEFAULT (GRID3 national
               cascade). Placed BEFORE the location fields so the supervisor first
               decides the data source, then picks the area. Turn OFF to drive the
