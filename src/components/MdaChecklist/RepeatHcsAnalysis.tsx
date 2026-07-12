@@ -95,7 +95,7 @@ function aggregateGeo(surveys: SurveyRow[], level: "community" | "lga", txB: num
       r = {
         key,
         label: level === "lga" ? (s.lga || "—") : (s.community_name || "Unspecified"),
-        sub: level === "lga" ? (s.state || "—") : `${s.ward || "—"} · ${s.lga || "—"}`,
+        sub: level === "lga" ? (s.state || "—") : `${s.lga || "—"} · ${s.ward || "—"} · ${s.flhf_name || "—"}`,
         households: 0, cddYes: 0, treatedYes: 0, offered: 0, swallowed: 0, txTest: null, hhTest: null,
       };
       map.set(key, r);
@@ -114,6 +114,30 @@ function aggregateGeo(surveys: SurveyRow[], level: "community" | "lga", txB: num
     return r;
   });
   return rows.sort((a, b) => pct(a.swallowed, a.offered) - pct(b.swallowed, b.offered));
+}
+
+/* Rich tooltip: shows the full geography name plus its LGA · Ward · FLHF path. */
+function GeoChartTooltip({ active, payload, txBenchmark }: any) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload || {};
+  return (
+    <div className="rounded-lg border border-border bg-background/95 px-3 py-2 shadow-lg backdrop-blur">
+      <div className="text-xs font-bold text-foreground">{row.fullName || row.name}</div>
+      {row.sub && <div className="mt-0.5 text-[10px] text-muted-foreground">{row.sub}</div>}
+      <div className="mt-1.5 space-y-0.5">
+        <div className="flex items-center gap-1.5 text-[11px]">
+          <span className="inline-block h-2 w-2 rounded-sm" style={{ background: (row.tx ?? 0) < txBenchmark ? RED : EMERALD }} />
+          <span className="text-muted-foreground">Therapeutic</span>
+          <span className="ml-auto font-semibold tabular-nums text-foreground">{row.tx}%</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-[11px]">
+          <span className="inline-block h-2 w-2 rounded-sm" style={{ background: BLUE }} />
+          <span className="text-muted-foreground">Household reach</span>
+          <span className="ml-auto font-semibold tabular-nums text-foreground">{row.reach}%</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /* ─────────────────────────── free-text themes ─────────────────────────── */
@@ -318,8 +342,11 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
     const aeDetails = analyzeText(aeYes.map((h) => h.side_effects_detail || ""));
 
     const geoRows = aggregateGeo(rows, geoLevel, txBenchmark, hhBenchmark);
-    const chartRows = geoRows.slice(0, 14).map((r) => ({
-      name: r.label.length > 14 ? r.label.slice(0, 13) + "…" : r.label,
+    // Plot EVERY geography (all LGAs, or all communities) — never a subset.
+    const chartRows = geoRows.map((r) => ({
+      name: r.label.length > 16 ? r.label.slice(0, 15) + "…" : r.label,
+      fullName: r.label,
+      sub: r.sub,
       tx: Math.round(pct(r.swallowed, r.offered) * 10) / 10,
       reach: Math.round(pct(r.cddYes, r.households) * 10) / 10,
     }));
@@ -330,7 +357,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
       const key = `${norm(s.state)}|${norm(s.lga)}|${norm(s.community_name)}`;
       let c = commMap.get(key);
       if (!c) {
-        c = { label: s.community_name || "Unspecified", sub: `${s.ward || "—"} · ${s.lga || "—"}`, count: 0 };
+        c = { label: s.community_name || "Unspecified", sub: `${s.lga || "—"} · ${s.ward || "—"} · ${s.flhf_name || "—"}`, count: 0 };
         commMap.set(key, c);
       }
       c.count += (s.households || []).length;
@@ -456,13 +483,14 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
             </button>
           ))}
         </div>
-        <div className="mt-3 h-64">
+        <div className="mt-3 overflow-x-auto">
+          <div style={{ height: 256, minWidth: Math.max(560, a.chartRows.length * (geoLevel === "lga" ? 56 : 68)) }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={a.chartRows} margin={{ top: 8, right: 8, left: -12, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-25} textAnchor="end" height={54} />
               <YAxis tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" />
-              <RTooltip formatter={(v: any) => `${v}%`} />
+              <RTooltip content={<GeoChartTooltip txBenchmark={txBenchmark} />} />
               <Legend
                 wrapperStyle={{ fontSize: 11 }}
                 payload={[
@@ -480,6 +508,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
               <Bar dataKey="reach" name="Household reach" fill={BLUE} radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+          </div>
         </div>
         <div className="mt-3 max-h-[360px] overflow-auto rounded-lg border border-border/60">
           <table className="w-full text-xs">
