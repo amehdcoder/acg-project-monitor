@@ -491,8 +491,12 @@ export const useOfflineStorage = () => {
         title: "Back Online",
         description: "Connection restored. Syncing pending submissions...",
       });
-      // Delay slightly to allow network to stabilize, then sync
-      setTimeout(() => trySyncIfNeeded(), 2000);
+      // Delay slightly to allow network to stabilize, then sync submissions
+      // and pull any master-data changes since the last sync.
+      setTimeout(() => {
+        trySyncIfNeeded();
+        void runMasterDataDeltaSync();
+      }, 2000);
     };
 
     const handleOffline = () => {
