@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   Lightbulb, Target, MessageSquareText, AlertTriangle, ShieldAlert,
   CheckCircle2, Zap, CalendarClock, FileSpreadsheet, ArrowRight, Info, Loader2,
+  ChevronDown,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import {
