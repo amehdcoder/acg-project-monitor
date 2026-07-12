@@ -36,6 +36,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowRight,
+  Home,
   BookOpen,
   ClipboardCheck,
   Repeat,
