@@ -322,8 +322,52 @@ export default function RepeatHouseholdCoverageSurvey({
     }
   }, [completed, current, done, draftKey]);
 
+  // Whether the survey holds unsubmitted work worth guarding on exit.
+  const hasUnsavedProgress = useMemo(() => {
+    if (done) return false;
+    if (completed.length > 0) return true;
+    const c = current;
+    return Boolean(
+      c.gps ||
+        c.cdd_came ||
+        c.anyone_treated ||
+        c.offered_count ||
+        c.swallowed_count ||
+        c.side_effects ||
+        c.side_effects_detail ||
+        c.ae_reported ||
+        c.f1_asked_height ||
+        c.f3_satisfied ||
+        c.f4_why?.trim() ||
+        c.suggestions?.trim() ||
+        c.people.some((p) => p.name || p.age || p.sex || p.offered || p.swallowed || p.reason),
+    );
+  }, [completed, current, done]);
+
+  // Native guard: warn before the browser/tab is closed or reloaded mid-survey.
+  useEffect(() => {
+    if (!hasUnsavedProgress) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+      return "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsavedProgress]);
+
+  // In-app guard: confirm before leaving the form when there is unsaved work.
+  const requestClose = () => {
+    if (hasUnsavedProgress) {
+      setShowExitConfirm(true);
+    } else {
+      onClose();
+    }
+  };
+
 
   const reachedTarget = completed.length >= target;
+
 
   const update = (patch: Partial<HouseholdRecord>) => setCurrent((c) => ({ ...c, ...patch }));
 
