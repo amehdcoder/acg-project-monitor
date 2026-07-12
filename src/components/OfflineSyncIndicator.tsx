@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   ChevronDown,
   Satellite,
+  Database,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,11 @@ import {
 } from "@/components/ui/popover";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import SatelliteSyncDialog from "@/components/SatelliteSyncDialog";
+import {
+  getMasterSyncStatus,
+  runMasterDataDeltaSync,
+  type MasterSyncMeta,
+} from "@/lib/deltaSync";
 
 const OfflineSyncIndicator = () => {
   const { isOnline, pendingCount, isSyncing, syncPendingSubmissions, getPending, updatePendingCount } = useOfflineStorage();
