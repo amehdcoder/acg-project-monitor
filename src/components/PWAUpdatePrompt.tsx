@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
-import { Button } from "@/components/ui/button";
-import { RefreshCw, Sparkles, X, Loader2 } from "lucide-react";
+import AppUpdateNotification from "@/components/AppUpdateNotification";
 import {
   hardReloadToLatest,
   isSnoozed,
