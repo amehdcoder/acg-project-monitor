@@ -83,6 +83,35 @@ const initDB = (): Promise<IDBDatabase> =>
     };
   });
 
+// Best-effort extraction of searchable metadata from a saved entry's responses
+// for the immutable local audit ledger. Never throws.
+const extractAuditMeta = (entry: SavedFormEntry) => {
+  const responses = entry.responses || {};
+  let communityName: string | null = null;
+  let medicineType: string | null = null;
+  try {
+    for (const [k, v] of Object.entries(responses)) {
+      if (v == null || typeof v === "object") continue;
+      const key = k.toLowerCase();
+      if (!communityName && /communit|village|ward|settlement/.test(key)) {
+        communityName = String(v);
+      }
+      if (!medicineType && /medicine|drug|commodity|treatment/.test(key)) {
+        medicineType = String(v);
+      }
+    }
+  } catch {
+    /* best-effort */
+  }
+  return {
+    communityName,
+    medicineType,
+    userName: entry.respondentName || entry.displayName || null,
+    clientSubmittedAt: entry.finalizedAt || entry.createdAt || null,
+    serverSyncedAt: entry.sentAt || null,
+  };
+};
+
 export const saveSavedEntry = async (entry: SavedFormEntry): Promise<void> => {
   // Stamp device + bump revision so multi-device edits are attributable and the
   // deterministic merge engine can resolve divergence.
@@ -91,14 +120,28 @@ export const saveSavedEntry = async (entry: SavedFormEntry): Promise<void> => {
     deviceId: entry.deviceId || getSavedFormDeviceId(),
     rev: (Number(entry.rev) || 0) + 1,
   };
+  const isFirstWrite = (Number(entry.rev) || 0) === 0;
   const db = await initDB();
-  return new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
     const req = tx.objectStore(STORE).put(stamped);
     req.onerror = () => reject(req.error);
     req.onsuccess = () => resolve();
   });
+  // Append an immutable audit-ledger entry (best-effort, fire-and-forget).
+  try {
+    const { appendSyncAudit } = await import("@/lib/syncAuditLog");
+    void appendSyncAudit({
+      formUuid: stamped.id,
+      formName: stamped.formName,
+      action: isFirstWrite ? "created" : "edited",
+      meta: extractAuditMeta(stamped),
+    });
+  } catch {
+    /* auditing must never break saving */
+  }
 };
+
 
 /**
  * Reconcile an incoming copy of a saved entry (e.g. pulled from another device
