@@ -48,13 +48,14 @@ const toneStyles: Record<Tone, { icon: typeof AlertTriangle; color: string; bg: 
 export default function NarrativeInsightsPanel({
   submissions, questions, config, accent = "#0EA5A5", projectName, className,
   advanced = false, advancedOptions,
-  afterHoursLog = false, afterHoursTables,
+  afterHoursLog = false, afterHoursTables, collapsibleIssues = false,
 }: Props) {
   const n = useMemo(
     () => buildNarrative(submissions || [], questions || [], config || {}),
     [submissions, questions, config],
   );
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [issuesOpen, setIssuesOpen] = useState(!collapsibleIssues);
 
   const handleExport = async (listId: string) => {
     const list = n.actionLists[listId];
