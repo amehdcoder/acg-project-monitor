@@ -167,6 +167,12 @@ export async function queueOrInsert(
   upsertOnId = false,
   opts: { mirrorEntryId?: string | null } = {},
 ): Promise<{ queued: boolean }> {
+  // Stamp the idempotency contract for contract-aware tables. Using the row's
+  // own id (a client-generated UUID for these forms) as submission_uuid keeps
+  // the identity stable across every retry so duplicates are impossible.
+  if (SYNC_CONTRACT_TABLES.has(table)) {
+    row = stampSyncContract(row, typeof row.id === "string" ? row.id : undefined);
+  }
   if (isOnline()) {
     try {
       const { error } = await writeRecordToServer(table, row, upsertOnId);
