@@ -71,6 +71,7 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Json } from "@/integrations/supabase/types";
 import { buildBuiltInTemplates } from "@/lib/builtInFormTemplates";
+import AdminDevicePreviewer, { PreviewDevice, DEVICE_SPECS, DEVICE_ORDER } from "@/components/AdminDevicePreviewer";
 
 interface FormTemplate {
   id: string;
