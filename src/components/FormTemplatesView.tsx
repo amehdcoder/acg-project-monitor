@@ -115,7 +115,7 @@ const QUESTION_TYPE_ICONS: Record<string, React.ReactNode> = {
 };
 
 const FormTemplatesView = () => {
-  const { profile, isAdmin } = useAuth();
+  const { profile, isAdmin, isSuperAdmin } = useAuth();
   const [templates, setTemplates] = useState<FormTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
