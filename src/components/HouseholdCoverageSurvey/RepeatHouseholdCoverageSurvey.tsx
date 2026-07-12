@@ -92,6 +92,12 @@ interface Props {
   projectId?: string | null;
   formId?: string | null;
   checklistSubmissionId?: string | null;
+  /**
+   * Unified journey: persists the linked MDA checklist (offline-capable) and
+   * returns its submission id. Called once from the single Submit button so both
+   * the checklist and the household survey are saved as one cohesive package.
+   */
+  onFinalizeChecklist?: () => Promise<string | null>;
   targetHouseholds: number;
   location?: HcsLocation;
   initialGps?: { lat: number; lng: number; accuracy?: number } | null;
