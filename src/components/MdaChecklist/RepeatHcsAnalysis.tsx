@@ -566,7 +566,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
 
 
       {/* Households sampled per community */}
-      <Section title="Households Sampled per Community" icon={Home} tint={TEAL} badge={`${a.communitySampled.length} communities`}>
+      <Section title="Households Sampled per Community" icon={Home} tint={TEAL} defaultOpen={false} badge={`${a.communitySampled.length} communities`}>
         {(() => {
           const s = commSearch.trim().toLowerCase();
           let list = s
