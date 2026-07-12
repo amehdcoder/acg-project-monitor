@@ -44,6 +44,9 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     if (typeof navigator !== "undefined" && navigator.onLine === false && hasCachedAuthSession()) {
       return <BootSkeleton />;
     }
+    // Remember the intended deep link so we can resolve back to it after
+    // authentication (or offline session hydration) completes.
+    rememberDeepLink(`${location.pathname}${location.search}`);
     return <Navigate to="/auth" replace />;
   }
 
