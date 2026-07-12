@@ -1341,8 +1341,68 @@ const QuizBuilder = () => {
         </div>
       )}
 
-      {/* Quiz Settings Dialog (pass mark + custom messages) */}
-      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+      {/* Copy Quiz to Another Project Dialog */}
+      <Dialog open={!!copyQuiz} onOpenChange={(o) => { if (!o) { setCopyQuiz(null); setCopyResult(null); setCopyTargetProject(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Copy className="h-5 w-5 text-primary" /> Copy quiz to another project
+            </DialogTitle>
+            <DialogDescription>
+              {copyResult
+                ? "Your quiz has been duplicated."
+                : `Create an independent copy of “${copyQuiz?.title ?? ""}” in another project. All questions, options, and settings are deep-copied.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {copyResult ? (
+            <div className="space-y-4 py-2">
+              <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
+                <CheckCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                <p>Quiz successfully copied to <span className="font-semibold">{copyResult.projectName}</span>! Any member of that project can now see and edit it.</p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => { setCopyQuiz(null); setCopyResult(null); setCopyTargetProject(""); }}>Close</Button>
+                <Button
+                  className="gap-1"
+                  onClick={() => {
+                    const q = copyResult.quiz;
+                    setCopyQuiz(null); setCopyResult(null); setCopyTargetProject("");
+                    setSelectedQuiz(q);
+                    fetchQuestions(q.id);
+                  }}
+                >
+                  Open copied quiz <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div>
+                <Label className="form-label">Target project</Label>
+                <Select value={copyTargetProject} onValueChange={setCopyTargetProject}>
+                  <SelectTrigger className="form-input">
+                    <SelectValue placeholder="Select a project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setCopyQuiz(null); setCopyTargetProject(""); }}>Cancel</Button>
+                <Button onClick={handleCopyQuiz} disabled={copyBusy || !copyTargetProject} className="gap-1">
+                  {copyBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+                  Copy quiz
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-indigo-600" /> Grading & result messages</DialogTitle>
