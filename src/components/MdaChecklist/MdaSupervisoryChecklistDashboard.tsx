@@ -57,6 +57,7 @@ import MdaAdvancedAnalyses from "./MdaAdvancedAnalyses";
 import MdaCorrectiveActionsAnalysis from "./MdaCorrectiveActionsAnalysis";
 import { labelPillStyle } from "@/lib/lgaColors";
 import MdaLongitudinalInsights from "./MdaLongitudinalInsights";
+import CollapsibleSection from "./CollapsibleSection";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import { useAuth } from "@/hooks/useAuth";
 import { buildLabelMap } from "@/lib/formLabelUtils";
@@ -1152,6 +1153,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         }}
         afterHoursLog
         afterHoursTables={["form_submissions"]}
+        collapsibleIssues
 
       />
       {/* Hypothesis testing for Therapeutic & Household coverage lives in the
@@ -1347,13 +1349,21 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       </Card>
 
       {/* ── Insightful, conditionally-formatted analyses ── */}
-      <MdaAdvancedAnalyses
-        submissions={deduped as any}
-        questions={questions as any}
-        projectName={projectName}
-        followUpFields={new Set(Object.values(moduleQuestions).flatMap((s) => Array.from(s)))}
-        offline={offline}
-      />
+      <CollapsibleSection
+        title="Advanced Analytics & Modeling"
+        icon={Activity}
+        tint={VIOLET}
+        summary="Random Forest drivers, Monte Carlo projections, data quality & what's missing"
+        defaultCollapsed
+      >
+        <MdaAdvancedAnalyses
+          submissions={deduped as any}
+          questions={questions as any}
+          projectName={projectName}
+          followUpFields={new Set(Object.values(moduleQuestions).flatMap((s) => Array.from(s)))}
+          offline={offline}
+        />
+      </CollapsibleSection>
 
       {/* ── Corrective Actions section: themes, word cloud & accountability ── */}
       <SectionErrorBoundary label="Corrective actions analysis">
@@ -1361,11 +1371,19 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       </SectionErrorBoundary>
 
       {/* ── Longitudinal follow-up outcome trend + duplicate community flags ── */}
-      <MdaLongitudinalInsights
-        checklist={checklist as any}
-        submissions={filtered as any}
-        questions={questions as any}
-      />
+      <CollapsibleSection
+        title="Duplicate Community Visits & Longitudinal Outcomes"
+        icon={ClipboardList}
+        tint={AMBER}
+        summary="Weekly follow-up outcome trend and flagged duplicate community visits"
+        defaultCollapsed
+      >
+        <MdaLongitudinalInsights
+          checklist={checklist as any}
+          submissions={filtered as any}
+          questions={questions as any}
+        />
+      </CollapsibleSection>
 
 
 

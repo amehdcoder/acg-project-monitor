@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   Lightbulb, Target, MessageSquareText, AlertTriangle, ShieldAlert,
   CheckCircle2, Zap, CalendarClock, FileSpreadsheet, ArrowRight, Info, Loader2,
+  ChevronDown,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import {
@@ -34,6 +35,8 @@ interface Props {
    *  provided) restricts the log to those gated submission tables. */
   afterHoursLog?: boolean;
   afterHoursTables?: string[];
+  /** When true, the "Issues detected" block renders collapsed by default. */
+  collapsibleIssues?: boolean;
 }
 
 const toneStyles: Record<Tone, { icon: typeof AlertTriangle; color: string; bg: string }> = {
@@ -46,13 +49,14 @@ const toneStyles: Record<Tone, { icon: typeof AlertTriangle; color: string; bg: 
 export default function NarrativeInsightsPanel({
   submissions, questions, config, accent = "#0EA5A5", projectName, className,
   advanced = false, advancedOptions,
-  afterHoursLog = false, afterHoursTables,
+  afterHoursLog = false, afterHoursTables, collapsibleIssues = false,
 }: Props) {
   const n = useMemo(
     () => buildNarrative(submissions || [], questions || [], config || {}),
     [submissions, questions, config],
   );
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [issuesOpen, setIssuesOpen] = useState(!collapsibleIssues);
 
   const handleExport = async (listId: string) => {
     const list = n.actionLists[listId];
@@ -145,14 +149,28 @@ export default function NarrativeInsightsPanel({
         {/* Issues */}
         {n.hasData && n.issues.length > 0 && (
           <section>
-            <div className="mb-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => collapsibleIssues && setIssuesOpen((o) => !o)}
+              aria-expanded={issuesOpen}
+              className={`mb-2 flex w-full items-center gap-2 text-left ${collapsibleIssues ? "cursor-pointer" : "cursor-default"}`}
+            >
               <AlertTriangle className="h-4 w-4 text-amber-600" />
               <h4 className="text-sm font-semibold text-foreground">Issues detected</h4>
-            </div>
-            <ul className="space-y-2">
-              {n.issues.map((it, i) => <ItemRow key={i} item={it} />)}
-            </ul>
+              {collapsibleIssues && (
+                <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">{n.issues.length}</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${issuesOpen ? "rotate-180" : ""}`} />
+                </span>
+              )}
+            </button>
+            {issuesOpen && (
+              <ul className="space-y-2">
+                {n.issues.map((it, i) => <ItemRow key={i} item={it} />)}
+              </ul>
+            )}
           </section>
+
         )}
 
         {/* Immediate actions */}
