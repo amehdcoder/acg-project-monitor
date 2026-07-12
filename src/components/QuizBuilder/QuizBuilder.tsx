@@ -394,6 +394,91 @@ const QuizBuilder = () => {
     setConfirmDeleteQuiz(null);
   };
 
+  // Deep-clone a quiz (and all its questions/options/settings) into a target
+  // project. The new row inherits the target project's RLS automatically, so
+  // any member of that project can immediately see and edit it.
+  const handleCopyQuiz = async () => {
+    if (!copyQuiz || !copyTargetProject) {
+      toast({ title: "Please select a target project", variant: "destructive" });
+      return;
+    }
+    setCopyBusy(true);
+    try {
+      // 1. Read the complete original quiz configuration.
+      const { data: original, error: readErr } = await supabase
+        .from("quizzes")
+        .select("*")
+        .eq("id", copyQuiz.id)
+        .single();
+      if (readErr || !original) throw readErr || new Error("Original quiz not found");
+
+      // 2. Build a fresh insert payload, stripping identity/ownership fields and
+      // re-pointing project_id to the target project.
+      const {
+        id: _id,
+        project_id: _pid,
+        created_by: _cb,
+        created_at: _ca,
+        updated_at: _ua,
+        ...clonable
+      } = original as any;
+
+      const targetName =
+        projects.find((p) => p.id === copyTargetProject)?.name || "the selected project";
+
+      const { data: newQuiz, error: insErr } = await supabase
+        .from("quizzes")
+        .insert({
+          ...clonable,
+          title: `${original.title} (Copy)`,
+          project_id: copyTargetProject,
+          created_by: user!.id,
+          is_published: false,
+          open_test_type: null,
+        })
+        .select()
+        .single();
+      if (insErr || !newQuiz) throw insErr || new Error("Could not create the copied quiz");
+
+      // 3. Deep-copy all questions with their options.
+      const { data: srcQuestions } = await supabase
+        .from("quiz_questions")
+        .select("*")
+        .eq("quiz_id", copyQuiz.id)
+        .order("sort_order");
+
+      if (srcQuestions && srcQuestions.length > 0) {
+        const rows = srcQuestions.map((q: any, i: number) => ({
+          quiz_id: newQuiz.id,
+          question_text: q.question_text,
+          question_type: q.question_type,
+          options: q.options,
+          correct_answer: q.correct_answer,
+          points: q.points,
+          sort_order: i,
+        }));
+        const { error: qErr } = await supabase.from("quiz_questions").insert(rows);
+        if (qErr) throw qErr;
+      }
+
+      toast({
+        title: "Quiz copied!",
+        description: `“${original.title}” was copied to ${targetName}.`,
+      });
+      setCopyResult({ quiz: newQuiz as Quiz, projectName: targetName });
+      fetchQuizzes();
+    } catch (err: any) {
+      toast({
+        title: "Could not copy quiz",
+        description: err?.message || "Unexpected error while copying.",
+        variant: "destructive",
+      });
+    } finally {
+      setCopyBusy(false);
+    }
+  };
+
+
   // Owner-only: archive every submission of a quiz for future reference, then
   // clear them so the quiz starts fresh.
   const archiveSubmissions = async (quiz: Quiz, alsoClear: boolean) => {
