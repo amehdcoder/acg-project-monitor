@@ -23,6 +23,7 @@ import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
 import OffGridSatelliteMessenger from "./components/SatelliteMessenger/OffGridSatelliteMessenger";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import AfterHoursGate from "./components/afterHours/AfterHoursGate";
 import AfterHoursApprovalCenter from "./components/afterHours/AfterHoursApprovalCenter";
 import MyAfterHoursRequests from "./components/afterHours/MyAfterHoursRequests";
