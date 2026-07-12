@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pencil, Save, X, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { getFieldLabel, type QuestionLabelMap } from "@/lib/formLabelUtils";
+import SyncConflictDialog from "@/components/SyncConflictDialog";
+import type { ConflictStrategy } from "@/lib/syncConflict";
 
 /**
  * Describes a single form field for the editor. When a `fieldSpec` is provided,
