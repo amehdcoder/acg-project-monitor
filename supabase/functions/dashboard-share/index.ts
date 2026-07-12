@@ -98,6 +98,9 @@ function publicShare(share: any) {
     access_type: share.access_type,
     label: share.label,
     expires_at: share.expires_at,
+    form_id: share.form_id,
+    form_name: share.form_name,
+    form_snapshot: share.form_snapshot,
   };
 }
 
