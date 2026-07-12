@@ -125,6 +125,9 @@ const emptyHousehold = (n: number): HouseholdRecord => ({
   side_effects_detail: "",
   ae_reported: false,
   f1_asked_height: "",
+  medicine_received: "",
+  taste_of_medicine: "",
+  taste_other: "",
   
   f3_satisfied: "",
   f4_why: "",
