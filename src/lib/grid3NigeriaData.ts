@@ -216,6 +216,8 @@ async function revalidateShard(kind: "fac" | "set", slug: string, cacheKey: stri
     const data = (await r.json()) as StateShard;
     _shardMem.set(cacheKey, data);
     await idbSet(cacheKey, data);
+    invalidateDerivedForSlug(slug); // drop stale derived lists so fresh data shows
+
   } catch {
     /* offline — keep the cached copy */
   }
