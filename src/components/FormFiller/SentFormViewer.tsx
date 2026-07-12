@@ -59,6 +59,20 @@ const SentFormViewer = ({ entry, onClose }: SentFormViewerProps) => {
   const responses = entry.responses || {};
   const keep = (q: Question) => q.type !== "note" && q.type !== "calculate";
 
+  const [auditTrail, setAuditTrail] = useState<SyncAuditEntry[]>([]);
+  useEffect(() => {
+    let active = true;
+    void listSyncAuditForForm(entry.id).then((rows) => {
+      if (active) setAuditTrail(rows);
+    });
+    return () => {
+      active = false;
+    };
+  }, [entry.id]);
+
+  const capturedAt = entry.finalizedAt || entry.createdAt || null;
+
+
   // Flatten top-level questions AND questions nested inside normal/repeat
   // groups so every answered and unanswered field is displayed.
   const rows: DisplayRow[] = [];
