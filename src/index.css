@@ -468,10 +468,12 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
-  /* Fixed / sticky bottom action bars respect the inset automatically */
+  /* Fixed / sticky bottom action bars respect the iOS home-indicator inset.
+     A full 1rem of breathing room is added on top of the safe-area inset so
+     "Submit / Finish / Save" buttons are never cut off behind the home bar. */
   .fixed.bottom-0,
   .sticky.bottom-0 {
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   .text-gradient-gold {
