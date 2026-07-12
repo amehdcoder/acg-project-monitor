@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
-  PublicShare, ResolveStatus, clearStoredSession, requestShareOtp, resolveShare, verifyShareOtp,
+  PublicShare, ResolveStatus, clearStoredSession, getStoredSession, requestShareOtp, resolveShare, verifyShareOtp,
 } from "@/lib/dashboardShare";
+import { installSharedDataProxy, uninstallSharedDataProxy } from "@/lib/sharedSupabaseProxy";
 import { rememberDeepLink } from "@/lib/deepLinkIntent";
 import SharedDashboardRenderer from "@/components/dashboard/SharedDashboardRenderer";
 
