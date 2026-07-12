@@ -10,11 +10,8 @@ import {
   startAppUpdatePolling,
   subscribeToAppUpdates,
   getAppUpdateState,
-  
-  APPLIED_BUILD_AT_KEY,
-  APPLIED_BUILD_ID_KEY,
 } from "@/lib/appUpdateManager";
-import { hasActiveUserFormProgress, prepareSilentFormRestoreForUpdate } from "@/lib/formProgressPersistence";
+import { hasActiveUserFormProgress } from "@/lib/formProgressPersistence";
 
 interface InnerProps {
   onAvailable: () => void;
