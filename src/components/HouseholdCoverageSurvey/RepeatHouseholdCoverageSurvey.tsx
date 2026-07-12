@@ -417,6 +417,7 @@ export default function RepeatHouseholdCoverageSurvey({
 
   const householdValid = current.cdd_came !== "";
   const hasGps = !!current.gps;
+  const tasteOtherMissing = current.taste_of_medicine === "other" && !current.taste_other.trim();
 
   const saveCurrentHousehold = (): HouseholdRecord[] => {
     const snapshot = [...completed, current];
