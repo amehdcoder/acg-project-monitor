@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { testAgainstBenchmark, type BenchmarkTest } from "@/lib/ces/coverageStats";
 import MdaCoverageMatrix from "./MdaCoverageMatrix";
 import RepeatHcsDuplicates from "./RepeatHcsDuplicates";
+import { labelPillStyle } from "@/lib/lgaColors";
 
 /* ─────────────────────────── palette ─────────────────────────── */
 const EMERALD = "#10b981";
