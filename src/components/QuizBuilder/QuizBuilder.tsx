@@ -430,7 +430,7 @@ const QuizBuilder = () => {
         .from("quizzes")
         .insert({
           ...clonable,
-          title: `${original.title} (Copy)`,
+          title: `${original.title} · ${targetName}`,
           project_id: copyTargetProject,
           created_by: user!.id,
           is_published: false,
@@ -461,11 +461,28 @@ const QuizBuilder = () => {
         if (qErr) throw qErr;
       }
 
+      // 4. Audit the copy action (source quiz, target project, initiator).
+      try {
+        await supabase.from("quiz_copy_audit" as any).insert({
+          source_quiz_id: copyQuiz.id,
+          new_quiz_id: newQuiz.id,
+          source_project_id: (original as any).project_id ?? null,
+          target_project_id: copyTargetProject,
+          target_project_name: targetName,
+          source_quiz_title: original.title,
+          copied_by: user!.id,
+          copied_by_email: user!.email ?? null,
+        });
+      } catch (auditErr) {
+        console.warn("Quiz copy audit log failed:", auditErr);
+      }
+
       toast({
         title: "Quiz copied!",
         description: `“${original.title}” was copied to ${targetName}.`,
       });
       setCopyResult({ quiz: newQuiz as Quiz, projectName: targetName });
+
       fetchQuizzes();
     } catch (err: any) {
       toast({
