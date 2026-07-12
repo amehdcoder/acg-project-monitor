@@ -50,6 +50,15 @@ export default function SharedDashboard() {
 
   useEffect(() => { void resolve(); }, [resolve]);
 
+  // While a shared dashboard is granted, route all Supabase reads through the
+  // secure edge-function proxy so anonymous/non-member viewers bypass RLS
+  // safely (service-role reads, scoped to the validated share token).
+  useEffect(() => {
+    if (stage !== "granted") return;
+    installSharedDataProxy({ token, sessionToken: getStoredSession(token) ?? undefined });
+    return () => uninstallSharedDataProxy();
+  }, [stage, token]);
+
   const sendOtp = async () => {
     if (!email.trim()) { toast.error("Enter your email"); return; }
     setBusy(true);
