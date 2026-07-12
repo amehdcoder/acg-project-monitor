@@ -333,7 +333,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
       const key = `${norm(s.state)}|${norm(s.lga)}|${norm(s.community_name)}`;
       let c = commMap.get(key);
       if (!c) {
-        c = { label: s.community_name || "Unspecified", sub: `${s.ward || "—"} · ${s.lga || "—"}`, count: 0 };
+        c = { label: s.community_name || "Unspecified", sub: `${s.lga || "—"} · ${s.ward || "—"} · ${s.flhf_name || "—"}`, count: 0 };
         commMap.set(key, c);
       }
       c.count += (s.households || []).length;
