@@ -270,7 +270,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [txBenchmark, setTxBenchmark] = useState(DEFAULT_TX_BENCHMARK);
-  const [hhBenchmark, setHhBenchmark] = useState(DEFAULT_HH_BENCHMARK);
+  const hhBenchmark = HH_BENCHMARK; // fixed 100% household reach target — not user-editable
   const [geoLevel, setGeoLevel] = useState<"lga" | "community">("lga");
   const [commSearch, setCommSearch] = useState("");
   const [commSort, setCommSort] = useState<"count-desc" | "count-asc" | "name">("count-desc");
