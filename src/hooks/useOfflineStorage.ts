@@ -568,6 +568,7 @@ export const useOfflineStorage = () => {
       submissionType: string = "regular"
     ): Promise<{ success: boolean; offline: boolean; id: string }> => {
       const submissionId = crypto.randomUUID();
+      const capturedAt = new Date().toISOString();
 
       const submission: PendingSubmission = {
         id: submissionId,
@@ -579,8 +580,11 @@ export const useOfflineStorage = () => {
         location,
         within_geofence: withinGeofence,
         submission_type: submissionType,
-        created_at: new Date().toISOString(),
+        created_at: capturedAt,
         retryCount: 0,
+        // Idempotency contract stamped at capture — durable across retransmits.
+        submission_uuid: submissionId,
+        client_submitted_at: capturedAt,
       };
 
 
