@@ -34,6 +34,8 @@ interface Props {
    *  provided) restricts the log to those gated submission tables. */
   afterHoursLog?: boolean;
   afterHoursTables?: string[];
+  /** When true, the "Issues detected" block renders collapsed by default. */
+  collapsibleIssues?: boolean;
 }
 
 const toneStyles: Record<Tone, { icon: typeof AlertTriangle; color: string; bg: string }> = {
