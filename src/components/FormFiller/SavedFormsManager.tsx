@@ -365,9 +365,20 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
                 {mode === "delete" && "You have no saved drafts to delete."}
               </p>
             </div>
+          ) : visibleEntries.length === 0 ? (
+            <div className="flex h-64 flex-col items-center justify-center text-center px-6">
+              <Search className="h-10 w-10 text-muted-foreground/40 mb-3" />
+              <h3 className="font-display text-base font-semibold text-foreground">
+                No matches
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground max-w-xs">
+                No sent forms match “{search}”. Try a different community, medicine or name.
+              </p>
+            </div>
           ) : (
-            entries.map((entry, idx) => {
+            visibleEntries.map((entry, idx) => {
               const isSel = selected.has(entry.id);
+
               const answered = countResponses(entry);
               return (
                 <motion.div
