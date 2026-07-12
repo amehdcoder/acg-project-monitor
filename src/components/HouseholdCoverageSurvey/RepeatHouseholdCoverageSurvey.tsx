@@ -891,6 +891,34 @@ export default function RepeatHouseholdCoverageSurvey({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Leave-guard: confirm before exiting with unsaved households */}
+      <AlertDialog open={showExitConfirm} onOpenChange={setShowExitConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Leave without submitting?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsubmitted survey data{completed.length > 0 ? ` (${completed.length} household${completed.length === 1 ? "" : "s"} captured)` : ""}. Your progress is
+              saved on this device as a draft and will be restored when you return, but it has not been
+              submitted yet.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay on form</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowExitConfirm(false);
+                onClose();
+              }}
+            >
+              Leave &amp; keep draft
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
