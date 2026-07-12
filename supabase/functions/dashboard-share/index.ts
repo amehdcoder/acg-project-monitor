@@ -167,6 +167,65 @@ const SHARED_FILTER_METHODS = new Set<string>([
   "contains", "containedBy", "overlaps", "not", "filter", "or", "match",
 ]);
 
+// For each shareable table, the column that scopes rows to a project. Every
+// query is force-filtered to the share's own project_id on this column so a
+// share link can never read another project's rows. `projects` is scoped by
+// its own primary key. Tables without a project dimension (lookup/config only)
+// are listed with `null` and must never expose per-user PII.
+const TABLE_PROJECT_COLUMN: Record<string, string | null> = {
+  irf_reports: "project_id",
+  acsm_reports: "project_id",
+  sbc_reports: "project_id",
+  seeclear_monitoring: "project_id",
+  form_submissions: "project_id",
+  forms: "project_id",
+  projects: "id",
+  household_coverage_surveys: "project_id",
+  user_project_assignments: "project_id",
+  sarmaan_acsm_archived_submissions: "project_id",
+  ces_household_visits: "project_id",
+  ces_surveys: "project_id",
+  profiles: null,
+  mda_tile_icons: null,
+};
+
+// Columns that must never be returned to an external/public shared viewer,
+// per table. Sensitive PII (emails, phone numbers) is stripped from any
+// selection so it cannot leak through a share link.
+const TABLE_BLOCKED_COLUMNS: Record<string, Set<string>> = {
+  profiles: new Set([
+    "email", "phone", "phone_number", "personal_email", "whatsapp",
+    "date_of_birth", "address", "nin", "bvn", "bank_account",
+  ]),
+};
+
+// Only these columns of `profiles` may be read via a share link (names used to
+// label charts). Everything else — especially contact details — is withheld.
+const PROFILES_ALLOWED_COLUMNS = new Set<string>([
+  "id", "user_id", "first_name", "last_name", "full_name", "display_name",
+  "designation", "role", "project_id", "avatar_url",
+]);
+
+function sanitizeColumns(table: string, columns: string): string {
+  if (columns === "*" || columns.trim() === "") {
+    if (table === "profiles") return [...PROFILES_ALLOWED_COLUMNS].join(",");
+    return "*";
+  }
+  const blocked = TABLE_BLOCKED_COLUMNS[table];
+  const requested = columns.split(",").map((c) => c.trim()).filter(Boolean);
+  let allowed = requested;
+  if (table === "profiles") {
+    allowed = requested.filter((c) => {
+      const base = c.split(":")[0].trim();
+      return PROFILES_ALLOWED_COLUMNS.has(base);
+    });
+    if (!allowed.length) allowed = [...PROFILES_ALLOWED_COLUMNS];
+  } else if (blocked) {
+    allowed = requested.filter((c) => !blocked.has(c.split(":")[0].trim()));
+  }
+  return allowed.join(",");
+}
+
 // Decide whether a request carries a valid, live grant for this share.
 async function isShareGranted(
   share: any,
