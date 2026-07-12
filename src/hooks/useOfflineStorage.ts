@@ -32,6 +32,13 @@ interface PendingSubmission {
    * so an offline edit never overwrites a NEWER server record.
    */
   client_updated_at?: string;
+  /**
+   * Idempotency contract (see src/lib/syncContract.ts). submission_uuid is the
+   * durable identity across every retransmit; client_submitted_at is the
+   * on-device capture clock. Both are stamped at capture and never change.
+   */
+  submission_uuid?: string;
+  client_submitted_at?: string;
 }
 
 /** Recorded when an offline edit is rejected because the server was newer. */
