@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Wifi,
   WifiOff,
@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   ChevronDown,
   Satellite,
+  Database,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,16 +19,53 @@ import {
 } from "@/components/ui/popover";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import SatelliteSyncDialog from "@/components/SatelliteSyncDialog";
+import {
+  getMasterSyncStatus,
+  runMasterDataDeltaSync,
+  type MasterSyncMeta,
+} from "@/lib/deltaSync";
 
 const OfflineSyncIndicator = () => {
   const { isOnline, pendingCount, isSyncing, syncPendingSubmissions, getPending, updatePendingCount } = useOfflineStorage();
   const [isOpen, setIsOpen] = useState(false);
   const [satOpen, setSatOpen] = useState(false);
   const [pendingForSat, setPendingForSat] = useState<any[]>([]);
+  const [master, setMaster] = useState<MasterSyncMeta[]>([]);
+  const [refreshingMaster, setRefreshingMaster] = useState(false);
+
+  const loadMaster = async () => {
+    try {
+      setMaster(await getMasterSyncStatus());
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) void loadMaster();
+  }, [isOpen]);
+
+  const handleRefreshMaster = async () => {
+    setRefreshingMaster(true);
+    try {
+      setMaster(await runMasterDataDeltaSync());
+    } finally {
+      setRefreshingMaster(false);
+    }
+  };
+
+  const masterCount = master.reduce((n, m) => n + (m.count || 0), 0);
+  const lastMasterSync = master
+    .map((m) => m.syncedAt)
+    .filter(Boolean)
+    .sort()
+    .pop();
 
   const handleSync = async () => {
     await syncPendingSubmissions();
   };
+
+
 
   const handleSatelliteSync = async () => {
     const pending = await getPending();
@@ -166,6 +204,42 @@ const OfflineSyncIndicator = () => {
               </p>
             </div>
           )}
+
+          {/* Reference (master) data — incremental delta sync status */}
+          <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Database className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-xs font-medium text-foreground">Reference data</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {masterCount > 0
+                      ? `${masterCount.toLocaleString()} records cached${
+                          lastMasterSync
+                            ? ` · updated ${new Date(lastMasterSync).toLocaleString()}`
+                            : ""
+                        }`
+                      : "Not synced yet"}
+                  </p>
+                </div>
+              </div>
+              {isOnline && (
+                <Button
+                  onClick={handleRefreshMaster}
+                  disabled={refreshingMaster}
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-[11px]"
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 ${refreshingMaster ? "animate-spin" : ""}`}
+                  />
+                  {refreshingMaster ? "Syncing" : "Refresh"}
+                </Button>
+              )}
+            </div>
+          </div>
+
         </div>
       </PopoverContent>
     </Popover>

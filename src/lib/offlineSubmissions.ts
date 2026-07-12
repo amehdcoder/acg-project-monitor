@@ -9,6 +9,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import { sealRecord, unsealRecord } from "@/lib/deviceCrypto";
 import { getSavedEntry, setSavedEntryStatus } from "@/lib/savedForms";
+import { stampSyncContract } from "@/lib/syncContract";
+
+// Tables that carry the formal idempotency contract (submission_uuid +
+// client_submitted_at columns). Rows destined for these tables are stamped so a
+// retransmit after a network blip is recognised and never duplicated.
+const SYNC_CONTRACT_TABLES = new Set(["bloomberg_validations", "seeclear_monitoring"]);
+
 
 const DB_NAME = "acg_offline_submissions";
 const DB_VERSION = 1;
@@ -160,6 +167,12 @@ export async function queueOrInsert(
   upsertOnId = false,
   opts: { mirrorEntryId?: string | null } = {},
 ): Promise<{ queued: boolean }> {
+  // Stamp the idempotency contract for contract-aware tables. Using the row's
+  // own id (a client-generated UUID for these forms) as submission_uuid keeps
+  // the identity stable across every retry so duplicates are impossible.
+  if (SYNC_CONTRACT_TABLES.has(table)) {
+    row = stampSyncContract(row, typeof row.id === "string" ? row.id : undefined);
+  }
   if (isOnline()) {
     try {
       const { error } = await writeRecordToServer(table, row, upsertOnId);

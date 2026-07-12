@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { sealRecord, unsealRecord, unsealAll } from "@/lib/deviceCrypto";
+import { runMasterDataDeltaSync } from "@/lib/deltaSync";
 
 const DB_NAME = "acg_monitor_offline";
 const DB_VERSION = 4;
@@ -31,6 +32,13 @@ interface PendingSubmission {
    * so an offline edit never overwrites a NEWER server record.
    */
   client_updated_at?: string;
+  /**
+   * Idempotency contract (see src/lib/syncContract.ts). submission_uuid is the
+   * durable identity across every retransmit; client_submitted_at is the
+   * on-device capture clock. Both are stamped at capture and never change.
+   */
+  submission_uuid?: string;
+  client_submitted_at?: string;
 }
 
 /** Recorded when an offline edit is rejected because the server was newer. */
@@ -344,6 +352,9 @@ export const useOfflineStorage = () => {
         status: "sent",
         submitted_at: s.created_at,
         synced_at: new Date().toISOString(),
+        // Idempotency contract: stable UUID + immutable on-device capture time.
+        submission_uuid: s.submission_uuid || s.id,
+        client_submitted_at: s.client_submitted_at || s.created_at,
       });
       const touchedFormIds = new Set<string>();
       let conflicts = 0;
@@ -480,8 +491,12 @@ export const useOfflineStorage = () => {
         title: "Back Online",
         description: "Connection restored. Syncing pending submissions...",
       });
-      // Delay slightly to allow network to stabilize, then sync
-      setTimeout(() => trySyncIfNeeded(), 2000);
+      // Delay slightly to allow network to stabilize, then sync submissions
+      // and pull any master-data changes since the last sync.
+      setTimeout(() => {
+        trySyncIfNeeded();
+        void runMasterDataDeltaSync();
+      }, 2000);
     };
 
     const handleOffline = () => {
@@ -498,6 +513,10 @@ export const useOfflineStorage = () => {
 
     // Check pending count on mount
     updatePendingCount();
+
+    // Opportunistic delta sync of master data on boot (only runs when online;
+    // downloads only rows changed since the last watermark).
+    if (navigator.onLine) void runMasterDataDeltaSync();
 
     return () => {
       window.removeEventListener("online", handleOnline);
@@ -557,6 +576,7 @@ export const useOfflineStorage = () => {
       submissionType: string = "regular"
     ): Promise<{ success: boolean; offline: boolean; id: string }> => {
       const submissionId = crypto.randomUUID();
+      const capturedAt = new Date().toISOString();
 
       const submission: PendingSubmission = {
         id: submissionId,
@@ -568,8 +588,11 @@ export const useOfflineStorage = () => {
         location,
         within_geofence: withinGeofence,
         submission_type: submissionType,
-        created_at: new Date().toISOString(),
+        created_at: capturedAt,
         retryCount: 0,
+        // Idempotency contract stamped at capture — durable across retransmits.
+        submission_uuid: submissionId,
+        client_submitted_at: capturedAt,
       };
 
 
@@ -587,9 +610,11 @@ export const useOfflineStorage = () => {
               location,
               within_geofence: withinGeofence,
               status: "sent",
-              submitted_at: new Date().toISOString(),
+              submitted_at: capturedAt,
               synced_at: new Date().toISOString(),
               submission_type: submissionType,
+              submission_uuid: submissionId,
+              client_submitted_at: capturedAt,
             })
             .select()
             .single();
