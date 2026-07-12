@@ -116,6 +116,30 @@ function aggregateGeo(surveys: SurveyRow[], level: "community" | "lga", txB: num
   return rows.sort((a, b) => pct(a.swallowed, a.offered) - pct(b.swallowed, b.offered));
 }
 
+/* Rich tooltip: shows the full geography name plus its LGA · Ward · FLHF path. */
+function GeoChartTooltip({ active, payload, txBenchmark }: any) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload || {};
+  return (
+    <div className="rounded-lg border border-border bg-background/95 px-3 py-2 shadow-lg backdrop-blur">
+      <div className="text-xs font-bold text-foreground">{row.fullName || row.name}</div>
+      {row.sub && <div className="mt-0.5 text-[10px] text-muted-foreground">{row.sub}</div>}
+      <div className="mt-1.5 space-y-0.5">
+        <div className="flex items-center gap-1.5 text-[11px]">
+          <span className="inline-block h-2 w-2 rounded-sm" style={{ background: (row.tx ?? 0) < txBenchmark ? RED : EMERALD }} />
+          <span className="text-muted-foreground">Therapeutic</span>
+          <span className="ml-auto font-semibold tabular-nums text-foreground">{row.tx}%</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-[11px]">
+          <span className="inline-block h-2 w-2 rounded-sm" style={{ background: BLUE }} />
+          <span className="text-muted-foreground">Household reach</span>
+          <span className="ml-auto font-semibold tabular-nums text-foreground">{row.reach}%</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─────────────────────────── free-text themes ─────────────────────────── */
 const THEME_RULES: { label: string; tint: string; re: RegExp }[] = [
   { label: "Refusal / hesitancy", tint: RED, re: /refus|declin|reject|unwilling|reluctan|distrust|fear|rumou?r/i },
