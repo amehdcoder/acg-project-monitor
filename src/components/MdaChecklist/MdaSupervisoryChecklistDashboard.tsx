@@ -1399,7 +1399,10 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
                       <div className="font-semibold text-foreground">{r.community}</div>
                       {r.risk && <span className="text-[10px]" style={{ color: norm(r.risk) === "high" ? RED : SLATE }}>{r.risk} risk</span>}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">{r.ward} · {r.lga}</td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      <span className="text-foreground">{r.ward}</span>
+                      {r.lga && <span className="ml-1.5 inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold align-middle" style={labelPillStyle(r.lga)}>{r.lga}</span>}
+                    </td>
                     <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{r.visitDate}</td>
                     <td className="px-3 py-2">
                       {r.hasCompletion
