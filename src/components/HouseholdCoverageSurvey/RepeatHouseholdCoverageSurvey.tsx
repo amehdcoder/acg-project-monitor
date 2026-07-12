@@ -17,6 +17,8 @@ import {
   ArrowRight,
   Cloud,
   Wifi,
+  X,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -305,6 +307,7 @@ export default function RepeatHouseholdCoverageSurvey({
   );
   const [submitting, setSubmitting] = useState(false);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [shortfallReason, setShortfallReason] = useState("");
   const [done, setDone] = useState(false);
 
@@ -319,8 +322,52 @@ export default function RepeatHouseholdCoverageSurvey({
     }
   }, [completed, current, done, draftKey]);
 
+  // Whether the survey holds unsubmitted work worth guarding on exit.
+  const hasUnsavedProgress = useMemo(() => {
+    if (done) return false;
+    if (completed.length > 0) return true;
+    const c = current;
+    return Boolean(
+      c.gps ||
+        c.cdd_came ||
+        c.anyone_treated ||
+        c.offered_count ||
+        c.swallowed_count ||
+        c.side_effects ||
+        c.side_effects_detail ||
+        c.ae_reported ||
+        c.f1_asked_height ||
+        c.f3_satisfied ||
+        c.f4_why?.trim() ||
+        c.suggestions?.trim() ||
+        c.people.some((p) => p.name || p.age || p.sex || p.offered || p.swallowed || p.reason),
+    );
+  }, [completed, current, done]);
+
+  // Native guard: warn before the browser/tab is closed or reloaded mid-survey.
+  useEffect(() => {
+    if (!hasUnsavedProgress) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+      return "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsavedProgress]);
+
+  // In-app guard: confirm before leaving the form when there is unsaved work.
+  const requestClose = () => {
+    if (hasUnsavedProgress) {
+      setShowExitConfirm(true);
+    } else {
+      onClose();
+    }
+  };
+
 
   const reachedTarget = completed.length >= target;
+
 
   const update = (patch: Partial<HouseholdRecord>) => setCurrent((c) => ({ ...c, ...patch }));
 
@@ -486,6 +533,14 @@ export default function RepeatHouseholdCoverageSurvey({
             {navigator.onLine ? <Wifi className="h-3.5 w-3.5" /> : <Cloud className="h-3.5 w-3.5" />}
             {navigator.onLine ? "Online" : "Offline"}
           </div>
+          <button
+            type="button"
+            onClick={requestClose}
+            aria-label="Close survey"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 transition-colors hover:bg-white/25"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
       </div>
 
@@ -832,6 +887,34 @@ export default function RepeatHouseholdCoverageSurvey({
               style={{ background: TEAL }}
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit survey"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Leave-guard: confirm before exiting with unsaved households */}
+      <AlertDialog open={showExitConfirm} onOpenChange={setShowExitConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Leave without submitting?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsubmitted survey data{completed.length > 0 ? ` (${completed.length} household${completed.length === 1 ? "" : "s"} captured)` : ""}. Your progress is
+              saved on this device as a draft and will be restored when you return, but it has not been
+              submitted yet.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay on form</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowExitConfirm(false);
+                onClose();
+              }}
+            >
+              Leave &amp; keep draft
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
