@@ -26,6 +26,27 @@ export interface SubmissionRecord {
   within_geofence: boolean | null;
 }
 
+const fetchVisibleFormSubmissions = async (formId: string) => {
+  const PAGE_SIZE = 1000;
+  let rows: any[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await (supabase as any).rpc("visible_form_submissions", {
+      _form_id: formId,
+      _limit: PAGE_SIZE,
+      _offset: offset,
+    });
+    if (error) throw error;
+    const page = data || [];
+    rows = rows.concat(page);
+    if (page.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+
+  return rows;
+};
+
 export interface FormAnalytics {
   id: string;
   name: string;
@@ -346,34 +367,23 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
     try {
       const formIds = formsData.map((f) => f.id);
       
-      // Fetch ALL submissions using pagination to bypass the 1000-row default limit
-      let allData: any[] = [];
-      const PAGE_SIZE = 1000;
-      let page = 0;
-      let hasMore = true;
-      
-      while (hasMore) {
-        let query = supabase
-          .from("form_submissions")
-          .select("*")
-          .in("form_id", formIds)
-          .order("submitted_at", { ascending: false })
-          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-
-        if (filters.startDate) {
-          query = query.gte("submitted_at", filters.startDate);
-        }
-        if (filters.endDate) {
-          query = query.lte("submitted_at", filters.endDate);
-        }
-
-        const { data, error } = await query;
-        if (error) throw error;
-        
-        allData = allData.concat(data || []);
-        hasMore = (data?.length || 0) === PAGE_SIZE;
-        page++;
+      // Fetch rows through the same backend-scoped helper used by dashboard
+      // counts, then apply local date filters so count/list permissions match.
+      const pages = await Promise.all(formIds.map((formId) => fetchVisibleFormSubmissions(formId)));
+      let allData = pages.flat();
+      if (filters.startDate) {
+        const start = new Date(filters.startDate).getTime();
+        allData = allData.filter((s) => new Date(s.submitted_at || s.created_at || 0).getTime() >= start);
       }
+      if (filters.endDate) {
+        const end = new Date(filters.endDate).getTime();
+        allData = allData.filter((s) => new Date(s.submitted_at || s.created_at || 0).getTime() <= end);
+      }
+      allData.sort(
+        (a, b) =>
+          new Date(b.submitted_at || b.created_at || 0).getTime() -
+          new Date(a.submitted_at || a.created_at || 0).getTime(),
+      );
 
       // Get user profiles for submitter names
       const userIds = [...new Set((allData).map((s) => s.user_id))];
