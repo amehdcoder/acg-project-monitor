@@ -140,6 +140,55 @@ async function userAllowedByRole(userId: string, allowedRoles: string[]): Promis
   return (roles ?? []).some((r: { role: string }) => allowedRoles.includes(r.role));
 }
 
+// Tables a shared (read-only) viewer is permitted to query. These are exactly
+// the tables the shareable supervisory dashboards read from. Any other table
+// is rejected so a share link can never be used to exfiltrate unrelated data.
+const SHARED_READ_TABLES = new Set<string>([
+  "irf_reports",
+  "acsm_reports",
+  "sbc_reports",
+  "seeclear_monitoring",
+  "form_submissions",
+  "forms",
+  "profiles",
+  "projects",
+  "household_coverage_surveys",
+  "user_project_assignments",
+  "sarmaan_acsm_archived_submissions",
+  "ces_household_visits",
+  "ces_surveys",
+  "mda_tile_icons",
+]);
+
+// PostgREST query-builder methods a shared viewer may chain. Read-only filters
+// and ordering only — never insert/update/delete/rpc.
+const SHARED_FILTER_METHODS = new Set<string>([
+  "eq", "neq", "gt", "gte", "lt", "lte", "like", "ilike", "is", "in",
+  "contains", "containedBy", "overlaps", "not", "filter", "or", "match",
+]);
+
+// Decide whether a request carries a valid, live grant for this share.
+async function isShareGranted(
+  share: any,
+  req: Request,
+  sessionToken: string,
+): Promise<boolean> {
+  if (share.access_type === "public") return true;
+  if (share.access_type === "internal_roles") {
+    const user = await getUserFromAuthHeader(req);
+    if (!user) return false;
+    return await userAllowedByRole(user.id, share.allowed_roles ?? []);
+  }
+  // external_emails
+  if (!sessionToken) return false;
+  const email = await verifySession(sessionToken, share.id);
+  if (!email) return false;
+  const allow = (share.allowed_emails ?? []).map((e: string) => e.toLowerCase());
+  return allow.includes(email.toLowerCase());
+}
+
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
