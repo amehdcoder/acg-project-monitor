@@ -258,10 +258,12 @@ export async function flushSubmissionQueue(
           return rec.attempts === 0 || Date.now() - last >= delay;
         });
 
-    // Drain with bounded concurrency so a large backlog clears in seconds
-    // instead of strictly one-at-a-time, while still capping simultaneous
-    // requests so we never overwhelm the device or the backend.
-    const CONCURRENCY = 6;
+    // Drain in small chunks so low-RAM field devices never flood the thread
+    // with a burst of concurrent network promises (a common cause of OOM tab
+    // crashes on cheap Android hardware). A conservative concurrency of 2 keeps
+    // the UI thread smooth while still clearing a backlog far faster than a
+    // strictly one-at-a-time loop.
+    const CONCURRENCY = 2;
     const processOne = async (rec: PendingInsert) => {
       if (!isOnline()) return;
       try {
