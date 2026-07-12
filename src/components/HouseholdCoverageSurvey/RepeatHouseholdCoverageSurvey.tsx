@@ -434,6 +434,10 @@ export default function RepeatHouseholdCoverageSurvey({
       toast({ title: "Capture the household GPS", description: "Each household must have its own geopoint. Tap “Capture Geopoint” before saving.", variant: "destructive" });
       return;
     }
+    if (tasteOtherMissing) {
+      toast({ title: "Specify the taste", description: "Please describe the other taste of the medicine before saving.", variant: "destructive" });
+      return;
+    }
     const snapshot = saveCurrentHousehold();
     if (snapshot.length >= target) {
       // Target reached — go straight to submit.
