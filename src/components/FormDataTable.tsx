@@ -543,6 +543,18 @@ const FormDataTable = ({
         </Table>
       </div>
     </div>
+    {conflict && (
+      <SyncConflictDialog
+        open={!!conflict}
+        recordLabel="Form submission"
+        localData={conflict.localData}
+        serverData={conflict.serverData}
+        fieldLabels={questionLabels as Record<string, string> | undefined}
+        onResolve={applyConflictResolution}
+        onCancel={() => setConflict(null)}
+      />
+    )}
+    </>
   );
 };
 
