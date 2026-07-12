@@ -478,6 +478,40 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     return m;
   }, [grid3Settlements]);
 
+  // ── Instant, environment-agnostic GPS for the supervision point ────────
+  // Tier-3 fallback = geographic center of the selected Community/Settlement.
+  const geoCenter = useMemo(() => {
+    const g = responses.community_gps;
+    if (g && Number.isFinite(g.lat) && Number.isFinite(g.lng)) {
+      return { lat: g.lat as number, lng: g.lng as number };
+    }
+    const coords = sel.community_name ? grid3SettlementCoords.get(normGeo(sel.community_name)) : null;
+    return coords ?? null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [responses.community_gps, sel.community_name, grid3SettlementCoords]);
+
+  const instantGps = useInstantLocation({ geoCenter });
+
+  // Persist the live supervision coordinate onto the form responses.
+  const lastGpsTsRef = useRef<number | null>(null);
+  useEffect(() => {
+    const c = instantGps.coord;
+    if (!c) return;
+    if (c.source === "fallback") return; // don't overwrite with area center
+    if (c.timestamp === lastGpsTsRef.current) return;
+    lastGpsTsRef.current = c.timestamp;
+    try {
+      onSet({
+        supervisor_latitude: c.lat,
+        supervisor_longitude: c.lng,
+        supervisor_gps: { lat: c.lat, lng: c.lng, accuracy: c.accuracy },
+      });
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instantGps.coord]);
+
   const options = (level: keyof GeoRow): string[] => {
     // GRID3 national cascade (default). State → LGA → Ward come from the full
     // consolidated GRID3 shards; FLHF and Community (settlements) come from
