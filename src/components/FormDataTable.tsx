@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pencil, Save, X, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { getFieldLabel, type QuestionLabelMap } from "@/lib/formLabelUtils";
+import SyncConflictDialog from "@/components/SyncConflictDialog";
+import type { ConflictStrategy } from "@/lib/syncConflict";
 
 /**
  * Describes a single form field for the editor. When a `fieldSpec` is provided,
@@ -102,6 +104,15 @@ const FormDataTable = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
+  // Optimistic-concurrency baseline: the version this device saw when editing
+  // began. Used to detect a conflicting edit made by someone else meanwhile.
+  const baseVersionRef = useRef<number | null>(null);
+  const [conflict, setConflict] = useState<
+    { serverData: Record<string, any>; serverVersion: number; localData: Record<string, any> } | null
+  >(null);
+
+  const usesGuardedUpdate = table === "form_submissions" && dataColumn === "data";
+
 
   // Resolve the current value for a field (from a column or the JSON blob).
   const resolveValue = (f: FieldDescriptor): any =>
@@ -151,12 +162,25 @@ const FormDataTable = ({
     });
     setEditData(editable);
     setIsEditing(true);
+    // Snapshot the current server version so a concurrent edit is detectable.
+    if (usesGuardedUpdate && !isPending) {
+      baseVersionRef.current = null;
+      void supabase
+        .from("form_submissions")
+        .select("version")
+        .eq("id", submissionId)
+        .maybeSingle()
+        .then(({ data: row }) => {
+          baseVersionRef.current = (row as any)?.version ?? null;
+        });
+    }
   };
 
   const cancelEditing = () => {
     setIsEditing(false);
     setEditData({});
   };
+
 
   const handleFieldChange = (entry: Entry, newValue: string) => {
     const type = entry.descriptor?.type;
@@ -218,48 +242,79 @@ const FormDataTable = ({
         dbUpdate[dataColumn] = answersObj;
       }
 
-      if (!isPending) {
+      const writeAudit = async () => {
+        if (changes.length === 0) return;
+        try {
+          const { data: authData } = await supabase.auth.getUser();
+          const uid = authData?.user?.id;
+          const meta = authData?.user?.user_metadata as any;
+          const name =
+            meta?.full_name || meta?.name || authData?.user?.email || "Unknown user";
+          const stringify = (v: any) =>
+            v === null || v === undefined
+              ? null
+              : typeof v === "object"
+              ? JSON.stringify(v)
+              : String(v);
+          if (uid) {
+            await supabase.from("submission_edit_audit" as any).insert(
+              changes.map((c) => ({
+                submission_id: submissionId,
+                table_name: table,
+                field_key: c.field_key,
+                field_label: c.field_label,
+                old_value: stringify(c.old_value),
+                new_value: stringify(c.new_value),
+                source: "admin_edit",
+                changed_by: uid,
+                changed_by_name: name,
+              })),
+            );
+          }
+        } catch (auditErr) {
+          console.warn("Audit log write failed:", auditErr);
+        }
+      };
+
+      // Guarded (optimistic-concurrency) path: only for form_submissions edits
+      // that touch the JSON answers column exclusively. Detects a conflicting
+      // edit made by another user and surfaces the resolution dialog instead of
+      // silently overwriting their changes.
+      const onlyDataChanged =
+        usesGuardedUpdate &&
+        Object.keys(dbUpdate).length === 1 &&
+        dataColumn in dbUpdate;
+
+      if (!isPending && onlyDataChanged) {
+        const { data: rpcRows, error } = await supabase.rpc("update_submission_guarded", {
+          p_id: submissionId,
+          p_expected_version: baseVersionRef.current ?? 1,
+          p_data: answersObj,
+        });
+        if (error) throw error;
+        const result = Array.isArray(rpcRows) ? (rpcRows[0] as any) : (rpcRows as any);
+        if (result?.conflict) {
+          // Someone changed the record first — do NOT overwrite. Open dialog.
+          setConflict({
+            serverData: (result.data as Record<string, any>) || {},
+            serverVersion: (result.version as number) ?? 1,
+            localData: answersObj,
+          });
+          setSaving(false);
+          return;
+        }
+        await writeAudit();
+        baseVersionRef.current = (result?.version as number) ?? baseVersionRef.current;
+      } else if (!isPending) {
         const { error } = await supabase
           .from(table as any)
           .update(dbUpdate as any)
           .eq("id", submissionId);
 
         if (error) throw error;
-
-        // Persist a per-field audit trail (best-effort; never blocks the save).
-        if (changes.length > 0) {
-          try {
-            const { data: authData } = await supabase.auth.getUser();
-            const uid = authData?.user?.id;
-            const meta = authData?.user?.user_metadata as any;
-            const name =
-              meta?.full_name || meta?.name || authData?.user?.email || "Unknown user";
-            const stringify = (v: any) =>
-              v === null || v === undefined
-                ? null
-                : typeof v === "object"
-                ? JSON.stringify(v)
-                : String(v);
-            if (uid) {
-              await supabase.from("submission_edit_audit" as any).insert(
-                changes.map((c) => ({
-                  submission_id: submissionId,
-                  table_name: table,
-                  field_key: c.field_key,
-                  field_label: c.field_label,
-                  old_value: stringify(c.old_value),
-                  new_value: stringify(c.new_value),
-                  source: "admin_edit",
-                  changed_by: uid,
-                  changed_by_name: name,
-                })),
-              );
-            }
-          } catch (auditErr) {
-            console.warn("Audit log write failed:", auditErr);
-          }
-        }
+        await writeAudit();
       }
+
 
       onDataUpdate?.(answersObj);
       onColumnsUpdate?.(updatedColumns);
@@ -279,6 +334,45 @@ const FormDataTable = ({
       setSaving(false);
     }
   };
+
+  // Apply the supervisor's chosen conflict resolution. The expected version is
+  // now the server's current version, so this write always lands cleanly.
+  const applyConflictResolution = async (
+    _strategy: ConflictStrategy,
+    payload: Record<string, any>,
+  ) => {
+    if (!conflict) return;
+    setSaving(true);
+    try {
+      const { data: rpcRows, error } = await supabase.rpc("update_submission_guarded", {
+        p_id: submissionId,
+        p_expected_version: conflict.serverVersion,
+        p_data: payload,
+      });
+      if (error) throw error;
+      const result = Array.isArray(rpcRows) ? (rpcRows[0] as any) : (rpcRows as any);
+      if (result?.conflict) {
+        // The record changed AGAIN — refresh the dialog with the newer server copy.
+        setConflict({
+          serverData: (result.data as Record<string, any>) || {},
+          serverVersion: (result.version as number) ?? conflict.serverVersion,
+          localData: payload,
+        });
+        return;
+      }
+      baseVersionRef.current = (result?.version as number) ?? null;
+      onDataUpdate?.(payload);
+      setConflict(null);
+      setIsEditing(false);
+      setEditData({});
+      toast({ title: "Conflict resolved", description: "Your resolution has been saved." });
+    } catch (err: any) {
+      toast({ title: "Resolution failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
 
   const renderEditor = (entry: Entry) => {
     const desc = entry.descriptor;
@@ -358,6 +452,7 @@ const FormDataTable = ({
   };
 
   return (
+    <>
     <div className="border-t pt-4">
       <div className="flex items-center justify-between mb-3">
         <h4 className="font-medium text-foreground">Form Data</h4>
@@ -448,6 +543,18 @@ const FormDataTable = ({
         </Table>
       </div>
     </div>
+    {conflict && (
+      <SyncConflictDialog
+        open={!!conflict}
+        recordLabel="Form submission"
+        localData={conflict.localData}
+        serverData={conflict.serverData}
+        fieldLabels={questionLabels as Record<string, string> | undefined}
+        onResolve={applyConflictResolution}
+        onCancel={() => setConflict(null)}
+      />
+    )}
+    </>
   );
 };
 

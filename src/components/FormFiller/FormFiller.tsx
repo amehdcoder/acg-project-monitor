@@ -49,6 +49,7 @@ import {
   HandMetal,
   Languages,
   Bug,
+  AlertTriangle,
 } from "lucide-react";
 import SkipLogicDebugPanel from "@/components/FormFiller/SkipLogicDebugPanel";
 import { toast } from "@/hooks/use-toast";
@@ -116,6 +117,7 @@ import TreatmentToolWizard, { type TreatmentTool } from "./TreatmentToolWizard";
 import { useAuth } from "@/hooks/useAuth";
 import { MoEExpertProvider } from "./MoEExpertProvider";
 import { ExpertFieldValidator } from "./ExpertFieldValidator";
+import { validateFieldValue } from "@/lib/formFieldValidation";
 // LocationGate / LocationHeaderBar intentionally NOT imported — location
 // capture runs silently in the background only.
 import { useLocationEnforcement, ACCURACY_HARD_LIMIT } from "@/hooks/useLocationEnforcement";
@@ -1764,33 +1766,12 @@ const FormFiller = ({
       // If no value provided and not required, skip further validation
       if (value === undefined || value === null || value === "") continue;
 
-      // Only check min/max if validation object has actual values set
-      if (question.type === "number" && question.validation) {
-        const numValue = parseFloat(value);
-        if (!isNaN(numValue)) {
-          if (question.validation.min !== undefined && question.validation.min !== null && numValue < question.validation.min) {
-            errors[question.id] = `Value must be at least ${question.validation.min}`;
-            trackValidationFailure(question.id, question.label, `min:${question.validation.min}`, String(value));
-          }
-          if (question.validation.max !== undefined && question.validation.max !== null && numValue > question.validation.max) {
-            errors[question.id] = `Value must be at most ${question.validation.max}`;
-            trackValidationFailure(question.id, question.label, `max:${question.validation.max}`, String(value));
-          }
-        }
-      }
-
-      // Only check regex if it's a non-empty string
-      if (question.validation?.regex && typeof question.validation.regex === "string" && question.validation.regex.trim()) {
-        try {
-          const regex = new RegExp(question.validation.regex);
-          if (!regex.test(String(value))) {
-            errors[question.id] = question.constraintMessage || "Invalid format";
-            trackValidationFailure(question.id, question.label, `regex:${question.validation.regex}`, String(value));
-          }
-        } catch {
-          // Invalid regex pattern — skip validation rather than blocking
-          console.warn(`Invalid regex pattern for question ${question.id}: ${question.validation.regex}`);
-        }
+      // Self-contained field rules: no negatives, numeric bounds, no future
+      // dates, regex format — all evaluated locally (offline-safe).
+      const fieldResult = validateFieldValue(question, value);
+      if (fieldResult.error) {
+        errors[question.id] = fieldResult.error;
+        trackValidationFailure(question.id, question.label, "field", String(value));
       }
     }
 
@@ -1837,32 +1818,12 @@ const FormFiller = ({
 
           if (value === undefined || value === null || value === "") continue;
 
-          // Number min/max
-          if (question.type === "number" && question.validation) {
-            const numValue = parseFloat(value);
-            if (!isNaN(numValue)) {
-              if (question.validation.min !== undefined && question.validation.min !== null && numValue < question.validation.min) {
-                errors[qKey] = `Value must be at least ${question.validation.min}`;
-                trackValidationFailure(question.id, question.label, `min:${question.validation.min}`, String(value));
-              }
-              if (question.validation.max !== undefined && question.validation.max !== null && numValue > question.validation.max) {
-                errors[qKey] = `Value must be at most ${question.validation.max}`;
-                trackValidationFailure(question.id, question.label, `max:${question.validation.max}`, String(value));
-              }
-            }
-          }
-
-          // Regex
-          if (question.validation?.regex && typeof question.validation.regex === "string" && question.validation.regex.trim()) {
-            try {
-              const regex = new RegExp(question.validation.regex);
-              if (!regex.test(String(value))) {
-                errors[qKey] = question.constraintMessage || "Invalid format";
-                trackValidationFailure(question.id, question.label, `regex:${question.validation.regex}`, String(value));
-              }
-            } catch {
-              console.warn(`Invalid regex pattern for question ${question.id}: ${question.validation.regex}`);
-            }
+          // Self-contained field rules (offline-safe): no negatives, numeric
+          // bounds, no future dates, regex format.
+          const fieldResult = validateFieldValue(question, value);
+          if (fieldResult.error) {
+            errors[qKey] = fieldResult.error;
+            trackValidationFailure(question.id, question.label, "field", String(value));
           }
         }
       }
@@ -3132,6 +3093,20 @@ const FormFiller = ({
     <div data-mda-scroll data-mda-mode={isMdaChecklist ? "true" : undefined} style={formThemeStyle} className={isMdaChecklist
       ? "fixed inset-0 z-[70] isolate flex flex-col overflow-y-auto bg-background lg:pl-64"
       : "flex min-h-full flex-col bg-background relative"}>
+      {/* Schema-error indicator: blocks a clean submit and jumps the user to
+          the first invalid field. Runs entirely on local validation state. */}
+      {Object.keys(validationErrors).length > 0 && (
+        <button
+          type="button"
+          onClick={() => scrollToFirstError(validationErrors)}
+          className="fixed bottom-24 left-1/2 z-[160] flex -translate-x-1/2 items-center gap-2 rounded-full border border-destructive/40 bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground shadow-lg transition-transform hover:scale-105"
+          aria-live="polite"
+        >
+          <AlertTriangle className="h-4 w-4" />
+          {Object.keys(validationErrors).length}{" "}
+          {Object.keys(validationErrors).length === 1 ? "field needs" : "fields need"} attention
+        </button>
+      )}
       {/* Skip-logic debug panel (admins/owners only) — confirm at a glance why
           any question is shown or hidden given the current answers. */}
       {isAdmin && (
