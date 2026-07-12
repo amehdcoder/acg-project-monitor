@@ -25,7 +25,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
+
 } from "@/components/ui/dropdown-menu";
 import {
   Search,
@@ -56,6 +62,8 @@ import {
   QrCode,
   BarChart2,
   TrendingUp,
+  MonitorSmartphone,
+
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -63,6 +71,7 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Json } from "@/integrations/supabase/types";
 import { buildBuiltInTemplates } from "@/lib/builtInFormTemplates";
+import AdminDevicePreviewer, { PreviewDevice, DEVICE_SPECS, DEVICE_ORDER } from "@/components/AdminDevicePreviewer";
 
 interface FormTemplate {
   id: string;
@@ -106,7 +115,7 @@ const QUESTION_TYPE_ICONS: Record<string, React.ReactNode> = {
 };
 
 const FormTemplatesView = () => {
-  const { profile, isAdmin } = useAuth();
+  const { profile, isAdmin, isSuperAdmin } = useAuth();
   const [templates, setTemplates] = useState<FormTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -124,6 +133,9 @@ const FormTemplatesView = () => {
 
   // Preview dialog
   const [previewTemplate, setPreviewTemplate] = useState<FormTemplate | null>(null);
+
+  // Quick device preview (Super Admin only)
+  const [devicePreview, setDevicePreview] = useState<{ template: FormTemplate; device: PreviewDevice } | null>(null);
 
   // Save from existing form dialog
   const [showSaveFromForm, setShowSaveFromForm] = useState(false);
@@ -635,6 +647,29 @@ const FormTemplatesView = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                        {isSuperAdmin && (
+                          <>
+                            <DropdownMenuLabel className="text-[11px] text-muted-foreground">Quick Preview</DropdownMenuLabel>
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
+                                <MonitorSmartphone className="h-4 w-4 mr-2" />
+                                Preview on device
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>
+                                {DEVICE_ORDER.map((d) => (
+                                  <DropdownMenuItem
+                                    key={d}
+                                    onClick={() => setDevicePreview({ template, device: d })}
+                                  >
+                                    <span className="mr-2">{DEVICE_SPECS[d].icon}</span>
+                                    {DEVICE_SPECS[d].label}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                            <DropdownMenuSeparator />
+                          </>
+                        )}
                         <DropdownMenuItem onClick={() => openEditor(template)}>
                           <Edit className="h-4 w-4 mr-2" />
                           Edit Details
@@ -701,6 +736,19 @@ const FormTemplatesView = () => {
             </Card>
           ))}
         </div>
+      )}
+
+      {/* Quick device preview (Super Admin) */}
+      {devicePreview && isSuperAdmin && (
+        <AdminDevicePreviewer
+          device={devicePreview.device}
+          formName={devicePreview.template.name}
+          formDescription={devicePreview.template.description || ""}
+          questions={devicePreview.template.questions}
+          settings={devicePreview.template.settings}
+          onDeviceChange={(d) => setDevicePreview((prev) => (prev ? { ...prev, device: d } : prev))}
+          onClose={() => setDevicePreview(null)}
+        />
       )}
 
       {/* Preview Dialog */}
