@@ -1535,20 +1535,20 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         <CardContent className="p-0">
           <div className="max-h-[320px] overflow-auto">
             <table className="w-full text-xs">
-              <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
-                <tr className="text-left text-[11px] text-muted-foreground">
-                  <th className="px-3 py-2 font-semibold">Field worker</th>
-                  <th className="px-3 py-2 text-right font-semibold">Checklist</th>
-                  <th className="px-3 py-2 text-right font-semibold">Follow-ups</th>
-                  <th className="px-3 py-2 text-right font-semibold">Total</th>
-                  <th className="px-3 py-2 text-right font-semibold">Communities</th>
-                  <th className="px-3 py-2 text-right font-semibold">Days worked</th>
-                  <th className="px-3 py-2 text-right font-semibold">Last active</th>
+              <thead className="sticky top-0 z-10" style={{ background: `linear-gradient(135deg, ${NAVY}, ${NAVY_SOFT})` }}>
+                <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-white">
+                  <th className="px-3 py-2">Field worker</th>
+                  <th className="px-3 py-2 text-right">Checklist</th>
+                  <th className="px-3 py-2 text-right">Follow-ups</th>
+                  <th className="px-3 py-2 text-right">Total</th>
+                  <th className="px-3 py-2 text-right">Communities</th>
+                  <th className="px-3 py-2 text-right">Days worked</th>
+                  <th className="px-3 py-2 text-right">Last active</th>
                 </tr>
               </thead>
               <tbody>
-                {workers.map((w) => (
-                  <tr key={w.name} className="border-t border-border/60 hover:bg-muted/40">
+                {workers.map((w, wi) => (
+                  <tr key={w.name} className={`border-t border-border/60 hover:bg-primary/5 ${wi % 2 ? "bg-muted/40" : ""}`}>
                     <td className="px-3 py-2 font-medium text-foreground">{w.name}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmt(w.checklist)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmt(w.followups)}</td>
