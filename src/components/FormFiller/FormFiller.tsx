@@ -3092,6 +3092,20 @@ const FormFiller = ({
     <div data-mda-scroll data-mda-mode={isMdaChecklist ? "true" : undefined} style={formThemeStyle} className={isMdaChecklist
       ? "fixed inset-0 z-[70] isolate flex flex-col overflow-y-auto bg-background lg:pl-64"
       : "flex min-h-full flex-col bg-background relative"}>
+      {/* Schema-error indicator: blocks a clean submit and jumps the user to
+          the first invalid field. Runs entirely on local validation state. */}
+      {Object.keys(validationErrors).length > 0 && (
+        <button
+          type="button"
+          onClick={() => scrollToFirstError(validationErrors)}
+          className="fixed bottom-24 left-1/2 z-[160] flex -translate-x-1/2 items-center gap-2 rounded-full border border-destructive/40 bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground shadow-lg transition-transform hover:scale-105"
+          aria-live="polite"
+        >
+          <AlertTriangle className="h-4 w-4" />
+          {Object.keys(validationErrors).length}{" "}
+          {Object.keys(validationErrors).length === 1 ? "field needs" : "fields need"} attention
+        </button>
+      )}
       {/* Skip-logic debug panel (admins/owners only) — confirm at a glance why
           any question is shown or hidden given the current answers. */}
       {isAdmin && (
