@@ -3179,6 +3179,9 @@ export type Database = {
           created_by: string
           dashboard_id: string
           expires_at: string | null
+          form_id: string | null
+          form_name: string | null
+          form_snapshot: Json | null
           id: string
           is_active: boolean
           label: string | null
@@ -3194,6 +3197,9 @@ export type Database = {
           created_by: string
           dashboard_id: string
           expires_at?: string | null
+          form_id?: string | null
+          form_name?: string | null
+          form_snapshot?: Json | null
           id?: string
           is_active?: boolean
           label?: string | null
@@ -3209,6 +3215,9 @@ export type Database = {
           created_by?: string
           dashboard_id?: string
           expires_at?: string | null
+          form_id?: string | null
+          form_name?: string | null
+          form_snapshot?: Json | null
           id?: string
           is_active?: boolean
           label?: string | null
