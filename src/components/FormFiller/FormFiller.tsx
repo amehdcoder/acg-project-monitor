@@ -2214,7 +2214,7 @@ const FormFiller = ({
   };
 
 
-  const doSubmit = async () => {
+  const doSubmit = async (opts?: { deferHouseholdSurvey?: boolean }): Promise<string | null> => {
     setIsSubmitting(true);
     setShowIncompleteConfirm(false);
 
