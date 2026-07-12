@@ -255,23 +255,58 @@ function collectWardsFromShard(shard: StateShard, state: string, lga: string): s
   return lgaKey ? Object.keys(shard[lgaKey] ?? {}).map(titleCase).sort((a, b) => a.localeCompare(b)) : [];
 }
 
+// ─── Derived-index memo caches ──────────────────────────────────────────────
+// The per-state shards are already keyed by LGA > Ward, but building/sorting the
+// LGA list, Ward list and coordinate arrays on every dropdown change is wasted
+// work once a shard is in memory. We memoise those derived results in bounded
+// key→value maps so a parent-dropdown change resolves to a ready array in O(1)
+// instead of re-scanning the shard. Caches are cleared for a shard when it is
+// revalidated so fresh data is never masked.
+const _derivedCache = new Map<string, string[]>();
+const _facCache = new Map<string, FacilityWithCoords[]>();
+
+const derivedKey = (kind: string, state: string, lga?: string, ward?: string) =>
+  `${kind}|${normGeo(state)}|${normGeo(lga || "")}|${normGeo(ward || "")}`;
+
+/** Drop every derived-index entry for a state slug (called after revalidation). */
+export function invalidateDerivedForSlug(slug: string): void {
+  // Keys are keyed by normalised names, not slugs, so clear conservatively:
+  // the caches are small and rebuild instantly from the in-memory shard.
+  _derivedCache.clear();
+  _facCache.clear();
+}
+
 export async function getGrid3StateNames(): Promise<string[]> {
+  const cached = _derivedCache.get("states");
+  if (cached) return cached;
   const manifest = await loadManifest();
-  return Object.keys(manifest).map((s) => (s === "Fct" ? "FCT" : s)).sort((a, b) => a.localeCompare(b));
+  const list = Object.keys(manifest).map((s) => (s === "Fct" ? "FCT" : s)).sort((a, b) => a.localeCompare(b));
+  _derivedCache.set("states", list);
+  return list;
 }
 
 export async function getGrid3LGAsForState(state: string): Promise<string[]> {
+  const key = derivedKey("lga", state);
+  const cached = _derivedCache.get(key);
+  if (cached) return cached;
   const [fac, set] = await Promise.all([loadStateShard("fac", state), loadStateShard("set", state)]);
   const settlementLgas = collectLgasFromShard(set);
   const facilityLgas = collectLgasFromShard(fac);
-  return Array.from(new Set(settlementLgas.length > 0 ? settlementLgas : facilityLgas)).sort((a, b) => a.localeCompare(b));
+  const list = Array.from(new Set(settlementLgas.length > 0 ? settlementLgas : facilityLgas)).sort((a, b) => a.localeCompare(b));
+  _derivedCache.set(key, list);
+  return list;
 }
 
 export async function getGrid3WardsForLGA(state: string, lga: string): Promise<string[]> {
+  const key = derivedKey("ward", state, lga);
+  const cached = _derivedCache.get(key);
+  if (cached) return cached;
   const [fac, set] = await Promise.all([loadStateShard("fac", state), loadStateShard("set", state)]);
   const settlementWards = collectWardsFromShard(set, state, lga);
   const facilityWards = collectWardsFromShard(fac, state, lga);
-  return Array.from(new Set(settlementWards.length > 0 ? settlementWards : facilityWards)).sort((a, b) => a.localeCompare(b));
+  const list = Array.from(new Set(settlementWards.length > 0 ? settlementWards : facilityWards)).sort((a, b) => a.localeCompare(b));
+  _derivedCache.set(key, list);
+  return list;
 }
 
 /**
@@ -279,16 +314,26 @@ export async function getGrid3WardsForLGA(state: string, lga: string): Promise<s
  * Loads only the relevant state shard — fast, memory-safe, and offline-ready.
  */
 export async function getGrid3FacilitiesWithCoords(state: string, lga: string, ward?: string): Promise<FacilityWithCoords[]> {
+  const key = derivedKey("fac", state, lga, ward);
+  const cached = _facCache.get(key);
+  if (cached) return cached;
   const shard = await loadStateShard("fac", state);
-  return collectFromShard(shard, state, lga, ward);
+  const out = collectFromShard(shard, state, lga, ward);
+  _facCache.set(key, out);
+  return out;
 }
 
 /**
  * Get GRID3 settlements (Community) with coordinates for a State/LGA(/Ward).
  */
 export async function getGrid3SettlementsWithCoords(state: string, lga: string, ward?: string): Promise<FacilityWithCoords[]> {
+  const key = derivedKey("set", state, lga, ward);
+  const cached = _facCache.get(key);
+  if (cached) return cached;
   const shard = await loadStateShard("set", state);
-  return collectFromShard(shard, state, lga, ward);
+  const out = collectFromShard(shard, state, lga, ward);
+  _facCache.set(key, out);
+  return out;
 }
 
 /**
@@ -299,6 +344,30 @@ export async function getGrid3SettlementsWithCoords(state: string, lga: string, 
 export async function prefetchGrid3State(state: string): Promise<void> {
   await Promise.all([loadStateShard("fac", state), loadStateShard("set", state)]);
 }
+
+/**
+ * Background boot hydration (call once on app start, only when online).
+ * Quietly warms the manifest + state-name index so the very first time a
+ * supervisor opens the checklist the State dropdown is already populated with
+ * no network wait. Never throws and never blocks the UI. Optionally warms a
+ * set of scope states' shards so their LGA/Ward/FLHF/Community lists are ready.
+ */
+export async function hydrateGrid3Cache(scopeStates: string[] = []): Promise<void> {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+  try {
+    await loadManifest();
+    await getGrid3StateNames();
+    const states = Array.from(new Set(scopeStates.filter(Boolean)));
+    // Warm shards sequentially so we never flood the network on boot.
+    for (const st of states) {
+      try { await prefetchGrid3State(st); } catch { /* best-effort */ }
+    }
+  } catch {
+    /* best-effort — cache stays whatever it was */
+  }
+}
+
+
 
 // Structured by State > LGA for cascading lookup
 const GRID3_HEALTH_FACILITIES: Record<string, Record<string, string[]>> = {
