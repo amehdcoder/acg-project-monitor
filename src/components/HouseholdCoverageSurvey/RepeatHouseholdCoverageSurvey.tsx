@@ -531,12 +531,21 @@ export default function RepeatHouseholdCoverageSurvey({
             </div>
           </div>
           <div className={`rounded-xl border bg-card p-4 transition-colors ${hasGps ? "border-teal-300" : "border-amber-300"}`}>
-            <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-              <MapPin className="h-4 w-4 text-teal-600" /> GPS of Household <span className="text-destructive">*</span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                <MapPin className="h-4 w-4 text-teal-600" /> GPS of Household <span className="text-destructive">*</span>
+              </div>
+              <LocationStatusBadge
+                source={geo.source}
+                label={geo.statusLabel}
+                accuracy={geo.accuracy}
+                isRefreshing={geo.isRefreshing}
+                onRefresh={() => void geo.refresh()}
+              />
             </div>
             <div className="mt-2 flex items-center gap-3">
-              <Button type="button" size="sm" onClick={captureGps} disabled={geo.isLoading} style={{ background: TEAL }} className="text-white">
-                {geo.isLoading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Crosshair className="h-4 w-4 mr-1.5" />}
+              <Button type="button" size="sm" onClick={captureGps} disabled={geo.isRefreshing} style={{ background: TEAL }} className="text-white">
+                {geo.isRefreshing ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Crosshair className="h-4 w-4 mr-1.5" />}
                 {hasGps ? "Re-capture" : "Capture Geopoint"}
               </Button>
               {hasGps ? (
@@ -544,10 +553,9 @@ export default function RepeatHouseholdCoverageSurvey({
                   <CheckCircle2 className="h-4 w-4" /> {gpsLabel}
                 </span>
               ) : (
-                <span className="text-xs text-amber-600">{geo.isLoading ? "Acquiring fix…" : "Required — capture a unique point at this house"}</span>
+                <span className="text-xs text-amber-600">{geo.isRefreshing ? "Acquiring fix…" : "Required — capture a unique point at this house"}</span>
               )}
             </div>
-            {geo.error && !hasGps && <p className="mt-1.5 text-[11px] text-destructive">{geo.error}</p>}
           </div>
         </div>
 
