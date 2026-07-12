@@ -25,7 +25,7 @@ import { format } from "date-fns";
 import {
   Plus, Trash2, Save, Eye, Send, ChevronUp, ChevronDown,
   BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, CalendarIcon, Users, UserPlus, Archive, Eraser,
-  Lock, LockOpen, DoorOpen, DoorClosed, Sparkles, RotateCcw, Mail, TrendingUp, AlertTriangle,
+  Lock, LockOpen, DoorOpen, DoorClosed, Sparkles, RotateCcw, Mail, TrendingUp, AlertTriangle, Copy, ArrowRight,
 } from "lucide-react";
 import { validateMessageTokens, KNOWN_QUIZ_TOKENS } from "@/lib/quizTokens";
 import { useAuth } from "@/hooks/useAuth";
@@ -115,6 +115,12 @@ const QuizBuilder = () => {
   const [releaseSearch, setReleaseSearch] = useState("");
   const [releaseLoading, setReleaseLoading] = useState(false);
   const [releaseBusy, setReleaseBusy] = useState(false);
+
+  // Copy quiz to another project
+  const [copyQuiz, setCopyQuiz] = useState<Quiz | null>(null);
+  const [copyTargetProject, setCopyTargetProject] = useState("");
+  const [copyBusy, setCopyBusy] = useState(false);
+  const [copyResult, setCopyResult] = useState<{ quiz: Quiz; projectName: string } | null>(null);
 
   const sampleMember = previewMember ?? { name: "Amina Yusuf", email: "amina.yusuf@example.org", source: "Sample project member" };
   const sampleMemberB = previewMemberB ?? { name: "Chidi Okonkwo", email: "chidi.okonkwo@example.org", source: "Sample project member" };
@@ -387,6 +393,91 @@ const QuizBuilder = () => {
     }
     setConfirmDeleteQuiz(null);
   };
+
+  // Deep-clone a quiz (and all its questions/options/settings) into a target
+  // project. The new row inherits the target project's RLS automatically, so
+  // any member of that project can immediately see and edit it.
+  const handleCopyQuiz = async () => {
+    if (!copyQuiz || !copyTargetProject) {
+      toast({ title: "Please select a target project", variant: "destructive" });
+      return;
+    }
+    setCopyBusy(true);
+    try {
+      // 1. Read the complete original quiz configuration.
+      const { data: original, error: readErr } = await supabase
+        .from("quizzes")
+        .select("*")
+        .eq("id", copyQuiz.id)
+        .single();
+      if (readErr || !original) throw readErr || new Error("Original quiz not found");
+
+      // 2. Build a fresh insert payload, stripping identity/ownership fields and
+      // re-pointing project_id to the target project.
+      const {
+        id: _id,
+        project_id: _pid,
+        created_by: _cb,
+        created_at: _ca,
+        updated_at: _ua,
+        ...clonable
+      } = original as any;
+
+      const targetName =
+        projects.find((p) => p.id === copyTargetProject)?.name || "the selected project";
+
+      const { data: newQuiz, error: insErr } = await supabase
+        .from("quizzes")
+        .insert({
+          ...clonable,
+          title: `${original.title} (Copy)`,
+          project_id: copyTargetProject,
+          created_by: user!.id,
+          is_published: false,
+          open_test_type: null,
+        })
+        .select()
+        .single();
+      if (insErr || !newQuiz) throw insErr || new Error("Could not create the copied quiz");
+
+      // 3. Deep-copy all questions with their options.
+      const { data: srcQuestions } = await supabase
+        .from("quiz_questions")
+        .select("*")
+        .eq("quiz_id", copyQuiz.id)
+        .order("sort_order");
+
+      if (srcQuestions && srcQuestions.length > 0) {
+        const rows = srcQuestions.map((q: any, i: number) => ({
+          quiz_id: newQuiz.id,
+          question_text: q.question_text,
+          question_type: q.question_type,
+          options: q.options,
+          correct_answer: q.correct_answer,
+          points: q.points,
+          sort_order: i,
+        }));
+        const { error: qErr } = await supabase.from("quiz_questions").insert(rows);
+        if (qErr) throw qErr;
+      }
+
+      toast({
+        title: "Quiz copied!",
+        description: `“${original.title}” was copied to ${targetName}.`,
+      });
+      setCopyResult({ quiz: newQuiz as Quiz, projectName: targetName });
+      fetchQuizzes();
+    } catch (err: any) {
+      toast({
+        title: "Could not copy quiz",
+        description: err?.message || "Unexpected error while copying.",
+        variant: "destructive",
+      });
+    } finally {
+      setCopyBusy(false);
+    }
+  };
+
 
   // Owner-only: archive every submission of a quiz for future reference, then
   // clear them so the quiz starts fresh.
@@ -1220,15 +1311,26 @@ const QuizBuilder = () => {
                       </Button>
                     )}
                     {isAdmin && (
-                      <Button
-                        size="icon" variant="ghost"
-                        onClick={e => { e.stopPropagation(); setConfirmDeleteQuiz(quiz); }}
-                        className="ml-auto h-7 w-7 text-muted-foreground/40 hover:text-destructive"
-                        aria-label="Delete quiz"
-                        title="Delete quiz"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      <>
+                        <Button
+                          size="icon" variant="ghost"
+                          onClick={e => { e.stopPropagation(); setCopyResult(null); setCopyTargetProject(""); setCopyQuiz(quiz); }}
+                          className="ml-auto h-7 w-7 text-muted-foreground/40 hover:text-primary"
+                          aria-label="Copy quiz to another project"
+                          title="Copy to project"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon" variant="ghost"
+                          onClick={e => { e.stopPropagation(); setConfirmDeleteQuiz(quiz); }}
+                          className="h-7 w-7 text-muted-foreground/40 hover:text-destructive"
+                          aria-label="Delete quiz"
+                          title="Delete quiz"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
                     )}
                   </div>
                 </CardContent>
@@ -1238,6 +1340,68 @@ const QuizBuilder = () => {
           )}
         </div>
       )}
+
+      {/* Copy Quiz to Another Project Dialog */}
+      <Dialog open={!!copyQuiz} onOpenChange={(o) => { if (!o) { setCopyQuiz(null); setCopyResult(null); setCopyTargetProject(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Copy className="h-5 w-5 text-primary" /> Copy quiz to another project
+            </DialogTitle>
+            <DialogDescription>
+              {copyResult
+                ? "Your quiz has been duplicated."
+                : `Create an independent copy of “${copyQuiz?.title ?? ""}” in another project. All questions, options, and settings are deep-copied.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {copyResult ? (
+            <div className="space-y-4 py-2">
+              <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
+                <CheckCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                <p>Quiz successfully copied to <span className="font-semibold">{copyResult.projectName}</span>! Any member of that project can now see and edit it.</p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => { setCopyQuiz(null); setCopyResult(null); setCopyTargetProject(""); }}>Close</Button>
+                <Button
+                  className="gap-1"
+                  onClick={() => {
+                    const q = copyResult.quiz;
+                    setCopyQuiz(null); setCopyResult(null); setCopyTargetProject("");
+                    setSelectedQuiz(q);
+                    fetchQuestions(q.id);
+                  }}
+                >
+                  Open copied quiz <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div>
+                <Label className="form-label">Target project</Label>
+                <Select value={copyTargetProject} onValueChange={setCopyTargetProject}>
+                  <SelectTrigger className="form-input">
+                    <SelectValue placeholder="Select a project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setCopyQuiz(null); setCopyTargetProject(""); }}>Cancel</Button>
+                <Button onClick={handleCopyQuiz} disabled={copyBusy || !copyTargetProject} className="gap-1">
+                  {copyBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+                  Copy quiz
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Quiz Settings Dialog (pass mark + custom messages) */}
       <Dialog open={showSettings} onOpenChange={setShowSettings}>
