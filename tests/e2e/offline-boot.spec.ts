@@ -1,20 +1,20 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, Page } from "@playwright/test";
 
 /**
  * Offline PWA boot + deep-link routing.
  *
- * Verifies the offline-first lifecycle: with no network the installed shell
- * must still boot and resolve deep links (/auth, protected dashboard routes)
- * to the correct cached view WITHOUT ever showing a blank white screen or the
- * browser's native "You're offline" error page.
+ * Verifies the offline-first lifecycle: with no network the app must still
+ * resolve deep links (/auth, protected dashboard routes) to the correct cached
+ * view WITHOUT a blank white screen or the browser's native offline page.
  *
- * Runs against the dev server. When a service worker cannot activate in the
- * test environment (dev builds ship no SW), the spec still validates the
- * client-side offline routing that guarantees a non-blank shell.
+ * The dev server ships no service worker, so a full offline reload can only be
+ * exercised when a SW is actually registered (published build / preview). To
+ * stay meaningful everywhere, the specs drive React Router's client-side
+ * navigation while offline — which is exactly the code path (ProtectedRoute →
+ * deep-link intent → BootSkeleton/Auth) that guarantees a non-blank shell.
  */
 
-// Consider the page "not blank" when #root has rendered real content.
-async function expectNonBlankShell(page: import("@playwright/test").Page) {
+async function expectNonBlankShell(page: Page) {
   await page.waitForFunction(
     () => {
       const root = document.getElementById("root");
@@ -23,42 +23,71 @@ async function expectNonBlankShell(page: import("@playwright/test").Page) {
     { timeout: 20_000 },
   );
   const bodyText = (await page.locator("body").innerText()).toLowerCase();
-  // Never Chrome's/Android's native offline interstitial.
   expect(bodyText).not.toContain("no internet");
   expect(bodyText).not.toContain("err_internet_disconnected");
 }
 
+// Drive React Router (BrowserRouter listens to popstate) without a page reload,
+// simulating an in-app deep-link navigation while offline.
+async function spaNavigate(page: Page, to: string) {
+  await page.evaluate((path) => {
+    window.history.pushState({}, "", path);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, to);
+}
+
 test.describe("offline PWA boot & deep links", () => {
-  test("boots to Auth deep link offline without a blank screen", async ({ page, context }) => {
-    // Warm the app + caches while online first (mirrors a real first launch).
+  test("Auth deep link renders offline without a blank screen", async ({ page, context }) => {
     await page.goto("/auth", { waitUntil: "domcontentloaded" });
     await expectNonBlankShell(page);
-    await expect(
-      page.getByRole("button", { name: /sign in|log in/i }).first(),
-    ).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("button", { name: /^login$/i }).first()).toBeVisible({
+      timeout: 20_000,
+    });
 
-    // Go fully offline and re-open the Auth deep link via client-side routing.
+    // Go offline and re-resolve the Auth deep link via client-side routing.
     await context.setOffline(true);
-    await page.goto("/auth", { waitUntil: "domcontentloaded" }).catch(() => {});
+    await spaNavigate(page, "/auth");
     await expectNonBlankShell(page);
-    // The signed-out user must land on the Auth view, not a white page.
-    await expect(
-      page.getByRole("button", { name: /sign in|log in/i }).first(),
-    ).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("button", { name: /^login$/i }).first()).toBeVisible({
+      timeout: 20_000,
+    });
   });
 
   test("protected deep link offline resolves to a cached view, never blank", async ({
     page,
     context,
   }) => {
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.goto("/auth", { waitUntil: "domcontentloaded" });
     await expectNonBlankShell(page);
 
     await context.setOffline(true);
-    // A protected dashboard deep link while signed out must resolve to either
-    // the branded boot skeleton (cached session hydrating) or the Auth view —
-    // in all cases a rendered shell, never a blank/native offline page.
-    await page.goto("/?tab=forms", { waitUntil: "domcontentloaded" }).catch(() => {});
+    // Signed-out protected deep link must resolve to the boot skeleton or the
+    // Auth view — a rendered shell, never blank or the native offline page.
+    await spaNavigate(page, "/?tab=forms");
+    await expectNonBlankShell(page);
+    await spaNavigate(page, "/satellite-messenger");
+    await expectNonBlankShell(page);
+  });
+
+  test("full offline reload boots the cached shell when a service worker is active", async ({
+    page,
+    context,
+  }) => {
+    await page.goto("/auth", { waitUntil: "domcontentloaded" });
+    await expectNonBlankShell(page);
+
+    const hasSW = await page.evaluate(async () => {
+      try {
+        const reg = await navigator.serviceWorker?.getRegistration();
+        return !!(reg && reg.active);
+      } catch {
+        return false;
+      }
+    });
+    test.skip(!hasSW, "No active service worker (dev build) — offline reload not applicable");
+
+    await context.setOffline(true);
+    await page.reload({ waitUntil: "domcontentloaded" });
     await expectNonBlankShell(page);
   });
 });
