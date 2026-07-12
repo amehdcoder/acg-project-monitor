@@ -1,4 +1,5 @@
-import { ArrowLeft, FileText, Clock, CheckCircle2, MapPin } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, FileText, Clock, CheckCircle2, MapPin, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -6,6 +7,15 @@ import { formatDistanceToNow, format } from "date-fns";
 import type { SavedFormEntry } from "@/lib/savedForms";
 import type { Question } from "@/components/FormBuilder/types";
 import MediaAttachment from "@/components/DataAnalytics/MediaAttachment";
+import { listSyncAuditForForm, type SyncAuditEntry } from "@/lib/syncAuditLog";
+
+const AUDIT_LABEL: Record<string, string> = {
+  created: "Created",
+  edited: "Edited",
+  queued: "Queued for sync",
+  synced: "Synced to server",
+  sync_failed: "Sync failed",
+};
 
 interface SentFormViewerProps {
   entry: SavedFormEntry;
