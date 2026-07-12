@@ -57,6 +57,7 @@ import MdaAdvancedAnalyses from "./MdaAdvancedAnalyses";
 import MdaCorrectiveActionsAnalysis from "./MdaCorrectiveActionsAnalysis";
 import { labelPillStyle } from "@/lib/lgaColors";
 import MdaLongitudinalInsights from "./MdaLongitudinalInsights";
+import CollapsibleSection from "./CollapsibleSection";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import { useAuth } from "@/hooks/useAuth";
 import { buildLabelMap } from "@/lib/formLabelUtils";
