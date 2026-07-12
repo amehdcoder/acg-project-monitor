@@ -459,13 +459,14 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
             </button>
           ))}
         </div>
-        <div className="mt-3 h-64">
+        <div className="mt-3 overflow-x-auto">
+          <div style={{ height: 256, minWidth: Math.max(560, a.chartRows.length * (geoLevel === "lga" ? 56 : 68)) }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={a.chartRows} margin={{ top: 8, right: 8, left: -12, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-25} textAnchor="end" height={54} />
               <YAxis tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" />
-              <RTooltip formatter={(v: any) => `${v}%`} />
+              <RTooltip content={<GeoChartTooltip txBenchmark={txBenchmark} />} />
               <Legend
                 wrapperStyle={{ fontSize: 11 }}
                 payload={[
@@ -483,6 +484,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
               <Bar dataKey="reach" name="Household reach" fill={BLUE} radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+          </div>
         </div>
         <div className="mt-3 max-h-[360px] overflow-auto rounded-lg border border-border/60">
           <table className="w-full text-xs">
