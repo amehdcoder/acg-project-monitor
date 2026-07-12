@@ -116,6 +116,7 @@ import TreatmentToolWizard, { type TreatmentTool } from "./TreatmentToolWizard";
 import { useAuth } from "@/hooks/useAuth";
 import { MoEExpertProvider } from "./MoEExpertProvider";
 import { ExpertFieldValidator } from "./ExpertFieldValidator";
+import { validateFieldValue } from "@/lib/formFieldValidation";
 // LocationGate / LocationHeaderBar intentionally NOT imported — location
 // capture runs silently in the background only.
 import { useLocationEnforcement, ACCURACY_HARD_LIMIT } from "@/hooks/useLocationEnforcement";
