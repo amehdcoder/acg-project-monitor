@@ -1014,9 +1014,21 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
       id: s.id, state: s.state, lga: s.lga, submitter: s.submitter,
       submittedAt: s.submittedAt, status: s.status,
       location: s.location || (() => {
-        const g = s.data?.geolocation || s.data?.geopoint;
+        const g = s.data?.community_gps || s.data?.geolocation || s.data?.geopoint || s.data?.gps;
+        if (g && typeof g === "object") {
+          const lat = Number((g as any).latitude ?? (g as any).lat);
+          const lng = Number((g as any).longitude ?? (g as any).lng ?? (g as any).lon);
+          if (Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)) {
+            return { latitude: lat, longitude: lng };
+          }
+        }
+        const latS = Number(s.data?.community_latitude ?? s.data?.latitude);
+        const lngS = Number(s.data?.community_longitude ?? s.data?.longitude);
+        if (Number.isFinite(latS) && Number.isFinite(lngS) && !(latS === 0 && lngS === 0)) {
+          return { latitude: latS, longitude: lngS };
+        }
         if (typeof g === "string") {
-          const m = g.match(/(-?\d+\.\d+)\s+(-?\d+\.\d+)/);
+          const m = g.match(/(-?\d{1,3}(?:\.\d+)?)\s+(-?\d{1,3}(?:\.\d+)?)/);
           if (m) return { latitude: parseFloat(m[1]), longitude: parseFloat(m[2]) };
         }
         return null;
