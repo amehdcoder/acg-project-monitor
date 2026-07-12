@@ -31,6 +31,9 @@ export interface PublicShare {
   access_type: ShareAccessType;
   label: string | null;
   expires_at: string | null;
+  form_id?: string | null;
+  form_name?: string | null;
+  form_snapshot?: unknown | null;
 }
 
 export type ResolveStatus =
