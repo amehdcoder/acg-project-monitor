@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { sealRecord, unsealRecord, unsealAll } from "@/lib/deviceCrypto";
+import { runMasterDataDeltaSync } from "@/lib/deltaSync";
 
 const DB_NAME = "acg_monitor_offline";
 const DB_VERSION = 4;
