@@ -87,15 +87,23 @@ const FormSubmissionsAccordion = ({ form, profiles }: FormSubmissionsAccordionPr
     const fetchSubmissions = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from("form_submissions")
-          .select("*")
-          .eq("form_id", form.id)
-          .order("submitted_at", { ascending: false });
+        const PAGE_SIZE = 1000;
+        let allRows: any[] = [];
+        let offset = 0;
+        while (true) {
+          const { data, error } = await (supabase as any).rpc("visible_form_submissions", {
+            _form_id: form.id,
+            _limit: PAGE_SIZE,
+            _offset: offset,
+          });
+          if (error) throw error;
+          const rows = data || [];
+          allRows = allRows.concat(rows);
+          if (rows.length < PAGE_SIZE) break;
+          offset += PAGE_SIZE;
+        }
 
-        if (error) throw error;
-
-        const mapped: SubmissionRecord[] = (data || []).map((s) => {
+        const mapped: SubmissionRecord[] = allRows.map((s) => {
           const loc = extractLocation(s);
           return {
             id: s.id,
