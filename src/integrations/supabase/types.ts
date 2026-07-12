@@ -8016,6 +8016,10 @@ export type Database = {
         Args: { _survey_id: string; _user_id: string }
         Returns: boolean
       }
+      can_read_mesh_signal: {
+        Args: { _room_id: string; _to_peer: string }
+        Returns: boolean
+      }
       can_read_microplan_entry: {
         Args: {
           _community: string
