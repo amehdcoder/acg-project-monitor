@@ -3129,6 +3129,95 @@ export type Database = {
         }
         Relationships: []
       }
+      dashboard_share_otps: {
+        Row: {
+          attempts: number
+          code_hash: string
+          consumed: boolean
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          share_id: string
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          consumed?: boolean
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          share_id: string
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          consumed?: boolean
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          share_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_share_otps_share_id_fkey"
+            columns: ["share_id"]
+            isOneToOne: false
+            referencedRelation: "dashboard_shares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dashboard_shares: {
+        Row: {
+          access_type: string
+          allowed_emails: string[]
+          allowed_roles: string[]
+          created_at: string
+          created_by: string
+          dashboard_id: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          label: string | null
+          project_id: string | null
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          access_type?: string
+          allowed_emails?: string[]
+          allowed_roles?: string[]
+          created_at?: string
+          created_by: string
+          dashboard_id: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          project_id?: string | null
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          access_type?: string
+          allowed_emails?: string[]
+          allowed_roles?: string[]
+          created_at?: string
+          created_by?: string
+          dashboard_id?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          project_id?: string | null
+          token?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       dashboard_widgets: {
         Row: {
           config: Json
@@ -8058,6 +8147,7 @@ export type Database = {
         Returns: boolean
       }
       is_co_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_dashboard_admin: { Args: { _user_id: string }; Returns: boolean }
       is_email_deleted: { Args: { _email: string }; Returns: boolean }
       is_irf_admin: { Args: never; Returns: boolean }
       is_mesh_room_member: { Args: { _room_id: string }; Returns: boolean }
