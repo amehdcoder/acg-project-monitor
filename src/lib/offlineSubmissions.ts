@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { sealRecord, unsealRecord } from "@/lib/deviceCrypto";
 import { getSavedEntry, setSavedEntryStatus } from "@/lib/savedForms";
 import { stampSyncContract } from "@/lib/syncContract";
+import { cascadeReferenceEntities, resolveReferences } from "@/lib/referenceSyncLedger";
 
 // Tables that carry the formal idempotency contract (submission_uuid +
 // client_submitted_at columns). Rows destined for these tables are stamped so a
