@@ -307,6 +307,7 @@ export default function RepeatHouseholdCoverageSurvey({
   );
   const [submitting, setSubmitting] = useState(false);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [shortfallReason, setShortfallReason] = useState("");
   const [done, setDone] = useState(false);
 
