@@ -141,11 +141,17 @@ const SentFormViewer = ({ entry, onClose }: SentFormViewerProps) => {
 
       {/* Meta */}
       <div className="bg-card/60 px-4 py-2.5 border-b border-border/60 flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground">
+        {capturedAt && (
+          <span className="inline-flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            Captured {format(new Date(capturedAt), "PPpp")}
+          </span>
+        )}
         <span className="inline-flex items-center gap-1">
-          <Clock className="h-3 w-3" />
+          <CheckCircle2 className="h-3 w-3" />
           {entry.sentAt
-            ? `Sent ${formatDistanceToNow(new Date(entry.sentAt), { addSuffix: true })}`
-            : "Sent"}
+            ? `Synced ${formatDistanceToNow(new Date(entry.sentAt), { addSuffix: true })}`
+            : "Synced"}
         </span>
         {entry.sentAt && (
           <span className="opacity-70">{format(new Date(entry.sentAt), "PPpp")}</span>
@@ -162,6 +168,35 @@ const SentFormViewer = ({ entry, onClose }: SentFormViewerProps) => {
           </span>
         )}
       </div>
+
+      {/* Immutable local audit trail for this submission */}
+      {auditTrail.length > 0 && (
+        <div className="bg-card/40 px-4 py-3 border-b border-border/60">
+          <p className="mb-2 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <History className="h-3.5 w-3.5" />
+            History
+          </p>
+          <ol className="space-y-1.5">
+            {auditTrail.map((log) => (
+              <li key={log.id} className="flex items-center gap-2 text-[11px]">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#7C5CFF]" />
+                <span className="font-medium text-foreground">
+                  {AUDIT_LABEL[log.action] || log.action}
+                </span>
+                {log.status != null && (
+                  <Badge variant="outline" className="h-4 px-1 text-[9px]">
+                    HTTP {log.status}
+                  </Badge>
+                )}
+                <span className="ml-auto text-muted-foreground tabular-nums">
+                  {format(new Date(log.timestamp), "PP p")}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
 
       {/* Answers (read-only) */}
       <ScrollArea className="flex-1">
