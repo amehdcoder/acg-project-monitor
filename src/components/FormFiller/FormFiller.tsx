@@ -3667,10 +3667,11 @@ const FormFiller = ({
                         disabled={isSubmitting}
                         className="gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-900/20 hover:from-emerald-700 hover:to-teal-700"
                       >
-                        {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                        {isSubmitting ? "Submitting..." : "Submit Checklist"}
+                        {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : offerHouseholdSurvey ? <ArrowRight className="h-5 w-5" /> : <Send className="h-5 w-5" />}
+                        {isSubmitting ? "Submitting..." : offerHouseholdSurvey ? "Continue to Household Survey" : "Submit Checklist"}
                       </Button>
                     )}
+
                   </div>
 
                   {/* Quick actions + reminder (Supervision Summary removed per request) */}
