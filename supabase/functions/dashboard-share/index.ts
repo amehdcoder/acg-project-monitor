@@ -315,14 +315,34 @@ Deno.serve(async (req) => {
       return json({ error: `Table "${table}" is not shareable`, data: null }, 403);
     }
 
-    const columns = typeof body?.columns === "string" ? body.columns : "*";
+    // Column selection is sanitized so sensitive PII (profile emails/phones)
+    // can never be returned through a share link.
+    const rawColumns = typeof body?.columns === "string" ? body.columns : "*";
+    const columns = sanitizeColumns(table, rawColumns);
     const selectOptions = body?.selectOptions && typeof body.selectOptions === "object"
       ? body.selectOptions : undefined;
     const filters = Array.isArray(body?.filters) ? body.filters : [];
     const order = Array.isArray(body?.order) ? body.order : [];
 
+    // Every query is scoped to the share's own project. Tables without a
+    // project dimension that could expose per-user PII (e.g. profiles) are
+    // rejected unless the share is tied to a project we can join against.
+    const scopeColumn = TABLE_PROJECT_COLUMN[table];
+    const shareProjectId = share.project_id ?? null;
+
+    if (scopeColumn && !shareProjectId) {
+      return json({ error: "This share is not scoped to a project", data: null }, 403);
+    }
+
     try {
       let q: any = admin.from(table).select(columns, selectOptions);
+
+      // Force project scoping server-side so a viewer can never widen the
+      // query to another project's rows.
+      if (scopeColumn && shareProjectId) {
+        q = q.eq(scopeColumn, shareProjectId);
+      }
+
       for (const f of filters) {
         const method = String(f?.method ?? "");
         if (!SHARED_FILTER_METHODS.has(method)) {
