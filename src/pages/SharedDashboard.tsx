@@ -124,7 +124,10 @@ export default function SharedDashboard() {
 
   if (stage === "gated") {
     if (status === "needs_login") {
-      const returnTo = encodeURIComponent(`/shared/dashboard/${token}`);
+      const goSignIn = () => {
+        rememberDeepLink(`/shared/dashboard/${token}`);
+        window.location.href = "/auth";
+      };
       return (
         <Shell>
           <Card className="w-full max-w-md border-0 shadow-lg">
