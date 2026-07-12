@@ -272,7 +272,12 @@ export default function RepeatHouseholdCoverageSurvey({
   onClose,
 }: Props) {
   const { user } = useAuth();
-  const geo = useGeolocation();
+  const geo = useInstantLocation({
+    geoCenter:
+      initialGps && Number.isFinite(initialGps.lat) && Number.isFinite(initialGps.lng)
+        ? { lat: initialGps.lat, lng: initialGps.lng }
+        : null,
+  });
 
   const target = Math.max(1, targetHouseholds || 1);
   const draftKey = useMemo(
