@@ -6099,6 +6099,45 @@ export type Database = {
           },
         ]
       }
+      quiz_copy_audit: {
+        Row: {
+          copied_by: string
+          copied_by_email: string | null
+          created_at: string
+          id: string
+          new_quiz_id: string | null
+          source_project_id: string | null
+          source_quiz_id: string
+          source_quiz_title: string | null
+          target_project_id: string
+          target_project_name: string | null
+        }
+        Insert: {
+          copied_by: string
+          copied_by_email?: string | null
+          created_at?: string
+          id?: string
+          new_quiz_id?: string | null
+          source_project_id?: string | null
+          source_quiz_id: string
+          source_quiz_title?: string | null
+          target_project_id: string
+          target_project_name?: string | null
+        }
+        Update: {
+          copied_by?: string
+          copied_by_email?: string | null
+          created_at?: string
+          id?: string
+          new_quiz_id?: string | null
+          source_project_id?: string | null
+          source_quiz_id?: string
+          source_quiz_title?: string | null
+          target_project_id?: string
+          target_project_name?: string | null
+        }
+        Relationships: []
+      }
       quiz_questions: {
         Row: {
           correct_answer: string
