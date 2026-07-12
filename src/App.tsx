@@ -20,6 +20,7 @@ import LearningLog from "./pages/LearningLog";
 import SharedDashboard from "./pages/SharedDashboard";
 import InstallBanner from "./components/InstallBanner";
 import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
+import StorageWarningBanner from "./components/StorageWarningBanner";
 import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
 import OffGridSatelliteMessenger from "./components/SatelliteMessenger/OffGridSatelliteMessenger";
 import { ProtectedRoute } from "./components/ProtectedRoute";
