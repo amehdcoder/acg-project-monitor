@@ -140,6 +140,55 @@ async function userAllowedByRole(userId: string, allowedRoles: string[]): Promis
   return (roles ?? []).some((r: { role: string }) => allowedRoles.includes(r.role));
 }
 
+// Tables a shared (read-only) viewer is permitted to query. These are exactly
+// the tables the shareable supervisory dashboards read from. Any other table
+// is rejected so a share link can never be used to exfiltrate unrelated data.
+const SHARED_READ_TABLES = new Set<string>([
+  "irf_reports",
+  "acsm_reports",
+  "sbc_reports",
+  "seeclear_monitoring",
+  "form_submissions",
+  "forms",
+  "profiles",
+  "projects",
+  "household_coverage_surveys",
+  "user_project_assignments",
+  "sarmaan_acsm_archived_submissions",
+  "ces_household_visits",
+  "ces_surveys",
+  "mda_tile_icons",
+]);
+
+// PostgREST query-builder methods a shared viewer may chain. Read-only filters
+// and ordering only — never insert/update/delete/rpc.
+const SHARED_FILTER_METHODS = new Set<string>([
+  "eq", "neq", "gt", "gte", "lt", "lte", "like", "ilike", "is", "in",
+  "contains", "containedBy", "overlaps", "not", "filter", "or", "match",
+]);
+
+// Decide whether a request carries a valid, live grant for this share.
+async function isShareGranted(
+  share: any,
+  req: Request,
+  sessionToken: string,
+): Promise<boolean> {
+  if (share.access_type === "public") return true;
+  if (share.access_type === "internal_roles") {
+    const user = await getUserFromAuthHeader(req);
+    if (!user) return false;
+    return await userAllowedByRole(user.id, share.allowed_roles ?? []);
+  }
+  // external_emails
+  if (!sessionToken) return false;
+  const email = await verifySession(sessionToken, share.id);
+  if (!email) return false;
+  const allow = (share.allowed_emails ?? []).map((e: string) => e.toLowerCase());
+  return allow.includes(email.toLowerCase());
+}
+
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -191,6 +240,57 @@ Deno.serve(async (req) => {
     }
     return json({ status: "needs_otp", share: publicShare(share) });
   }
+
+  // ---- QUERY (read-only data proxy) -------------------------------------
+  // Lets an authorized shared viewer read the exact tables the supervisory
+  // dashboards need, using the service role so anonymous RLS never applies.
+  // Access is only granted when the share is live AND the request carries a
+  // valid grant (public link, verified OTP session, or allowed internal role).
+  if (action === "query") {
+    const sessionToken = String(body?.sessionToken ?? "");
+    const granted = await isShareGranted(share, req, sessionToken);
+    if (!granted) return json({ error: "Forbidden", data: null }, 403);
+
+    const table = String(body?.table ?? "");
+    if (!SHARED_READ_TABLES.has(table)) {
+      return json({ error: `Table "${table}" is not shareable`, data: null }, 403);
+    }
+
+    const columns = typeof body?.columns === "string" ? body.columns : "*";
+    const selectOptions = body?.selectOptions && typeof body.selectOptions === "object"
+      ? body.selectOptions : undefined;
+    const filters = Array.isArray(body?.filters) ? body.filters : [];
+    const order = Array.isArray(body?.order) ? body.order : [];
+
+    try {
+      let q: any = admin.from(table).select(columns, selectOptions);
+      for (const f of filters) {
+        const method = String(f?.method ?? "");
+        if (!SHARED_FILTER_METHODS.has(method)) {
+          return json({ error: `Filter "${method}" not allowed`, data: null }, 403);
+        }
+        const args = Array.isArray(f?.args) ? f.args : [];
+        q = q[method](...args);
+      }
+      for (const o of order) {
+        q = q.order(String(o?.column ?? ""), o?.options ?? undefined);
+      }
+      if (typeof body?.rangeFrom === "number" && typeof body?.rangeTo === "number") {
+        q = q.range(body.rangeFrom, body.rangeTo);
+      }
+      if (typeof body?.limit === "number") q = q.limit(body.limit);
+      if (body?.single === "maybe") q = q.maybeSingle();
+      else if (body?.single === "single") q = q.single();
+
+      const { data, error, count } = await q;
+      if (error) return json({ error: error.message, data: null }, 400);
+      return json({ data, count: count ?? null, error: null });
+    } catch (e) {
+      return json({ error: e instanceof Error ? e.message : String(e), data: null }, 400);
+    }
+  }
+
+
 
   // ---- REQUEST OTP ------------------------------------------------------
   if (action === "request-otp") {

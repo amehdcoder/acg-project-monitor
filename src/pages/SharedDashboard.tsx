@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
-  PublicShare, ResolveStatus, clearStoredSession, requestShareOtp, resolveShare, verifyShareOtp,
+  PublicShare, ResolveStatus, clearStoredSession, getStoredSession, requestShareOtp, resolveShare, verifyShareOtp,
 } from "@/lib/dashboardShare";
+import { installSharedDataProxy, uninstallSharedDataProxy } from "@/lib/sharedSupabaseProxy";
 import { rememberDeepLink } from "@/lib/deepLinkIntent";
 import SharedDashboardRenderer from "@/components/dashboard/SharedDashboardRenderer";
 
@@ -48,6 +49,15 @@ export default function SharedDashboard() {
   }, [token]);
 
   useEffect(() => { void resolve(); }, [resolve]);
+
+  // While a shared dashboard is granted, route all Supabase reads through the
+  // secure edge-function proxy so anonymous/non-member viewers bypass RLS
+  // safely (service-role reads, scoped to the validated share token).
+  useEffect(() => {
+    if (stage !== "granted") return;
+    installSharedDataProxy({ token, sessionToken: getStoredSession(token) ?? undefined });
+    return () => uninstallSharedDataProxy();
+  }, [stage, token]);
 
   const sendOtp = async () => {
     if (!email.trim()) { toast.error("Enter your email"); return; }
