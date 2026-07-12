@@ -14,10 +14,15 @@ import { initSavedFormAutoSync } from "./lib/savedFormAutoSync";
 import { initSpecialFormReconcile } from "./lib/specialFormReconcile";
 import { prepareSilentFormRestoreForUpdate } from "./lib/formProgressPersistence";
 import { installAfterHoursInterceptor } from "./lib/afterHours/interceptor";
+import { requestPersistentStorage } from "./lib/storagePersistence";
 import "./index.css";
 
 // Gate all form submissions during the locked evening window (7 PM–8 AM WAT).
 installAfterHoursInterceptor();
+
+// Ask the OS to treat our offline IndexedDB data (queues, saved forms, audit
+// ledger) as persistent so it is exempt from automated background eviction.
+void requestPersistentStorage();
 
 // Drain any queued offline media + submissions as soon as the app boots /
 // regains connectivity.

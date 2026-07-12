@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -107,8 +109,27 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   const [viewing, setViewing] = useState<SavedFormEntry | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [search, setSearch] = useState("");
 
   const selectable = mode === "send" || mode === "delete";
+
+  // Fully-offline search across form name, respondent, community and any text
+  // response value. No network requests — filters the in-memory list.
+  const visibleEntries = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return entries;
+    return entries.filter((e) => {
+      const responseText = Object.values(e.responses || {})
+        .map((v) => (typeof v === "string" || typeof v === "number" ? String(v) : ""))
+        .join(" ");
+      const hay = [e.formName, e.displayName, e.respondentName, responseText]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [entries, search]);
+
 
   const load = async () => {
     setLoading(true);
@@ -282,7 +303,22 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
         </div>
       </div>
 
-      {/* Select all bar */}
+      {/* Offline search — view (Sent) history only */}
+      {mode === "view" && entries.length > 0 && (
+        <div className="bg-card px-4 py-2.5 border-b border-border/60">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by community, medicine, name…"
+              className="pl-9 h-10"
+              inputMode="search"
+            />
+          </div>
+        </div>
+      )}
+
       {selectable && entries.length > 0 && (
         <div className="flex items-center justify-between bg-card px-4 py-2 border-b border-border/60">
           <button
@@ -329,9 +365,20 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
                 {mode === "delete" && "You have no saved drafts to delete."}
               </p>
             </div>
+          ) : visibleEntries.length === 0 ? (
+            <div className="flex h-64 flex-col items-center justify-center text-center px-6">
+              <Search className="h-10 w-10 text-muted-foreground/40 mb-3" />
+              <h3 className="font-display text-base font-semibold text-foreground">
+                No matches
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground max-w-xs">
+                No sent forms match “{search}”. Try a different community, medicine or name.
+              </p>
+            </div>
           ) : (
-            entries.map((entry, idx) => {
+            visibleEntries.map((entry, idx) => {
               const isSel = selected.has(entry.id);
+
               const answered = countResponses(entry);
               return (
                 <motion.div

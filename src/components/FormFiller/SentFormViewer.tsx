@@ -1,4 +1,5 @@
-import { ArrowLeft, FileText, Clock, CheckCircle2, MapPin } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, FileText, Clock, CheckCircle2, MapPin, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -6,6 +7,15 @@ import { formatDistanceToNow, format } from "date-fns";
 import type { SavedFormEntry } from "@/lib/savedForms";
 import type { Question } from "@/components/FormBuilder/types";
 import MediaAttachment from "@/components/DataAnalytics/MediaAttachment";
+import { listSyncAuditForForm, type SyncAuditEntry } from "@/lib/syncAuditLog";
+
+const AUDIT_LABEL: Record<string, string> = {
+  created: "Created",
+  edited: "Edited",
+  queued: "Queued for sync",
+  synced: "Synced to server",
+  sync_failed: "Sync failed",
+};
 
 interface SentFormViewerProps {
   entry: SavedFormEntry;
@@ -48,6 +58,20 @@ interface DisplayRow {
 const SentFormViewer = ({ entry, onClose }: SentFormViewerProps) => {
   const responses = entry.responses || {};
   const keep = (q: Question) => q.type !== "note" && q.type !== "calculate";
+
+  const [auditTrail, setAuditTrail] = useState<SyncAuditEntry[]>([]);
+  useEffect(() => {
+    let active = true;
+    void listSyncAuditForForm(entry.id).then((rows) => {
+      if (active) setAuditTrail(rows);
+    });
+    return () => {
+      active = false;
+    };
+  }, [entry.id]);
+
+  const capturedAt = entry.finalizedAt || entry.createdAt || null;
+
 
   // Flatten top-level questions AND questions nested inside normal/repeat
   // groups so every answered and unanswered field is displayed.
@@ -117,11 +141,17 @@ const SentFormViewer = ({ entry, onClose }: SentFormViewerProps) => {
 
       {/* Meta */}
       <div className="bg-card/60 px-4 py-2.5 border-b border-border/60 flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground">
+        {capturedAt && (
+          <span className="inline-flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            Captured {format(new Date(capturedAt), "PPpp")}
+          </span>
+        )}
         <span className="inline-flex items-center gap-1">
-          <Clock className="h-3 w-3" />
+          <CheckCircle2 className="h-3 w-3" />
           {entry.sentAt
-            ? `Sent ${formatDistanceToNow(new Date(entry.sentAt), { addSuffix: true })}`
-            : "Sent"}
+            ? `Synced ${formatDistanceToNow(new Date(entry.sentAt), { addSuffix: true })}`
+            : "Synced"}
         </span>
         {entry.sentAt && (
           <span className="opacity-70">{format(new Date(entry.sentAt), "PPpp")}</span>
@@ -138,6 +168,35 @@ const SentFormViewer = ({ entry, onClose }: SentFormViewerProps) => {
           </span>
         )}
       </div>
+
+      {/* Immutable local audit trail for this submission */}
+      {auditTrail.length > 0 && (
+        <div className="bg-card/40 px-4 py-3 border-b border-border/60">
+          <p className="mb-2 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <History className="h-3.5 w-3.5" />
+            History
+          </p>
+          <ol className="space-y-1.5">
+            {auditTrail.map((log) => (
+              <li key={log.id} className="flex items-center gap-2 text-[11px]">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#7C5CFF]" />
+                <span className="font-medium text-foreground">
+                  {AUDIT_LABEL[log.action] || log.action}
+                </span>
+                {log.status != null && (
+                  <Badge variant="outline" className="h-4 px-1 text-[9px]">
+                    HTTP {log.status}
+                  </Badge>
+                )}
+                <span className="ml-auto text-muted-foreground tabular-nums">
+                  {format(new Date(log.timestamp), "PP p")}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
 
       {/* Answers (read-only) */}
       <ScrollArea className="flex-1">
