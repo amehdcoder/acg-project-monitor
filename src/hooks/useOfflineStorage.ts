@@ -352,6 +352,9 @@ export const useOfflineStorage = () => {
         status: "sent",
         submitted_at: s.created_at,
         synced_at: new Date().toISOString(),
+        // Idempotency contract: stable UUID + immutable on-device capture time.
+        submission_uuid: s.submission_uuid || s.id,
+        client_submitted_at: s.client_submitted_at || s.created_at,
       });
       const touchedFormIds = new Set<string>();
       let conflicts = 0;
