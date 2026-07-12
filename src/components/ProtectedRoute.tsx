@@ -4,6 +4,7 @@ import { ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import BootSkeleton from "@/components/BootSkeleton";
+import { rememberDeepLink } from "@/lib/deepLinkIntent";
 
 // Detects a cached auth session persisted in localStorage by the Supabase
 // client. Used so an OFFLINE cold boot never flashes the /auth screen before
@@ -43,6 +44,9 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     if (typeof navigator !== "undefined" && navigator.onLine === false && hasCachedAuthSession()) {
       return <BootSkeleton />;
     }
+    // Remember the intended deep link so we can resolve back to it after
+    // authentication (or offline session hydration) completes.
+    rememberDeepLink(`${location.pathname}${location.search}`);
     return <Navigate to="/auth" replace />;
   }
 

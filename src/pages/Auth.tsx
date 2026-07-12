@@ -23,6 +23,7 @@ import { toast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2, RefreshCw } from "lucide-react";
 import acgLogo from "@/assets/acg-logo.png";
 import { recoverAuthAndReload } from "@/lib/authRecovery";
+import { consumeDeepLink } from "@/lib/deepLinkIntent";
 
 const NIGERIAN_STATES = [
   "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
@@ -122,7 +123,7 @@ const Auth = () => {
 
   useEffect(() => {
     if (user && !authLoading) {
-      navigate("/");
+      navigate(consumeDeepLink("/"), { replace: true });
     }
   }, [user, authLoading, navigate]);
 
@@ -176,7 +177,7 @@ const Auth = () => {
       // Track login location
       trackLoginLocation();
       toast({ title: "Welcome back!", description: "You have been logged in successfully." });
-      navigate("/");
+      navigate(consumeDeepLink("/"), { replace: true });
     }
   };
 
