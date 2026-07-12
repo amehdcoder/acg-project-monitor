@@ -738,6 +738,19 @@ const FormTemplatesView = () => {
         </div>
       )}
 
+      {/* Quick device preview (Super Admin) */}
+      {devicePreview && isSuperAdmin && (
+        <AdminDevicePreviewer
+          device={devicePreview.device}
+          formName={devicePreview.template.name}
+          formDescription={devicePreview.template.description || ""}
+          questions={devicePreview.template.questions}
+          settings={devicePreview.template.settings}
+          onDeviceChange={(d) => setDevicePreview((prev) => (prev ? { ...prev, device: d } : prev))}
+          onClose={() => setDevicePreview(null)}
+        />
+      )}
+
       {/* Preview Dialog */}
       {previewTemplate && (
         <Dialog open={!!previewTemplate} onOpenChange={() => setPreviewTemplate(null)}>
