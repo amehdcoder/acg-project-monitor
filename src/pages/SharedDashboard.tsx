@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import {
   PublicShare, ResolveStatus, clearStoredSession, requestShareOtp, resolveShare, verifyShareOtp,
 } from "@/lib/dashboardShare";
+import { rememberDeepLink } from "@/lib/deepLinkIntent";
 import SharedDashboardRenderer from "@/components/dashboard/SharedDashboardRenderer";
 
 type Stage = "loading" | "gated" | "granted" | "error";
