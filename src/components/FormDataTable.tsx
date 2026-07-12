@@ -242,48 +242,79 @@ const FormDataTable = ({
         dbUpdate[dataColumn] = answersObj;
       }
 
-      if (!isPending) {
+      const writeAudit = async () => {
+        if (changes.length === 0) return;
+        try {
+          const { data: authData } = await supabase.auth.getUser();
+          const uid = authData?.user?.id;
+          const meta = authData?.user?.user_metadata as any;
+          const name =
+            meta?.full_name || meta?.name || authData?.user?.email || "Unknown user";
+          const stringify = (v: any) =>
+            v === null || v === undefined
+              ? null
+              : typeof v === "object"
+              ? JSON.stringify(v)
+              : String(v);
+          if (uid) {
+            await supabase.from("submission_edit_audit" as any).insert(
+              changes.map((c) => ({
+                submission_id: submissionId,
+                table_name: table,
+                field_key: c.field_key,
+                field_label: c.field_label,
+                old_value: stringify(c.old_value),
+                new_value: stringify(c.new_value),
+                source: "admin_edit",
+                changed_by: uid,
+                changed_by_name: name,
+              })),
+            );
+          }
+        } catch (auditErr) {
+          console.warn("Audit log write failed:", auditErr);
+        }
+      };
+
+      // Guarded (optimistic-concurrency) path: only for form_submissions edits
+      // that touch the JSON answers column exclusively. Detects a conflicting
+      // edit made by another user and surfaces the resolution dialog instead of
+      // silently overwriting their changes.
+      const onlyDataChanged =
+        usesGuardedUpdate &&
+        Object.keys(dbUpdate).length === 1 &&
+        dataColumn in dbUpdate;
+
+      if (!isPending && onlyDataChanged) {
+        const { data: rpcRows, error } = await supabase.rpc("update_submission_guarded", {
+          p_id: submissionId,
+          p_expected_version: baseVersionRef.current ?? 1,
+          p_data: answersObj,
+        });
+        if (error) throw error;
+        const result = Array.isArray(rpcRows) ? (rpcRows[0] as any) : (rpcRows as any);
+        if (result?.conflict) {
+          // Someone changed the record first — do NOT overwrite. Open dialog.
+          setConflict({
+            serverData: (result.data as Record<string, any>) || {},
+            serverVersion: (result.version as number) ?? 1,
+            localData: answersObj,
+          });
+          setSaving(false);
+          return;
+        }
+        await writeAudit();
+        baseVersionRef.current = (result?.version as number) ?? baseVersionRef.current;
+      } else if (!isPending) {
         const { error } = await supabase
           .from(table as any)
           .update(dbUpdate as any)
           .eq("id", submissionId);
 
         if (error) throw error;
-
-        // Persist a per-field audit trail (best-effort; never blocks the save).
-        if (changes.length > 0) {
-          try {
-            const { data: authData } = await supabase.auth.getUser();
-            const uid = authData?.user?.id;
-            const meta = authData?.user?.user_metadata as any;
-            const name =
-              meta?.full_name || meta?.name || authData?.user?.email || "Unknown user";
-            const stringify = (v: any) =>
-              v === null || v === undefined
-                ? null
-                : typeof v === "object"
-                ? JSON.stringify(v)
-                : String(v);
-            if (uid) {
-              await supabase.from("submission_edit_audit" as any).insert(
-                changes.map((c) => ({
-                  submission_id: submissionId,
-                  table_name: table,
-                  field_key: c.field_key,
-                  field_label: c.field_label,
-                  old_value: stringify(c.old_value),
-                  new_value: stringify(c.new_value),
-                  source: "admin_edit",
-                  changed_by: uid,
-                  changed_by_name: name,
-                })),
-              );
-            }
-          } catch (auditErr) {
-            console.warn("Audit log write failed:", auditErr);
-          }
-        }
+        await writeAudit();
       }
+
 
       onDataUpdate?.(answersObj);
       onColumnsUpdate?.(updatedColumns);
