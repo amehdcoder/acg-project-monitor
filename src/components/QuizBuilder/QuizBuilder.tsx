@@ -1403,6 +1403,8 @@ const QuizBuilder = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Quiz Settings Dialog (pass mark + custom messages) */}
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-indigo-600" /> Grading & result messages</DialogTitle>
