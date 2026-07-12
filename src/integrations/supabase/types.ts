@@ -8131,6 +8131,10 @@ export type Database = {
         Returns: boolean
       }
       can_view_all_locations: { Args: { _user_id: string }; Returns: boolean }
+      can_view_form_submissions: {
+        Args: { _form_id: string; _user_id: string }
+        Returns: boolean
+      }
       current_user_can_build_mda_followups: { Args: never; Returns: boolean }
       current_user_can_build_mda_followups_for_project: {
         Args: { p_project_id: string }
@@ -8223,6 +8227,10 @@ export type Database = {
         Returns: boolean
       }
       has_field_designation: { Args: { _user_id: string }; Returns: boolean }
+      has_microplan_form_access: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
       has_minimal_access: { Args: { _user_id: string }; Returns: boolean }
       has_page_access: {
         Args: { _page_id: string; _user_id: string }
