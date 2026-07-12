@@ -350,6 +350,9 @@ export default function RepeatHouseholdCoverageSurvey({
         c.side_effects_detail ||
         c.ae_reported ||
         c.f1_asked_height ||
+        c.medicine_received ||
+        c.taste_of_medicine ||
+        c.taste_other?.trim() ||
         c.f3_satisfied ||
         c.f4_why?.trim() ||
         c.suggestions?.trim() ||
