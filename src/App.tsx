@@ -95,6 +95,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          <StorageWarningBanner />
           <InstallBanner />
           <PWAUpdatePrompt />
           <BrowserRouter>
