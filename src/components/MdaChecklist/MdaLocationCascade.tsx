@@ -48,6 +48,8 @@ import {
   MapPinned, Lock, PlusCircle, Loader2, Info, CheckCircle2, DownloadCloud, WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useInstantLocation } from "@/hooks/useInstantLocation";
+import LocationStatusBadge from "@/components/LocationStatusBadge";
 
 interface GeoRow {
   state: string | null;
@@ -475,6 +477,40 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     }
     return m;
   }, [grid3Settlements]);
+
+  // ── Instant, environment-agnostic GPS for the supervision point ────────
+  // Tier-3 fallback = geographic center of the selected Community/Settlement.
+  const geoCenter = useMemo(() => {
+    const g = responses.community_gps;
+    if (g && Number.isFinite(g.lat) && Number.isFinite(g.lng)) {
+      return { lat: g.lat as number, lng: g.lng as number };
+    }
+    const coords = sel.community_name ? grid3SettlementCoords.get(normGeo(sel.community_name)) : null;
+    return coords ?? null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [responses.community_gps, sel.community_name, grid3SettlementCoords]);
+
+  const instantGps = useInstantLocation({ geoCenter });
+
+  // Persist the live supervision coordinate onto the form responses.
+  const lastGpsTsRef = useRef<number | null>(null);
+  useEffect(() => {
+    const c = instantGps.coord;
+    if (!c) return;
+    if (c.source === "fallback") return; // don't overwrite with area center
+    if (c.timestamp === lastGpsTsRef.current) return;
+    lastGpsTsRef.current = c.timestamp;
+    try {
+      onSet({
+        supervisor_latitude: c.lat,
+        supervisor_longitude: c.lng,
+        supervisor_gps: { lat: c.lat, lng: c.lng, accuracy: c.accuracy },
+      });
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instantGps.coord]);
 
   const options = (level: keyof GeoRow): string[] => {
     // GRID3 national cascade (default). State → LGA → Ward come from the full
@@ -929,6 +965,23 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
       )}
 
 
+
+      {/* Instant supervision GPS status */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <MapPinned className="h-3.5 w-3.5 text-primary" />
+          {instantGps.coord && instantGps.source !== "fallback"
+            ? `${instantGps.coord.lat.toFixed(6)}, ${instantGps.coord.lng.toFixed(6)}`
+            : "Acquiring supervision GPS…"}
+        </div>
+        <LocationStatusBadge
+          source={instantGps.source}
+          label={instantGps.statusLabel}
+          accuracy={instantGps.accuracy}
+          isRefreshing={instantGps.isRefreshing}
+          onRefresh={() => void instantGps.refresh()}
+        />
+      </div>
 
       {/* Selection confirmation */}
       {(sel.community_name || sel.ward || sel.lga) && (
