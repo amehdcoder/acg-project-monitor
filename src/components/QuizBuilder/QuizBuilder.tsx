@@ -1311,15 +1311,26 @@ const QuizBuilder = () => {
                       </Button>
                     )}
                     {isAdmin && (
-                      <Button
-                        size="icon" variant="ghost"
-                        onClick={e => { e.stopPropagation(); setConfirmDeleteQuiz(quiz); }}
-                        className="ml-auto h-7 w-7 text-muted-foreground/40 hover:text-destructive"
-                        aria-label="Delete quiz"
-                        title="Delete quiz"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      <>
+                        <Button
+                          size="icon" variant="ghost"
+                          onClick={e => { e.stopPropagation(); setCopyResult(null); setCopyTargetProject(""); setCopyQuiz(quiz); }}
+                          className="ml-auto h-7 w-7 text-muted-foreground/40 hover:text-primary"
+                          aria-label="Copy quiz to another project"
+                          title="Copy to project"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon" variant="ghost"
+                          onClick={e => { e.stopPropagation(); setConfirmDeleteQuiz(quiz); }}
+                          className="h-7 w-7 text-muted-foreground/40 hover:text-destructive"
+                          aria-label="Delete quiz"
+                          title="Delete quiz"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
                     )}
                   </div>
                 </CardContent>
