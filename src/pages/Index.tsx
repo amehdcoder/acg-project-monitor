@@ -53,6 +53,7 @@ import OffGridSatelliteMessenger from "@/components/SatelliteMessenger/OffGridSa
 import OfflineFormShare from "@/components/MeshSync/OfflineFormShare";
 import VersionHistoryViewer from "@/components/VersionHistoryViewer";
 import SecurityAuditView from "@/components/SecurityAuditView";
+import AppVersionAuditView from "@/components/AppVersionAuditView";
 import ImageRecognitionCapture from "@/components/ImageRecognition/ImageRecognitionCapture";
 import NfcRfidCollector from "@/components/NfcRfidCollector";
 import SocialShareView from "@/components/SocialShareView";
