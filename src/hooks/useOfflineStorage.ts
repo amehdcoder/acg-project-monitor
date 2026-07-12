@@ -514,6 +514,10 @@ export const useOfflineStorage = () => {
     // Check pending count on mount
     updatePendingCount();
 
+    // Opportunistic delta sync of master data on boot (only runs when online;
+    // downloads only rows changed since the last watermark).
+    if (navigator.onLine) void runMasterDataDeltaSync();
+
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
