@@ -1172,6 +1172,7 @@ export type Database = {
       }
       bloomberg_validations: {
         Row: {
+          client_submitted_at: string | null
           created_at: string
           enrolment: Json
           evidence: Json
@@ -1192,6 +1193,7 @@ export type Database = {
           specified_locations: Json
           state: string | null
           status: string
+          submission_uuid: string | null
           submitted_at: string
           total_female: number | null
           total_male: number | null
@@ -1201,6 +1203,7 @@ export type Database = {
           ward: string | null
         }
         Insert: {
+          client_submitted_at?: string | null
           created_at?: string
           enrolment?: Json
           evidence?: Json
@@ -1221,6 +1224,7 @@ export type Database = {
           specified_locations?: Json
           state?: string | null
           status?: string
+          submission_uuid?: string | null
           submitted_at?: string
           total_female?: number | null
           total_male?: number | null
@@ -1230,6 +1234,7 @@ export type Database = {
           ward?: string | null
         }
         Update: {
+          client_submitted_at?: string | null
           created_at?: string
           enrolment?: Json
           evidence?: Json
@@ -1250,6 +1255,7 @@ export type Database = {
           specified_locations?: Json
           state?: string | null
           status?: string
+          submission_uuid?: string | null
           submitted_at?: string
           total_female?: number | null
           total_male?: number | null
@@ -3704,6 +3710,7 @@ export type Database = {
       }
       form_submissions: {
         Row: {
+          client_submitted_at: string | null
           created_at: string
           data: Json
           form_id: string
@@ -3711,6 +3718,7 @@ export type Database = {
           location: Json | null
           status: string
           submission_type: string
+          submission_uuid: string | null
           submitted_at: string | null
           synced_at: string | null
           updated_at: string
@@ -3718,6 +3726,7 @@ export type Database = {
           within_geofence: boolean | null
         }
         Insert: {
+          client_submitted_at?: string | null
           created_at?: string
           data?: Json
           form_id: string
@@ -3725,6 +3734,7 @@ export type Database = {
           location?: Json | null
           status?: string
           submission_type?: string
+          submission_uuid?: string | null
           submitted_at?: string | null
           synced_at?: string | null
           updated_at?: string
@@ -3732,6 +3742,7 @@ export type Database = {
           within_geofence?: boolean | null
         }
         Update: {
+          client_submitted_at?: string | null
           created_at?: string
           data?: Json
           form_id?: string
@@ -3739,6 +3750,7 @@ export type Database = {
           location?: Json | null
           status?: string
           submission_type?: string
+          submission_uuid?: string | null
           submitted_at?: string | null
           synced_at?: string | null
           updated_at?: string
@@ -4518,6 +4530,7 @@ export type Database = {
           longitude: number
           recorded_at: string
           speed: number | null
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -4531,6 +4544,7 @@ export type Database = {
           longitude: number
           recorded_at?: string
           speed?: number | null
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -4544,6 +4558,7 @@ export type Database = {
           longitude?: number
           recorded_at?: string
           speed?: number | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -6578,6 +6593,7 @@ export type Database = {
       seeclear_monitoring: {
         Row: {
           challenges: Json
+          client_submitted_at: string | null
           community: string | null
           complete_records: boolean | null
           created_at: string
@@ -6619,12 +6635,14 @@ export type Database = {
           staff_on_duty: number | null
           state: string | null
           status: string
+          submission_uuid: string | null
           team_members: Json
           updated_at: string
           ward: string | null
         }
         Insert: {
           challenges?: Json
+          client_submitted_at?: string | null
           community?: string | null
           complete_records?: boolean | null
           created_at?: string
@@ -6666,12 +6684,14 @@ export type Database = {
           staff_on_duty?: number | null
           state?: string | null
           status?: string
+          submission_uuid?: string | null
           team_members?: Json
           updated_at?: string
           ward?: string | null
         }
         Update: {
           challenges?: Json
+          client_submitted_at?: string | null
           community?: string | null
           complete_records?: boolean | null
           created_at?: string
@@ -6713,6 +6733,7 @@ export type Database = {
           staff_on_duty?: number | null
           state?: string | null
           status?: string
+          submission_uuid?: string | null
           team_members?: Json
           updated_at?: string
           ward?: string | null
@@ -7598,6 +7619,7 @@ export type Database = {
           id: string
           project_id: string
           starts_at: string | null
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -7607,6 +7629,7 @@ export type Database = {
           id?: string
           project_id: string
           starts_at?: string | null
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -7616,6 +7639,7 @@ export type Database = {
           id?: string
           project_id?: string
           starts_at?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -7634,6 +7658,7 @@ export type Database = {
           created_at: string
           id: string
           role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -7641,6 +7666,7 @@ export type Database = {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -7648,6 +7674,7 @@ export type Database = {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
