@@ -966,6 +966,23 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
 
 
 
+      {/* Instant supervision GPS status */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <MapPinned className="h-3.5 w-3.5 text-primary" />
+          {instantGps.coord && instantGps.source !== "fallback"
+            ? `${instantGps.coord.lat.toFixed(6)}, ${instantGps.coord.lng.toFixed(6)}`
+            : "Acquiring supervision GPS…"}
+        </div>
+        <LocationStatusBadge
+          source={instantGps.source}
+          label={instantGps.statusLabel}
+          accuracy={instantGps.accuracy}
+          isRefreshing={instantGps.isRefreshing}
+          onRefresh={() => void instantGps.refresh()}
+        />
+      </div>
+
       {/* Selection confirmation */}
       {(sel.community_name || sel.ward || sel.lga) && (
         <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
