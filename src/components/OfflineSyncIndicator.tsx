@@ -204,6 +204,42 @@ const OfflineSyncIndicator = () => {
               </p>
             </div>
           )}
+
+          {/* Reference (master) data — incremental delta sync status */}
+          <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Database className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-xs font-medium text-foreground">Reference data</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {masterCount > 0
+                      ? `${masterCount.toLocaleString()} records cached${
+                          lastMasterSync
+                            ? ` · updated ${new Date(lastMasterSync).toLocaleString()}`
+                            : ""
+                        }`
+                      : "Not synced yet"}
+                  </p>
+                </div>
+              </div>
+              {isOnline && (
+                <Button
+                  onClick={handleRefreshMaster}
+                  disabled={refreshingMaster}
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-[11px]"
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 ${refreshingMaster ? "animate-spin" : ""}`}
+                  />
+                  {refreshingMaster ? "Syncing" : "Refresh"}
+                </Button>
+              )}
+            </div>
+          </div>
+
         </div>
       </PopoverContent>
     </Popover>
