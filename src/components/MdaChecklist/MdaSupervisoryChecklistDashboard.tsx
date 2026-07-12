@@ -1379,22 +1379,22 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         <CardContent className="p-0">
           <div className="max-h-[460px] overflow-auto">
             <table className="w-full text-xs">
-              <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
-                <tr className="text-left text-[11px] text-muted-foreground">
-                  <th className="px-3 py-2 font-semibold">Community</th>
-                  <th className="px-3 py-2 font-semibold">Ward · LGA</th>
-                  <th className="px-3 py-2 font-semibold">Visit</th>
-                  <th className="px-3 py-2 font-semibold">MDA Completion</th>
-                  <th className="px-3 py-2 font-semibold">Commodities</th>
-                  <th className="px-3 py-2 font-semibold">Adverse</th>
-                  <th className="px-3 py-2 font-semibold">Supervisor</th>
+              <thead className="sticky top-0 z-10" style={{ background: `linear-gradient(135deg, ${NAVY}, ${NAVY_SOFT})` }}>
+                <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-white">
+                  <th className="px-3 py-2">Community</th>
+                  <th className="px-3 py-2">Ward · LGA</th>
+                  <th className="px-3 py-2">Visit</th>
+                  <th className="px-3 py-2">MDA Completion</th>
+                  <th className="px-3 py-2">Commodities</th>
+                  <th className="px-3 py-2">Adverse</th>
+                  <th className="px-3 py-2">Supervisor</th>
                 </tr>
               </thead>
               <tbody>
                 {linkage.length === 0 ? (
                   <tr><td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">No communities match the current filters.</td></tr>
-                ) : register.paginatedData.map((r) => (
-                  <tr key={r.id} className="border-t border-border/60 hover:bg-muted/40">
+                ) : register.paginatedData.map((r, ri) => (
+                  <tr key={r.id} className={`border-t border-border/60 hover:bg-primary/5 ${ri % 2 ? "bg-muted/40" : ""}`}>
                     <td className="px-3 py-2">
                       <div className="font-semibold text-foreground">{r.community}</div>
                       {r.risk && <span className="text-[10px]" style={{ color: norm(r.risk) === "high" ? RED : SLATE }}>{r.risk} risk</span>}
