@@ -92,6 +92,12 @@ interface Props {
   projectId?: string | null;
   formId?: string | null;
   checklistSubmissionId?: string | null;
+  /**
+   * Unified journey: persists the linked MDA checklist (offline-capable) and
+   * returns its submission id. Called once from the single Submit button so both
+   * the checklist and the household survey are saved as one cohesive package.
+   */
+  onFinalizeChecklist?: () => Promise<string | null>;
   targetHouseholds: number;
   location?: HcsLocation;
   initialGps?: { lat: number; lng: number; accuracy?: number } | null;
@@ -268,6 +274,7 @@ export default function RepeatHouseholdCoverageSurvey({
   projectId,
   formId,
   checklistSubmissionId,
+  onFinalizeChecklist,
   targetHouseholds,
   location,
   initialGps,
@@ -444,6 +451,23 @@ export default function RepeatHouseholdCoverageSurvey({
     setSubmitting(true);
     try {
       const gps = records.find((r) => r.gps)?.gps ?? initialGps ?? null;
+      // Unified journey: persist the linked MDA checklist FIRST (offline-capable)
+      // so the household survey can reference it — one Submit, one linked package.
+      // If the checklist fails to persist we abort and keep the local draft.
+      let linkedChecklistId = checklistSubmissionId ?? null;
+      if (onFinalizeChecklist && !checklistSubmissionId) {
+        linkedChecklistId = await onFinalizeChecklist();
+        if (!linkedChecklistId) {
+          toast({
+            title: "Submission failed",
+            description: "Could not save the supervisory checklist. Your entries are safe — please try again.",
+            variant: "destructive",
+          });
+          setSubmitting(false);
+          setShowFinishConfirm(false);
+          return;
+        }
+      }
       const submissionId =
         typeof crypto !== "undefined" && "randomUUID" in crypto
           ? crypto.randomUUID()
@@ -456,7 +480,7 @@ export default function RepeatHouseholdCoverageSurvey({
         "household_coverage_surveys",
         {
           id: submissionId,
-          checklist_submission_id: checklistSubmissionId ?? null,
+          checklist_submission_id: linkedChecklistId ?? null,
           form_id: formId ?? null,
           project_id: projectId ?? null,
           user_id: user.id,
@@ -475,6 +499,7 @@ export default function RepeatHouseholdCoverageSurvey({
         },
         true,
       );
+
       setDone(true);
       // Survey submitted (online or offline) — clear the on-device draft so it
       // never prompts to resume previously captured households again.

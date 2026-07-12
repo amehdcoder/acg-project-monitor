@@ -35,6 +35,8 @@ import {
   ChevronUp,
   ChevronLeft,
   ChevronRight,
+  ArrowRight,
+  Home,
   BookOpen,
   ClipboardCheck,
   Repeat,
@@ -494,12 +496,17 @@ const FormFiller = ({
   const [showThankYou, setShowThankYou] = useState(false);
   
   // Repeat Household Coverage Survey launch context (replaces the old 3D flow).
+  // In the unified journey the checklist is NOT persisted up-front — the survey's
+  // single "Submit" button persists BOTH the checklist and the household survey
+  // as one linked package, so `submissionId` stays null until then.
   const [householdSurveyCtx, setHouseholdSurveyCtx] = useState<null | {
-    submissionId: string;
+    submissionId: string | null;
     target: number;
     location: { state?: string; lga?: string; ward?: string; flhf_name?: string; community_name?: string; settlement_name?: string };
     gps: { lat: number; lng: number; accuracy?: number } | null;
   }>(null);
+  // Disclaimer gate shown immediately after the final checklist question.
+  const [showSurveyDisclaimer, setShowSurveyDisclaimer] = useState(false);
   const navigate = useNavigate();
   // Integrated MDA Supervisory Checklist branded experience + Coverage Evaluation linkage.
   // Also detect by name so older/offline saved copies that missed the settings
@@ -2205,11 +2212,64 @@ const FormFiller = ({
       }
     }
 
+    // Unified journey: on an MDA checklist that links to the household survey,
+    // do NOT persist the checklist here. Show the disclaimer gate first; the
+    // checklist is submitted together with the survey via one Submit button.
+    if (offerHouseholdSurvey) {
+      setShowSurveyDisclaimer(true);
+      return;
+    }
+
     await doSubmit();
   };
 
+  // User acknowledged the disclaimer → advance into the household survey without
+  // persisting the checklist yet. The survey's single Submit button will persist
+  // both datasets as one linked package.
+  const handleProceedToHouseholdSurvey = () => {
+    setShowSurveyDisclaimer(false);
+    setHouseholdSurveyCtx(buildHouseholdSurveyCtx(null));
+  };
 
-  const doSubmit = async () => {
+  // Called from inside the survey's Submit handler: persists the checklist
+  // (offline-capable) and returns the new submission id so the survey can link
+  // its household records to it in the same cohesive package.
+  const finalizeChecklistFromSurvey = async (): Promise<string | null> => {
+    return await doSubmit({ deferHouseholdSurvey: true });
+  };
+
+  // Resolve the household survey launch context (target, geography, GPS) from the
+  // current checklist responses — used both by the disclaimer→survey handoff
+  // (submissionId null, persisted later) and the legacy immediate-launch path.
+  const buildHouseholdSurveyCtx = (submissionId: string | null) => {
+    const answer = (...names: string[]) => {
+      for (const name of names) {
+        const direct = responses[name];
+        if (direct !== undefined && direct !== null && String(direct).trim() !== "") return String(direct);
+        const id = nameToIdMap[name];
+        const byId = id ? responses[id] : undefined;
+        if (byId !== undefined && byId !== null && String(byId).trim() !== "") return String(byId);
+      }
+      return "";
+    };
+    const handoffGps = gpsQuestionAnswer || gpsPosition || locEnforcement.autoGps || backgroundLocation || null;
+    return {
+      submissionId,
+      target: Math.max(1, Number((settings as any).householdSampleSize) || 10),
+      location: {
+        state: answer("state", "state_name", "admin_state"),
+        lga: answer("lga", "lga_name", "local_government", "local_government_area"),
+        ward: answer("ward", "ward_name"),
+        flhf_name: answer("flhf_name", "flhf", "health_facility", "facility", "facility_name"),
+        community_name: answer("community_name", "community"),
+        settlement_name: answer("settlement_name", "settlement"),
+      },
+      gps: handoffGps ? { lat: handoffGps.lat, lng: handoffGps.lng, accuracy: (handoffGps as any).accuracy } : null,
+    };
+  };
+
+
+  const doSubmit = async (opts?: { deferHouseholdSurvey?: boolean }): Promise<string | null> => {
     setIsSubmitting(true);
     setShowIncompleteConfirm(false);
 
@@ -2306,45 +2366,33 @@ const FormFiller = ({
         // MDA Supervisory Checklist → launch the Repeat Household Coverage
         // Survey (repeatable, sampled) when enabled or when the legacy coverage
         // evaluation linkage is on; otherwise show the thank-you dialog.
+        // In the unified journey the checklist is persisted from INSIDE the
+        // survey's single Submit button, so `deferHouseholdSurvey` skips any
+        // launch/thank-you here and simply returns the new submission id.
+        if (opts?.deferHouseholdSurvey) {
+          onSubmitSuccess?.(result.id);
+          return result.id;
+        }
         if (offerHouseholdSurvey) {
-          const answer = (...names: string[]) => {
-            for (const name of names) {
-              const direct = responses[name];
-              if (direct !== undefined && direct !== null && String(direct).trim() !== "") return String(direct);
-              const id = nameToIdMap[name];
-              const byId = id ? responses[id] : undefined;
-              if (byId !== undefined && byId !== null && String(byId).trim() !== "") return String(byId);
-            }
-            return "";
-          };
-          const handoffGps = gpsQuestionAnswer || gpsPosition || locEnforcement.autoGps || backgroundLocation || null;
-          setHouseholdSurveyCtx({
-            submissionId: result.id,
-            target: Math.max(1, Number((settings as any).householdSampleSize) || 10),
-            location: {
-              state: answer("state", "state_name", "admin_state"),
-              lga: answer("lga", "lga_name", "local_government", "local_government_area"),
-              ward: answer("ward", "ward_name"),
-              flhf_name: answer("flhf_name", "flhf", "health_facility", "facility", "facility_name"),
-              community_name: answer("community_name", "community"),
-              settlement_name: answer("settlement_name", "settlement"),
-            },
-            gps: handoffGps ? { lat: handoffGps.lat, lng: handoffGps.lng, accuracy: (handoffGps as any).accuracy } : null,
-          });
+          setHouseholdSurveyCtx(buildHouseholdSurveyCtx(result.id));
         } else {
           setShowThankYou(true);
         }
         // Notify the parent that submission succeeded but DON'T auto-close —
         // the user will dismiss the thank-you dialog, which then closes the form.
         onSubmitSuccess?.(result.id);
+        return result.id;
       }
+      return null;
     } catch (error) {
       console.error("Submission error:", error);
       toast({ title: "Submission Failed", description: "An error occurred. Please try again.", variant: "destructive" });
+      return null;
     } finally {
       setIsSubmitting(false);
     }
   };
+
 
   // Bind handleSubmit to the ref for the voice engine
   handleSubmitRef.current = handleSubmit;
@@ -3621,10 +3669,11 @@ const FormFiller = ({
                         disabled={isSubmitting}
                         className="gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-900/20 hover:from-emerald-700 hover:to-teal-700"
                       >
-                        {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                        {isSubmitting ? "Submitting..." : "Submit Checklist"}
+                        {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : offerHouseholdSurvey ? <ArrowRight className="h-5 w-5" /> : <Send className="h-5 w-5" />}
+                        {isSubmitting ? "Submitting..." : offerHouseholdSurvey ? "Continue to Household Survey" : "Submit Checklist"}
                       </Button>
                     )}
+
                   </div>
 
                   {/* Quick actions + reminder (Supervision Summary removed per request) */}
@@ -3912,7 +3961,7 @@ const FormFiller = ({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={doSubmit}>Yes, Submit</AlertDialogAction>
+            <AlertDialogAction onClick={() => { void doSubmit(); }}>Yes, Submit</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -4055,14 +4104,45 @@ const FormFiller = ({
         }}
       />
 
-      {/* Repeat Household Coverage Survey — full-screen, launched after an MDA
-          checklist submission. Replaces the old "Coverage Evaluation 3D" flow. */}
+      {/* Disclaimer gate — shown immediately after the final checklist question
+          ("Status of MDA"), before the household survey. Dynamically greets the
+          active user by name. */}
+      <AlertDialog open={showSurveyDisclaimer} onOpenChange={setShowSurveyDisclaimer}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="mx-auto mb-1 flex h-12 w-12 items-center justify-center rounded-full bg-teal-100 text-teal-700">
+              <Home className="h-6 w-6" />
+            </div>
+            <AlertDialogTitle className="text-center">Household Coverage Survey</AlertDialogTitle>
+            <AlertDialogDescription className="text-center leading-relaxed">
+              Hi{" "}
+              <strong className="text-foreground">
+                {[profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim() || profile?.email || "there"}
+              </strong>
+              , you are about to proceed to sample and interview households to assess
+              coverage &amp; compliance with MDA standards. This process fully supports
+              offline data capture.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go back</AlertDialogCancel>
+            <AlertDialogAction onClick={handleProceedToHouseholdSurvey} className="gap-2 bg-gradient-to-r from-teal-600 to-cyan-600">
+              Proceed <ArrowRight className="h-4 w-4" />
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Repeat Household Coverage Survey — full-screen. In the unified journey the
+          checklist is persisted together with the survey by ONE Submit button
+          inside the survey (via onFinalizeChecklist). */}
       {householdSurveyCtx && (
         <div className="fixed inset-0 z-[70] overflow-y-auto bg-background">
           <RepeatHouseholdCoverageSurvey
             projectId={projectId}
             formId={formId}
             checklistSubmissionId={householdSurveyCtx.submissionId}
+            onFinalizeChecklist={finalizeChecklistFromSurvey}
             targetHouseholds={householdSurveyCtx.target}
             location={householdSurveyCtx.location}
             initialGps={householdSurveyCtx.gps}
@@ -4073,6 +4153,7 @@ const FormFiller = ({
           />
         </div>
       )}
+
 
 
 
