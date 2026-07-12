@@ -26,14 +26,14 @@ export interface SubmissionRecord {
   within_geofence: boolean | null;
 }
 
-const fetchVisibleFormSubmissions = async (formId: string) => {
+const fetchVisibleFormSubmissionsForForms = async (formIds: string[]) => {
   const PAGE_SIZE = 1000;
   let rows: any[] = [];
   let offset = 0;
 
   while (true) {
-    const { data, error } = await (supabase as any).rpc("visible_form_submissions", {
-      _form_id: formId,
+    const { data, error } = await (supabase as any).rpc("visible_form_submissions_for_forms", {
+      _form_ids: formIds,
       _limit: PAGE_SIZE,
       _offset: offset,
     });
@@ -369,8 +369,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
       
       // Fetch rows through the same backend-scoped helper used by dashboard
       // counts, then apply local date filters so count/list permissions match.
-      const pages = await Promise.all(formIds.map((formId) => fetchVisibleFormSubmissions(formId)));
-      let allData = pages.flat();
+      let allData = await fetchVisibleFormSubmissionsForForms(formIds);
       if (filters.startDate) {
         const start = new Date(filters.startDate).getTime();
         allData = allData.filter((s) => new Date(s.submitted_at || s.created_at || 0).getTime() >= start);
