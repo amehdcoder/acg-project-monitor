@@ -126,6 +126,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "accessibility", label: "Accessibility", icon: Accessibility, adminOnly: false, showForUsers: true },
     { id: "version-history", label: "Version History", icon: History, adminOnly: true },
     { id: "security-audit", label: "Security Audit", icon: Shield, adminOnly: true },
+    { id: "version-audit", label: "App Version Audit", icon: TabletSmartphone, adminOnly: true },
     { id: "image-recognition", label: "Image Recognition", icon: ScanLine, adminOnly: true },
     { id: "nfc-rfid", label: "NFC & RFID", icon: Nfc, adminOnly: false, showForUsers: true },
     { id: "social-share", label: "Share Progress", icon: Share2, adminOnly: false, showForUsers: true },
