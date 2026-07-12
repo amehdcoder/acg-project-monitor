@@ -61,6 +61,22 @@ Deno.serve(async (req) => {
     }
 
     const admin = createClient(supabaseUrl, serviceKey);
+
+    // Authorization: the caller must be allowed to manage this specific form.
+    // Without this check any authenticated user could export ANY form's
+    // submissions (service role bypasses RLS) to an attacker-controlled
+    // destination.
+    const { data: canManage, error: manageErr } = await admin.rpc("can_manage_form", {
+      _user_id: userData.user.id,
+      _form_id: body.formId,
+    });
+    if (manageErr || !canManage) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data: form } = await admin
       .from("forms")
       .select("id,name,questions")
