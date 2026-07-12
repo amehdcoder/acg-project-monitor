@@ -17,6 +17,7 @@ import Install from "./pages/Install";
 import DataCleaner from "./pages/DataCleaner";
 import MdaAnalysesHarness from "./pages/MdaAnalysesHarness";
 import LearningLog from "./pages/LearningLog";
+import SharedDashboard from "./pages/SharedDashboard";
 import InstallBanner from "./components/InstallBanner";
 import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
