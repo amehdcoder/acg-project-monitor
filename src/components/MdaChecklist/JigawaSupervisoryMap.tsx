@@ -87,9 +87,14 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
     () =>
       submissions
         .map((s) => {
-          const lat = s.location?.latitude;
-          const lng = s.location?.longitude;
-          if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+          let lat = Number(s.location?.latitude);
+          let lng = Number(s.location?.longitude);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+          // Reject the null-island sentinel used for empty GPS.
+          if (lat === 0 && lng === 0) return null;
+          // Auto-correct an obvious lat/lng swap (Jigawa lat≈12, lng≈9).
+          if (Math.abs(lat) > 90 && Math.abs(lng) <= 90) { const t = lat; lat = lng; lng = t; }
+          if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
           return { id: s.id, lat, lng, submitter: s.submitter || "—", at: s.submittedAt, lga: s.lga || null };
         })
         .filter(Boolean) as { id: string; lat: number; lng: number; submitter: string; at?: string | null; lga: string | null }[],
