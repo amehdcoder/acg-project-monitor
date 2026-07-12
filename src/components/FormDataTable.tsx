@@ -452,6 +452,7 @@ const FormDataTable = ({
   };
 
   return (
+    <>
     <div className="border-t pt-4">
       <div className="flex items-center justify-between mb-3">
         <h4 className="font-medium text-foreground">Form Data</h4>
