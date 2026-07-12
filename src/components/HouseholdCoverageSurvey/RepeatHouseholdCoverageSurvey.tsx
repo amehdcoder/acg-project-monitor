@@ -42,7 +42,8 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { useAuth } from "@/hooks/useAuth";
-import { useGeolocation } from "@/hooks/useGeolocation";
+import { useInstantLocation } from "@/hooks/useInstantLocation";
+import LocationStatusBadge from "@/components/LocationStatusBadge";
 import { toast } from "@/hooks/use-toast";
 import { queueOrInsert } from "@/lib/offlineSubmissions";
 
