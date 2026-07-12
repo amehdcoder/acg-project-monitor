@@ -284,6 +284,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
   const [dashboardForm, setDashboardForm] = useState<Form | null>(null);
   const [mdaDashboardForm, setMdaDashboardForm] = useState<Form | null>(null);
+  const [mdaDashboardCounts, setMdaDashboardCounts] = useState<Record<string, number>>({});
   const [specialDashForm, setSpecialDashForm] = useState<Form | null>(null);
   const [sarmaanDashForm, setSarmaanDashForm] = useState<Form | null>(null);
   const [sarmaanLaunchForm, setSarmaanLaunchForm] = useState<Form | null>(null);
@@ -1447,14 +1448,41 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const mdaChecklistForms = mergedForms.filter((form) =>
     isMdaChecklistLike({ settings: form.settings, formName: form.name, groups: form.groups })
   );
+  const mdaChecklistFormIdsKey = mdaChecklistForms.map((form) => form.id).sort().join(",");
+
+  useEffect(() => {
+    const ids = mdaChecklistFormIdsKey ? mdaChecklistFormIdsKey.split(",") : [];
+    if (ids.length === 0) {
+      setMdaDashboardCounts({});
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await (supabase as any).rpc("visible_form_submission_counts", { _form_ids: ids });
+      if (cancelled || error) return;
+      setMdaDashboardCounts(
+        Object.fromEntries((data || []).map((row: any) => [row.form_id, Number(row.total || 0)])),
+      );
+    })();
+
+    return () => { cancelled = true; };
+  }, [mdaChecklistFormIdsKey]);
   // The MDA Supervisory Dashboard is NOT auto-granted with the checklist.
   // Systems Admins, Super Admins, Owner, Co-owner — or members the Owner/Admin
   // has explicitly granted dashboard access — may open it.
   const canSeeMdaDashboard = isAdmin || isOwnerLevel || hasDashboardAccess("mda_supervisory", currentProjectId);
   const canSeeIrfDashboard = isAdmin || isOwnerLevel || hasDashboardAccess("sairf", currentProjectId);
-  const primaryMdaDashboardForm = currentProjectId
-    ? mdaChecklistForms.find((form) => form.project_id === currentProjectId) || null
-    : mdaChecklistForms[0] || null;
+  const primaryMdaDashboardForm = (() => {
+    const candidates = currentProjectId
+      ? mdaChecklistForms.filter((form) => form.project_id === currentProjectId)
+      : mdaChecklistForms;
+    return [...candidates].sort((a, b) => {
+      const byCount = (mdaDashboardCounts[b.id] ?? b.submissions_count ?? 0) - (mdaDashboardCounts[a.id] ?? a.submissions_count ?? 0);
+      if (byCount !== 0) return byCount;
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    })[0] || null;
+  })();
 
   const currentProject = projects.find(p => p.id === currentProjectId);
   const sarmaanSupervisoryForms = useMemo(

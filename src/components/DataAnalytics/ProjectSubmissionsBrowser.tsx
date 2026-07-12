@@ -44,17 +44,15 @@ const ProjectSubmissionsBrowser = forwardRef<ProjectSubmissionsBrowserHandle>((_
       const formIds = (formsData || []).map((f) => f.id);
       let countMap: Record<string, number> = {};
       if (formIds.length > 0) {
-        // Use individual count queries per form to avoid the 1000-row limit
-        const countPromises = formIds.map(async (formId) => {
-          const { count } = await supabase
-            .from("form_submissions")
-            .select("*", { count: "exact", head: true })
-            .eq("form_id", formId);
-          return { formId, count: count || 0 };
-        });
-        const counts = await Promise.all(countPromises);
-        counts.forEach(({ formId, count }) => {
-          countMap[formId] = count;
+        // One backend-scoped count query. This uses the exact same permission
+        // helper as the submission list RPC below, avoiding count/list mismatch.
+        const { data: counts, error: countErr } = await (supabase as any).rpc(
+          "visible_form_submission_counts",
+          { _form_ids: formIds },
+        );
+        if (countErr) throw countErr;
+        (counts || []).forEach((row: any) => {
+          countMap[row.form_id] = Number(row.total || 0);
         });
       }
 
