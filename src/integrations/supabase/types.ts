@@ -6404,6 +6404,65 @@ export type Database = {
           },
         ]
       }
+      reference_locations: {
+        Row: {
+          created_at: string
+          created_by: string
+          entity_type: string
+          id: string
+          latitude: number | null
+          lga: string | null
+          local_ref: string | null
+          longitude: number | null
+          name: string
+          parent_id: string | null
+          project_id: string | null
+          state: string | null
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          entity_type: string
+          id?: string
+          latitude?: number | null
+          lga?: string | null
+          local_ref?: string | null
+          longitude?: number | null
+          name: string
+          parent_id?: string | null
+          project_id?: string | null
+          state?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          entity_type?: string
+          id?: string
+          latitude?: number | null
+          lga?: string | null
+          local_ref?: string | null
+          longitude?: number | null
+          name?: string
+          parent_id?: string | null
+          project_id?: string | null
+          state?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reference_locations_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "reference_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sarmaan_acsm_archived_submissions: {
         Row: {
           archived_at: string

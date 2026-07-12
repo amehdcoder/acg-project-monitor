@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { sealRecord, unsealRecord } from "@/lib/deviceCrypto";
 import { getSavedEntry, setSavedEntryStatus } from "@/lib/savedForms";
 import { stampSyncContract } from "@/lib/syncContract";
+import { cascadeReferenceEntities, resolveReferences } from "@/lib/referenceSyncLedger";
 
 // Tables that carry the formal idempotency contract (submission_uuid +
 // client_submitted_at columns). Rows destined for these tables are stamped so a
@@ -227,7 +228,21 @@ export async function flushSubmissionQueue(
   flushing = true;
   let inserted = 0;
   try {
-    const records = await getAllRecords();
+    // CASCADING SYNC LEDGER: commit any locally-created reference entities
+    // (Community / Village / Location Hub) to the server FIRST and fold the
+    // resulting local→server id map into the ledger, so every dependent form
+    // payload below can be rewritten to point at the real server ids before it
+    // is transmitted. Never blocks the drain on failure.
+    let idMap: Record<string, string> = {};
+    try {
+      idMap = await cascadeReferenceEntities();
+    } catch {
+      /* offline / transient — payloads keep their local refs and retry later */
+    }
+    const records = (await getAllRecords()).map((rec) => ({
+      ...rec,
+      row: resolveReferences(rec.row, idMap),
+    }));
     // A forced drain (e.g. app open / manual resync) ignores the exponential
     // backoff window so a queue that has been stuck for days — like a field
     // device that was offline through several work days — is retried in full
