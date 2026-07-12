@@ -74,22 +74,87 @@ function pick(data: Record<string, unknown> | undefined, keys: string[]): string
   return null;
 }
 
+// Valid on-Earth coordinate. We deliberately reject the (0,0) null-island pair
+// which is a common "empty GPS" sentinel that would otherwise plot in the Gulf
+// of Guinea, far from any Nigerian LGA.
+function isValidLatLng(lat: number, lng: number): boolean {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return false;
+  if (lat === 0 && lng === 0) return false;
+  return true;
+}
+
+// Pull a {lat,lng} pair out of a single value that may be an object
+// ({lat,lng} | {latitude,longitude}) or a "lat,lng" / "lat lng" string.
+// Coordinates are sanitized: numbers are coerced from strings, and if a pair
+// is out of range but swaps into range (lng in the lat slot, common with
+// mis-ordered captures) we auto-correct it so the point still plots.
+function coerceLatLng(value: unknown): { latitude: number; longitude: number } | null {
+  if (value && typeof value === "object") {
+    const p = value as Record<string, unknown>;
+    const lat = Number(p.latitude ?? p.lat);
+    const lng = Number(p.longitude ?? p.lng ?? p.lon ?? p.long);
+    if (isValidLatLng(lat, lng)) return { latitude: lat, longitude: lng };
+    // Auto-correct an obvious lat/lng swap.
+    if (isValidLatLng(lng, lat)) return { latitude: lng, longitude: lat };
+    return null;
+  }
+  if (typeof value === "string") {
+    const m = value.match(/(-?\d{1,3}(?:\.\d+)?)\s*[,\s]\s*(-?\d{1,3}(?:\.\d+)?)/);
+    if (m) {
+      const lat = Number(m[1]);
+      const lng = Number(m[2]);
+      if (isValidLatLng(lat, lng)) return { latitude: lat, longitude: lng };
+      if (isValidLatLng(lng, lat)) return { latitude: lng, longitude: lat };
+    }
+  }
+  return null;
+}
+
+// Robust GPS extraction. We check the KNOWN GPS-carrying fields first (in
+// priority order) so a stray numeric string elsewhere in the submission can
+// never be mistaken for coordinates — the previous "scan every value" approach
+// could grab garbage and cause valid captures (e.g. some Babura submissions)
+// to silently drop. Only if none of the explicit fields yield a valid pair do
+// we fall back to a best-effort scan of the remaining values.
 function readGps(data: Record<string, unknown> | undefined): { latitude: number; longitude: number } | null {
   if (!data) return null;
+
+  // 1) Explicit paired lat/lng scalar fields captured by the form.
+  const latScalar = Number(data.community_latitude ?? data.latitude ?? data.lat ?? data.gps_latitude);
+  const lngScalar = Number(data.community_longitude ?? data.longitude ?? data.lng ?? data.gps_longitude);
+  if (isValidLatLng(latScalar, lngScalar)) return { latitude: latScalar, longitude: lngScalar };
+  if (isValidLatLng(lngScalar, latScalar)) return { latitude: lngScalar, longitude: latScalar };
+
+  // 2) Well-known GPS object fields, in priority order.
+  const preferredKeys = ["community_gps", "gps", "geolocation", "geopoint", "location", "coordinates"];
+  for (const key of preferredKeys) {
+    const found = coerceLatLng(data[key]);
+    if (found) return found;
+  }
+
+  // 3) Any GPS-question object (Special Form Studio uses q_*_* keys whose value
+  //    is a {lat,lng,accuracy,...} object).
+  for (const [k, value] of Object.entries(data)) {
+    if (/^q[_-]/i.test(k)) {
+      const found = coerceLatLng(value);
+      if (found) return found;
+    }
+  }
+
+  // 4) form_metadata.auto_gps captured automatically in the background.
+  const meta = data.form_metadata as Record<string, unknown> | undefined;
+  if (meta && typeof meta === "object") {
+    const autoGps = coerceLatLng(meta.auto_gps);
+    if (autoGps) return autoGps;
+  }
+
+  // 5) Last-resort scan of remaining OBJECT values (never raw strings, which
+  //    caused false positives) so we don't regress unexpected key layouts.
   for (const value of Object.values(data)) {
     if (value && typeof value === "object") {
-      const point = value as Record<string, unknown>;
-      const lat = Number(point.latitude ?? point.lat);
-      const lng = Number(point.longitude ?? point.lng ?? point.lon);
-      if (Number.isFinite(lat) && Number.isFinite(lng)) return { latitude: lat, longitude: lng };
-    }
-    if (typeof value === "string") {
-      const match = value.match(/(-?\d+(?:\.\d+)?)\s*[,\s]\s*(-?\d+(?:\.\d+)?)/);
-      if (match) {
-        const latitude = Number(match[1]);
-        const longitude = Number(match[2]);
-        if (Number.isFinite(latitude) && Number.isFinite(longitude)) return { latitude, longitude };
-      }
+      const found = coerceLatLng(value);
+      if (found) return found;
     }
   }
   return null;
