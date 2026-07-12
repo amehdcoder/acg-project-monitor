@@ -533,6 +533,14 @@ export default function RepeatHouseholdCoverageSurvey({
             {navigator.onLine ? <Wifi className="h-3.5 w-3.5" /> : <Cloud className="h-3.5 w-3.5" />}
             {navigator.onLine ? "Online" : "Offline"}
           </div>
+          <button
+            type="button"
+            onClick={requestClose}
+            aria-label="Close survey"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 transition-colors hover:bg-white/25"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
       </div>
 
