@@ -503,7 +503,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
       <Section title="Coverage Inference (95% Confidence Intervals)" icon={Percent} tint={EMERALD} badge={`n=${a.totalHh}`}>
         <div className="grid gap-3 pt-3 sm:grid-cols-2">
           {[
-            { name: "Therapeutic coverage", obs: a.txPct, test: a.txTest, benchmark: txBenchmark, formula: `${a.swallowed.toLocaleString()} swallowed ÷ ${a.offered.toLocaleString()} offered`, has: a.offered > 0 },
+            { name: "Therapeutic coverage", obs: a.txPct, test: a.txTest, benchmark: txBenchmark, formula: `${a.swallowed.toLocaleString()} swallowed ÷ ${(a.eligible > 0 ? a.eligible : a.offered).toLocaleString()} eligible persons`, has: (a.eligible > 0 ? a.eligible : a.offered) > 0 },
             { name: "Household reach", obs: a.reachPct, test: a.hhTest, benchmark: hhBenchmark, formula: `${a.cddYes.toLocaleString()} CDD-visited ÷ ${a.totalHh.toLocaleString()} households`, has: a.totalHh > 0 },
           ].map((b) => {
             const tint = !b.test ? SLATE : b.test.ciBelow ? RED : b.test.ciAbove ? EMERALD : AMBER;
