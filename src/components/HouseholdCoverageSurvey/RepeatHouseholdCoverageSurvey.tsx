@@ -769,7 +769,7 @@ export default function RepeatHouseholdCoverageSurvey({
         <Section>
           <QRow n={1} text="During the last MDA in this community, did any drug distributor/CDD come to this house?">
             <PillOptions
-              value={current.cdd_came}
+              value={record.cdd_came}
               onChange={(v) => update({ cdd_came: v })}
               options={[
                 { value: "yes", label: "Yes" },
@@ -781,7 +781,7 @@ export default function RepeatHouseholdCoverageSurvey({
 
           <QRow n={2} text="Was anyone in your household treated?">
             <PillOptions
-              value={current.anyone_treated}
+              value={record.anyone_treated}
               onChange={(v) => update({ anyone_treated: v })}
               options={[
                 { value: "yes", label: "Yes" },
@@ -794,11 +794,11 @@ export default function RepeatHouseholdCoverageSurvey({
             <div className="flex flex-wrap gap-6">
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Offered drugs</p>
-                <Stepper value={current.offered_count} onChange={(v) => update({ offered_count: v })} />
+                <Stepper value={record.offered_count} onChange={(v) => update({ offered_count: v })} />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Actually swallowed</p>
-                <Stepper value={current.swallowed_count} onChange={(v) => update({ swallowed_count: v })} />
+                <Stepper value={record.swallowed_count} onChange={(v) => update({ swallowed_count: v })} />
               </div>
             </div>
           </QRow>
@@ -820,7 +820,7 @@ export default function RepeatHouseholdCoverageSurvey({
                   </tr>
                 </thead>
                 <tbody>
-                  {current.people.map((p, i) => (
+                  {record.people.map((p, i) => (
                     <tr key={i} className="border-t">
                       <td className="px-2 py-1.5 text-center text-muted-foreground">{i + 1}</td>
                       <td className="px-2 py-1.5">
@@ -854,8 +854,8 @@ export default function RepeatHouseholdCoverageSurvey({
                         <Input value={p.reason} onChange={(e) => updatePerson(i, { reason: e.target.value })} placeholder="Optional" className="h-8" />
                       </td>
                       <td className="px-2 py-1.5">
-                        {current.people.length > 1 && (
-                          <button type="button" onClick={() => update({ people: current.people.filter((_, idx) => idx !== i) })} className="text-muted-foreground hover:text-destructive">
+                        {record.people.length > 1 && (
+                          <button type="button" onClick={() => update({ people: record.people.filter((_, idx) => idx !== i) })} className="text-muted-foreground hover:text-destructive">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
@@ -865,7 +865,7 @@ export default function RepeatHouseholdCoverageSurvey({
                 </tbody>
               </table>
             </div>
-            <Button type="button" variant="outline" size="sm" className="mt-2 text-blue-800 border-blue-200" onClick={() => update({ people: [...current.people, emptyPerson()] })}>
+            <Button type="button" variant="outline" size="sm" className="mt-2 text-blue-800 border-blue-200" onClick={() => update({ people: [...record.people, emptyPerson()] })}>
               <Plus className="h-4 w-4 mr-1.5" /> Add another person
             </Button>
           </QRow>
@@ -873,7 +873,7 @@ export default function RepeatHouseholdCoverageSurvey({
           {/* Q5 adverse events */}
           <QRow n={5} text="Did anyone in the household experience side effects after taking the drugs?">
             <PillOptions
-              value={current.side_effects}
+              value={record.side_effects}
               onChange={(v) => update({ side_effects: v })}
               options={[
                 { value: "yes", label: "Yes" },
@@ -881,17 +881,17 @@ export default function RepeatHouseholdCoverageSurvey({
                 { value: "dont_know", label: "Don't know" },
               ]}
             />
-            {current.side_effects === "yes" && (
+            {record.side_effects === "yes" && (
               <div className="mt-3 space-y-2">
                 <Label className="text-xs">If Yes, what happened and what was done?</Label>
                 <Textarea
-                  value={current.side_effects_detail}
+                  value={record.side_effects_detail}
                   onChange={(e) => update({ side_effects_detail: e.target.value })}
                   placeholder="Describe what happened and what was done…"
                   rows={2}
                 />
                 <label className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={current.ae_reported} onCheckedChange={(v) => update({ ae_reported: !!v })} />
+                  <Checkbox checked={record.ae_reported} onCheckedChange={(v) => update({ ae_reported: !!v })} />
                   Check if AE was reported to health facility
                 </label>
               </div>
@@ -908,7 +908,7 @@ export default function RepeatHouseholdCoverageSurvey({
             <FRow code="F1" text="Was your height measured using a dose pole/tape before receiving the medicine?">
               <PillOptions
                 color="#7c3aed"
-                value={current.f1_asked_height}
+                value={record.f1_asked_height}
                 onChange={(v) => update({ f1_asked_height: v })}
                 options={[
                   { value: "yes", label: "Yes" },
@@ -919,7 +919,7 @@ export default function RepeatHouseholdCoverageSurvey({
             </FRow>
             <FRow code="F1b" text="Medicine Received">
               <Select
-                value={current.medicine_received}
+                value={record.medicine_received}
                 onValueChange={(v) => update({ medicine_received: v as HouseholdRecord["medicine_received"] })}
               >
                 <SelectTrigger>
@@ -937,7 +937,7 @@ export default function RepeatHouseholdCoverageSurvey({
             </FRow>
             <FRow code="F1c" text="Taste of the Medicine">
               <Select
-                value={current.taste_of_medicine}
+                value={record.taste_of_medicine}
                 onValueChange={(v) =>
                   update({
                     taste_of_medicine: v as HouseholdRecord["taste_of_medicine"],
@@ -955,14 +955,14 @@ export default function RepeatHouseholdCoverageSurvey({
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
-              {current.taste_of_medicine === "other" && (
+              {record.taste_of_medicine === "other" && (
                 <div className="mt-3">
                   <Label className="text-xs font-medium">
                     Please specify other taste <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     className="mt-1"
-                    value={current.taste_other}
+                    value={record.taste_other}
                     onChange={(e) => update({ taste_other: e.target.value })}
                     placeholder="Describe the taste…"
                   />
@@ -972,7 +972,7 @@ export default function RepeatHouseholdCoverageSurvey({
             <FRow code="F2" text="Are you satisfied with how the drug distribution was done in your community?">
               <PillOptions
                 color="#7c3aed"
-                value={current.f3_satisfied}
+                value={record.f3_satisfied}
                 onChange={(v) => update({ f3_satisfied: v })}
                 options={[
                   { value: "very", label: "Very satisfied" },
@@ -983,7 +983,7 @@ export default function RepeatHouseholdCoverageSurvey({
               />
             </FRow>
             <FRow code="F3" text="Why?">
-              <Input value={current.f4_why} onChange={(e) => update({ f4_why: e.target.value })} placeholder="Enter your response…" />
+              <Input value={record.f4_why} onChange={(e) => update({ f4_why: e.target.value })} placeholder="Enter your response…" />
             </FRow>
 
           </div>
@@ -996,7 +996,7 @@ export default function RepeatHouseholdCoverageSurvey({
           </div>
           <div className="p-4 bg-orange-50/40">
             <FRow code="G1" color="#ea580c" text="What can be done to improve drug distribution in the next MDA?">
-              <Textarea value={current.suggestions} onChange={(e) => update({ suggestions: e.target.value })} placeholder="Enter your suggestions…" rows={2} />
+              <Textarea value={record.suggestions} onChange={(e) => update({ suggestions: e.target.value })} placeholder="Enter your suggestions…" rows={2} />
             </FRow>
           </div>
         </div>
