@@ -580,7 +580,8 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
             <tbody>
               {a.geoRows.map((r, i) => {
                 const reachV = pct(r.cddYes, r.households);
-                const txV = pct(r.swallowed, r.offered);
+                const txDenomR = r.eligible > 0 ? r.eligible : r.offered;
+                const txV = Math.min(100, pct(r.swallowed, txDenomR));
                 const txOk = txV >= txBenchmark;
                 const reachOk = reachV >= hhBenchmark;
                 return (
