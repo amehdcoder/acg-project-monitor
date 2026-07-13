@@ -48,6 +48,7 @@ interface Profile {
   is_co_owner?: boolean;
   approval_status: string;
   avatar_url?: string | null;
+  has_quiz_access?: boolean;
 }
 
 interface AuthContextType {
