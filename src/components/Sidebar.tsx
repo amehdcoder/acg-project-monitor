@@ -159,8 +159,9 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
       if (minimalAccess) {
         return ["forms", "project-chat", "my-submissions"].includes(item.id);
       }
-      // Quizzes: regular users see it only when granted Quiz Page Access.
-      if (item.id === "quizzes") return !!profile?.has_quiz_access;
+      // Quizzes: every project member sees it by default; quiz visibility itself
+      // is scoped per project (with a friendly empty state when none exist).
+      if (item.id === "quizzes") return true;
       if (DEFAULT_USER_PAGES.includes(item.id)) return true;
       if ((item as any).adhocOnly) return false; // my-submissions stays adhoc-only
       return canAccessPage ? canAccessPage(item.id) : false;

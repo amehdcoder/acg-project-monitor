@@ -283,18 +283,7 @@ const Index = () => {
       case "data-quality": return guardedPage("data-quality", <DataQualityView />);
       case "microplanning": return guardedPage("microplanning", <MicroplanningView />);
       case "environment": return guardedPage("environment", <ChangeEnvironmentView />);
-      case "quizzes": return isAdmin ? guardedPage("quizzes", <QuizBuilder />) : (
-        profile?.has_quiz_access ? <QuizBuilder /> : (
-          <div className="flex h-96 items-center justify-center p-6">
-            <div className="max-w-md text-center space-y-2">
-              <h2 className="font-display text-xl font-bold text-foreground">Access Restricted</h2>
-              <p className="text-sm text-muted-foreground">
-                You don't have access to the Quizzes page. Ask an administrator to grant you Quiz Page Access.
-              </p>
-            </div>
-          </div>
-        )
-      );
+      case "quizzes": return isAdmin ? guardedPage("quizzes", <QuizBuilder />) : <QuizBuilder />;
       case "ntd-assessment": return <NTDAssessmentView />;
       case "sign-language": return <SignLanguageView />;
       case "accessibility": return <AccessibilityStatementView />;
