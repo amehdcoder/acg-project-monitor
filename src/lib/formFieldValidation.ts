@@ -92,7 +92,7 @@ export function validateFieldValue(question: Question, rawValue: unknown): Field
   }
 
   // ---- Date rules: no future dates unless explicitly allowed ----
-  if (DATE_TYPES.has(question.type) && !(v && v.allowFuture)) {
+  if (DATE_TYPES.has(question.type) && !(v && v.allowFuture) && !(v && v.maxDate)) {
     const t = new Date(String(value)).getTime();
     if (Number.isFinite(t)) {
       // Compare against end-of-today so "today" is always valid regardless of TZ.
@@ -103,6 +103,20 @@ export function validateFieldValue(question: Question, rawValue: unknown): Field
       }
     }
   }
+
+  // ---- Explicit date bounds (minDate / maxDate; accept keywords like "today") ----
+  if (DATE_TYPES.has(question.type) && v && (v.minDate || v.maxDate)) {
+    const day = String(value).slice(0, 10);
+    const lo = resolveDateBound(v.minDate);
+    const hi = resolveDateBound(v.maxDate);
+    if (lo && day < lo) {
+      return { error: v.message || `${label} cannot be in the past` };
+    }
+    if (hi && day > hi) {
+      return { error: v.message || `${label} cannot be in the future` };
+    }
+  }
+
 
   // ---- Regex format ----
   if (v && typeof v.regex === "string" && v.regex.trim()) {
