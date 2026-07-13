@@ -87,6 +87,9 @@ interface DateInputProps {
   disabled?: boolean;
   placeholder?: string;
   hasError?: boolean;
+  /** Optional min/max bounds as canonical ISO date strings (YYYY-MM-DD). */
+  min?: string;
+  max?: string;
 }
 
 const DateInput = ({
@@ -98,6 +101,8 @@ const DateInput = ({
   disabled,
   placeholder,
   hasError,
+  min,
+  max,
 }: DateInputProps) => {
   // ISO format → native HTML input is fine and offers the best UX.
   const useNative = dateFormat === "YYYY-MM-DD";
