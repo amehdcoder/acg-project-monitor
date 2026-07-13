@@ -1528,6 +1528,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     isOwner ||
     (!!currentProjectId && bmzProjectIds.has(currentProjectId)) ||
     projects.some((p) => bmzProjectIds.has(p.id));
+  useEffect(() => {
+    console.log("[BMZ] visibility eval", {
+      bmzFolderVisible,
+      isOwner,
+      currentProjectId,
+      currentProjectAssigned: !!currentProjectId && bmzProjectIds.has(currentProjectId),
+      anyAccessibleProjectAssigned: projects.some((p) => bmzProjectIds.has(p.id)),
+      assignedProjectIds: [...bmzProjectIds],
+    });
+  }, [bmzFolderVisible, isOwner, currentProjectId, bmzProjectIds, projects]);
   const sarmaanSupervisoryForms = useMemo(
     () => mergedForms.filter((form) => isSupervisoryLearningForm({ settings: form.settings, name: form.name })),
     [mergedForms],
