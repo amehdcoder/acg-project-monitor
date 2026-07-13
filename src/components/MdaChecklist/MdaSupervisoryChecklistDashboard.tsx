@@ -437,13 +437,26 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
   // submitted more than once, we keep the submission whose linked household
   // survey captured MORE households so every analysis reflects the richest visit.
   const [hhCountBySubmission, setHhCountBySubmission] = useState<Record<string, number>>({});
+  // Validated therapeutic-coverage inputs (eligible / offered / swallowed), keyed
+  // by checklist submission, so the Random Forest + Monte Carlo modelling ingests
+  // the same clean numbers enforced by the Repeat Household Coverage Survey form.
+  const [coverageBySubmission, setCoverageBySubmission] = useState<
+    Record<string, { eligible_persons: number; offered_drugs: number; actually_swallowed: number; therapeutic_coverage_pct: number }>
+  >({});
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const ids = Array.from(new Set(submissions.map((s) => s.id).filter(Boolean)));
-      if (ids.length === 0) { setHhCountBySubmission({}); return; }
+      if (ids.length === 0) { setHhCountBySubmission({}); setCoverageBySubmission({}); return; }
+      // Tolerant per-household readers accept both the new validated keys and the
+      // legacy *_count keys, clamped so no household can exceed its eligible total.
+      const numFrom = (h: any, keys: string[]) => {
+        for (const k of keys) { const n = Number(h?.[k]); if (Number.isFinite(n) && n > 0) return n; }
+        return 0;
+      };
       try {
         const map: Record<string, number> = {};
+        const cov: Record<string, { eligible_persons: number; offered_drugs: number; actually_swallowed: number; therapeutic_coverage_pct: number }> = {};
         // Chunk the IN() filter to stay within URL limits on large datasets.
         for (let i = 0; i < ids.length; i += 200) {
           const chunk = ids.slice(i, i + 200);
@@ -455,19 +468,39 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
           for (const row of (data as any[]) || []) {
             const key = row.checklist_submission_id;
             if (!key) continue;
-            const count = Number(row.completed_households) ||
-              (Array.isArray(row.households) ? row.households.length : 0);
+            const hhArr: any[] = Array.isArray(row.households) ? row.households : [];
+            const count = Number(row.completed_households) || hhArr.length;
             // A community may have several linked surveys — keep the largest.
-            map[key] = Math.max(map[key] ?? 0, count);
+            if ((map[key] ?? 0) <= count) {
+              map[key] = Math.max(map[key] ?? 0, count);
+              // Aggregate validated coverage numbers for the richest linked survey.
+              let elig = 0, off = 0, sw = 0;
+              for (const h of hhArr) {
+                const e = Math.max(0, Math.round(numFrom(h, ["eligible_persons", "eligible_count"])));
+                const o = Math.max(0, Math.round(numFrom(h, ["offered_drugs", "offered_count"])));
+                const s = Math.max(0, Math.round(numFrom(h, ["actually_swallowed", "swallowed_count"])));
+                elig += e;
+                off += e > 0 ? Math.min(o, e) : o;
+                sw += e > 0 ? Math.min(s, e) : s;
+              }
+              const denom = elig > 0 ? elig : off;
+              cov[key] = {
+                eligible_persons: elig,
+                offered_drugs: off,
+                actually_swallowed: sw,
+                therapeutic_coverage_pct: denom > 0 ? Math.min(100, Math.round((sw / denom) * 1000) / 10) : 0,
+              };
+            }
           }
         }
-        if (!cancelled) setHhCountBySubmission(map);
+        if (!cancelled) { setHhCountBySubmission(map); setCoverageBySubmission(cov); }
       } catch {
-        if (!cancelled) setHhCountBySubmission({});
+        if (!cancelled) { setHhCountBySubmission({}); setCoverageBySubmission({}); }
       }
     })();
     return () => { cancelled = true; };
   }, [submissions]);
+
 
 
   // Module → question-name set (for classifying follow-up submissions).
