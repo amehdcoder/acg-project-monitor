@@ -37,10 +37,7 @@ import {
 } from "@/lib/geographyCache";
 import {
   getGrid3FacilitiesWithCoords,
-  getGrid3LGAsForState,
-  getGrid3StateNames,
   getGrid3SettlementsWithCoords,
-  getGrid3WardsForLGA,
   prefetchGrid3State,
   type FacilityWithCoords,
 } from "@/lib/grid3NigeriaData";
