@@ -1168,7 +1168,7 @@ const UsersView = () => {
       if (error) throw error;
 
       await logAction(
-        newState ? "grant_quiz_access" : "revoke_quiz_access",
+        (newState ? "grant_quiz_access" : "revoke_quiz_access") as any,
         `${newState ? "Granted" : "Revoked"} Quiz Page Access for ${getUserDisplayName(userToToggle)} (${safeText(userToToggle.email)})`,
         "user",
         userToToggle.user_id
