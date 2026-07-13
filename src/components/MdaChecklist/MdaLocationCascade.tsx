@@ -681,6 +681,26 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     setPrefetchState("done");
   };
 
+  // Hidden admin-only action: rebuild the local State→LGA→Ward lookup table.
+  // Only needed when administrative boundaries are structurally modified — the
+  // dataset is otherwise loaded once and served entirely from local storage.
+  const [refreshingGeo, setRefreshingGeo] = useState(false);
+  const handleRefreshHierarchy = async () => {
+    if (refreshingGeo) return;
+    setRefreshingGeo(true);
+    try {
+      const res = await refreshGeographyHierarchy();
+      toast({
+        title: "Geography data refreshed",
+        description: `Local hierarchy rebuilt — ${res.states} states cached offline.`,
+      });
+    } catch {
+      toast({ title: "Refresh failed", description: "Could not rebuild the local geography cache.", variant: "destructive" });
+    } finally {
+      setRefreshingGeo(false);
+    }
+  };
+
   return (
     <div className="space-y-4 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/[0.06] to-transparent p-4 sm:p-5">
 
