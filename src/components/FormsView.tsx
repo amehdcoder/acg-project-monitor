@@ -20,6 +20,7 @@ import SeeClearDashboard from "@/components/SeeClear/SeeClearDashboard";
 import { SEECLEAR_FORM_NAME, SEECLEAR_FORM_DESC, SEECLEAR_DASH_NAME, SEECLEAR_DASH_DESC } from "@/lib/seeclear/definition";
 import BmzFormFiller from "@/components/BMZ/BmzFormFiller";
 import BmzDashboard from "@/components/BMZ/BmzDashboard";
+import BmzAddToProjectDialog from "@/components/BMZ/BmzAddToProjectDialog";
 import { BMZ_FORM_NAME, BMZ_FORM_DESC, BMZ_DASH_NAME, BMZ_DASH_DESC } from "@/lib/bmz/definition";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
 import { ALL_STANDARD_FORMS } from "@/lib/standardAssessments/allStandardForms";
@@ -329,6 +330,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showSeeClearDash, setShowSeeClearDash] = useState(false);
   const [showBmzForm, setShowBmzForm] = useState(false);
   const [showBmzDash, setShowBmzDash] = useState(false);
+  const [showBmzAddDialog, setShowBmzAddDialog] = useState(false);
+  const [bmzProjectIds, setBmzProjectIds] = useState<Set<string>>(new Set());
+  const loadBmzAssignments = useCallback(async () => {
+    const { data } = await (supabase as any)
+      .from("bmz_project_assignments")
+      .select("project_id");
+    setBmzProjectIds(new Set<string>((data ?? []).map((r: any) => r.project_id)));
+  }, []);
+  useEffect(() => { loadBmzAssignments(); }, [loadBmzAssignments]);
   const [showAcsmForm, setShowAcsmForm] = useState(false);
   const [showAcsmDash, setShowAcsmDash] = useState(false);
   const [showSbcForm, setShowSbcForm] = useState(false);
@@ -4024,11 +4034,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     { kind: "seeclear_dash" as const, icon: BarChart3, bg: "bg-[#DCF3F0]", fg: "text-[#0f766e]", label: "Monitoring Dashboard", desc: "Readiness, equipment, referrals, data quality & map (Owner only)." },
                   ],
                 }] : []),
-                ...(isOwner ? [{
+                ...((isOwner || (currentProjectId && bmzProjectIds.has(currentProjectId))) ? [{
                   id: "bmz_folder",
                   title: "BMZ — Jigawa Inclusive Eye Health Project",
                   subtitle: "Monitoring checklist for Health Ambassadors, TBAs & CHEWs",
                   bg: "bg-[#DCF1EA]", fg: "text-[#0f6b52]", chipBg: "bg-[#DCF1EA]", chipFg: "text-[#0f6b52]",
+                  canAddToProject: isOwner || isAdmin,
                   items: [
                     { kind: "bmz_form" as const, icon: ClipboardCheck, bg: "bg-[#DCF1EA]", fg: "text-[#14b8a6]", label: "Eye Health Monitoring Checklist", desc: "Identification, training, service delivery, referrals, challenges & sign-off." },
                     { kind: "bmz_dash" as const, icon: BarChart3, bg: "bg-[#DCF1EA]", fg: "text-[#0f6b52]", label: "Monitoring Dashboard", desc: "Cadre performance, training, screening, referrals & flagged gaps (Owner only)." },
@@ -4133,6 +4144,18 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">{folder.title}</h4>
                         <p className="mt-0.5 line-clamp-2 text-xs sm:text-sm text-muted-foreground">{folder.subtitle}</p>
                       </div>
+                      {(folder as any).canAddToProject && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          title="Add to a project"
+                          onClick={(e) => { e.stopPropagation(); setShowBmzAddDialog(true); }}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setShowBmzAddDialog(true); } }}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0f6b52] text-white shadow-sm transition-transform hover:scale-105"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </span>
+                      )}
                       {(() => {
                         const total = folder.items.reduce((n, it: any) => n + (it.kind === "office" ? (it.codes?.length || 0) : 1), 0);
                         return (
@@ -4623,6 +4646,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         userId={user?.id}
         onCopied={() => currentProjectId && fetchForms(currentProjectId)}
       />
+
+      <BmzAddToProjectDialog
+        open={showBmzAddDialog}
+        onOpenChange={setShowBmzAddDialog}
+        projects={projects}
+        userId={user?.id}
+        onChanged={loadBmzAssignments}
+      />
+
 
       {/* Template Picker Dialog */}
       {showTemplatePicker && (

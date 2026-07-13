@@ -1409,6 +1409,35 @@ export type Database = {
         }
         Relationships: []
       }
+      bmz_project_assignments: {
+        Row: {
+          added_by: string | null
+          created_at: string
+          id: string
+          project_id: string
+        }
+        Insert: {
+          added_by?: string | null
+          created_at?: string
+          id?: string
+          project_id: string
+        }
+        Update: {
+          added_by?: string | null
+          created_at?: string
+          id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bmz_project_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_activities: {
         Row: {
           activity_type: string
