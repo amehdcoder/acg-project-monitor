@@ -329,6 +329,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showSeeClearDash, setShowSeeClearDash] = useState(false);
   const [showBmzForm, setShowBmzForm] = useState(false);
   const [showBmzDash, setShowBmzDash] = useState(false);
+  const [showBmzAddDialog, setShowBmzAddDialog] = useState(false);
+  const [bmzProjectIds, setBmzProjectIds] = useState<Set<string>>(new Set());
+  const loadBmzAssignments = useCallback(async () => {
+    const { data } = await (supabase as any)
+      .from("bmz_project_assignments")
+      .select("project_id");
+    setBmzProjectIds(new Set<string>((data ?? []).map((r: any) => r.project_id)));
+  }, []);
   const [showAcsmForm, setShowAcsmForm] = useState(false);
   const [showAcsmDash, setShowAcsmDash] = useState(false);
   const [showSbcForm, setShowSbcForm] = useState(false);
