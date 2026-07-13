@@ -45,6 +45,12 @@ interface PersonRow { offered?: string; swallowed?: string }
 interface HouseholdRecord {
   cdd_came?: string;
   anyone_treated?: string;
+  // New validated numeric keys from the Repeat Household Coverage Survey form.
+  eligible_persons?: number;
+  offered_drugs?: number;
+  actually_swallowed?: number;
+  // Legacy keys (kept for backward compatibility with older submissions).
+  eligible_count?: number;
   offered_count?: number;
   swallowed_count?: number;
   people?: PersonRow[];
@@ -74,17 +80,42 @@ interface SurveyRow {
 }
 
 /* ─────────────────────────── metrics ─────────────────────────── */
-const personsOffered = (h: HouseholdRecord) =>
-  Math.max(0, Math.round(Math.max(Number(h.offered_count) || 0, (h.people || []).filter((p) => norm(p.offered) === "y").length)));
+/** First finite, non-negative value among the supplied candidate keys. */
+const firstNum = (h: HouseholdRecord, keys: (keyof HouseholdRecord)[]) => {
+  for (const k of keys) {
+    const n = Number(h[k] as any);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
+};
+
+/** Eligible persons in the household — the therapeutic-coverage denominator. */
+const personsEligible = (h: HouseholdRecord) =>
+  Math.max(0, Math.round(firstNum(h, ["eligible_persons", "eligible_count"])));
+
+const personsOffered = (h: HouseholdRecord) => {
+  const raw = Math.max(
+    0,
+    Math.round(Math.max(firstNum(h, ["offered_drugs", "offered_count"]), (h.people || []).filter((p) => norm(p.offered) === "y").length)),
+  );
+  // The form strictly enforces offered ≤ eligible; clamp defensively for older rows.
+  const elig = personsEligible(h);
+  return elig > 0 ? Math.min(raw, elig) : raw;
+};
 /**
- * Treated (swallowed) persons can never exceed the eligible persons offered
- * treatment — clamp to the offered count to keep therapeutic coverage ≤ 100%
+ * Treated (swallowed) persons can never exceed the eligible persons in the
+ * household — clamp to the eligible count to keep therapeutic coverage ≤ 100%
  * and prevent impossible >100% aggregates at community/LGA level.
  */
 const personsSwallowed = (h: HouseholdRecord) => {
-  const raw = Math.max(0, Math.round(Math.max(Number(h.swallowed_count) || 0, (h.people || []).filter((p) => norm(p.swallowed) === "y").length)));
-  return Math.min(raw, personsOffered(h));
+  const raw = Math.max(
+    0,
+    Math.round(Math.max(firstNum(h, ["actually_swallowed", "swallowed_count"]), (h.people || []).filter((p) => norm(p.swallowed) === "y").length)),
+  );
+  const elig = personsEligible(h);
+  return elig > 0 ? Math.min(raw, elig) : Math.min(raw, personsOffered(h));
 };
+
 
 interface GeoRow {
   key: string; label: string; sub: string;
