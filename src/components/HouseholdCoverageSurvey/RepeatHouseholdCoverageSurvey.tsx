@@ -790,18 +790,49 @@ export default function RepeatHouseholdCoverageSurvey({
             />
           </QRow>
 
-          <QRow n={3} text="How many people were offered vs actually swallowed the drugs?">
-            <div className="flex flex-wrap gap-6">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Offered drugs</p>
-                <Stepper value={record.offered_count} onChange={(v) => update({ offered_count: v })} />
+          <QRow n={3} text="Drug coverage in this household">
+            <div className="space-y-4">
+              <div className="max-w-xs">
+                <p className="text-xs font-medium text-foreground mb-1">
+                  Eligible persons in the household <span className="text-destructive">*</span>
+                </p>
+                <Input
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={record.eligible_count ? String(record.eligible_count) : ""}
+                  onChange={(e) => {
+                    const n = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                    update({ eligible_count: n });
+                  }}
+                  placeholder="e.g. 5"
+                  aria-invalid={eligibleMissing || countError}
+                  className={`text-base ${eligibleMissing || countError ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                />
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Actually swallowed</p>
-                <Stepper value={record.swallowed_count} onChange={(v) => update({ swallowed_count: v })} />
+              <div className="flex flex-wrap gap-6">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Offered drugs <span className="text-destructive">*</span>
+                  </p>
+                  <Stepper value={record.offered_count} onChange={(v) => update({ offered_count: v })} />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Actually swallowed <span className="text-destructive">*</span>
+                  </p>
+                  <Stepper value={record.swallowed_count} onChange={(v) => update({ swallowed_count: v })} />
+                </div>
               </div>
+              {countValidationMessage && (
+                <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{countValidationMessage}</span>
+                </div>
+              )}
             </div>
           </QRow>
+
 
           {/* Q4 roster */}
           <QRow n={4} text="For each person in the household, please tell me:">
