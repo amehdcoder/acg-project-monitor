@@ -179,9 +179,19 @@ Deno.serve(async (req) => {
     } else if (kind === 'rest_api') {
       const url = String(config.url ?? '')
       if (!/^https?:\/\//.test(url)) throw new Error('Invalid API URL')
+      const safeUrl = await assertSafeUrl(url)
       const method = (String(config.method ?? 'GET').toUpperCase())
-      const headers = (config.headers ?? {}) as Record<string, string>
-      const resp = await fetch(url, { method, headers })
+      // Only allow safe read methods and a minimal, controlled set of headers.
+      if (method !== 'GET' && method !== 'HEAD') {
+        throw new Error('Only GET/HEAD requests are permitted for REST sources')
+      }
+      const rawHeaders = (config.headers ?? {}) as Record<string, string>
+      const ALLOWED_HEADERS = new Set(['authorization', 'accept', 'x-api-key'])
+      const headers: Record<string, string> = {}
+      for (const [k, v] of Object.entries(rawHeaders)) {
+        if (ALLOWED_HEADERS.has(k.toLowerCase())) headers[k] = String(v)
+      }
+      const resp = await fetch(safeUrl.toString(), { method, headers, redirect: 'error' })
       if (!resp.ok) throw new Error(`API request failed (${resp.status})`)
       const json = await resp.json()
       let arr = getByPath(json, config.jsonPath as string | undefined)
