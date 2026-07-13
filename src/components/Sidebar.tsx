@@ -23,6 +23,7 @@ interface Profile {
   last_name: string;
   designation: string;
   other_designation?: string | null;
+  has_quiz_access?: boolean;
 }
 
 interface SidebarProps {
@@ -158,6 +159,8 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
       if (minimalAccess) {
         return ["forms", "project-chat", "my-submissions"].includes(item.id);
       }
+      // Quizzes: regular users see it only when granted Quiz Page Access.
+      if (item.id === "quizzes") return !!profile?.has_quiz_access;
       if (DEFAULT_USER_PAGES.includes(item.id)) return true;
       if ((item as any).adhocOnly) return false; // my-submissions stays adhoc-only
       return canAccessPage ? canAccessPage(item.id) : false;
