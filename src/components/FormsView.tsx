@@ -2497,7 +2497,56 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                       </p>
                     </div>
                   ) : (
-                    <>
+                     <>
+                {bmzFolderVisible && (
+                  <div className="border-b border-border/60 bg-[#F4FBF8] p-3 sm:p-4">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-bold text-[#0f6b52]">BMZ — Jigawa Inclusive Eye Health Project</p>
+                        <p className="truncate text-xs text-muted-foreground">Monitoring checklist for Health Ambassadors, TBAs &amp; CHEWs</p>
+                      </div>
+                      {(isOwner || isAdmin) && (
+                        <button
+                          type="button"
+                          onClick={() => setShowBmzAddDialog(true)}
+                          className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[#0f6b52] px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-[#0c5a45]"
+                        >
+                          <Plus className="h-3.5 w-3.5" /> Add to project
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowBmzForm(true)}
+                        className="group flex items-start gap-3 rounded-2xl border border-[#0f6b52]/20 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                      >
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#DCF1EA]">
+                          <ClipboardCheck className="h-6 w-6 text-[#14b8a6]" strokeWidth={2.2} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[15px] font-extrabold leading-snug text-[#0f6b52]">Eye Health Monitoring Checklist</span>
+                          <span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">Identification, training, service delivery, referrals, challenges &amp; sign-off.</span>
+                        </span>
+                        <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowBmzDash(true)}
+                        className="group flex items-start gap-3 rounded-2xl border border-[#0f6b52]/20 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                      >
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#DCF1EA]">
+                          <BarChart3 className="h-6 w-6 text-[#0f6b52]" strokeWidth={2.2} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[15px] font-extrabold leading-snug text-[#0f6b52]">Monitoring Dashboard</span>
+                          <span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">Cadre performance, training, screening, referrals &amp; flagged gaps.</span>
+                        </span>
+                        <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {shouldShowSarmaanSupervisoryBlock && (
                   <div className="border-b border-border/60 bg-[#F8FAFD] p-3 sm:p-4">
                     {primarySarmaanSupervisoryForm ? (
