@@ -5783,6 +5783,7 @@ export type Database = {
           device_phone_number: string | null
           email: string
           first_name: string
+          has_quiz_access: boolean
           has_seen_tour: boolean
           id: string
           is_active: boolean
@@ -5814,6 +5815,7 @@ export type Database = {
           device_phone_number?: string | null
           email: string
           first_name: string
+          has_quiz_access?: boolean
           has_seen_tour?: boolean
           id?: string
           is_active?: boolean
@@ -5845,6 +5847,7 @@ export type Database = {
           device_phone_number?: string | null
           email?: string
           first_name?: string
+          has_quiz_access?: boolean
           has_seen_tour?: boolean
           id?: string
           is_active?: boolean
@@ -6218,6 +6221,7 @@ export type Database = {
           created_at: string | null
           id: string
           percentage: number
+          project_id: string | null
           quiz_id: string
           score: number
           started_at: string | null
@@ -6231,6 +6235,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           percentage?: number
+          project_id?: string | null
           quiz_id: string
           score?: number
           started_at?: string | null
@@ -6244,6 +6249,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           percentage?: number
+          project_id?: string | null
           quiz_id?: string
           score?: number
           started_at?: string | null
@@ -6251,6 +6257,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "quiz_attempts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "quiz_attempts_quiz_id_fkey"
             columns: ["quiz_id"]
@@ -8287,6 +8300,7 @@ export type Database = {
         Args: { _page_id: string; _user_id: string }
         Returns: boolean
       }
+      has_quiz_page_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
