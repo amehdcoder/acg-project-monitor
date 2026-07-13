@@ -23,6 +23,7 @@ const TABLE_BY_FORM: Record<string, string> = {
   [BLOOMBERG_FORM_ID]: "bloomberg_validations",
   bloomberg_enrolment: "bloomberg_validations",
   [SEECLEAR_FORM_ID]: "seeclear_monitoring",
+  [BMZ_FORM_ID]: "bmz_monitoring",
 };
 
 let running = false;
