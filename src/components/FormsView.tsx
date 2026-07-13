@@ -1514,6 +1514,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   })();
 
   const currentProject = projects.find(p => p.id === currentProjectId);
+
+  // BMZ folder visibility: Owners always; otherwise anyone who belongs to a
+  // project the BMZ module has been added to (matches the current project OR
+  // any of the user's accessible projects, so it shows even before a project
+  // is explicitly selected).
+  const bmzFolderVisible =
+    isOwner ||
+    (!!currentProjectId && bmzProjectIds.has(currentProjectId)) ||
+    projects.some((p) => bmzProjectIds.has(p.id));
   const sarmaanSupervisoryForms = useMemo(
     () => mergedForms.filter((form) => isSupervisoryLearningForm({ settings: form.settings, name: form.name })),
     [mergedForms],
@@ -4034,7 +4043,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     { kind: "seeclear_dash" as const, icon: BarChart3, bg: "bg-[#DCF3F0]", fg: "text-[#0f766e]", label: "Monitoring Dashboard", desc: "Readiness, equipment, referrals, data quality & map (Owner only)." },
                   ],
                 }] : []),
-                ...((isOwner || (currentProjectId && bmzProjectIds.has(currentProjectId))) ? [{
+                ...(bmzFolderVisible ? [{
                   id: "bmz_folder",
                   title: "BMZ — Jigawa Inclusive Eye Health Project",
                   subtitle: "Monitoring checklist for Health Ambassadors, TBAs & CHEWs",
