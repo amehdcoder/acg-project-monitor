@@ -1274,6 +1274,141 @@ export type Database = {
           },
         ]
       }
+      bmz_monitoring: {
+        Row: {
+          action_points: string | null
+          cadre: string | null
+          challenges: Json
+          client_submitted_at: string | null
+          community_ward: string | null
+          compliance_score: number | null
+          created_at: string
+          date_of_visit: string | null
+          eye_poster: string | null
+          gatherings_count: number | null
+          gps_accuracy: number | null
+          gps_lat: number | null
+          gps_lng: number | null
+          id: string
+          last_training_date: string | null
+          lga: string | null
+          linked_facility: string | null
+          monitor_id: string
+          no_referrals: boolean | null
+          num_referrals: number | null
+          primary_activities: Json
+          primary_activity_other: string | null
+          readiness_band: string | null
+          referrals_evidence: boolean | null
+          refresher_status: string | null
+          register_reason: string | null
+          register_updated: boolean | null
+          respondent_name: string | null
+          respondent_sig_date: string | null
+          screening_kits: string | null
+          sex: string | null
+          state: string | null
+          state_supervisor: string | null
+          status: string
+          submission_uuid: string | null
+          suggestions: Json
+          supervisor_comments: string | null
+          supervisor_name: string | null
+          supervisor_sig_date: string | null
+          total_screened: number | null
+          trained_eye_care: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          action_points?: string | null
+          cadre?: string | null
+          challenges?: Json
+          client_submitted_at?: string | null
+          community_ward?: string | null
+          compliance_score?: number | null
+          created_at?: string
+          date_of_visit?: string | null
+          eye_poster?: string | null
+          gatherings_count?: number | null
+          gps_accuracy?: number | null
+          gps_lat?: number | null
+          gps_lng?: number | null
+          id?: string
+          last_training_date?: string | null
+          lga?: string | null
+          linked_facility?: string | null
+          monitor_id?: string
+          no_referrals?: boolean | null
+          num_referrals?: number | null
+          primary_activities?: Json
+          primary_activity_other?: string | null
+          readiness_band?: string | null
+          referrals_evidence?: boolean | null
+          refresher_status?: string | null
+          register_reason?: string | null
+          register_updated?: boolean | null
+          respondent_name?: string | null
+          respondent_sig_date?: string | null
+          screening_kits?: string | null
+          sex?: string | null
+          state?: string | null
+          state_supervisor?: string | null
+          status?: string
+          submission_uuid?: string | null
+          suggestions?: Json
+          supervisor_comments?: string | null
+          supervisor_name?: string | null
+          supervisor_sig_date?: string | null
+          total_screened?: number | null
+          trained_eye_care?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          action_points?: string | null
+          cadre?: string | null
+          challenges?: Json
+          client_submitted_at?: string | null
+          community_ward?: string | null
+          compliance_score?: number | null
+          created_at?: string
+          date_of_visit?: string | null
+          eye_poster?: string | null
+          gatherings_count?: number | null
+          gps_accuracy?: number | null
+          gps_lat?: number | null
+          gps_lng?: number | null
+          id?: string
+          last_training_date?: string | null
+          lga?: string | null
+          linked_facility?: string | null
+          monitor_id?: string
+          no_referrals?: boolean | null
+          num_referrals?: number | null
+          primary_activities?: Json
+          primary_activity_other?: string | null
+          readiness_band?: string | null
+          referrals_evidence?: boolean | null
+          refresher_status?: string | null
+          register_reason?: string | null
+          register_updated?: boolean | null
+          respondent_name?: string | null
+          respondent_sig_date?: string | null
+          screening_kits?: string | null
+          sex?: string | null
+          state?: string | null
+          state_supervisor?: string | null
+          status?: string
+          submission_uuid?: string | null
+          suggestions?: Json
+          supervisor_comments?: string | null
+          supervisor_name?: string | null
+          supervisor_sig_date?: string | null
+          total_screened?: number | null
+          trained_eye_care?: boolean | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       case_activities: {
         Row: {
           activity_type: string
