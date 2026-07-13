@@ -19,6 +19,7 @@ export interface SubmissionRecord {
   user_id: string;
   submitter_name: string;
   location: string;
+  raw_location?: Record<string, any> | null;
   state: string | null;
   submitted_at: string;
   status: string;
@@ -405,6 +406,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
           user_id: s.user_id,
           submitter_name: profileMap.get(s.user_id) || "Unknown",
           location,
+          raw_location: (s.location && typeof s.location === "object" ? s.location : null) as Record<string, any> | null,
           state,
           submitted_at: s.submitted_at || s.created_at,
           status: s.status,

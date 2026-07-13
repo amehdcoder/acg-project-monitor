@@ -8,7 +8,8 @@
  * network or recomputation is needed to render from it.
  */
 
-const PREFIX = "mda-dashboard-cache:";
+const LEGACY_PREFIX = "mda-dashboard-cache:";
+const PREFIX = "mda-dashboard-cache:v2:";
 const MAX_ROWS = 5000; // keep localStorage payloads bounded
 
 export interface MdaCachePayload {
@@ -48,6 +49,22 @@ export function clearMdaCache(formId: string): void {
   if (!formId) return;
   try {
     localStorage.removeItem(PREFIX + formId);
+    localStorage.removeItem(LEGACY_PREFIX + formId);
+  } catch {
+    // storage unavailable — clearing is best-effort
+  }
+}
+
+export function clearLegacyMdaCache(formId?: string): void {
+  try {
+    if (formId) {
+      localStorage.removeItem(LEGACY_PREFIX + formId);
+      return;
+    }
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(LEGACY_PREFIX)) localStorage.removeItem(key);
+    }
   } catch {
     // storage unavailable — clearing is best-effort
   }

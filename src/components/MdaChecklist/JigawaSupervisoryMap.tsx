@@ -20,7 +20,7 @@ export interface JigawaSubmissionLite {
   lga?: string | null;
   submitter?: string | null;
   submittedAt?: string | null;
-  location?: { latitude?: number; longitude?: number } | null;
+  location?: { latitude?: number; longitude?: number; lat?: number; lng?: number; lon?: number; long?: number } | string | null;
 }
 
 interface Props {
@@ -44,6 +44,44 @@ const prettyLga = (raw: string) => LGA_LABEL[norm(raw)] ?? raw;
 
 const SATELLITE_TILE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const SATELLITE_ATTRIBUTION = "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community";
+const JIGAWA_BOUNDS = { minLat: 11.55, maxLat: 13.35, minLng: 8.0, maxLng: 10.6 };
+
+const inJigawaBounds = (lat: number, lng: number) =>
+  lat >= JIGAWA_BOUNDS.minLat && lat <= JIGAWA_BOUNDS.maxLat && lng >= JIGAWA_BOUNDS.minLng && lng <= JIGAWA_BOUNDS.maxLng;
+
+const isFiniteCoord = (lat: number, lng: number) =>
+  Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+
+function parsePointLocation(raw: JigawaSubmissionLite["location"]): { lat: number; lng: number; source: string; inverted: boolean } | null {
+  let value: unknown = raw;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === "[]") return null;
+    if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+      try { value = JSON.parse(trimmed); } catch { /* fall through to regex */ }
+    }
+    if (typeof value === "string") {
+      const m = trimmed.match(/(-?\d{1,3}(?:\.\d+)?)\s*[,\s]\s*(-?\d{1,3}(?:\.\d+)?)/);
+      if (!m) return null;
+      value = { lat: Number(m[1]), lng: Number(m[2]) };
+    }
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) return null;
+    if (value.length >= 2 && value.every((v) => typeof v === "number" || typeof v === "string")) {
+      value = { lat: Number(value[0]), lng: Number(value[1]) };
+    } else {
+      value = value.find((v) => v && typeof v === "object") ?? null;
+    }
+  }
+  if (!value || typeof value !== "object") return null;
+  const p = value as Record<string, unknown>;
+  const lat = Number(p.latitude ?? p.lat);
+  const lng = Number(p.longitude ?? p.lng ?? p.lon ?? p.long);
+  if (isFiniteCoord(lat, lng)) return { lat, lng, source: p.latitude !== undefined ? "latitude/longitude" : "lat/lng", inverted: false };
+  if (isFiniteCoord(lng, lat)) return { lat: lng, lng: lat, source: "inverted-autocorrect", inverted: true };
+  return null;
+}
 
 // Ray-casting point-in-polygon, handling Polygon + MultiPolygon rings.
 function pointInFeature(lat: number, lng: number, geom: any): boolean {
@@ -84,20 +122,51 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
   const liveRef = useRef<L.Marker | null>(null);
 
   const points = useMemo(
-    () =>
-      submissions
+    () => {
+      const rejected: Array<{ id: string; lga: string | null; raw: unknown; reason: string }> = [];
+      let baburaSeen = 0;
+      let baburaAccepted = 0;
+      let baburaOutOfBounds = 0;
+      let inverted = 0;
+      const parsed = submissions
         .map((s) => {
-          let lat = Number(s.location?.latitude);
-          let lng = Number(s.location?.longitude);
-          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-          // Reject the null-island sentinel used for empty GPS.
-          if (lat === 0 && lng === 0) return null;
-          // Auto-correct an obvious lat/lng swap (Jigawa lat≈12, lng≈9).
-          if (Math.abs(lat) > 90 && Math.abs(lng) <= 90) { const t = lat; lat = lng; lng = t; }
-          if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
-          return { id: s.id, lat, lng, submitter: s.submitter || "—", at: s.submittedAt, lga: s.lga || null };
+          const isBabura = norm(s.lga) === "babura";
+          if (isBabura) baburaSeen += 1;
+          const loc = parsePointLocation(s.location);
+          if (!loc) {
+            rejected.push({ id: s.id, lga: s.lga || null, raw: s.location, reason: "missing-or-unparseable-coordinate" });
+            return null;
+          }
+          if (loc.inverted) inverted += 1;
+          if (isBabura && !inJigawaBounds(loc.lat, loc.lng)) baburaOutOfBounds += 1;
+          if (isBabura) baburaAccepted += 1;
+          return {
+            id: s.id,
+            lat: loc.lat,
+            lng: loc.lng,
+            submitter: s.submitter || "—",
+            at: s.submittedAt,
+            lga: s.lga || null,
+            source: loc.source,
+            outsideJigawaBounds: !inJigawaBounds(loc.lat, loc.lng),
+          };
         })
-        .filter(Boolean) as { id: string; lat: number; lng: number; submitter: string; at?: string | null; lga: string | null }[],
+        .filter(Boolean) as { id: string; lat: number; lng: number; submitter: string; at?: string | null; lga: string | null; source: string; outsideJigawaBounds: boolean }[];
+
+      if (typeof console !== "undefined" && /localhost|lovable/i.test(window.location.host)) {
+        console.info("[JigawaSupervisoryMap] Babura GPS trace", {
+          totalSubmissions: submissions.length,
+          acceptedPoints: parsed.length,
+          baburaSeen,
+          baburaAccepted,
+          baburaOutOfBounds,
+          invertedAutocorrected: inverted,
+          rejectedBabura: rejected.filter((r) => norm(r.lga) === "babura").slice(0, 10),
+          sampleBaburaPoints: parsed.filter((p) => norm(p.lga) === "babura").slice(0, 10),
+        });
+      }
+      return parsed;
+    },
     [submissions],
   );
 
@@ -202,14 +271,21 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
     );
     group.addLayer(gj);
 
-    // GPS markers at the captured coordinates.
+    // GPS markers at the captured coordinates. Do not reject valid points simply
+    // because they fall outside the strict Jigawa polygon/bounds; the fitted map
+    // expands to include them so inverted/off-boundary ledger captures are visible
+    // instead of silently disappearing.
     for (const p of points) {
       const m = L.circleMarker([p.lat, p.lng], {
-        radius: 5, color: "#fff", weight: 1.5, fillColor: "#ef4444", fillOpacity: 0.95,
+        radius: p.outsideJigawaBounds ? 7 : 5,
+        color: p.outsideJigawaBounds ? "#f59e0b" : "#fff",
+        weight: p.outsideJigawaBounds ? 2.2 : 1.5,
+        fillColor: p.outsideJigawaBounds ? "#f97316" : "#ef4444",
+        fillOpacity: 0.95,
       }).bindPopup(
         `<div style="font-size:12px"><strong>${p.lga ? prettyLga(p.lga) : "Captured GPS"}</strong><br/>` +
           `By: ${p.submitter}<br/>${p.at ? new Date(p.at).toLocaleString() : ""}<br/>` +
-          `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</div>`,
+          `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}<br/>Source: ${p.source}${p.outsideJigawaBounds ? "<br/><strong>Outside strict Jigawa bounds</strong>" : ""}</div>`,
       );
       group.addLayer(m);
       // Ensure every valid GPS point is inside the fitted view — even if it
