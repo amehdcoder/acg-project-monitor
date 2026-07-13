@@ -4144,6 +4144,18 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">{folder.title}</h4>
                         <p className="mt-0.5 line-clamp-2 text-xs sm:text-sm text-muted-foreground">{folder.subtitle}</p>
                       </div>
+                      {(folder as any).canAddToProject && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          title="Add to a project"
+                          onClick={(e) => { e.stopPropagation(); setShowBmzAddDialog(true); }}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setShowBmzAddDialog(true); } }}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0f6b52] text-white shadow-sm transition-transform hover:scale-105"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </span>
+                      )}
                       {(() => {
                         const total = folder.items.reduce((n, it: any) => n + (it.kind === "office" ? (it.codes?.length || 0) : 1), 0);
                         return (
