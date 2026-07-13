@@ -45,6 +45,12 @@ interface PersonRow { offered?: string; swallowed?: string }
 interface HouseholdRecord {
   cdd_came?: string;
   anyone_treated?: string;
+  // New validated numeric keys from the Repeat Household Coverage Survey form.
+  eligible_persons?: number;
+  offered_drugs?: number;
+  actually_swallowed?: number;
+  // Legacy keys (kept for backward compatibility with older submissions).
+  eligible_count?: number;
   offered_count?: number;
   swallowed_count?: number;
   people?: PersonRow[];
@@ -74,23 +80,48 @@ interface SurveyRow {
 }
 
 /* ─────────────────────────── metrics ─────────────────────────── */
-const personsOffered = (h: HouseholdRecord) =>
-  Math.max(0, Math.round(Math.max(Number(h.offered_count) || 0, (h.people || []).filter((p) => norm(p.offered) === "y").length)));
+/** First finite, non-negative value among the supplied candidate keys. */
+const firstNum = (h: HouseholdRecord, keys: (keyof HouseholdRecord)[]) => {
+  for (const k of keys) {
+    const n = Number(h[k] as any);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
+};
+
+/** Eligible persons in the household — the therapeutic-coverage denominator. */
+const personsEligible = (h: HouseholdRecord) =>
+  Math.max(0, Math.round(firstNum(h, ["eligible_persons", "eligible_count"])));
+
+const personsOffered = (h: HouseholdRecord) => {
+  const raw = Math.max(
+    0,
+    Math.round(Math.max(firstNum(h, ["offered_drugs", "offered_count"]), (h.people || []).filter((p) => norm(p.offered) === "y").length)),
+  );
+  // The form strictly enforces offered ≤ eligible; clamp defensively for older rows.
+  const elig = personsEligible(h);
+  return elig > 0 ? Math.min(raw, elig) : raw;
+};
 /**
- * Treated (swallowed) persons can never exceed the eligible persons offered
- * treatment — clamp to the offered count to keep therapeutic coverage ≤ 100%
+ * Treated (swallowed) persons can never exceed the eligible persons in the
+ * household — clamp to the eligible count to keep therapeutic coverage ≤ 100%
  * and prevent impossible >100% aggregates at community/LGA level.
  */
 const personsSwallowed = (h: HouseholdRecord) => {
-  const raw = Math.max(0, Math.round(Math.max(Number(h.swallowed_count) || 0, (h.people || []).filter((p) => norm(p.swallowed) === "y").length)));
-  return Math.min(raw, personsOffered(h));
+  const raw = Math.max(
+    0,
+    Math.round(Math.max(firstNum(h, ["actually_swallowed", "swallowed_count"]), (h.people || []).filter((p) => norm(p.swallowed) === "y").length)),
+  );
+  const elig = personsEligible(h);
+  return elig > 0 ? Math.min(raw, elig) : Math.min(raw, personsOffered(h));
 };
+
 
 interface GeoRow {
   key: string; label: string; sub: string;
   households: number;
   cddYes: number; treatedYes: number;
-  offered: number; swallowed: number;
+  eligible: number; offered: number; swallowed: number;
   txTest: BenchmarkTest | null;
   hhTest: BenchmarkTest | null;
 }
@@ -107,7 +138,7 @@ function aggregateGeo(surveys: SurveyRow[], level: "community" | "lga", txB: num
         key,
         label: level === "lga" ? (s.lga || "—") : (s.community_name || "Unspecified"),
         sub: level === "lga" ? (s.state || "—") : `${s.lga || "—"} · ${s.ward || "—"} · ${s.flhf_name || "—"}`,
-        households: 0, cddYes: 0, treatedYes: 0, offered: 0, swallowed: 0, txTest: null, hhTest: null,
+        households: 0, cddYes: 0, treatedYes: 0, eligible: 0, offered: 0, swallowed: 0, txTest: null, hhTest: null,
       };
       map.set(key, r);
     }
@@ -115,17 +146,22 @@ function aggregateGeo(surveys: SurveyRow[], level: "community" | "lga", txB: num
       r.households += 1;
       if (norm(h.cdd_came) === "yes") r.cddYes += 1;
       if (norm(h.anyone_treated) === "yes") r.treatedYes += 1;
+      r.eligible += personsEligible(h);
       r.offered += personsOffered(h);
       r.swallowed += personsSwallowed(h);
     }
   }
   const rows = [...map.values()].map((r) => {
-    r.txTest = r.offered > 0 ? testAgainstBenchmark(r.swallowed, r.offered, txB) : null;
+    // Therapeutic coverage = swallowed ÷ eligible persons (fall back to offered
+    // only for legacy rows that never captured an eligible count).
+    const denom = r.eligible > 0 ? r.eligible : r.offered;
+    r.txTest = denom > 0 ? testAgainstBenchmark(r.swallowed, denom, txB) : null;
     r.hhTest = r.households > 0 ? testAgainstBenchmark(r.cddYes, r.households, hhB) : null;
     return r;
   });
-  return rows.sort((a, b) => pct(a.swallowed, a.offered) - pct(b.swallowed, b.offered));
+  return rows.sort((a, b) => pct(a.swallowed, a.eligible > 0 ? a.eligible : a.offered) - pct(b.swallowed, b.eligible > 0 ? b.eligible : b.offered));
 }
+
 
 /* Rich tooltip: shows the full geography name plus its LGA · Ward · FLHF path. */
 function GeoChartTooltip({ active, payload, txBenchmark }: any) {
@@ -307,10 +343,14 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
     const totalHh = allHh.length;
     const cddYes = allHh.filter((h) => norm(h.cdd_came) === "yes").length;
     const treatedYes = allHh.filter((h) => norm(h.anyone_treated) === "yes").length;
+    const eligible = allHh.reduce((a, h) => a + personsEligible(h), 0);
     const offered = allHh.reduce((a, h) => a + personsOffered(h), 0);
     const swallowed = allHh.reduce((a, h) => a + personsSwallowed(h), 0);
 
-    const txTest = offered > 0 ? testAgainstBenchmark(swallowed, offered, txBenchmark) : null;
+    // Therapeutic Coverage Rate = actually_swallowed ÷ eligible_persons.
+    // Fall back to offered only for legacy rows lacking an eligible count.
+    const txDenom = eligible > 0 ? eligible : offered;
+    const txTest = txDenom > 0 ? testAgainstBenchmark(swallowed, txDenom, txBenchmark) : null;
     const hhTest = totalHh > 0 ? testAgainstBenchmark(cddYes, totalHh, hhBenchmark) : null;
 
     const count = (key: keyof HouseholdRecord, val: string) => allHh.filter((h) => norm(h[key] as any) === val).length;
@@ -358,7 +398,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
       name: r.label.length > 16 ? r.label.slice(0, 15) + "…" : r.label,
       fullName: r.label,
       sub: r.sub,
-      tx: Math.round(pct(r.swallowed, r.offered) * 10) / 10,
+      tx: Math.round(Math.min(100, pct(r.swallowed, r.eligible > 0 ? r.eligible : r.offered)) * 10) / 10,
       reach: Math.round(pct(r.cddYes, r.households) * 10) / 10,
     }));
 
@@ -377,8 +417,10 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
 
     return {
       communitySampled,
-      totalSurveys: rows.length, totalHh, cddYes, treatedYes, offered, swallowed,
-      reachPct: pct(cddYes, totalHh), txPct: pct(swallowed, offered), treatPct: pct(treatedYes, totalHh),
+      totalSurveys: rows.length, totalHh, cddYes, treatedYes, eligible, offered, swallowed,
+      reachPct: pct(cddYes, totalHh),
+      txPct: Math.min(100, pct(swallowed, txDenom)),
+      treatPct: pct(treatedYes, totalHh),
       txTest, hhTest, satisfaction, height, sideEffects, cdd,
       aeCount: aeYes.length, aeReported, satisfiedPct,
       suggestions, reasons, aeDetails, geoRows, chartRows,
@@ -451,7 +493,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
           <Kpi label="Surveys" value={a.totalSurveys.toLocaleString()} sub={`${a.communities} communities · ${a.lgas} LGAs`} icon={MapPinned} tint={SLATE} />
           <Kpi label="Households" value={a.totalHh.toLocaleString()} icon={Home} tint={TEAL} />
           <Kpi label="Household reach" value={`${a.reachPct.toFixed(1)}%`} sub={`${a.cddYes}/${a.totalHh} visited by CDD`} icon={Users2} tint={BLUE} />
-          <Kpi label="Therapeutic coverage" value={`${a.txPct.toFixed(1)}%`} sub={`${a.swallowed}/${a.offered} swallowed`} icon={Pill} tint={EMERALD} />
+          <Kpi label="Therapeutic Coverage Rate" value={`${a.txPct.toFixed(1)}%`} sub={`${a.swallowed.toLocaleString()}/${(a.eligible > 0 ? a.eligible : a.offered).toLocaleString()} swallowed ÷ eligible`} icon={Pill} tint={EMERALD} />
           <Kpi label="Households treated" value={`${a.treatPct.toFixed(1)}%`} sub={`${a.treatedYes}/${a.totalHh}`} icon={CheckCircle2} tint={AMBER} />
           <Kpi label="Satisfaction" value={`${a.satisfiedPct.toFixed(0)}%`} sub="satisfied or very" icon={Smile} tint={PURPLE} />
         </CardContent>
@@ -461,7 +503,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
       <Section title="Coverage Inference (95% Confidence Intervals)" icon={Percent} tint={EMERALD} badge={`n=${a.totalHh}`}>
         <div className="grid gap-3 pt-3 sm:grid-cols-2">
           {[
-            { name: "Therapeutic coverage", obs: a.txPct, test: a.txTest, benchmark: txBenchmark, formula: `${a.swallowed.toLocaleString()} swallowed ÷ ${a.offered.toLocaleString()} offered`, has: a.offered > 0 },
+            { name: "Therapeutic coverage", obs: a.txPct, test: a.txTest, benchmark: txBenchmark, formula: `${a.swallowed.toLocaleString()} swallowed ÷ ${(a.eligible > 0 ? a.eligible : a.offered).toLocaleString()} eligible persons`, has: (a.eligible > 0 ? a.eligible : a.offered) > 0 },
             { name: "Household reach", obs: a.reachPct, test: a.hhTest, benchmark: hhBenchmark, formula: `${a.cddYes.toLocaleString()} CDD-visited ÷ ${a.totalHh.toLocaleString()} households`, has: a.totalHh > 0 },
           ].map((b) => {
             const tint = !b.test ? SLATE : b.test.ciBelow ? RED : b.test.ciAbove ? EMERALD : AMBER;
@@ -538,7 +580,8 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
             <tbody>
               {a.geoRows.map((r, i) => {
                 const reachV = pct(r.cddYes, r.households);
-                const txV = pct(r.swallowed, r.offered);
+                const txDenomR = r.eligible > 0 ? r.eligible : r.offered;
+                const txV = Math.min(100, pct(r.swallowed, txDenomR));
                 const txOk = txV >= txBenchmark;
                 const reachOk = reachV >= hhBenchmark;
                 return (
@@ -554,7 +597,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
                     </span>
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {r.offered > 0 ? (
+                    {txDenomR > 0 ? (
                       <span className="inline-block rounded-md px-2 py-0.5 text-[11px] font-bold tabular-nums" style={{ background: `${(txOk ? EMERALD : RED)}1a`, color: txOk ? EMERALD : RED }}>
                         {txV.toFixed(0)}%
                       </span>
