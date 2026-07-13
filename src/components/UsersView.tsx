@@ -96,6 +96,7 @@ interface UserProfile {
   is_owner: boolean;
   approval_status: string | null;
   created_at: string | null;
+  has_quiz_access?: boolean;
 }
 
 interface UserRole {
