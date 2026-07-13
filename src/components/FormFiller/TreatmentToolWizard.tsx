@@ -366,9 +366,11 @@ const CommunitySummaryWizard = (p: InnerProps) => {
             "estimated_total_population, estimated_children_0_4, estimated_children_5_14, estimated_adults_15_plus, number_of_households, trachoma_0_5_months, trachoma_6m_6y, trachoma_7_14y, settlement_name",
           )
           .eq("community_name", selCommunity);
-        if (selState) q = q.eq("state", selState);
-        if (selLga) q = q.eq("lga", selLga);
-        if (selWard) q = q.eq("ward", selWard);
+        if (selState) q = q.ilike("state", selState.trim());
+        // Case-insensitive, whitespace-tolerant LGA match so values from the
+        // offline deep-rewriting ledger (e.g. " Babura", "babura") still resolve.
+        if (selLga) q = q.ilike("lga", selLga.trim());
+        if (selWard) q = q.ilike("ward", selWard.trim());
         if (selFlhf) q = q.eq("flhf_name", selFlhf);
         const { data } = await q.limit(100);
         let row = (data || [])[0] || null;
