@@ -88,12 +88,22 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get target user's profile for audit log
+    // Get target user's profile for audit log and privilege checks
     const { data: targetProfile } = await adminClient
       .from("profiles")
-      .select("first_name, last_name, email")
+      .select("first_name, last_name, email, is_owner, is_co_owner")
       .eq("user_id", target_user_id)
       .maybeSingle();
+
+    // Never allow impersonating the Owner or Co-owner. This mirrors the
+    // protection in admin-delete-user and prevents a super_admin from
+    // inheriting full Owner privileges by logging in as the Owner.
+    if (targetProfile?.is_owner || targetProfile?.is_co_owner) {
+      return new Response(
+        JSON.stringify({ error: "Cannot impersonate the Owner or Co-owner account" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const { data: adminProfile } = await adminClient
       .from("profiles")

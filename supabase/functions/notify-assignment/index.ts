@@ -1,12 +1,25 @@
 // Sends a professional notification email to a user when they are assigned
 // to a new project or form(s). Delegates actual delivery to send-email-smtp.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { guardRequest } from "../_shared/authGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-worker-secret",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+// Escapes user-supplied strings before interpolating into the HTML email body
+// to prevent HTML/content injection.
+function escapeHtml(input: unknown): string {
+  return String(input ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 const PRIMARY = "#0F766E";
 const ACCENT = "#B45309";
@@ -23,7 +36,7 @@ function renderEmail(opts: {
   items: string[];
 }): { subject: string; html: string } {
   const { firstName, kind, items } = opts;
-  const greeting = firstName ? `Dear ${firstName},` : "Hello,";
+  const greeting = firstName ? `Dear ${escapeHtml(firstName)},` : "Hello,";
   const label = kind === "project" ? "project" : "form";
   const plural = items.length > 1 ? `${label}s` : label;
   const heading =
@@ -33,7 +46,7 @@ function renderEmail(opts: {
   const list = items
     .map(
       (i) =>
-        `<li style="margin:0 0 6px;padding:0;font-size:15px;color:${TEXT};">${i}</li>`,
+        `<li style="margin:0 0 6px;padding:0;font-size:15px;color:${TEXT};">${escapeHtml(i)}</li>`,
     )
     .join("");
 
@@ -87,6 +100,12 @@ function renderEmail(opts: {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
+    // Only admins (or trusted server callers via service role / cron secret)
+    // may trigger assignment notification emails. This prevents anyone on the
+    // internet from sending branded emails to arbitrary addresses.
+    const guard = await guardRequest(req, corsHeaders, { requireAdmin: true });
+    if (guard.response) return guard.response;
+
     const body = await req.json();
     const { email, firstName, kind, items } = body ?? {};
 

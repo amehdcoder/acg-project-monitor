@@ -64,6 +64,65 @@ function getByPath(obj: unknown, path?: string): unknown {
   }, obj)
 }
 
+// --- SSRF protection -------------------------------------------------------
+// Reject URLs that resolve/point to private, loopback, link-local or otherwise
+// internal address ranges to prevent server-side request forgery against
+// internal services or the cloud metadata endpoint.
+function isPrivateHostname(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, '')
+  if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.internal') || h.endsWith('.local')) {
+    return true
+  }
+  // IPv6 loopback / link-local / unique-local
+  if (h === '::1' || h === '::' || h.startsWith('fe80:') || h.startsWith('fc') || h.startsWith('fd')) {
+    return true
+  }
+  // IPv4 literal checks
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (m) {
+    const [a, b] = [Number(m[1]), Number(m[2])]
+    if (a === 10) return true
+    if (a === 127) return true
+    if (a === 0) return true
+    if (a === 169 && b === 254) return true // link-local incl. 169.254.169.254 metadata
+    if (a === 172 && b >= 16 && b <= 31) return true
+    if (a === 192 && b === 168) return true
+    if (a === 100 && b >= 64 && b <= 127) return true // carrier-grade NAT
+    if (a >= 224) return true // multicast / reserved
+  }
+  return false
+}
+
+async function assertSafeUrl(rawUrl: string): Promise<URL> {
+  let parsed: URL
+  try {
+    parsed = new URL(rawUrl)
+  } catch {
+    throw new Error('Invalid API URL')
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('Only http(s) URLs are allowed')
+  }
+  if (isPrivateHostname(parsed.hostname)) {
+    throw new Error('Requests to internal or private addresses are not allowed')
+  }
+  // Resolve DNS and re-check to defend against hostnames that map to internal IPs.
+  try {
+    const records = await Deno.resolveDns(parsed.hostname, 'A').catch(() => [])
+    const records6 = await Deno.resolveDns(parsed.hostname, 'AAAA').catch(() => [])
+    for (const ip of [...records, ...records6]) {
+      if (isPrivateHostname(ip)) {
+        throw new Error('Requests to internal or private addresses are not allowed')
+      }
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('internal or private')) throw e
+    // DNS resolution failures fall through; fetch will surface a normal error.
+  }
+  return parsed
+}
+
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -120,9 +179,19 @@ Deno.serve(async (req) => {
     } else if (kind === 'rest_api') {
       const url = String(config.url ?? '')
       if (!/^https?:\/\//.test(url)) throw new Error('Invalid API URL')
+      const safeUrl = await assertSafeUrl(url)
       const method = (String(config.method ?? 'GET').toUpperCase())
-      const headers = (config.headers ?? {}) as Record<string, string>
-      const resp = await fetch(url, { method, headers })
+      // Only allow safe read methods and a minimal, controlled set of headers.
+      if (method !== 'GET' && method !== 'HEAD') {
+        throw new Error('Only GET/HEAD requests are permitted for REST sources')
+      }
+      const rawHeaders = (config.headers ?? {}) as Record<string, string>
+      const ALLOWED_HEADERS = new Set(['authorization', 'accept', 'x-api-key'])
+      const headers: Record<string, string> = {}
+      for (const [k, v] of Object.entries(rawHeaders)) {
+        if (ALLOWED_HEADERS.has(k.toLowerCase())) headers[k] = String(v)
+      }
+      const resp = await fetch(safeUrl.toString(), { method, headers, redirect: 'error' })
       if (!resp.ok) throw new Error(`API request failed (${resp.status})`)
       const json = await resp.json()
       let arr = getByPath(json, config.jsonPath as string | undefined)
