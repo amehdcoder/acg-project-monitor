@@ -238,7 +238,7 @@ export function buildMdaSupervisoryChecklist(): {
       q({ type: "text", name: "issues_identified", label: "Issues identified", text: { multiline: true, rows: 3 } }),
       q({ type: "text", name: "corrective_actions", label: "Corrective actions agreed", text: { multiline: true, rows: 3 } }),
       q({ type: "text", name: "responsible_person", label: "Responsible person" }),
-      q({ type: "date", name: "action_deadline", label: "Action deadline" }),
+      q({ type: "date", name: "action_deadline", label: "Action deadline", validation: { minDate: "today", message: "Action deadline can be today or a future date, not in the past." } }),
       q({ type: "signature", name: "supervisor_signature", label: "Supervisor signature", signature: { requirePrintedName: true } }),
       q({ type: "acknowledge", name: "attestation", label: "Attestation", required: true, acknowledge: { statement: "I confirm the above observations are accurate and were made during this supervisory visit." } }),
     ]),
