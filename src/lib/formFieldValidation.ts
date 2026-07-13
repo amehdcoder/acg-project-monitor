@@ -20,7 +20,29 @@ export interface FieldValidationResult {
 
 const DATE_TYPES = new Set(["date", "datetime", "datetime-local"]);
 
-const cleanLabel = (label: string): string => label.replace(/<[^>]*>/g, "").trim();
+/**
+ * Resolve a date-bound token to a canonical YYYY-MM-DD string. Accepts the
+ * keywords "today"/"now"/"yesterday"/"tomorrow" or an ISO date string.
+ * Returns undefined when there is no bound.
+ */
+export function resolveDateBound(token?: string | null): string | undefined {
+  if (!token) return undefined;
+  const t = token.trim().toLowerCase();
+  const fmt = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+  const now = new Date();
+  if (t === "today" || t === "now") return fmt(now);
+  if (t === "yesterday") return fmt(new Date(now.getTime() - 86400000));
+  if (t === "tomorrow") return fmt(new Date(now.getTime() + 86400000));
+  // Assume already an ISO/parseable date string — normalise to date part.
+  const parsed = new Date(token);
+  if (!Number.isNaN(parsed.getTime())) return fmt(parsed);
+  return undefined;
+}
 
 /**
  * Validate a single answered value against a question's schema. Callers should
