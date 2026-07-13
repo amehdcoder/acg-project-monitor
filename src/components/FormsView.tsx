@@ -4043,7 +4043,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     { kind: "seeclear_dash" as const, icon: BarChart3, bg: "bg-[#DCF3F0]", fg: "text-[#0f766e]", label: "Monitoring Dashboard", desc: "Readiness, equipment, referrals, data quality & map (Owner only)." },
                   ],
                 }] : []),
-                ...((isOwner || (currentProjectId && bmzProjectIds.has(currentProjectId))) ? [{
+                ...(bmzFolderVisible ? [{
                   id: "bmz_folder",
                   title: "BMZ — Jigawa Inclusive Eye Health Project",
                   subtitle: "Monitoring checklist for Health Ambassadors, TBAs & CHEWs",
