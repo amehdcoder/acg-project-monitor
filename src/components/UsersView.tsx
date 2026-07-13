@@ -1467,6 +1467,7 @@ const UsersView = () => {
     logAction,
     fetchUsers,
     handleToggleActive,
+    handleToggleQuizAccess,
   };
 
   // Shared per-row context. Changes only on the rare events that affect every
