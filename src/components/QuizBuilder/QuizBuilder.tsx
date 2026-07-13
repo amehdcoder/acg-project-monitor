@@ -25,7 +25,7 @@ import { format } from "date-fns";
 import {
   Plus, Trash2, Save, Eye, Send, ChevronUp, ChevronDown,
   BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, CalendarIcon, Users, UserPlus, Archive, Eraser,
-  Lock, LockOpen, DoorOpen, DoorClosed, Sparkles, RotateCcw, Mail, TrendingUp, AlertTriangle, Copy, ArrowRight,
+  Lock, LockOpen, DoorOpen, DoorClosed, Sparkles, RotateCcw, Mail, TrendingUp, AlertTriangle, Copy, ArrowRight, Pencil,
 } from "lucide-react";
 import { validateMessageTokens, KNOWN_QUIZ_TOKENS } from "@/lib/quizTokens";
 import { useAuth } from "@/hooks/useAuth";
@@ -33,6 +33,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import QuizTaker from "./QuizTaker";
 import QuizAnalytics from "./QuizAnalytics";
+import QuizOpenedDialog from "./QuizOpenedDialog";
+
 
 interface QuizQuestion {
   id: string;
@@ -115,6 +117,44 @@ const QuizBuilder = () => {
   const [releaseSearch, setReleaseSearch] = useState("");
   const [releaseLoading, setReleaseLoading] = useState(false);
   const [releaseBusy, setReleaseBusy] = useState(false);
+
+  // Rename quiz (Super Admin) — give any quiz a custom name.
+  const [renameQuiz, setRenameQuiz] = useState<Quiz | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameBusy, setRenameBusy] = useState(false);
+
+  const openRenameDialog = (quiz: Quiz) => {
+    setRenameQuiz(quiz);
+    setRenameValue(quiz.title);
+  };
+
+  const handleRenameQuiz = async () => {
+    if (!renameQuiz) return;
+    const newTitle = renameValue.trim();
+    if (!newTitle) {
+      toast({ title: "Please enter a quiz name", variant: "destructive" });
+      return;
+    }
+    if (newTitle === renameQuiz.title) {
+      setRenameQuiz(null);
+      return;
+    }
+    setRenameBusy(true);
+    const { error } = await supabase
+      .from("quizzes")
+      .update({ title: newTitle })
+      .eq("id", renameQuiz.id);
+    setRenameBusy(false);
+    if (error) {
+      toast({ title: "Could not rename quiz", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Quiz renamed", description: `Now called “${newTitle}”.` });
+    setQuizzes((prev) => prev.map((q) => (q.id === renameQuiz.id ? { ...q, title: newTitle } : q)));
+    setSelectedQuiz((prev) => (prev && prev.id === renameQuiz.id ? { ...prev, title: newTitle } : prev));
+    setRenameQuiz(null);
+  };
+
 
   // Copy quiz to another project
   const [copyQuiz, setCopyQuiz] = useState<Quiz | null>(null);
@@ -846,6 +886,11 @@ const QuizBuilder = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Beautiful "assessment is now open" popup for members */}
+      {!isAdmin && (
+        <QuizOpenedDialog quizzes={quizzes} onTake={(q) => setShowTaker(q as Quiz)} />
+      )}
+
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-fuchsia-600 to-amber-500 p-5 shadow-lg sm:p-6">
         <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-12 left-1/3 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
@@ -898,6 +943,10 @@ const QuizBuilder = () => {
               <div className="flex gap-2 flex-wrap pt-2">
                 {isAdmin && (
                   <>
+                    <Button size="sm" variant="outline" onClick={() => openRenameDialog(selectedQuiz)} className="gap-1">
+                      <Pencil className="h-3 w-3" /> Rename
+                    </Button>
+
                     <Button size="sm" variant="outline" onClick={() => togglePublish(selectedQuiz)} className="gap-1">
                       <Send className="h-3 w-3" /> {selectedQuiz.is_published ? "Unpublish" : "Publish"}
                     </Button>
@@ -1331,13 +1380,23 @@ const QuizBuilder = () => {
                       <>
                         <Button
                           size="icon" variant="ghost"
-                          onClick={e => { e.stopPropagation(); setCopyResult(null); setCopyTargetProject(""); setCopyQuiz(quiz); }}
+                          onClick={e => { e.stopPropagation(); openRenameDialog(quiz); }}
                           className="ml-auto h-7 w-7 text-muted-foreground/40 hover:text-primary"
+                          aria-label="Rename quiz"
+                          title="Rename quiz"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon" variant="ghost"
+                          onClick={e => { e.stopPropagation(); setCopyResult(null); setCopyTargetProject(""); setCopyQuiz(quiz); }}
+                          className="h-7 w-7 text-muted-foreground/40 hover:text-primary"
                           aria-label="Copy quiz to another project"
                           title="Copy to project"
                         >
                           <Copy className="h-3.5 w-3.5" />
                         </Button>
+
                         <Button
                           size="icon" variant="ghost"
                           onClick={e => { e.stopPropagation(); setConfirmDeleteQuiz(quiz); }}
@@ -1358,7 +1417,40 @@ const QuizBuilder = () => {
         </div>
       )}
 
+      {/* Rename Quiz Dialog (Super Admin) */}
+      <Dialog open={!!renameQuiz} onOpenChange={(o) => { if (!o) setRenameQuiz(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-primary" /> Rename quiz
+            </DialogTitle>
+            <DialogDescription>
+              Give this quiz a custom name. The new name updates everywhere it appears — lists, headers, and dashboards.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-1">
+            <Label className="form-label">Quiz name</Label>
+            <Input
+              value={renameValue}
+              autoFocus
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleRenameQuiz(); }}
+              placeholder="e.g. NTD Knowledge Assessment — Round 2"
+              className="form-input"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameQuiz(null)}>Cancel</Button>
+            <Button onClick={handleRenameQuiz} disabled={renameBusy || !renameValue.trim()} className="gap-1">
+              {renameBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save name
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Copy Quiz to Another Project Dialog */}
+
       <Dialog open={!!copyQuiz} onOpenChange={(o) => { if (!o) { setCopyQuiz(null); setCopyResult(null); setCopyTargetProject(""); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
