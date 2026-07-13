@@ -1410,7 +1410,40 @@ const QuizBuilder = () => {
         </div>
       )}
 
+      {/* Rename Quiz Dialog (Super Admin) */}
+      <Dialog open={!!renameQuiz} onOpenChange={(o) => { if (!o) setRenameQuiz(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-primary" /> Rename quiz
+            </DialogTitle>
+            <DialogDescription>
+              Give this quiz a custom name. The new name updates everywhere it appears — lists, headers, and dashboards.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-1">
+            <Label className="form-label">Quiz name</Label>
+            <Input
+              value={renameValue}
+              autoFocus
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleRenameQuiz(); }}
+              placeholder="e.g. NTD Knowledge Assessment — Round 2"
+              className="form-input"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameQuiz(null)}>Cancel</Button>
+            <Button onClick={handleRenameQuiz} disabled={renameBusy || !renameValue.trim()} className="gap-1">
+              {renameBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save name
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Copy Quiz to Another Project Dialog */}
+
       <Dialog open={!!copyQuiz} onOpenChange={(o) => { if (!o) { setCopyQuiz(null); setCopyResult(null); setCopyTargetProject(""); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
