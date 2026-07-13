@@ -116,6 +116,44 @@ const QuizBuilder = () => {
   const [releaseLoading, setReleaseLoading] = useState(false);
   const [releaseBusy, setReleaseBusy] = useState(false);
 
+  // Rename quiz (Super Admin) — give any quiz a custom name.
+  const [renameQuiz, setRenameQuiz] = useState<Quiz | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameBusy, setRenameBusy] = useState(false);
+
+  const openRenameDialog = (quiz: Quiz) => {
+    setRenameQuiz(quiz);
+    setRenameValue(quiz.title);
+  };
+
+  const handleRenameQuiz = async () => {
+    if (!renameQuiz) return;
+    const newTitle = renameValue.trim();
+    if (!newTitle) {
+      toast({ title: "Please enter a quiz name", variant: "destructive" });
+      return;
+    }
+    if (newTitle === renameQuiz.title) {
+      setRenameQuiz(null);
+      return;
+    }
+    setRenameBusy(true);
+    const { error } = await supabase
+      .from("quizzes")
+      .update({ title: newTitle })
+      .eq("id", renameQuiz.id);
+    setRenameBusy(false);
+    if (error) {
+      toast({ title: "Could not rename quiz", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Quiz renamed", description: `Now called “${newTitle}”.` });
+    setQuizzes((prev) => prev.map((q) => (q.id === renameQuiz.id ? { ...q, title: newTitle } : q)));
+    setSelectedQuiz((prev) => (prev && prev.id === renameQuiz.id ? { ...prev, title: newTitle } : prev));
+    setRenameQuiz(null);
+  };
+
+
   // Copy quiz to another project
   const [copyQuiz, setCopyQuiz] = useState<Quiz | null>(null);
   const [copyTargetProject, setCopyTargetProject] = useState("");
