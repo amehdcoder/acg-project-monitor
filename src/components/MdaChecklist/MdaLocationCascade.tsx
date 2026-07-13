@@ -48,11 +48,12 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
-  MapPinned, Lock, PlusCircle, Loader2, Info, CheckCircle2, DownloadCloud, WifiOff,
+  MapPinned, Lock, PlusCircle, Loader2, Info, CheckCircle2, DownloadCloud, WifiOff, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useInstantLocation } from "@/hooks/useInstantLocation";
 import LocationStatusBadge from "@/components/LocationStatusBadge";
+import { toast } from "@/hooks/use-toast";
 
 interface GeoRow {
   state: string | null;
