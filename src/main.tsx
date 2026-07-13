@@ -11,6 +11,7 @@ import { installGlobalErrorReporter, recordError } from "./lib/errorReporter";
 import { initOfflineMedia } from "./lib/offlineMedia";
 import { initOfflineSubmissions } from "./lib/offlineSubmissions";
 import { initSavedFormAutoSync } from "./lib/savedFormAutoSync";
+import { initGeographyCache } from "./lib/geographyCache";
 import { initSpecialFormReconcile } from "./lib/specialFormReconcile";
 import { prepareSilentFormRestoreForUpdate } from "./lib/formProgressPersistence";
 import { installAfterHoursInterceptor } from "./lib/afterHours/interceptor";
