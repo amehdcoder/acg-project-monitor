@@ -117,7 +117,7 @@ import TreatmentToolWizard, { type TreatmentTool } from "./TreatmentToolWizard";
 import { useAuth } from "@/hooks/useAuth";
 import { MoEExpertProvider } from "./MoEExpertProvider";
 import { ExpertFieldValidator } from "./ExpertFieldValidator";
-import { validateFieldValue } from "@/lib/formFieldValidation";
+import { validateFieldValue, resolveDateBound } from "@/lib/formFieldValidation";
 // LocationGate / LocationHeaderBar intentionally NOT imported — location
 // capture runs silently in the background only.
 import { useLocationEnforcement, ACCURACY_HARD_LIMIT } from "@/hooks/useLocationEnforcement";
@@ -2737,6 +2737,8 @@ const FormFiller = ({
             value={value}
             onChange={(v) => update(v)}
             dateFormat={question.dateFormat}
+            min={resolveDateBound(question.validation?.minDate)}
+            max={resolveDateBound(question.validation?.maxDate)}
             hasError={!!error}
           />
         );

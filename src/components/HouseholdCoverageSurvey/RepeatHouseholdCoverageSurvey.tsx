@@ -76,7 +76,7 @@ interface HouseholdRecord {
   gps: { lat: number; lng: number; accuracy: number } | null;
   cdd_came: "yes" | "no" | "dont_know" | "";
   anyone_treated: "yes" | "no" | "";
-  eligible_count: number;
+  eligible_count: number | null;
   offered_count: number;
   swallowed_count: number;
   people: PersonRow[];
@@ -119,7 +119,7 @@ const emptyHousehold = (n: number): HouseholdRecord => ({
   gps: null,
   cdd_came: "",
   anyone_treated: "",
-  eligible_count: 0,
+  eligible_count: null,
   offered_count: 0,
   swallowed_count: 0,
   people: [emptyPerson(), emptyPerson()],
@@ -383,7 +383,7 @@ export default function RepeatHouseholdCoverageSurvey({
       c.gps ||
         c.cdd_came ||
         c.anyone_treated ||
-        c.eligible_count ||
+        c.eligible_count !== null ||
         c.offered_count ||
         c.swallowed_count ||
         c.side_effects ||
@@ -492,9 +492,9 @@ export default function RepeatHouseholdCoverageSurvey({
   // ── Eligible-persons / drug validation ──────────────────────────
   // "Eligible persons in the household" is strictly required, and neither
   // "Offered drugs" nor "Actually swallowed" may ever exceed it.
-  const eligibleMissing = !(record.eligible_count > 0);
-  const offeredExceeds = record.offered_count > record.eligible_count;
-  const swallowedExceeds = record.swallowed_count > record.eligible_count;
+  const eligibleMissing = record.eligible_count === null;
+  const offeredExceeds = record.offered_count > (record.eligible_count ?? 0);
+  const swallowedExceeds = record.swallowed_count > (record.eligible_count ?? 0);
   const countError = !eligibleMissing && (offeredExceeds || swallowedExceeds);
   const countValidationMessage = eligibleMissing
     ? "Enter the number of eligible persons in the household (required)."
@@ -581,7 +581,7 @@ export default function RepeatHouseholdCoverageSurvey({
       // and the legacy *_count keys, so old and new analytics stay aligned.
       const householdsForSave = records.map((r) => ({
         ...r,
-        eligible_persons: r.eligible_count,
+        eligible_persons: r.eligible_count ?? 0,
         offered_drugs: r.offered_count,
         actually_swallowed: r.swallowed_count,
       }));
@@ -846,10 +846,19 @@ export default function RepeatHouseholdCoverageSurvey({
                 <Input
                   type="number"
                   min={0}
+                  step={1}
                   inputMode="numeric"
-                  value={record.eligible_count ? String(record.eligible_count) : ""}
+                  onKeyDown={(e) => {
+                    if (e.key === "-" || e.key === "e" || e.key === "+") e.preventDefault();
+                  }}
+                  value={record.eligible_count === null ? "" : String(record.eligible_count)}
                   onChange={(e) => {
-                    const n = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                    const raw = e.target.value;
+                    if (raw === "") {
+                      update({ eligible_count: null });
+                      return;
+                    }
+                    const n = Math.max(0, Math.floor(Number(raw) || 0));
                     update({ eligible_count: n });
                   }}
                   placeholder="e.g. 5"

@@ -87,6 +87,9 @@ interface DateInputProps {
   disabled?: boolean;
   placeholder?: string;
   hasError?: boolean;
+  /** Optional min/max bounds as canonical ISO date strings (YYYY-MM-DD). */
+  min?: string;
+  max?: string;
 }
 
 const DateInput = ({
@@ -98,6 +101,8 @@ const DateInput = ({
   disabled,
   placeholder,
   hasError,
+  min,
+  max,
 }: DateInputProps) => {
   // ISO format → native HTML input is fine and offers the best UX.
   const useNative = dateFormat === "YYYY-MM-DD";
@@ -137,6 +142,8 @@ const DateInput = ({
         value={value || ""}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
+        min={min}
+        max={max}
         className={cn(hasError && "border-destructive", className)}
       />
     );
@@ -199,6 +206,17 @@ const DateInput = ({
               setOpen(false);
             }}
             initialFocus
+            disabled={(d) => {
+              if (min) {
+                const lo = parse(min, "yyyy-MM-dd", new Date());
+                if (isValid(lo) && d < lo) return true;
+              }
+              if (max) {
+                const hi = parse(max, "yyyy-MM-dd", new Date());
+                if (isValid(hi) && d > hi) return true;
+              }
+              return false;
+            }}
             className="pointer-events-auto"
           />
         </PopoverContent>

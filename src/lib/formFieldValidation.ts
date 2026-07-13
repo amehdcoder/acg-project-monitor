@@ -20,6 +20,30 @@ export interface FieldValidationResult {
 
 const DATE_TYPES = new Set(["date", "datetime", "datetime-local"]);
 
+/**
+ * Resolve a date-bound token to a canonical YYYY-MM-DD string. Accepts the
+ * keywords "today"/"now"/"yesterday"/"tomorrow" or an ISO date string.
+ * Returns undefined when there is no bound.
+ */
+export function resolveDateBound(token?: string | null): string | undefined {
+  if (!token) return undefined;
+  const t = token.trim().toLowerCase();
+  const fmt = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+  const now = new Date();
+  if (t === "today" || t === "now") return fmt(now);
+  if (t === "yesterday") return fmt(new Date(now.getTime() - 86400000));
+  if (t === "tomorrow") return fmt(new Date(now.getTime() + 86400000));
+  // Assume already an ISO/parseable date string — normalise to date part.
+  const parsed = new Date(token);
+  if (!Number.isNaN(parsed.getTime())) return fmt(parsed);
+  return undefined;
+}
+
 const cleanLabel = (label: string): string => label.replace(/<[^>]*>/g, "").trim();
 
 /**
@@ -32,7 +56,15 @@ export function validateFieldValue(question: Question, rawValue: unknown): Field
   const value = rawValue;
   const label = cleanLabel(question.label || "This field");
   const v = question.validation as
-    | { min?: number | null; max?: number | null; regex?: string | null; allowFuture?: boolean }
+    | {
+        min?: number | null;
+        max?: number | null;
+        regex?: string | null;
+        allowFuture?: boolean;
+        minDate?: string | null;
+        maxDate?: string | null;
+        message?: string | null;
+      }
     | undefined;
 
   // ---- Numeric rules ----
@@ -60,7 +92,7 @@ export function validateFieldValue(question: Question, rawValue: unknown): Field
   }
 
   // ---- Date rules: no future dates unless explicitly allowed ----
-  if (DATE_TYPES.has(question.type) && !(v && v.allowFuture)) {
+  if (DATE_TYPES.has(question.type) && !(v && v.allowFuture) && !(v && v.maxDate)) {
     const t = new Date(String(value)).getTime();
     if (Number.isFinite(t)) {
       // Compare against end-of-today so "today" is always valid regardless of TZ.
@@ -71,6 +103,20 @@ export function validateFieldValue(question: Question, rawValue: unknown): Field
       }
     }
   }
+
+  // ---- Explicit date bounds (minDate / maxDate; accept keywords like "today") ----
+  if (DATE_TYPES.has(question.type) && v && (v.minDate || v.maxDate)) {
+    const day = String(value).slice(0, 10);
+    const lo = resolveDateBound(v.minDate);
+    const hi = resolveDateBound(v.maxDate);
+    if (lo && day < lo) {
+      return { error: v.message || `${label} cannot be in the past` };
+    }
+    if (hi && day > hi) {
+      return { error: v.message || `${label} cannot be in the future` };
+    }
+  }
+
 
   // ---- Regex format ----
   if (v && typeof v.regex === "string" && v.regex.trim()) {
