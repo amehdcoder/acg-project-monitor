@@ -666,6 +666,8 @@ export default function RepeatHouseholdCoverageSurvey({
   }
 
   const hhNo = completed.length + 1;
+  const displayHhNo = viewingPrevious ? record.household_no : hhNo;
+
 
   return (
     <div className="min-h-full bg-muted/20">
