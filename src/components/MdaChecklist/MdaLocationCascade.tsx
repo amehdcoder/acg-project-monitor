@@ -34,6 +34,7 @@ import {
   getCachedStates,
   getCachedLGAsForState,
   getCachedWardsForLGA,
+  refreshGeographyHierarchy,
 } from "@/lib/geographyCache";
 import {
   getGrid3FacilitiesWithCoords,
