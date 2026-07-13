@@ -19,8 +19,10 @@ import { queueOrInsert } from "@/lib/offlineSubmissions";
 // Stable synthetic form ids so mirrored entries group nicely.
 export const BLOOMBERG_FORM_ID = "bloomberg-school-enrolment-validation";
 export const SEECLEAR_FORM_ID = "seeclear-eye-health-facility-checklist";
+export const BMZ_FORM_ID = "bmz-jigawa-eye-health-monitoring-checklist";
 export const BLOOMBERG_SPECIAL_FORM_KEY = "bloomberg";
 export const SEECLEAR_SPECIAL_FORM_KEY = "seeclear";
+export const BMZ_SPECIAL_FORM_KEY = "bmz";
 
 interface MirrorArgs {
   id?: string;
