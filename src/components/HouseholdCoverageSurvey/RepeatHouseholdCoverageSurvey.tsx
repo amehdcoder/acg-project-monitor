@@ -76,6 +76,7 @@ interface HouseholdRecord {
   gps: { lat: number; lng: number; accuracy: number } | null;
   cdd_came: "yes" | "no" | "dont_know" | "";
   anyone_treated: "yes" | "no" | "";
+  eligible_count: number;
   offered_count: number;
   swallowed_count: number;
   people: PersonRow[];
@@ -118,6 +119,7 @@ const emptyHousehold = (n: number): HouseholdRecord => ({
   gps: null,
   cdd_came: "",
   anyone_treated: "",
+  eligible_count: 0,
   offered_count: 0,
   swallowed_count: 0,
   people: [emptyPerson(), emptyPerson()],
@@ -134,7 +136,10 @@ const emptyHousehold = (n: number): HouseholdRecord => ({
   suggestions: "",
 });
 
-const TEAL = "#0d9488";
+// Deep Corporate Blue — the leading, dominant brand colour of this survey.
+const TEAL = "#1e3a8a";
+const TEAL_DARK = "#172554";
+
 
 /* ------------------------------------------------------------------ */
 /* Draft persistence                                                   */
@@ -323,6 +328,16 @@ export default function RepeatHouseholdCoverageSurvey({
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [shortfallReason, setShortfallReason] = useState("");
   const [done, setDone] = useState(false);
+  // When non-null, the supervisor is stepping BACK through an already-saved
+  // household (read/edit) instead of the live in-progress one. The live
+  // `current` household is preserved untouched so no progress is ever lost.
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  // The household currently shown on screen: either a previously saved record
+  // (when navigating back) or the live in-progress one.
+  const viewingPrevious = editingIndex !== null;
+  const record: HouseholdRecord =
+    viewingPrevious && completed[editingIndex!] ? completed[editingIndex!] : current;
 
   // Persist in-progress households whenever they change (until submitted).
   useEffect(() => {
@@ -335,6 +350,30 @@ export default function RepeatHouseholdCoverageSurvey({
     }
   }, [completed, current, done, draftKey]);
 
+  // Android/iOS minimization guard: flush the draft the instant the app is
+  // backgrounded or hidden (before the OS may freeze/kill the tab) so bringing
+  // the app back to the foreground restores the exact step the user left.
+  useEffect(() => {
+    if (done) return;
+    const flush = () => {
+      try {
+        const draft: HcsDraft = { completed, current, savedAt: new Date().toISOString() };
+        localStorage.setItem(draftKey, JSON.stringify(draft));
+      } catch {
+        /* ignore */
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [completed, current, done, draftKey]);
+
   // Whether the survey holds unsubmitted work worth guarding on exit.
   const hasUnsavedProgress = useMemo(() => {
     if (done) return false;
@@ -344,6 +383,7 @@ export default function RepeatHouseholdCoverageSurvey({
       c.gps ||
         c.cdd_came ||
         c.anyone_treated ||
+        c.eligible_count ||
         c.offered_count ||
         c.swallowed_count ||
         c.side_effects ||
@@ -384,14 +424,32 @@ export default function RepeatHouseholdCoverageSurvey({
 
   const reachedTarget = completed.length >= target;
 
+  // Route edits to the record on screen: the live household, or the saved one
+  // being reviewed. Editing a saved record never disturbs the live progress.
+  const update = (patch: Partial<HouseholdRecord>) => {
+    if (viewingPrevious) {
+      setCompleted((list) => list.map((h, i) => (i === editingIndex ? { ...h, ...patch } : h)));
+    } else {
+      setCurrent((c) => ({ ...c, ...patch }));
+    }
+  };
 
-  const update = (patch: Partial<HouseholdRecord>) => setCurrent((c) => ({ ...c, ...patch }));
-
-  const updatePerson = (idx: number, patch: Partial<PersonRow>) =>
-    setCurrent((c) => ({
-      ...c,
-      people: c.people.map((p, i) => (i === idx ? { ...p, ...patch } : p)),
-    }));
+  const updatePerson = (idx: number, patch: Partial<PersonRow>) => {
+    if (viewingPrevious) {
+      setCompleted((list) =>
+        list.map((h, i) =>
+          i === editingIndex
+            ? { ...h, people: h.people.map((p, j) => (j === idx ? { ...p, ...patch } : p)) }
+            : h,
+        ),
+      );
+    } else {
+      setCurrent((c) => ({
+        ...c,
+        people: c.people.map((p, i) => (i === idx ? { ...p, ...patch } : p)),
+      }));
+    }
+  };
 
   const captureGps = () => {
     void geo.refresh();
@@ -399,33 +457,81 @@ export default function RepeatHouseholdCoverageSurvey({
 
   // Commit incoming geo fix onto the current household when captured.
   const gpsLabel = useMemo(() => {
-    const g = current.gps;
+    const g = record.gps;
     if (g) return `${g.lat.toFixed(6)}, ${g.lng.toFixed(6)} · ±${Math.round(g.accuracy)}m`;
     return null;
-  }, [current.gps]);
+  }, [record.gps]);
 
   // Each household MUST capture its own unique geopoint. We track the last
   // consumed GPS timestamp so a fresh fix (from tapping "Capture Geopoint" on
   // the new household) is always adopted, while a stale fix carried over from a
-  // previous household is never silently re-used.
+  // previous household is never silently re-used. A fresh fix only applies to
+  // the LIVE household — never to a saved one being reviewed.
   const lastGpsTsRef = useRef<number | null>(null);
   useEffect(() => {
     const pos = geo.coord;
     if (!pos) return;
     if (pos.timestamp === lastGpsTsRef.current) return;
     lastGpsTsRef.current = pos.timestamp;
-    setCurrent((c) => ({ ...c, gps: { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy } }));
+    if (viewingPrevious) {
+      setCompleted((list) =>
+        list.map((h, i) =>
+          i === editingIndex ? { ...h, gps: { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy } } : h,
+        ),
+      );
+    } else {
+      setCurrent((c) => ({ ...c, gps: { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy } }));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geo.coord]);
 
-  const householdValid = current.cdd_came !== "";
-  const hasGps = !!current.gps;
-  const tasteOtherMissing = current.taste_of_medicine === "other" && !current.taste_other.trim();
+  const householdValid = record.cdd_came !== "";
+  const hasGps = !!record.gps;
+  const tasteOtherMissing = record.taste_of_medicine === "other" && !record.taste_other.trim();
+
+  // ── Eligible-persons / drug validation ──────────────────────────
+  // "Eligible persons in the household" is strictly required, and neither
+  // "Offered drugs" nor "Actually swallowed" may ever exceed it.
+  const eligibleMissing = !(record.eligible_count > 0);
+  const offeredExceeds = record.offered_count > record.eligible_count;
+  const swallowedExceeds = record.swallowed_count > record.eligible_count;
+  const countError = !eligibleMissing && (offeredExceeds || swallowedExceeds);
+  const countValidationMessage = eligibleMissing
+    ? "Enter the number of eligible persons in the household (required)."
+    : offeredExceeds && swallowedExceeds
+    ? "Offered and swallowed cannot exceed the number of eligible persons."
+    : offeredExceeds
+    ? "Offered drugs cannot exceed the number of eligible persons."
+    : swallowedExceeds
+    ? "Actually swallowed cannot exceed the number of eligible persons."
+    : "";
+  const countsBlockProgress = eligibleMissing || countError;
 
   const saveCurrentHousehold = (): HouseholdRecord[] => {
     const snapshot = [...completed, current];
     setCompleted(snapshot);
     return snapshot;
+  };
+
+  const goToPreviousHousehold = () => {
+    if (viewingPrevious) {
+      if (editingIndex! > 0) setEditingIndex(editingIndex! - 1);
+    } else if (completed.length > 0) {
+      setEditingIndex(completed.length - 1);
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const goToNextHousehold = () => {
+    if (!viewingPrevious) return;
+    if (editingIndex! < completed.length - 1) setEditingIndex(editingIndex! + 1);
+    else setEditingIndex(null); // back to the live in-progress household
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const returnToCurrent = () => {
+    setEditingIndex(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleSaveAndNext = () => {
@@ -435,6 +541,10 @@ export default function RepeatHouseholdCoverageSurvey({
     }
     if (!hasGps) {
       toast({ title: "Capture the household GPS", description: "Each household must have its own geopoint. Tap “Capture Geopoint” before saving.", variant: "destructive" });
+      return;
+    }
+    if (countsBlockProgress) {
+      toast({ title: "Check the drug coverage numbers", description: countValidationMessage, variant: "destructive" });
       return;
     }
     if (tasteOtherMissing) {
@@ -456,6 +566,7 @@ export default function RepeatHouseholdCoverageSurvey({
     // Include the current household if it has an answer.
     setShowFinishConfirm(true);
   };
+
 
   const finalize = async (records: HouseholdRecord[], reason: string) => {
     if (!user) {
@@ -536,10 +647,10 @@ export default function RepeatHouseholdCoverageSurvey({
   /* ---- Success screen ---- */
   if (done) {
     return (
-      <div className="min-h-full bg-gradient-to-b from-teal-50 to-background flex items-center justify-center p-6">
+      <div className="min-h-full bg-gradient-to-b from-blue-50 to-background flex items-center justify-center p-6">
         <div className="max-w-md w-full text-center space-y-4 rounded-2xl border bg-card p-8 shadow-lg">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-teal-100">
-            <CheckCircle2 className="h-9 w-9 text-teal-600" />
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
+            <CheckCircle2 className="h-9 w-9 text-blue-800" />
           </div>
           <h2 className="font-display text-2xl font-bold">Coverage Survey Complete</h2>
           <p className="text-muted-foreground">
@@ -555,11 +666,13 @@ export default function RepeatHouseholdCoverageSurvey({
   }
 
   const hhNo = completed.length + 1;
+  const displayHhNo = viewingPrevious ? record.household_no : hhNo;
+
 
   return (
     <div className="min-h-full bg-muted/20">
       {/* Header */}
-      <div className="sticky top-0 z-20 text-white shadow-md" style={{ background: `linear-gradient(100deg, #0f766e, #0d9488)` }}>
+      <div className="sticky top-0 z-20 text-white shadow-md" style={{ background: `linear-gradient(105deg, ${TEAL_DARK}, ${TEAL})` }}>
         <div className="mx-auto max-w-4xl px-4 py-3.5 flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
             <Home className="h-6 w-6" />
@@ -584,26 +697,59 @@ export default function RepeatHouseholdCoverageSurvey({
       </div>
 
       <div className="mx-auto max-w-4xl p-4 space-y-4 pb-44 sm:pb-32">
+        {/* Reviewing-a-previous-household banner */}
+        {viewingPrevious && (
+          <div className="flex flex-col gap-2 rounded-xl border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 font-medium">
+              <ArrowLeft className="h-4 w-4 shrink-0" />
+              Reviewing saved Household {record.household_no} of {completed.length}. Edits here are kept — your current entry is untouched.
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={returnToCurrent}
+              className="shrink-0 text-white"
+              style={{ background: TEAL }}
+            >
+              Return to current
+            </Button>
+          </div>
+        )}
+
         {/* Location + progress banner */}
         <div className="rounded-xl border bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-4">
           <ProgressRing done={completed.length} total={target} />
           <div className="flex-1 space-y-1">
             <div className="flex items-center gap-2 text-sm font-semibold">
-              <MapPin className="h-4 w-4 text-teal-600" />
+              <MapPin className="h-4 w-4 text-blue-800" />
               {[location?.community_name, location?.ward, location?.lga, location?.state].filter(Boolean).join(" • ") || "Location from checklist"}
             </div>
             <p className="text-xs text-muted-foreground">
               Interview <strong>{target}</strong> households in this community. Locked from the supervisory checklist.
             </p>
             <div className="flex flex-wrap gap-1.5 pt-1">
-              {completed.map((h) => (
-                <span key={h.household_no} className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-100 text-teal-700 text-xs font-bold">
-                  {h.household_no}
+              {completed.map((h, i) => {
+                const active = viewingPrevious && editingIndex === i;
+                return (
+                  <button
+                    key={h.household_no}
+                    type="button"
+                    onClick={() => { setEditingIndex(i); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                      active ? "text-white ring-2 ring-blue-300" : "bg-blue-100 text-blue-900 hover:bg-blue-200"
+                    }`}
+                    style={active ? { background: TEAL } : undefined}
+                    title={`Review household ${h.household_no}`}
+                  >
+                    {h.household_no}
+                  </button>
+                );
+              })}
+              {!viewingPrevious && (
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-800 text-white text-xs font-bold ring-2 ring-blue-200">
+                  {hhNo}
                 </span>
-              ))}
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-600 text-white text-xs font-bold ring-2 ring-teal-200">
-                {hhNo}
-              </span>
+              )}
               {Array.from({ length: Math.max(0, target - hhNo) }).map((_, i) => (
                 <span key={i} className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground text-xs">
                   {hhNo + i + 1}
@@ -617,17 +763,20 @@ export default function RepeatHouseholdCoverageSurvey({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="rounded-xl border bg-card p-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-              <Home className="h-4 w-4 text-teal-600" /> Household No.
+              <Home className="h-4 w-4 text-blue-800" /> Household No.
             </div>
             <div className="mt-1 flex items-center gap-2">
-              <span className="text-3xl font-extrabold text-teal-600">{hhNo}</span>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Auto-generated</span>
+              <span className="text-3xl font-extrabold text-blue-800">{displayHhNo}</span>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                {viewingPrevious ? "Saved record" : "Auto-generated"}
+              </span>
             </div>
           </div>
-          <div className={`rounded-xl border bg-card p-4 transition-colors ${hasGps ? "border-teal-300" : "border-amber-300"}`}>
+
+          <div className={`rounded-xl border bg-card p-4 transition-colors ${hasGps ? "border-blue-300" : "border-amber-300"}`}>
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                <MapPin className="h-4 w-4 text-teal-600" /> GPS of Household <span className="text-destructive">*</span>
+                <MapPin className="h-4 w-4 text-blue-800" /> GPS of Household <span className="text-destructive">*</span>
               </div>
               <LocationStatusBadge
                 source={geo.source}
@@ -643,7 +792,7 @@ export default function RepeatHouseholdCoverageSurvey({
                 {hasGps ? "Re-capture" : "Capture Geopoint"}
               </Button>
               {hasGps ? (
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-700">
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-900">
                   <CheckCircle2 className="h-4 w-4" /> {gpsLabel}
                 </span>
               ) : (
@@ -658,7 +807,7 @@ export default function RepeatHouseholdCoverageSurvey({
         <Section>
           <QRow n={1} text="During the last MDA in this community, did any drug distributor/CDD come to this house?">
             <PillOptions
-              value={current.cdd_came}
+              value={record.cdd_came}
               onChange={(v) => update({ cdd_came: v })}
               options={[
                 { value: "yes", label: "Yes" },
@@ -670,7 +819,7 @@ export default function RepeatHouseholdCoverageSurvey({
 
           <QRow n={2} text="Was anyone in your household treated?">
             <PillOptions
-              value={current.anyone_treated}
+              value={record.anyone_treated}
               onChange={(v) => update({ anyone_treated: v })}
               options={[
                 { value: "yes", label: "Yes" },
@@ -679,18 +828,49 @@ export default function RepeatHouseholdCoverageSurvey({
             />
           </QRow>
 
-          <QRow n={3} text="How many people were offered vs actually swallowed the drugs?">
-            <div className="flex flex-wrap gap-6">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Offered drugs</p>
-                <Stepper value={current.offered_count} onChange={(v) => update({ offered_count: v })} />
+          <QRow n={3} text="Drug coverage in this household">
+            <div className="space-y-4">
+              <div className="max-w-xs">
+                <p className="text-xs font-medium text-foreground mb-1">
+                  Eligible persons in the household <span className="text-destructive">*</span>
+                </p>
+                <Input
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={record.eligible_count ? String(record.eligible_count) : ""}
+                  onChange={(e) => {
+                    const n = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                    update({ eligible_count: n });
+                  }}
+                  placeholder="e.g. 5"
+                  aria-invalid={eligibleMissing || countError}
+                  className={`text-base ${eligibleMissing || countError ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                />
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Actually swallowed</p>
-                <Stepper value={current.swallowed_count} onChange={(v) => update({ swallowed_count: v })} />
+              <div className="flex flex-wrap gap-6">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Offered drugs <span className="text-destructive">*</span>
+                  </p>
+                  <Stepper value={record.offered_count} onChange={(v) => update({ offered_count: v })} />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Actually swallowed <span className="text-destructive">*</span>
+                  </p>
+                  <Stepper value={record.swallowed_count} onChange={(v) => update({ swallowed_count: v })} />
+                </div>
               </div>
+              {countValidationMessage && (
+                <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{countValidationMessage}</span>
+                </div>
+              )}
             </div>
           </QRow>
+
 
           {/* Q4 roster */}
           <QRow n={4} text="For each person in the household, please tell me:">
@@ -709,7 +889,7 @@ export default function RepeatHouseholdCoverageSurvey({
                   </tr>
                 </thead>
                 <tbody>
-                  {current.people.map((p, i) => (
+                  {record.people.map((p, i) => (
                     <tr key={i} className="border-t">
                       <td className="px-2 py-1.5 text-center text-muted-foreground">{i + 1}</td>
                       <td className="px-2 py-1.5">
@@ -725,7 +905,7 @@ export default function RepeatHouseholdCoverageSurvey({
                               key={s}
                               type="button"
                               onClick={() => updatePerson(i, { sex: s })}
-                              className={`h-8 w-8 rounded-md border text-xs font-bold ${p.sex === s ? "text-white" : "text-teal-600 border-teal-200"}`}
+                              className={`h-8 w-8 rounded-md border text-xs font-bold ${p.sex === s ? "text-white" : "text-blue-800 border-blue-200"}`}
                               style={p.sex === s ? { background: TEAL, borderColor: TEAL } : undefined}
                             >
                               {s}
@@ -743,8 +923,8 @@ export default function RepeatHouseholdCoverageSurvey({
                         <Input value={p.reason} onChange={(e) => updatePerson(i, { reason: e.target.value })} placeholder="Optional" className="h-8" />
                       </td>
                       <td className="px-2 py-1.5">
-                        {current.people.length > 1 && (
-                          <button type="button" onClick={() => update({ people: current.people.filter((_, idx) => idx !== i) })} className="text-muted-foreground hover:text-destructive">
+                        {record.people.length > 1 && (
+                          <button type="button" onClick={() => update({ people: record.people.filter((_, idx) => idx !== i) })} className="text-muted-foreground hover:text-destructive">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
@@ -754,7 +934,7 @@ export default function RepeatHouseholdCoverageSurvey({
                 </tbody>
               </table>
             </div>
-            <Button type="button" variant="outline" size="sm" className="mt-2 text-teal-600 border-teal-200" onClick={() => update({ people: [...current.people, emptyPerson()] })}>
+            <Button type="button" variant="outline" size="sm" className="mt-2 text-blue-800 border-blue-200" onClick={() => update({ people: [...record.people, emptyPerson()] })}>
               <Plus className="h-4 w-4 mr-1.5" /> Add another person
             </Button>
           </QRow>
@@ -762,7 +942,7 @@ export default function RepeatHouseholdCoverageSurvey({
           {/* Q5 adverse events */}
           <QRow n={5} text="Did anyone in the household experience side effects after taking the drugs?">
             <PillOptions
-              value={current.side_effects}
+              value={record.side_effects}
               onChange={(v) => update({ side_effects: v })}
               options={[
                 { value: "yes", label: "Yes" },
@@ -770,17 +950,17 @@ export default function RepeatHouseholdCoverageSurvey({
                 { value: "dont_know", label: "Don't know" },
               ]}
             />
-            {current.side_effects === "yes" && (
+            {record.side_effects === "yes" && (
               <div className="mt-3 space-y-2">
                 <Label className="text-xs">If Yes, what happened and what was done?</Label>
                 <Textarea
-                  value={current.side_effects_detail}
+                  value={record.side_effects_detail}
                   onChange={(e) => update({ side_effects_detail: e.target.value })}
                   placeholder="Describe what happened and what was done…"
                   rows={2}
                 />
                 <label className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={current.ae_reported} onCheckedChange={(v) => update({ ae_reported: !!v })} />
+                  <Checkbox checked={record.ae_reported} onCheckedChange={(v) => update({ ae_reported: !!v })} />
                   Check if AE was reported to health facility
                 </label>
               </div>
@@ -797,7 +977,7 @@ export default function RepeatHouseholdCoverageSurvey({
             <FRow code="F1" text="Was your height measured using a dose pole/tape before receiving the medicine?">
               <PillOptions
                 color="#7c3aed"
-                value={current.f1_asked_height}
+                value={record.f1_asked_height}
                 onChange={(v) => update({ f1_asked_height: v })}
                 options={[
                   { value: "yes", label: "Yes" },
@@ -808,7 +988,7 @@ export default function RepeatHouseholdCoverageSurvey({
             </FRow>
             <FRow code="F1b" text="Medicine Received">
               <Select
-                value={current.medicine_received}
+                value={record.medicine_received}
                 onValueChange={(v) => update({ medicine_received: v as HouseholdRecord["medicine_received"] })}
               >
                 <SelectTrigger>
@@ -826,7 +1006,7 @@ export default function RepeatHouseholdCoverageSurvey({
             </FRow>
             <FRow code="F1c" text="Taste of the Medicine">
               <Select
-                value={current.taste_of_medicine}
+                value={record.taste_of_medicine}
                 onValueChange={(v) =>
                   update({
                     taste_of_medicine: v as HouseholdRecord["taste_of_medicine"],
@@ -844,14 +1024,14 @@ export default function RepeatHouseholdCoverageSurvey({
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
-              {current.taste_of_medicine === "other" && (
+              {record.taste_of_medicine === "other" && (
                 <div className="mt-3">
                   <Label className="text-xs font-medium">
                     Please specify other taste <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     className="mt-1"
-                    value={current.taste_other}
+                    value={record.taste_other}
                     onChange={(e) => update({ taste_other: e.target.value })}
                     placeholder="Describe the taste…"
                   />
@@ -861,7 +1041,7 @@ export default function RepeatHouseholdCoverageSurvey({
             <FRow code="F2" text="Are you satisfied with how the drug distribution was done in your community?">
               <PillOptions
                 color="#7c3aed"
-                value={current.f3_satisfied}
+                value={record.f3_satisfied}
                 onChange={(v) => update({ f3_satisfied: v })}
                 options={[
                   { value: "very", label: "Very satisfied" },
@@ -872,7 +1052,7 @@ export default function RepeatHouseholdCoverageSurvey({
               />
             </FRow>
             <FRow code="F3" text="Why?">
-              <Input value={current.f4_why} onChange={(e) => update({ f4_why: e.target.value })} placeholder="Enter your response…" />
+              <Input value={record.f4_why} onChange={(e) => update({ f4_why: e.target.value })} placeholder="Enter your response…" />
             </FRow>
 
           </div>
@@ -885,7 +1065,7 @@ export default function RepeatHouseholdCoverageSurvey({
           </div>
           <div className="p-4 bg-orange-50/40">
             <FRow code="G1" color="#ea580c" text="What can be done to improve drug distribution in the next MDA?">
-              <Textarea value={current.suggestions} onChange={(e) => update({ suggestions: e.target.value })} placeholder="Enter your suggestions…" rows={2} />
+              <Textarea value={record.suggestions} onChange={(e) => update({ suggestions: e.target.value })} placeholder="Enter your suggestions…" rows={2} />
             </FRow>
           </div>
         </div>
@@ -901,43 +1081,82 @@ export default function RepeatHouseholdCoverageSurvey({
         <div className="mx-auto max-w-4xl px-3 py-2.5 sm:px-4 sm:py-3">
           {/* Counter shown above the buttons on small screens to free horizontal room */}
           <div className="mb-2 text-center text-[11px] font-medium text-muted-foreground sm:hidden">
-            Household {hhNo} of {target}
+            {viewingPrevious ? `Reviewing household ${record.household_no} of ${completed.length}` : `Household ${hhNo} of ${target}`}
           </div>
-          <div className="flex items-stretch gap-2 sm:gap-3">
-            <Button
-              variant="outline"
-              onClick={handleFinishEarly}
-              disabled={submitting}
-              className="flex-1 min-w-0 gap-1.5 px-2 text-xs sm:flex-none sm:px-4 sm:text-sm"
-            >
-              <ArrowLeft className="h-4 w-4 shrink-0" />
-              <span className="truncate">Finish &amp; submit</span>
-            </Button>
-            <div className="hidden flex-1 text-center text-xs text-muted-foreground sm:block sm:self-center">
-              Household {hhNo} of {target}
+          {viewingPrevious ? (
+            /* Navigation controls while reviewing a saved household */
+            <div className="flex items-stretch gap-2 sm:gap-3">
+              <Button
+                variant="outline"
+                onClick={goToPreviousHousehold}
+                disabled={editingIndex === 0}
+                className="flex-1 min-w-0 gap-1.5 px-2 text-xs sm:px-4 sm:text-sm"
+              >
+                <ArrowLeft className="h-4 w-4 shrink-0" />
+                <span className="truncate">Previous</span>
+              </Button>
+              <Button
+                onClick={goToNextHousehold}
+                style={{ background: TEAL }}
+                className="flex-1 min-w-0 gap-1.5 px-2 text-xs text-white sm:px-4 sm:text-sm"
+              >
+                <span className="truncate">
+                  {editingIndex! < completed.length - 1 ? "Next household" : "Back to current"}
+                </span>
+                <ArrowRight className="h-4 w-4 shrink-0" />
+              </Button>
             </div>
-            <Button
-              onClick={handleSaveAndNext}
-              disabled={submitting}
-              style={{ background: TEAL }}
-              className="flex-1 min-w-0 gap-1.5 px-2 text-xs text-white sm:flex-none sm:px-4 sm:text-sm"
-            >
-              {submitting ? (
-                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-              ) : completed.length + 1 >= target ? (
-                <>
-                  <Send className="h-4 w-4 shrink-0" />
-                  <span className="truncate">Save &amp; submit</span>
-                </>
-              ) : (
-                <>
-                  <span className="truncate">Save &amp; next household</span>
-                  <ArrowRight className="h-4 w-4 shrink-0" />
-                </>
+          ) : (
+            <div className="flex items-stretch gap-2 sm:gap-3">
+              {/* Previous Household Record — step back through saved households */}
+              {completed.length > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={goToPreviousHousehold}
+                  disabled={submitting}
+                  className="min-w-0 gap-1.5 px-2 text-xs sm:px-4 sm:text-sm border-blue-300 text-blue-900 hover:bg-blue-50"
+                  title="Review the previous household record"
+                >
+                  <ArrowLeft className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Previous</span>
+                </Button>
               )}
-            </Button>
-          </div>
+              <Button
+                variant="outline"
+                onClick={handleFinishEarly}
+                disabled={submitting}
+                className="flex-1 min-w-0 gap-1.5 px-2 text-xs sm:flex-none sm:px-4 sm:text-sm"
+              >
+                <Send className="h-4 w-4 shrink-0" />
+                <span className="truncate">Finish &amp; submit</span>
+              </Button>
+              <div className="hidden flex-1 text-center text-xs text-muted-foreground sm:block sm:self-center">
+                Household {hhNo} of {target}
+              </div>
+              <Button
+                onClick={handleSaveAndNext}
+                disabled={submitting || countsBlockProgress}
+                style={{ background: TEAL }}
+                className="flex-1 min-w-0 gap-1.5 px-2 text-xs text-white sm:flex-none sm:px-4 sm:text-sm"
+              >
+                {submitting ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                ) : completed.length + 1 >= target ? (
+                  <>
+                    <Send className="h-4 w-4 shrink-0" />
+                    <span className="truncate">Save &amp; submit</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="truncate">Save &amp; next household</span>
+                    <ArrowRight className="h-4 w-4 shrink-0" />
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
+
       </div>
 
       {/* Finish-early confirmation (requires shortfall reason if under target) */}
@@ -945,7 +1164,7 @@ export default function RepeatHouseholdCoverageSurvey({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <ClipboardCheck className="h-5 w-5 text-teal-600" />
+              <ClipboardCheck className="h-5 w-5 text-blue-800" />
               Finish coverage survey?
             </AlertDialogTitle>
             <AlertDialogDescription>

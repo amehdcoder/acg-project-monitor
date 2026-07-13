@@ -316,15 +316,23 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
   }, [loading, submissions.length, visibleRealRows, questions, form.id]);
 
   const hasCache = !!cached && cached.rows.length > 0;
-  // Only fall back to cached data when a live fetch actually FAILED while offline.
-  // A successful fetch that returns zero rows must render a true empty state
-  // (e.g. right after the owner clears/deletes submissions) — never the cache.
-  const useCacheNow = hasCache && loadFailed && isOffline() && submissions.length === 0;
+  const liveHasData = submissions.length > 0;
+  // Cache-first hydration: render the last synced checklist rows INSTANTLY while
+  // the live fetch is still in flight, or whenever the live fetch failed. This
+  // guarantees the dashboard never flashes a spinner or a false "No submissions"
+  // message because of RLS latency or a slow/flaky network. As soon as the live
+  // query resolves with rows we swap to the fresh data.
+  const useCacheNow = hasCache && !liveHasData && (loading || loadFailed);
+  // Distinguish a true offline/failed state from a normal cache-first warm-up so
+  // the banner copy stays accurate.
+  const cacheIsStale = useCacheNow && (loadFailed || isOffline());
 
   const dashboardRows = useCacheNow ? cached!.rows : visibleRealRows;
   const dashboardQuestions = useCacheNow ? cached!.questions : questions;
   const projectName = projects.find((p) => p.id === form.project_id)?.name;
-  const showLoader = loading && !useCacheNow;
+  // Only block on the loader when there is genuinely nothing to show yet.
+  const showLoader = loading && !useCacheNow && !hasCache;
+
   const handleDataChanged = async () => {
     clearMdaCache(form.id);
     setCacheVersion((v) => v + 1);
@@ -522,14 +530,23 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
         )}
 
         {useCacheNow && (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
-            <WifiOff className="h-4 w-4 shrink-0" />
+          <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm text-primary">
+            {cacheIsStale ? <WifiOff className="h-4 w-4 shrink-0" /> : <Loader2 className="h-4 w-4 shrink-0 animate-spin" />}
             <span>
-              <strong>Offline:</strong> showing the last synced checklist data
-              {cached?.cachedAt ? ` (cached ${new Date(cached.cachedAt).toLocaleString()})` : ""}. It will refresh once you reconnect.
+              {cacheIsStale ? (
+                <>
+                  <strong>Offline:</strong> showing the last synced checklist data
+                  {cached?.cachedAt ? ` (cached ${new Date(cached.cachedAt).toLocaleString()})` : ""}. It will refresh once you reconnect.
+                </>
+              ) : (
+                <>
+                  <strong>Loaded instantly</strong> from your last synced data — refreshing with the latest checklist submissions…
+                </>
+              )}
             </span>
           </div>
         )}
+
 
         {!published && !canManageLifecycle ? (
           <Card className="border-dashed">
