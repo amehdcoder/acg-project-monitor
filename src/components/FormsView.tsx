@@ -518,6 +518,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       case "bloomberg_dash": setShowBloombergDash(true); break;
       case "seeclear_form": setShowSeeClearForm(true); break;
       case "seeclear_dash": setShowSeeClearDash(true); break;
+      case "bmz_form": setShowBmzForm(true); break;
+      case "bmz_dash": setShowBmzDash(true); break;
       case "acsm_form": setShowAcsmForm(true); break;
       case "acsm_dash": setShowAcsmDash(true); break;
       case "sbc_form": setShowSbcForm(true); break;
