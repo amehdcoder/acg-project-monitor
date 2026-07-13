@@ -207,3 +207,96 @@ export function getCachedWardsForLGA(state: string, lga: string): string[] {
 export function getGeographyVersion(): string {
   return memVersion;
 }
+
+// ═════════════════════════════════════════════════════════════════════════
+// 5-TIER OFFLINE-FIRST PIPELINE — State → LGA → Ward → FLHF → Community
+// ═════════════════════════════════════════════════════════════════════════
+// Tiers 1–3 (State/LGA/Ward) ship in the JS bundle (INEC registry) and are
+// served synchronously by the accessors above. Tiers 4–5 (FLHF/Community) are
+// far too large to bundle, so they are delivered as pre-compiled *static* JSON
+// shards (one per state, hosted on static file storage / the SW cache). The
+// login-time seed downloads every shard ONCE — offloading 100% of the read
+// pressure to static hosting so hundreds of concurrent logins cost the
+// database 0% CPU — and persists them into IndexedDB. After that, all five
+// cascade levels resolve from memory with zero network calls.
+
+import {
+  seedAllStatesShards,
+  getGrid3FacilitiesSync,
+  getGrid3SettlementsSync,
+  type FacilityWithCoords,
+} from "@/lib/grid3NigeriaData";
+
+// Bump this string whenever the shipped geography assets change structurally so
+// returning users re-seed their local IndexedDB copy on next login.
+export const GEO_SEEDED_VERSION = `${BUNDLED_VERSION}+grid3.v1`;
+const GEO_SEEDED_KEY = "geo_seeded_version";
+
+/** True when THIS device already holds the current full 5-tier dataset. */
+export function isGeoFullySeeded(): boolean {
+  try {
+    return localStorage.getItem(GEO_SEEDED_KEY) === GEO_SEEDED_VERSION;
+  } catch {
+    return false;
+  }
+}
+
+/** Clear the seed stamp so the next login re-runs the one-time setup. */
+export function resetGeoSeed(): void {
+  try {
+    localStorage.removeItem(GEO_SEEDED_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+let seedPromise: Promise<void> | null = null;
+
+/**
+ * Run the one-time, login-time full-hierarchy seed. Downloads every state's
+ * FLHF + Community shard into IndexedDB (via static hosting — never the DB),
+ * ensures the State/LGA/Ward cache is persisted, then stamps
+ * `geo_seeded_version` in localStorage. Idempotent + de-duped: a second call
+ * (or a call on an already-seeded device) resolves immediately.
+ */
+export function seedFullGeography(
+  onProgress?: (done: number, total: number) => void,
+): Promise<void> {
+  if (isGeoFullySeeded()) {
+    onProgress?.(1, 1);
+    return Promise.resolve();
+  }
+  if (seedPromise) return seedPromise;
+  seedPromise = (async () => {
+    // Tiers 1–3 → IndexedDB (bundled dataset, instant).
+    await initGeographyCache();
+    // Tiers 4–5 → download & persist every static shard.
+    await seedAllStatesShards(onProgress);
+    try {
+      localStorage.setItem(GEO_SEEDED_KEY, GEO_SEEDED_VERSION);
+    } catch {
+      /* private-mode / quota — the shards are still cached in IndexedDB */
+    }
+  })().catch((e) => {
+    // Allow a retry on the next login attempt.
+    seedPromise = null;
+    throw e;
+  });
+  return seedPromise;
+}
+
+// ── Synchronous tier-4 / tier-5 accessors (zero network, <1ms) ────────────
+
+/** FLHFs for a State→LGA→Ward selection, resolved synchronously from cache. */
+export function getCachedFLHFs(state: string, lga: string, ward?: string): FacilityWithCoords[] {
+  return getGrid3FacilitiesSync(state, lga, ward) ?? [];
+}
+
+/** Communities for a State→LGA→Ward selection, resolved synchronously. */
+export function getCachedCommunities(
+  state: string,
+  lga: string,
+  ward?: string,
+): FacilityWithCoords[] {
+  return getGrid3SettlementsSync(state, lga, ward) ?? [];
+}
