@@ -249,6 +249,21 @@ const UserCard = memo(function UserCard({
             {(user.designation || "").replace("_", " ") || "—"}
             {user.other_designation && ` - ${user.other_designation}`}
           </p>
+          {!user.is_owner && (
+            <div className="mt-2 flex items-center gap-2">
+              <Switch
+                id={`quiz-access-${user.id}`}
+                checked={!!user.has_quiz_access}
+                onCheckedChange={() => a.handleToggleQuizAccess(user)}
+              />
+              <label
+                htmlFor={`quiz-access-${user.id}`}
+                className="text-xs font-medium text-muted-foreground cursor-pointer"
+              >
+                Grant Quiz Page Access
+              </label>
+            </div>
+          )}
           {/* Access: projects & forms (blank when none) */}
           <div className="mt-2.5 flex flex-col gap-1.5">
             <div className="flex flex-wrap items-center gap-1.5">
