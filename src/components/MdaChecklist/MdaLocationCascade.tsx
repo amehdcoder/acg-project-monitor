@@ -35,6 +35,8 @@ import {
   getCachedLGAsForState,
   getCachedWardsForLGA,
   refreshGeographyHierarchy,
+  getCachedFLHFs,
+  getCachedCommunities,
 } from "@/lib/geographyCache";
 import {
   getGrid3FacilitiesWithCoords,
@@ -584,10 +586,24 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
       setGrid3Settlements([]);
       return;
     }
-    let cancelled = false;
     const st = canonicalStateName(sel.state);
     const lg = canonicalLgaName(sel.state, sel.lga);
     const wd = sel.ward ? canonicalWardName(sel.state, sel.lga, sel.ward) : undefined;
+
+    // Fast path (post-login seed): the full 5-tier hierarchy is already in
+    // IndexedDB/memory, so FLHF + Community resolve SYNCHRONOUSLY (<1ms) with
+    // zero network calls — no spinner, no background Supabase request.
+    const syncFac = getCachedFLHFs(st, lg, wd);
+    const syncSet = getCachedCommunities(st, lg, wd);
+    if (syncFac.length > 0 || syncSet.length > 0) {
+      setGrid3Facilities(syncFac);
+      setGrid3Settlements(syncSet);
+      return;
+    }
+
+    // Cold fallback (device seeded incompletely / offline before first seed):
+    // lazily hydrate the single needed state shard, then render.
+    let cancelled = false;
     (async () => {
       try {
         const [fac, set] = await Promise.all([
@@ -605,6 +621,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [useAdminHierarchy, sel.state, sel.lga, sel.ward]);
+
 
 
   // When falling back to the admin hierarchy and the project was designed for a
@@ -748,7 +765,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         </div>
       </div>
 
-      {loading || scope.loading ? (
+      {(loading || scope.loading) && !useAdminHierarchy ? (
         // Skeleton that mirrors the real field grid so the cascade container
         // keeps its footprint while geography loads — no layout shift / jump.
         <div className="space-y-3" aria-busy="true" aria-live="polite">

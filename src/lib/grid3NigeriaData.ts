@@ -785,3 +785,97 @@ export const searchSettlements = (query: string): string[] => {
   }
   return [...new Set(results)].sort();
 };
+
+// ─────────────────────────────────────────────────────────────────────────
+// Login-time BULK seeding + SYNCHRONOUS accessors (5-tier offline cascade)
+// ─────────────────────────────────────────────────────────────────────────
+// The MDA Supervisory Checklist needs the full State→LGA→Ward→FLHF→Community
+// hierarchy available with ZERO network + ZERO spinners once the user has
+// logged in. `seedAllStatesShards` downloads every per-state static JSON shard
+// (served from static hosting / the SW cache — 0% database CPU) exactly once at
+// login and persists them to IndexedDB + memory. Afterwards the *sync*
+// accessors below resolve each cascade level from memory in well under 1ms.
+
+/**
+ * Download & persist EVERY state shard (facilities + settlements) into
+ * IndexedDB + memory. Pure static-file reads — never touches the database.
+ * Reports coarse progress so the one-time setup screen can show a bar.
+ */
+export async function seedAllStatesShards(
+  onProgress?: (done: number, total: number) => void,
+): Promise<{ states: number }> {
+  const manifest = await loadManifest();
+  const states = Object.keys(manifest);
+  const total = states.length;
+  let done = 0;
+  onProgress?.(0, total);
+  for (const state of states) {
+    try {
+      await Promise.all([loadStateShard("fac", state), loadStateShard("set", state)]);
+    } catch {
+      /* best-effort — a single missing shard must not abort the whole seed */
+    }
+    done += 1;
+    onProgress?.(done, total);
+  }
+  return { states: total };
+}
+
+/** True once at least one shard is resident in memory (post-seed). */
+export function isGrid3Warm(): boolean {
+  return _shardMem.size > 0;
+}
+
+// Resolve a state shard from the in-memory cache ONLY (no async, no network).
+function memShard(kind: "fac" | "set", state: string): StateShard | null {
+  if (!_manifest) return null;
+  const slug = resolveSlug(_manifest, state);
+  if (!slug) return null;
+  return _shardMem.get(`${kind}:${slug}`) ?? null;
+}
+
+/** Synchronous LGA list for a state — null if the shard is not seeded yet. */
+export function getGrid3LGAsForStateSync(state: string): string[] | null {
+  const set = memShard("set", state);
+  const fac = memShard("fac", state);
+  if (!set && !fac) return null;
+  const settlementLgas = set ? collectLgasFromShard(set) : [];
+  const facilityLgas = fac ? collectLgasFromShard(fac) : [];
+  return Array.from(new Set(settlementLgas.length > 0 ? settlementLgas : facilityLgas)).sort((a, b) =>
+    a.localeCompare(b),
+  );
+}
+
+/** Synchronous Ward list for a state+LGA — null if the shard is not seeded. */
+export function getGrid3WardsForLGASync(state: string, lga: string): string[] | null {
+  const set = memShard("set", state);
+  const fac = memShard("fac", state);
+  if (!set && !fac) return null;
+  const settlementWards = set ? collectWardsFromShard(set, state, lga) : [];
+  const facilityWards = fac ? collectWardsFromShard(fac, state, lga) : [];
+  return Array.from(new Set(settlementWards.length > 0 ? settlementWards : facilityWards)).sort((a, b) =>
+    a.localeCompare(b),
+  );
+}
+
+/** Synchronous FLHF list (with coords) — null if the shard is not seeded. */
+export function getGrid3FacilitiesSync(
+  state: string,
+  lga: string,
+  ward?: string,
+): FacilityWithCoords[] | null {
+  const shard = memShard("fac", state);
+  if (!shard) return null;
+  return collectFromShard(shard, state, lga, ward);
+}
+
+/** Synchronous Community/settlement list (with coords) — null if not seeded. */
+export function getGrid3SettlementsSync(
+  state: string,
+  lga: string,
+  ward?: string,
+): FacilityWithCoords[] | null {
+  const shard = memShard("set", state);
+  if (!shard) return null;
+  return collectFromShard(shard, state, lga, ward);
+}
