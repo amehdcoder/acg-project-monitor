@@ -361,6 +361,7 @@ const Index = () => {
   }
 
   return (
+    <GeoSetupGate>
     <ProximityProvider>
 
       <div className="flex h-[100dvh] overflow-hidden bg-background" style={{
