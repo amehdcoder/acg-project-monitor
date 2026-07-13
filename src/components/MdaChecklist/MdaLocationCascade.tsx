@@ -31,11 +31,14 @@ import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useAuth } from "@/hooks/useAuth";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import {
+  getCachedStates,
+  getCachedLGAsForState,
+  getCachedWardsForLGA,
+  refreshGeographyHierarchy,
+} from "@/lib/geographyCache";
+import {
   getGrid3FacilitiesWithCoords,
-  getGrid3LGAsForState,
-  getGrid3StateNames,
   getGrid3SettlementsWithCoords,
-  getGrid3WardsForLGA,
   prefetchGrid3State,
   type FacilityWithCoords,
 } from "@/lib/grid3NigeriaData";
@@ -45,11 +48,12 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
-  MapPinned, Lock, PlusCircle, Loader2, Info, CheckCircle2, DownloadCloud, WifiOff,
+  MapPinned, Lock, PlusCircle, Loader2, Info, CheckCircle2, DownloadCloud, WifiOff, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useInstantLocation } from "@/hooks/useInstantLocation";
 import LocationStatusBadge from "@/components/LocationStatusBadge";
+import { toast } from "@/hooks/use-toast";
 
 interface GeoRow {
   state: string | null;
@@ -184,9 +188,9 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   // the current State/LGA/Ward — FLHF facilities and settlements with GPS.
   const [grid3Facilities, setGrid3Facilities] = useState<FacilityWithCoords[]>([]);
   const [grid3Settlements, setGrid3Settlements] = useState<FacilityWithCoords[]>([]);
-  const [grid3States, setGrid3States] = useState<string[]>([]);
-  const [grid3Lgas, setGrid3Lgas] = useState<string[]>([]);
-  const [grid3Wards, setGrid3Wards] = useState<string[]>([]);
+  // State → LGA → Ward come from the local, offline-first geography cache
+  // (see geographyCache.ts) — pure in-memory filtering, NO network on change.
+  // FLHF / Community / Settlement still use the richer GRID3 shards (GPS).
   // States the project was designed for (from project scope) — used as the
   // cascade fallback when no microplan is linked to the project.
   const [projectStates, setProjectStates] = useState<string[]>([]);
@@ -396,46 +400,31 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   // off-microplan community OR when the project has no linked microplan yet.
   const useAdminHierarchy = disableMicroplan || notInMicroplan || microplanIsEmpty;
 
-  useEffect(() => {
-    let cancelled = false;
-    getGrid3StateNames()
-      .then((states) => { if (!cancelled) setGrid3States(states.map(canonicalStateName).filter(Boolean)); })
-      .catch(() => { if (!cancelled) setGrid3States(getAllStates().map(canonicalStateName)); });
-    return () => { cancelled = true; };
-  }, []);
+  // ── Local, offline-first State → LGA → Ward option lists ──────────────
+  // Resolved SYNCHRONOUSLY from the geography cache (bundled INEC registry,
+  // persisted in IndexedDB). Changing a parent selector filters the child list
+  // entirely in-memory — no GRID3 / Supabase fetch fires on change.
+  const localStates = useMemo(
+    () => getCachedStates().map(canonicalStateName).filter(Boolean),
+    [],
+  );
+  const localLgas = useMemo(
+    () => (sel.state ? getCachedLGAsForState(canonicalStateName(sel.state)) : []),
+    [sel.state],
+  );
+  const localWards = useMemo(
+    () =>
+      sel.state && sel.lga
+        ? getCachedWardsForLGA(canonicalStateName(sel.state), canonicalLgaName(sel.state, sel.lga))
+        : [],
+    [sel.state, sel.lga],
+  );
 
-  useEffect(() => {
-    if (!useAdminHierarchy || !sel.state) {
-      setGrid3Lgas([]);
-      setGrid3Wards([]);
-      return;
-    }
-    let cancelled = false;
-    getGrid3LGAsForState(canonicalStateName(sel.state))
-      .then((lgas) => { if (!cancelled) setGrid3Lgas(lgas); })
-      .catch(() => { if (!cancelled) setGrid3Lgas(getLGAsForState(canonicalStateName(sel.state))); });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [useAdminHierarchy, sel.state]);
-
-  useEffect(() => {
-    if (!useAdminHierarchy || !sel.state || !sel.lga) {
-      setGrid3Wards([]);
-      return;
-    }
-    let cancelled = false;
-    getGrid3WardsForLGA(canonicalStateName(sel.state), canonicalLgaName(sel.state, sel.lga))
-      .then((wards) => { if (!cancelled) setGrid3Wards(wards); })
-      .catch(() => { if (!cancelled) setGrid3Wards(getWardsForLGA(canonicalStateName(sel.state), canonicalLgaName(sel.state, sel.lga))); });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [useAdminHierarchy, sel.state, sel.lga]);
-
-  // State → LGA → Ward options derived from the consolidated GRID3 shards,
+  // State → LGA → Ward options derived from the local geography cache,
   // bounded by the project's designed state scope and by locked microplan data.
   const grid3GeoOptions = (level: keyof GeoRow): string[] => {
     if (level === "state") {
-      const all = grid3States.length > 0 ? grid3States : getAllStates().map(canonicalStateName);
+      const all = localStates.length > 0 ? localStates : getAllStates().map(canonicalStateName);
       let list = hasStateScope ? all.filter((s) => allowedStates.has(s)) : all;
       // When the project has a locked-in microplan, ONLY states the microplan
       // was entered for may be supervised — applies to the off-microplan path too.
@@ -445,8 +434,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
       }
       return uniqueSorted(list);
     }
-    if (level === "lga") return sel.state ? grid3Lgas : [];
-    if (level === "ward") return sel.state && sel.lga ? grid3Wards : [];
+    if (level === "lga") return sel.state ? localLgas : [];
+    if (level === "ward") return sel.state && sel.lga ? localWards : [];
     return [];
   };
 
@@ -692,6 +681,26 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     setPrefetchState("done");
   };
 
+  // Hidden admin-only action: rebuild the local State→LGA→Ward lookup table.
+  // Only needed when administrative boundaries are structurally modified — the
+  // dataset is otherwise loaded once and served entirely from local storage.
+  const [refreshingGeo, setRefreshingGeo] = useState(false);
+  const handleRefreshHierarchy = async () => {
+    if (refreshingGeo) return;
+    setRefreshingGeo(true);
+    try {
+      const res = await refreshGeographyHierarchy();
+      toast({
+        title: "Geography data refreshed",
+        description: `Local hierarchy rebuilt — ${res.states} states cached offline.`,
+      });
+    } catch {
+      toast({ title: "Refresh failed", description: "Could not rebuild the local geography cache.", variant: "destructive" });
+    } finally {
+      setRefreshingGeo(false);
+    }
+  };
+
   return (
     <div className="space-y-4 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/[0.06] to-transparent p-4 sm:p-5">
 
@@ -722,6 +731,20 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
           <Badge variant="outline" className="gap-1 border-primary/40 text-primary">
             <Lock className="h-3 w-3" /> {(disableMicroplan || microplanIsEmpty) ? "State cascade" : "Microplan-locked"}
           </Badge>
+          {(isAdmin || isOwner) && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleRefreshHierarchy}
+              disabled={refreshingGeo}
+              className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+              title="Rebuild the offline State → LGA → Ward hierarchy (admin only)"
+            >
+              <RefreshCw className={cn("h-3 w-3", refreshingGeo && "animate-spin")} />
+              {refreshingGeo ? "Refreshing…" : "Refresh Hierarchy Data"}
+            </Button>
+          )}
         </div>
       </div>
 
