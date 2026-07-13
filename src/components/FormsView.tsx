@@ -20,6 +20,7 @@ import SeeClearDashboard from "@/components/SeeClear/SeeClearDashboard";
 import { SEECLEAR_FORM_NAME, SEECLEAR_FORM_DESC, SEECLEAR_DASH_NAME, SEECLEAR_DASH_DESC } from "@/lib/seeclear/definition";
 import BmzFormFiller from "@/components/BMZ/BmzFormFiller";
 import BmzDashboard from "@/components/BMZ/BmzDashboard";
+import BmzAddToProjectDialog from "@/components/BMZ/BmzAddToProjectDialog";
 import { BMZ_FORM_NAME, BMZ_FORM_DESC, BMZ_DASH_NAME, BMZ_DASH_DESC } from "@/lib/bmz/definition";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
 import { ALL_STANDARD_FORMS } from "@/lib/standardAssessments/allStandardForms";
