@@ -765,7 +765,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         </div>
       </div>
 
-      {loading || scope.loading ? (
+      {(loading || scope.loading) && !useAdminHierarchy ? (
         // Skeleton that mirrors the real field grid so the cascade container
         // keeps its footprint while geography loads — no layout shift / jump.
         <div className="space-y-3" aria-busy="true" aria-live="polite">
