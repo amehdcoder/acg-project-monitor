@@ -56,7 +56,15 @@ export function validateFieldValue(question: Question, rawValue: unknown): Field
   const value = rawValue;
   const label = cleanLabel(question.label || "This field");
   const v = question.validation as
-    | { min?: number | null; max?: number | null; regex?: string | null; allowFuture?: boolean }
+    | {
+        min?: number | null;
+        max?: number | null;
+        regex?: string | null;
+        allowFuture?: boolean;
+        minDate?: string | null;
+        maxDate?: string | null;
+        message?: string | null;
+      }
     | undefined;
 
   // ---- Numeric rules ----
