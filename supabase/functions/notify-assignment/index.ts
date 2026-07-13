@@ -1,12 +1,25 @@
 // Sends a professional notification email to a user when they are assigned
 // to a new project or form(s). Delegates actual delivery to send-email-smtp.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { guardRequest } from "../_shared/authGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-worker-secret",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+// Escapes user-supplied strings before interpolating into the HTML email body
+// to prevent HTML/content injection.
+function escapeHtml(input: unknown): string {
+  return String(input ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 const PRIMARY = "#0F766E";
 const ACCENT = "#B45309";
