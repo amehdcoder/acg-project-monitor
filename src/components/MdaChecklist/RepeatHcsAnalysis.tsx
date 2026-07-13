@@ -398,7 +398,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
       name: r.label.length > 16 ? r.label.slice(0, 15) + "…" : r.label,
       fullName: r.label,
       sub: r.sub,
-      tx: Math.round(pct(r.swallowed, r.offered) * 10) / 10,
+      tx: Math.round(Math.min(100, pct(r.swallowed, r.eligible > 0 ? r.eligible : r.offered)) * 10) / 10,
       reach: Math.round(pct(r.cddYes, r.households) * 10) / 10,
     }));
 
