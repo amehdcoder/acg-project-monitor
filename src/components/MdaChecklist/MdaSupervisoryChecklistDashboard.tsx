@@ -1209,6 +1209,7 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
           targets: [
             { name: "Status of MDA", pattern: /status\s+of\s+mda/i },
             { name: "Side effects during MDA", pattern: /complain.*side\s*effect|side\s*effects?\s+during\s+mda|anybody\s+complain/i },
+            { name: "Therapeutic coverage rate", pattern: /therapeutic_coverage_pct|therapeutic\s*coverage/i },
           ],
         }}
         afterHoursLog
