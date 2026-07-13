@@ -697,6 +697,25 @@ export default function RepeatHouseholdCoverageSurvey({
       </div>
 
       <div className="mx-auto max-w-4xl p-4 space-y-4 pb-44 sm:pb-32">
+        {/* Reviewing-a-previous-household banner */}
+        {viewingPrevious && (
+          <div className="flex flex-col gap-2 rounded-xl border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 font-medium">
+              <ArrowLeft className="h-4 w-4 shrink-0" />
+              Reviewing saved Household {record.household_no} of {completed.length}. Edits here are kept — your current entry is untouched.
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={returnToCurrent}
+              className="shrink-0 text-white"
+              style={{ background: TEAL }}
+            >
+              Return to current
+            </Button>
+          </div>
+        )}
+
         {/* Location + progress banner */}
         <div className="rounded-xl border bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-4">
           <ProgressRing done={completed.length} total={target} />
@@ -709,14 +728,28 @@ export default function RepeatHouseholdCoverageSurvey({
               Interview <strong>{target}</strong> households in this community. Locked from the supervisory checklist.
             </p>
             <div className="flex flex-wrap gap-1.5 pt-1">
-              {completed.map((h) => (
-                <span key={h.household_no} className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-900 text-xs font-bold">
-                  {h.household_no}
+              {completed.map((h, i) => {
+                const active = viewingPrevious && editingIndex === i;
+                return (
+                  <button
+                    key={h.household_no}
+                    type="button"
+                    onClick={() => { setEditingIndex(i); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                      active ? "text-white ring-2 ring-blue-300" : "bg-blue-100 text-blue-900 hover:bg-blue-200"
+                    }`}
+                    style={active ? { background: TEAL } : undefined}
+                    title={`Review household ${h.household_no}`}
+                  >
+                    {h.household_no}
+                  </button>
+                );
+              })}
+              {!viewingPrevious && (
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-800 text-white text-xs font-bold ring-2 ring-blue-200">
+                  {hhNo}
                 </span>
-              ))}
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-800 text-white text-xs font-bold ring-2 ring-blue-200">
-                {hhNo}
-              </span>
+              )}
               {Array.from({ length: Math.max(0, target - hhNo) }).map((_, i) => (
                 <span key={i} className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground text-xs">
                   {hhNo + i + 1}
@@ -733,10 +766,13 @@ export default function RepeatHouseholdCoverageSurvey({
               <Home className="h-4 w-4 text-blue-800" /> Household No.
             </div>
             <div className="mt-1 flex items-center gap-2">
-              <span className="text-3xl font-extrabold text-blue-800">{hhNo}</span>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Auto-generated</span>
+              <span className="text-3xl font-extrabold text-blue-800">{displayHhNo}</span>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                {viewingPrevious ? "Saved record" : "Auto-generated"}
+              </span>
             </div>
           </div>
+
           <div className={`rounded-xl border bg-card p-4 transition-colors ${hasGps ? "border-blue-300" : "border-amber-300"}`}>
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
