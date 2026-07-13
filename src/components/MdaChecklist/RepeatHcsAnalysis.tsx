@@ -493,7 +493,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
           <Kpi label="Surveys" value={a.totalSurveys.toLocaleString()} sub={`${a.communities} communities · ${a.lgas} LGAs`} icon={MapPinned} tint={SLATE} />
           <Kpi label="Households" value={a.totalHh.toLocaleString()} icon={Home} tint={TEAL} />
           <Kpi label="Household reach" value={`${a.reachPct.toFixed(1)}%`} sub={`${a.cddYes}/${a.totalHh} visited by CDD`} icon={Users2} tint={BLUE} />
-          <Kpi label="Therapeutic coverage" value={`${a.txPct.toFixed(1)}%`} sub={`${a.swallowed}/${a.offered} swallowed`} icon={Pill} tint={EMERALD} />
+          <Kpi label="Therapeutic Coverage Rate" value={`${a.txPct.toFixed(1)}%`} sub={`${a.swallowed.toLocaleString()}/${(a.eligible > 0 ? a.eligible : a.offered).toLocaleString()} swallowed ÷ eligible`} icon={Pill} tint={EMERALD} />
           <Kpi label="Households treated" value={`${a.treatPct.toFixed(1)}%`} sub={`${a.treatedYes}/${a.totalHh}`} icon={CheckCircle2} tint={AMBER} />
           <Kpi label="Satisfaction" value={`${a.satisfiedPct.toFixed(0)}%`} sub="satisfied or very" icon={Smile} tint={PURPLE} />
         </CardContent>
