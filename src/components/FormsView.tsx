@@ -1786,6 +1786,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     return <SeeClearDashboard onClose={() => setShowSeeClearDash(false)} />;
   }
 
+  if (showBmzForm) {
+    return <BmzFormFiller onClose={() => setShowBmzForm(false)} />;
+  }
+
+  if (showBmzDash) {
+    return <BmzDashboard onClose={() => setShowBmzDash(false)} />;
+  }
+
   if (showAcsmForm) {
     return <ACSMFormFiller projectId={currentProjectId} onClose={() => setShowAcsmForm(false)} />;
   }
