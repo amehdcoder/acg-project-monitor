@@ -76,7 +76,7 @@ interface HouseholdRecord {
   gps: { lat: number; lng: number; accuracy: number } | null;
   cdd_came: "yes" | "no" | "dont_know" | "";
   anyone_treated: "yes" | "no" | "";
-  eligible_count: number;
+  eligible_count: number | null;
   offered_count: number;
   swallowed_count: number;
   people: PersonRow[];
