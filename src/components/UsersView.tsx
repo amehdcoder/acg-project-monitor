@@ -1149,6 +1149,50 @@ const UsersView = () => {
     }
   };
 
+  const handleToggleQuizAccess = async (userToToggle: UserProfile & { role?: UserRole }) => {
+    const newState = !userToToggle.has_quiz_access;
+
+    // Optimistic UI update — reflects instantly.
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === userToToggle.id ? { ...u, has_quiz_access: newState } : u
+      )
+    );
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ has_quiz_access: newState } as any)
+        .eq("id", userToToggle.id);
+
+      if (error) throw error;
+
+      await logAction(
+        newState ? "grant_quiz_access" : "revoke_quiz_access",
+        `${newState ? "Granted" : "Revoked"} Quiz Page Access for ${getUserDisplayName(userToToggle)} (${safeText(userToToggle.email)})`,
+        "user",
+        userToToggle.user_id
+      );
+
+      toast({
+        title: newState ? "Quiz Access Granted" : "Quiz Access Revoked",
+        description: `${getUserDisplayName(userToToggle)} ${newState ? "can now access" : "can no longer access"} the Quizzes page.`,
+      });
+    } catch (error) {
+      // Revert on error
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === userToToggle.id ? { ...u, has_quiz_access: userToToggle.has_quiz_access } : u
+        )
+      );
+      toast({
+        title: "Error",
+        description: "Failed to update quiz access",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDeleteUserPermanently = async () => {
     if (!selectedUser) return;
     setDeletingUser(true);
