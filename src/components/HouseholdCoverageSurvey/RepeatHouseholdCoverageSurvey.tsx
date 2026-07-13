@@ -76,6 +76,7 @@ interface HouseholdRecord {
   gps: { lat: number; lng: number; accuracy: number } | null;
   cdd_came: "yes" | "no" | "dont_know" | "";
   anyone_treated: "yes" | "no" | "";
+  eligible_count: number;
   offered_count: number;
   swallowed_count: number;
   people: PersonRow[];
@@ -118,6 +119,7 @@ const emptyHousehold = (n: number): HouseholdRecord => ({
   gps: null,
   cdd_came: "",
   anyone_treated: "",
+  eligible_count: 0,
   offered_count: 0,
   swallowed_count: 0,
   people: [emptyPerson(), emptyPerson()],
@@ -134,7 +136,10 @@ const emptyHousehold = (n: number): HouseholdRecord => ({
   suggestions: "",
 });
 
-const TEAL = "#0d9488";
+// Deep Corporate Blue — the leading, dominant brand colour of this survey.
+const TEAL = "#1e3a8a";
+const TEAL_DARK = "#172554";
+
 
 /* ------------------------------------------------------------------ */
 /* Draft persistence                                                   */
