@@ -16,6 +16,7 @@ import { IncomingCallManager } from "@/components/ProjectChat/IncomingCallManage
 
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
+import GeoSetupGate from "@/components/GeoSetupGate";
 import Dashboard from "@/components/Dashboard";
 import FormsView from "@/components/FormsView";
 import ProjectsView from "@/components/ProjectsView";
