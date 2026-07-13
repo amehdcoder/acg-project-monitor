@@ -417,8 +417,10 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
 
     return {
       communitySampled,
-      totalSurveys: rows.length, totalHh, cddYes, treatedYes, offered, swallowed,
-      reachPct: pct(cddYes, totalHh), txPct: pct(swallowed, offered), treatPct: pct(treatedYes, totalHh),
+      totalSurveys: rows.length, totalHh, cddYes, treatedYes, eligible, offered, swallowed,
+      reachPct: pct(cddYes, totalHh),
+      txPct: Math.min(100, pct(swallowed, txDenom)),
+      treatPct: pct(treatedYes, totalHh),
       txTest, hhTest, satisfaction, height, sideEffects, cdd,
       aeCount: aeYes.length, aeReported, satisfiedPct,
       suggestions, reasons, aeDetails, geoRows, chartRows,
