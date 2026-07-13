@@ -142,6 +142,8 @@ const DateInput = ({
         value={value || ""}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
+        min={min}
+        max={max}
         className={cn(hasError && "border-destructive", className)}
       />
     );
