@@ -36,7 +36,7 @@ function renderEmail(opts: {
   items: string[];
 }): { subject: string; html: string } {
   const { firstName, kind, items } = opts;
-  const greeting = firstName ? `Dear ${firstName},` : "Hello,";
+  const greeting = firstName ? `Dear ${escapeHtml(firstName)},` : "Hello,";
   const label = kind === "project" ? "project" : "form";
   const plural = items.length > 1 ? `${label}s` : label;
   const heading =
@@ -46,7 +46,7 @@ function renderEmail(opts: {
   const list = items
     .map(
       (i) =>
-        `<li style="margin:0 0 6px;padding:0;font-size:15px;color:${TEXT};">${i}</li>`,
+        `<li style="margin:0 0 6px;padding:0;font-size:15px;color:${TEXT};">${escapeHtml(i)}</li>`,
     )
     .join("");
 
