@@ -752,6 +752,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     showBloombergDash,
     showSeeClearForm,
     showSeeClearDash,
+    showBmzForm,
+    showBmzDash,
     microplanFillingActive,
     dashboardForm,
     mdaDashboardForm,
