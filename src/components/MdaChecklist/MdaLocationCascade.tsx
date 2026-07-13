@@ -31,6 +31,11 @@ import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useAuth } from "@/hooks/useAuth";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import {
+  getCachedStates,
+  getCachedLGAsForState,
+  getCachedWardsForLGA,
+} from "@/lib/geographyCache";
+import {
   getGrid3FacilitiesWithCoords,
   getGrid3LGAsForState,
   getGrid3StateNames,
