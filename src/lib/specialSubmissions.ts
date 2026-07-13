@@ -39,6 +39,7 @@ export const SPECIAL_SOURCES: SpecialSource[] = [
   { table: "acsm_reports", userCol: "created_by", label: "ACSM Report", accent: "#7c3aed" },
   { table: "sbc_reports", userCol: "created_by", label: "SBC Report", accent: "#db2777" },
   { table: "seeclear_monitoring", userCol: "created_by", label: "SeeClear Monitoring", accent: "#0891b2" },
+  { table: "bmz_monitoring", userCol: "monitor_id", label: "Jigawa Eye Health Monitoring", accent: "#0f6b52" },
   { table: "ntd_assessments", userCol: "created_by", label: "NTD Assessment", accent: "#16a34a" },
   { table: "ces_surveys", userCol: "created_by", label: "Coverage Evaluation 3D", accent: "#ea580c" },
   { table: "standard_assessment_submissions", userCol: "submitted_by", label: "Standard Assessment", accent: "#2563eb" },

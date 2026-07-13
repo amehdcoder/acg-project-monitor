@@ -18,6 +18,9 @@ import { BLOOMBERG_FORM_NAME, BLOOMBERG_FORM_DESC, BLOOMBERG_DASH_NAME, BLOOMBER
 import SeeClearFormFiller from "@/components/SeeClear/SeeClearFormFiller";
 import SeeClearDashboard from "@/components/SeeClear/SeeClearDashboard";
 import { SEECLEAR_FORM_NAME, SEECLEAR_FORM_DESC, SEECLEAR_DASH_NAME, SEECLEAR_DASH_DESC } from "@/lib/seeclear/definition";
+import BmzFormFiller from "@/components/BMZ/BmzFormFiller";
+import BmzDashboard from "@/components/BMZ/BmzDashboard";
+import { BMZ_FORM_NAME, BMZ_FORM_DESC, BMZ_DASH_NAME, BMZ_DASH_DESC } from "@/lib/bmz/definition";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
 import { ALL_STANDARD_FORMS } from "@/lib/standardAssessments/allStandardForms";
 import ACSMFormFiller from "@/components/ACSM/ACSMFormFiller";
@@ -324,6 +327,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showBloombergDash, setShowBloombergDash] = useState(false);
   const [showSeeClearForm, setShowSeeClearForm] = useState(false);
   const [showSeeClearDash, setShowSeeClearDash] = useState(false);
+  const [showBmzForm, setShowBmzForm] = useState(false);
+  const [showBmzDash, setShowBmzDash] = useState(false);
   const [showAcsmForm, setShowAcsmForm] = useState(false);
   const [showAcsmDash, setShowAcsmDash] = useState(false);
   const [showSbcForm, setShowSbcForm] = useState(false);
@@ -513,6 +518,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       case "bloomberg_dash": setShowBloombergDash(true); break;
       case "seeclear_form": setShowSeeClearForm(true); break;
       case "seeclear_dash": setShowSeeClearDash(true); break;
+      case "bmz_form": setShowBmzForm(true); break;
+      case "bmz_dash": setShowBmzDash(true); break;
       case "acsm_form": setShowAcsmForm(true); break;
       case "acsm_dash": setShowAcsmDash(true); break;
       case "sbc_form": setShowSbcForm(true); break;
@@ -706,6 +713,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       showBloombergDash ||
       showSeeClearForm ||
       showSeeClearDash ||
+      showBmzForm ||
+      showBmzDash ||
       microplanFillingActive ||
       dashboardForm ||
       mdaDashboardForm ||
@@ -743,6 +752,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     showBloombergDash,
     showSeeClearForm,
     showSeeClearDash,
+    showBmzForm,
+    showBmzDash,
     microplanFillingActive,
     dashboardForm,
     mdaDashboardForm,
@@ -1773,6 +1784,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   if (showSeeClearDash) {
     return <SeeClearDashboard onClose={() => setShowSeeClearDash(false)} />;
+  }
+
+  if (showBmzForm) {
+    return <BmzFormFiller onClose={() => setShowBmzForm(false)} />;
+  }
+
+  if (showBmzDash) {
+    return <BmzDashboard onClose={() => setShowBmzDash(false)} />;
   }
 
   if (showAcsmForm) {
@@ -4005,6 +4024,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     { kind: "seeclear_dash" as const, icon: BarChart3, bg: "bg-[#DCF3F0]", fg: "text-[#0f766e]", label: "Monitoring Dashboard", desc: "Readiness, equipment, referrals, data quality & map (Owner only)." },
                   ],
                 }] : []),
+                ...(isOwner ? [{
+                  id: "bmz_folder",
+                  title: "BMZ — Jigawa Inclusive Eye Health Project",
+                  subtitle: "Monitoring checklist for Health Ambassadors, TBAs & CHEWs",
+                  bg: "bg-[#DCF1EA]", fg: "text-[#0f6b52]", chipBg: "bg-[#DCF1EA]", chipFg: "text-[#0f6b52]",
+                  items: [
+                    { kind: "bmz_form" as const, icon: ClipboardCheck, bg: "bg-[#DCF1EA]", fg: "text-[#14b8a6]", label: "Eye Health Monitoring Checklist", desc: "Identification, training, service delivery, referrals, challenges & sign-off." },
+                    { kind: "bmz_dash" as const, icon: BarChart3, bg: "bg-[#DCF1EA]", fg: "text-[#0f6b52]", label: "Monitoring Dashboard", desc: "Cadre performance, training, screening, referrals & flagged gaps (Owner only)." },
+                  ],
+                }] : []),
                 {
                   id: "action_tracker_folder",
                   title: "Meeting Action Tracking",
@@ -4144,6 +4173,26 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                               <button
                                 key={idx}
                                 onClick={() => (isDash ? setShowSeeClearDash(true) : setShowSeeClearForm(true))}
+                                className="flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 text-left hover:bg-white/60 transition-colors border-t border-border/30 first:border-t-0"
+                              >
+                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${it.bg}`}>
+                                  <Icon className={`h-4 w-4 ${it.fg}`} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h5 className="truncate text-sm font-semibold">{it.label}</h5>
+                                  <p className="text-xs text-muted-foreground">{it.desc}</p>
+                                </div>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </button>
+                            );
+                          }
+                          if (it.kind === "bmz_form" || it.kind === "bmz_dash") {
+                            const Icon = it.icon;
+                            const isDash = it.kind === "bmz_dash";
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => (isDash ? setShowBmzDash(true) : setShowBmzForm(true))}
                                 className="flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 text-left hover:bg-white/60 transition-colors border-t border-border/30 first:border-t-0"
                               >
                                 <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${it.bg}`}>

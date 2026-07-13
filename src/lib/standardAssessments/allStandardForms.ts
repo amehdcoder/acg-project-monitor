@@ -44,6 +44,8 @@ const EXTRA_STANDARD_FORMS: StandardFormOption[] = [
   { code: "bloomberg_dash", name: "Bloomberg Validation Dashboard", group: "Project Tools" },
   { code: "seeclear_form", name: "See Clear Facility Monitoring Checklist", group: "Project Tools" },
   { code: "seeclear_dash", name: "See Clear Monitoring Dashboard", group: "Project Tools" },
+  { code: "bmz_form", name: "Jigawa Eye Health Monitoring Checklist", group: "Project Tools" },
+  { code: "bmz_dash", name: "Jigawa Eye Health Monitoring Dashboard", group: "Project Tools" },
   { code: "acsm_form", name: "ACSM Reporting Form", group: "Project Tools" },
   { code: "acsm_dash", name: "ACSM Dashboard", group: "Project Tools" },
   { code: "sbc_form", name: "SBC Reporting Form", group: "Project Tools" },
