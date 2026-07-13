@@ -383,7 +383,7 @@ export default function RepeatHouseholdCoverageSurvey({
       c.gps ||
         c.cdd_came ||
         c.anyone_treated ||
-        c.eligible_count ||
+        c.eligible_count !== null ||
         c.offered_count ||
         c.swallowed_count ||
         c.side_effects ||
