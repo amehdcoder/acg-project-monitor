@@ -1303,11 +1303,18 @@ const QuizBuilder = () => {
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
           ) : quizzes.length === 0 ? (
-            <Card className="col-span-full form-card">
-              <CardContent className="py-12 text-center">
-                <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
-                <p className="text-muted-foreground">
-                  {isAdmin ? "No quizzes created yet." : "No quizzes assigned to you yet."}
+            <Card className="col-span-full form-card border-dashed">
+              <CardContent className="py-14 px-6 text-center flex flex-col items-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-4">
+                  <BookOpen className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="font-display text-lg font-bold text-foreground mb-1.5">
+                  {isAdmin ? "No quizzes created yet" : "No quiz set up yet"}
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
+                  {isAdmin
+                    ? "Create your first quiz to start running Pre-test and Post-test assessments for a project."
+                    : "There is no quiz set up for your project yet. Once an administrator publishes one, it will appear here automatically for you to take."}
                 </p>
               </CardContent>
             </Card>
