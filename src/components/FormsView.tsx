@@ -4647,6 +4647,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         onCopied={() => currentProjectId && fetchForms(currentProjectId)}
       />
 
+      <BmzAddToProjectDialog
+        open={showBmzAddDialog}
+        onOpenChange={setShowBmzAddDialog}
+        projects={projects}
+        userId={user?.id}
+        onChanged={loadBmzAssignments}
+      />
+
+
       {/* Template Picker Dialog */}
       {showTemplatePicker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowTemplatePicker(false)}>
