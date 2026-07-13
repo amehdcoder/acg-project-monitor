@@ -936,6 +936,10 @@ const QuizBuilder = () => {
               <div className="flex gap-2 flex-wrap pt-2">
                 {isAdmin && (
                   <>
+                    <Button size="sm" variant="outline" onClick={() => openRenameDialog(selectedQuiz)} className="gap-1">
+                      <Pencil className="h-3 w-3" /> Rename
+                    </Button>
+
                     <Button size="sm" variant="outline" onClick={() => togglePublish(selectedQuiz)} className="gap-1">
                       <Send className="h-3 w-3" /> {selectedQuiz.is_published ? "Unpublish" : "Publish"}
                     </Button>
