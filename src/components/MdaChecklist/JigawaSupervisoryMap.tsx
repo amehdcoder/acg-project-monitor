@@ -158,7 +158,7 @@ export default function JigawaSupervisoryMap({ submissions, formName }: Props) {
         })
         .filter(Boolean) as { id: string; lat: number; lng: number; submitter: string; at?: string | null; lga: string | null; source: string; outsideJigawaBounds: boolean }[];
 
-      if (typeof console !== "undefined" && /localhost|lovable/i.test(window.location.host)) {
+      if (typeof console !== "undefined" && typeof window !== "undefined" && /localhost|lovable/i.test(window.location.host)) {
         console.info("[JigawaSupervisoryMap] Babura GPS trace", {
           totalSubmissions: submissions.length,
           acceptedPoints: parsed.length,
