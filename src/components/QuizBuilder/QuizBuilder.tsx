@@ -33,6 +33,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import QuizTaker from "./QuizTaker";
 import QuizAnalytics from "./QuizAnalytics";
+import QuizOpenedDialog from "./QuizOpenedDialog";
+
 
 interface QuizQuestion {
   id: string;
