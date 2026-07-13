@@ -492,9 +492,9 @@ export default function RepeatHouseholdCoverageSurvey({
   // ── Eligible-persons / drug validation ──────────────────────────
   // "Eligible persons in the household" is strictly required, and neither
   // "Offered drugs" nor "Actually swallowed" may ever exceed it.
-  const eligibleMissing = !(record.eligible_count > 0);
-  const offeredExceeds = record.offered_count > record.eligible_count;
-  const swallowedExceeds = record.swallowed_count > record.eligible_count;
+  const eligibleMissing = record.eligible_count === null;
+  const offeredExceeds = record.offered_count > (record.eligible_count ?? 0);
+  const swallowedExceeds = record.swallowed_count > (record.eligible_count ?? 0);
   const countError = !eligibleMissing && (offeredExceeds || swallowedExceeds);
   const countValidationMessage = eligibleMissing
     ? "Enter the number of eligible persons in the household (required)."
