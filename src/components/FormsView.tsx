@@ -333,9 +333,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showBmzAddDialog, setShowBmzAddDialog] = useState(false);
   const [bmzProjectIds, setBmzProjectIds] = useState<Set<string>>(new Set());
   const loadBmzAssignments = useCallback(async () => {
-    const { data } = await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from("bmz_project_assignments")
       .select("project_id");
+    if (error) {
+      console.error("[BMZ] Failed to fetch bmz_project_assignments:", error.message);
+    } else {
+      console.log("[BMZ] Fetched project assignments:", (data ?? []).map((r: any) => r.project_id));
+    }
     setBmzProjectIds(new Set<string>((data ?? []).map((r: any) => r.project_id)));
   }, []);
   useEffect(() => { loadBmzAssignments(); }, [loadBmzAssignments]);
