@@ -886,6 +886,11 @@ const QuizBuilder = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Beautiful "assessment is now open" popup for members */}
+      {!isAdmin && (
+        <QuizOpenedDialog quizzes={quizzes} onTake={(q) => setShowTaker(q as Quiz)} />
+      )}
+
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-fuchsia-600 to-amber-500 p-5 shadow-lg sm:p-6">
         <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-12 left-1/3 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
