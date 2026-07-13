@@ -423,6 +423,7 @@ const Index = () => {
 
       <GuidedTour onNavigate={handleTabChange} />
     </ProximityProvider>
+    </GeoSetupGate>
   );
 };
 
