@@ -627,7 +627,7 @@ export default function RepeatHouseholdCoverageSurvey({
           target_households: target,
           completed_households: records.length,
           shortfall_reason: reason.trim() || null,
-          households: records,
+          households: householdsForSave,
           gps,
           metadata: { source: "mda_checklist", submitted_at: new Date().toISOString() },
         },
