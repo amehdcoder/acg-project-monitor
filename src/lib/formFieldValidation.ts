@@ -44,6 +44,8 @@ export function resolveDateBound(token?: string | null): string | undefined {
   return undefined;
 }
 
+const cleanLabel = (label: string): string => label.replace(/<[^>]*>/g, "").trim();
+
 /**
  * Validate a single answered value against a question's schema. Callers should
  * only invoke this for VISIBLE, input-type questions that already have a value
