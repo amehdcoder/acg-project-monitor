@@ -15,7 +15,7 @@ import { cascadeReferenceEntities, resolveReferences } from "@/lib/referenceSync
 // Tables that carry the formal idempotency contract (submission_uuid +
 // client_submitted_at columns). Rows destined for these tables are stamped so a
 // retransmit after a network blip is recognised and never duplicated.
-const SYNC_CONTRACT_TABLES = new Set(["bloomberg_validations", "seeclear_monitoring"]);
+const SYNC_CONTRACT_TABLES = new Set(["bloomberg_validations", "seeclear_monitoring", "bmz_monitoring"]);
 
 
 const DB_NAME = "acg_offline_submissions";
