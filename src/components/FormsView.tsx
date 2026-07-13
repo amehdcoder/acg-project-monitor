@@ -4024,6 +4024,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     { kind: "seeclear_dash" as const, icon: BarChart3, bg: "bg-[#DCF3F0]", fg: "text-[#0f766e]", label: "Monitoring Dashboard", desc: "Readiness, equipment, referrals, data quality & map (Owner only)." },
                   ],
                 }] : []),
+                ...(isOwner ? [{
+                  id: "bmz_folder",
+                  title: "BMZ — Jigawa Inclusive Eye Health Project",
+                  subtitle: "Monitoring checklist for Health Ambassadors, TBAs & CHEWs",
+                  bg: "bg-[#DCF1EA]", fg: "text-[#0f6b52]", chipBg: "bg-[#DCF1EA]", chipFg: "text-[#0f6b52]",
+                  items: [
+                    { kind: "bmz_form" as const, icon: ClipboardCheck, bg: "bg-[#DCF1EA]", fg: "text-[#14b8a6]", label: "Eye Health Monitoring Checklist", desc: "Identification, training, service delivery, referrals, challenges & sign-off." },
+                    { kind: "bmz_dash" as const, icon: BarChart3, bg: "bg-[#DCF1EA]", fg: "text-[#0f6b52]", label: "Monitoring Dashboard", desc: "Cadre performance, training, screening, referrals & flagged gaps (Owner only)." },
+                  ],
+                }] : []),
                 {
                   id: "action_tracker_folder",
                   title: "Meeting Action Tracking",
