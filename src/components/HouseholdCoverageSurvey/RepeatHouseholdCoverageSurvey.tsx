@@ -581,7 +581,7 @@ export default function RepeatHouseholdCoverageSurvey({
       // and the legacy *_count keys, so old and new analytics stay aligned.
       const householdsForSave = records.map((r) => ({
         ...r,
-        eligible_persons: r.eligible_count,
+        eligible_persons: r.eligible_count ?? 0,
         offered_drugs: r.offered_count,
         actually_swallowed: r.swallowed_count,
       }));
