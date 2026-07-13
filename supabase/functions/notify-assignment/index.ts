@@ -100,6 +100,12 @@ function renderEmail(opts: {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
+    // Only admins (or trusted server callers via service role / cron secret)
+    // may trigger assignment notification emails. This prevents anyone on the
+    // internet from sending branded emails to arbitrary addresses.
+    const guard = await guardRequest(req, corsHeaders, { requireAdmin: true });
+    if (guard.response) return guard.response;
+
     const body = await req.json();
     const { email, firstName, kind, items } = body ?? {};
 
