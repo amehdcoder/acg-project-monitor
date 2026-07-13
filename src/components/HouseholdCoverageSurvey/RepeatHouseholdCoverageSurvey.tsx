@@ -1081,43 +1081,82 @@ export default function RepeatHouseholdCoverageSurvey({
         <div className="mx-auto max-w-4xl px-3 py-2.5 sm:px-4 sm:py-3">
           {/* Counter shown above the buttons on small screens to free horizontal room */}
           <div className="mb-2 text-center text-[11px] font-medium text-muted-foreground sm:hidden">
-            Household {hhNo} of {target}
+            {viewingPrevious ? `Reviewing household ${record.household_no} of ${completed.length}` : `Household ${hhNo} of ${target}`}
           </div>
-          <div className="flex items-stretch gap-2 sm:gap-3">
-            <Button
-              variant="outline"
-              onClick={handleFinishEarly}
-              disabled={submitting}
-              className="flex-1 min-w-0 gap-1.5 px-2 text-xs sm:flex-none sm:px-4 sm:text-sm"
-            >
-              <ArrowLeft className="h-4 w-4 shrink-0" />
-              <span className="truncate">Finish &amp; submit</span>
-            </Button>
-            <div className="hidden flex-1 text-center text-xs text-muted-foreground sm:block sm:self-center">
-              Household {hhNo} of {target}
+          {viewingPrevious ? (
+            /* Navigation controls while reviewing a saved household */
+            <div className="flex items-stretch gap-2 sm:gap-3">
+              <Button
+                variant="outline"
+                onClick={goToPreviousHousehold}
+                disabled={editingIndex === 0}
+                className="flex-1 min-w-0 gap-1.5 px-2 text-xs sm:px-4 sm:text-sm"
+              >
+                <ArrowLeft className="h-4 w-4 shrink-0" />
+                <span className="truncate">Previous</span>
+              </Button>
+              <Button
+                onClick={goToNextHousehold}
+                style={{ background: TEAL }}
+                className="flex-1 min-w-0 gap-1.5 px-2 text-xs text-white sm:px-4 sm:text-sm"
+              >
+                <span className="truncate">
+                  {editingIndex! < completed.length - 1 ? "Next household" : "Back to current"}
+                </span>
+                <ArrowRight className="h-4 w-4 shrink-0" />
+              </Button>
             </div>
-            <Button
-              onClick={handleSaveAndNext}
-              disabled={submitting}
-              style={{ background: TEAL }}
-              className="flex-1 min-w-0 gap-1.5 px-2 text-xs text-white sm:flex-none sm:px-4 sm:text-sm"
-            >
-              {submitting ? (
-                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-              ) : completed.length + 1 >= target ? (
-                <>
-                  <Send className="h-4 w-4 shrink-0" />
-                  <span className="truncate">Save &amp; submit</span>
-                </>
-              ) : (
-                <>
-                  <span className="truncate">Save &amp; next household</span>
-                  <ArrowRight className="h-4 w-4 shrink-0" />
-                </>
+          ) : (
+            <div className="flex items-stretch gap-2 sm:gap-3">
+              {/* Previous Household Record — step back through saved households */}
+              {completed.length > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={goToPreviousHousehold}
+                  disabled={submitting}
+                  className="min-w-0 gap-1.5 px-2 text-xs sm:px-4 sm:text-sm border-blue-300 text-blue-900 hover:bg-blue-50"
+                  title="Review the previous household record"
+                >
+                  <ArrowLeft className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Previous</span>
+                </Button>
               )}
-            </Button>
-          </div>
+              <Button
+                variant="outline"
+                onClick={handleFinishEarly}
+                disabled={submitting}
+                className="flex-1 min-w-0 gap-1.5 px-2 text-xs sm:flex-none sm:px-4 sm:text-sm"
+              >
+                <Send className="h-4 w-4 shrink-0" />
+                <span className="truncate">Finish &amp; submit</span>
+              </Button>
+              <div className="hidden flex-1 text-center text-xs text-muted-foreground sm:block sm:self-center">
+                Household {hhNo} of {target}
+              </div>
+              <Button
+                onClick={handleSaveAndNext}
+                disabled={submitting}
+                style={{ background: TEAL }}
+                className="flex-1 min-w-0 gap-1.5 px-2 text-xs text-white sm:flex-none sm:px-4 sm:text-sm"
+              >
+                {submitting ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                ) : completed.length + 1 >= target ? (
+                  <>
+                    <Send className="h-4 w-4 shrink-0" />
+                    <span className="truncate">Save &amp; submit</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="truncate">Save &amp; next household</span>
+                    <ArrowRight className="h-4 w-4 shrink-0" />
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
+
       </div>
 
       {/* Finish-early confirmation (requires shortfall reason if under target) */}
