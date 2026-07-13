@@ -647,10 +647,10 @@ export default function RepeatHouseholdCoverageSurvey({
   /* ---- Success screen ---- */
   if (done) {
     return (
-      <div className="min-h-full bg-gradient-to-b from-teal-50 to-background flex items-center justify-center p-6">
+      <div className="min-h-full bg-gradient-to-b from-blue-50 to-background flex items-center justify-center p-6">
         <div className="max-w-md w-full text-center space-y-4 rounded-2xl border bg-card p-8 shadow-lg">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-teal-100">
-            <CheckCircle2 className="h-9 w-9 text-teal-600" />
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
+            <CheckCircle2 className="h-9 w-9 text-blue-800" />
           </div>
           <h2 className="font-display text-2xl font-bold">Coverage Survey Complete</h2>
           <p className="text-muted-foreground">
@@ -670,7 +670,7 @@ export default function RepeatHouseholdCoverageSurvey({
   return (
     <div className="min-h-full bg-muted/20">
       {/* Header */}
-      <div className="sticky top-0 z-20 text-white shadow-md" style={{ background: `linear-gradient(100deg, #0f766e, #0d9488)` }}>
+      <div className="sticky top-0 z-20 text-white shadow-md" style={{ background: `linear-gradient(105deg, ${TEAL_DARK}, ${TEAL})` }}>
         <div className="mx-auto max-w-4xl px-4 py-3.5 flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
             <Home className="h-6 w-6" />
@@ -700,7 +700,7 @@ export default function RepeatHouseholdCoverageSurvey({
           <ProgressRing done={completed.length} total={target} />
           <div className="flex-1 space-y-1">
             <div className="flex items-center gap-2 text-sm font-semibold">
-              <MapPin className="h-4 w-4 text-teal-600" />
+              <MapPin className="h-4 w-4 text-blue-800" />
               {[location?.community_name, location?.ward, location?.lga, location?.state].filter(Boolean).join(" • ") || "Location from checklist"}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -708,11 +708,11 @@ export default function RepeatHouseholdCoverageSurvey({
             </p>
             <div className="flex flex-wrap gap-1.5 pt-1">
               {completed.map((h) => (
-                <span key={h.household_no} className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-100 text-teal-700 text-xs font-bold">
+                <span key={h.household_no} className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-900 text-xs font-bold">
                   {h.household_no}
                 </span>
               ))}
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-600 text-white text-xs font-bold ring-2 ring-teal-200">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-800 text-white text-xs font-bold ring-2 ring-blue-200">
                 {hhNo}
               </span>
               {Array.from({ length: Math.max(0, target - hhNo) }).map((_, i) => (
@@ -728,17 +728,17 @@ export default function RepeatHouseholdCoverageSurvey({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="rounded-xl border bg-card p-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-              <Home className="h-4 w-4 text-teal-600" /> Household No.
+              <Home className="h-4 w-4 text-blue-800" /> Household No.
             </div>
             <div className="mt-1 flex items-center gap-2">
-              <span className="text-3xl font-extrabold text-teal-600">{hhNo}</span>
+              <span className="text-3xl font-extrabold text-blue-800">{hhNo}</span>
               <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Auto-generated</span>
             </div>
           </div>
-          <div className={`rounded-xl border bg-card p-4 transition-colors ${hasGps ? "border-teal-300" : "border-amber-300"}`}>
+          <div className={`rounded-xl border bg-card p-4 transition-colors ${hasGps ? "border-blue-300" : "border-amber-300"}`}>
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                <MapPin className="h-4 w-4 text-teal-600" /> GPS of Household <span className="text-destructive">*</span>
+                <MapPin className="h-4 w-4 text-blue-800" /> GPS of Household <span className="text-destructive">*</span>
               </div>
               <LocationStatusBadge
                 source={geo.source}
@@ -754,7 +754,7 @@ export default function RepeatHouseholdCoverageSurvey({
                 {hasGps ? "Re-capture" : "Capture Geopoint"}
               </Button>
               {hasGps ? (
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-700">
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-900">
                   <CheckCircle2 className="h-4 w-4" /> {gpsLabel}
                 </span>
               ) : (
@@ -836,7 +836,7 @@ export default function RepeatHouseholdCoverageSurvey({
                               key={s}
                               type="button"
                               onClick={() => updatePerson(i, { sex: s })}
-                              className={`h-8 w-8 rounded-md border text-xs font-bold ${p.sex === s ? "text-white" : "text-teal-600 border-teal-200"}`}
+                              className={`h-8 w-8 rounded-md border text-xs font-bold ${p.sex === s ? "text-white" : "text-blue-800 border-blue-200"}`}
                               style={p.sex === s ? { background: TEAL, borderColor: TEAL } : undefined}
                             >
                               {s}
@@ -865,7 +865,7 @@ export default function RepeatHouseholdCoverageSurvey({
                 </tbody>
               </table>
             </div>
-            <Button type="button" variant="outline" size="sm" className="mt-2 text-teal-600 border-teal-200" onClick={() => update({ people: [...current.people, emptyPerson()] })}>
+            <Button type="button" variant="outline" size="sm" className="mt-2 text-blue-800 border-blue-200" onClick={() => update({ people: [...current.people, emptyPerson()] })}>
               <Plus className="h-4 w-4 mr-1.5" /> Add another person
             </Button>
           </QRow>
@@ -1056,7 +1056,7 @@ export default function RepeatHouseholdCoverageSurvey({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <ClipboardCheck className="h-5 w-5 text-teal-600" />
+              <ClipboardCheck className="h-5 w-5 text-blue-800" />
               Finish coverage survey?
             </AlertDialogTitle>
             <AlertDialogDescription>
