@@ -206,6 +206,17 @@ const DateInput = ({
               setOpen(false);
             }}
             initialFocus
+            disabled={(d) => {
+              if (min) {
+                const lo = parse(min, "yyyy-MM-dd", new Date());
+                if (isValid(lo) && d < lo) return true;
+              }
+              if (max) {
+                const hi = parse(max, "yyyy-MM-dd", new Date());
+                if (isValid(hi) && d > hi) return true;
+              }
+              return false;
+            }}
             className="pointer-events-auto"
           />
         </PopoverContent>
