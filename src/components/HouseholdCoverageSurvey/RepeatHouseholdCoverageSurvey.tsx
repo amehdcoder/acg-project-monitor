@@ -328,6 +328,16 @@ export default function RepeatHouseholdCoverageSurvey({
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [shortfallReason, setShortfallReason] = useState("");
   const [done, setDone] = useState(false);
+  // When non-null, the supervisor is stepping BACK through an already-saved
+  // household (read/edit) instead of the live in-progress one. The live
+  // `current` household is preserved untouched so no progress is ever lost.
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  // The household currently shown on screen: either a previously saved record
+  // (when navigating back) or the live in-progress one.
+  const viewingPrevious = editingIndex !== null;
+  const record: HouseholdRecord =
+    viewingPrevious && completed[editingIndex!] ? completed[editingIndex!] : current;
 
   // Persist in-progress households whenever they change (until submitted).
   useEffect(() => {
@@ -340,6 +350,30 @@ export default function RepeatHouseholdCoverageSurvey({
     }
   }, [completed, current, done, draftKey]);
 
+  // Android/iOS minimization guard: flush the draft the instant the app is
+  // backgrounded or hidden (before the OS may freeze/kill the tab) so bringing
+  // the app back to the foreground restores the exact step the user left.
+  useEffect(() => {
+    if (done) return;
+    const flush = () => {
+      try {
+        const draft: HcsDraft = { completed, current, savedAt: new Date().toISOString() };
+        localStorage.setItem(draftKey, JSON.stringify(draft));
+      } catch {
+        /* ignore */
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [completed, current, done, draftKey]);
+
   // Whether the survey holds unsubmitted work worth guarding on exit.
   const hasUnsavedProgress = useMemo(() => {
     if (done) return false;
@@ -349,6 +383,7 @@ export default function RepeatHouseholdCoverageSurvey({
       c.gps ||
         c.cdd_came ||
         c.anyone_treated ||
+        c.eligible_count ||
         c.offered_count ||
         c.swallowed_count ||
         c.side_effects ||
@@ -389,14 +424,32 @@ export default function RepeatHouseholdCoverageSurvey({
 
   const reachedTarget = completed.length >= target;
 
+  // Route edits to the record on screen: the live household, or the saved one
+  // being reviewed. Editing a saved record never disturbs the live progress.
+  const update = (patch: Partial<HouseholdRecord>) => {
+    if (viewingPrevious) {
+      setCompleted((list) => list.map((h, i) => (i === editingIndex ? { ...h, ...patch } : h)));
+    } else {
+      setCurrent((c) => ({ ...c, ...patch }));
+    }
+  };
 
-  const update = (patch: Partial<HouseholdRecord>) => setCurrent((c) => ({ ...c, ...patch }));
-
-  const updatePerson = (idx: number, patch: Partial<PersonRow>) =>
-    setCurrent((c) => ({
-      ...c,
-      people: c.people.map((p, i) => (i === idx ? { ...p, ...patch } : p)),
-    }));
+  const updatePerson = (idx: number, patch: Partial<PersonRow>) => {
+    if (viewingPrevious) {
+      setCompleted((list) =>
+        list.map((h, i) =>
+          i === editingIndex
+            ? { ...h, people: h.people.map((p, j) => (j === idx ? { ...p, ...patch } : p)) }
+            : h,
+        ),
+      );
+    } else {
+      setCurrent((c) => ({
+        ...c,
+        people: c.people.map((p, i) => (i === idx ? { ...p, ...patch } : p)),
+      }));
+    }
+  };
 
   const captureGps = () => {
     void geo.refresh();
@@ -404,33 +457,81 @@ export default function RepeatHouseholdCoverageSurvey({
 
   // Commit incoming geo fix onto the current household when captured.
   const gpsLabel = useMemo(() => {
-    const g = current.gps;
+    const g = record.gps;
     if (g) return `${g.lat.toFixed(6)}, ${g.lng.toFixed(6)} · ±${Math.round(g.accuracy)}m`;
     return null;
-  }, [current.gps]);
+  }, [record.gps]);
 
   // Each household MUST capture its own unique geopoint. We track the last
   // consumed GPS timestamp so a fresh fix (from tapping "Capture Geopoint" on
   // the new household) is always adopted, while a stale fix carried over from a
-  // previous household is never silently re-used.
+  // previous household is never silently re-used. A fresh fix only applies to
+  // the LIVE household — never to a saved one being reviewed.
   const lastGpsTsRef = useRef<number | null>(null);
   useEffect(() => {
     const pos = geo.coord;
     if (!pos) return;
     if (pos.timestamp === lastGpsTsRef.current) return;
     lastGpsTsRef.current = pos.timestamp;
-    setCurrent((c) => ({ ...c, gps: { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy } }));
+    if (viewingPrevious) {
+      setCompleted((list) =>
+        list.map((h, i) =>
+          i === editingIndex ? { ...h, gps: { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy } } : h,
+        ),
+      );
+    } else {
+      setCurrent((c) => ({ ...c, gps: { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy } }));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geo.coord]);
 
-  const householdValid = current.cdd_came !== "";
-  const hasGps = !!current.gps;
-  const tasteOtherMissing = current.taste_of_medicine === "other" && !current.taste_other.trim();
+  const householdValid = record.cdd_came !== "";
+  const hasGps = !!record.gps;
+  const tasteOtherMissing = record.taste_of_medicine === "other" && !record.taste_other.trim();
+
+  // ── Eligible-persons / drug validation ──────────────────────────
+  // "Eligible persons in the household" is strictly required, and neither
+  // "Offered drugs" nor "Actually swallowed" may ever exceed it.
+  const eligibleMissing = !(record.eligible_count > 0);
+  const offeredExceeds = record.offered_count > record.eligible_count;
+  const swallowedExceeds = record.swallowed_count > record.eligible_count;
+  const countError = !eligibleMissing && (offeredExceeds || swallowedExceeds);
+  const countValidationMessage = eligibleMissing
+    ? "Enter the number of eligible persons in the household (required)."
+    : offeredExceeds && swallowedExceeds
+    ? "Offered and swallowed cannot exceed the number of eligible persons."
+    : offeredExceeds
+    ? "Offered drugs cannot exceed the number of eligible persons."
+    : swallowedExceeds
+    ? "Actually swallowed cannot exceed the number of eligible persons."
+    : "";
+  const countsBlockProgress = eligibleMissing || countError;
 
   const saveCurrentHousehold = (): HouseholdRecord[] => {
     const snapshot = [...completed, current];
     setCompleted(snapshot);
     return snapshot;
+  };
+
+  const goToPreviousHousehold = () => {
+    if (viewingPrevious) {
+      if (editingIndex! > 0) setEditingIndex(editingIndex! - 1);
+    } else if (completed.length > 0) {
+      setEditingIndex(completed.length - 1);
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const goToNextHousehold = () => {
+    if (!viewingPrevious) return;
+    if (editingIndex! < completed.length - 1) setEditingIndex(editingIndex! + 1);
+    else setEditingIndex(null); // back to the live in-progress household
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const returnToCurrent = () => {
+    setEditingIndex(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleSaveAndNext = () => {
@@ -440,6 +541,10 @@ export default function RepeatHouseholdCoverageSurvey({
     }
     if (!hasGps) {
       toast({ title: "Capture the household GPS", description: "Each household must have its own geopoint. Tap “Capture Geopoint” before saving.", variant: "destructive" });
+      return;
+    }
+    if (countsBlockProgress) {
+      toast({ title: "Check the drug coverage numbers", description: countValidationMessage, variant: "destructive" });
       return;
     }
     if (tasteOtherMissing) {
@@ -461,6 +566,7 @@ export default function RepeatHouseholdCoverageSurvey({
     // Include the current household if it has an answer.
     setShowFinishConfirm(true);
   };
+
 
   const finalize = async (records: HouseholdRecord[], reason: string) => {
     if (!user) {
