@@ -576,6 +576,15 @@ export default function RepeatHouseholdCoverageSurvey({
     setSubmitting(true);
     try {
       const gps = records.find((r) => r.gps)?.gps ?? initialGps ?? null;
+      // Persist each household with BOTH the canonical validated keys the
+      // dashboards read (eligible_persons / offered_drugs / actually_swallowed)
+      // and the legacy *_count keys, so old and new analytics stay aligned.
+      const householdsForSave = records.map((r) => ({
+        ...r,
+        eligible_persons: r.eligible_count,
+        offered_drugs: r.offered_count,
+        actually_swallowed: r.swallowed_count,
+      }));
       // Unified journey: persist the linked MDA checklist FIRST (offline-capable)
       // so the household survey can reference it — one Submit, one linked package.
       // If the checklist fails to persist we abort and keep the local draft.
