@@ -30,6 +30,10 @@ void requestPersistentStorage();
 initOfflineMedia();
 initOfflineSubmissions();
 initSavedFormAutoSync();
+// Seed the offline-first State→LGA→Ward geography lookup table into IndexedDB
+// once (skips the write entirely if a current copy already exists). The pickers
+// work synchronously from the bundled dataset while this resolves.
+void initGeographyCache();
 // Self-heal any special-form mirrors stuck showing "queued" after their row
 // already reached the server.
 initSpecialFormReconcile();
