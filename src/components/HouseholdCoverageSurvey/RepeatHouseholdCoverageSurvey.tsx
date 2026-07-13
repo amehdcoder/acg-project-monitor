@@ -119,7 +119,7 @@ const emptyHousehold = (n: number): HouseholdRecord => ({
   gps: null,
   cdd_came: "",
   anyone_treated: "",
-  eligible_count: 0,
+  eligible_count: null,
   offered_count: 0,
   swallowed_count: 0,
   people: [emptyPerson(), emptyPerson()],
