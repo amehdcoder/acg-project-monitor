@@ -184,9 +184,9 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   // the current State/LGA/Ward — FLHF facilities and settlements with GPS.
   const [grid3Facilities, setGrid3Facilities] = useState<FacilityWithCoords[]>([]);
   const [grid3Settlements, setGrid3Settlements] = useState<FacilityWithCoords[]>([]);
-  const [grid3States, setGrid3States] = useState<string[]>([]);
-  const [grid3Lgas, setGrid3Lgas] = useState<string[]>([]);
-  const [grid3Wards, setGrid3Wards] = useState<string[]>([]);
+  // State → LGA → Ward come from the local, offline-first geography cache
+  // (see geographyCache.ts) — pure in-memory filtering, NO network on change.
+  // FLHF / Community / Settlement still use the richer GRID3 shards (GPS).
   // States the project was designed for (from project scope) — used as the
   // cascade fallback when no microplan is linked to the project.
   const [projectStates, setProjectStates] = useState<string[]>([]);
