@@ -23,6 +23,7 @@ interface Profile {
   last_name: string;
   designation: string;
   other_designation?: string | null;
+  has_quiz_access?: boolean;
 }
 
 interface SidebarProps {
