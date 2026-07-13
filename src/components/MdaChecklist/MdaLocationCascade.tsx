@@ -731,6 +731,20 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
           <Badge variant="outline" className="gap-1 border-primary/40 text-primary">
             <Lock className="h-3 w-3" /> {(disableMicroplan || microplanIsEmpty) ? "State cascade" : "Microplan-locked"}
           </Badge>
+          {(isAdmin || isOwner) && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleRefreshHierarchy}
+              disabled={refreshingGeo}
+              className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+              title="Rebuild the offline State → LGA → Ward hierarchy (admin only)"
+            >
+              <RefreshCw className={cn("h-3 w-3", refreshingGeo && "animate-spin")} />
+              {refreshingGeo ? "Refreshing…" : "Refresh Hierarchy Data"}
+            </Button>
+          )}
         </div>
       </div>
 
