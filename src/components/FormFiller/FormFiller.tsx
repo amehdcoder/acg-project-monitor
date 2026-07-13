@@ -2737,6 +2737,8 @@ const FormFiller = ({
             value={value}
             onChange={(v) => update(v)}
             dateFormat={question.dateFormat}
+            min={resolveDateBound(question.validation?.minDate)}
+            max={resolveDateBound(question.validation?.maxDate)}
             hasError={!!error}
           />
         );
