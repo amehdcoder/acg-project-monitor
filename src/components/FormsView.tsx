@@ -1514,6 +1514,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   })();
 
   const currentProject = projects.find(p => p.id === currentProjectId);
+
+  // BMZ folder visibility: Owners always; otherwise anyone who belongs to a
+  // project the BMZ module has been added to (matches the current project OR
+  // any of the user's accessible projects, so it shows even before a project
+  // is explicitly selected).
+  const bmzFolderVisible =
+    isOwner ||
+    (!!currentProjectId && bmzProjectIds.has(currentProjectId)) ||
+    projects.some((p) => bmzProjectIds.has(p.id));
   const sarmaanSupervisoryForms = useMemo(
     () => mergedForms.filter((form) => isSupervisoryLearningForm({ settings: form.settings, name: form.name })),
     [mergedForms],
