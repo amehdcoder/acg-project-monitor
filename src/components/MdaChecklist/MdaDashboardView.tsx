@@ -530,14 +530,23 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
         )}
 
         {useCacheNow && (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
-            <WifiOff className="h-4 w-4 shrink-0" />
+          <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm text-primary">
+            {cacheIsStale ? <WifiOff className="h-4 w-4 shrink-0" /> : <Loader2 className="h-4 w-4 shrink-0 animate-spin" />}
             <span>
-              <strong>Offline:</strong> showing the last synced checklist data
-              {cached?.cachedAt ? ` (cached ${new Date(cached.cachedAt).toLocaleString()})` : ""}. It will refresh once you reconnect.
+              {cacheIsStale ? (
+                <>
+                  <strong>Offline:</strong> showing the last synced checklist data
+                  {cached?.cachedAt ? ` (cached ${new Date(cached.cachedAt).toLocaleString()})` : ""}. It will refresh once you reconnect.
+                </>
+              ) : (
+                <>
+                  <strong>Loaded instantly</strong> from your last synced data — refreshing with the latest checklist submissions…
+                </>
+              )}
             </span>
           </div>
         )}
+
 
         {!published && !canManageLifecycle ? (
           <Card className="border-dashed">
