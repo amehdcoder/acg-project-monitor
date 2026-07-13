@@ -1135,7 +1135,7 @@ export default function RepeatHouseholdCoverageSurvey({
               </div>
               <Button
                 onClick={handleSaveAndNext}
-                disabled={submitting}
+                disabled={submitting || countsBlockProgress}
                 style={{ background: TEAL }}
                 className="flex-1 min-w-0 gap-1.5 px-2 text-xs text-white sm:flex-none sm:px-4 sm:text-sm"
               >
