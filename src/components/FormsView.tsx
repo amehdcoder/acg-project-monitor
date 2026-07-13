@@ -2484,7 +2484,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         </div>
                       ))}
                     </div>
-                  ) : visibleMyFormsCount === 0 && !(currentProjectIsSarmaan && isAdmin) ? (
+                  ) : visibleMyFormsCount === 0 && !(currentProjectIsSarmaan && isAdmin) && !bmzFolderVisible ? (
                     <div className="flex h-40 flex-col items-center justify-center text-center px-4">
                       <FileText className="h-10 w-10 text-muted-foreground/50" />
                       <h3 className="mt-3 font-display text-base font-semibold text-foreground">No forms found</h3>
