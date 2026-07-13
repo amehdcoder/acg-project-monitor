@@ -18,6 +18,10 @@ const fmt1 = (n: number) => (Number.isFinite(n) ? n.toFixed(1) : "—");
 interface PersonRow { offered?: string; swallowed?: string }
 interface HouseholdRecord {
   anyone_treated?: string;
+  // Canonical validated keys + legacy *_count fallbacks.
+  eligible_persons?: number;
+  offered_drugs?: number;
+  actually_swallowed?: number;
   offered_count?: number;
   swallowed_count?: number;
   people?: PersonRow[];
@@ -31,10 +35,15 @@ export interface CoverageExportRow {
   households: HouseholdRecord[] | null;
 }
 
+const numFrom = (h: HouseholdRecord, keys: (keyof HouseholdRecord)[]) => {
+  for (const k of keys) { const n = Number(h[k] as any); if (Number.isFinite(n) && n > 0) return n; }
+  return 0;
+};
 const personsOffered = (h: HouseholdRecord) =>
-  Math.max(Number(h.offered_count) || 0, (h.people || []).filter((p) => norm(p.offered) === "y").length);
+  Math.max(numFrom(h, ["offered_drugs", "offered_count"]), (h.people || []).filter((p) => norm(p.offered) === "y").length);
 const personsSwallowed = (h: HouseholdRecord) =>
-  Math.max(Number(h.swallowed_count) || 0, (h.people || []).filter((p) => norm(p.swallowed) === "y").length);
+  Math.max(numFrom(h, ["actually_swallowed", "swallowed_count"]), (h.people || []).filter((p) => norm(p.swallowed) === "y").length);
+
 
 interface WardRow {
   lga: string; ward: string;
