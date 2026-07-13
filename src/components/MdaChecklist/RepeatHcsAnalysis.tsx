@@ -597,7 +597,7 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
                     </span>
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {r.offered > 0 ? (
+                    {txDenomR > 0 ? (
                       <span className="inline-block rounded-md px-2 py-0.5 text-[11px] font-bold tabular-nums" style={{ background: `${(txOk ? EMERALD : RED)}1a`, color: txOk ? EMERALD : RED }}>
                         {txV.toFixed(0)}%
                       </span>
