@@ -343,10 +343,14 @@ export default function RepeatHcsAnalysis({ projectId, stateFilter, dateFrom, da
     const totalHh = allHh.length;
     const cddYes = allHh.filter((h) => norm(h.cdd_came) === "yes").length;
     const treatedYes = allHh.filter((h) => norm(h.anyone_treated) === "yes").length;
+    const eligible = allHh.reduce((a, h) => a + personsEligible(h), 0);
     const offered = allHh.reduce((a, h) => a + personsOffered(h), 0);
     const swallowed = allHh.reduce((a, h) => a + personsSwallowed(h), 0);
 
-    const txTest = offered > 0 ? testAgainstBenchmark(swallowed, offered, txBenchmark) : null;
+    // Therapeutic Coverage Rate = actually_swallowed ÷ eligible_persons.
+    // Fall back to offered only for legacy rows lacking an eligible count.
+    const txDenom = eligible > 0 ? eligible : offered;
+    const txTest = txDenom > 0 ? testAgainstBenchmark(swallowed, txDenom, txBenchmark) : null;
     const hhTest = totalHh > 0 ? testAgainstBenchmark(cddYes, totalHh, hhBenchmark) : null;
 
     const count = (key: keyof HouseholdRecord, val: string) => allHh.filter((h) => norm(h[key] as any) === val).length;
