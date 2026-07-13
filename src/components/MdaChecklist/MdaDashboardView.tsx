@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useDataAnalytics, type SubmissionRecord } from "@/hooks/useDataAnalytics";
-import { clearMdaCache, loadMdaCache, saveMdaCache, isOffline } from "@/lib/mda/offlineCache";
+import { clearLegacyMdaCache, clearMdaCache, loadMdaCache, saveMdaCache, isOffline } from "@/lib/mda/offlineCache";
 import { canonicalizeSubmissionData } from "@/lib/mda/dashboardData";
 import { isDashboardPublished, type MdaCopySettings } from "@/lib/mda/copyChecklist";
 import MdaSupervisoryChecklistDashboard from "./MdaSupervisoryChecklistDashboard";
@@ -215,7 +215,7 @@ function toMdaSubmission(s: SubmissionRecord, form: MdaDashboardForm, questions:
     submitter: s.submitter_name || "Unknown",
     submittedAt: s.submitted_at,
     status: s.status,
-    location: readGps(data),
+    location: readGps((s as any).raw_location) || readGps(data),
     data,
   };
 }
@@ -242,6 +242,7 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
   useEffect(() => {
     setPublished(isDashboardPublished((form.settings ?? {}) as MdaCopySettings));
     setFinalized(String((form as any).status ?? "") === "published");
+    clearLegacyMdaCache(form.id);
   }, [form]);
 
   const togglePublish = async () => {
