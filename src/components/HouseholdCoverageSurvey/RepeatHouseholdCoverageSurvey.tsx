@@ -846,10 +846,19 @@ export default function RepeatHouseholdCoverageSurvey({
                 <Input
                   type="number"
                   min={0}
+                  step={1}
                   inputMode="numeric"
-                  value={record.eligible_count ? String(record.eligible_count) : ""}
+                  onKeyDown={(e) => {
+                    if (e.key === "-" || e.key === "e" || e.key === "+") e.preventDefault();
+                  }}
+                  value={record.eligible_count === null ? "" : String(record.eligible_count)}
                   onChange={(e) => {
-                    const n = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                    const raw = e.target.value;
+                    if (raw === "") {
+                      update({ eligible_count: null });
+                      return;
+                    }
+                    const n = Math.max(0, Math.floor(Number(raw) || 0));
                     update({ eligible_count: n });
                   }}
                   placeholder="e.g. 5"
