@@ -78,7 +78,12 @@ function parsePointLocation(raw: JigawaSubmissionLite["location"]): { lat: numbe
   const p = value as Record<string, unknown>;
   const lat = Number(p.latitude ?? p.lat);
   const lng = Number(p.longitude ?? p.lng ?? p.lon ?? p.long);
-  if (isFiniteCoord(lat, lng)) return { lat, lng, source: p.latitude !== undefined ? "latitude/longitude" : "lat/lng", inverted: false };
+  if (isFiniteCoord(lat, lng)) {
+    if (!inJigawaBounds(lat, lng) && inJigawaBounds(lng, lat)) {
+      return { lat: lng, lng: lat, source: "jigawa-bounds-inverted-autocorrect", inverted: true };
+    }
+    return { lat, lng, source: p.latitude !== undefined ? "latitude/longitude" : "lat/lng", inverted: false };
+  }
   if (isFiniteCoord(lng, lat)) return { lat: lng, lng: lat, source: "inverted-autocorrect", inverted: true };
   return null;
 }
