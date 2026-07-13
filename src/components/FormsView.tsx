@@ -338,6 +338,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       .select("project_id");
     setBmzProjectIds(new Set<string>((data ?? []).map((r: any) => r.project_id)));
   }, []);
+  useEffect(() => { loadBmzAssignments(); }, [loadBmzAssignments]);
   const [showAcsmForm, setShowAcsmForm] = useState(false);
   const [showAcsmDash, setShowAcsmDash] = useState(false);
   const [showSbcForm, setShowSbcForm] = useState(false);
