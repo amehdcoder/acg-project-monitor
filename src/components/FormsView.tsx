@@ -327,6 +327,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showBloombergDash, setShowBloombergDash] = useState(false);
   const [showSeeClearForm, setShowSeeClearForm] = useState(false);
   const [showSeeClearDash, setShowSeeClearDash] = useState(false);
+  const [showBmzForm, setShowBmzForm] = useState(false);
+  const [showBmzDash, setShowBmzDash] = useState(false);
   const [showAcsmForm, setShowAcsmForm] = useState(false);
   const [showAcsmDash, setShowAcsmDash] = useState(false);
   const [showSbcForm, setShowSbcForm] = useState(false);
