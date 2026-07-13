@@ -121,7 +121,7 @@ interface GeoRow {
   key: string; label: string; sub: string;
   households: number;
   cddYes: number; treatedYes: number;
-  offered: number; swallowed: number;
+  eligible: number; offered: number; swallowed: number;
   txTest: BenchmarkTest | null;
   hhTest: BenchmarkTest | null;
 }
@@ -138,7 +138,7 @@ function aggregateGeo(surveys: SurveyRow[], level: "community" | "lga", txB: num
         key,
         label: level === "lga" ? (s.lga || "—") : (s.community_name || "Unspecified"),
         sub: level === "lga" ? (s.state || "—") : `${s.lga || "—"} · ${s.ward || "—"} · ${s.flhf_name || "—"}`,
-        households: 0, cddYes: 0, treatedYes: 0, offered: 0, swallowed: 0, txTest: null, hhTest: null,
+        households: 0, cddYes: 0, treatedYes: 0, eligible: 0, offered: 0, swallowed: 0, txTest: null, hhTest: null,
       };
       map.set(key, r);
     }
@@ -146,17 +146,22 @@ function aggregateGeo(surveys: SurveyRow[], level: "community" | "lga", txB: num
       r.households += 1;
       if (norm(h.cdd_came) === "yes") r.cddYes += 1;
       if (norm(h.anyone_treated) === "yes") r.treatedYes += 1;
+      r.eligible += personsEligible(h);
       r.offered += personsOffered(h);
       r.swallowed += personsSwallowed(h);
     }
   }
   const rows = [...map.values()].map((r) => {
-    r.txTest = r.offered > 0 ? testAgainstBenchmark(r.swallowed, r.offered, txB) : null;
+    // Therapeutic coverage = swallowed ÷ eligible persons (fall back to offered
+    // only for legacy rows that never captured an eligible count).
+    const denom = r.eligible > 0 ? r.eligible : r.offered;
+    r.txTest = denom > 0 ? testAgainstBenchmark(r.swallowed, denom, txB) : null;
     r.hhTest = r.households > 0 ? testAgainstBenchmark(r.cddYes, r.households, hhB) : null;
     return r;
   });
-  return rows.sort((a, b) => pct(a.swallowed, a.offered) - pct(b.swallowed, b.offered));
+  return rows.sort((a, b) => pct(a.swallowed, a.eligible > 0 ? a.eligible : a.offered) - pct(b.swallowed, b.eligible > 0 ? b.eligible : b.offered));
 }
+
 
 /* Rich tooltip: shows the full geography name plus its LGA · Ward · FLHF path. */
 function GeoChartTooltip({ active, payload, txBenchmark }: any) {
