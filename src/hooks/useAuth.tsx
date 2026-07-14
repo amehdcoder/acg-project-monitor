@@ -29,6 +29,26 @@ const withTimeout = <T,>(p: PromiseLike<T>, ms: number, label = "request_timeout
     new Promise<T>((_, reject) => setTimeout(() => reject(new Error(label)), ms)),
   ]);
 
+/**
+ * Centralized offline-auth tracing. Every message is prefixed with
+ * "[Offline Auth]" so the entire offline-resilient auth lifecycle (boot
+ * hydration, caught network exceptions that were deliberately swallowed, and
+ * online/offline transitions) can be filtered in one place in the console.
+ */
+const offlineAuthLog = (message: string, detail?: unknown) => {
+  try {
+    if (detail !== undefined) {
+      console.log(`[Offline Auth] ${message}`, detail);
+    } else {
+      console.log(`[Offline Auth] ${message}`);
+    }
+  } catch {
+    /* console unavailable — never let logging break auth */
+  }
+};
+
+
+
 interface Profile {
   id: string;
   user_id: string;
@@ -344,7 +364,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Network too slow / unreachable — hydrate from cached credential so the
         // app opens instead of spinning forever, then let a later silent refresh
         // fill in fresh data.
-        console.warn("Profile fetch timed out — falling back to cached profile", timeoutErr);
+        offlineAuthLog("Profile fetch timed out / unreachable — caught network exception, keeping session and falling back to cached profile (no sign-out)", timeoutErr);
         try {
           const cached = await getLatestOfflineCredential();
           if (cached?.user?.id === userId) {
@@ -494,6 +514,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // refresh/profile read from holding the entire app on the boot spinner.
     const bootStoredSession = getStoredAuthSession();
     if (bootStoredSession?.user) {
+      offlineAuthLog("Boot: hydrating React auth context from locally persisted session BEFORE any network request", {
+        userId: bootStoredSession.user.id,
+        email: bootStoredSession.user.email,
+        online: typeof navigator !== "undefined" ? navigator.onLine : true,
+      });
       setSession(bootStoredSession);
       setUser(bootStoredSession.user);
       setLoading(false);
@@ -502,13 +527,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (typeof navigator !== "undefined" && navigator.onLine === false) {
         // Fully offline: paint the correctly-permissioned app instantly from the
         // encrypted device profile — no network wait, no null-role flicker.
+        offlineAuthLog("Boot: device is offline — hydrating cached profile/role, bypassing online auth checks");
         void hydrateCachedProfileFor(bootStoredSession.user.id);
       } else {
         window.setTimeout(() => {
           void fetchProfile(bootStoredSession.user.id, { silent: true });
         }, 6000);
       }
+    } else {
+      offlineAuthLog("Boot: no locally persisted session found", {
+        online: typeof navigator !== "undefined" ? navigator.onLine : true,
+      });
     }
+
 
 
     // Absolute safety net: no matter what stalls (getSession hanging, a wedged
@@ -547,26 +578,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // explicitly signed out, recover from the encrypted device credential
         // and keep working; a later successful refresh restores the live session.
         if (event === "SIGNED_OUT" && !userSignOutRef.current) {
+          offlineAuthLog(
+            "Caught spurious SIGNED_OUT (not user-initiated) — treating as network/token-refresh failure. NOT clearing local session; recovering from cached credential.",
+            { online: typeof navigator !== "undefined" ? navigator.onLine : true },
+          );
           setSession(null);
           setTimeout(async () => {
             const recovered = await recoverFromCachedCredential("token_refresh_lost");
             if (!recovered) {
               const stored = getStoredAuthSession();
               if (stored?.user) {
+                offlineAuthLog("Spurious SIGNED_OUT: kept user signed in from persisted browser session");
                 setSession(stored);
                 setUser(stored.user);
                 void fetchProfile(stored.user.id, { silent: true });
               } else {
+                offlineAuthLog("Spurious SIGNED_OUT: no cached credential or persisted session available to recover from");
                 setUser(null);
                 setProfile(null);
                 setRole(null);
               }
+            } else {
+              offlineAuthLog("Spurious SIGNED_OUT: recovered session from encrypted device credential");
             }
             setProfileLoading(false);
             setLoading(false);
           }, 0);
           return;
         }
+
 
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
@@ -619,11 +659,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // No live Supabase session AND we're offline → hydrate from the
         // most recently cached account so the app boots logged-in.
         // Sync to the server will still require re-auth when online.
+        offlineAuthLog("Boot: no live session and device offline — auto-login from most recent cached credential");
         try {
           await recoverFromCachedCredential("auto_login_offline_boot");
         } catch (e) {
-          console.warn("Offline auto-login failed:", e);
+          offlineAuthLog("Boot: offline auto-login failed", e);
         }
+
         setProfileLoading(false);
       } else {
         setProfileLoading(false);
@@ -636,7 +678,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // getSession itself failed or timed out (network/storage/refresh error).
       // Don't hang the boot. If this device has a saved active profile, hydrate
       // it so field users can continue working under poor connectivity.
-      console.warn("getSession failed during boot:", e);
+      offlineAuthLog("Boot: getSession failed/timed out (network exception) — session NOT cleared, falling back to cached credential", e);
       const recovered = await recoverFromCachedCredential("initial_session_failed");
       if (recovered) {
         initialLoadDoneRef.current = true;
@@ -675,13 +717,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // the encrypted device credential + spurious-sign-out guard keep the user in.
     let refreshing = false;
     const refreshSessionWithRetry = async (attempts = 4) => {
-      if (refreshing || !navigator.onLine) return;
+      if (refreshing || !navigator.onLine) {
+        if (!navigator.onLine) {
+          offlineAuthLog("Token refresh paused/queued — device offline; will retry when connectivity returns");
+        }
+        return;
+      }
       refreshing = true;
+      offlineAuthLog("Token refresh: starting with exponential backoff", { attempts });
       try {
         for (let i = 0; i < attempts; i++) {
           try {
             const { data, error } = await supabase.auth.refreshSession();
             if (!error && data?.session) {
+              offlineAuthLog("Token refresh succeeded — live session restored", { attempt: i + 1 });
               setSession(data.session);
               setUser(data.session.user ?? null);
               userSignOutRef.current = false;
@@ -690,24 +739,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // A definitive auth failure (revoked/invalid) — stop retrying but do
             // not force a client-side sign-out; let the server-driven flow decide.
             const status = (error as any)?.status;
-            if (status && [400, 401, 403, 422].includes(status)) return;
-          } catch {
+            if (status && [400, 401, 403, 422].includes(status)) {
+              offlineAuthLog("Token refresh: definitive server auth failure — stopping retries (not forcing client sign-out)", { status });
+              return;
+            }
+            offlineAuthLog("Token refresh: transient failure — will back off and retry", { attempt: i + 1, status });
+          } catch (refreshErr) {
             /* network blip — fall through to backoff */
+            offlineAuthLog("Token refresh: caught network exception — session preserved, backing off", { attempt: i + 1, error: String((refreshErr as any)?.message || refreshErr) });
           }
           await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** i, 8000)));
         }
+        offlineAuthLog("Token refresh: all retries exhausted — session intentionally kept alive from cache until network stabilizes");
       } finally {
         refreshing = false;
       }
     };
 
     const handleOnline = () => {
+      offlineAuthLog("Connectivity change: ONLINE — flushing queues and retrying token refresh with backoff");
       setIsOfflineMode(false);
       syncAuditQueue();
       syncInactiveAttemptQueue();
       void refreshSessionWithRetry();
     };
-    const handleOffline = () => { setIsOfflineMode(true); };
+    const handleOffline = () => {
+      offlineAuthLog("Connectivity change: OFFLINE — pausing background token refreshes, staying signed in on cached credentials");
+      setIsOfflineMode(true);
+    };
+
     const handleVisibility = () => {
       if (document.visibilityState === "visible") void refreshSessionWithRetry();
     };
@@ -804,6 +864,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (error && isLikelyNetworkAuthError(error)) {
+      offlineAuthLog("Sign-in: backend unreachable (network exception, not a 401/403) — falling back to encrypted offline credential, NOT failing login", { error: String(error?.message || error) });
+
       try {
         return await tryOfflineSignIn("backend_unreachable");
       } catch (err: any) {
