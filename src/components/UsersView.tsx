@@ -1734,6 +1734,12 @@ const UsersView = () => {
             <div className="flex h-48 items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
             </div>
+          ) : loadError ? (
+            <div className="flex h-48 flex-col items-center justify-center gap-3 text-center px-4">
+              <AlertTriangle className="h-8 w-8 text-destructive" />
+              <div className="text-sm text-muted-foreground max-w-md">{loadError}</div>
+              <Button size="sm" onClick={reloadAll}>Try again</Button>
+            </div>
           ) : (
             <div className="space-y-6">
               {groupedUsers.map((group) => {
