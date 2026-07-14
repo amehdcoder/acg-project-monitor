@@ -678,7 +678,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // getSession itself failed or timed out (network/storage/refresh error).
       // Don't hang the boot. If this device has a saved active profile, hydrate
       // it so field users can continue working under poor connectivity.
-      console.warn("getSession failed during boot:", e);
+      offlineAuthLog("Boot: getSession failed/timed out (network exception) — session NOT cleared, falling back to cached credential", e);
       const recovered = await recoverFromCachedCredential("initial_session_failed");
       if (recovered) {
         initialLoadDoneRef.current = true;
