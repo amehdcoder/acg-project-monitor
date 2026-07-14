@@ -578,26 +578,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // explicitly signed out, recover from the encrypted device credential
         // and keep working; a later successful refresh restores the live session.
         if (event === "SIGNED_OUT" && !userSignOutRef.current) {
+          offlineAuthLog(
+            "Caught spurious SIGNED_OUT (not user-initiated) — treating as network/token-refresh failure. NOT clearing local session; recovering from cached credential.",
+            { online: typeof navigator !== "undefined" ? navigator.onLine : true },
+          );
           setSession(null);
           setTimeout(async () => {
             const recovered = await recoverFromCachedCredential("token_refresh_lost");
             if (!recovered) {
               const stored = getStoredAuthSession();
               if (stored?.user) {
+                offlineAuthLog("Spurious SIGNED_OUT: kept user signed in from persisted browser session");
                 setSession(stored);
                 setUser(stored.user);
                 void fetchProfile(stored.user.id, { silent: true });
               } else {
+                offlineAuthLog("Spurious SIGNED_OUT: no cached credential or persisted session available to recover from");
                 setUser(null);
                 setProfile(null);
                 setRole(null);
               }
+            } else {
+              offlineAuthLog("Spurious SIGNED_OUT: recovered session from encrypted device credential");
             }
             setProfileLoading(false);
             setLoading(false);
           }, 0);
           return;
         }
+
 
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
