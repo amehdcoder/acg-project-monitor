@@ -864,6 +864,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (error && isLikelyNetworkAuthError(error)) {
+      offlineAuthLog("Sign-in: backend unreachable (network exception, not a 401/403) — falling back to encrypted offline credential, NOT failing login", { error: String(error?.message || error) });
+
       try {
         return await tryOfflineSignIn("backend_unreachable");
       } catch (err: any) {
