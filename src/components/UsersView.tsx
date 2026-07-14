@@ -556,10 +556,10 @@ const UsersView = () => {
 
   // Race any promise against a strict timeout so a hung fetch (offline, 504,
   // stalled JWT refresh) can't leave the UI stuck on a spinner forever.
-  const withTimeout = <T,>(p: Promise<T>, ms = 12000, label = "request"): Promise<T> =>
-    new Promise((resolve, reject) => {
+  const withTimeout = <T,>(p: PromiseLike<T>, ms = 12000, label = "request"): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
       const t = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
-      p.then(
+      Promise.resolve(p).then(
         (v) => { clearTimeout(t); resolve(v); },
         (e) => { clearTimeout(t); reject(e); },
       );
