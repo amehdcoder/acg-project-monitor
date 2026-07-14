@@ -500,6 +500,7 @@ const UsersView = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [forms, setForms] = useState<Form[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterDesignation, setFilterDesignation] = useState<"all" | "adhoc">("all");
   const [selectedUser, setSelectedUser] = useState<(UserProfile & { role?: UserRole }) | null>(null);
