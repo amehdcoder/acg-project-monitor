@@ -514,6 +514,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // refresh/profile read from holding the entire app on the boot spinner.
     const bootStoredSession = getStoredAuthSession();
     if (bootStoredSession?.user) {
+      offlineAuthLog("Boot: hydrating React auth context from locally persisted session BEFORE any network request", {
+        userId: bootStoredSession.user.id,
+        email: bootStoredSession.user.email,
+        online: typeof navigator !== "undefined" ? navigator.onLine : true,
+      });
       setSession(bootStoredSession);
       setUser(bootStoredSession.user);
       setLoading(false);
@@ -522,13 +527,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (typeof navigator !== "undefined" && navigator.onLine === false) {
         // Fully offline: paint the correctly-permissioned app instantly from the
         // encrypted device profile — no network wait, no null-role flicker.
+        offlineAuthLog("Boot: device is offline — hydrating cached profile/role, bypassing online auth checks");
         void hydrateCachedProfileFor(bootStoredSession.user.id);
       } else {
         window.setTimeout(() => {
           void fetchProfile(bootStoredSession.user.id, { silent: true });
         }, 6000);
       }
+    } else {
+      offlineAuthLog("Boot: no locally persisted session found", {
+        online: typeof navigator !== "undefined" ? navigator.onLine : true,
+      });
     }
+
 
 
     // Absolute safety net: no matter what stalls (getSession hanging, a wedged
