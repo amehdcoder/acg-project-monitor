@@ -364,7 +364,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Network too slow / unreachable — hydrate from cached credential so the
         // app opens instead of spinning forever, then let a later silent refresh
         // fill in fresh data.
-        console.warn("Profile fetch timed out — falling back to cached profile", timeoutErr);
+        offlineAuthLog("Profile fetch timed out / unreachable — caught network exception, keeping session and falling back to cached profile (no sign-out)", timeoutErr);
         try {
           const cached = await getLatestOfflineCredential();
           if (cached?.user?.id === userId) {
