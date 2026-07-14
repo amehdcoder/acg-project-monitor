@@ -659,11 +659,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // No live Supabase session AND we're offline → hydrate from the
         // most recently cached account so the app boots logged-in.
         // Sync to the server will still require re-auth when online.
+        offlineAuthLog("Boot: no live session and device offline — auto-login from most recent cached credential");
         try {
           await recoverFromCachedCredential("auto_login_offline_boot");
         } catch (e) {
-          console.warn("Offline auto-login failed:", e);
+          offlineAuthLog("Boot: offline auto-login failed", e);
         }
+
         setProfileLoading(false);
       } else {
         setProfileLoading(false);
