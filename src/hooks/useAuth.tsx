@@ -715,13 +715,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // the encrypted device credential + spurious-sign-out guard keep the user in.
     let refreshing = false;
     const refreshSessionWithRetry = async (attempts = 4) => {
-      if (refreshing || !navigator.onLine) return;
+      if (refreshing || !navigator.onLine) {
+        if (!navigator.onLine) {
+          offlineAuthLog("Token refresh paused/queued — device offline; will retry when connectivity returns");
+        }
+        return;
+      }
       refreshing = true;
+      offlineAuthLog("Token refresh: starting with exponential backoff", { attempts });
       try {
         for (let i = 0; i < attempts; i++) {
           try {
             const { data, error } = await supabase.auth.refreshSession();
             if (!error && data?.session) {
+              offlineAuthLog("Token refresh succeeded — live session restored", { attempt: i + 1 });
               setSession(data.session);
               setUser(data.session.user ?? null);
               userSignOutRef.current = false;
@@ -730,24 +737,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // A definitive auth failure (revoked/invalid) — stop retrying but do
             // not force a client-side sign-out; let the server-driven flow decide.
             const status = (error as any)?.status;
-            if (status && [400, 401, 403, 422].includes(status)) return;
-          } catch {
+            if (status && [400, 401, 403, 422].includes(status)) {
+              offlineAuthLog("Token refresh: definitive server auth failure — stopping retries (not forcing client sign-out)", { status });
+              return;
+            }
+            offlineAuthLog("Token refresh: transient failure — will back off and retry", { attempt: i + 1, status });
+          } catch (refreshErr) {
             /* network blip — fall through to backoff */
+            offlineAuthLog("Token refresh: caught network exception — session preserved, backing off", { attempt: i + 1, error: String((refreshErr as any)?.message || refreshErr) });
           }
           await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** i, 8000)));
         }
+        offlineAuthLog("Token refresh: all retries exhausted — session intentionally kept alive from cache until network stabilizes");
       } finally {
         refreshing = false;
       }
     };
 
     const handleOnline = () => {
+      offlineAuthLog("Connectivity change: ONLINE — flushing queues and retrying token refresh with backoff");
       setIsOfflineMode(false);
       syncAuditQueue();
       syncInactiveAttemptQueue();
       void refreshSessionWithRetry();
     };
-    const handleOffline = () => { setIsOfflineMode(true); };
+    const handleOffline = () => {
+      offlineAuthLog("Connectivity change: OFFLINE — pausing background token refreshes, staying signed in on cached credentials");
+      setIsOfflineMode(true);
+    };
+
     const handleVisibility = () => {
       if (document.visibilityState === "visible") void refreshSessionWithRetry();
     };
