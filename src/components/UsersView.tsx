@@ -500,6 +500,7 @@ const UsersView = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [forms, setForms] = useState<Form[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterDesignation, setFilterDesignation] = useState<"all" | "adhoc">("all");
   const [selectedUser, setSelectedUser] = useState<(UserProfile & { role?: UserRole }) | null>(null);
@@ -550,57 +551,81 @@ const UsersView = () => {
   const [cascadeUser, setCascadeUser] = useState<UserProfile | null>(null);
 
   useEffect(() => {
+    reloadAll();
+  }, []);
+
+  // Race any promise against a strict timeout so a hung fetch (offline, 504,
+  // stalled JWT refresh) can't leave the UI stuck on a spinner forever.
+  const withTimeout = <T,>(p: PromiseLike<T>, ms = 12000, label = "request"): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+      Promise.resolve(p).then(
+        (v) => { clearTimeout(t); resolve(v); },
+        (e) => { clearTimeout(t); reject(e); },
+      );
+    });
+
+  const reloadAll = () => {
+    setLoadError(null);
+    setLoading(true);
     fetchUsers();
     fetchProjects();
     fetchForms();
     fetchAssignments();
-  }, []);
+  };
 
   const fetchAssignments = async () => {
-    const [{ data: pa }, { data: fa }, { data: ca }, { data: sa }] = await Promise.all([
-      supabase.from("user_project_assignments").select("user_id, project_id"),
-      supabase.from("user_form_assignments").select("user_id, form_id"),
-      supabase.from("user_cascade_assignments").select("user_id, form_id, field_key, value, value_label"),
-      (supabase as any).from("user_standard_form_assignments").select("user_id, form_code"),
-    ]);
-    const pMap: Record<string, string[]> = {};
-    (pa || []).forEach((r: any) => {
-      if (!r.user_id || !r.project_id) return;
-      (pMap[r.user_id] ||= []).push(r.project_id);
-    });
-    const fMap: Record<string, string[]> = {};
-    (fa || []).forEach((r: any) => {
-      if (!r.user_id || !r.form_id) return;
-      (fMap[r.user_id] ||= []).push(r.form_id);
-    });
-    const cMap: Record<string, { form_id: string; field_key: string; value: string; value_label: string | null }[]> = {};
-    (ca || []).forEach((r: any) => {
-      if (!r.user_id) return;
-      (cMap[r.user_id] ||= []).push({ form_id: r.form_id, field_key: r.field_key, value: r.value, value_label: r.value_label });
-    });
-    const sMap: Record<string, string[]> = {};
-    (sa || []).forEach((r: any) => {
-      if (!r.user_id || !r.form_code) return;
-      (sMap[r.user_id] ||= []).push(r.form_code);
-    });
-    setProjectAssign(pMap);
-    setFormAssign(fMap);
-    setCascadeAssign(cMap);
-    setStdFormAssign(sMap);
+    try {
+      const [{ data: pa }, { data: fa }, { data: ca }, { data: sa }] = await withTimeout(Promise.all([
+        supabase.from("user_project_assignments").select("user_id, project_id"),
+        supabase.from("user_form_assignments").select("user_id, form_id"),
+        supabase.from("user_cascade_assignments").select("user_id, form_id, field_key, value, value_label"),
+        (supabase as any).from("user_standard_form_assignments").select("user_id, form_code"),
+      ]), 15000, "assignments");
+      const pMap: Record<string, string[]> = {};
+      (pa || []).forEach((r: any) => {
+        if (!r.user_id || !r.project_id) return;
+        (pMap[r.user_id] ||= []).push(r.project_id);
+      });
+      const fMap: Record<string, string[]> = {};
+      (fa || []).forEach((r: any) => {
+        if (!r.user_id || !r.form_id) return;
+        (fMap[r.user_id] ||= []).push(r.form_id);
+      });
+      const cMap: Record<string, { form_id: string; field_key: string; value: string; value_label: string | null }[]> = {};
+      (ca || []).forEach((r: any) => {
+        if (!r.user_id) return;
+        (cMap[r.user_id] ||= []).push({ form_id: r.form_id, field_key: r.field_key, value: r.value, value_label: r.value_label });
+      });
+      const sMap: Record<string, string[]> = {};
+      (sa || []).forEach((r: any) => {
+        if (!r.user_id || !r.form_code) return;
+        (sMap[r.user_id] ||= []).push(r.form_code);
+      });
+      setProjectAssign(pMap);
+      setFormAssign(fMap);
+      setCascadeAssign(cMap);
+      setStdFormAssign(sMap);
+    } catch (err) {
+      console.warn("[UsersView] fetchAssignments failed", err);
+    }
   };
 
   const fetchUsers = async () => {
     try {
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const { data: profiles, error: profilesError } = await withTimeout(
+        supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+        12000,
+        "profiles",
+      );
 
       if (profilesError) throw profilesError;
 
-      const { data: roles, error: rolesError } = await supabase
-        .from("user_roles")
-        .select("*");
+      const { data: roles, error: rolesError } = await withTimeout(
+        supabase.from("user_roles").select("*"),
+        12000,
+        "user_roles",
+      );
 
       if (rolesError) throw rolesError;
 
@@ -614,26 +639,37 @@ const UsersView = () => {
       })) || [];
 
       setUsers(usersWithRoles);
-    } catch (error) {
+      setLoadError(null);
+    } catch (error: any) {
       console.error("Error fetching users:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch users",
-        variant: "destructive",
-      });
+      const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+      const msg = offline
+        ? "You appear to be offline. Reconnect and try again."
+        : /timed out/i.test(error?.message || "")
+          ? "The server took too long to respond. Please try again."
+          : `Unable to load users${error?.message ? `: ${error.message}` : "."}`;
+      setLoadError(msg);
     } finally {
       setLoading(false);
     }
   };
 
   const fetchProjects = async () => {
-    const { data } = await supabase.from("projects").select("id, name");
-    setProjects(data || []);
+    try {
+      const { data } = await withTimeout(supabase.from("projects").select("id, name"), 12000, "projects");
+      setProjects(data || []);
+    } catch (err) {
+      console.warn("[UsersView] fetchProjects failed", err);
+    }
   };
 
   const fetchForms = async () => {
-    const { data } = await supabase.from("forms").select("id, name, project_id");
-    setForms(data || []);
+    try {
+      const { data } = await withTimeout(supabase.from("forms").select("id, name, project_id"), 12000, "forms");
+      setForms(data || []);
+    } catch (err) {
+      console.warn("[UsersView] fetchForms failed", err);
+    }
   };
 
   const handleUpdateRole = async () => {
@@ -1697,6 +1733,12 @@ const UsersView = () => {
           {loading ? (
             <div className="flex h-48 items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+            </div>
+          ) : loadError ? (
+            <div className="flex h-48 flex-col items-center justify-center gap-3 text-center px-4">
+              <AlertTriangle className="h-8 w-8 text-destructive" />
+              <div className="text-sm text-muted-foreground max-w-md">{loadError}</div>
+              <Button size="sm" onClick={reloadAll}>Try again</Button>
             </div>
           ) : (
             <div className="space-y-6">
