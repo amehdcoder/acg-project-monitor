@@ -29,6 +29,26 @@ const withTimeout = <T,>(p: PromiseLike<T>, ms: number, label = "request_timeout
     new Promise<T>((_, reject) => setTimeout(() => reject(new Error(label)), ms)),
   ]);
 
+/**
+ * Centralized offline-auth tracing. Every message is prefixed with
+ * "[Offline Auth]" so the entire offline-resilient auth lifecycle (boot
+ * hydration, caught network exceptions that were deliberately swallowed, and
+ * online/offline transitions) can be filtered in one place in the console.
+ */
+const offlineAuthLog = (message: string, detail?: unknown) => {
+  try {
+    if (detail !== undefined) {
+      console.log(`[Offline Auth] ${message}`, detail);
+    } else {
+      console.log(`[Offline Auth] ${message}`);
+    }
+  } catch {
+    /* console unavailable — never let logging break auth */
+  }
+};
+
+
+
 interface Profile {
   id: string;
   user_id: string;
