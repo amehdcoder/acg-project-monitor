@@ -232,7 +232,58 @@ export default function BmzDashboard({ onClose }: Props) {
               </Card>
             </div>
 
-            {/* Challenges */}
+            {/* Jigawa State choropleth map */}
+            <Card title="Jigawa State — coverage & compliance map" icon={MapIcon}>
+              <p className="mb-2 text-[11px] text-muted-foreground">
+                LGAs are shaded by number of monitoring visits (deeper green = higher coverage). Dots mark individual
+                visits, coloured by readiness band. Hover an LGA for its compliance score.
+              </p>
+              <JigawaLgaMap lgaData={d.byLga} points={d.points} />
+            </Card>
+
+            {/* McKinsey-style quadrant: coverage vs. compliance */}
+            {lgaQuadrant.length > 0 && (
+              <Card title="LGA coverage × compliance (McKinsey quadrant)" icon={Target}>
+                <p className="mb-2 text-[11px] text-muted-foreground">
+                  Bubble position shows LGA coverage (visits) and average compliance. Bubbles in the upper-right
+                  are model LGAs; the lower-right are well-covered but under-performing (priority for support).
+                </p>
+                <ResponsiveContainer width="100%" height={280}>
+                  <ScatterChart margin={{ top: 20, right: 20, bottom: 30, left: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" dataKey="x" name="Visits" tick={{ fontSize: 11 }}
+                      label={{ value: "Visits (coverage)", position: "insideBottom", offset: -8, fontSize: 11 }} />
+                    <YAxis type="number" dataKey="y" name="Compliance %" domain={[0, 100]} tick={{ fontSize: 11 }} unit="%"
+                      label={{ value: "Avg compliance", angle: -90, position: "insideLeft", fontSize: 11 }} />
+                    <ZAxis type="number" dataKey="z" range={[80, 500]} />
+                    <Tooltip
+                      cursor={{ strokeDasharray: "3 3" }}
+                      formatter={(v: any, n: string) =>
+                        n === "Compliance %" ? [`${v}%`, "Compliance"] :
+                        n === "Visits" ? [v, "Visits"] : [v, n]}
+                      labelFormatter={() => ""}
+                      content={({ active, payload }: any) =>
+                        active && payload?.length ? (
+                          <div className="rounded-md border border-border bg-white p-2 text-xs shadow">
+                            <p className="font-bold text-[#0b3d2e]">{payload[0].payload.name}</p>
+                            <p>Visits: <b>{payload[0].payload.x}</b></p>
+                            <p>Compliance: <b>{payload[0].payload.y}%</b></p>
+                            <p>Band: <b style={{ color: payload[0].payload.color }}>{readinessBand(payload[0].payload.y).label}</b></p>
+                          </div>
+                        ) : null
+                      }
+                    />
+                    <ReferenceLine y={60} stroke="#94a3b8" strokeDasharray="4 4" label={{ value: "60% target", fontSize: 10, position: "right" }} />
+                    <ReferenceLine x={medianVisits} stroke="#94a3b8" strokeDasharray="4 4" label={{ value: "median coverage", fontSize: 10, position: "top" }} />
+                    <Scatter data={lgaQuadrant}>
+                      {lgaQuadrant.map((p) => <Cell key={p.name} fill={p.color} />)}
+                      <LabelList dataKey="name" position="top" style={{ fontSize: 10, fill: BMZ_DARK, fontWeight: 600 }} />
+                    </Scatter>
+                  </ScatterChart>
+                </ResponsiveContainer>
+              </Card>
+            )}
+
             {d.challenges.length > 0 && (
               <Card title="Reported challenges" icon={AlertTriangle}>
                 <div className="space-y-2">
