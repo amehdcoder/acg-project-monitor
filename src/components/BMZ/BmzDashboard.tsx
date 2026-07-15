@@ -1,15 +1,19 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   ArrowLeft, Loader2, RefreshCw, Users, GraduationCap, Stethoscope, ClipboardList,
-  Eye, TrendingUp, AlertTriangle, Activity, MapPin,
+  Eye, TrendingUp, AlertTriangle, Activity, MapPin, Download, Map as MapIcon, Target,
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
   PieChart, Pie, Legend, RadialBarChart, RadialBar,
+  ScatterChart, Scatter, ZAxis, ReferenceLine, LabelList,
 } from "recharts";
-import { Button } from "@/components/ui/button";
+
 import { useBmzDashboard } from "@/hooks/useBmzDashboard";
-import { BMZ_GREEN, BMZ_TEAL, BMZ_DARK } from "@/lib/bmz/definition";
+import { BMZ_GREEN, BMZ_TEAL, BMZ_DARK, readinessBand } from "@/lib/bmz/definition";
+import JigawaLgaMap from "./JigawaLgaMap";
+import { exportJigawaEyeHealthWorkbook } from "@/lib/bmz/bmzExcelExport";
+import { toast } from "sonner";
 
 interface Props {
   onClose: () => void;
@@ -38,11 +42,39 @@ const Card = ({ title, icon: Icon, children }: { title: string; icon: any; child
 export default function BmzDashboard({ onClose }: Props) {
   const d = useBmzDashboard();
   const { stats } = d;
+  const [downloading, setDownloading] = useState(false);
 
   const compGauge = useMemo(
     () => [{ name: "compliance", value: Math.round(stats.avgCompliance), fill: stats.avgBand.color }],
     [stats],
   );
+
+  // McKinsey-style LGA quadrant (visits × compliance) — bubble size reflects compliance.
+  const lgaQuadrant = useMemo(
+    () => d.byLga.map((l) => ({
+      name: l.name, x: l.count, y: l.compliance, z: Math.max(60, l.compliance * 4),
+      color: readinessBand(l.compliance).color,
+    })),
+    [d.byLga],
+  );
+  const medianVisits = useMemo(() => {
+    const arr = d.byLga.map((l) => l.count).sort((a, b) => a - b);
+    return arr.length ? arr[Math.floor(arr.length / 2)] : 0;
+  }, [d.byLga]);
+
+  const handleDownload = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      await exportJigawaEyeHealthWorkbook(d.rows);
+      toast.success("Jigawa Eye Health workbook downloaded");
+    } catch (e: any) {
+      console.error("[BMZ export]", e);
+      toast.error("Could not build the workbook. Please try again.");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#f1f6f4]">
@@ -57,7 +89,18 @@ export default function BmzDashboard({ onClose }: Props) {
               <p className="text-[10px]" style={{ color: BMZ_TEAL }}>BMZ Inclusive Eye Health Project</p>
             </div>
           </div>
-          <button onClick={() => d.reload()} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"><RefreshCw className={`h-4 w-4 ${d.loading ? "animate-spin" : ""}`} /></button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDownload}
+              disabled={downloading || d.loading || stats.total === 0}
+              title="Download full dataset & insights (Excel)"
+              className="flex h-9 items-center gap-1.5 rounded-full bg-white/15 px-3 text-[11px] font-bold uppercase tracking-wide hover:bg-white/25 disabled:opacity-50"
+            >
+              {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              <span className="hidden sm:inline">{downloading ? "Building…" : "Excel"}</span>
+            </button>
+            <button onClick={() => d.reload()} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"><RefreshCw className={`h-4 w-4 ${d.loading ? "animate-spin" : ""}`} /></button>
+          </div>
         </div>
       </div>
 
@@ -189,7 +232,58 @@ export default function BmzDashboard({ onClose }: Props) {
               </Card>
             </div>
 
-            {/* Challenges */}
+            {/* Jigawa State choropleth map */}
+            <Card title="Jigawa State — coverage & compliance map" icon={MapIcon}>
+              <p className="mb-2 text-[11px] text-muted-foreground">
+                LGAs are shaded by number of monitoring visits (deeper green = higher coverage). Dots mark individual
+                visits, coloured by readiness band. Hover an LGA for its compliance score.
+              </p>
+              <JigawaLgaMap lgaData={d.byLga} points={d.points} />
+            </Card>
+
+            {/* McKinsey-style quadrant: coverage vs. compliance */}
+            {lgaQuadrant.length > 0 && (
+              <Card title="LGA coverage × compliance (McKinsey quadrant)" icon={Target}>
+                <p className="mb-2 text-[11px] text-muted-foreground">
+                  Bubble position shows LGA coverage (visits) and average compliance. Bubbles in the upper-right
+                  are model LGAs; the lower-right are well-covered but under-performing (priority for support).
+                </p>
+                <ResponsiveContainer width="100%" height={280}>
+                  <ScatterChart margin={{ top: 20, right: 20, bottom: 30, left: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" dataKey="x" name="Visits" tick={{ fontSize: 11 }}
+                      label={{ value: "Visits (coverage)", position: "insideBottom", offset: -8, fontSize: 11 }} />
+                    <YAxis type="number" dataKey="y" name="Compliance %" domain={[0, 100]} tick={{ fontSize: 11 }} unit="%"
+                      label={{ value: "Avg compliance", angle: -90, position: "insideLeft", fontSize: 11 }} />
+                    <ZAxis type="number" dataKey="z" range={[80, 500]} />
+                    <Tooltip
+                      cursor={{ strokeDasharray: "3 3" }}
+                      formatter={(v: any, n: string) =>
+                        n === "Compliance %" ? [`${v}%`, "Compliance"] :
+                        n === "Visits" ? [v, "Visits"] : [v, n]}
+                      labelFormatter={() => ""}
+                      content={({ active, payload }: any) =>
+                        active && payload?.length ? (
+                          <div className="rounded-md border border-border bg-white p-2 text-xs shadow">
+                            <p className="font-bold text-[#0b3d2e]">{payload[0].payload.name}</p>
+                            <p>Visits: <b>{payload[0].payload.x}</b></p>
+                            <p>Compliance: <b>{payload[0].payload.y}%</b></p>
+                            <p>Band: <b style={{ color: payload[0].payload.color }}>{readinessBand(payload[0].payload.y).label}</b></p>
+                          </div>
+                        ) : null
+                      }
+                    />
+                    <ReferenceLine y={60} stroke="#94a3b8" strokeDasharray="4 4" label={{ value: "60% target", fontSize: 10, position: "right" }} />
+                    <ReferenceLine x={medianVisits} stroke="#94a3b8" strokeDasharray="4 4" label={{ value: "median coverage", fontSize: 10, position: "top" }} />
+                    <Scatter data={lgaQuadrant}>
+                      {lgaQuadrant.map((p) => <Cell key={p.name} fill={p.color} />)}
+                      <LabelList dataKey="name" position="top" style={{ fontSize: 10, fill: BMZ_DARK, fontWeight: 600 }} />
+                    </Scatter>
+                  </ScatterChart>
+                </ResponsiveContainer>
+              </Card>
+            )}
+
             {d.challenges.length > 0 && (
               <Card title="Reported challenges" icon={AlertTriangle}>
                 <div className="space-y-2">
