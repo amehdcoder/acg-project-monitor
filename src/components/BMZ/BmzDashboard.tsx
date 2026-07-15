@@ -42,11 +42,39 @@ const Card = ({ title, icon: Icon, children }: { title: string; icon: any; child
 export default function BmzDashboard({ onClose }: Props) {
   const d = useBmzDashboard();
   const { stats } = d;
+  const [downloading, setDownloading] = useState(false);
 
   const compGauge = useMemo(
     () => [{ name: "compliance", value: Math.round(stats.avgCompliance), fill: stats.avgBand.color }],
     [stats],
   );
+
+  // McKinsey-style LGA quadrant (visits × compliance) — bubble size reflects compliance.
+  const lgaQuadrant = useMemo(
+    () => d.byLga.map((l) => ({
+      name: l.name, x: l.count, y: l.compliance, z: Math.max(60, l.compliance * 4),
+      color: readinessBand(l.compliance).color,
+    })),
+    [d.byLga],
+  );
+  const medianVisits = useMemo(() => {
+    const arr = d.byLga.map((l) => l.count).sort((a, b) => a - b);
+    return arr.length ? arr[Math.floor(arr.length / 2)] : 0;
+  }, [d.byLga]);
+
+  const handleDownload = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      await exportJigawaEyeHealthWorkbook(d.rows);
+      toast.success("Jigawa Eye Health workbook downloaded");
+    } catch (e: any) {
+      console.error("[BMZ export]", e);
+      toast.error("Could not build the workbook. Please try again.");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#f1f6f4]">
@@ -61,7 +89,18 @@ export default function BmzDashboard({ onClose }: Props) {
               <p className="text-[10px]" style={{ color: BMZ_TEAL }}>BMZ Inclusive Eye Health Project</p>
             </div>
           </div>
-          <button onClick={() => d.reload()} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"><RefreshCw className={`h-4 w-4 ${d.loading ? "animate-spin" : ""}`} /></button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDownload}
+              disabled={downloading || d.loading || stats.total === 0}
+              title="Download full dataset & insights (Excel)"
+              className="flex h-9 items-center gap-1.5 rounded-full bg-white/15 px-3 text-[11px] font-bold uppercase tracking-wide hover:bg-white/25 disabled:opacity-50"
+            >
+              {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              <span className="hidden sm:inline">{downloading ? "Building…" : "Excel"}</span>
+            </button>
+            <button onClick={() => d.reload()} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"><RefreshCw className={`h-4 w-4 ${d.loading ? "animate-spin" : ""}`} /></button>
+          </div>
         </div>
       </div>
 
