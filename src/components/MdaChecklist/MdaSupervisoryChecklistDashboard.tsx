@@ -1417,13 +1417,15 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         summary="Random Forest drivers, Monte Carlo projections, data quality & what's missing"
         defaultCollapsed
       >
-        <MdaAdvancedAnalyses
-          submissions={deduped as any}
-          questions={questions as any}
-          projectName={projectName}
-          followUpFields={new Set(Object.values(moduleQuestions).flatMap((s) => Array.from(s)))}
-          offline={offline}
-        />
+        <SectionErrorBoundary label="Advanced analytics & modeling">
+          <MdaAdvancedAnalyses
+            submissions={deduped as any}
+            questions={questions as any}
+            projectName={projectName}
+            followUpFields={new Set(Object.values(moduleQuestions).flatMap((s) => Array.from(s)))}
+            offline={offline}
+          />
+        </SectionErrorBoundary>
       </CollapsibleSection>
 
       {/* ── Corrective Actions section: themes, word cloud & accountability ── */}
@@ -1439,11 +1441,13 @@ export default function MdaSupervisoryChecklistDashboard({ submissions, question
         summary="Weekly follow-up outcome trend and flagged duplicate community visits"
         defaultCollapsed
       >
-        <MdaLongitudinalInsights
-          checklist={checklist as any}
-          submissions={filtered as any}
-          questions={questions as any}
-        />
+        <SectionErrorBoundary label="Longitudinal insights">
+          <MdaLongitudinalInsights
+            checklist={checklist as any}
+            submissions={filtered as any}
+            questions={questions as any}
+          />
+        </SectionErrorBoundary>
       </CollapsibleSection>
 
 
