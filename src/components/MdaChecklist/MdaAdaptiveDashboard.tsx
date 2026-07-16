@@ -272,7 +272,8 @@ function QuestionCard({ q, submissions, color }: { q: FormQuestion; submissions:
       value: 0,
     }));
     for (const n of nums) {
-      let idx = max === min ? 0 : Math.min(buckets - 1, Math.floor((n - min) / step));
+      let idx = max === min ? 0 : Math.min(buckets - 1, Math.max(0, Math.floor((n - min) / step)));
+      if (!Number.isFinite(idx) || !hist[idx]) continue;
       hist[idx].value++;
     }
     const fmt = (n: number) => (Number.isInteger(n) ? n.toLocaleString() : n.toFixed(1));
