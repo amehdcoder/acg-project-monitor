@@ -32,6 +32,17 @@ const norm = (v: any) => stripTags(v).toLowerCase();
 /** Flatten the question tree, keeping the effective storage key (name || id). */
 export interface ResolvedQ { key: string; label: string; type?: string; options: AOption[] }
 
+const safeOptions = (options: unknown): AOption[] =>
+  Array.isArray(options)
+    ? options
+        .filter((o): o is AOption => !!o && typeof o === "object")
+        .map((o) => ({
+          id: o.id == null ? undefined : String(o.id),
+          label: o.label == null ? undefined : String(o.label),
+          value: o.value == null ? undefined : String(o.value),
+        }))
+    : [];
+
 export function flattenQuestions(items: AQuestion[]): ResolvedQ[] {
   const out: ResolvedQ[] = [];
   const walk = (arr?: AQuestion[]) => {
@@ -42,7 +53,7 @@ export function flattenQuestions(items: AQuestion[]): ResolvedQ[] {
           key: String(it.name || it.id),
           label: stripTags(it.label || it.name || ""),
           type: it.type,
-          options: it.options || [],
+          options: safeOptions(it.options),
         });
       }
       if (Array.isArray(it.questions)) walk(it.questions);
@@ -104,7 +115,9 @@ export class MdaQuestionIndex {
   label(q: ResolvedQ | null, raw: any): string {
     if (raw === undefined || raw === null || raw === "") return "";
     const translate = (v: any) => {
-      const opt = q?.options?.find((o) => String(o.value) === String(v) || norm(o.label) === norm(v));
+      const opt = q?.options?.find((o) =>
+        String(o?.value ?? "") === String(v) || norm(o?.label) === norm(v),
+      );
       return stripTags(opt?.label ?? v);
     };
     if (Array.isArray(raw)) return raw.map(translate).filter(Boolean).join(", ");

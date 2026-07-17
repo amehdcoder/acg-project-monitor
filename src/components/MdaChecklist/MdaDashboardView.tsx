@@ -11,6 +11,7 @@ import { clearLegacyMdaCache, clearMdaCache, loadMdaCache, saveMdaCache, isOffli
 import { canonicalizeSubmissionData } from "@/lib/mda/dashboardData";
 import { isDashboardPublished, type MdaCopySettings } from "@/lib/mda/copyChecklist";
 import MdaSupervisoryChecklistDashboard from "./MdaSupervisoryChecklistDashboard";
+import SectionErrorBoundary from "./SectionErrorBoundary";
 import OwnerSubmissionManager, { type OwnerDataMutation } from "@/components/owner/OwnerSubmissionManager";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -564,15 +565,17 @@ export default function MdaDashboardView({ form, projects = [], onClose, embedde
             </CardContent>
           </Card>
         ) : (
-          <MdaSupervisoryChecklistDashboard
-            submissions={dashboardRows}
-            questions={dashboardQuestions}
-            formName={form.name}
-            projectName={projectName}
-            projectId={form.project_id || null}
-            offline={useCacheNow}
-            onDataChanged={refresh}
-          />
+          <SectionErrorBoundary label="Integrated MDA Supervisory Dashboard">
+            <MdaSupervisoryChecklistDashboard
+              submissions={dashboardRows}
+              questions={dashboardQuestions}
+              formName={form.name}
+              projectName={projectName}
+              projectId={form.project_id || null}
+              offline={useCacheNow}
+              onDataChanged={refresh}
+            />
+          </SectionErrorBoundary>
         )}
       </main>
     </div>

@@ -40,6 +40,7 @@ import { toast } from "sonner";
 import { exportMdaDashboard } from "@/lib/mda/dashboardExport";
 import { prepareMdaData, communityKey } from "@/lib/mda/dashboardData";
 import { isMdaFollowUpGroup, getMdaFollowUpGroupName } from "@/lib/mdaFollowUp";
+import { sanitizeMdaQuestions, sanitizeMdaSubmissions } from "@/lib/mda/sanitize";
 import MdaDrillDownSheet, { type DrillData } from "./MdaDrillDownSheet";
 
 // ───────────────────────── Types ─────────────────────────
@@ -127,7 +128,7 @@ function buildSections(questions: FormQuestion[]): Section[] {
 
 const keyFor = (q: FormQuestion) => q.name || q.id;
 const optionLabel = (q: FormQuestion, val: string) =>
-  stripTags(q.options?.find((o) => o.value === val || o.label === val)?.label) || val;
+  stripTags(q.options?.find((o) => String(o?.value ?? "") === val || String(o?.label ?? "") === val)?.label) || val;
 
 // ───────────────────────── Small UI atoms ─────────────────────────
 function KpiTile({ icon: Icon, label, value, sub, tint, onClick }: any) {
@@ -357,13 +358,15 @@ function EmptyCard({ q, label, answered, total }: any) {
 
 // ───────────────────────── Main component ─────────────────────────
 export default function MdaAdaptiveDashboard({
-  submissions: allSubmissions,
-  questions,
+  submissions: rawSubmissions,
+  questions: rawQuestions,
   formName,
   formId,
   projectId,
   projects = [],
 }: Props) {
+  const allSubmissions = useMemo(() => sanitizeMdaSubmissions(rawSubmissions), [rawSubmissions]);
+  const questions = useMemo(() => sanitizeMdaQuestions(rawQuestions), [rawQuestions]);
   const sections = useMemo(() => buildSections(questions), [questions]);
   const [activeSection, setActiveSection] = useState<string>("all");
   const [query, setQuery] = useState("");

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   ArrowLeft, Loader2, RefreshCw, Users, GraduationCap, Stethoscope, ClipboardList,
   Eye, TrendingUp, AlertTriangle, Activity, MapPin, Download, Map as MapIcon, Target,
+  ShieldCheck,
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
@@ -13,6 +14,7 @@ import { useBmzDashboard } from "@/hooks/useBmzDashboard";
 import { BMZ_GREEN, BMZ_TEAL, BMZ_DARK, readinessBand } from "@/lib/bmz/definition";
 import JigawaLgaMap from "./JigawaLgaMap";
 import { exportJigawaEyeHealthWorkbook } from "@/lib/bmz/bmzExcelExport";
+import { formatDay, formatDuration } from "@/lib/accountability";
 import { toast } from "sonner";
 
 interface Props {
@@ -61,6 +63,29 @@ export default function BmzDashboard({ onClose }: Props) {
     const arr = d.byLga.map((l) => l.count).sort((a, b) => a - b);
     return arr.length ? arr[Math.floor(arr.length / 2)] : 0;
   }, [d.byLga]);
+
+  const supervisorAccountability = useMemo(
+    () => d.accountability.slice(0, 10).map((u) => ({
+      name: u.name,
+      email: u.email,
+      visits: u.visitCount,
+      days: u.daysWorked,
+      avgMinutes: u.avgTimeMs ? Math.round(u.avgTimeMs / 60000) : 0,
+      avgDuration: formatDuration(u.avgTimeMs),
+      lastDay: formatDay(u.lastDay),
+    })),
+    [d.accountability],
+  );
+
+  const accountabilitySummary = useMemo(() => {
+    const supervisors = d.accountability.length;
+    const visits = d.accountability.reduce((sum, u) => sum + u.visitCount, 0);
+    const activeDays = new Set(d.accountability.flatMap((u) => u.visits.map((v) => v.date).filter(Boolean))).size;
+    const avgMinutes = visits > 0
+      ? Math.round(d.accountability.reduce((sum, u) => sum + u.totalTimeMs, 0) / visits / 60000)
+      : 0;
+    return { supervisors, visits, activeDays, avgDuration: formatDuration(avgMinutes * 60000) };
+  }, [d.accountability]);
 
   const handleDownload = async () => {
     if (downloading) return;
@@ -201,6 +226,43 @@ export default function BmzDashboard({ onClose }: Props) {
                 </ResponsiveContainer>
               </Card>
             </div>
+
+            {supervisorAccountability.length > 0 && (
+              <Card title="Supervisor accountability" icon={ShieldCheck}>
+                <div className="mb-3 grid grid-cols-2 gap-2 text-center text-[11px] md:grid-cols-4">
+                  <div className="rounded-lg bg-[#f1f6f4] p-2"><p className="font-bold text-[#0b3d2e]">{accountabilitySummary.supervisors}</p><p className="text-muted-foreground">Supervisors</p></div>
+                  <div className="rounded-lg bg-[#f1f6f4] p-2"><p className="font-bold text-[#0b3d2e]">{accountabilitySummary.visits}</p><p className="text-muted-foreground">Submitted visits</p></div>
+                  <div className="rounded-lg bg-[#f1f6f4] p-2"><p className="font-bold text-[#0b3d2e]">{accountabilitySummary.activeDays}</p><p className="text-muted-foreground">Active field days</p></div>
+                  <div className="rounded-lg bg-[#f1f6f4] p-2"><p className="font-bold text-[#0b3d2e]">{accountabilitySummary.avgDuration}</p><p className="text-muted-foreground">Avg time / visit</p></div>
+                </div>
+                <ResponsiveContainer width="100%" height={Math.max(260, supervisorAccountability.length * 34)}>
+                  <BarChart data={supervisorAccountability} layout="vertical" margin={{ left: 12, right: 28, top: 8, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                    <YAxis type="category" dataKey="name" width={138} tick={{ fontSize: 10 }} />
+                    <Tooltip
+                      content={({ active, payload }: any) => {
+                        if (!active || !payload?.length) return null;
+                        const row = payload[0].payload;
+                        return (
+                          <div className="rounded-md border border-border bg-white p-2 text-xs shadow">
+                            <p className="font-bold text-[#0b3d2e]">{row.name}</p>
+                            {row.email && <p className="text-muted-foreground">{row.email}</p>}
+                            <p>Visits submitted: <b>{row.visits}</b></p>
+                            <p>Days worked: <b>{row.days}</b></p>
+                            <p>Avg time / visit: <b>{row.avgDuration}</b></p>
+                            <p>Last active: <b>{row.lastDay}</b></p>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="visits" name="Visits" radius={[0, 6, 6, 0]} fill={BMZ_GREEN} />
+                    <Bar dataKey="days" name="Days worked" radius={[0, 6, 6, 0]} fill={BMZ_TEAL} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            )}
 
             {/* Availability + LGA */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

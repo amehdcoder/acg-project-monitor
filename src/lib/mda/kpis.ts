@@ -456,7 +456,7 @@ export function computeMdaKpis(submissions: KSubmission[], questions: KQuestion[
   // Adverse Reactions — categories = reaction types reported at first visit.
   const aeCats: string[] = [];
   for (const opt of dq.aeType?.options || []) {
-    const lbl = strip(opt.label || opt.value);
+    const lbl = strip(opt?.label || opt?.value);
     if (lbl && !aeCats.includes(lbl)) aeCats.push(lbl);
   }
   if (!aeCats.length) aeCats.push("Reported");
