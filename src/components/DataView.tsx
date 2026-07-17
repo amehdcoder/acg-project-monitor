@@ -24,6 +24,7 @@ import ProjectSubmissionsBrowser, {
 import PullToRefresh from "@/components/PullToRefresh";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MdaSupervisoryMap, SupervisoryGapAnalysisDashboard, MdaAdaptiveDashboard, MdaSupervisoryChecklistDashboard } from "@/components/MdaChecklist";
+import SectionErrorBoundary from "@/components/MdaChecklist/SectionErrorBoundary";
 import FormDataKnowledgeGraph from "@/components/KnowledgeGraph/FormDataKnowledgeGraph";
 import { useAuth } from "@/hooks/useAuth";
 import { generateMdaSimulation } from "@/lib/mda/simulation";
@@ -227,28 +228,36 @@ const DataView = () => {
                       SIMULATION MODE — dashboards below show synthetic data ({simulatedMdaSubs.length} records). Nothing is saved.
                     </div>
                   )}
-                  <MdaSupervisoryChecklistDashboard
-                    submissions={mdaSubs as any}
-                    questions={((selectedForm as any)?.questions ?? []) as any}
-                    formName={selectedForm?.name}
-                  />
-                  <MdaAdaptiveDashboard
-                    submissions={mdaSubs as any}
-                    questions={((selectedForm as any)?.questions ?? []) as any}
-                    formName={selectedForm?.name}
-                    formId={selectedFormId}
-                    projectId={(selectedForm as any)?.project_id ?? selectedProjectId}
-                    projects={projects}
-                  />
-                  <SupervisoryGapAnalysisDashboard
-                    submissions={mdaSubs as any}
-                    questions={((selectedForm as any)?.questions ?? []) as any}
-                    formName={selectedForm?.name}
-                  />
-                  <MdaSupervisoryMap
-                    submissions={mdaSubs as any}
-                    formName={selectedForm?.name}
-                  />
+                  <SectionErrorBoundary label="Integrated MDA supervisory dashboard">
+                    <MdaSupervisoryChecklistDashboard
+                      submissions={mdaSubs as any}
+                      questions={((selectedForm as any)?.questions ?? []) as any}
+                      formName={selectedForm?.name}
+                    />
+                  </SectionErrorBoundary>
+                  <SectionErrorBoundary label="Integrated MDA adaptive dashboard">
+                    <MdaAdaptiveDashboard
+                      submissions={mdaSubs as any}
+                      questions={((selectedForm as any)?.questions ?? []) as any}
+                      formName={selectedForm?.name}
+                      formId={selectedFormId}
+                      projectId={(selectedForm as any)?.project_id ?? selectedProjectId}
+                      projects={projects}
+                    />
+                  </SectionErrorBoundary>
+                  <SectionErrorBoundary label="Integrated MDA gap analysis dashboard">
+                    <SupervisoryGapAnalysisDashboard
+                      submissions={mdaSubs as any}
+                      questions={((selectedForm as any)?.questions ?? []) as any}
+                      formName={selectedForm?.name}
+                    />
+                  </SectionErrorBoundary>
+                  <SectionErrorBoundary label="Integrated MDA supervision map">
+                    <MdaSupervisoryMap
+                      submissions={mdaSubs as any}
+                      formName={selectedForm?.name}
+                    />
+                  </SectionErrorBoundary>
                 </>
               )}
               <DataVisualizations submissions={submissions} selectedForm={selectedForm} loading={loading} />

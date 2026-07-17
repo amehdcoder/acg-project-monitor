@@ -63,6 +63,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { buildLabelMap } from "@/lib/formLabelUtils";
 import AdminSubmissionEditor from "@/components/AdminSubmissionEditor";
 import NarrativeInsightsPanel from "@/components/shared/NarrativeInsightsPanel";
+import { sanitizeMdaQuestions, sanitizeMdaSubmissions } from "@/lib/mda/sanitize";
 import {
   Pagination, PaginationContent, PaginationItem, PaginationLink,
   PaginationNext, PaginationPrevious,
@@ -399,7 +400,9 @@ const writeDashboardUrl = (updates: Record<string, string | null | undefined>) =
 };
 
 // ───────────────────────── Main ─────────────────────────
-export default function MdaSupervisoryChecklistDashboard({ submissions, questions, formName, projectName, projectId, offline, onDataChanged }: Props) {
+export default function MdaSupervisoryChecklistDashboard({ submissions: rawSubmissions, questions: rawQuestions, formName, projectName, projectId, offline, onDataChanged }: Props) {
+  const submissions = useMemo(() => sanitizeMdaSubmissions(rawSubmissions), [rawSubmissions]);
+  const questions = useMemo(() => sanitizeMdaQuestions(rawQuestions), [rawQuestions]);
   const { isAdmin, isOwnerLevel } = useAuth();
   const canEditSubmissions = isAdmin || isOwnerLevel;
   const questionLabels = useMemo(() => buildLabelMap(questions as any[]), [questions]);
