@@ -21,13 +21,14 @@ export function sanitizeMdaQuestions<T = any>(items: T[] | null | undefined): an
   return items
     .map((item, idx) => {
       if (!isRecord(item)) return null;
-      const id = String(item.id ?? item.name ?? `question_${idx}`);
-      const name = strOrUndefined(item.name);
-      const label = strOrUndefined(item.label ?? item.name ?? id);
-      const type = strOrUndefined(item.type);
+      const row = item as Record<string, any>;
+      const id = String(row.id ?? row.name ?? `question_${idx}`);
+      const name = strOrUndefined(row.name);
+      const label = strOrUndefined(row.label ?? row.name ?? id);
+      const type = strOrUndefined(row.type);
 
-      const options = Array.isArray(item.options)
-        ? item.options
+      const options = Array.isArray(row.options)
+        ? row.options
             .map((opt: unknown, optIdx: number) => {
               if (!isRecord(opt)) return null;
               const label = String(opt.label ?? opt.value ?? `Option ${optIdx + 1}`);
@@ -42,12 +43,12 @@ export function sanitizeMdaQuestions<T = any>(items: T[] | null | undefined): an
             .filter(Boolean)
         : undefined;
 
-      const questions = Array.isArray(item.questions)
-        ? sanitizeMdaQuestions(item.questions)
+      const questions = Array.isArray(row.questions)
+        ? sanitizeMdaQuestions(row.questions)
         : undefined;
 
       return {
-        ...item,
+        ...row,
         id,
         name,
         label,
