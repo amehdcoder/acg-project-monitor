@@ -106,6 +106,7 @@ export interface MdaKpis {
 
 const STATUS_ORDER = ["Not Started", "Ongoing", "Halted", "Completed"];
 const COMMODITY_CATS = ["Treatment Register", "Dose Pole/Tape", "Sufficient Medicine"];
+const UNKNOWN_CATEGORY = "Unknown";
 
 export interface ModelCom {
   key: string;
@@ -391,46 +392,57 @@ export function computeMdaKpis(submissions: KSubmission[], questions: KQuestion[
     categoryOf: (c: Com) => string[], // categories this community belongs to (at first visit)
     followedIn: (c: Com) => boolean,
   ): Heatmap => {
+    const categories = [...new Set(cats.filter((cat) => strip(cat)))];
+    const ensureCell = (bucket: Record<string, HeatCell>, cat: string): HeatCell => {
+      if (!bucket[cat]) bucket[cat] = { value: 0, followed: 0, members: [] };
+      return bucket[cat];
+    };
     const byLga = new Map<string, HeatRow>();
-    const colTotals: Record<string, HeatCell> = Object.fromEntries(cats.map((c) => [c, { value: 0, followed: 0, members: [] }]));
+    const colTotals: Record<string, HeatCell> = Object.fromEntries(categories.map((c) => [c, { value: 0, followed: 0, members: [] }]));
     for (const c of relevant) {
       const lga = c.lga || "Unspecified";
       let row = byLga.get(lga);
       if (!row) {
-        row = { lga, total: 0, cells: Object.fromEntries(cats.map((cc) => [cc, { value: 0, followed: 0, members: [] }])) };
+        row = { lga, total: 0, cells: Object.fromEntries(categories.map((cc) => [cc, { value: 0, followed: 0, members: [] }])) };
         byLga.set(lga, row);
       }
       row.total++;
       const followed = followedIn(c);
-      for (const cat of categoryOf(c)) {
-        if (!row.cells[cat]) row.cells[cat] = { value: 0, followed: 0, members: [] };
-        row.cells[cat].value++;
-        (row.cells[cat].members ||= []).push(c.key);
-        if (followed) row.cells[cat].followed++;
-        colTotals[cat].value++;
-        (colTotals[cat].members ||= []).push(c.key);
-        if (followed) colTotals[cat].followed++;
+      for (const rawCat of categoryOf(c)) {
+        const cat = strip(rawCat) || UNKNOWN_CATEGORY;
+        if (!categories.includes(cat)) categories.push(cat);
+        const rowCell = ensureCell(row.cells, cat);
+        const totalCell = ensureCell(colTotals, cat);
+        rowCell.value++;
+        (rowCell.members ||= []).push(c.key);
+        if (followed) rowCell.followed++;
+        totalCell.value++;
+        (totalCell.members ||= []).push(c.key);
+        if (followed) totalCell.followed++;
       }
     }
     const rows = [...byLga.values()].sort((a, b) => b.total - a.total);
-    return { categories: cats, rows, colTotals };
+    return { categories, rows, colTotals };
   };
 
   // MDA Completion Outcomes — categories = MDA status; followed = completion FU exists.
   // Communities with NO recorded status are kept in a distinct "Unknown" column
   // (never silently folded into "Not Started"), so every supervised community is
   // represented in exactly one cell and the columns sum to the community total.
-  const hasUnknownStatus = allComs.some((c) => !latestStatus(c));
-  const completionCats = hasUnknownStatus ? [...STATUS_ORDER, "Unknown"] : STATUS_ORDER;
+  const hasUnknownStatus = allComs.some((c) => {
+    const st = latestStatus(c);
+    return !st || !STATUS_ORDER.some((known) => norm(known) === st);
+  });
+  const completionCats = hasUnknownStatus ? [...STATUS_ORDER, UNKNOWN_CATEGORY] : STATUS_ORDER;
   const completionHeatmap = allComs.length
     ? buildHeatmap(
         allComs,
         completionCats,
         (c) => {
           const st = latestStatus(c);
-          if (!st) return ["Unknown"];
+          if (!st) return [UNKNOWN_CATEGORY];
           const title = statusTitle(st);
-          return completionCats.includes(title) ? [title] : ["Unknown"];
+          return completionCats.includes(title) ? [title] : [UNKNOWN_CATEGORY];
         },
         (c) => hasFu(c, MDA_FOLLOWUP_COMPLETION),
       )
