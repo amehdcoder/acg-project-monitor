@@ -1487,6 +1487,13 @@ export type Database = {
             referencedRelation: "form_submissions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "case_activities_form_submission_id_fkey"
+            columns: ["form_submission_id"]
+            isOneToOne: false
+            referencedRelation: "v_form_submissions_enriched"
+            referencedColumns: ["id"]
+          },
         ]
       }
       case_attachments: {
@@ -3606,6 +3613,13 @@ export type Database = {
             referencedRelation: "form_submissions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "data_quality_issues_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "v_form_submissions_enriched"
+            referencedColumns: ["id"]
+          },
         ]
       }
       deleted_account_emails: {
@@ -4014,6 +4028,13 @@ export type Database = {
             columns: ["submission_id"]
             isOneToOne: false
             referencedRelation: "form_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_tracking_events_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "v_form_submissions_enriched"
             referencedColumns: ["id"]
           },
         ]
@@ -6683,6 +6704,13 @@ export type Database = {
             referencedRelation: "reference_locations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "reference_locations_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "v_microplan_entries_enriched"
+            referencedColumns: ["reference_location_id"]
+          },
         ]
       }
       sarmaan_acsm_archived_submissions: {
@@ -7505,6 +7533,13 @@ export type Database = {
             referencedRelation: "form_submissions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "submission_versions_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "v_form_submissions_enriched"
+            referencedColumns: ["id"]
+          },
         ]
       }
       sync_history: {
@@ -8269,7 +8304,170 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_form_submissions_enriched: {
+        Row: {
+          client_submitted_at: string | null
+          created_at: string | null
+          data: Json | null
+          form_id: string | null
+          form_name: string | null
+          form_project_id: string | null
+          form_status: string | null
+          id: string | null
+          location: Json | null
+          status: string | null
+          submission_type: string | null
+          submission_uuid: string | null
+          submitted_at: string | null
+          submitter_designation:
+            | Database["public"]["Enums"]["user_designation"]
+            | null
+          submitter_email: string | null
+          submitter_first_name: string | null
+          submitter_last_name: string | null
+          synced_at: string | null
+          updated_at: string | null
+          user_id: string | null
+          version: number | null
+          within_geofence: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_submissions_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forms_project_id_fkey"
+            columns: ["form_project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_microplan_entries_enriched: {
+        Row: {
+          accessibility: string | null
+          campaign_type: string | null
+          catchment_boundary: Json | null
+          cdd_from_community: boolean | null
+          cdd_names: string | null
+          cdd_phone_numbers: string | null
+          community_distance_to_flhf_km: number | null
+          community_gps_accuracy: number | null
+          community_lat_override: number | null
+          community_latitude: number | null
+          community_leader_name: string | null
+          community_leader_phone: string | null
+          community_lng_override: number | null
+          community_longitude: number | null
+          community_name: string | null
+          created_at: string | null
+          created_by: string | null
+          estimated_adults_15_plus: number | null
+          estimated_children_0_4: number | null
+          estimated_children_5_14: number | null
+          estimated_total_population: number | null
+          flhf_incharge_name: string | null
+          flhf_incharge_phone: string | null
+          flhf_lat_override: number | null
+          flhf_latitude: number | null
+          flhf_lng_override: number | null
+          flhf_longitude: number | null
+          flhf_name: string | null
+          gps_overridden_at: string | null
+          gps_overridden_by: string | null
+          households_treated: number | null
+          id: string | null
+          lga: string | null
+          medicine_reversed_other: string | null
+          medicine_reversed_to: string | null
+          medicine_used: number | null
+          notes: string | null
+          number_of_households: number | null
+          population_source: string | null
+          project_id: string | null
+          pwd_albinism: number | null
+          pwd_communication: number | null
+          pwd_hearing: number | null
+          pwd_intellectual: number | null
+          pwd_physical: number | null
+          pwd_selfcare: number | null
+          pwd_total: number | null
+          pwd_visual: number | null
+          reference_entity_type: string | null
+          reference_latitude: number | null
+          reference_location_id: string | null
+          reference_longitude: number | null
+          reference_name: string | null
+          security_clearance: string | null
+          settlement_distance_to_flhf_km: number | null
+          settlement_lat_override: number | null
+          settlement_latitude: number | null
+          settlement_lng_override: number | null
+          settlement_longitude: number | null
+          settlement_mai_unguwa: string | null
+          settlement_name: string | null
+          state: string | null
+          status: string | null
+          terrain_type: string | null
+          total_households_reported: number | null
+          total_households_treated: number | null
+          total_treated: number | null
+          trachoma_0_5_months: number | null
+          trachoma_15_plus: number | null
+          trachoma_6m_6y: number | null
+          trachoma_7_14y: number | null
+          updated_at: string | null
+          updated_by: string | null
+          ward: string | null
+          year_of_microplanning: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "microplan_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_user_project_assignments_enriched: {
+        Row: {
+          assigned_by: string | null
+          created_at: string | null
+          expires_at: string | null
+          id: string | null
+          project_end_date: string | null
+          project_id: string | null
+          project_name: string | null
+          project_start_date: string | null
+          project_status: string | null
+          starts_at: string | null
+          updated_at: string | null
+          user_approval_status: string | null
+          user_designation:
+            | Database["public"]["Enums"]["user_designation"]
+            | null
+          user_email: string | null
+          user_first_name: string | null
+          user_id: string | null
+          user_last_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_project_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       _after_hours_allowed_tables: { Args: never; Returns: string[] }
