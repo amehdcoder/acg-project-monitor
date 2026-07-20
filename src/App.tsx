@@ -65,9 +65,11 @@ const queryClient = new QueryClient({
         return failureCount < 3;
       },
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 15000),
-      staleTime: 30_000,
+      staleTime: 60_000,
       gcTime: 5 * 60_000,
       refetchOnWindowFocus: false,
+      refetchOnReconnect: "always",
+      refetchOnMount: false,
       networkMode: "offlineFirst",
     },
     mutations: {
