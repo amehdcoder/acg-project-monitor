@@ -234,6 +234,7 @@ export default function BmzFormFiller({ onClose }: Props) {
     } catch (e: any) {
       toast.error(e.message || "Could not save");
     } finally {
+      submittingRef.current = false;
       setSaving(false);
     }
   };
