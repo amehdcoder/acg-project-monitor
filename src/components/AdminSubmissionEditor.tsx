@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import FormDataTable, { type FieldDescriptor } from "@/components/FormDataTable";
 import SubmissionEditHistory from "@/components/SubmissionEditHistory";
 import { getFieldLabel, type QuestionLabelMap } from "@/lib/formLabelUtils";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 export interface EditableSubmission {
   id: string;
@@ -109,8 +110,10 @@ export default function AdminSubmissionEditor({
   };
 
 
+  const debouncedSearch = useDebouncedValue(search, 300);
+
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = debouncedSearch.trim().toLowerCase();
     let rows = submissions;
     if (chapterFilter !== "__all__") {
       rows = rows.filter((s) => (s.chapter || "") === chapterFilter);
@@ -128,7 +131,7 @@ export default function AdminSubmissionEditor({
     return [...rows].sort(
       (a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime(),
     );
-  }, [submissions, search, chapterFilter]);
+  }, [submissions, debouncedSearch, chapterFilter]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, pageCount - 1);
