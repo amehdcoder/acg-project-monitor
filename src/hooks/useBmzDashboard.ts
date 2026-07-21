@@ -246,9 +246,10 @@ export const useBmzDashboard = () => {
     if (!ids.length) return;
     const { error } = await supabase.from("bmz_monitoring" as any).delete().in("id", ids);
     if (error) throw error;
-    setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
+    qc.setQueryData<BmzRow[]>(["bmz", "monitoring"], (prev) => (prev ?? []).filter((r) => !ids.includes(r.id)));
     await reload();
   };
+
 
   return {
     rows, loading, reload,
