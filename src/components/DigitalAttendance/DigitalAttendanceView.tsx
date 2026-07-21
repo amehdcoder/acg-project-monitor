@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, LayoutDashboard, UserPlus, CalendarRange, ClipboardCheck, BarChart3, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,30 +22,68 @@ interface Props {
 
 export default function DigitalAttendanceView({ projectId, onClose }: Props) {
   const [tab, setTab] = useState<Tab>("dashboard");
-  const [participants, setParticipants] = useState<Participant[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [openCreateSession, setOpenCreateSession] = useState(false);
+  const qc = useQueryClient();
 
-  const load = useCallback(async () => {
-    const [p, s, r] = await Promise.all([
-      supabase.from("attendance_participants" as any).select("*").order("created_at", { ascending: false }).limit(2000),
-      supabase.from("attendance_sessions" as any).select("*").order("session_date", { ascending: false }).limit(500),
-      supabase.from("attendance_records" as any).select("*").limit(5000),
-    ]);
-    if (p.error) toast({ title: "Failed loading participants", description: p.error.message, variant: "destructive" });
-    setParticipants((p.data as unknown as Participant[]) || []);
-    setSessions((s.data as unknown as Session[]) || []);
-    setRecords((r.data as unknown as AttendanceRecord[]) || []);
-  }, []);
+  // Cached, deduped fetches — identical concurrent mounts share one request.
+  const participantsQ = useQuery({
+    queryKey: ["attendance", "participants"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("attendance_participants" as any)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(2000);
+      if (error) {
+        toast({ title: "Failed loading participants", description: error.message, variant: "destructive" });
+        throw error;
+      }
+      return (data as unknown as Participant[]) || [];
+    },
+  });
+  const sessionsQ = useQuery({
+    queryKey: ["attendance", "sessions"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("attendance_sessions" as any)
+        .select("*")
+        .order("session_date", { ascending: false })
+        .limit(500);
+      return (data as unknown as Session[]) || [];
+    },
+  });
+  const recordsQ = useQuery({
+    queryKey: ["attendance", "records"],
+    queryFn: async () => {
+      const { data } = await supabase.from("attendance_records" as any).select("*").limit(5000);
+      return (data as unknown as AttendanceRecord[]) || [];
+    },
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const participants = participantsQ.data ?? [];
+  const sessions = sessionsQ.data ?? [];
+  const records = recordsQ.data ?? [];
+
+  const setParticipants = useCallback(
+    (updater: (prev: Participant[]) => Participant[]) =>
+      qc.setQueryData<Participant[]>(["attendance", "participants"], (prev) => updater(prev ?? [])),
+    [qc],
+  );
+  const setSessions = useCallback(
+    (updater: (prev: Session[]) => Session[]) =>
+      qc.setQueryData<Session[]>(["attendance", "sessions"], (prev) => updater(prev ?? [])),
+    [qc],
+  );
+  const setRecords = useCallback(
+    (updater: (prev: AttendanceRecord[]) => AttendanceRecord[]) =>
+      qc.setQueryData<AttendanceRecord[]>(["attendance", "records"], (prev) => updater(prev ?? [])),
+    [qc],
+  );
 
   const reloadRecords = useCallback(async () => {
-    const { data } = await supabase.from("attendance_records" as any).select("*").limit(5000);
-    setRecords((data as unknown as AttendanceRecord[]) || []);
-  }, []);
+    await qc.invalidateQueries({ queryKey: ["attendance", "records"] });
+  }, [qc]);
 
   const TABS: { id: Tab; label: string; icon: any }[] = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
