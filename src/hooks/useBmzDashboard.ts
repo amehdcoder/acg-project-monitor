@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   CADRE_OPTIONS, REFRESHER_OPTIONS, PRIMARY_ACTIVITIES, AVAIL_OPTIONS,
@@ -58,37 +59,43 @@ async function fetchAll(): Promise<BmzRow[]> {
 }
 
 export const useBmzDashboard = () => {
-  const [rows, setRows] = useState<BmzRow[]>([]);
-  const [profileMap, setProfileMap] = useState<Map<string, ProfileLite>>(new Map());
-  const [loading, setLoading] = useState(true);
-  const reqIdRef = useRef(0);
+  const qc = useQueryClient();
+
+  const rowsQ = useQuery({
+    queryKey: ["bmz", "monitoring"],
+    queryFn: () => fetchAll(),
+  });
+  const rows = rowsQ.data ?? [];
+
+  const monitorIds = useMemo(
+    () => [...new Set(rows.map((r) => r.monitor_id).filter(Boolean))] as string[],
+    [rows],
+  );
+
+  const profilesQ = useQuery({
+    queryKey: ["bmz", "profiles", monitorIds.sort().join(",")],
+    enabled: monitorIds.length > 0,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("user_id,first_name,last_name,email")
+        .in("user_id", monitorIds);
+      const pm = new Map<string, ProfileLite>();
+      (data || []).forEach((p: any) => {
+        const name = `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email || "User";
+        pm.set(p.user_id, { name, email: p.email || "" });
+      });
+      return pm;
+    },
+  });
+  const profileMap = profilesQ.data ?? new Map<string, ProfileLite>();
+  const loading = rowsQ.isLoading || (monitorIds.length > 0 && profilesQ.isLoading);
 
   const reload = async () => {
-    const myReq = ++reqIdRef.current;
-    setLoading(true);
-    try {
-      const data = await fetchAll();
-      const ids = [...new Set(data.map((r) => r.monitor_id).filter(Boolean))] as string[];
-      const pm = new Map<string, ProfileLite>();
-      if (ids.length) {
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("user_id,first_name,last_name,email")
-          .in("user_id", ids);
-        (profs || []).forEach((p: any) => {
-          const name = `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email || "User";
-          pm.set(p.user_id, { name, email: p.email || "" });
-        });
-      }
-      if (myReq !== reqIdRef.current) return;
-      setRows(data);
-      setProfileMap(pm);
-    } finally {
-      if (myReq === reqIdRef.current) setLoading(false);
-    }
+    await qc.invalidateQueries({ queryKey: ["bmz"] });
   };
 
-  useEffect(() => { void reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
 
   const visits = useMemo(
     () => rows.filter((r) => r.status === "sent" || r.status === "finalized"),
@@ -239,9 +246,10 @@ export const useBmzDashboard = () => {
     if (!ids.length) return;
     const { error } = await supabase.from("bmz_monitoring" as any).delete().in("id", ids);
     if (error) throw error;
-    setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
+    qc.setQueryData<BmzRow[]>(["bmz", "monitoring"], (prev) => (prev ?? []).filter((r) => !ids.includes(r.id)));
     await reload();
   };
+
 
   return {
     rows, loading, reload,

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, ArrowRight, Check, MapPin, Loader2, Send, Save,
@@ -160,12 +160,15 @@ export default function BmzFormFiller({ onClose }: Props) {
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
 
+  const submittingRef = useRef(false);
   const submit = async (asDraft: boolean) => {
+    if (submittingRef.current) return; // Synchronous double-submit lock
     if (!user?.id) return;
     if (!asDraft && !idValid) { setStep(0); return toast.error("Complete identification."); }
     if (!asDraft && !serviceValid) { setStep(1); return toast.error("Complete service delivery."); }
     if (!asDraft && !challengeValid) { setStep(2); return toast.error("Complete challenges & output."); }
     if (!asDraft && !signoffValid) { setStep(3); return toast.error("Complete respondent & supervisor sign-off."); }
+    submittingRef.current = true;
     setSaving(true);
     try {
       const submissionId = crypto.randomUUID();
@@ -231,6 +234,7 @@ export default function BmzFormFiller({ onClose }: Props) {
     } catch (e: any) {
       toast.error(e.message || "Could not save");
     } finally {
+      submittingRef.current = false;
       setSaving(false);
     }
   };
