@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import FormDataTable, { type FieldDescriptor } from "@/components/FormDataTable";
 import SubmissionEditHistory from "@/components/SubmissionEditHistory";
 import { getFieldLabel, type QuestionLabelMap } from "@/lib/formLabelUtils";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 export interface EditableSubmission {
   id: string;
