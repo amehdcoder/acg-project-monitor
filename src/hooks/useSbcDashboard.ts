@@ -77,6 +77,7 @@ export const useSbcDashboard = (projectId?: string | null, categoryFilter: SbcCa
     queryFn: () => fetchAll(projectId),
     enabled: !simulate,
     placeholderData: keepPreviousData,
+    ...DASHBOARD_QUERY_OPTIONS,
   });
 
   const simRows = useMemo(() => (simulate ? generateSbcSimulation().rows : []), [simulate]);
