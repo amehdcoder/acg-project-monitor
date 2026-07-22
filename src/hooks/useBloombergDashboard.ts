@@ -106,114 +106,101 @@ export interface SchoolLite {
 }
 
 export const useBloombergDashboard = () => {
-  const [validations, setValidations] = useState<ValidationRow[]>([]);
-  const [baselines, setBaselines] = useState<BaselineRow[]>([]);
-  const [schools, setSchools] = useState<SchoolLite[]>([]);
-  const [schoolCount, setSchoolCount] = useState(0);
-  const [profileMap, setProfileMap] = useState<Map<string, ProfileLite>>(new Map());
-  const [localAuditRows, setLocalAuditRows] = useState<LocalAuditRow[]>([]);
-  const [loading, setLoading] = useState(true);
+interface BloombergDashboardData {
+  validations: ValidationRow[];
+  baselines: BaselineRow[];
+  schools: SchoolLite[];
+  schoolCount: number;
+  profileMap: Map<string, ProfileLite>;
+  localAuditRows: LocalAuditRow[];
+}
 
-  // Monotonic request id: any async load tags itself with the current value
-  // and discards its result if a newer load has started.
-  const reqIdRef = useRef(0);
-  const reloadTimerRef = useRef<number | null>(null);
+const EMPTY_DATA: BloombergDashboardData = {
+  validations: [],
+  baselines: [],
+  schools: [],
+  schoolCount: 0,
+  profileMap: new Map(),
+  localAuditRows: [],
+};
+
+const BLOOMBERG_QUERY_KEY = ["bloomberg-dashboard"] as const;
+
+async function fetchBloombergDashboard(): Promise<BloombergDashboardData> {
+  const [v, b, s] = await Promise.all([
+    fetchAll<ValidationRow>(
+      "bloomberg_validations",
+      "id,validator_id,school_key,school_name,school_type,school_code,state,lga,ward,gps_lat,gps_lng,total_male,total_female,grand_total,verification,status,submitted_at,updated_at,created_at",
+    ),
+    fetchAll<BaselineRow>("bloomberg_school_baselines", "school_key,total_male,total_female,grand_total"),
+    fetchAll<SchoolLite>(
+      "bloomberg_schools",
+      "school_key,school_name,school_type,school_code,state,lga,ward,location,state_label,lga_label,ward_label,location_label",
+    ),
+  ]);
+  const audit = await fetchAll<LocalAuditRow>(
+    "bloomberg_local_form_audit",
+    "user_id,device_id,device_label,drafts,ready_to_send,submitted,last_activity_at,updated_at,drafts_screenshot_path,ready_screenshot_path,days_worked,snapshot_captured_at",
+  ).catch(() => [] as LocalAuditRow[]);
+
+  const ids = [
+    ...new Set([
+      ...v.map((r) => r.validator_id).filter(Boolean),
+      ...audit.map((r) => r.user_id).filter(Boolean),
+    ]),
+  ] as string[];
+  const pm = new Map<string, ProfileLite>();
+  if (ids.length) {
+    const { data: profs } = await supabase
+      .from("profiles")
+      .select("user_id,first_name,last_name,email")
+      .in("user_id", ids);
+    (profs || []).forEach((p: any) => {
+      const name = `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email || "User";
+      pm.set(p.user_id, { name, email: p.email || "" });
+    });
+  }
+  return { validations: v, baselines: b, schools: s, schoolCount: s.length, profileMap: pm, localAuditRows: audit };
+}
+
+export const useBloombergDashboard = () => {
+  const queryClient = useQueryClient();
+  const { data = EMPTY_DATA, isLoading, isFetching, refetch } = useQuery({
+    queryKey: BLOOMBERG_QUERY_KEY,
+    queryFn: fetchBloombergDashboard,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    placeholderData: keepPreviousData,
+  });
+  const { validations, baselines, schools, schoolCount, profileMap, localAuditRows } = data;
+  const loading = isLoading || (isFetching && validations.length === 0);
   const reload = async () => {
-    const myReq = ++reqIdRef.current;
-    setLoading(true);
-    try {
-      const [v, b, s] = await Promise.all([
-        fetchAll<ValidationRow>(
-          "bloomberg_validations",
-          "id,validator_id,school_key,school_name,school_type,school_code,state,lga,ward,gps_lat,gps_lng,total_male,total_female,grand_total,verification,status,submitted_at,updated_at,created_at",
-        ),
-        fetchAll<BaselineRow>("bloomberg_school_baselines", "school_key,total_male,total_female,grand_total"),
-        fetchAll<SchoolLite>(
-          "bloomberg_schools",
-          "school_key,school_name,school_type,school_code,state,lga,ward,location,state_label,lga_label,ward_label,location_label",
-        ),
-      ]);
-      const count = s.length;
-
-      // Per-device local form audit reported by every user's device.
-      const audit = await fetchAll<LocalAuditRow>(
-        "bloomberg_local_form_audit",
-        "user_id,device_id,device_label,drafts,ready_to_send,submitted,last_activity_at,updated_at,drafts_screenshot_path,ready_screenshot_path,days_worked,snapshot_captured_at",
-      ).catch(() => [] as LocalAuditRow[]);
-
-      // Resolve validator names for the accountability table — include both
-      // submitters and any user who only has local drafts/ready-to-send.
-      const ids = [
-        ...new Set([
-          ...v.map((r) => r.validator_id).filter(Boolean),
-          ...audit.map((r) => r.user_id).filter(Boolean),
-        ]),
-      ] as string[];
-      const pm = new Map<string, ProfileLite>();
-      if (ids.length) {
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("user_id,first_name,last_name,email")
-          .in("user_id", ids);
-        (profs || []).forEach((p: any) => {
-          const name = `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email || "User";
-          pm.set(p.user_id, { name, email: p.email || "" });
-        });
-      }
-
-      if (myReq !== reqIdRef.current) return;
-      setLocalAuditRows(audit);
-      setValidations(v);
-      setBaselines(b);
-      setSchools(s);
-      setSchoolCount(count || 0);
-      setProfileMap(pm);
-    } catch (error) {
-      // Never leave the Bloomberg dashboard locked on a spinner when the backend
-      // is busy or a weak network drops a page of the large register. Keep the
-      // last good state (or empty initial state) and let the user retry/refresh.
-      console.warn("Bloomberg dashboard load timed out or failed:", error);
-    } finally {
-      if (myReq === reqIdRef.current) setLoading(false);
-    }
+    await refetch();
   };
 
+  const reloadTimerRef = useRef<number | null>(null);
   useEffect(() => {
-    const myReq = ++reqIdRef.current;
-    setValidations([]);
-    setBaselines([]);
-    setSchools([]);
-    setSchoolCount(0);
-    void reload();
     const scheduleReload = () => {
       if (reloadTimerRef.current !== null) window.clearTimeout(reloadTimerRef.current);
       reloadTimerRef.current = window.setTimeout(() => {
         reloadTimerRef.current = null;
-        void reload();
+        queryClient.invalidateQueries({ queryKey: BLOOMBERG_QUERY_KEY });
       }, 800);
     };
     const onMigrated = () => scheduleReload();
     window.addEventListener("bloomberg:ready-to-send-migrated", onMigrated);
     const channel = supabase
       .channel("bloomberg-validations-dashboard")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "bloomberg_validations" },
-        () => scheduleReload(),
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "bloomberg_local_form_audit" },
-        () => scheduleReload(),
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "bloomberg_validations" }, () => scheduleReload())
+      .on("postgres_changes", { event: "*", schema: "public", table: "bloomberg_local_form_audit" }, () => scheduleReload())
       .subscribe();
     return () => {
       window.removeEventListener("bloomberg:ready-to-send-migrated", onMigrated);
       if (reloadTimerRef.current !== null) window.clearTimeout(reloadTimerRef.current);
       supabase.removeChannel(channel);
-      if (myReq === reqIdRef.current) reqIdRef.current++;
     };
-  }, []);
+  }, [queryClient]);
+
 
 
   const baselineByKey = useMemo(() => {
