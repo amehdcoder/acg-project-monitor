@@ -269,7 +269,9 @@ const FormSubmissionsAccordion = ({ form, profiles }: FormSubmissionsAccordionPr
             </Button>
           )}
           <Badge variant="secondary" className="text-xs">
-            {loaded ? `${submissions.length} submissions` : `${form.total_submissions} submissions`}
+            {loaded
+              ? `${submissions.length}${hasMore ? "+" : ""} of ${form.total_submissions} submissions`
+              : `${form.total_submissions} submissions`}
           </Badge>
         </div>
       </button>
