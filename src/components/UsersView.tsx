@@ -1317,8 +1317,10 @@ const UsersView = () => {
     }
   };
 
+  // 300ms debounce prevents per-keystroke re-filtering of large user lists.
+  const debouncedSearchQuery = useDebouncedValue(searchQuery);
   const filteredUsers = useMemo(() => {
-    const q = searchQuery.toLowerCase();
+    const q = debouncedSearchQuery.toLowerCase();
     return users.filter((user) => {
       const matchesSearch = `${safeText(user.first_name, "")} ${safeText(user.last_name, "")} ${safeText(user.email, "")}`
         .toLowerCase()
@@ -1326,7 +1328,8 @@ const UsersView = () => {
       const matchesDesignation = filterDesignation === "all" || user.designation === "adhoc_user";
       return matchesSearch && matchesDesignation;
     });
-  }, [users, searchQuery, filterDesignation]);
+  }, [users, debouncedSearchQuery, filterDesignation]);
+
 
   // ---------------- Bulk actions (selected users) ----------------
   const selectableUsers = useMemo(() => filteredUsers.filter((u) => !u.is_owner), [filteredUsers]);
