@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfDay, endOfDay, subHours, differenceInMinutes } from "date-fns";
+
 import { extractLocationInfo } from "@/lib/locationUtils";
 
 export interface UserStatus {
@@ -68,12 +70,14 @@ export interface ProjectSummary {
   compliance_rate: number | null;
 }
 
+const SUPERVISOR_QUERY_KEY = ["supervisor-dashboard"] as const;
+
 export function useSupervisorDashboard() {
+  const queryClient = useQueryClient();
   const [users, setUsers] = useState<UserStatus[]>([]);
   const [alerts, setAlerts] = useState<SupervisorAlert[]>([]);
   const [dailySummary, setDailySummary] = useState<DailyActivitySummary | null>(null);
   const [projectSummaries, setProjectSummaries] = useState<ProjectSummary[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
@@ -86,19 +90,14 @@ export function useSupervisorDashboard() {
   const dateRangeRef = useRef(dateRange);
   dateRangeRef.current = dateRange;
   const dismissedAlertsRef = useRef<Set<string>>(new Set());
-  const pollIntervalRef = useRef(2000);
-  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const lastSyncRef = useRef<string | null>(null);
-  const isActiveRef = useRef(true);
-  const [reconnectNonce, setReconnectNonce] = useState(0);
 
   // Force a realtime reconnect + immediate data refresh (used by the
   // "Reconnect" button when the channel is Offline/Connecting).
   const reconnectRealtime = useCallback(() => {
     setRealtimeStatus("connecting");
-    pollIntervalRef.current = 2000;
-    setReconnectNonce((n) => n + 1);
-  }, []);
+    queryClient.invalidateQueries({ queryKey: SUPERVISOR_QUERY_KEY });
+  }, [queryClient]);
+
 
   const fetchAllData = useCallback(async () => {
     try {
@@ -411,72 +410,56 @@ export function useSupervisorDashboard() {
       });
 
       setProjectSummaries(summaries.filter(s => s.total_users > 0));
-      lastSyncRef.current = new Date().toISOString();
       setLastUpdated(new Date());
-      pollIntervalRef.current = 2000;
+      return Date.now();
 
     } catch (error) {
       console.error("Error fetching supervisor data:", error);
+      throw error;
     }
   }, []);
 
+  // TanStack Query: dedupes concurrent callers, caches for 60s, and
+  // auto-refetches on window focus / interval so we no longer maintain a
+  // custom exponential-backoff polling loop.
+  const { isLoading, refetch } = useQuery({
+    queryKey: SUPERVISOR_QUERY_KEY,
+    queryFn: fetchAllData,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    placeholderData: keepPreviousData,
+  });
+
   const refresh = useCallback(async () => {
-    setIsLoading(true);
-    await fetchAllData();
-    setIsLoading(false);
-  }, [fetchAllData]);
+    await refetch();
+  }, [refetch]);
 
   const dismissAlert = useCallback((alertId: string) => {
     dismissedAlertsRef.current.add(alertId);
     setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, dismissed: true } : a));
   }, []);
 
+  // Realtime channel: any change invalidates the query so React Query
+  // debounces/dedupes concurrent refetches for us.
   useEffect(() => {
-    isActiveRef.current = true;
-    refresh();
-
+    const invalidate = () => queryClient.invalidateQueries({ queryKey: SUPERVISOR_QUERY_KEY });
     const channel = supabase
       .channel("supervisor-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "form_submissions" }, () => {
-        pollIntervalRef.current = 2000;
-        fetchAllData();
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "form_submissions" }, () => {
-        fetchAllData();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "field_activity" }, () => {
-        pollIntervalRef.current = 2000;
-        fetchAllData();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
-        fetchAllData();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "cases" }, () => {
-        fetchAllData();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "field_activity" }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "cases" }, invalidate)
       .subscribe((status) => {
         if (status === "SUBSCRIBED") setRealtimeStatus("connected");
         else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") setRealtimeStatus("disconnected");
         else setRealtimeStatus("connecting");
       });
-
-    const poll = async () => {
-      if (!isActiveRef.current) return;
-      await fetchAllData();
-      pollIntervalRef.current = Math.min(pollIntervalRef.current * 1.5, 30000);
-      if (isActiveRef.current) {
-        pollTimeoutRef.current = setTimeout(poll, pollIntervalRef.current);
-      }
-    };
-
-    pollTimeoutRef.current = setTimeout(poll, 5000);
-
     return () => {
-      isActiveRef.current = false;
-      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
       supabase.removeChannel(channel);
     };
-  }, [refresh, fetchAllData, reconnectNonce]);
+  }, [queryClient]);
 
   // React to time-filter (date range) changes with a visible loading state so
   // the UI can disable interactions until the whole page finishes reloading.
@@ -488,13 +471,14 @@ export function useSupervisorDashboard() {
     }
     let cancelled = false;
     setIsFiltering(true);
-    fetchAllData().finally(() => {
+    refetch().finally(() => {
       if (!cancelled) setIsFiltering(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [dateRange.from.getTime(), dateRange.to.getTime(), fetchAllData]);
+  }, [dateRange.from.getTime(), dateRange.to.getTime(), refetch]);
+
 
   const activeAlerts = alerts.filter(a => !a.dismissed);
 
