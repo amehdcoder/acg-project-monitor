@@ -105,7 +105,6 @@ export interface SchoolLite {
   location?: string | null;
 }
 
-export const useBloombergDashboard = () => {
 interface BloombergDashboardData {
   validations: ValidationRow[];
   baselines: BaselineRow[];
