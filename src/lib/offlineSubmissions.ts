@@ -220,26 +220,37 @@ export async function queueOrInsert(
   row: Record<string, any>,
   upsertOnId = false,
   opts: { mirrorEntryId?: string | null } = {},
-): Promise<{ queued: boolean }> {
+): Promise<{ queued: boolean; idempotencyKey: string }> {
   // Stamp the idempotency contract for contract-aware tables. Using the row's
   // own id (a client-generated UUID for these forms) as submission_uuid keeps
   // the identity stable across every retry so duplicates are impossible.
   if (SYNC_CONTRACT_TABLES.has(table)) {
     row = stampSyncContract(row, typeof row.id === "string" ? row.id : undefined);
   }
+  // Universal client-side idempotency key: stamped on EVERY submission before
+  // it leaves the device, whether the destination table has the formal contract
+  // columns or not. This is what makes a mid-upload network failure safe to
+  // retry — the same key travels with the same payload forever.
+  const idempotencyKey = resolveIdempotencyKey(row);
+  row = { ...row, __idempotency_key: idempotencyKey };
+
   if (isOnline()) {
     try {
-      const { error } = await writeRecordToServer(table, row, upsertOnId);
+      const { error } = await writeRecordToServer(table, row, upsertOnId, idempotencyKey);
       if (error) throw error;
       // Confirmed on the server — reconcile the UI mirror right away.
       await markMirrorSent(opts.mirrorEntryId);
-      return { queued: false };
+      return { queued: false, idempotencyKey };
     } catch {
       // fall through to queue — never lose the submission
     }
   }
   await putRecord({
-    id: `${table}::${Date.now()}::${Math.random().toString(36).slice(2)}`,
+    // Deterministic record id: re-queueing the SAME submission (same
+    // idempotency key) overwrites the pending entry instead of creating a
+    // second one, so a user who taps submit twice while offline still ends up
+    // with a single queued row.
+    id: `${table}::${idempotencyKey}`,
     table,
     row,
     created_at: new Date().toISOString(),
@@ -252,7 +263,7 @@ export async function queueOrInsert(
   // Kick an immediate background flush attempt so a transient failure while
   // online does not leave the row sitting "queued" for the whole interval.
   scheduleFlush(500);
-  return { queued: true };
+  return { queued: true, idempotencyKey };
 }
 
 export async function getPendingInsertCount(): Promise<number> {
