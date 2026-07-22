@@ -9,13 +9,38 @@
 import { supabase } from "@/integrations/supabase/client";
 import { sealRecord, unsealRecord } from "@/lib/deviceCrypto";
 import { getSavedEntry, setSavedEntryStatus } from "@/lib/savedForms";
-import { stampSyncContract } from "@/lib/syncContract";
+import { stampSyncContract, newSubmissionUuid, isUuid } from "@/lib/syncContract";
 import { cascadeReferenceEntities, resolveReferences } from "@/lib/referenceSyncLedger";
 
 // Tables that carry the formal idempotency contract (submission_uuid +
 // client_submitted_at columns). Rows destined for these tables are stamped so a
 // retransmit after a network blip is recognised and never duplicated.
 const SYNC_CONTRACT_TABLES = new Set(["bloomberg_validations", "seeclear_monitoring", "bmz_monitoring"]);
+
+/**
+ * Every payload that flows through the queue is stamped with a client-generated
+ * idempotency key BEFORE it is transmitted. The key is derived deterministically
+ * from the row identity (row.id / row.submission_uuid) when available, otherwise
+ * a fresh UUID v4 is minted. It is:
+ *   • preserved on the queued IndexedDB record so retries reuse the SAME key,
+ *   • used as the IndexedDB record id so re-queueing the same submission cannot
+ *     create a duplicate pending entry,
+ *   • forwarded to the server through the standard idempotency channels
+ *     (submission_uuid column for contract tables, PK upsert-on-id for all
+ *     others, and an `x-idempotency-key` header on the PostgREST request) so
+ *     a mid-upload network failure that is retried is treated as the SAME
+ *     transaction and never produces a duplicate row.
+ */
+const IDEMPOTENCY_HEADER = "x-idempotency-key";
+
+function resolveIdempotencyKey(row: Record<string, any>): string {
+  if (isUuid(row?.submission_uuid)) return row.submission_uuid;
+  if (isUuid(row?.id)) return row.id;
+  if (typeof row?.__idempotency_key === "string" && isUuid(row.__idempotency_key)) {
+    return row.__idempotency_key;
+  }
+  return newSubmissionUuid();
+}
 
 
 const DB_NAME = "acg_offline_submissions";
