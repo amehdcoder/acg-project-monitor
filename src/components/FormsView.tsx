@@ -21,6 +21,9 @@ import { SEECLEAR_FORM_NAME, SEECLEAR_FORM_DESC, SEECLEAR_DASH_NAME, SEECLEAR_DA
 import BmzFormFiller from "@/components/BMZ/BmzFormFiller";
 import BmzDashboard from "@/components/BMZ/BmzDashboard";
 import BmzAddToProjectDialog from "@/components/BMZ/BmzAddToProjectDialog";
+import MicroplanProjectAccessDialog from "@/components/Microplanning/MicroplanProjectAccessDialog";
+import MicroplanMoveEntriesDialog from "@/components/Microplanning/MicroplanMoveEntriesDialog";
+import chwHero from "@/assets/community-health-worker.jpg.asset.json";
 import { BMZ_FORM_NAME, BMZ_FORM_DESC, BMZ_DASH_NAME, BMZ_DASH_DESC } from "@/lib/bmz/definition";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
 import { ALL_STANDARD_FORMS } from "@/lib/standardAssessments/allStandardForms";
@@ -316,6 +319,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [dailyTargetForm, setDailyTargetForm] = useState<Form | null>(null);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [hasMicroplanAccess, setHasMicroplanAccess] = useState(false);
+  const [microplanProjectIds, setMicroplanProjectIds] = useState<Set<string>>(new Set());
+  const [showMicroplanAccessDialog, setShowMicroplanAccessDialog] = useState(false);
+  const [showMicroplanMoveDialog, setShowMicroplanMoveDialog] = useState(false);
   const [microplanFillingActive, setMicroplanFillingActive] = useState(false);
   const [activeStandardAssessment, setActiveStandardAssessment] = useState<StandardFormCode | null>(null);
   const [showDigitalAttendance, setShowDigitalAttendance] = useState(false);
@@ -815,23 +821,40 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     toast({ title: disable ? "Standard form disabled" : "Standard form enabled" });
   };
 
-  // Check if user has microplan form access
+  // Check if user has microplan form access:
+  //   1. Legacy per-user grant (microplan_form_access), OR
+  //   2. Member of a project with a microplan_project_grants row and NOT excluded.
   useEffect(() => {
     const checkMicroplanAccess = async () => {
       if (!user?.id) return;
-      const { data } = await withTimeoutFallback(
-        supabase
-          .from("microplan_form_access")
-          .select("id")
-          .eq("user_id", user.id)
-          .limit(1),
-        7000,
-        { data: [] } as any,
+      const [legacyRes, grantsRes, exclRes, asgRes] = await Promise.all([
+        withTimeoutFallback(
+          supabase.from("microplan_form_access").select("id").eq("user_id", user.id).limit(1),
+          7000, { data: [] } as any),
+        withTimeoutFallback(
+          supabase.from("microplan_project_grants" as any).select("project_id"),
+          7000, { data: [] } as any),
+        withTimeoutFallback(
+          supabase.from("microplan_project_exclusions" as any).select("project_id").eq("user_id", user.id),
+          7000, { data: [] } as any),
+        withTimeoutFallback(
+          supabase.from("user_project_assignments").select("project_id").eq("user_id", user.id),
+          7000, { data: [] } as any),
+      ]);
+      const legacy = !!(legacyRes?.data && (legacyRes.data as any[]).length > 0);
+      const grantedSet = new Set(((grantsRes?.data as any[]) || []).map((r) => r.project_id));
+      const excludedSet = new Set(((exclRes?.data as any[]) || []).map((r) => r.project_id));
+      const myProjects = ((asgRes?.data as any[]) || []).map((r) => r.project_id);
+      const allowedProjects = new Set(
+        myProjects.filter((pid) => grantedSet.has(pid) && !excludedSet.has(pid))
       );
-      setHasMicroplanAccess(!!data && data.length > 0);
+      // Admins/Owners always see the management tools too.
+      if (isSuperAdmin || isOwnerLevel) grantedSet.forEach((pid) => allowedProjects.add(pid));
+      setMicroplanProjectIds(allowedProjects);
+      setHasMicroplanAccess(legacy || allowedProjects.size > 0);
     };
     checkMicroplanAccess();
-  }, [user?.id]);
+  }, [user?.id, isSuperAdmin, isOwnerLevel]);
 
   // Wait for auth (role/user) to resolve before fetching, otherwise super admins
   // and assigned users get empty/incorrect lists that never refresh because the
@@ -4527,26 +4550,56 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
               {/* Microplanning entry — kept inside the list */}
               {(hasMicroplanAccess || (!isAdhoc && projects.length > 0)) && (
-
-                <button
-                  onClick={() => setMicroplanFillingActive(true)}
-                  className="flex w-full items-center gap-3 p-3 sm:p-4 text-left hover:bg-[#F4F6F8]/70 transition-colors"
-                >
-                  <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg bg-[#E2F5EC]">
-                    <MapPin className="h-5 w-5 sm:h-6 sm:w-6 text-[#22A55A]" strokeWidth={2} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">
-                      Geo-enabled Microplanning Entry
-                    </h4>
-                    <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">
-                      Community-level campaign microplanning with georeferenced data collection.
-                    </p>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-[#E2F5EC] px-3 py-1 text-xs font-medium text-[#1F7A3A]">
-                    Open
-                  </span>
-                </button>
+                <div className="border-t border-border/40">
+                  <button
+                    onClick={() => setMicroplanFillingActive(true)}
+                    className="group relative flex w-full items-stretch overflow-hidden text-left transition-transform hover:-translate-y-[1px]"
+                    style={{ minHeight: 96 }}
+                  >
+                    <div
+                      className="absolute inset-0 bg-cover bg-center"
+                      style={{ backgroundImage: `url(${chwHero.url})` }}
+                      aria-hidden="true"
+                    />
+                    <div
+                      className="absolute inset-0"
+                      style={{ background: "linear-gradient(90deg, rgba(11,58,36,0.92) 0%, rgba(11,58,36,0.72) 45%, rgba(11,58,36,0.15) 100%)" }}
+                      aria-hidden="true"
+                    />
+                    <div className="relative flex flex-1 items-center gap-3 p-3 sm:p-4">
+                      <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg bg-white/95 shadow-md">
+                        <MapPin className="h-5 w-5 sm:h-6 sm:w-6 text-[#0B5B2E]" strokeWidth={2.25} />
+                      </div>
+                      <div className="min-w-0 flex-1 text-white">
+                        <h4 className="truncate text-sm sm:text-base font-bold drop-shadow">
+                          Geo-enabled Microplanning Entry
+                        </h4>
+                        <p className="mt-0.5 truncate text-xs sm:text-sm text-white/90">
+                          Community-level campaign microplanning with georeferenced data collection.
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-[#0B5B2E]">
+                        Open
+                      </span>
+                    </div>
+                  </button>
+                  {(isSuperAdmin || isOwnerLevel) && (
+                    <div className="flex items-center gap-2 border-t border-border/40 bg-muted/30 px-3 sm:px-4 py-2">
+                      <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-[11px] font-medium text-muted-foreground">Super Admin</span>
+                      <div className="ml-auto flex flex-wrap gap-1.5">
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+                          onClick={() => setShowMicroplanAccessDialog(true)}>
+                          Grant to project
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+                          onClick={() => setShowMicroplanMoveDialog(true)}>
+                          Move entries
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
                 </div>
               )}
@@ -4730,6 +4783,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         userId={user?.id}
         onChanged={loadBmzAssignments}
       />
+
+      <MicroplanProjectAccessDialog
+        open={showMicroplanAccessDialog}
+        onOpenChange={setShowMicroplanAccessDialog}
+      />
+      <MicroplanMoveEntriesDialog
+        open={showMicroplanMoveDialog}
+        onOpenChange={setShowMicroplanMoveDialog}
+      />
+
+
 
 
       {/* Template Picker Dialog */}

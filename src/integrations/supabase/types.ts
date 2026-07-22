@@ -5602,6 +5602,67 @@ export type Database = {
         }
         Relationships: []
       }
+      microplan_project_exclusions: {
+        Row: {
+          created_at: string
+          excluded_by: string
+          id: string
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          excluded_by: string
+          id?: string
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          excluded_by?: string
+          id?: string
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "microplan_project_exclusions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      microplan_project_grants: {
+        Row: {
+          created_at: string
+          granted_by: string
+          id: string
+          project_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by: string
+          id?: string
+          project_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string
+          id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "microplan_project_grants_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           category: string
@@ -8951,8 +9012,16 @@ export type Database = {
         Args: { _chat_group_id: string; _user_id: string }
         Returns: boolean
       }
+      user_can_enter_microplan: {
+        Args: { _project_id: string; _state: string; _uid: string }
+        Returns: boolean
+      }
       user_cascade_allows: {
         Args: { _fields: Json; _form_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_has_microplan_project_access: {
+        Args: { _uid: string }
         Returns: boolean
       }
       user_has_microplan_scope: {
