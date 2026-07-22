@@ -154,6 +154,7 @@ import CopyMdaChecklistDialog from "@/components/MdaChecklist/CopyMdaChecklistDi
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { withTimeoutFallback } from "@/lib/withTimeout";
 import { fetchProjectsWithRetry, writeProjectCaches } from "@/lib/prefetchProjects";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 interface FormSettings {
   requireLocation?: boolean;
@@ -1463,8 +1464,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   ];
 
 
+  // 300ms debounce prevents per-keystroke re-filtering across the full merged form set.
+  const debouncedSearchQuery = useDebouncedValue(searchQuery);
   const filteredForms = mergedForms.filter((form) =>
-    form.name.toLowerCase().includes(searchQuery.toLowerCase())
+    form.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
   );
 
   const mdaChecklistForms = mergedForms.filter((form) =>
@@ -1658,8 +1661,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       isSupervisoryLearningForm({ settings: form.settings, name: form.name }) || isSarmaanAcsmStoredForm(form)
     )),
   );
-  const sarmaanSearchMatches = !searchQuery.trim() || /sarmaan|supervisory|supervision|checklist|dashboard|learning|acsm|mda|azithromycin/i.test(searchQuery);
-  const acsmSearchMatches = !searchQuery.trim() || /sarmaan|acsm|mda|supervision|checklist|dashboard|azithromycin/i.test(searchQuery);
+  const sarmaanSearchMatches = !debouncedSearchQuery.trim() || /sarmaan|supervisory|supervision|checklist|dashboard|learning|acsm|mda|azithromycin/i.test(debouncedSearchQuery);
+  const acsmSearchMatches = !debouncedSearchQuery.trim() || /sarmaan|acsm|mda|supervision|checklist|dashboard|azithromycin/i.test(debouncedSearchQuery);
   const shouldShowSarmaanSupervisoryBlock = currentProjectIsSarmaan && sarmaanSearchMatches && (!!primarySarmaanSupervisoryForm || isAdmin);
   const shouldShowSarmaanAcsmBlock = sarmaanAcsmContext && acsmSearchMatches && (sarmaanIsManager || !!acsmForm || canSeeAcsmChecklist || canSeeAcsmDashboard);
   const sarmaanVisibleRowCount = (shouldShowSarmaanSupervisoryBlock ? 2 : 0) + (shouldShowSarmaanAcsmBlock ? 1 : 0);
