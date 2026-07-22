@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   STATUS_META, type SbcStatus, type SbcCategory,
   findIndicator, computeAchievement, statusFromAchievement,
 } from "@/lib/sbc/definition";
 import { generateSbcSimulation } from "@/lib/sbc/simulation";
+import { safeArray } from "@/lib/safeData";
 
 export interface SbcRow {
   id: string;
@@ -64,41 +66,23 @@ async function fetchAll(projectId?: string | null): Promise<SbcRow[]> {
 
 const MONTHS = ["Nov 2024", "Dec 2024", "Jan 2025", "Feb 2025", "Mar 2025", "Apr 2025", "May 2025"];
 
+const sbcKey = (projectId?: string | null) => ["sbc-reports", projectId ?? "all"] as const;
+
 export const useSbcDashboard = (projectId?: string | null, categoryFilter: SbcCategory | "all" = "all") => {
-  const [allRows, setAllRows] = useState<SbcRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [simulate, setSimulate] = useState(false);
 
-  const reqIdRef = useRef(0);
-  const simulateRef = useRef(simulate);
-  simulateRef.current = simulate;
+  const query = useQuery<SbcRow[]>({
+    queryKey: sbcKey(projectId),
+    queryFn: () => fetchAll(projectId),
+    enabled: !simulate,
+    placeholderData: keepPreviousData,
+  });
 
-  const reload = async () => {
-    const myReq = ++reqIdRef.current;
-    setLoading(true);
-    try {
-      const data = await fetchAll(projectId);
-      if (myReq !== reqIdRef.current || simulateRef.current) return;
-      setAllRows(data);
-    } finally {
-      if (myReq === reqIdRef.current) setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const myReq = ++reqIdRef.current;
-    if (simulate) {
-      setAllRows(generateSbcSimulation().rows);
-      setLoading(false);
-    } else {
-      setAllRows([]);
-      void reload();
-    }
-    return () => {
-      if (myReq === reqIdRef.current) reqIdRef.current++;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simulate, projectId]);
+  const simRows = useMemo(() => (simulate ? generateSbcSimulation().rows : []), [simulate]);
+  const allRows = simulate ? simRows : safeArray<SbcRow>(query.data);
+  const loading = simulate ? false : query.isLoading;
+  const reload = () => queryClient.invalidateQueries({ queryKey: sbcKey(projectId) });
 
   const rows = useMemo(
     () => (categoryFilter === "all" ? allRows : allRows.filter((r) => r.category === categoryFilter)),

@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo } from "react";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
 import { flagDuplicates, applyOverrides, irfSignature, irfOrder, type OverrideMap } from "@/lib/acsm/irfBridge";
 import { IRF_METRIC_FIELDS, IRF_SECTIONS, type IrfReport } from "@/lib/irf/definition";
 import { normalizeIrfRows, computeIrfReach } from "@/lib/irf/normalize";
+import { safeArray } from "@/lib/safeData";
 
 async function fetchAll(projectId?: string | null): Promise<IrfReport[]> {
   const rows = await fetchAllRowsKeyset<IrfReport>((limit, afterId) => {
@@ -20,41 +22,37 @@ async function fetchAll(projectId?: string | null): Promise<IrfReport[]> {
 
 const num = (v: any) => (v == null || v === "" ? 0 : Number(v) || 0);
 
+// React-query keys — identical `[domain, projectId]` tuples from any component
+// share a single in-flight request and a single cache entry (auto-dedup).
+const irfKey = (projectId?: string | null) => ["irf-reports", projectId ?? "all"] as const;
+
 export const useIrfDashboard = (projectId?: string | null, overrideMap?: OverrideMap | null) => {
-  const [rawRows, setRawRows] = useState<IrfReport[]>([]);
-  const [loading, setLoading] = useState(true);
-  const reqIdRef = useRef(0);
+  const queryClient = useQueryClient();
 
-  const reload = async () => {
-    const myReq = ++reqIdRef.current;
-    setLoading(true);
-    try {
-      const data = await fetchAll(projectId);
-      if (myReq !== reqIdRef.current) return;
-      setRawRows(data);
-    } finally {
-      if (myReq === reqIdRef.current) setLoading(false);
-    }
-  };
+  const query = useQuery<IrfReport[]>({
+    queryKey: irfKey(projectId),
+    queryFn: () => fetchAll(projectId),
+    placeholderData: keepPreviousData,
+  });
 
-  useEffect(() => {
-    void reload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+  const rawRows = useMemo(() => safeArray<IrfReport>(query.data), [query.data]);
+  const loading = query.isLoading;
+  const reload = () => queryClient.invalidateQueries({ queryKey: irfKey(projectId) });
 
   // Realtime: instantly refresh when a report is inserted/updated/deleted.
+  // The invalidate is a no-op cost against the cache; react-query dedupes the
+  // resulting refetch across mounted subscribers of this key.
   useEffect(() => {
     const channel = supabase
       .channel(`irf_reports_${projectId || "all"}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "irf_reports" },
-        () => { void reload(); },
+        () => { void queryClient.invalidateQueries({ queryKey: irfKey(projectId) }); },
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+  }, [projectId, queryClient]);
 
   // Duplicate detection + admin overrides. Rejected submissions are dropped from all
   // analyses; "unique" overrides force-include auto-flagged rows. The remaining
