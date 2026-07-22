@@ -894,7 +894,10 @@ export const useBloombergDashboard = () => {
       .in("id", ids);
     if (error) throw error;
     // Optimistically drop locally, then re-sync from server.
-    setValidations((prev) => prev.filter((v) => !ids.includes(v.id)));
+    // Optimistically drop locally, then re-sync from server.
+    queryClient.setQueryData<BloombergDashboardData>(BLOOMBERG_QUERY_KEY, (prev) =>
+      prev ? { ...prev, validations: prev.validations.filter((v) => !ids.includes(v.id)) } : prev,
+    );
     await reload();
   };
 
