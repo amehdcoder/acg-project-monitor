@@ -331,7 +331,8 @@ export async function flushSubmissionQueue(
     const processOne = async (rec: PendingInsert) => {
       if (!isOnline()) return;
       try {
-        const { error } = await writeRecordToServer(rec.table, rec.row, rec.upsertOnId ?? false);
+        const key = resolveIdempotencyKey(rec.row);
+        const { error } = await writeRecordToServer(rec.table, rec.row, rec.upsertOnId ?? false, key);
         if (error) throw error;
         await deleteRecord(rec.id);
         await markMirrorSent(rec.mirrorEntryId);
