@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ACSM_CATEGORIES, STATUS_META, type AcsmStatus, type AcsmCategory,
@@ -130,90 +131,92 @@ export const useAcsmDashboard = (
   categoryFilter: AcsmCategory | "all" = "all",
   overrides?: { acsmMap?: OverrideMap | null; irfMap?: OverrideMap | null },
 ) => {
-  const [allRows, setAllRows] = useState<AcsmRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [simulate, setSimulate] = useState(false);
   const [duplicateInfo, setDuplicateInfo] = useState<AcsmDuplicateInfo>({
     acsmDuplicates: 0, irfDuplicates: 0, total: 0, irfReports: 0, irfUnique: 0,
   });
 
-  const reqIdRef = useRef(0);
-  const simulateRef = useRef(simulate);
-  simulateRef.current = simulate;
-  const overridesRef = useRef(overrides);
-  overridesRef.current = overrides;
   const acsmOverrideSig = mapSignature(overrides?.acsmMap);
   const irfOverrideSig = mapSignature(overrides?.irfMap);
   const overrideSig = `${acsmOverrideSig}|${irfOverrideSig}`;
 
-  const reload = async () => {
-    const myReq = ++reqIdRef.current;
-    setLoading(true);
-    try {
-      const [acsmRaw, irfRaw] = await Promise.all([fetchAll(projectId), fetchIrf(projectId)]);
-      if (myReq !== reqIdRef.current || simulateRef.current) return;
+  // TanStack Query key — automatic dedupe across components, 60s staleness,
+  // 5min gc, offline-first via App-level defaults.
+  const queryKey = ["acsm", "dashboard", projectId ?? "all"] as const;
 
-      // De-duplicate native ACSM reports, then apply any admin overrides.
-      const acsmBase = flagDuplicates(
-        acsmRaw, acsmSignature, (r) => r.id,
-        (r) => new Date(r.created_at || 0).getTime(),
-      );
-      const acsmDedup = applyOverrides(acsmBase, (r) => r.id, overridesRef.current?.acsmMap);
-      // De-duplicate IRF submissions BEFORE mapping so duplicates can't inflate the
-      // Advocacy Dashboard contributions; admin overrides win here too.
-      const irfBase = flagDuplicates(irfRaw, irfSignature, (r) => r.id, irfOrder);
-      const irfDedup = applyOverrides(irfBase, (r) => r.id, overridesRef.current?.irfMap);
-      const derived = mapIrfRowsToAcsmRows(irfDedup.unique);
+  const query = useQuery({
+    queryKey,
+    enabled: !simulate,
+    queryFn: async () => {
+      try {
+        const [acsmRaw, irfRaw] = await Promise.all([fetchAll(projectId), fetchIrf(projectId)]);
+        return { acsmRaw, irfRaw };
+      } catch (error) {
+        logAcsmDataError("reload", error, { projectId, categoryFilter });
+        throw error;
+      }
+    },
+  });
 
-      setAllRows([...acsmDedup.unique, ...derived]);
-      setDuplicateInfo({
+  // Derive rows + duplicate info from the cached raw payload + current overrides.
+  const derived = useMemo(() => {
+    if (simulate) {
+      return {
+        allRows: generateAcsmSimulation().rows as AcsmRow[],
+        info: { acsmDuplicates: 0, irfDuplicates: 0, total: 0, irfReports: 0, irfUnique: 0 } as AcsmDuplicateInfo,
+      };
+    }
+    const data = query.data;
+    if (!data) {
+      return {
+        allRows: [] as AcsmRow[],
+        info: { acsmDuplicates: 0, irfDuplicates: 0, total: 0, irfReports: 0, irfUnique: 0 } as AcsmDuplicateInfo,
+      };
+    }
+    const acsmBase = flagDuplicates(
+      data.acsmRaw, acsmSignature, (r) => r.id,
+      (r) => new Date(r.created_at || 0).getTime(),
+    );
+    const acsmDedup = applyOverrides(acsmBase, (r) => r.id, overrides?.acsmMap);
+    const irfBase = flagDuplicates(data.irfRaw, irfSignature, (r) => r.id, irfOrder);
+    const irfDedup = applyOverrides(irfBase, (r) => r.id, overrides?.irfMap);
+    const derivedRows = mapIrfRowsToAcsmRows(irfDedup.unique);
+    return {
+      allRows: [...acsmDedup.unique, ...derivedRows],
+      info: {
         acsmDuplicates: acsmDedup.duplicateCount,
         irfDuplicates: irfDedup.duplicateCount,
         total: acsmDedup.duplicateCount + irfDedup.duplicateCount,
-        irfReports: irfRaw.length,
+        irfReports: data.irfRaw.length,
         irfUnique: irfDedup.uniqueCount,
-      });
-    } catch (error) {
-      logAcsmDataError("reload", error, { projectId, categoryFilter });
-      if (myReq === reqIdRef.current) {
-        setAllRows([]);
-        setDuplicateInfo({
-          acsmDuplicates: 0, irfDuplicates: 0, total: 0, irfReports: 0, irfUnique: 0,
-        });
-      }
-    } finally {
-      if (myReq === reqIdRef.current) setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const myReq = ++reqIdRef.current;
-    if (simulate) {
-      setAllRows(generateAcsmSimulation().rows);
-      setLoading(false);
-    } else {
-      setAllRows([]);
-      void reload();
-    }
-    return () => {
-      if (myReq === reqIdRef.current) reqIdRef.current++;
+      },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simulate, projectId, overrideSig]);
+  }, [simulate, query.data, overrideSig]);
 
-  // Realtime: refresh when either the ACSM IRF table or the IRF table changes.
+  const allRows = derived.allRows;
+  useEffect(() => { setDuplicateInfo(derived.info); }, [derived.info]);
+
+  const loading = !simulate && query.isLoading;
+  const reload = async () => {
+    await queryClient.invalidateQueries({ queryKey });
+  };
+
+  // Realtime: invalidate the query key when ACSM or IRF tables change.
   useEffect(() => {
     if (simulate) return;
     const channel = supabase
       .channel(`advocacy_dashboard_${projectId || "all"}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "acsm_reports" },
-        () => { void reload(); })
+        () => { void queryClient.invalidateQueries({ queryKey }); })
       .on("postgres_changes", { event: "*", schema: "public", table: "irf_reports" },
-        () => { void reload(); })
+        () => { void queryClient.invalidateQueries({ queryKey }); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, simulate]);
+
 
 
   const rows = useMemo(
