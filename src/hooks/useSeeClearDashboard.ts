@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   EQUIPMENT_ITEMS, EQUIP_STATUS_META, readinessBand, type EquipStatus,
 } from "@/lib/seeclear/definition";
 import { generateSeeClearSimulation } from "@/lib/seeclear/simulation";
 import { buildAccountability, type ProfileLite } from "@/lib/accountability";
+import { safeArray } from "@/lib/safeData";
 
 export interface MonitoringRow {
   id: string;
@@ -53,65 +55,61 @@ async function fetchAll(): Promise<MonitoringRow[]> {
   return all;
 }
 
+async function fetchProfilesFor(rows: MonitoringRow[]): Promise<Map<string, ProfileLite>> {
+  const ids = [...new Set(rows.map((r) => r.monitor_id).filter(Boolean))] as string[];
+  const pm = new Map<string, ProfileLite>();
+  if (!ids.length) return pm;
+  const { data: profs } = await supabase
+    .from("profiles")
+    .select("user_id,first_name,last_name,email")
+    .in("user_id", ids);
+  (profs || []).forEach((p: any) => {
+    const name = `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email || "User";
+    pm.set(p.user_id, { name, email: p.email || "" });
+  });
+  return pm;
+}
+
 const LEVEL_LABEL: Record<string, string> = { primary: "Primary (PHC)", secondary: "Secondary (PCH/SDH/CIG)", tertiary: "Tertiary (Hospital)" };
 
+const seeclearKey = ["seeclear-monitoring", "all"] as const;
+const seeclearProfilesKey = ["seeclear-monitoring", "profiles"] as const;
+
+// Stable empty sentinels so simulate=false renders don't fight react-query cache.
+const SIM_PROFILES = (() => {
+  const names = ["Amaka Obi", "Ibrahim Sani", "Grace Danjuma", "Yusuf Bello", "Ngozi Eze", "Peter Gyang"];
+  const pm = new Map<string, ProfileLite>();
+  names.forEach((n, i) => pm.set(`sim-monitor-${i + 1}`, { name: n, email: `${n.split(" ")[0].toLowerCase()}@example.org` }));
+  return pm;
+})();
+
 export const useSeeClearDashboard = () => {
-  const [rows, setRows] = useState<MonitoringRow[]>([]);
-  const [profileMap, setProfileMap] = useState<Map<string, ProfileLite>>(new Map());
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [simulate, setSimulate] = useState(false);
 
-  const reqIdRef = useRef(0);
-  const simulateRef = useRef(simulate);
-  simulateRef.current = simulate;
+  // Realtime backend query — deduped across every mounted component.
+  const rowsQuery = useQuery<MonitoringRow[]>({
+    queryKey: seeclearKey,
+    queryFn: fetchAll,
+    enabled: !simulate,
+    placeholderData: keepPreviousData,
+  });
 
-  const reload = async () => {
-    const myReq = ++reqIdRef.current;
-    setLoading(true);
-    try {
-      const data = await fetchAll();
+  // Profile lookup keyed by monitor-ids present in the current row set.
+  // Depends on the row query so identical concurrent dashboards share it too.
+  const profilesQuery = useQuery<Map<string, ProfileLite>>({
+    queryKey: [...seeclearProfilesKey, safeArray<MonitoringRow>(rowsQuery.data).length],
+    queryFn: () => fetchProfilesFor(safeArray<MonitoringRow>(rowsQuery.data)),
+    enabled: !simulate && !!rowsQuery.data,
+    placeholderData: keepPreviousData,
+  });
 
-      // Resolve monitor names for the accountability table.
-      const ids = [...new Set(data.map((r) => r.monitor_id).filter(Boolean))] as string[];
-      const pm = new Map<string, ProfileLite>();
-      if (ids.length) {
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("user_id,first_name,last_name,email")
-          .in("user_id", ids);
-        (profs || []).forEach((p: any) => {
-          const name = `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email || "User";
-          pm.set(p.user_id, { name, email: p.email || "" });
-        });
-      }
+  const simRows = useMemo(() => (simulate ? generateSeeClearSimulation().rows : []), [simulate]);
+  const rows = simulate ? simRows : safeArray<MonitoringRow>(rowsQuery.data);
+  const profileMap = simulate ? SIM_PROFILES : (profilesQuery.data ?? new Map<string, ProfileLite>());
+  const loading = simulate ? false : rowsQuery.isLoading;
 
-      if (myReq !== reqIdRef.current || simulateRef.current) return;
-      setRows(data);
-      setProfileMap(pm);
-    } finally {
-      if (myReq === reqIdRef.current) setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const myReq = ++reqIdRef.current;
-    if (simulate) {
-      const sim = generateSeeClearSimulation();
-      setRows(sim.rows);
-      const names = ["Amaka Obi", "Ibrahim Sani", "Grace Danjuma", "Yusuf Bello", "Ngozi Eze", "Peter Gyang"];
-      const pm = new Map<string, ProfileLite>();
-      names.forEach((n, i) => pm.set(`sim-monitor-${i + 1}`, { name: n, email: `${n.split(" ")[0].toLowerCase()}@example.org` }));
-      setProfileMap(pm);
-      setLoading(false);
-    } else {
-      setRows([]);
-      void reload();
-    }
-    return () => {
-      if (myReq === reqIdRef.current) reqIdRef.current++;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simulate]);
+  const reload = () => queryClient.invalidateQueries({ queryKey: seeclearKey });
 
   // Only consider submitted (non-draft) facilities for analytics.
   const facilities = useMemo(
@@ -286,8 +284,12 @@ export const useSeeClearDashboard = () => {
       .delete()
       .in("id", ids);
     if (error) throw error;
-    setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
-    await reload();
+    // Optimistically prune the cache, then re-sync so any concurrent viewer
+    // sees the mutation via the same query key.
+    queryClient.setQueryData<MonitoringRow[]>(seeclearKey, (prev) =>
+      safeArray<MonitoringRow>(prev).filter((r) => !ids.includes(r.id)),
+    );
+    await queryClient.invalidateQueries({ queryKey: seeclearKey });
   };
 
   return {
