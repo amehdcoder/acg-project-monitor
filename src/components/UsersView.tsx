@@ -1013,12 +1013,15 @@ const UsersView = () => {
     }
     setBulkBusy(false);
     setBulkProgress(null);
+    bulkLockRef.current = false;
   };
 
 
   const handleBulkResendInvite = async () => {
+    if (bulkLockRef.current) return;
     const targets = selectedUserObjects();
     if (targets.length === 0) return;
+    bulkLockRef.current = true;
     setBulkBusy(true);
     setBulkResults([]);
     setBulkProgress({ done: 0, total: targets.length });
@@ -1047,11 +1050,14 @@ const UsersView = () => {
     if (okCount === targets.length) clearSelection();
     setBulkBusy(false);
     setBulkProgress(null);
+    bulkLockRef.current = false;
   };
 
   const handleBulkRemoveAccess = async () => {
+    if (bulkLockRef.current) return;
     const targets = selectedUserObjects();
     if (targets.length === 0) return;
+    bulkLockRef.current = true;
     setBulkBusy(true);
     setBulkResults([]);
     setBulkProgress({ done: 0, total: targets.length });
@@ -1084,6 +1090,7 @@ const UsersView = () => {
     fetchUsers();
     setBulkBusy(false);
     setBulkProgress(null);
+    bulkLockRef.current = false;
   };
 
 
