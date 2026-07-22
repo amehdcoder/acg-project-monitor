@@ -821,23 +821,40 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     toast({ title: disable ? "Standard form disabled" : "Standard form enabled" });
   };
 
-  // Check if user has microplan form access
+  // Check if user has microplan form access:
+  //   1. Legacy per-user grant (microplan_form_access), OR
+  //   2. Member of a project with a microplan_project_grants row and NOT excluded.
   useEffect(() => {
     const checkMicroplanAccess = async () => {
       if (!user?.id) return;
-      const { data } = await withTimeoutFallback(
-        supabase
-          .from("microplan_form_access")
-          .select("id")
-          .eq("user_id", user.id)
-          .limit(1),
-        7000,
-        { data: [] } as any,
+      const [legacyRes, grantsRes, exclRes, asgRes] = await Promise.all([
+        withTimeoutFallback(
+          supabase.from("microplan_form_access").select("id").eq("user_id", user.id).limit(1),
+          7000, { data: [] } as any),
+        withTimeoutFallback(
+          supabase.from("microplan_project_grants" as any).select("project_id"),
+          7000, { data: [] } as any),
+        withTimeoutFallback(
+          supabase.from("microplan_project_exclusions" as any).select("project_id").eq("user_id", user.id),
+          7000, { data: [] } as any),
+        withTimeoutFallback(
+          supabase.from("user_project_assignments").select("project_id").eq("user_id", user.id),
+          7000, { data: [] } as any),
+      ]);
+      const legacy = !!(legacyRes?.data && (legacyRes.data as any[]).length > 0);
+      const grantedSet = new Set(((grantsRes?.data as any[]) || []).map((r) => r.project_id));
+      const excludedSet = new Set(((exclRes?.data as any[]) || []).map((r) => r.project_id));
+      const myProjects = ((asgRes?.data as any[]) || []).map((r) => r.project_id);
+      const allowedProjects = new Set(
+        myProjects.filter((pid) => grantedSet.has(pid) && !excludedSet.has(pid))
       );
-      setHasMicroplanAccess(!!data && data.length > 0);
+      // Admins/Owners always see the management tools too.
+      if (isSuperAdmin || isOwnerLevel) grantedSet.forEach((pid) => allowedProjects.add(pid));
+      setMicroplanProjectIds(allowedProjects);
+      setHasMicroplanAccess(legacy || allowedProjects.size > 0);
     };
     checkMicroplanAccess();
-  }, [user?.id]);
+  }, [user?.id, isSuperAdmin, isOwnerLevel]);
 
   // Wait for auth (role/user) to resolve before fetching, otherwise super admins
   // and assigned users get empty/incorrect lists that never refresh because the
