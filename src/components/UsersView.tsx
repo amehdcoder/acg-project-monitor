@@ -807,7 +807,12 @@ const UsersView = () => {
     }
   };
 
+  // Ref-based sync lock: flips instantly on click so the second click of a
+  // rapid double-tap is dropped before React re-renders `bulkBusy`.
+  const bulkLockRef = useRef(false);
+
   const handleBulkAssignProject = async () => {
+    if (bulkLockRef.current) return;
     const targets = selectedUserObjects();
     const formIds = Array.from(bulkForms);
     const stdForms = Array.from(bulkStandardForms);
@@ -821,6 +826,7 @@ const UsersView = () => {
       targets.length === 0
     )
       return;
+    bulkLockRef.current = true;
     const projName = bulkProject ? (projectById.get(bulkProject)?.name || "the project") : "";
     const formNames = formIds.map((id) => formById.get(id)?.name || "form");
     setBulkBusy(true);
