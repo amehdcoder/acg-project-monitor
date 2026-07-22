@@ -160,62 +160,31 @@ const getMondayOfWeek = (): Date => {
 
 export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
   const { user, isAdmin } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [projects, setProjects] = useState<any[]>([]);
-  const [forms, setForms] = useState<FormAnalytics[]>([]);
-  const [submissions, setSubmissions] = useState<SubmissionRecord[]>([]);
-  const [loadFailed, setLoadFailed] = useState(false);
-  const [kpis, setKpis] = useState<KPIData>({
-    totalSubmissions: 0,
-    totalSubmissionsChange: 0,
-    thisWeek: 0,
-    thisWeekChange: 0,
-    uniqueLocations: 0,
-    uniqueLocationsChange: 0,
-    avgCompletion: 0,
-    avgCompletionChange: 0,
-  });
-  const [formAnalytics, setFormAnalytics] = useState<FormAnalytics[]>([]);
-  const [locationAnalytics, setLocationAnalytics] = useState<LocationAnalytics[]>([]);
+  const queryClient = useQueryClient();
 
-  // Fetch projects for the current admin
-  const fetchProjects = useCallback(async () => {
-    if (!user || !isAdmin) return;
-
-    try {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("id, name")
-        .order("name");
-
+  // ---- Projects (admin only) ----
+  const projectsQuery = useQuery({
+    queryKey: ["analytics", "projects"] as const,
+    enabled: !!user && !!isAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("projects").select("id, name").order("name");
       if (error) throw error;
-      setProjects(data || []);
-    } catch (error: any) {
-      console.error("Error fetching projects:", error);
-    }
-  }, [user, isAdmin]);
+      return data || [];
+    },
+  });
 
-  // Fetch forms based on project filter or specific form
-  const fetchForms = useCallback(async () => {
-    if (!user) return;
-    
-    // For non-admins, only allow fetching if a specific formId is provided
-    if (!isAdmin && !filters.formId) return;
-
-    try {
+  // ---- Forms (scoped by project/form filter) ----
+  const formsEnabled = !!user && (isAdmin || !!filters.formId);
+  const formsQuery = useQuery({
+    queryKey: ["analytics", "forms", { projectId: filters.projectId ?? null, formId: filters.formId ?? null, isAdmin: !!isAdmin }] as const,
+    enabled: formsEnabled,
+    queryFn: async (): Promise<FormAnalytics[]> => {
       let query = supabase.from("forms").select("id, name, questions, project_id, settings");
-
-      // If a specific formId is provided, only fetch that form
-      if (filters.formId) {
-        query = query.eq("id", filters.formId);
-      } else if (filters.projectId) {
-        query = query.eq("project_id", filters.projectId);
-      }
-
+      if (filters.formId) query = query.eq("id", filters.formId);
+      else if (filters.projectId) query = query.eq("project_id", filters.projectId);
       const { data, error } = await query.order("name");
       if (error) throw error;
-
-      const formsData = (data || []).map((f) => ({
+      return (data || []).map((f) => ({
         id: f.id,
         name: f.name,
         project_id: f.project_id,
@@ -224,58 +193,39 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
         questions: Array.isArray(f.questions) ? f.questions : [],
         settings: (f as any).settings ?? {},
       }));
+    },
+  });
 
-      setForms(formsData);
-      return formsData;
-    } catch (error: any) {
-      console.error("Error fetching forms:", error);
-      return [];
-    }
-  }, [user, isAdmin, filters.projectId, filters.formId]);
+  const forms = formsQuery.data ?? [];
 
   // Administrative unit field patterns (case-insensitive matching)
   const ADMIN_UNIT_PATTERNS = {
-    // Top-level administrative units (priority order)
     region: ["region", "reg", "zone", "geo_zone", "geopolitical_zone"],
     state: ["state", "province", "stat"],
     lga: ["lga", "local_government", "local_government_area", "area_council", "district", "lg", "local_govt"],
     ward: ["ward", "wrd"],
-    // Health-related units
     flhf: ["flhf", "frontline_health_facility", "health_facility", "facility", "health_center", "hf", "phc", "primary_health_center"],
-    // Community-level units
     community: ["community", "village", "settlement", "town", "comm"],
     school: ["school", "institution", "sch"],
   };
 
-  // Find a field value by checking multiple possible field names
   const findAdminUnitValue = (data: Record<string, any>, patterns: string[]): string | null => {
     if (!data) return null;
-    
     const dataKeys = Object.keys(data);
     for (const pattern of patterns) {
-      // Check for exact match (case-insensitive)
       const exactMatch = dataKeys.find((key) => key.toLowerCase() === pattern.toLowerCase());
-      if (exactMatch && data[exactMatch]) {
-        return String(data[exactMatch]);
-      }
-      
-      // Check for partial match (e.g., "state_name", "lga_code" should match "state", "lga")
+      if (exactMatch && data[exactMatch]) return String(data[exactMatch]);
       const partialMatch = dataKeys.find((key) => {
         const lowerKey = key.toLowerCase();
         return lowerKey.includes(pattern.toLowerCase()) || pattern.toLowerCase().includes(lowerKey);
       });
-      if (partialMatch && data[partialMatch]) {
-        return String(data[partialMatch]);
-      }
+      if (partialMatch && data[partialMatch]) return String(data[partialMatch]);
     }
     return null;
   };
 
-  // Determine location from submission data
   const extractLocation = useCallback((submission: any): { location: string; state: string | null } => {
     const formData = submission.data as Record<string, any>;
-    
-    // Extract all available administrative units
     const adminUnits = {
       region: findAdminUnitValue(formData, ADMIN_UNIT_PATTERNS.region),
       state: findAdminUnitValue(formData, ADMIN_UNIT_PATTERNS.state),
@@ -285,42 +235,20 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
       community: findAdminUnitValue(formData, ADMIN_UNIT_PATTERNS.community),
       school: findAdminUnitValue(formData, ADMIN_UNIT_PATTERNS.school),
     };
-
-    // Determine state value (primary identifier for grouping)
     const stateValue = adminUnits.state || adminUnits.region || null;
-
-    // Build location string from available administrative units (in hierarchical order)
     const locationParts = [
-      adminUnits.region,
-      adminUnits.state,
-      adminUnits.lga,
-      adminUnits.ward,
-      adminUnits.community,
-      adminUnits.flhf,
-      adminUnits.school,
+      adminUnits.region, adminUnits.state, adminUnits.lga, adminUnits.ward,
+      adminUnits.community, adminUnits.flhf, adminUnits.school,
     ].filter(Boolean);
+    if (locationParts.length > 0) return { location: locationParts.join(", "), state: stateValue };
 
-    // If we have any administrative unit data, use it
-    if (locationParts.length > 0) {
-      return { 
-        location: locationParts.join(", "), 
-        state: stateValue 
-      };
-    }
-
-    // Fall back to GPS coordinates
     const gpsLocation = submission.location as Record<string, any>;
     if (gpsLocation?.latitude && gpsLocation?.longitude) {
       const lat = parseFloat(gpsLocation.latitude);
       const lng = parseFloat(gpsLocation.longitude);
-      
       if (!isNaN(lat) && !isNaN(lng)) {
         const detectedState = getStateFromGPS(lat, lng);
-        if (detectedState) {
-          return { location: detectedState, state: detectedState };
-        }
-        
-        // Format GPS with altitude and precision if available
+        if (detectedState) return { location: detectedState, state: detectedState };
         let gpsString = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
         if (gpsLocation.altitude && !isNaN(parseFloat(gpsLocation.altitude))) {
           gpsString += ` (Alt: ${parseFloat(gpsLocation.altitude).toFixed(1)}m)`;
@@ -328,49 +256,36 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
         if (gpsLocation.accuracy && !isNaN(parseFloat(gpsLocation.accuracy))) {
           gpsString += ` [±${parseFloat(gpsLocation.accuracy).toFixed(0)}m]`;
         }
-        
         return { location: gpsString, state: null };
       }
     }
-
-    // Check for GPS data stored in form responses (geopoint questions)
     for (const key of Object.keys(formData || {})) {
       const value = formData[key];
       if (value && typeof value === "object" && (value.lat || value.latitude)) {
         const lat = parseFloat(value.lat || value.latitude);
         const lng = parseFloat(value.lng || value.longitude);
-        
         if (!isNaN(lat) && !isNaN(lng)) {
           const detectedState = getStateFromGPS(lat, lng);
-          if (detectedState) {
-            return { location: detectedState, state: detectedState };
-          }
+          if (detectedState) return { location: detectedState, state: detectedState };
           return { location: `${lat.toFixed(4)}, ${lng.toFixed(4)}`, state: null };
         }
       }
     }
-
     return { location: "Unknown", state: null };
   }, []);
 
-  // Fetch submissions with full data
-  const fetchSubmissions = useCallback(async (formsData: FormAnalytics[]) => {
-    if (!user || formsData.length === 0) {
-      setSubmissions([]);
-      return [];
-    }
-    
-    // Non-admins can only fetch if a specific formId is provided
-    if (!isAdmin && !filters.formId) {
-      setSubmissions([]);
-      return [];
-    }
+  // ---- Submissions (depends on forms) ----
+  const formIds = useMemo(() => forms.map((f) => f.id).sort(), [forms]);
+  const formIdsKey = formIds.join(",");
+  const submissionsEnabled = formsEnabled && formIds.length > 0;
 
-    try {
-      const formIds = formsData.map((f) => f.id);
-      
-      // Fetch rows through the same backend-scoped helper used by dashboard
-      // counts, then apply local date filters so count/list permissions match.
+  const submissionsQuery = useQuery({
+    queryKey: [
+      "analytics", "submissions",
+      { formIdsKey, startDate: filters.startDate ?? null, endDate: filters.endDate ?? null, state: filters.state ?? null },
+    ] as const,
+    enabled: submissionsEnabled,
+    queryFn: async (): Promise<SubmissionRecord[]> => {
       let allData = await fetchVisibleFormSubmissionsForForms(formIds);
       if (filters.startDate) {
         const start = new Date(filters.startDate).getTime();
@@ -380,25 +295,20 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
         const end = new Date(filters.endDate).getTime();
         allData = allData.filter((s) => new Date(s.submitted_at || s.created_at || 0).getTime() <= end);
       }
-      allData.sort(
-        (a, b) =>
-          new Date(b.submitted_at || b.created_at || 0).getTime() -
-          new Date(a.submitted_at || a.created_at || 0).getTime(),
+      allData.sort((a, b) =>
+        new Date(b.submitted_at || b.created_at || 0).getTime() -
+        new Date(a.submitted_at || a.created_at || 0).getTime(),
       );
 
-      // Get user profiles for submitter names
-      const userIds = [...new Set((allData).map((s) => s.user_id))];
+      const userIds = [...new Set(allData.map((s) => s.user_id))];
       const { data: profiles } = await supabase
         .from("profiles")
         .select("user_id, first_name, last_name")
         .in("user_id", userIds);
+      const profileMap = new Map((profiles || []).map((p) => [p.user_id, `${p.first_name} ${p.last_name}`]));
+      const formMap = new Map(forms.map((f) => [f.id, f.name]));
 
-      const profileMap = new Map(
-        (profiles || []).map((p) => [p.user_id, `${p.first_name} ${p.last_name}`])
-      );
-      const formMap = new Map(formsData.map((f) => [f.id, f.name]));
-
-      const processedSubmissions: SubmissionRecord[] = (allData).map((s) => {
+      const processed: SubmissionRecord[] = allData.map((s) => {
         const { location, state } = extractLocation(s);
         return {
           id: s.id,
@@ -416,90 +326,65 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
         };
       });
 
-      // Filter by state if specified
-      const filteredSubmissions = filters.state
-        ? processedSubmissions.filter((s) => s.state === filters.state)
-        : processedSubmissions;
+      return filters.state ? processed.filter((s) => s.state === filters.state) : processed;
+    },
+  });
 
-      setSubmissions(filteredSubmissions);
-      return filteredSubmissions;
-    } catch (error: any) {
-      console.error("Error fetching submissions:", error);
-      return [];
-    }
-  }, [user, isAdmin, filters.formId, filters.startDate, filters.endDate, filters.state, extractLocation]);
+  const submissions = submissionsQuery.data ?? [];
 
-  // Calculate KPIs with real period-over-period comparisons
-  const calculateKPIs = useCallback((submissionsData: SubmissionRecord[]) => {
+  // ---- Derived analytics (pure memos over cached data) ----
+  const kpis = useMemo<KPIData>(() => {
     const mondayOfWeek = getMondayOfWeek();
     const prevMondayOfWeek = new Date(mondayOfWeek);
     prevMondayOfWeek.setDate(prevMondayOfWeek.getDate() - 7);
-
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const sixtyDaysAgo = new Date();
     sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-    const syncedSubmissions = submissionsData.filter((s) => s.status === "sent");
-    const totalSubmissions = syncedSubmissions.length;
-
-    // Current 30-day window vs previous 30-day window
-    const currentPeriodSubs = syncedSubmissions.filter(
-      (s) => new Date(s.submitted_at) >= thirtyDaysAgo
-    ).length;
-    const prevPeriodSubs = syncedSubmissions.filter(
-      (s) => {
-        const d = new Date(s.submitted_at);
-        return d >= sixtyDaysAgo && d < thirtyDaysAgo;
-      }
-    ).length;
+    const synced = submissions.filter((s) => s.status === "sent");
+    const totalSubmissions = synced.length;
+    const currentPeriodSubs = synced.filter((s) => new Date(s.submitted_at) >= thirtyDaysAgo).length;
+    const prevPeriodSubs = synced.filter((s) => {
+      const d = new Date(s.submitted_at);
+      return d >= sixtyDaysAgo && d < thirtyDaysAgo;
+    }).length;
     const totalSubmissionsChange = prevPeriodSubs > 0
       ? Math.round(((currentPeriodSubs - prevPeriodSubs) / prevPeriodSubs) * 100)
       : currentPeriodSubs > 0 ? 100 : 0;
 
-    // This week vs last week
-    const thisWeekSubmissions = syncedSubmissions.filter(
-      (s) => new Date(s.submitted_at) >= mondayOfWeek
-    ).length;
-    const lastWeekSubmissions = syncedSubmissions.filter(
-      (s) => {
-        const d = new Date(s.submitted_at);
-        return d >= prevMondayOfWeek && d < mondayOfWeek;
-      }
-    ).length;
+    const thisWeekSubmissions = synced.filter((s) => new Date(s.submitted_at) >= mondayOfWeek).length;
+    const lastWeekSubmissions = synced.filter((s) => {
+      const d = new Date(s.submitted_at);
+      return d >= prevMondayOfWeek && d < mondayOfWeek;
+    }).length;
     const thisWeekChange = thisWeekSubmissions - lastWeekSubmissions;
 
-    // Unique states — current vs previous period
     const currentStates = new Set(
-      syncedSubmissions.filter(s => new Date(s.submitted_at) >= thirtyDaysAgo).map(s => s.state).filter(Boolean)
+      synced.filter((s) => new Date(s.submitted_at) >= thirtyDaysAgo).map((s) => s.state).filter(Boolean),
     );
     const prevStates = new Set(
-      syncedSubmissions.filter(s => {
+      synced.filter((s) => {
         const d = new Date(s.submitted_at);
         return d >= sixtyDaysAgo && d < thirtyDaysAgo;
-      }).map(s => s.state).filter(Boolean)
+      }).map((s) => s.state).filter(Boolean),
     );
     const uniqueLocationsChange = currentStates.size - prevStates.size;
 
-    // Avg completion (synced / total including drafts) — current vs previous
-    const allSubmissions = submissionsData.length;
-    const avgCompletion = allSubmissions > 0
-      ? Math.round((totalSubmissions / allSubmissions) * 100)
-      : 0;
-
-    const currentAllSubs = submissionsData.filter(s => new Date(s.submitted_at) >= thirtyDaysAgo);
-    const currentSynced = currentAllSubs.filter(s => s.status === "sent").length;
-    const currentCompletion = currentAllSubs.length > 0 ? Math.round((currentSynced / currentAllSubs.length) * 100) : 0;
-
-    const prevAllSubs = submissionsData.filter(s => {
+    const allSubs = submissions.length;
+    const avgCompletion = allSubs > 0 ? Math.round((totalSubmissions / allSubs) * 100) : 0;
+    const currentAll = submissions.filter((s) => new Date(s.submitted_at) >= thirtyDaysAgo);
+    const currentSynced = currentAll.filter((s) => s.status === "sent").length;
+    const currentCompletion = currentAll.length > 0 ? Math.round((currentSynced / currentAll.length) * 100) : 0;
+    const prevAll = submissions.filter((s) => {
       const d = new Date(s.submitted_at);
       return d >= sixtyDaysAgo && d < thirtyDaysAgo;
     });
-    const prevSynced = prevAllSubs.filter(s => s.status === "sent").length;
-    const prevCompletion = prevAllSubs.length > 0 ? Math.round((prevSynced / prevAllSubs.length) * 100) : 0;
+    const prevSynced = prevAll.filter((s) => s.status === "sent").length;
+    const prevCompletion = prevAll.length > 0 ? Math.round((prevSynced / prevAll.length) * 100) : 0;
     const avgCompletionChange = currentCompletion - prevCompletion;
 
-    setKpis({
+    return {
       totalSubmissions,
       totalSubmissionsChange,
       thisWeek: thisWeekSubmissions,
@@ -508,117 +393,80 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
       uniqueLocationsChange,
       avgCompletion,
       avgCompletionChange,
-    });
-  }, []);
+    };
+  }, [submissions]);
 
-  // Calculate form analytics
-  const calculateFormAnalytics = useCallback((formsData: FormAnalytics[], submissionsData: SubmissionRecord[]) => {
+  const formAnalytics = useMemo<FormAnalytics[]>(() => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    return forms
+      .map((form) => {
+        const formSubs = submissions.filter((s) => s.form_id === form.id && s.status === "sent");
+        const currentCycle = formSubs.filter((s) => new Date(s.submitted_at) >= thirtyDaysAgo);
+        return { ...form, total_submissions: formSubs.length, current_cycle_submissions: currentCycle.length };
+      })
+      .sort((a, b) => b.total_submissions - a.total_submissions);
+  }, [forms, submissions]);
 
-    const analytics = formsData.map((form) => {
-      const formSubmissions = submissionsData.filter(
-        (s) => s.form_id === form.id && s.status === "sent"
-      );
-      const currentCycle = formSubmissions.filter(
-        (s) => new Date(s.submitted_at) >= thirtyDaysAgo
-      );
-
-      return {
-        ...form,
-        total_submissions: formSubmissions.length,
-        current_cycle_submissions: currentCycle.length,
-      };
-    }).sort((a, b) => b.total_submissions - a.total_submissions);
-
-    setFormAnalytics(analytics);
-  }, []);
-
-  // Calculate location analytics
-  const calculateLocationAnalytics = useCallback((submissionsData: SubmissionRecord[]) => {
+  const locationAnalytics = useMemo<LocationAnalytics[]>(() => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const syncedSubmissions = submissionsData.filter((s) => s.status === "sent");
+    const synced = submissions.filter((s) => s.status === "sent");
     const stateMap = new Map<string, { total: number; current: number }>();
-
-    syncedSubmissions.forEach((s) => {
+    synced.forEach((s) => {
       if (s.state) {
         const existing = stateMap.get(s.state) || { total: 0, current: 0 };
         existing.total++;
-        if (new Date(s.submitted_at) >= thirtyDaysAgo) {
-          existing.current++;
-        }
+        if (new Date(s.submitted_at) >= thirtyDaysAgo) existing.current++;
         stateMap.set(s.state, existing);
       }
     });
-
-    const analytics: LocationAnalytics[] = Array.from(stateMap.entries())
-      .map(([state, data]) => ({
-        state,
-        total_submissions: data.total,
-        current_cycle_submissions: data.current,
-      }))
+    return Array.from(stateMap.entries())
+      .map(([state, d]) => ({ state, total_submissions: d.total, current_cycle_submissions: d.current }))
       .sort((a, b) => b.total_submissions - a.total_submissions);
+  }, [submissions]);
 
-    setLocationAnalytics(analytics);
-  }, []);
-
-  // Main data refresh function
-  const refresh = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      await fetchProjects();
-      const formsData = await fetchForms();
-      if (formsData && formsData.length > 0) {
-        const submissionsData = await fetchSubmissions(formsData);
-        calculateKPIs(submissionsData);
-        calculateFormAnalytics(formsData, submissionsData);
-        calculateLocationAnalytics(submissionsData);
-      }
-      setLoadFailed(false);
-    } catch (error: any) {
-      setLoadFailed(true);
-      if (!silent) {
-        toast({
-          title: "Error loading analytics",
-          description: error.message,
-          variant: "destructive",
-        });
-      }
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, [fetchProjects, fetchForms, fetchSubmissions, calculateKPIs, calculateFormAnalytics, calculateLocationAnalytics]);
-
-  useEffect(() => {
-    refresh();
-  }, [filters.projectId, filters.formId, filters.state, filters.startDate, filters.endDate]);
-
-  // Realtime: when new submissions land (e.g. a "Send Checklist" submit), the
-  // dashboard refreshes silently (no loading flash) so data appears instantly.
-  // A single debounced timer coalesces high-volume bursts so the UI stays
-  // steady even under very large submission volumes.
-  useEffect(() => {
-    const unsubscribe = subscribeToFormSubmissionChanges({
-      formId: filters.formId ?? null,
-      debounceMs: 1200,
-      channelSuffix: "analytics",
-      onChange: () => refresh(true),
-    });
-    return unsubscribe;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.formId]);
-
-  // Get unique states for filtering
   const availableStates = useMemo(() => {
     const states = new Set(submissions.map((s) => s.state).filter(Boolean) as string[]);
     return Array.from(states).sort();
   }, [submissions]);
 
+  // Realtime: invalidate the submissions cache on new form submissions.
+  useEffect(() => {
+    const unsubscribe = subscribeToFormSubmissionChanges({
+      formId: filters.formId ?? null,
+      debounceMs: 1200,
+      channelSuffix: "analytics",
+      onChange: () => {
+        void queryClient.invalidateQueries({ queryKey: ["analytics", "submissions"] });
+      },
+    });
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.formId]);
+
+  // Surface fetch errors once via toast (behaviour parity with the old refresh).
+  useEffect(() => {
+    const err = submissionsQuery.error || formsQuery.error;
+    if (err) {
+      toast({
+        title: "Error loading analytics",
+        description: (err as any).message || String(err),
+        variant: "destructive",
+      });
+    }
+  }, [submissionsQuery.error, formsQuery.error]);
+
+  const refresh = useCallback(async (_silent = false) => {
+    await queryClient.invalidateQueries({ queryKey: ["analytics"] });
+  }, [queryClient]);
+
+  const loading = (formsEnabled && formsQuery.isLoading) || (submissionsEnabled && submissionsQuery.isLoading);
+  const loadFailed = !!(submissionsQuery.error || formsQuery.error);
+
   return {
     loading,
-    projects,
+    projects: projectsQuery.data ?? [],
     forms,
     submissions,
     kpis,
@@ -628,4 +476,6 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
     loadFailed,
     refresh,
   };
+};
+
 };
