@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { DASHBOARD_QUERY_OPTIONS } from "@/lib/queryConfig";
 import { supabase } from "@/integrations/supabase/client";
 
 import { ALL_CLASSES, NOT_FOUND_REASONS, OPERATIONAL_STATUS } from "@/lib/bloomberg/definition";
