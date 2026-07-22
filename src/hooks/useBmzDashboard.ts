@@ -65,6 +65,7 @@ export const useBmzDashboard = () => {
   const rowsQ = useQuery({
     queryKey: ["bmz", "monitoring"],
     queryFn: () => fetchAll(),
+    ...DASHBOARD_QUERY_OPTIONS,
   });
   const rows = rowsQ.data ?? [];
 
@@ -88,6 +89,7 @@ export const useBmzDashboard = () => {
       });
       return pm;
     },
+    ...DASHBOARD_QUERY_OPTIONS,
   });
   const profileMap = profilesQ.data ?? new Map<string, ProfileLite>();
   const loading = rowsQ.isLoading || (monitorIds.length > 0 && profilesQ.isLoading);
