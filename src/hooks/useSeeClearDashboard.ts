@@ -94,6 +94,7 @@ export const useSeeClearDashboard = () => {
     queryFn: fetchAll,
     enabled: !simulate,
     placeholderData: keepPreviousData,
+    ...DASHBOARD_QUERY_OPTIONS,
   });
 
   // Profile lookup keyed by monitor-ids present in the current row set.
@@ -103,6 +104,7 @@ export const useSeeClearDashboard = () => {
     queryFn: () => fetchProfilesFor(safeArray<MonitoringRow>(rowsQuery.data)),
     enabled: !simulate && !!rowsQuery.data,
     placeholderData: keepPreviousData,
+    ...DASHBOARD_QUERY_OPTIONS,
   });
 
   const simRows = useMemo(() => (simulate ? generateSeeClearSimulation().rows : []), [simulate]);
