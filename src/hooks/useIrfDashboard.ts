@@ -34,6 +34,7 @@ export const useIrfDashboard = (projectId?: string | null, overrideMap?: Overrid
     queryKey: irfKey(projectId),
     queryFn: () => fetchAll(projectId),
     placeholderData: keepPreviousData,
+    ...DASHBOARD_QUERY_OPTIONS,
   });
 
   const rawRows = useMemo(() => safeArray<IrfReport>(query.data), [query.data]);
