@@ -319,6 +319,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [dailyTargetForm, setDailyTargetForm] = useState<Form | null>(null);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [hasMicroplanAccess, setHasMicroplanAccess] = useState(false);
+  const [microplanProjectIds, setMicroplanProjectIds] = useState<Set<string>>(new Set());
+  const [showMicroplanAccessDialog, setShowMicroplanAccessDialog] = useState(false);
+  const [showMicroplanMoveDialog, setShowMicroplanMoveDialog] = useState(false);
   const [microplanFillingActive, setMicroplanFillingActive] = useState(false);
   const [activeStandardAssessment, setActiveStandardAssessment] = useState<StandardFormCode | null>(null);
   const [showDigitalAttendance, setShowDigitalAttendance] = useState(false);
