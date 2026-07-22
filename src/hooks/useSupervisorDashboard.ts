@@ -410,72 +410,56 @@ export function useSupervisorDashboard() {
       });
 
       setProjectSummaries(summaries.filter(s => s.total_users > 0));
-      lastSyncRef.current = new Date().toISOString();
       setLastUpdated(new Date());
-      pollIntervalRef.current = 2000;
+      return Date.now();
 
     } catch (error) {
       console.error("Error fetching supervisor data:", error);
+      throw error;
     }
   }, []);
 
+  // TanStack Query: dedupes concurrent callers, caches for 60s, and
+  // auto-refetches on window focus / interval so we no longer maintain a
+  // custom exponential-backoff polling loop.
+  const { isLoading, refetch } = useQuery({
+    queryKey: SUPERVISOR_QUERY_KEY,
+    queryFn: fetchAllData,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    placeholderData: keepPreviousData,
+  });
+
   const refresh = useCallback(async () => {
-    setIsLoading(true);
-    await fetchAllData();
-    setIsLoading(false);
-  }, [fetchAllData]);
+    await refetch();
+  }, [refetch]);
 
   const dismissAlert = useCallback((alertId: string) => {
     dismissedAlertsRef.current.add(alertId);
     setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, dismissed: true } : a));
   }, []);
 
+  // Realtime channel: any change invalidates the query so React Query
+  // debounces/dedupes concurrent refetches for us.
   useEffect(() => {
-    isActiveRef.current = true;
-    refresh();
-
+    const invalidate = () => queryClient.invalidateQueries({ queryKey: SUPERVISOR_QUERY_KEY });
     const channel = supabase
       .channel("supervisor-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "form_submissions" }, () => {
-        pollIntervalRef.current = 2000;
-        fetchAllData();
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "form_submissions" }, () => {
-        fetchAllData();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "field_activity" }, () => {
-        pollIntervalRef.current = 2000;
-        fetchAllData();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
-        fetchAllData();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "cases" }, () => {
-        fetchAllData();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "field_activity" }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "cases" }, invalidate)
       .subscribe((status) => {
         if (status === "SUBSCRIBED") setRealtimeStatus("connected");
         else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") setRealtimeStatus("disconnected");
         else setRealtimeStatus("connecting");
       });
-
-    const poll = async () => {
-      if (!isActiveRef.current) return;
-      await fetchAllData();
-      pollIntervalRef.current = Math.min(pollIntervalRef.current * 1.5, 30000);
-      if (isActiveRef.current) {
-        pollTimeoutRef.current = setTimeout(poll, pollIntervalRef.current);
-      }
-    };
-
-    pollTimeoutRef.current = setTimeout(poll, 5000);
-
     return () => {
-      isActiveRef.current = false;
-      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
       supabase.removeChannel(channel);
     };
-  }, [refresh, fetchAllData, reconnectNonce]);
+  }, [queryClient]);
 
   // React to time-filter (date range) changes with a visible loading state so
   // the UI can disable interactions until the whole page finishes reloading.
@@ -487,13 +471,14 @@ export function useSupervisorDashboard() {
     }
     let cancelled = false;
     setIsFiltering(true);
-    fetchAllData().finally(() => {
+    refetch().finally(() => {
       if (!cancelled) setIsFiltering(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [dateRange.from.getTime(), dateRange.to.getTime(), fetchAllData]);
+  }, [dateRange.from.getTime(), dateRange.to.getTime(), refetch]);
+
 
   const activeAlerts = alerts.filter(a => !a.dismissed);
 
