@@ -157,25 +157,53 @@ const isMissingRpc = (error: unknown) =>
   (error as { code?: string })?.code === "42883" ||
   /submit_bloomberg_validation/i.test(String((error as { message?: string })?.message || ""));
 
-async function writeRecordToServer(table: string, row: Record<string, any>, upsertOnId: boolean) {
-  // Bloomberg validations have already been affected in the field by RLS/FK/client
-  // edge-cases. Route them through the backend-owned RPC, which validates the
-  // signed-in user, repairs missing school keys, and performs an idempotent upsert.
-  if (table === "bloomberg_validations") {
-    const { error } = await (supabase as any).rpc("submit_bloomberg_validation", { _row: row });
-    if (!error) return { error: null };
-    // Keep local development/remix previews usable before the migration exists.
-    if (!isMissingRpc(error)) return { error };
-  }
+async function writeRecordToServer(
+  table: string,
+  row: Record<string, any>,
+  upsertOnId: boolean,
+  idempotencyKey: string,
+) {
+  // Strip transport-only fields before they hit the DB layer.
+  const cleanRow = { ...row };
+  delete (cleanRow as any).__idempotency_key;
 
-  const { error } = upsertOnId
-    ? await supabase.from(table as any).upsert(row, { onConflict: "id" })
-    : await supabase.from(table as any).insert(row);
-  if (error) {
-    const retried = upsertOnId ? await retryWithoutBrokenSchoolKey(table, row, error) : null;
-    if (retried) return { error: retried.error };
+  // Tag the outgoing PostgREST request with the client-generated idempotency
+  // key. Any retry of the same payload (after a network blip, a browser tab
+  // freeze, or an offline drain) carries the SAME header, so a caching proxy
+  // or future server-side dedupe layer can collapse the duplicates safely.
+  // Setting per-call headers via `supabase.functions`/`from` is not supported
+  // directly on the JS client, so we mutate the shared PostgREST headers for
+  // the duration of the call. The header is best-effort — the durable
+  // guarantee still comes from submission_uuid + PK upsert below.
+  const pg: any = (supabase as any).rest || (supabase as any).postgrest;
+  const prevHeader = pg?.headers?.[IDEMPOTENCY_HEADER];
+  if (pg?.headers) pg.headers[IDEMPOTENCY_HEADER] = idempotencyKey;
+
+  try {
+    // Bloomberg validations have already been affected in the field by RLS/FK/client
+    // edge-cases. Route them through the backend-owned RPC, which validates the
+    // signed-in user, repairs missing school keys, and performs an idempotent upsert.
+    if (table === "bloomberg_validations") {
+      const { error } = await (supabase as any).rpc("submit_bloomberg_validation", { _row: cleanRow });
+      if (!error) return { error: null };
+      // Keep local development/remix previews usable before the migration exists.
+      if (!isMissingRpc(error)) return { error };
+    }
+
+    const { error } = upsertOnId
+      ? await supabase.from(table as any).upsert(cleanRow, { onConflict: "id" })
+      : await supabase.from(table as any).insert(cleanRow);
+    if (error) {
+      const retried = upsertOnId ? await retryWithoutBrokenSchoolKey(table, cleanRow, error) : null;
+      if (retried) return { error: retried.error };
+    }
+    return { error };
+  } finally {
+    if (pg?.headers) {
+      if (prevHeader === undefined) delete pg.headers[IDEMPOTENCY_HEADER];
+      else pg.headers[IDEMPOTENCY_HEADER] = prevHeader;
+    }
   }
-  return { error };
 }
 
 /**
