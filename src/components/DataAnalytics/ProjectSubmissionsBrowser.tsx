@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from "react";
+import { useState, useMemo, forwardRef, useImperativeHandle } from "react";
 import { FolderOpen, ChevronDown, ChevronRight, Loader2, ChevronsUpDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
 import FormSubmissionsAccordion from "./FormSubmissionsAccordion";
 import type { FormAnalytics } from "@/hooks/useDataAnalytics";
 
@@ -18,34 +19,37 @@ export interface ProjectSubmissionsBrowserHandle {
   refresh: () => Promise<void>;
 }
 
+interface BrowserPayload {
+  projects: ProjectWithForms[];
+  profiles: Map<string, string>;
+}
+
 const ProjectSubmissionsBrowser = forwardRef<ProjectSubmissionsBrowserHandle>((_, ref) => {
   const { user, isAdmin } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [projects, setProjects] = useState<ProjectWithForms[]>([]);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
-  const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
 
-  const fetchData = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const { data: projectsData, error: projErr } = await supabase
-        .from("projects")
-        .select("id, name")
-        .order("name");
+  // Single TanStack Query key — identical concurrent mounts across tabs/dashboards
+  // dedupe automatically; 60s staleTime / 5min gcTime inherited from QueryClient.
+  const {
+    data,
+    isLoading,
+    refetch,
+  } = useQuery<BrowserPayload>({
+    queryKey: ["project-submissions-browser", user?.id ?? null, isAdmin],
+    enabled: !!user,
+    queryFn: async () => {
+      const [{ data: projectsData, error: projErr }, { data: formsData, error: formsErr }, { data: profilesData }] =
+        await Promise.all([
+          supabase.from("projects").select("id, name").order("name"),
+          supabase.from("forms").select("id, name, questions, project_id").order("name"),
+          supabase.from("profiles").select("user_id, first_name, last_name"),
+        ]);
       if (projErr) throw projErr;
-
-      const { data: formsData, error: formsErr } = await supabase
-        .from("forms")
-        .select("id, name, questions, project_id")
-        .order("name");
       if (formsErr) throw formsErr;
 
       const formIds = (formsData || []).map((f) => f.id);
-      let countMap: Record<string, number> = {};
+      const countMap: Record<string, number> = {};
       if (formIds.length > 0) {
-        // One backend-scoped count query. This uses the exact same permission
-        // helper as the submission list RPC below, avoiding count/list mismatch.
         const { data: counts, error: countErr } = await (supabase as any).rpc(
           "visible_form_submission_counts",
           { _form_ids: formIds },
@@ -56,17 +60,13 @@ const ProjectSubmissionsBrowser = forwardRef<ProjectSubmissionsBrowserHandle>((_
         });
       }
 
-      const { data: profilesData } = await supabase
-        .from("profiles")
-        .select("user_id, first_name, last_name");
       const profileMap = new Map<string, string>();
-      (profilesData || []).forEach((p) => {
+      (profilesData || []).forEach((p: any) => {
         profileMap.set(p.user_id, `${p.first_name} ${p.last_name}`.trim());
       });
-      setProfiles(profileMap);
 
       const formsByProject: Record<string, FormAnalytics[]> = {};
-      (formsData || []).forEach((f) => {
+      (formsData || []).forEach((f: any) => {
         if (!formsByProject[f.project_id]) formsByProject[f.project_id] = [];
         formsByProject[f.project_id].push({
           id: f.id,
@@ -77,28 +77,18 @@ const ProjectSubmissionsBrowser = forwardRef<ProjectSubmissionsBrowserHandle>((_
         });
       });
 
-      const projectsList: ProjectWithForms[] = (projectsData || [])
-        .map((p) => ({
-          id: p.id,
-          name: p.name,
-          forms: formsByProject[p.id] || [],
-        }))
+      const projects: ProjectWithForms[] = (projectsData || [])
+        .map((p: any) => ({ id: p.id, name: p.name, forms: formsByProject[p.id] || [] }))
         .filter((p) => p.forms.length > 0);
 
-      setProjects(projectsList);
-    } catch (err) {
-      console.error("Error loading project browser:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [user, isAdmin]);
+      return { projects, profiles: profileMap };
+    },
+  });
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const projects = data?.projects ?? [];
+  const profiles = data?.profiles ?? new Map<string, string>();
 
-  // Expose refresh to parent via ref
-  useImperativeHandle(ref, () => ({ refresh: fetchData }), [fetchData]);
+  useImperativeHandle(ref, () => ({ refresh: async () => { await refetch(); } }), [refetch]);
 
   const toggleProject = (projectId: string) => {
     setExpandedProjects((prev) => {
@@ -114,7 +104,7 @@ const ProjectSubmissionsBrowser = forwardRef<ProjectSubmissionsBrowserHandle>((_
     [projects]
   );
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -134,11 +124,8 @@ const ProjectSubmissionsBrowser = forwardRef<ProjectSubmissionsBrowserHandle>((_
   const allExpanded = expandedProjects.size === projects.length;
 
   const toggleAll = () => {
-    if (allExpanded) {
-      setExpandedProjects(new Set());
-    } else {
-      setExpandedProjects(new Set(projects.map((p) => p.id)));
-    }
+    if (allExpanded) setExpandedProjects(new Set());
+    else setExpandedProjects(new Set(projects.map((p) => p.id)));
   };
 
   return (
