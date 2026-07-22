@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { DASHBOARD_QUERY_OPTIONS } from "@/lib/queryConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfDay, endOfDay, subHours, differenceInMinutes } from "date-fns";
 
