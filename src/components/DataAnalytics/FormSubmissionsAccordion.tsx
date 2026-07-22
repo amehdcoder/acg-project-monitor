@@ -282,15 +282,36 @@ const FormSubmissionsAccordion = ({ form, profiles }: FormSubmissionsAccordionPr
               <span className="ml-2 text-sm text-muted-foreground">Loading submissions…</span>
             </div>
           ) : (
-            <SubmissionsTable
-              submissions={submissions}
-              loading={false}
-              questionLabels={questionLabels}
-              pageSize={15}
-              onSubmissionUpdate={handleUpdate}
-              onSubmissionDelete={handleDelete}
-              onSubmissionValidate={handleValidate}
-            />
+            <>
+              <SubmissionsTable
+                submissions={submissions}
+                loading={false}
+                questionLabels={questionLabels}
+                pageSize={15}
+                onSubmissionUpdate={handleUpdate}
+                onSubmissionDelete={handleDelete}
+                onSubmissionValidate={handleValidate}
+              />
+              {hasMore && (
+                <div className="flex justify-center pt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="gap-1.5"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+                      </>
+                    ) : (
+                      <>Load more ({PAGE_SIZE})</>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       )}
