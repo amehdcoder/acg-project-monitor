@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { DASHBOARD_QUERY_OPTIONS } from "@/lib/queryConfig";
 import { supabase } from "@/integrations/supabase/client";
 import {
   STATUS_META, type SbcStatus, type SbcCategory,
@@ -77,6 +78,7 @@ export const useSbcDashboard = (projectId?: string | null, categoryFilter: SbcCa
     queryFn: () => fetchAll(projectId),
     enabled: !simulate,
     placeholderData: keepPreviousData,
+    ...DASHBOARD_QUERY_OPTIONS,
   });
 
   const simRows = useMemo(() => (simulate ? generateSbcSimulation().rows : []), [simulate]);

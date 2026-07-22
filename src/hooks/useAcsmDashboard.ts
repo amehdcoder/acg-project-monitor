@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { DASHBOARD_QUERY_OPTIONS } from "@/lib/queryConfig";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ACSM_CATEGORIES, STATUS_META, type AcsmStatus, type AcsmCategory,
@@ -157,6 +158,7 @@ export const useAcsmDashboard = (
         throw error;
       }
     },
+    ...DASHBOARD_QUERY_OPTIONS,
   });
 
   // Derive rows + duplicate info from the cached raw payload + current overrides.

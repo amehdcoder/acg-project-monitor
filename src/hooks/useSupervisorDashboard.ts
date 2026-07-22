@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { DASHBOARD_QUERY_OPTIONS } from "@/lib/queryConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfDay, endOfDay, subHours, differenceInMinutes } from "date-fns";
 
@@ -419,17 +420,16 @@ export function useSupervisorDashboard() {
     }
   }, []);
 
-  // TanStack Query: dedupes concurrent callers, caches for 60s, and
-  // auto-refetches on window focus / interval so we no longer maintain a
+  // TanStack Query: deduped across every mounted supervisor dashboard, held
+  // fresh for the 5-minute window from `DASHBOARD_QUERY_OPTIONS`, and only
+  // refetched by the interval / manual invalidation below. Replaces the old
   // custom exponential-backoff polling loop.
   const { isLoading, refetch } = useQuery({
     queryKey: SUPERVISOR_QUERY_KEY,
     queryFn: fetchAllData,
-    staleTime: 60_000,
-    gcTime: 5 * 60_000,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
+    refetchInterval: 5 * 60_000,
     placeholderData: keepPreviousData,
+    ...DASHBOARD_QUERY_OPTIONS,
   });
 
   const refresh = useCallback(async () => {
