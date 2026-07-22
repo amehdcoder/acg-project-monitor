@@ -396,9 +396,17 @@ const Index = () => {
                * Any fade-in on tab change is perceived as a "blink" by the user.
                * Render the new view immediately with no wrapper animation.
                * (No-blink rule: enforced for the lifetime of the app.)
+               *
+               * Per-module isolation: an inner ErrorBoundary keyed by `activeTab`
+               * localizes crashes (bad API shape, timeout, thrown render) to the
+               * active module. The Retry button lives on the boundary; navigating
+               * to another tab remounts a fresh boundary so a broken module never
+               * poisons the whole app.
                */}
               <div className="min-h-full" data-tour-section={activeTab}>
-                {renderContent()}
+                <ErrorBoundary key={activeTab} name={activeTab}>
+                  {renderContent()}
+                </ErrorBoundary>
               </div>
             </ErrorBoundary>
           </main>
