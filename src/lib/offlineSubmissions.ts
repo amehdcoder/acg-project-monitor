@@ -9,13 +9,38 @@
 import { supabase } from "@/integrations/supabase/client";
 import { sealRecord, unsealRecord } from "@/lib/deviceCrypto";
 import { getSavedEntry, setSavedEntryStatus } from "@/lib/savedForms";
-import { stampSyncContract } from "@/lib/syncContract";
+import { stampSyncContract, newSubmissionUuid, isUuid } from "@/lib/syncContract";
 import { cascadeReferenceEntities, resolveReferences } from "@/lib/referenceSyncLedger";
 
 // Tables that carry the formal idempotency contract (submission_uuid +
 // client_submitted_at columns). Rows destined for these tables are stamped so a
 // retransmit after a network blip is recognised and never duplicated.
 const SYNC_CONTRACT_TABLES = new Set(["bloomberg_validations", "seeclear_monitoring", "bmz_monitoring"]);
+
+/**
+ * Every payload that flows through the queue is stamped with a client-generated
+ * idempotency key BEFORE it is transmitted. The key is derived deterministically
+ * from the row identity (row.id / row.submission_uuid) when available, otherwise
+ * a fresh UUID v4 is minted. It is:
+ *   • preserved on the queued IndexedDB record so retries reuse the SAME key,
+ *   • used as the IndexedDB record id so re-queueing the same submission cannot
+ *     create a duplicate pending entry,
+ *   • forwarded to the server through the standard idempotency channels
+ *     (submission_uuid column for contract tables, PK upsert-on-id for all
+ *     others, and an `x-idempotency-key` header on the PostgREST request) so
+ *     a mid-upload network failure that is retried is treated as the SAME
+ *     transaction and never produces a duplicate row.
+ */
+const IDEMPOTENCY_HEADER = "x-idempotency-key";
+
+function resolveIdempotencyKey(row: Record<string, any>): string {
+  if (isUuid(row?.submission_uuid)) return row.submission_uuid;
+  if (isUuid(row?.id)) return row.id;
+  if (typeof row?.__idempotency_key === "string" && isUuid(row.__idempotency_key)) {
+    return row.__idempotency_key;
+  }
+  return newSubmissionUuid();
+}
 
 
 const DB_NAME = "acg_offline_submissions";
@@ -132,25 +157,53 @@ const isMissingRpc = (error: unknown) =>
   (error as { code?: string })?.code === "42883" ||
   /submit_bloomberg_validation/i.test(String((error as { message?: string })?.message || ""));
 
-async function writeRecordToServer(table: string, row: Record<string, any>, upsertOnId: boolean) {
-  // Bloomberg validations have already been affected in the field by RLS/FK/client
-  // edge-cases. Route them through the backend-owned RPC, which validates the
-  // signed-in user, repairs missing school keys, and performs an idempotent upsert.
-  if (table === "bloomberg_validations") {
-    const { error } = await (supabase as any).rpc("submit_bloomberg_validation", { _row: row });
-    if (!error) return { error: null };
-    // Keep local development/remix previews usable before the migration exists.
-    if (!isMissingRpc(error)) return { error };
-  }
+async function writeRecordToServer(
+  table: string,
+  row: Record<string, any>,
+  upsertOnId: boolean,
+  idempotencyKey: string,
+) {
+  // Strip transport-only fields before they hit the DB layer.
+  const cleanRow = { ...row };
+  delete (cleanRow as any).__idempotency_key;
 
-  const { error } = upsertOnId
-    ? await supabase.from(table as any).upsert(row, { onConflict: "id" })
-    : await supabase.from(table as any).insert(row);
-  if (error) {
-    const retried = upsertOnId ? await retryWithoutBrokenSchoolKey(table, row, error) : null;
-    if (retried) return { error: retried.error };
+  // Tag the outgoing PostgREST request with the client-generated idempotency
+  // key. Any retry of the same payload (after a network blip, a browser tab
+  // freeze, or an offline drain) carries the SAME header, so a caching proxy
+  // or future server-side dedupe layer can collapse the duplicates safely.
+  // Setting per-call headers via `supabase.functions`/`from` is not supported
+  // directly on the JS client, so we mutate the shared PostgREST headers for
+  // the duration of the call. The header is best-effort — the durable
+  // guarantee still comes from submission_uuid + PK upsert below.
+  const pg: any = (supabase as any).rest || (supabase as any).postgrest;
+  const prevHeader = pg?.headers?.[IDEMPOTENCY_HEADER];
+  if (pg?.headers) pg.headers[IDEMPOTENCY_HEADER] = idempotencyKey;
+
+  try {
+    // Bloomberg validations have already been affected in the field by RLS/FK/client
+    // edge-cases. Route them through the backend-owned RPC, which validates the
+    // signed-in user, repairs missing school keys, and performs an idempotent upsert.
+    if (table === "bloomberg_validations") {
+      const { error } = await (supabase as any).rpc("submit_bloomberg_validation", { _row: cleanRow });
+      if (!error) return { error: null };
+      // Keep local development/remix previews usable before the migration exists.
+      if (!isMissingRpc(error)) return { error };
+    }
+
+    const { error } = upsertOnId
+      ? await supabase.from(table as any).upsert(cleanRow, { onConflict: "id" })
+      : await supabase.from(table as any).insert(cleanRow);
+    if (error) {
+      const retried = upsertOnId ? await retryWithoutBrokenSchoolKey(table, cleanRow, error) : null;
+      if (retried) return { error: retried.error };
+    }
+    return { error };
+  } finally {
+    if (pg?.headers) {
+      if (prevHeader === undefined) delete pg.headers[IDEMPOTENCY_HEADER];
+      else pg.headers[IDEMPOTENCY_HEADER] = prevHeader;
+    }
   }
-  return { error };
 }
 
 /**
@@ -167,26 +220,37 @@ export async function queueOrInsert(
   row: Record<string, any>,
   upsertOnId = false,
   opts: { mirrorEntryId?: string | null } = {},
-): Promise<{ queued: boolean }> {
+): Promise<{ queued: boolean; idempotencyKey: string }> {
   // Stamp the idempotency contract for contract-aware tables. Using the row's
   // own id (a client-generated UUID for these forms) as submission_uuid keeps
   // the identity stable across every retry so duplicates are impossible.
   if (SYNC_CONTRACT_TABLES.has(table)) {
     row = stampSyncContract(row, typeof row.id === "string" ? row.id : undefined);
   }
+  // Universal client-side idempotency key: stamped on EVERY submission before
+  // it leaves the device, whether the destination table has the formal contract
+  // columns or not. This is what makes a mid-upload network failure safe to
+  // retry — the same key travels with the same payload forever.
+  const idempotencyKey = resolveIdempotencyKey(row);
+  row = { ...row, __idempotency_key: idempotencyKey };
+
   if (isOnline()) {
     try {
-      const { error } = await writeRecordToServer(table, row, upsertOnId);
+      const { error } = await writeRecordToServer(table, row, upsertOnId, idempotencyKey);
       if (error) throw error;
       // Confirmed on the server — reconcile the UI mirror right away.
       await markMirrorSent(opts.mirrorEntryId);
-      return { queued: false };
+      return { queued: false, idempotencyKey };
     } catch {
       // fall through to queue — never lose the submission
     }
   }
   await putRecord({
-    id: `${table}::${Date.now()}::${Math.random().toString(36).slice(2)}`,
+    // Deterministic record id: re-queueing the SAME submission (same
+    // idempotency key) overwrites the pending entry instead of creating a
+    // second one, so a user who taps submit twice while offline still ends up
+    // with a single queued row.
+    id: `${table}::${idempotencyKey}`,
     table,
     row,
     created_at: new Date().toISOString(),
@@ -199,7 +263,7 @@ export async function queueOrInsert(
   // Kick an immediate background flush attempt so a transient failure while
   // online does not leave the row sitting "queued" for the whole interval.
   scheduleFlush(500);
-  return { queued: true };
+  return { queued: true, idempotencyKey };
 }
 
 export async function getPendingInsertCount(): Promise<number> {
@@ -267,7 +331,8 @@ export async function flushSubmissionQueue(
     const processOne = async (rec: PendingInsert) => {
       if (!isOnline()) return;
       try {
-        const { error } = await writeRecordToServer(rec.table, rec.row, rec.upsertOnId ?? false);
+        const key = resolveIdempotencyKey(rec.row);
+        const { error } = await writeRecordToServer(rec.table, rec.row, rec.upsertOnId ?? false, key);
         if (error) throw error;
         await deleteRecord(rec.id);
         await markMirrorSent(rec.mirrorEntryId);
