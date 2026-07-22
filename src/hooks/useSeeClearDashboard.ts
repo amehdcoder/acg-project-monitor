@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { DASHBOARD_QUERY_OPTIONS } from "@/lib/queryConfig";
 import { supabase } from "@/integrations/supabase/client";
 import {
   EQUIPMENT_ITEMS, EQUIP_STATUS_META, readinessBand, type EquipStatus,
