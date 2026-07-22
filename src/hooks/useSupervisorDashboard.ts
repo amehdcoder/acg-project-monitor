@@ -70,12 +70,14 @@ export interface ProjectSummary {
   compliance_rate: number | null;
 }
 
+const SUPERVISOR_QUERY_KEY = ["supervisor-dashboard"] as const;
+
 export function useSupervisorDashboard() {
+  const queryClient = useQueryClient();
   const [users, setUsers] = useState<UserStatus[]>([]);
   const [alerts, setAlerts] = useState<SupervisorAlert[]>([]);
   const [dailySummary, setDailySummary] = useState<DailyActivitySummary | null>(null);
   const [projectSummaries, setProjectSummaries] = useState<ProjectSummary[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
@@ -88,19 +90,14 @@ export function useSupervisorDashboard() {
   const dateRangeRef = useRef(dateRange);
   dateRangeRef.current = dateRange;
   const dismissedAlertsRef = useRef<Set<string>>(new Set());
-  const pollIntervalRef = useRef(2000);
-  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const lastSyncRef = useRef<string | null>(null);
-  const isActiveRef = useRef(true);
-  const [reconnectNonce, setReconnectNonce] = useState(0);
 
   // Force a realtime reconnect + immediate data refresh (used by the
   // "Reconnect" button when the channel is Offline/Connecting).
   const reconnectRealtime = useCallback(() => {
     setRealtimeStatus("connecting");
-    pollIntervalRef.current = 2000;
-    setReconnectNonce((n) => n + 1);
-  }, []);
+    queryClient.invalidateQueries({ queryKey: SUPERVISOR_QUERY_KEY });
+  }, [queryClient]);
+
 
   const fetchAllData = useCallback(async () => {
     try {
