@@ -158,6 +158,7 @@ export const useAcsmDashboard = (
         throw error;
       }
     },
+    ...DASHBOARD_QUERY_OPTIONS,
   });
 
   // Derive rows + duplicate info from the cached raw payload + current overrides.
