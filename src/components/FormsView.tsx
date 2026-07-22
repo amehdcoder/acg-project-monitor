@@ -4784,6 +4784,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         onChanged={loadBmzAssignments}
       />
 
+      <MicroplanProjectAccessDialog
+        open={showMicroplanAccessDialog}
+        onOpenChange={setShowMicroplanAccessDialog}
+      />
+      <MicroplanMoveEntriesDialog
+        open={showMicroplanMoveDialog}
+        onOpenChange={setShowMicroplanMoveDialog}
+      />
+
+
+
 
       {/* Template Picker Dialog */}
       {showTemplatePicker && (
