@@ -42,27 +42,56 @@ const Stat = ({ icon: Icon, label, value }: { icon: any; label: string; value: s
   </div>
 );
 
+const PAGE_SIZE = 20;
+const UPRP_COLUMNS =
+  "id, name_of_data_collector, type_of_training, training_center, participants, documents, location, created_at";
+
 const UPRPSubmissionsView = ({ projectId, onClose }: Props) => {
   const { user, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [rows, setRows] = useState<UProSubmission[]>([]);
+  const [hasMore, setHasMore] = useState(true);
 
-  const load = async () => {
-    setLoading(true);
+  // Keyset cursor pagination on (created_at, id) — stable under concurrent inserts
+  // and cheaper than offset scans on large tables.
+  const fetchPage = async (cursor: { created_at: string; id: string } | null, append: boolean) => {
+    append ? setLoadingMore(true) : setLoading(true);
     try {
-      let q = supabase.from("uprp_submissions").select("*").order("created_at", { ascending: false }).limit(1000);
+      let q = supabase
+        .from("uprp_submissions")
+        .select(UPRP_COLUMNS)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(PAGE_SIZE);
       if (projectId) q = q.eq("project_id", projectId);
-      // Regular users only ever see their own records. Super Admins see everyone's.
       if (!isSuperAdmin && user?.id) q = q.eq("user_id", user.id);
+      if (cursor) {
+        // (created_at, id) < (cursor.created_at, cursor.id)
+        q = q.or(
+          `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,
+        );
+      }
       const { data, error } = await q;
       if (error) throw error;
-      setRows((data as any) || []);
+      const next = (data as any) || [];
+      setRows((prev) => (append ? [...prev, ...next] : next));
+      setHasMore(next.length === PAGE_SIZE);
     } catch (e: any) {
       toast({ title: "Could not load submissions", description: e.message, variant: "destructive" });
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const load = () => fetchPage(null, false);
+  const loadMore = () => {
+    if (!hasMore || loadingMore || loading) return;
+    const last = rows[rows.length - 1];
+    if (!last) return;
+    fetchPage({ created_at: last.created_at, id: last.id }, true);
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [projectId, isSuperAdmin, user?.id]);
