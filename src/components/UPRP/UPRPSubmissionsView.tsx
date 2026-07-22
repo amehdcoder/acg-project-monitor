@@ -304,6 +304,25 @@ const UPRPSubmissionsView = ({ projectId, onClose }: Props) => {
                   ))}
                 </div>
               )}
+              {hasMore && rows.length > 0 && (
+                <div className="flex justify-center border-t border-emerald-50 p-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+                      </>
+                    ) : (
+                      <>Load more ({PAGE_SIZE})</>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           </>
         )}
