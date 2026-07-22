@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronDown, ChevronRight, FileText, Loader2, Download } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -70,67 +70,78 @@ const formatExportValue = (value: any): string => {
   return String(value);
 };
 
+const PAGE_SIZE = 20;
+
 const FormSubmissionsAccordion = ({ form, profiles }: FormSubmissionsAccordionProps) => {
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [submissions, setSubmissions] = useState<SubmissionRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const busyRef = useRef(false);
 
   const questionLabels = useMemo(
     () => (form.questions ? buildLabelMap(form.questions) : {}),
     [form.questions]
   );
 
-  useEffect(() => {
-    if (!expanded || loaded) return;
+  const mapRow = useCallback(
+    (s: any): SubmissionRecord => {
+      const loc = extractLocation(s);
+      return {
+        id: s.id,
+        form_id: s.form_id,
+        form_name: form.name,
+        user_id: s.user_id,
+        submitter_name: profiles.get(s.user_id) || "Unknown",
+        location: loc.location,
+        state: loc.state,
+        submitted_at: s.submitted_at || s.created_at,
+        status: s.status,
+        data: (s.data || {}) as Record<string, any>,
+        within_geofence: s.within_geofence,
+      };
+    },
+    [form.name, profiles],
+  );
 
-    const fetchSubmissions = async () => {
-      setLoading(true);
+  const fetchPage = useCallback(
+    async (offset: number, append: boolean) => {
+      if (busyRef.current) return;
+      busyRef.current = true;
+      append ? setLoadingMore(true) : setLoading(true);
       try {
-        const PAGE_SIZE = 1000;
-        let allRows: any[] = [];
-        let offset = 0;
-        while (true) {
-          const { data, error } = await (supabase as any).rpc("visible_form_submissions", {
-            _form_id: form.id,
-            _limit: PAGE_SIZE,
-            _offset: offset,
-          });
-          if (error) throw error;
-          const rows = data || [];
-          allRows = allRows.concat(rows);
-          if (rows.length < PAGE_SIZE) break;
-          offset += PAGE_SIZE;
-        }
-
-        const mapped: SubmissionRecord[] = allRows.map((s) => {
-          const loc = extractLocation(s);
-          return {
-            id: s.id,
-            form_id: s.form_id,
-            form_name: form.name,
-            user_id: s.user_id,
-            submitter_name: profiles.get(s.user_id) || "Unknown",
-            location: loc.location,
-            state: loc.state,
-            submitted_at: s.submitted_at || s.created_at,
-            status: s.status,
-            data: (s.data || {}) as Record<string, any>,
-            within_geofence: s.within_geofence,
-          };
+        const { data, error } = await (supabase as any).rpc("visible_form_submissions", {
+          _form_id: form.id,
+          _limit: PAGE_SIZE,
+          _offset: offset,
         });
-
-        setSubmissions(mapped);
+        if (error) throw error;
+        const rows = (data || []).map(mapRow);
+        setSubmissions((prev) => (append ? [...prev, ...rows] : rows));
+        setHasMore(rows.length === PAGE_SIZE);
         setLoaded(true);
       } catch (err) {
         console.error("Error fetching submissions for form:", form.id, err);
       } finally {
+        busyRef.current = false;
         setLoading(false);
+        setLoadingMore(false);
       }
-    };
+    },
+    [form.id, mapRow],
+  );
 
-    fetchSubmissions();
-  }, [expanded, loaded, form.id, form.name, profiles]);
+  useEffect(() => {
+    if (!expanded || loaded) return;
+    fetchPage(0, false);
+  }, [expanded, loaded, fetchPage]);
+
+  const loadMore = useCallback(() => {
+    if (!hasMore || loading || loadingMore) return;
+    fetchPage(submissions.length, true);
+  }, [hasMore, loading, loadingMore, submissions.length, fetchPage]);
 
   const handleUpdate = useCallback((id: string, updatedData: Record<string, any>) => {
     setSubmissions((prev) =>
@@ -258,7 +269,9 @@ const FormSubmissionsAccordion = ({ form, profiles }: FormSubmissionsAccordionPr
             </Button>
           )}
           <Badge variant="secondary" className="text-xs">
-            {loaded ? `${submissions.length} submissions` : `${form.total_submissions} submissions`}
+            {loaded
+              ? `${submissions.length}${hasMore ? "+" : ""} of ${form.total_submissions} submissions`
+              : `${form.total_submissions} submissions`}
           </Badge>
         </div>
       </button>
@@ -271,15 +284,36 @@ const FormSubmissionsAccordion = ({ form, profiles }: FormSubmissionsAccordionPr
               <span className="ml-2 text-sm text-muted-foreground">Loading submissions…</span>
             </div>
           ) : (
-            <SubmissionsTable
-              submissions={submissions}
-              loading={false}
-              questionLabels={questionLabels}
-              pageSize={15}
-              onSubmissionUpdate={handleUpdate}
-              onSubmissionDelete={handleDelete}
-              onSubmissionValidate={handleValidate}
-            />
+            <>
+              <SubmissionsTable
+                submissions={submissions}
+                loading={false}
+                questionLabels={questionLabels}
+                pageSize={15}
+                onSubmissionUpdate={handleUpdate}
+                onSubmissionDelete={handleDelete}
+                onSubmissionValidate={handleValidate}
+              />
+              {hasMore && (
+                <div className="flex justify-center pt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="gap-1.5"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+                      </>
+                    ) : (
+                      <>Load more ({PAGE_SIZE})</>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       )}
