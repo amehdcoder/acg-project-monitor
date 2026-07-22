@@ -4550,26 +4550,56 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
               {/* Microplanning entry — kept inside the list */}
               {(hasMicroplanAccess || (!isAdhoc && projects.length > 0)) && (
-
-                <button
-                  onClick={() => setMicroplanFillingActive(true)}
-                  className="flex w-full items-center gap-3 p-3 sm:p-4 text-left hover:bg-[#F4F6F8]/70 transition-colors"
-                >
-                  <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg bg-[#E2F5EC]">
-                    <MapPin className="h-5 w-5 sm:h-6 sm:w-6 text-[#22A55A]" strokeWidth={2} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">
-                      Geo-enabled Microplanning Entry
-                    </h4>
-                    <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">
-                      Community-level campaign microplanning with georeferenced data collection.
-                    </p>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-[#E2F5EC] px-3 py-1 text-xs font-medium text-[#1F7A3A]">
-                    Open
-                  </span>
-                </button>
+                <div className="border-t border-border/40">
+                  <button
+                    onClick={() => setMicroplanFillingActive(true)}
+                    className="group relative flex w-full items-stretch overflow-hidden text-left transition-transform hover:-translate-y-[1px]"
+                    style={{ minHeight: 96 }}
+                  >
+                    <div
+                      className="absolute inset-0 bg-cover bg-center"
+                      style={{ backgroundImage: `url(${chwHero.url})` }}
+                      aria-hidden="true"
+                    />
+                    <div
+                      className="absolute inset-0"
+                      style={{ background: "linear-gradient(90deg, rgba(11,58,36,0.92) 0%, rgba(11,58,36,0.72) 45%, rgba(11,58,36,0.15) 100%)" }}
+                      aria-hidden="true"
+                    />
+                    <div className="relative flex flex-1 items-center gap-3 p-3 sm:p-4">
+                      <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg bg-white/95 shadow-md">
+                        <MapPin className="h-5 w-5 sm:h-6 sm:w-6 text-[#0B5B2E]" strokeWidth={2.25} />
+                      </div>
+                      <div className="min-w-0 flex-1 text-white">
+                        <h4 className="truncate text-sm sm:text-base font-bold drop-shadow">
+                          Geo-enabled Microplanning Entry
+                        </h4>
+                        <p className="mt-0.5 truncate text-xs sm:text-sm text-white/90">
+                          Community-level campaign microplanning with georeferenced data collection.
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-[#0B5B2E]">
+                        Open
+                      </span>
+                    </div>
+                  </button>
+                  {(isSuperAdmin || isOwnerLevel) && (
+                    <div className="flex items-center gap-2 border-t border-border/40 bg-muted/30 px-3 sm:px-4 py-2">
+                      <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-[11px] font-medium text-muted-foreground">Super Admin</span>
+                      <div className="ml-auto flex flex-wrap gap-1.5">
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+                          onClick={() => setShowMicroplanAccessDialog(true)}>
+                          Grant to project
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+                          onClick={() => setShowMicroplanMoveDialog(true)}>
+                          Move entries
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
                 </div>
               )}
