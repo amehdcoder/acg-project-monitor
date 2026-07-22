@@ -1,7 +1,9 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryCache, keepPreviousData } from "@tanstack/react-query";
+import { toast as sonnerToast } from "sonner";
+import { isTransientBackendError, describeBackendError } from "@/lib/safeData";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { AuthProvider } from "@/hooks/useAuth";
@@ -55,13 +57,41 @@ const GpsWarmer = () => {
 // Hardened QueryClient: exponential backoff, sane caching, offline-tolerant.
 // Prevents tight retry loops, runaway refetches, and "stuck spinner" failures
 // when the backend hiccups or the device flips between 3G and offline.
+//
+// Under heavy concurrent load the backend can respond with 429/504/empty
+// bodies. `placeholderData: keepPreviousData` makes every query keep its last
+// successful payload while the refetch is in flight, so downstream components
+// never see `undefined` in the middle of a render and never crash on
+// `.map`/`.length`. A dedup-aware toast surfaces the transient error without
+// unmounting the widget.
+const transientToastCache = new Map<string, number>();
+function toastTransient(key: string, error: unknown) {
+  const now = Date.now();
+  const last = transientToastCache.get(key) ?? 0;
+  if (now - last < 8000) return; // dedupe bursts
+  transientToastCache.set(key, now);
+  sonnerToast.error(describeBackendError(error));
+}
+
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error, query) => {
+      if (isTransientBackendError(error)) {
+        const key = Array.isArray(query.queryKey)
+          ? String(query.queryKey[0] ?? "query")
+          : "query";
+        toastTransient(key, error);
+      }
+    },
+  }),
   defaultOptions: {
     queries: {
       retry: (failureCount, error: any) => {
         // Don't retry auth / permission / not-found — they won't get better
         const status = error?.status ?? error?.statusCode;
         if (status && [400, 401, 403, 404, 422].includes(status)) return false;
+        // Transient overloads (429/504/503/502) — retry more aggressively
+        if (isTransientBackendError(error)) return failureCount < 4;
         return failureCount < 3;
       },
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 15000),
@@ -71,6 +101,9 @@ const queryClient = new QueryClient({
       refetchOnReconnect: "always",
       refetchOnMount: false,
       networkMode: "offlineFirst",
+      // Keep last-good data on the screen during refetches / transient errors
+      // so components rendering arrays never see `undefined` mid-refresh.
+      placeholderData: keepPreviousData,
     },
     mutations: {
       retry: (failureCount, error: any) => {
