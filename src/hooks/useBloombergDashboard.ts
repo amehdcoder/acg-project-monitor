@@ -168,9 +168,8 @@ export const useBloombergDashboard = () => {
   const { data = EMPTY_DATA, isLoading, isFetching, refetch } = useQuery({
     queryKey: BLOOMBERG_QUERY_KEY,
     queryFn: fetchBloombergDashboard,
-    staleTime: 60_000,
-    gcTime: 5 * 60_000,
     placeholderData: keepPreviousData,
+    ...DASHBOARD_QUERY_OPTIONS,
   });
   const { validations, baselines, schools, schoolCount, profileMap, localAuditRows } = data;
   const loading = isLoading || (isFetching && validations.length === 0);
