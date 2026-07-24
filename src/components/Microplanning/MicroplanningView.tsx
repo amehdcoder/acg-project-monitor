@@ -677,6 +677,14 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   };
 
   const handleDelete = async (id: string) => {
+    // Non-admins cannot delete directly — they must submit a delete request
+    // for admin approval. Admins delete immediately (with confirmation).
+    if (!isAdmin && !isOwner) {
+      const entry = entries.find((e: any) => e.id === id);
+      const label = entry ? [entry.community_name, entry.settlement_name].filter(Boolean).join(" / ") : undefined;
+      setDeleteRequestTarget({ id, label, projectId: entry?.project_id ?? selectedProjectId ?? null });
+      return;
+    }
     if (!confirm("Delete this microplan entry?")) return;
     const { error } = await supabase.from("microplan_entries").delete().eq("id", id);
     if (error) {
