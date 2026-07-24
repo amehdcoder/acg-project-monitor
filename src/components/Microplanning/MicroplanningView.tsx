@@ -2868,6 +2868,23 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         </DialogContent>
       </Dialog>
       )}
+
+      {/* Deletion request dialog (for non-admin owners of their entries) */}
+      <MicroplanDeleteRequestDialog
+        open={!!deleteRequestTarget}
+        onClose={() => setDeleteRequestTarget(null)}
+        entryId={deleteRequestTarget?.id ?? null}
+        projectId={deleteRequestTarget?.projectId ?? null}
+        entryLabel={deleteRequestTarget?.label}
+        onSubmitted={fetchEntries}
+      />
+
+      {/* Delete requests review panel (admins see all; users see their own) */}
+      <MicroplanDeleteRequestsPanel
+        open={showDeleteRequestsPanel}
+        onClose={() => { setShowDeleteRequestsPanel(false); fetchEntries(); }}
+        isAdmin={isAdmin || isOwner}
+      />
     </div>
   );
 };
