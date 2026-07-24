@@ -1757,11 +1757,16 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               <UserPlus className="h-3.5 w-3.5 mr-1" /> Access
             </Button>
           )}
+          <Button size="sm" variant="outline" onClick={() => setShowDeleteRequestsPanel(true)} className="shadow-sm">
+            <ShieldCheck className="h-3.5 w-3.5 mr-1" />
+            {(isAdmin || isOwner) ? "Delete Requests" : "My Delete Requests"}
+          </Button>
           <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }} className="shadow-sm font-semibold">
             <Plus className="h-3.5 w-3.5 mr-1" /> Add Entry
           </Button>
         </div>
       </div>
+
 
       {!entryOnly && (
         <>
