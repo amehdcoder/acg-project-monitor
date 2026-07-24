@@ -5192,6 +5192,63 @@ export type Database = {
         }
         Relationships: []
       }
+      microplan_delete_requests: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decider_reason: string | null
+          entry_id: string
+          id: string
+          project_id: string | null
+          requester_id: string
+          requester_reason: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decider_reason?: string | null
+          entry_id: string
+          id?: string
+          project_id?: string | null
+          requester_id: string
+          requester_reason: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decider_reason?: string | null
+          entry_id?: string
+          id?: string
+          project_id?: string | null
+          requester_id?: string
+          requester_reason?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "microplan_delete_requests_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "microplan_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "microplan_delete_requests_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "v_microplan_entries_enriched"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       microplan_designation_assignments: {
         Row: {
           communities: string[]

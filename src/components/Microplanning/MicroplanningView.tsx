@@ -22,6 +22,8 @@ import TravelRouteMap from "./TravelRouteMap";
 import HistoricalDataReview from "./HistoricalDataReview";
 import DesignationManagerDialog from "./DesignationManagerDialog";
 import AllocationHistoryDialog from "./AllocationHistoryDialog";
+import MicroplanDeleteRequestDialog from "./MicroplanDeleteRequestDialog";
+import MicroplanDeleteRequestsPanel from "./MicroplanDeleteRequestsPanel";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useProjectScope } from "@/hooks/useProjectScope";
 import { rowInScope } from "@/lib/projectScope";
@@ -440,6 +442,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   // User access management state
   const [showAccessManager, setShowAccessManager] = useState(false);
+  const [deleteRequestTarget, setDeleteRequestTarget] = useState<{ id: string; label?: string; projectId?: string | null } | null>(null);
+  const [showDeleteRequestsPanel, setShowDeleteRequestsPanel] = useState(false);
   const [showDesignationManager, setShowDesignationManager] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -673,6 +677,14 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   };
 
   const handleDelete = async (id: string) => {
+    // Non-admins cannot delete directly — they must submit a delete request
+    // for admin approval. Admins delete immediately (with confirmation).
+    if (!isAdmin && !isOwner) {
+      const entry = entries.find((e: any) => e.id === id);
+      const label = entry ? [entry.community_name, entry.settlement_name].filter(Boolean).join(" / ") : undefined;
+      setDeleteRequestTarget({ id, label, projectId: entry?.project_id ?? selectedProjectId ?? null });
+      return;
+    }
     if (!confirm("Delete this microplan entry?")) return;
     const { error } = await supabase.from("microplan_entries").delete().eq("id", id);
     if (error) {
@@ -1745,11 +1757,16 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               <UserPlus className="h-3.5 w-3.5 mr-1" /> Access
             </Button>
           )}
+          <Button size="sm" variant="outline" onClick={() => setShowDeleteRequestsPanel(true)} className="shadow-sm">
+            <ShieldCheck className="h-3.5 w-3.5 mr-1" />
+            {(isAdmin || isOwner) ? "Delete Requests" : "My Delete Requests"}
+          </Button>
           <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }} className="shadow-sm font-semibold">
             <Plus className="h-3.5 w-3.5 mr-1" /> Add Entry
           </Button>
         </div>
       </div>
+
 
       {!entryOnly && (
         <>
@@ -2851,6 +2868,23 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         </DialogContent>
       </Dialog>
       )}
+
+      {/* Deletion request dialog (for non-admin owners of their entries) */}
+      <MicroplanDeleteRequestDialog
+        open={!!deleteRequestTarget}
+        onClose={() => setDeleteRequestTarget(null)}
+        entryId={deleteRequestTarget?.id ?? null}
+        projectId={deleteRequestTarget?.projectId ?? null}
+        entryLabel={deleteRequestTarget?.label}
+        onSubmitted={fetchEntries}
+      />
+
+      {/* Delete requests review panel (admins see all; users see their own) */}
+      <MicroplanDeleteRequestsPanel
+        open={showDeleteRequestsPanel}
+        onClose={() => { setShowDeleteRequestsPanel(false); fetchEntries(); }}
+        isAdmin={isAdmin || isOwner}
+      />
     </div>
   );
 };
