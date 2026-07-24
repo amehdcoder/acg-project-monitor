@@ -22,6 +22,8 @@ import TravelRouteMap from "./TravelRouteMap";
 import HistoricalDataReview from "./HistoricalDataReview";
 import DesignationManagerDialog from "./DesignationManagerDialog";
 import AllocationHistoryDialog from "./AllocationHistoryDialog";
+import MicroplanDeleteRequestDialog from "./MicroplanDeleteRequestDialog";
+import MicroplanDeleteRequestsPanel from "./MicroplanDeleteRequestsPanel";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useProjectScope } from "@/hooks/useProjectScope";
 import { rowInScope } from "@/lib/projectScope";
