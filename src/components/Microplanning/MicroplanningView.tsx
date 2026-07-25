@@ -553,6 +553,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
+  // Non-admin project members only get the Planning list + form. Force-reset
+  // the view so analytics/dashboard tabs can never render for them.
+  useEffect(() => { if (!isAdmin && activeView !== "list") setActiveView("list"); }, [isAdmin, activeView]);
 
   // Fetch persisted medicine allocations for the active project
   const fetchAllocations = useCallback(async () => {
