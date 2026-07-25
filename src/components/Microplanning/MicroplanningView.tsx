@@ -2038,40 +2038,44 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <SelectItem value="seasonal">Seasonal</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex border border-border rounded-lg overflow-hidden">
-              <Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("list")}>
-                <List className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline text-xs">Planning</span>
-              </Button>
-              <Button variant={activeView === "medicine" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("medicine")}>
-                <Pill className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline text-xs">Medicine</span>
-              </Button>
-              <Button variant={activeView === "coverage" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("coverage")}>
-                <Activity className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline text-xs">Coverage</span>
-              </Button>
-              <Button variant={activeView === "reconciliation" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("reconciliation")}>
-                <Heart className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline text-xs">Reconciliation</span>
-              </Button>
-              <Button variant={activeView === "gaps" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("gaps")}>
-                <Target className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline text-xs">Gaps</span>
-              </Button>
-              <Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("map")}>
-                <MapIcon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline text-xs">Map</span>
-              </Button>
-              <Button variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
-                <Navigation className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline text-xs">Routes</span>
-              </Button>
-              <Button variant={activeView === "historical" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("historical")}>
-                <HistoryIcon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline text-xs">Historical</span>
-              </Button>
-            </div>
+            {/* Analytics/dashboard tabs are admin-only. Non-admin project members
+                only see their own submitted entries (Planning list) and the form. */}
+            {isAdmin && (
+              <div className="flex border border-border rounded-lg overflow-hidden">
+                <Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("list")}>
+                  <List className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline text-xs">Planning</span>
+                </Button>
+                <Button variant={activeView === "medicine" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("medicine")}>
+                  <Pill className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline text-xs">Medicine</span>
+                </Button>
+                <Button variant={activeView === "coverage" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("coverage")}>
+                  <Activity className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline text-xs">Coverage</span>
+                </Button>
+                <Button variant={activeView === "reconciliation" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("reconciliation")}>
+                  <Heart className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline text-xs">Reconciliation</span>
+                </Button>
+                <Button variant={activeView === "gaps" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("gaps")}>
+                  <Target className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline text-xs">Gaps</span>
+                </Button>
+                <Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("map")}>
+                  <MapIcon className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline text-xs">Map</span>
+                </Button>
+                <Button variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
+                  <Navigation className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline text-xs">Routes</span>
+                </Button>
+                <Button variant={activeView === "historical" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("historical")}>
+                  <HistoryIcon className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline text-xs">Historical</span>
+                </Button>
+              </div>
+            )}
             {canManageAccess && (
               <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setShowDesignationManager(true)}>
                 <ShieldCheck className="h-3.5 w-3.5" /> Designations
