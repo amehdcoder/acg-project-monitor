@@ -533,7 +533,8 @@ export function workbookToBase64(wb: XLSX.WorkBook): { bytes: Uint8Array; base64
 
 export function downloadWorkbookBlob(wb: XLSX.WorkBook, filename: string) {
   const { bytes } = workbookToBase64(wb);
-  const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const buf = bytes.slice().buffer as ArrayBuffer;
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
