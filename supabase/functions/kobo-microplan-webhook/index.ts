@@ -153,17 +153,20 @@ Deno.serve(async (req) => {
   //   { "<microplan_column>": "<kobo_question_name>" }
   let mapping: Record<string, string> = {};
   let cfgProjectId: string | null = null;
+  let mappingVersion: number | null = null;
   if (formUid) {
     const { data: cfg } = await supabase
       .from("kobo_form_configs")
-      .select("field_mappings, project_id")
+      .select("field_mappings, project_id, active_version_number")
       .eq("form_uid", formUid)
       .maybeSingle();
     if (cfg?.field_mappings && typeof cfg.field_mappings === "object") {
       mapping = cfg.field_mappings as Record<string, string>;
     }
     cfgProjectId = (cfg?.project_id as string | null) ?? null;
+    mappingVersion = (cfg?.active_version_number as number | null) ?? null;
   }
+
 
   const mapped = (col: string, defaults: string[]): string | null => {
     const src = mapping[col];
