@@ -151,6 +151,21 @@ Deno.serve(async (req) => {
       return { ok: true, steps, asset, fields };
     }
 
+    if (action === "get_webhook_secret") {
+      // Restrict to Super Admin / Systems Admin / Owner
+      const { data: roles } = await admin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userRes.user.id);
+      const allowed = (roles ?? []).some((r: any) =>
+        ["super_admin", "systems_admin", "owner"].includes(String(r.role)),
+      );
+      if (!allowed) return j({ error: "Forbidden" }, 403);
+      const secret = Deno.env.get("KOBO_WEBHOOK_SECRET") ?? "";
+      if (!secret) return j({ error: "KOBO_WEBHOOK_SECRET is not configured" }, 404);
+      return j({ ok: true, secret });
+    }
+
     if (action === "test_connection" || action === "inspect") {
       const { server_url, form_uid, api_token } = params;
       if (!server_url || !form_uid || !api_token) return j({ error: "Missing server_url/form_uid/api_token" }, 400);
