@@ -1,8 +1,16 @@
 // Public Kobo webhook — ingests microplanning submissions into
 // public.microplan_entries with idempotency (per _uuid).
 //
-// Auth: header `x-kobo-secret` OR `Authorization: Bearer <KOBO_WEBHOOK_SECRET>`.
-// Every request (even rejected ones) is logged into kobo_webhook_events.
+// Auth (any one accepted, matching Kobo's REST Services options):
+//   • Custom header:  x-kobo-secret: <KOBO_WEBHOOK_SECRET>
+//   • Bearer token:   Authorization: Bearer <KOBO_WEBHOOK_SECRET>
+//   • Basic Auth:     Authorization: Basic base64(user:<KOBO_WEBHOOK_SECRET>)
+//                     (username is ignored; password must equal the secret)
+//
+// Field mapping: if a public.kobo_form_configs row exists for the incoming
+// form UID, its `field_mappings` object is used to translate Kobo question
+// names into microplan_entries column values. Otherwise a default best-effort
+// mapping is applied (backwards-compatible with the shipped XLSForm template).
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders as baseCors } from "npm:@supabase/supabase-js@2/cors";
@@ -19,16 +27,47 @@ const supabase = createClient(
   { auth: { persistSession: false } },
 );
 
+function decodeBasic(header: string): string | null {
+  const m = header.match(/^Basic\s+(.+)$/i);
+  if (!m) return null;
+  try {
+    const decoded = atob(m[1].trim());
+    const idx = decoded.indexOf(":");
+    return idx >= 0 ? decoded.slice(idx + 1) : decoded;
+  } catch {
+    return null;
+  }
+}
+
+function checkAuth(req: Request, secret: string): boolean {
+  const custom = req.headers.get("x-kobo-secret");
+  if (custom && custom === secret) return true;
+  const auth = req.headers.get("authorization") ?? "";
+  if (!auth) return false;
+  if (/^Bearer\s+/i.test(auth)) {
+    return auth.replace(/^Bearer\s+/i, "").trim() === secret;
+  }
+  if (/^Basic\s+/i.test(auth)) {
+    const pwd = decodeBasic(auth);
+    return pwd === secret;
+  }
+  return auth === secret;
+}
+
+function getFlat(obj: Record<string, unknown>, key: string): unknown {
+  if (key in obj) return obj[key];
+  // Support Kobo grouped notation "group/name"
+  for (const [k, v] of Object.entries(obj)) {
+    if (k === key || k.endsWith(`/${key}`)) return v;
+  }
+  return undefined;
+}
+
 function pickFirst(obj: Record<string, unknown>, keys: string[]): string | null {
   for (const k of keys) {
-    // Support Kobo dotted / grouped names as well as flat names
-    const direct = obj[k];
-    if (typeof direct === "string" && direct.trim()) return direct.trim();
-    for (const [dk, dv] of Object.entries(obj)) {
-      if (dk.endsWith(`/${k}`) && typeof dv === "string" && (dv as string).trim()) {
-        return (dv as string).trim();
-      }
-    }
+    const v = getFlat(obj, k);
+    if (typeof v === "string" && v.trim()) return v.trim();
+    if (typeof v === "number" && Number.isFinite(v)) return String(v);
   }
   return null;
 }
@@ -46,7 +85,6 @@ function extractGeo(payload: Record<string, unknown>): { lat: number | null; lng
     const [lat, lng] = geo;
     if (typeof lat === "number" && typeof lng === "number") return { lat, lng };
   }
-  // Fallback: `community_gps` = "lat lng alt acc"
   const gpsStr = pickFirst(payload, ["community_gps", "settlement_gps", "gps", "_geopoint"]);
   if (gpsStr) {
     const parts = gpsStr.split(/\s+/).map(Number);
@@ -57,38 +95,38 @@ function extractGeo(payload: Record<string, unknown>): { lat: number | null; lng
   return { lat: null, lng: null };
 }
 
+// Numeric columns that should coerce string values
+const NUMERIC_COLS = new Set([
+  "estimated_total_population","estimated_children_5_14","estimated_adults_15_plus",
+  "estimated_children_0_4","number_of_households","community_distance_to_flhf_km",
+  "settlement_distance_to_flhf_km","community_latitude","community_longitude",
+  "settlement_latitude","settlement_longitude","flhf_latitude","flhf_longitude",
+  "year_of_microplanning","total_treated","medicine_used","households_treated",
+  "total_households_reported","total_households_treated",
+]);
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const logEvent = async (row: Record<string, unknown>) => {
-    try {
-      await supabase.from("kobo_webhook_events").insert(row);
-    } catch (e) {
-      console.error("kobo_webhook_events insert failed:", (e as Error).message);
-    }
+    try { await supabase.from("kobo_webhook_events").insert(row); }
+    catch (e) { console.error("kobo_webhook_events insert failed:", (e as Error).message); }
   };
 
   const secret = Deno.env.get("KOBO_WEBHOOK_SECRET");
-  const provided =
-    req.headers.get("x-kobo-secret") ??
-    (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-
-  if (!secret || provided !== secret) {
+  if (!secret || !checkAuth(req, secret)) {
     await logEvent({ status: "failed", error: "unauthorized", payload: {} });
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
   let payload: Record<string, unknown>;
-  try {
-    payload = await req.json();
-  } catch {
+  try { payload = await req.json(); }
+  catch {
     await logEvent({ status: "failed", error: "invalid_json", payload: {} });
     return new Response(JSON.stringify({ error: "Invalid JSON" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -99,61 +137,104 @@ Deno.serve(async (req) => {
     null;
   const submittedAt = (payload["_submission_time"] as string | undefined) ?? null;
   const submittedBy = (payload["_submitted_by"] as string | undefined) ?? null;
+  const formUid =
+    (payload["_xform_id_string"] as string | undefined) ??
+    (payload["formhub/uuid"] as string | undefined) ??
+    null;
 
   if (!koboUuid) {
     await logEvent({ status: "failed", error: "missing_uuid", payload });
     return new Response(JSON.stringify({ error: "Missing _uuid" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  const flhfName = pickFirst(payload, ["flhf_name"]);
-  const flhfCustom = pickFirst(payload, ["flhf_custom", "flhf_other"]);
-  const communityName = pickFirst(payload, ["community", "community_name"]);
-  const communityCustom = pickFirst(payload, ["community_custom", "community_other"]);
-  const settlementName = pickFirst(payload, ["settlement", "settlement_name"]);
-  const settlementCustom = pickFirst(payload, ["settlement_custom", "settlement_other"]);
+  // Load mapping for this form (if any). field_mappings shape:
+  //   { "<microplan_column>": "<kobo_question_name>" }
+  let mapping: Record<string, string> = {};
+  let cfgProjectId: string | null = null;
+  if (formUid) {
+    const { data: cfg } = await supabase
+      .from("kobo_form_configs")
+      .select("field_mappings, project_id")
+      .eq("form_uid", formUid)
+      .maybeSingle();
+    if (cfg?.field_mappings && typeof cfg.field_mappings === "object") {
+      mapping = cfg.field_mappings as Record<string, string>;
+    }
+    cfgProjectId = (cfg?.project_id as string | null) ?? null;
+  }
 
-  const flhfFinal =
-    flhfName && flhfName.toLowerCase() !== "other" ? flhfName : (flhfCustom ?? flhfName ?? null);
-  const communityFinal =
-    communityName && communityName.toLowerCase() !== "other"
-      ? communityName
-      : (communityCustom ?? communityName ?? null);
-  const settlementFinal =
-    settlementName && settlementName.toLowerCase() !== "other"
-      ? settlementName
-      : (settlementCustom ?? settlementName ?? null);
+  const mapped = (col: string, defaults: string[]): string | null => {
+    const src = mapping[col];
+    if (src) {
+      const v = getFlat(payload, src);
+      if (typeof v === "string" && v.trim()) return v.trim();
+      if (typeof v === "number") return String(v);
+    }
+    return pickFirst(payload, defaults);
+  };
+
+  const mappedNum = (col: string, defaults: string[]): number | null => {
+    const v = mapped(col, defaults);
+    if (v == null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const flhfName = mapped("flhf_name", ["flhf_name"]);
+  const flhfCustom = mapped("flhf_custom", ["flhf_custom", "flhf_other"]);
+  const communityName = mapped("community_name", ["community", "community_name"]);
+  const communityCustom = mapped("community_custom", ["community_custom", "community_other"]);
+  const settlementName = mapped("settlement_name", ["settlement", "settlement_name"]);
+  const settlementCustom = mapped("settlement_custom", ["settlement_custom", "settlement_other"]);
+
+  const finalize = (main: string | null, alt: string | null) =>
+    main && main.toLowerCase() !== "other" ? main : (alt ?? main ?? null);
+
+  const flhfFinal = finalize(flhfName, flhfCustom);
+  const communityFinal = finalize(communityName, communityCustom);
+  const settlementFinal = finalize(settlementName, settlementCustom);
 
   const isCustom = Boolean(
     (flhfName?.toLowerCase() === "other" && flhfCustom) ||
-      (communityName?.toLowerCase() === "other" && communityCustom) ||
-      (settlementName?.toLowerCase() === "other" && settlementCustom),
+    (communityName?.toLowerCase() === "other" && communityCustom) ||
+    (settlementName?.toLowerCase() === "other" && settlementCustom),
   );
 
   const { lat, lng } = extractGeo(payload);
-  const projectId = pickFirst(payload, ["project_id", "amehnities_project_id"]);
 
   const record: Record<string, unknown> = {
     idempotency_key: koboUuid,
-    state: pickFirst(payload, ["state"]),
-    lga: pickFirst(payload, ["lga"]),
-    ward: pickFirst(payload, ["ward"]),
+    project_id: mapped("project_id", ["project_id", "amehnities_project_id"]) ?? cfgProjectId,
+    state: mapped("state", ["state"]),
+    lga: mapped("lga", ["lga"]),
+    ward: mapped("ward", ["ward"]),
     flhf_name: flhfFinal,
+    flhf_incharge_name: mapped("flhf_incharge_name", ["flhf_incharge_name"]),
+    flhf_incharge_phone: mapped("flhf_incharge_phone", ["flhf_incharge_phone"]),
     community_name: communityFinal,
+    community_leader_name: mapped("community_leader_name", ["community_leader_name"]),
+    community_leader_phone: mapped("community_leader_phone", ["community_leader_phone"]),
     settlement_name: settlementFinal,
+    estimated_total_population: mappedNum("estimated_total_population", ["estimated_total_population"]),
+    number_of_households: mappedNum("number_of_households", ["number_of_households"]),
     community_latitude: lat,
     community_longitude: lng,
-    settlement_latitude: pickNumber(payload, ["settlement_lat"]) ?? lat,
-    settlement_longitude: pickNumber(payload, ["settlement_lng"]) ?? lng,
+    settlement_latitude: mappedNum("settlement_latitude", ["settlement_lat"]) ?? lat,
+    settlement_longitude: mappedNum("settlement_longitude", ["settlement_lng"]) ?? lng,
     is_custom_location: isCustom,
-    project_id: projectId,
-    notes: `Ingested from KoboToolbox (_uuid=${koboUuid}, submitted_by=${submittedBy ?? "unknown"})`,
+    notes: `Ingested from KoboToolbox (_uuid=${koboUuid}, form=${formUid ?? "unknown"}, submitted_by=${submittedBy ?? "unknown"})`,
   };
 
-  // Remove null keys so we don't overwrite existing values on conflict
-  for (const k of Object.keys(record)) if (record[k] == null) delete record[k];
+  for (const k of Object.keys(record)) {
+    if (record[k] == null) delete record[k];
+    else if (NUMERIC_COLS.has(k)) {
+      const n = Number(record[k]);
+      if (!Number.isFinite(n)) delete record[k];
+      else record[k] = n;
+    }
+  }
 
   const { data, error } = await supabase
     .from("microplan_entries")
@@ -163,26 +244,18 @@ Deno.serve(async (req) => {
 
   if (error) {
     await logEvent({
-      status: "failed",
-      error: error.message,
-      kobo_uuid: koboUuid,
-      submitted_by_kobo: submittedBy,
-      submitted_at: submittedAt,
-      payload,
+      status: "failed", error: error.message, kobo_uuid: koboUuid,
+      submitted_by_kobo: submittedBy, submitted_at: submittedAt, payload,
     });
     return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
   await logEvent({
-    status: "success",
-    kobo_uuid: koboUuid,
-    submitted_by_kobo: submittedBy,
-    submitted_at: submittedAt,
-    matched_entry_id: data?.id ?? null,
-    payload,
+    status: "success", kobo_uuid: koboUuid,
+    submitted_by_kobo: submittedBy, submitted_at: submittedAt,
+    matched_entry_id: data?.id ?? null, payload,
   });
 
   return new Response(
