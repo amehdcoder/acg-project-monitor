@@ -47,42 +47,11 @@ const copy = async (text: string, label: string) => {
   }
 };
 
-const downloadXlsFormTemplate = () => {
-  const survey = [
-    ["type", "name", "label", "required", "appearance", "choice_filter"],
-    ["start", "start", "", "", "", ""],
-    ["end", "end", "", "", "", ""],
-    ["today", "today", "", "", "", ""],
-    ["deviceid", "deviceid", "", "", "", ""],
-    ["text", "project_id", "Amehnities Project ID", "yes", "", ""],
-    ["select_one states", "state", "State", "yes", "", ""],
-    ["select_one lgas", "lga", "LGA", "yes", "", "state=${state}"],
-    ["select_one wards", "ward", "Ward", "yes", "", "lga=${lga}"],
-    ["select_one flhfs_or_other", "flhf_name", "FLHF", "yes", "", "ward=${ward}"],
-    ["text", "flhf_custom", "Other FLHF (specify)", "", "", "${flhf_name} = 'other'"],
-    ["select_one communities_or_other", "community", "Community", "yes", "", "flhf=${flhf_name}"],
-    ["text", "community_custom", "Other Community (specify)", "", "", "${community} = 'other'"],
-    ["select_one settlements_or_other", "settlement", "Settlement", "", "", "community=${community}"],
-    ["text", "settlement_custom", "Other Settlement (specify)", "", "", "${settlement} = 'other'"],
-    ["geopoint", "community_gps", "Community GPS", "yes", "", ""],
-    ["note", "hint", "Ensure all cascading choices load before submission.", "", "", ""],
-  ];
-  const choices = [
-    ["list_name", "name", "label"],
-    ["flhfs_or_other", "other", "Other (specify manually)"],
-    ["communities_or_other", "other", "Other (specify manually)"],
-    ["settlements_or_other", "other", "Other (specify manually)"],
-  ];
-  const settings = [
-    ["form_title", "form_id", "version"],
-    ["Amehnities Microplanning (Kobo)", "amehnities_microplanning", new Date().toISOString().slice(0, 10).replace(/-/g, "")],
-  ];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(survey), "survey");
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(choices), "choices");
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(settings), "settings");
-  XLSX.writeFile(wb, "microplanning_xlsform.xlsx");
-};
+// XLSForm builder moved to `@/lib/microplanning/xlsformBuilder` — it emits a
+// full-fidelity XLSForm mirroring MicroplanEntryForm.tsx (cascaded GRID3
+// choices with GPS coordinates, "Other" manual entry, skip logic, distance
+// calculations and validations).
+
 
 const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
   const [showSecret, setShowSecret] = useState(false);
