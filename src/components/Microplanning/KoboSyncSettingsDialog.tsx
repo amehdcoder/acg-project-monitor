@@ -292,21 +292,38 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
           <KoboFormConfigPanel />
 
 
-          {/* XLSForm template */}
+          {/* Complete XLSForm — full-fidelity mirror of the Geo-enabled Microplanning entry form */}
           <div className="border rounded-lg p-3 space-y-2 bg-card">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-xs font-semibold">
-                <Download className="h-4 w-4 text-primary" /> XLSForm Hierarchy Template
+                <Download className="h-4 w-4 text-primary" /> Complete XLSForm — Geo-enabled Microplanning
               </div>
-              <Button size="sm" variant="outline" onClick={downloadXlsFormTemplate}>
-                <Download className="h-3.5 w-3.5 mr-1" /> Download template
+              <Button size="sm" variant="default" onClick={handleDownloadXls} disabled={buildingXls}>
+                {buildingXls ? (
+                  <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Building…</>
+                ) : (
+                  <><Download className="h-3.5 w-3.5 mr-1.5" /> Download XLSForm (.xlsx)</>
+                )}
               </Button>
             </div>
-            <p className="text-[10px] text-muted-foreground">
-              Pre-configured with cascading State → LGA → Ward → FLHF → Community choices and <code>or_other</code>-style
-              manual entry for FLHFs, Communities, and Settlements.
+            <p className="text-[10px] text-muted-foreground leading-relaxed">
+              Ready-to-upload XLSForm mirroring every field, skip logic, calculation and validation of the
+              Geo-enabled Microplanning entry form. Includes the <b>complete GRID3 cascade</b> (State → LGA → Ward →
+              FLHF → Community → Settlement) with pre-loaded <b>GPS coordinates</b>, in-field <b>GPS override</b>,
+              and <b>“Other (specify manually)”</b> free-text entry for FLHFs, Communities and Settlements not in
+              GRID3. Upload in KoboToolbox → <b>New project → Import an XLSForm</b>.
             </p>
+            {buildingXls && xlsProgress && (
+              <div className="text-[10px] text-primary font-medium">
+                {xlsProgress.phase === "states" && `Preparing admin cascade… ${xlsProgress.done}/${xlsProgress.total} states`}
+                {xlsProgress.phase === "flhfs" && `Packing GRID3 FLHFs… ${xlsProgress.done}/${xlsProgress.total} states`}
+                {xlsProgress.phase === "communities" && `Packing GRID3 Communities & Settlements… ${xlsProgress.done}/${xlsProgress.total} states`}
+                {xlsProgress.phase === "assemble" && "Assembling workbook…"}
+                {xlsProgress.phase === "done" && "Finalising…"}
+              </div>
+            )}
           </div>
+
 
           {/* Sync log */}
           <div className="border rounded-lg p-3 space-y-2 bg-card">
