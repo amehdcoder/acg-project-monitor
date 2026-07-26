@@ -24,6 +24,7 @@ import DesignationManagerDialog from "./DesignationManagerDialog";
 import AllocationHistoryDialog from "./AllocationHistoryDialog";
 import MicroplanDeleteRequestDialog from "./MicroplanDeleteRequestDialog";
 import MicroplanDeleteRequestsPanel from "./MicroplanDeleteRequestsPanel";
+import KoboSyncSettingsDialog from "./KoboSyncSettingsDialog";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useProjectScope } from "@/hooks/useProjectScope";
 import { rowInScope } from "@/lib/projectScope";
@@ -444,6 +445,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [showAccessManager, setShowAccessManager] = useState(false);
   const [deleteRequestTarget, setDeleteRequestTarget] = useState<{ id: string; label?: string; projectId?: string | null } | null>(null);
   const [showDeleteRequestsPanel, setShowDeleteRequestsPanel] = useState(false);
+  const [showKoboSettings, setShowKoboSettings] = useState(false);
   const [showDesignationManager, setShowDesignationManager] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -1764,6 +1766,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             <ShieldCheck className="h-3.5 w-3.5 mr-1" />
             {(isAdmin || isOwner) ? "Delete Requests" : "My Delete Requests"}
           </Button>
+          {isSuperAdmin && (
+            <Button size="sm" variant="outline" onClick={() => setShowKoboSettings(true)} className="shadow-sm">
+              <HistoryIcon className="h-3.5 w-3.5 mr-1" /> Kobo Sync
+            </Button>
+          )}
           <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }} className="shadow-sm font-semibold">
             <Plus className="h-3.5 w-3.5 mr-1" /> Add Entry
           </Button>
@@ -2891,6 +2898,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         open={showDeleteRequestsPanel}
         onClose={() => { setShowDeleteRequestsPanel(false); fetchEntries(); }}
         isAdmin={isAdmin || isOwner}
+      />
+
+      <KoboSyncSettingsDialog
+        open={showKoboSettings}
+        onClose={() => setShowKoboSettings(false)}
       />
     </div>
   );

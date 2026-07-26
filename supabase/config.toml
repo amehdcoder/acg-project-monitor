@@ -75,3 +75,6 @@ verify_jwt = false
 
 [functions.dashboard-share]
 verify_jwt = false
+
+[functions.kobo-microplan-webhook]
+verify_jwt = false
