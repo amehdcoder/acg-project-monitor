@@ -87,6 +87,7 @@ const downloadXlsFormTemplate = () => {
 const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
   const [showSecret, setShowSecret] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
+  const [secretError, setSecretError] = useState<string | null>(null);
   const [loadingSecret, setLoadingSecret] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -108,24 +109,43 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
     }
   };
 
-  useEffect(() => {
-    if (open) loadEvents();
-  }, [open]);
-
-  const revealSecret = async () => {
-    if (secret) { setShowSecret((s) => !s); return; }
+  const fetchSecret = async () => {
     setLoadingSecret(true);
+    setSecretError(null);
     try {
-      // Ask a small edge function or admin to reveal? For safety we don't expose it via client.
-      // Instead provide instructions.
-      toast({
-        title: "Secret is stored server-side",
-        description: "Use the 'Copy Secret' button — the value is injected securely into the webhook function only.",
+      const { data, error } = await supabase.functions.invoke("kobo-form-manager", {
+        body: { action: "get_webhook_secret" },
       });
+      if (error) throw error;
+      if (!data?.secret) throw new Error(data?.error ?? "Secret unavailable");
+      setSecret(data.secret as string);
+    } catch (e: any) {
+      setSecretError(e.message ?? "Failed to load secret");
     } finally {
       setLoadingSecret(false);
     }
   };
+
+  useEffect(() => {
+    if (open) {
+      loadEvents();
+      if (!secret) fetchSecret();
+    }
+  }, [open]);
+
+  const copySecret = async () => {
+    if (!secret) {
+      toast({ title: "Secret not loaded yet", variant: "destructive" });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(secret);
+      toast({ title: "Webhook Secret copied to clipboard!" });
+    } catch {
+      toast({ title: "Copy failed", variant: "destructive" });
+    }
+  };
+
 
   const statusBadge = (s: string) =>
     s === "success"
