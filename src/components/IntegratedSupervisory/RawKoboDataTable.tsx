@@ -70,7 +70,7 @@ const rowQuality = (r: any, columns: KoboColumn[]) => {
   return (filled / fields.length) * 100;
 };
 
-const uniq = (vals: (string | number | null | undefined)[]) =>
+const uniq = (vals: unknown[]) =>
   Array.from(new Set(vals.map((v) => (v == null ? "" : String(v))).filter(Boolean))).sort();
 
 const KpiCard = ({
