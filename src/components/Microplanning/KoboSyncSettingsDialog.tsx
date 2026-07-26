@@ -27,6 +27,8 @@ import type * as XLSX from "xlsx";
 interface Props {
   open: boolean;
   onClose: () => void;
+  projectName?: string | null;
+  projectStates?: string[] | null;
 }
 
 interface EventRow {
