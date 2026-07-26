@@ -317,24 +317,58 @@ export default function KoboFormConfigPanel() {
         </div>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
-        <Button size="sm" onClick={inspect} disabled={inspecting}>
-          {inspecting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Search className="h-3 w-3 mr-1" />}
-          Inspect Form
+      <div className="flex gap-2 flex-wrap items-center">
+        <Button size="sm" onClick={testConnection} disabled={testing}>
+          {testing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <PlugZap className="h-3 w-3 mr-1" />}
+          Test Connection
         </Button>
         {fields && isEmpty && (
-          <Button size="sm" variant="secondary" onClick={deploySchema} disabled={deploying}>
+          <Button size="sm" variant="secondary" onClick={() => deploySchema(false)} disabled={deploying}>
             {deploying ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Rocket className="h-3 w-3 mr-1" />}
             Deploy Microplanning schema
           </Button>
         )}
-        {fields && (
-          <Button size="sm" onClick={saveConfig} disabled={saving}>
-            {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
-            Save Configuration
+        {fields && !isEmpty && (
+          <Button size="sm" variant="outline" onClick={() => setPreviewOpen(true)}>
+            <Eye className="h-3 w-3 mr-1" /> Preview Mapping
           </Button>
         )}
+        {fields && (
+          <Button size="sm" onClick={saveConfig} disabled={saving || testOk !== true}>
+            {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
+            Save & Enable Webhook
+          </Button>
+        )}
+        {testOk === true && (
+          <Badge className="bg-emerald-600 hover:bg-emerald-700"><CheckCircle2 className="h-3 w-3 mr-1" />Verified</Badge>
+        )}
+        {testOk === false && (
+          <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Failed</Badge>
+        )}
       </div>
+
+      {/* Test result diagnostics */}
+      {testSteps && (
+        <div className="border rounded p-2 space-y-1 bg-muted/30">
+          <div className="text-[11px] font-semibold">Connection Test Report</div>
+          <ul className="text-xs space-y-0.5">
+            {testSteps.map((s, i) => (
+              <li key={i} className="flex items-start gap-1.5">
+                {s.ok
+                  ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                  : <XCircle className="h-3.5 w-3.5 text-destructive shrink-0 mt-0.5" />}
+                <span className="capitalize font-medium">{s.step}:</span>
+                <span className={s.ok ? "text-muted-foreground" : "text-destructive"}>{s.detail ?? (s.ok ? "OK" : "failed")}</span>
+              </li>
+            ))}
+          </ul>
+          {submissionCount > 0 && (
+            <div className="text-[11px] text-amber-600 flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" /> This form already has {submissionCount} submission(s).
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Mapping UI */}
       {fields && !isEmpty && (
@@ -389,6 +423,65 @@ export default function KoboFormConfigPanel() {
           Geo-enabled Microplanning question set into Kobo automatically. Field mapping will then be 1:1.
         </div>
       )}
+
+      {/* Side-by-side preview modal */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-4 w-4 text-primary" /> Mapping Preview
+              {formTitle && <span className="text-xs text-muted-foreground font-normal">· {formTitle}</span>}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto text-xs">
+            <table className="w-full">
+              <thead className="bg-muted text-left sticky top-0">
+                <tr>
+                  <th className="p-2 w-1/3">Microplanning column</th>
+                  <th className="p-2 w-1/3">Kobo question (label · name)</th>
+                  <th className="p-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {TARGET_FIELDS.map((t) => {
+                  const src = mapping[t.key];
+                  const field = fields?.find((f) => f.name === src);
+                  const status = !src
+                    ? { label: "Unmapped", cls: "text-amber-600", icon: <AlertTriangle className="h-3 w-3" /> }
+                    : !field
+                    ? { label: "Missing from Kobo", cls: "text-destructive", icon: <XCircle className="h-3 w-3" /> }
+                    : { label: "Mapped", cls: "text-emerald-600", icon: <CheckCircle2 className="h-3 w-3" /> };
+                  return (
+                    <tr key={t.key} className="border-t">
+                      <td className="p-2">
+                        <div className="font-medium">{t.label}</div>
+                        <div className="text-[10px] font-mono text-muted-foreground">{t.key}</div>
+                      </td>
+                      <td className="p-2">
+                        {field ? (
+                          <>
+                            <div className="font-medium">{field.label}</div>
+                            <div className="text-[10px] font-mono text-muted-foreground">{field.name} · {field.type}</div>
+                          </>
+                        ) : <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="p-2">
+                        <span className={`inline-flex items-center gap-1 ${status.cls}`}>
+                          {status.icon}{status.label}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="text-[11px] text-muted-foreground border-t pt-2">
+            Only fields marked <b>Mapped</b> will be transferred by the webhook. Save the configuration to
+            enable ingestion for this form.
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
