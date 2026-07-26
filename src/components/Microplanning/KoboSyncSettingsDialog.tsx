@@ -148,6 +148,29 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
     }
   };
 
+  const resetSecret = async () => {
+    setResetting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("kobo-form-manager", {
+        body: { action: "reset_webhook_secret" },
+      });
+      if (error) throw error;
+      if (!data?.secret) throw new Error(data?.error ?? "Rotation failed");
+      setSecret(data.secret as string);
+      setShowSecret(true);
+      setSecretError(null);
+      setConfirmingReset(false);
+      toast({
+        title: "New Webhook Secret generated",
+        description: "The previous key is now invalid. Copy and paste this into KoboToolbox.",
+      });
+    } catch (e: any) {
+      toast({ title: "Reset failed", description: e.message, variant: "destructive" });
+    } finally {
+      setResetting(false);
+    }
+  };
+
 
   const statusBadge = (s: string) =>
     s === "success"
