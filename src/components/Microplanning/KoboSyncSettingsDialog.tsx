@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { Copy, Download, Eye, EyeOff, Link2, Loader2, RefreshCw, RotateCw, Webhook } from "lucide-react";
-import * as XLSX from "xlsx";
+import { downloadMicroplanningXlsForm, type BuildProgress } from "@/lib/microplanning/xlsformBuilder";
 import KoboFormConfigPanel from "./KoboFormConfigPanel";
 
 interface Props {
