@@ -137,7 +137,7 @@ export async function testConnection(cfg: KoboConfig) {
   const { data, error } = await supabase.functions.invoke("kobo-form-manager", {
     body: { action: "test_connection", server_url: cfg.serverUrl, form_uid: cfg.formUid, api_token: cfg.apiToken },
   });
-  if (error) throw error;
+  if (error) throw await parseInvokeError(error);
   return data as any;
 }
 
@@ -155,9 +155,11 @@ async function fetchPage(cfg: KoboConfig, page: number) {
       page,
     },
   });
-  if (error) throw error;
+  if (error) throw await parseInvokeError(error);
   const d = data as any;
-  if (d?.error) throw new Error(d.detail || d.error);
+  if (d?.error) {
+    throw new KoboClientError((d.code as KoboErrorCode) || "server_error", d.error, Number(d.status) || 0, d.detail);
+  }
   return d;
 }
 
@@ -176,15 +178,31 @@ export async function fetchSubmissions(cfg: KoboConfig): Promise<KoboCache> {
   }
   const flatResults = flattenAll(results);
   const columns = buildDataDictionary(flatResults);
+  const fields = Array.isArray(first?.fields) ? first.fields : [];
+  const validation = validateDataDictionary(columns, fields);
+  if (!validation.ok || validation.warnings.length > 0) {
+    console.warn("[Kobo] schema validation issues:", validation.issues);
+  }
   const cache: KoboCache = {
     fetchedAt: new Date().toISOString(),
     formTitle: first?.form_title ?? null,
     count: results.length,
     results,
     flatResults,
-    fields: Array.isArray(first?.fields) ? first.fields : [],
+    fields,
     columns,
+    validation,
   };
   saveKoboCache(cache);
   return cache;
 }
+
+/**
+ * Re-validate a cached dictionary against its stored schema without re-fetching.
+ * Used by consumers (dashboards, exports) as a last-line guard before rendering.
+ */
+export function validateCache(cache: KoboCache | null): SchemaValidationReport | null {
+  if (!cache) return null;
+  return validateDataDictionary(cache.columns ?? [], cache.fields ?? []);
+}
+
