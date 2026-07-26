@@ -555,6 +555,7 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
           </div>
         </div>
       </DialogContent>
+      <XlsFormVersionsDialog open={versionsOpen} onClose={() => setVersionsOpen(false)} />
     </Dialog>
   );
 };
