@@ -12,7 +12,10 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Search, Rocket, Save, Trash2, PlusCircle } from "lucide-react";
+import { Loader2, Search, Rocket, Save, Trash2, PlusCircle, PlugZap, CheckCircle2, XCircle, AlertTriangle, Eye } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+type TestStep = { step: string; ok: boolean; detail?: string };
 
 // Target columns in public.microplan_entries the admin can map to
 const TARGET_FIELDS: Array<{ key: string; label: string }> = [
