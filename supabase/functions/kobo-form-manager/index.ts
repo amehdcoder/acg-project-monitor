@@ -118,27 +118,76 @@ Deno.serve(async (req) => {
 
     const { action, ...params } = await req.json();
 
-    if (action === "inspect") {
+    // Reusable auth + asset probe. Returns structured diagnostics without throwing.
+    async function probe(server_url: string, form_uid: string, api_token: string) {
+      const steps: Array<{ step: string; ok: boolean; detail?: string }> = [];
+      // Step 1 — auth (whoami)
+      try {
+        const me = await koboFetch(server_url, `/me/?format=json`, api_token);
+        steps.push({ step: "auth", ok: true, detail: `Authenticated as ${me?.username ?? "?"}` });
+      } catch (e) {
+        steps.push({ step: "auth", ok: false, detail: (e as Error).message });
+        return { ok: false, steps, asset: null, fields: [] as any[] };
+      }
+      // Step 2 — asset fetch
+      let asset: any = null;
+      try {
+        asset = await koboFetch(server_url, `/api/v2/assets/${form_uid}/?format=json`, api_token);
+        steps.push({ step: "asset", ok: true, detail: asset?.name ?? form_uid });
+      } catch (e) {
+        steps.push({ step: "asset", ok: false, detail: (e as Error).message });
+        return { ok: false, steps, asset: null, fields: [] as any[] };
+      }
+      // Step 3 — deployment status (informational, non-blocking)
+      steps.push({
+        step: "deployment",
+        ok: Boolean(asset?.has_deployment),
+        detail: asset?.has_deployment
+          ? `Active · ${asset?.deployment__submission_count ?? 0} submissions`
+          : "Not deployed yet (Kobo will not accept submissions until deployed)",
+      });
+      const fields = extractSurveyFields(asset);
+      steps.push({ step: "schema", ok: true, detail: `${fields.length} question(s) discovered` });
+      return { ok: true, steps, asset, fields };
+    }
+
+    if (action === "test_connection" || action === "inspect") {
       const { server_url, form_uid, api_token } = params;
       if (!server_url || !form_uid || !api_token) return j({ error: "Missing server_url/form_uid/api_token" }, 400);
-      const asset = await koboFetch(server_url, `/api/v2/assets/${form_uid}/?format=json`, api_token);
-      const fields = extractSurveyFields(asset);
+      const res = await probe(server_url, form_uid, api_token);
       return j({
-        ok: true,
-        form_title: asset?.name ?? asset?.settings?.title ?? null,
-        deployment_active: Boolean(asset?.has_deployment),
-        submission_count: asset?.deployment__submission_count ?? 0,
-        is_empty: fields.length === 0,
-        fields,
+        ok: res.ok,
+        steps: res.steps,
+        form_title: res.asset?.name ?? res.asset?.settings?.title ?? null,
+        deployment_active: Boolean(res.asset?.has_deployment),
+        submission_count: res.asset?.deployment__submission_count ?? 0,
+        is_empty: res.fields.length === 0,
+        fields: res.fields,
       });
     }
 
     if (action === "deploy") {
-      const { server_url, form_uid, api_token } = params;
+      const { server_url, form_uid, api_token, force } = params;
       if (!server_url || !form_uid || !api_token) return j({ error: "Missing server_url/form_uid/api_token" }, 400);
+      // Safety gate: re-inspect BEFORE writing, refuse if the form already has questions unless force=true
+      const res = await probe(server_url, form_uid, api_token);
+      if (!res.ok) return j({ error: "Pre-deploy check failed", steps: res.steps }, 400);
+      if (!force && res.fields.length > 0) {
+        return j({
+          error: "refused_form_not_empty",
+          detail: `The Kobo form already has ${res.fields.length} question(s). Deploy would overwrite them.`,
+          fields: res.fields,
+          submission_count: res.asset?.deployment__submission_count ?? 0,
+        }, 409);
+      }
+      if (!force && (res.asset?.deployment__submission_count ?? 0) > 0) {
+        return j({
+          error: "refused_has_submissions",
+          detail: `The Kobo form already has ${res.asset?.deployment__submission_count} submissions. Refusing to overwrite.`,
+        }, 409);
+      }
       const xlsx = buildMicroplanXlsxBytes();
       const b64 = btoa(String.fromCharCode(...xlsx));
-      // Try imports API first (preferred for XLS deployment)
       const importRes = await koboFetch(server_url, `/api/v2/imports/`, api_token, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -149,7 +198,6 @@ Deno.serve(async (req) => {
           assetUid: form_uid,
         }),
       });
-      // Try to deploy the asset so it can receive submissions
       try {
         await koboFetch(server_url, `/api/v2/assets/${form_uid}/deployment/`, api_token, {
           method: "POST",
