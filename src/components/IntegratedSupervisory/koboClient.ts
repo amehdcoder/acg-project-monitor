@@ -85,6 +85,15 @@ export interface KoboCache {
   validation?: SchemaValidationReport;         // schema drift report (computed on fetch)
 }
 
+export interface KoboConfig {
+  serverUrl: string;
+  formUid: string;
+  apiToken: string;
+  autoSync?: boolean;
+  pollMinutes?: number;
+}
+
+
 
 export function loadKoboConfig(): KoboConfig | null {
   try { const raw = localStorage.getItem(CONFIG_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
