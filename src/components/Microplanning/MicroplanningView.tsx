@@ -2899,6 +2899,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         onClose={() => { setShowDeleteRequestsPanel(false); fetchEntries(); }}
         isAdmin={isAdmin || isOwner}
       />
+
+      <KoboSyncSettingsDialog
+        open={showKoboSettings}
+        onClose={() => setShowKoboSettings(false)}
+      />
     </div>
   );
 };
