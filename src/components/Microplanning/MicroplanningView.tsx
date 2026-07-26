@@ -1780,17 +1780,34 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
       {!entryOnly && (
         <>
-          {/* Demo Data Banner */}
-          {isUsingDemoData && (
-            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2.5 flex items-center gap-3">
-              <span className="text-lg">🎯</span>
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">Demo Data Preview</p>
-                <p className="text-[10px] text-amber-600 dark:text-amber-400">Showing 20 sample communities across Nigeria. This data will automatically disappear when you add real entries.</p>
+          {/* Demo Data Banner — dynamically reflects the project's state lock */}
+          {isUsingDemoData && (() => {
+            const totalDemo = DEMO_ENTRIES.length;
+            const activeDemo = displayEntries.length;
+            const lockedStates = projectScope?.states ?? [];
+            const noun = activeDemo === 1 ? "community" : "communities";
+            const stateList =
+              lockedStates.length === 0
+                ? ""
+                : lockedStates.length === 1
+                  ? lockedStates[0]
+                  : lockedStates.length === 2
+                    ? `${lockedStates[0]} and ${lockedStates[1]}`
+                    : `${lockedStates.slice(0, -1).join(", ")}, and ${lockedStates[lockedStates.length - 1]}`;
+            const message = lockedStates.length > 0
+              ? `Showing ${activeDemo.toLocaleString()} sample ${noun} in ${stateList} (out of ${totalDemo} total nationwide sample dataset). This data will automatically disappear when you add real entries.`
+              : `Showing ${totalDemo} sample communities across Nigeria. This data will automatically disappear when you add real entries.`;
+            return (
+              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2.5 flex items-center gap-3">
+                <span className="text-lg">🎯</span>
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">Demo Data Preview</p>
+                  <p className="text-[10px] text-amber-600 dark:text-amber-400">{message}</p>
+                </div>
+                <Badge variant="outline" className="border-amber-300 text-amber-700 dark:text-amber-300 text-[10px]">DEMO</Badge>
               </div>
-              <Badge variant="outline" className="border-amber-300 text-amber-700 dark:text-amber-300 text-[10px]">DEMO</Badge>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ===== FIONET-STYLE KPI DASHBOARD ===== */}
           {/* Row 1: Primary colored KPI blocks */}
