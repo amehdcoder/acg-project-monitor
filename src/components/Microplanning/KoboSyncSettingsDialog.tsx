@@ -62,6 +62,25 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
   const [confirmingReset, setConfirmingReset] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [buildingXls, setBuildingXls] = useState(false);
+  const [xlsProgress, setXlsProgress] = useState<BuildProgress | null>(null);
+
+  const handleDownloadXls = async () => {
+    setBuildingXls(true);
+    setXlsProgress({ phase: "states", done: 0, total: 1 });
+    try {
+      await downloadMicroplanningXlsForm((p) => setXlsProgress(p));
+      toast({
+        title: "XLSForm ready",
+        description: "Upload the file to KoboToolbox → New project → Import XLSForm.",
+      });
+    } catch (e: any) {
+      toast({ title: "XLSForm build failed", description: e?.message ?? "Unexpected error", variant: "destructive" });
+    } finally {
+      setBuildingXls(false);
+      setXlsProgress(null);
+    }
+  };
 
   const loadEvents = async () => {
     setLoading(true);
