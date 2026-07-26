@@ -249,6 +249,7 @@ Deno.serve(async (req) => {
     await logEvent({
       status: "failed", error: error.message, kobo_uuid: koboUuid,
       submitted_by_kobo: submittedBy, submitted_at: submittedAt, payload,
+      mapping_version_number: mappingVersion,
     });
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -259,7 +260,9 @@ Deno.serve(async (req) => {
     status: "success", kobo_uuid: koboUuid,
     submitted_by_kobo: submittedBy, submitted_at: submittedAt,
     matched_entry_id: data?.id ?? null, payload,
+    mapping_version_number: mappingVersion,
   });
+
 
   return new Response(
     JSON.stringify({ ok: true, entry_id: data?.id ?? null, idempotency_key: koboUuid }),
