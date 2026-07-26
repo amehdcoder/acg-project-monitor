@@ -666,7 +666,10 @@ Deno.serve(async (req) => {
           fetched_at: new Date().toISOString(),
         });
       } catch (e) {
-        return j({ error: "Kobo fetch failed", detail: (e as Error).message }, 502);
+        if (e instanceof KoboApiError) {
+          return j({ error: "Kobo fetch failed", code: e.code, status: e.status, detail: e.message }, e.code === "auth_failed" ? 401 : e.code === "forbidden" ? 403 : e.code === "not_found" ? 404 : e.code === "rate_limited" ? 429 : e.code === "timeout" ? 504 : 502);
+        }
+        return j({ error: "Kobo fetch failed", code: "server_error", detail: (e as Error).message }, 502);
       }
     }
 
@@ -674,6 +677,10 @@ Deno.serve(async (req) => {
 
   } catch (e) {
     console.error("kobo-form-manager error:", (e as Error).message);
-    return j({ error: (e as Error).message }, 500);
+    if (e instanceof KoboApiError) {
+      return j({ error: e.message, code: e.code, status: e.status }, e.code === "auth_failed" ? 401 : e.code === "forbidden" ? 403 : e.code === "not_found" ? 404 : e.code === "rate_limited" ? 429 : e.code === "timeout" ? 504 : 500);
+    }
+    return j({ error: (e as Error).message, code: "server_error" }, 500);
   }
 });
+
