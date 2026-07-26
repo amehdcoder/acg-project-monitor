@@ -299,11 +299,15 @@ export default function KoboFormConfigPanel() {
                     <Badge variant="secondary">{Object.keys(c.field_mappings ?? {}).length} fields</Badge>
                   </td>
                   <td className="px-2 py-1 text-right space-x-1">
+                    <Button size="sm" variant="ghost" onClick={() => setHistoryOpenFor(c)} title="Mapping history">
+                      <History className="h-3 w-3" />
+                    </Button>
                     <Button size="sm" variant="outline" onClick={() => editConfig(c)}>Edit</Button>
                     <Button size="sm" variant="ghost" onClick={() => deleteConfig(c.id)}>
                       <Trash2 className="h-3 w-3 text-destructive" />
                     </Button>
                   </td>
+
                 </tr>
               ))}
             </tbody>
