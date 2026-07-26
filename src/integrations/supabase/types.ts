@@ -4664,6 +4664,62 @@ export type Database = {
           },
         ]
       }
+      kobo_form_configs: {
+        Row: {
+          api_token: string
+          created_at: string
+          created_by: string | null
+          field_mappings: Json
+          form_status: string
+          form_title: string | null
+          form_uid: string
+          id: string
+          kobo_server_url: string
+          last_deployed_at: string | null
+          last_inspected_at: string | null
+          project_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          api_token: string
+          created_at?: string
+          created_by?: string | null
+          field_mappings?: Json
+          form_status?: string
+          form_title?: string | null
+          form_uid: string
+          id?: string
+          kobo_server_url?: string
+          last_deployed_at?: string | null
+          last_inspected_at?: string | null
+          project_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          api_token?: string
+          created_at?: string
+          created_by?: string | null
+          field_mappings?: Json
+          form_status?: string
+          form_title?: string | null
+          form_uid?: string
+          id?: string
+          kobo_server_url?: string
+          last_deployed_at?: string | null
+          last_inspected_at?: string | null
+          project_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kobo_form_configs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kobo_webhook_events: {
         Row: {
           created_at: string
