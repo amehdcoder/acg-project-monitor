@@ -454,6 +454,169 @@ Deno.serve(async (req) => {
       return j({ ok: true, restored_from: target_version_number, new_version: hist });
     }
 
+    // ---------- Versioned XLSForm history + Kobo upload ----------
+
+    if (action === "list_xlsform_versions") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
+      const { data, error } = await admin
+        .from("microplan_xlsform_versions")
+        .select("id, version_number, changelog, notes, size_bytes, sha256, survey_row_count, choices_row_count, validation_report, kobo_asset_uid, kobo_version_id, kobo_server_url, kobo_deployed_at, is_active, created_by, created_by_email, created_at")
+        .order("version_number", { ascending: false });
+      if (error) throw error;
+      return j({ ok: true, versions: data ?? [] });
+    }
+
+    if (action === "get_xlsform_version") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
+      const { id } = params;
+      if (!id) return j({ error: "Missing id" }, 400);
+      const { data, error } = await admin
+        .from("microplan_xlsform_versions")
+        .select("id, version_number, xlsx_base64, size_bytes, sha256")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return j({ error: "Not found" }, 404);
+      return j({ ok: true, version: data });
+    }
+
+    if (action === "save_xlsform_version") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
+      const { xlsx_base64, changelog, notes, validation_report, sha256, size_bytes, survey_row_count, choices_row_count, set_active } = params;
+      if (!xlsx_base64 || typeof xlsx_base64 !== "string") return j({ error: "Missing xlsx_base64" }, 400);
+      if (xlsx_base64.length > 40 * 1024 * 1024) return j({ error: "XLSForm exceeds 40 MB base64 limit" }, 413);
+
+      const { data: last } = await admin
+        .from("microplan_xlsform_versions")
+        .select("version_number")
+        .order("version_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextVersion = ((last?.version_number as number | undefined) ?? 0) + 1;
+
+      if (set_active) {
+        await admin.from("microplan_xlsform_versions").update({ is_active: false }).eq("is_active", true);
+      }
+
+      const { data, error } = await admin.from("microplan_xlsform_versions").insert({
+        version_number: nextVersion,
+        changelog: changelog || "New XLSForm export",
+        notes: notes || null,
+        xlsx_base64,
+        size_bytes: size_bytes ?? Math.floor((xlsx_base64.length * 3) / 4),
+        sha256: sha256 ?? null,
+        survey_row_count: survey_row_count ?? 0,
+        choices_row_count: choices_row_count ?? 0,
+        validation_report: validation_report ?? {},
+        is_active: Boolean(set_active),
+        created_by: userRes.user.id,
+        created_by_email: userRes.user.email ?? null,
+      }).select("id, version_number, is_active, created_at").maybeSingle();
+      if (error) throw error;
+      return j({ ok: true, version: data });
+    }
+
+    if (action === "rollback_xlsform_version") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
+      const { id } = params;
+      if (!id) return j({ error: "Missing id" }, 400);
+      await admin.from("microplan_xlsform_versions").update({ is_active: false }).eq("is_active", true);
+      const { data, error } = await admin
+        .from("microplan_xlsform_versions")
+        .update({ is_active: true })
+        .eq("id", id)
+        .select("id, version_number")
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return j({ error: "Version not found" }, 404);
+      return j({ ok: true, active_version: data });
+    }
+
+    if (action === "upload_xlsform_to_kobo") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
+      const { server_url, api_token, xlsx_base64, form_uid, asset_name, version_id } = params;
+      if (!server_url || !api_token || !xlsx_base64) {
+        return j({ error: "Missing server_url/api_token/xlsx_base64" }, 400);
+      }
+
+      const importBody: Record<string, unknown> = {
+        base64Encoded: `base64:${xlsx_base64}`,
+        name: asset_name || `amehnities_microplanning_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      };
+      if (form_uid) {
+        importBody.destination = `${stripTrailingSlash(server_url)}/api/v2/assets/${form_uid}/`;
+        importBody.assetUid = form_uid;
+      }
+
+      let importRes: any;
+      try {
+        importRes = await koboFetch(server_url, `/api/v2/imports/`, api_token, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(importBody),
+        });
+      } catch (e) {
+        return j({ error: "Kobo import failed", detail: (e as Error).message }, 502);
+      }
+
+      // Poll import status up to ~15s to confirm the asset was accepted.
+      const importUrl: string | undefined = importRes?.url;
+      let status = importRes?.status ?? "created";
+      let finalAsset: any = null;
+      let finalUid: string | null = form_uid ?? null;
+      const started = Date.now();
+      while (importUrl && Date.now() - started < 15000 && !["complete", "error"].includes(String(status))) {
+        await new Promise((r) => setTimeout(r, 1500));
+        try {
+          const path = importUrl.replace(/^https?:\/\/[^/]+/, "");
+          const poll = await koboFetch(server_url, path, api_token);
+          status = poll?.status ?? status;
+          finalUid = poll?.messages?.updated?.[0]?.uid || poll?.messages?.created?.[0]?.uid || finalUid;
+        } catch { break; }
+      }
+
+      if (finalUid) {
+        try {
+          finalAsset = await koboFetch(server_url, `/api/v2/assets/${finalUid}/?format=json`, api_token);
+        } catch { /* ignore */ }
+        // Best-effort (re)deploy so the asset is live.
+        try {
+          await koboFetch(server_url, `/api/v2/assets/${finalUid}/deployment/`, api_token, {
+            method: finalAsset?.has_deployment ? "PATCH" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ active: true }),
+          });
+        } catch { /* ignore */ }
+      }
+
+      const koboVersionId = finalAsset?.version_id ?? finalAsset?.deployed_version_id ?? null;
+
+      if (version_id) {
+        await admin.from("microplan_xlsform_versions").update({
+          kobo_asset_uid: finalUid,
+          kobo_version_id: koboVersionId,
+          kobo_server_url: server_url,
+          kobo_deployed_at: new Date().toISOString(),
+          kobo_upload_response: { import: importRes, status, asset: finalAsset ? { name: finalAsset.name, uid: finalAsset.uid, version_id: finalAsset.version_id, deployed_version_id: finalAsset.deployed_version_id, has_deployment: finalAsset.has_deployment } : null },
+        }).eq("id", version_id);
+      }
+
+      return j({
+        ok: status !== "error",
+        status,
+        form_uid: finalUid,
+        form_title: finalAsset?.name ?? null,
+        version_id: koboVersionId,
+        submission_count: finalAsset?.deployment__submission_count ?? 0,
+        import: importRes,
+      });
+    }
+
     return j({ error: `Unknown action: ${action}` }, 400);
 
   } catch (e) {
