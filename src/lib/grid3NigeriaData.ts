@@ -348,6 +348,33 @@ export async function prefetchGrid3State(state: string): Promise<void> {
 }
 
 /**
+ * Iterate every entry in a state's shard (facility or settlement), flattened
+ * into `{lga, ward, name, latitude, longitude}` rows. Loads the shard once and
+ * walks it directly — used by the XLSForm exporter to emit the full GRID3
+ * cascaded choice list without O(wards) per-ward calls.
+ */
+export async function getGrid3FullStateEntries(
+  kind: "fac" | "set",
+  state: string,
+): Promise<Array<{ lga: string; ward: string; name: string; latitude: number | null; longitude: number | null }>> {
+  const shard = await loadStateShard(kind, state);
+  const out: Array<{ lga: string; ward: string; name: string; latitude: number | null; longitude: number | null }> = [];
+  for (const [lgaKey, wardMap] of Object.entries(shard)) {
+    const lga = (lgaKey === "Abuja Municipal Area Council" || lgaKey === "Municipal Area Council")
+      ? "Abuja Municipal" : lgaKey;
+    for (const [wardKey, entries] of Object.entries(wardMap)) {
+      const ward = titleCase(wardKey);
+      for (const e of entries) {
+        out.push({ lga, ward, name: e[0], latitude: e[1], longitude: e[2] });
+      }
+    }
+  }
+  return out;
+}
+
+
+
+/**
  * Background boot hydration (call once on app start, only when online).
  * Quietly warms the manifest + state-name index so the very first time a
  * supervisor opens the checklist the State dropdown is already populated with
