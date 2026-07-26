@@ -102,7 +102,7 @@ const KoboSyncSettingsDialog = ({ open, onClose, projectName, projectStates }: P
     setXlsProgress({ phase: "states", done: 0, total: 1 });
     resetPipeline();
     try {
-      const wb = await buildMicroplanningXlsForm((p) => setXlsProgress(p));
+      const wb = await buildMicroplanningXlsForm((p) => setXlsProgress(p), { projectName, projectStates });
       const r = validateMicroplanningXlsForm(wb);
       setWorkbook(wb);
       setReport(r);
