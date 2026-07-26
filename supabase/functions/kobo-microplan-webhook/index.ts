@@ -39,19 +39,21 @@ function decodeBasic(header: string): string | null {
   }
 }
 
-function checkAuth(req: Request, secret: string): boolean {
+function checkAuth(req: Request, secrets: string[]): boolean {
+  const valid = new Set(secrets.filter(Boolean));
+  if (valid.size === 0) return false;
   const custom = req.headers.get("x-kobo-secret");
-  if (custom && custom === secret) return true;
+  if (custom && valid.has(custom)) return true;
   const auth = req.headers.get("authorization") ?? "";
   if (!auth) return false;
   if (/^Bearer\s+/i.test(auth)) {
-    return auth.replace(/^Bearer\s+/i, "").trim() === secret;
+    return valid.has(auth.replace(/^Bearer\s+/i, "").trim());
   }
   if (/^Basic\s+/i.test(auth)) {
     const pwd = decodeBasic(auth);
-    return pwd === secret;
+    return pwd != null && valid.has(pwd);
   }
-  return auth === secret;
+  return valid.has(auth);
 }
 
 function getFlat(obj: Record<string, unknown>, key: string): unknown {
