@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { Copy, Download, Eye, EyeOff, Link2, Loader2, RefreshCw, RotateCw, Webhook } from "lucide-react";
-import * as XLSX from "xlsx";
+import { downloadMicroplanningXlsForm, type BuildProgress } from "@/lib/microplanning/xlsformBuilder";
 import KoboFormConfigPanel from "./KoboFormConfigPanel";
 
 interface Props {
@@ -47,42 +47,11 @@ const copy = async (text: string, label: string) => {
   }
 };
 
-const downloadXlsFormTemplate = () => {
-  const survey = [
-    ["type", "name", "label", "required", "appearance", "choice_filter"],
-    ["start", "start", "", "", "", ""],
-    ["end", "end", "", "", "", ""],
-    ["today", "today", "", "", "", ""],
-    ["deviceid", "deviceid", "", "", "", ""],
-    ["text", "project_id", "Amehnities Project ID", "yes", "", ""],
-    ["select_one states", "state", "State", "yes", "", ""],
-    ["select_one lgas", "lga", "LGA", "yes", "", "state=${state}"],
-    ["select_one wards", "ward", "Ward", "yes", "", "lga=${lga}"],
-    ["select_one flhfs_or_other", "flhf_name", "FLHF", "yes", "", "ward=${ward}"],
-    ["text", "flhf_custom", "Other FLHF (specify)", "", "", "${flhf_name} = 'other'"],
-    ["select_one communities_or_other", "community", "Community", "yes", "", "flhf=${flhf_name}"],
-    ["text", "community_custom", "Other Community (specify)", "", "", "${community} = 'other'"],
-    ["select_one settlements_or_other", "settlement", "Settlement", "", "", "community=${community}"],
-    ["text", "settlement_custom", "Other Settlement (specify)", "", "", "${settlement} = 'other'"],
-    ["geopoint", "community_gps", "Community GPS", "yes", "", ""],
-    ["note", "hint", "Ensure all cascading choices load before submission.", "", "", ""],
-  ];
-  const choices = [
-    ["list_name", "name", "label"],
-    ["flhfs_or_other", "other", "Other (specify manually)"],
-    ["communities_or_other", "other", "Other (specify manually)"],
-    ["settlements_or_other", "other", "Other (specify manually)"],
-  ];
-  const settings = [
-    ["form_title", "form_id", "version"],
-    ["Amehnities Microplanning (Kobo)", "amehnities_microplanning", new Date().toISOString().slice(0, 10).replace(/-/g, "")],
-  ];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(survey), "survey");
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(choices), "choices");
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(settings), "settings");
-  XLSX.writeFile(wb, "microplanning_xlsform.xlsx");
-};
+// XLSForm builder moved to `@/lib/microplanning/xlsformBuilder` — it emits a
+// full-fidelity XLSForm mirroring MicroplanEntryForm.tsx (cascaded GRID3
+// choices with GPS coordinates, "Other" manual entry, skip logic, distance
+// calculations and validations).
+
 
 const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
   const [showSecret, setShowSecret] = useState(false);
@@ -93,6 +62,25 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
   const [confirmingReset, setConfirmingReset] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [buildingXls, setBuildingXls] = useState(false);
+  const [xlsProgress, setXlsProgress] = useState<BuildProgress | null>(null);
+
+  const handleDownloadXls = async () => {
+    setBuildingXls(true);
+    setXlsProgress({ phase: "states", done: 0, total: 1 });
+    try {
+      await downloadMicroplanningXlsForm((p) => setXlsProgress(p));
+      toast({
+        title: "XLSForm ready",
+        description: "Upload the file to KoboToolbox → New project → Import XLSForm.",
+      });
+    } catch (e: any) {
+      toast({ title: "XLSForm build failed", description: e?.message ?? "Unexpected error", variant: "destructive" });
+    } finally {
+      setBuildingXls(false);
+      setXlsProgress(null);
+    }
+  };
 
   const loadEvents = async () => {
     setLoading(true);
@@ -304,21 +292,38 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
           <KoboFormConfigPanel />
 
 
-          {/* XLSForm template */}
+          {/* Complete XLSForm — full-fidelity mirror of the Geo-enabled Microplanning entry form */}
           <div className="border rounded-lg p-3 space-y-2 bg-card">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-xs font-semibold">
-                <Download className="h-4 w-4 text-primary" /> XLSForm Hierarchy Template
+                <Download className="h-4 w-4 text-primary" /> Complete XLSForm — Geo-enabled Microplanning
               </div>
-              <Button size="sm" variant="outline" onClick={downloadXlsFormTemplate}>
-                <Download className="h-3.5 w-3.5 mr-1" /> Download template
+              <Button size="sm" variant="default" onClick={handleDownloadXls} disabled={buildingXls}>
+                {buildingXls ? (
+                  <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Building…</>
+                ) : (
+                  <><Download className="h-3.5 w-3.5 mr-1.5" /> Download XLSForm (.xlsx)</>
+                )}
               </Button>
             </div>
-            <p className="text-[10px] text-muted-foreground">
-              Pre-configured with cascading State → LGA → Ward → FLHF → Community choices and <code>or_other</code>-style
-              manual entry for FLHFs, Communities, and Settlements.
+            <p className="text-[10px] text-muted-foreground leading-relaxed">
+              Ready-to-upload XLSForm mirroring every field, skip logic, calculation and validation of the
+              Geo-enabled Microplanning entry form. Includes the <b>complete GRID3 cascade</b> (State → LGA → Ward →
+              FLHF → Community → Settlement) with pre-loaded <b>GPS coordinates</b>, in-field <b>GPS override</b>,
+              and <b>“Other (specify manually)”</b> free-text entry for FLHFs, Communities and Settlements not in
+              GRID3. Upload in KoboToolbox → <b>New project → Import an XLSForm</b>.
             </p>
+            {buildingXls && xlsProgress && (
+              <div className="text-[10px] text-primary font-medium">
+                {xlsProgress.phase === "states" && `Preparing admin cascade… ${xlsProgress.done}/${xlsProgress.total} states`}
+                {xlsProgress.phase === "flhfs" && `Packing GRID3 FLHFs… ${xlsProgress.done}/${xlsProgress.total} states`}
+                {xlsProgress.phase === "communities" && `Packing GRID3 Communities & Settlements… ${xlsProgress.done}/${xlsProgress.total} states`}
+                {xlsProgress.phase === "assemble" && "Assembling workbook…"}
+                {xlsProgress.phase === "done" && "Finalising…"}
+              </div>
+            )}
           </div>
+
 
           {/* Sync log */}
           <div className="border rounded-lg p-3 space-y-2 bg-card">
