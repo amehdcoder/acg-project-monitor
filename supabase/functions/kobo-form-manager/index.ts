@@ -30,24 +30,51 @@ const j = (body: unknown, status = 200) =>
 
 const stripTrailingSlash = (u: string) => u.replace(/\/+$/, "");
 
-async function koboFetch(server: string, path: string, token: string, init: RequestInit = {}) {
+export type KoboErrCode =
+  | "auth_failed" | "forbidden" | "not_found" | "rate_limited"
+  | "timeout" | "network" | "server_error" | "bad_response";
+
+class KoboApiError extends Error {
+  code: KoboErrCode; status: number; detail: unknown;
+  constructor(code: KoboErrCode, status: number, message: string, detail?: unknown) {
+    super(message); this.name = "KoboApiError"; this.code = code; this.status = status; this.detail = detail;
+  }
+}
+
+const codeForStatus = (s: number): KoboErrCode =>
+  s === 401 ? "auth_failed" :
+  s === 403 ? "forbidden" :
+  s === 404 ? "not_found" :
+  s === 429 ? "rate_limited" :
+  s >= 500 ? "server_error" : "bad_response";
+
+async function koboFetch(server: string, path: string, token: string, init: RequestInit = {}, timeoutMs = 20_000) {
   const url = `${stripTrailingSlash(server)}${path}`;
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      Authorization: `Token ${token}`,
-      Accept: "application/json",
-      ...(init.headers ?? {}),
-    },
-  });
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...init,
+      signal: ctrl.signal,
+      headers: { Authorization: `Token ${token}`, Accept: "application/json", ...(init.headers ?? {}) },
+    });
+  } catch (e) {
+    clearTimeout(t);
+    const aborted = (e as Error)?.name === "AbortError";
+    throw new KoboApiError(aborted ? "timeout" : "network", 0,
+      aborted ? `Kobo request timed out after ${Math.round(timeoutMs/1000)}s` : `Network error contacting Kobo: ${(e as Error).message}`);
+  } finally { clearTimeout(t); }
   const text = await res.text();
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
   if (!res.ok) {
-    throw new Error(`Kobo ${res.status}: ${typeof data === "string" ? data : (data?.detail ?? JSON.stringify(data))}`);
+    const detailMsg = typeof data === "string" ? data : (data?.detail ?? JSON.stringify(data));
+    throw new KoboApiError(codeForStatus(res.status), res.status, `Kobo ${res.status}: ${detailMsg}`, data);
   }
   return data;
 }
+
 
 // Microplanning XLSForm template (same schema as client-side download)
 function buildMicroplanXlsxBytes(): Uint8Array {
