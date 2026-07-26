@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { Copy, Download, Eye, EyeOff, Link2, Loader2, RefreshCw, Webhook } from "lucide-react";
 import * as XLSX from "xlsx";
+import KoboFormConfigPanel from "./KoboFormConfigPanel";
 
 interface Props {
   open: boolean;
