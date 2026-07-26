@@ -12,8 +12,11 @@ import {
   FileSpreadsheet, Filter, Grid3x3, Lightbulb, MapPin, MoreVertical, RefreshCw, Search, Star, Users,
 } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import type { KoboCache } from "./koboClient";
+import { toast } from "sonner";
+import { AlertTriangle } from "lucide-react";
+import { validateCache, type KoboCache } from "./koboClient";
 import { buildDataDictionary, typeIcon, type KoboColumn } from "./koboSchema";
+
 
 type StatusKey = "approved" | "flagged" | "pending";
 
