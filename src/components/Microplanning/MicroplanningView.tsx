@@ -445,6 +445,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [showAccessManager, setShowAccessManager] = useState(false);
   const [deleteRequestTarget, setDeleteRequestTarget] = useState<{ id: string; label?: string; projectId?: string | null } | null>(null);
   const [showDeleteRequestsPanel, setShowDeleteRequestsPanel] = useState(false);
+  const [showKoboSettings, setShowKoboSettings] = useState(false);
   const [showDesignationManager, setShowDesignationManager] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [allUsers, setAllUsers] = useState<any[]>([]);
