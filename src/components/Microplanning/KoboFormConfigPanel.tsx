@@ -199,7 +199,7 @@ export default function KoboFormConfigPanel() {
     setSaving(true);
     try {
       const cleanMapping = Object.fromEntries(Object.entries(mapping).filter(([, v]) => v));
-      await invoke({
+      const res: any = await invoke({
         action: "save_config",
         id: editingId,
         server_url: server.trim(),
@@ -210,6 +210,20 @@ export default function KoboFormConfigPanel() {
         field_mappings: cleanMapping,
         form_status: isEmpty ? "deployed" : "existing",
       });
+      // Log a mapping version snapshot for the audit trail
+      const savedId = res?.config?.id ?? editingId;
+      if (savedId) {
+        try {
+          await invoke({
+            action: "save_mapping_version",
+            config_id: savedId,
+            field_mappings: cleanMapping,
+            change_summary: editingId ? "Manual mapping update" : "Initial mapping",
+          });
+        } catch (histErr: any) {
+          console.warn("[Kobo] mapping version snapshot failed:", histErr?.message);
+        }
+      }
       toast({ title: "Configuration saved" });
       resetDraft();
       await loadAll();
@@ -219,6 +233,7 @@ export default function KoboFormConfigPanel() {
       setSaving(false);
     }
   };
+
 
   const deleteConfig = async (id: string) => {
     if (!confirm("Delete this Kobo form configuration?")) return;
