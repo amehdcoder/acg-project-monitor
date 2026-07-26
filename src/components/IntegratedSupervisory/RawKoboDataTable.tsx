@@ -185,7 +185,7 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
 
   const fmtInt = (n: number) => n.toLocaleString();
   const fmtPct = (n: number) => `${n.toFixed(1)}%`;
-  const lastSync = cache?.syncedAt ? new Date(cache.syncedAt) : null;
+  const lastSync = cache?.fetchedAt ? new Date(cache.syncedAt) : null;
   const lastSyncStr = lastSync
     ? lastSync.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
     : "—";
