@@ -158,10 +158,16 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
               </Button>
             </div>
             <p className="text-[10px] text-muted-foreground">
-              In KoboToolbox → Project → Settings → REST Services, add this URL and set a custom header{" "}
-              <code className="px-1 bg-muted rounded">x-kobo-secret</code> with the webhook secret below.
+              In KoboToolbox → Project → Settings → REST Services, paste this URL into <b>Endpoint URL</b>,
+              set <b>Type = JSON</b>, tick <b>Enabled</b>, and authenticate the webhook using either:
+              (a) <b>Security = Basic Authorization</b> with any username and the webhook secret below as the password,
+              or (b) leave <b>Security = No Authorization</b> and add a <b>Custom HTTP Header</b>{" "}
+              <code className="px-1 bg-muted rounded">x-kobo-secret</code> with the secret as its value.
             </p>
           </div>
+
+          {/* Form Configurations & Mapping */}
+          <KoboFormConfigPanel />
 
           {/* Secret */}
           <div className="border rounded-lg p-3 space-y-2 bg-card">
