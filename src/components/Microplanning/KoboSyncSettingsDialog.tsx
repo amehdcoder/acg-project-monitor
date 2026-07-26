@@ -166,6 +166,76 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+          {/* Webhook Authorization Credentials — prominent */}
+          <div className="border-2 border-primary/40 rounded-lg p-4 space-y-3 bg-primary/5">
+            <div className="flex items-center gap-2 text-sm font-bold text-primary">
+              <Webhook className="h-5 w-5" /> Webhook Authorization Credentials
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold">
+                Webhook Secret Key (<code className="px-1 bg-muted rounded text-[10px]">x-kobo-secret</code>)
+              </label>
+              <div className="flex gap-2 items-center">
+                <Input
+                  readOnly
+                  type={showSecret ? "text" : "password"}
+                  value={
+                    loadingSecret
+                      ? "Loading secret key..."
+                      : secretError
+                        ? `⚠ ${secretError}`
+                        : (secret ?? WEBHOOK_SECRET_HINT)
+                  }
+                  className="font-mono text-xs"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowSecret((s) => !s)}
+                  disabled={loadingSecret || !secret}
+                  title={showSecret ? "Hide" : "Show"}
+                >
+                  {loadingSecret ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : showSecret ? (
+                    <EyeOff className="h-3.5 w-3.5" />
+                  ) : (
+                    <Eye className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={copySecret}
+                  disabled={loadingSecret || !secret}
+                  className="whitespace-nowrap"
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy Secret Key
+                </Button>
+              </div>
+              {secretError && (
+                <div className="flex items-center justify-between text-[11px] text-destructive">
+                  <span>{secretError}</span>
+                  <Button size="sm" variant="ghost" onClick={fetchSecret}>Retry</Button>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-md border bg-background/60 p-2.5 text-[11px] space-y-1.5">
+              <div className="font-semibold text-foreground">Where to paste this in KoboToolbox (kf.kobotoolbox.org):</div>
+              <div>
+                <b>Option 1 · Custom HTTP Header</b> — Set <b>Header Name</b> to{" "}
+                <code className="px-1 bg-muted rounded">x-kobo-secret</code> and{" "}
+                <b>Header Value</b> to your copied secret key.
+              </div>
+              <div>
+                <b>Option 2 · Basic Authorization</b> — Set <b>Username</b> to{" "}
+                <code className="px-1 bg-muted rounded">kobo</code> and{" "}
+                <b>Password</b> to your copied secret key.
+              </div>
+            </div>
+          </div>
+
           {/* Webhook URL */}
           <div className="border rounded-lg p-3 space-y-2 bg-card">
             <div className="flex items-center gap-2 text-xs font-semibold">
@@ -179,32 +249,13 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
             </div>
             <p className="text-[10px] text-muted-foreground">
               In KoboToolbox → Project → Settings → REST Services, paste this URL into <b>Endpoint URL</b>,
-              set <b>Type = JSON</b>, tick <b>Enabled</b>, and authenticate the webhook using either:
-              (a) <b>Security = Basic Authorization</b> with any username and the webhook secret below as the password,
-              or (b) leave <b>Security = No Authorization</b> and add a <b>Custom HTTP Header</b>{" "}
-              <code className="px-1 bg-muted rounded">x-kobo-secret</code> with the secret as its value.
+              set <b>Type = JSON</b>, tick <b>Enabled</b>, and authenticate using either option shown above.
             </p>
           </div>
 
           {/* Form Configurations & Mapping */}
           <KoboFormConfigPanel />
 
-          {/* Secret */}
-          <div className="border rounded-lg p-3 space-y-2 bg-card">
-            <div className="flex items-center gap-2 text-xs font-semibold">
-              <Webhook className="h-4 w-4 text-primary" /> Webhook Secret
-            </div>
-            <div className="flex gap-2 items-center">
-              <Input readOnly type={showSecret ? "text" : "password"} value={secret ?? WEBHOOK_SECRET_HINT} className="font-mono text-xs" />
-              <Button size="sm" variant="outline" onClick={revealSecret} disabled={loadingSecret}>
-                {showSecret ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-              </Button>
-            </div>
-            <p className="text-[10px] text-muted-foreground">
-              Secret <code className="px-1 bg-muted rounded">KOBO_WEBHOOK_SECRET</code> lives only in the edge function.
-              To rotate it, regenerate the secret in project settings — the value is never exposed to the browser.
-            </p>
-          </div>
 
           {/* XLSForm template */}
           <div className="border rounded-lg p-3 space-y-2 bg-card">
