@@ -385,32 +385,45 @@ export async function buildMicroplanningXlsForm(
   // ─── CHOICES ───────────────────────────────────────────────────────────
   const choices: Row[] = [CHOICES_HEADER as unknown as Row];
 
-  choices.push(ch({ list_name: "yes_no", name: "yes", label: "Yes" }));
-  choices.push(ch({ list_name: "yes_no", name: "no", label: "No" }));
+  // Global (list_name, name) dedup gate — every push goes through this to
+  // guarantee PyXForm never sees "name appears more than once in list …".
+  const choiceKeys = new Set<string>();
+  const pushChoice = (row: Partial<Record<(typeof CHOICES_HEADER)[number], string | number>>) => {
+    const list = String(row.list_name ?? "");
+    const name = String(row.name ?? "");
+    if (!list || !name) return;
+    const key = `${list}\u0001${name}`;
+    if (choiceKeys.has(key)) return;
+    choiceKeys.add(key);
+    choices.push(ch(row));
+  };
+
+  pushChoice({ list_name: "yes_no", name: "yes", label: "Yes" });
+  pushChoice({ list_name: "yes_no", name: "no", label: "No" });
 
   for (const [n, l] of [
     ["ntd", "NTD (MDA)"], ["polio", "Polio (SIA)"], ["malaria", "Malaria (ITN/IRS)"],
     ["routine_immunization", "Routine Immunization"], ["covid19", "COVID-19 Vaccination"],
     ["nutrition", "Nutrition"], ["other", "Other"],
-  ]) choices.push(ch({ list_name: "campaign_type", name: n, label: l }));
+  ]) pushChoice({ list_name: "campaign_type", name: n, label: l });
 
   for (const [n, l] of [
     ["census", "National Census"], ["projected", "Census Projection"],
     ["community_leader", "Community Leader Estimate"], ["health_facility", "Health Facility Records"],
     ["household_listing", "Household Listing"], ["survey", "Survey/Study"], ["other", "Other"],
-  ]) choices.push(ch({ list_name: "population_source", name: n, label: l }));
+  ]) pushChoice({ list_name: "population_source", name: n, label: l });
 
   for (const [n, l] of [
     ["flat", "Flat"], ["hilly", "Hilly"], ["mountainous", "Mountainous"],
     ["riverine", "Riverine"], ["swampy", "Swampy"], ["desert", "Desert"], ["forest", "Forest"],
-  ]) choices.push(ch({ list_name: "terrain_type", name: n, label: l }));
+  ]) pushChoice({ list_name: "terrain_type", name: n, label: l });
   for (const [n, l] of [
     ["accessible", "Accessible"], ["hard_to_reach", "Hard to Reach"],
     ["inaccessible", "Inaccessible"], ["seasonal", "Seasonal Access"],
-  ]) choices.push(ch({ list_name: "accessibility", name: n, label: l }));
+  ]) pushChoice({ list_name: "accessibility", name: n, label: l });
   for (const [n, l] of [
     ["cleared", "Cleared"], ["partial", "Partial"], ["not_cleared", "Not Cleared"], ["unknown", "Unknown"],
-  ]) choices.push(ch({ list_name: "security_clearance", name: n, label: l }));
+  ]) pushChoice({ list_name: "security_clearance", name: n, label: l });
 
   // ── GRID3 cascade — SCOPED to project states ──
   const allStates = getAllStates();
@@ -418,30 +431,41 @@ export async function buildMicroplanningXlsForm(
     ? allStates.filter((s) => scopedStates.includes(s))
     : allStates;
 
-  const stateNameById = new Map<string, string>();
-  const lgaNameById = new Map<string, string>();
-  const wardNameById = new Map<string, string>();
+  // Composite-key → sanitized id maps guarantee we only ever assign ONE id per
+  // real-world (state, lga, ward, flhf, community) tuple, even when GRID3
+  // returns the same admin unit across many rows.
+  const stateNameById = new Map<string, string>();      // state → sid
+  const lgaNameById = new Map<string, string>();        // `${state}||${lga}` → lid
+  const wardNameById = new Map<string, string>();       // `${state}||${lga}||${ward}` → wid
+  const flhfIdByKey = new Map<string, string>();        // `${wid}||${slug}` → id
+  const communityIdByKey = new Map<string, string>();   // `${wid}||${slug}` → id
+  const settlementIdByKey = new Map<string, string>();  // `${cid}||${slug}` → id
 
   onProgress?.({ phase: "states", done: 0, total: targetStates.length });
   targetStates.forEach((s) => {
     const id = sanitize(s);
     stateNameById.set(s, id);
-    // Only emit `states` list rows when we're actually rendering a state picker.
-    if (!singleState) choices.push(ch({ list_name: "states", name: id, label: s }));
+    if (!singleState) pushChoice({ list_name: "states", name: id, label: s });
   });
 
   targetStates.forEach((s, i) => {
     const sid = stateNameById.get(s)!;
     for (const lga of getLGAsForState(s)) {
-      // LGAs need to be unique across the entire `lgas` list, so we prefix by
-      // state — but the choice_filter no longer references state.
-      const lid = `${sid}__${sanitize(lga)}`.slice(0, 60);
-      lgaNameById.set(`${s}||${lga}`, lid);
-      choices.push(ch({ list_name: "lgas", name: lid, label: lga }));
+      const lgaKey = `${s}||${lga}`;
+      let lid = lgaNameById.get(lgaKey);
+      if (!lid) {
+        lid = `${sid}__${sanitize(lga)}`.slice(0, 60);
+        lgaNameById.set(lgaKey, lid);
+      }
+      pushChoice({ list_name: "lgas", name: lid, label: lga });
       for (const ward of getWardsForLGA(s, lga)) {
-        const wid = sanitize(`${lid}__${sanitize(ward)}`);
-        wardNameById.set(`${s}||${lga}||${ward}`, wid);
-        choices.push(ch({ list_name: "wards", name: wid, label: ward, lga: lid }));
+        const wardKey = `${s}||${lga}||${ward}`;
+        let wid = wardNameById.get(wardKey);
+        if (!wid) {
+          wid = sanitize(`${lid}__${sanitize(ward)}`);
+          wardNameById.set(wardKey, wid);
+        }
+        pushChoice({ list_name: "wards", name: wid, label: ward, lga: lid });
       }
     }
     onProgress?.({ phase: "states", done: i + 1, total: targetStates.length });
@@ -454,98 +478,93 @@ export async function buildMicroplanningXlsForm(
     if (!lid) {
       lid = `${sid}__${sanitize(lga)}`.slice(0, 60);
       lgaNameById.set(lgaKey, lid);
-      choices.push(ch({ list_name: "lgas", name: lid, label: lga }));
+      pushChoice({ list_name: "lgas", name: lid, label: lga });
     }
     const wardKey = `${state}||${lga}||${ward}`;
     let wid = wardNameById.get(wardKey);
     if (!wid) {
       wid = sanitize(`${lid}__${sanitize(ward)}`);
       wardNameById.set(wardKey, wid);
-      choices.push(ch({ list_name: "wards", name: wid, label: ward, lga: lid }));
+      pushChoice({ list_name: "wards", name: wid, label: ward, lga: lid });
     }
     return { lid, wid };
   };
 
-  // FLHFs
-  const flhfSeen = new Set<string>();
-  const flhfIdByKey = new Map<string, string>(); // ward|name → flhf id (for settlement→flhf reverse lookup, if ever needed)
-  choices.push(ch({ list_name: "flhfs", name: "__other__", label: "Other (specify manually)" }));
+  // FLHFs — dedup by (ward, sanitized-name)
+  pushChoice({ list_name: "flhfs", name: "__other__", label: "Other (specify manually)" });
   for (let i = 0; i < targetStates.length; i++) {
     const s = targetStates[i];
     onProgress?.({ phase: "flhfs", done: i, total: targetStates.length });
     let entries: Awaited<ReturnType<typeof getGrid3FullStateEntries>> = [];
     try { entries = await getGrid3FullStateEntries("fac", s); } catch { entries = []; }
-    let idx = 0;
     for (const e of entries) {
       const { wid } = resolveWardId(s, e.lga, e.ward);
-      const base = sanitize(`${wid}__f_${sanitize(e.name)}`);
-      let id = base;
-      while (flhfSeen.has(id)) { idx += 1; id = sanitize(`${base}_${idx}`); }
-      flhfSeen.add(id);
-      flhfIdByKey.set(`${wid}||${sanitize(e.name)}`, id);
-      choices.push(ch({
+      const slug = sanitize(e.name);
+      const key = `${wid}||${slug}`;
+      if (flhfIdByKey.has(key)) continue;
+      const id = sanitize(`${wid}__f_${slug}`);
+      flhfIdByKey.set(key, id);
+      pushChoice({
         list_name: "flhfs", name: id, label: e.name,
         ward: wid,
         lat: e.latitude ?? "", lng: e.longitude ?? "",
-      }));
+      });
     }
   }
   onProgress?.({ phase: "flhfs", done: targetStates.length, total: targetStates.length });
 
-  // Communities & Settlements
-  const commSeen = new Set<string>();
-  const setSeen = new Set<string>();
-  choices.push(ch({ list_name: "communities", name: "__other__", label: "Other (specify manually)" }));
-  choices.push(ch({ list_name: "settlements", name: "__other__", label: "Other (specify manually)" }));
+  // Communities & Settlements — dedup community by (ward, slug) so multiple
+  // settlement rows sharing the same parent community reuse the SAME id.
+  pushChoice({ list_name: "communities", name: "__other__", label: "Other (specify manually)" });
+  pushChoice({ list_name: "settlements", name: "__other__", label: "Other (specify manually)" });
   for (let i = 0; i < targetStates.length; i++) {
     const s = targetStates[i];
     onProgress?.({ phase: "communities", done: i, total: targetStates.length });
     let entries: Awaited<ReturnType<typeof getGrid3FullStateEntries>> = [];
     try { entries = await getGrid3FullStateEntries("set", s); } catch { entries = []; }
-    let cIdx = 0, sIdx = 0;
     for (const e of entries) {
       const { wid } = resolveWardId(s, e.lga, e.ward);
-      const nameSlug = sanitize(e.name);
-      // Community — parent is the ward
-      const cBase = sanitize(`${wid}__c_${nameSlug}`);
-      let cId = cBase;
-      while (commSeen.has(cId)) { cIdx += 1; cId = sanitize(`${cBase}_${cIdx}`); }
-      commSeen.add(cId);
-      choices.push(ch({
-        list_name: "communities", name: cId, label: e.name,
-        ward: wid,
-        lat: e.latitude ?? "", lng: e.longitude ?? "",
-      }));
-
-      // Settlement — parented to community when the entry looks like a
-      // sub-item; otherwise ward-scoped. Unique id derived from parent chain.
-      const xBase = sanitize(`${cId}__s_${nameSlug}`);
-      let xId = xBase;
-      while (setSeen.has(xId)) { sIdx += 1; xId = sanitize(`${xBase}_${sIdx}`); }
-      setSeen.add(xId);
-      choices.push(ch({
+      const slug = sanitize(e.name);
+      const cKey = `${wid}||${slug}`;
+      let cId = communityIdByKey.get(cKey);
+      if (!cId) {
+        cId = sanitize(`${wid}__c_${slug}`);
+        communityIdByKey.set(cKey, cId);
+        pushChoice({
+          list_name: "communities", name: cId, label: e.name,
+          ward: wid,
+          lat: e.latitude ?? "", lng: e.longitude ?? "",
+        });
+      }
+      const sKey = `${cId}||${slug}`;
+      if (settlementIdByKey.has(sKey)) continue;
+      const xId = sanitize(`${cId}__s_${slug}`);
+      settlementIdByKey.set(sKey, xId);
+      pushChoice({
         list_name: "settlements", name: xId, label: e.name,
         ward: wid, community: cId,
         lat: e.latitude ?? "", lng: e.longitude ?? "",
-      }));
+      });
     }
   }
   onProgress?.({ phase: "communities", done: targetStates.length, total: targetStates.length });
 
   // ─── SETTINGS ──────────────────────────────────────────────────────────
   onProgress?.({ phase: "assemble", done: 0, total: 1 });
+  // YYYYMMDDHHmm (12 chars) — matches request spec.
   const versionStamp = versionInt != null
     ? String(versionInt)
-    : new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 14); // yyyymmddhhmmss
-  const projectSlug = sanitize(projectName || "amehnities");
+    : new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 12);
   const formTitle = projectName
-    ? `${projectName} — Geo-enabled Microplanning`
-    : "Amehnities — Geo-enabled Microplanning Entry";
-  const formId = sanitize(`${projectSlug}_microplan_v${versionStamp}`);
+    ? `${projectName} — Geo Microplanning`
+    : "Geo Microplanning";
+  // Canonical stable form_id so Kobo overwrites the same asset on re-upload.
+  const formId = "amehnities_geo_microplanning";
   const settings: Row[] = [
     SETTINGS_HEADER as unknown as Row,
-    [formTitle, formId, versionStamp, "English (en)", "pages"],
+    [formTitle, formId, versionStamp, "English (en)", "pages", "yes"],
   ];
+
 
   const wb = XLSX.utils.book_new();
   const surveySheet = XLSX.utils.aoa_to_sheet(survey);
