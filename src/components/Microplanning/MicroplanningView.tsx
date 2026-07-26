@@ -2920,6 +2920,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       <KoboSyncSettingsDialog
         open={showKoboSettings}
         onClose={() => setShowKoboSettings(false)}
+        projectName={projects.find(p => p.id === selectedProjectId)?.name ?? null}
+        projectStates={projectScope?.states ?? []}
       />
     </div>
   );

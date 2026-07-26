@@ -27,6 +27,8 @@ import type * as XLSX from "xlsx";
 interface Props {
   open: boolean;
   onClose: () => void;
+  projectName?: string | null;
+  projectStates?: string[] | null;
 }
 
 interface EventRow {
@@ -63,7 +65,7 @@ const copy = async (text: string, label: string) => {
 // calculations and validations).
 
 
-const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
+const KoboSyncSettingsDialog = ({ open, onClose, projectName, projectStates }: Props) => {
   const [showSecret, setShowSecret] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
   const [secretError, setSecretError] = useState<string | null>(null);
@@ -100,7 +102,7 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
     setXlsProgress({ phase: "states", done: 0, total: 1 });
     resetPipeline();
     try {
-      const wb = await buildMicroplanningXlsForm((p) => setXlsProgress(p));
+      const wb = await buildMicroplanningXlsForm((p) => setXlsProgress(p), { projectName, projectStates });
       const r = validateMicroplanningXlsForm(wb);
       setWorkbook(wb);
       setReport(r);

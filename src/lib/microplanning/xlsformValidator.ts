@@ -203,6 +203,8 @@ export function validateMicroplanningXlsForm(wb: XLSX.WorkBook): ValidationRepor
   // ---- Choices sheet ----
   const listMembers = new Map<string, number>();
   const listDupCheck = new Map<string, Set<string>>();
+  // Invalid XML 1.0 control chars (except \t \n \r) are rejected by PyXForm.
+  const INVALID_XML_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F]/;
   choices.forEach((row, idx) => {
     const excelRow = idx + 2;
     const list = (row.list_name || "").trim();
@@ -214,13 +216,19 @@ export function validateMicroplanningXlsForm(wb: XLSX.WorkBook): ValidationRepor
     else if (!NAME_RE.test(name) && !/^__[a-z0-9_]+__$/i.test(name)) {
       warn("choices_invalid_name", `choices row ${excelRow}: name "${name}" is unusual — Kobo prefers letters/digits/underscores.`, { sheet: "choices", row: excelRow });
     }
+    if (name && INVALID_XML_RE.test(name)) {
+      err("choices_invalid_xml_char", `choices row ${excelRow}: name "${name}" contains an invalid XML control character.`, { sheet: "choices", row: excelRow });
+    }
+    if (label && INVALID_XML_RE.test(label)) {
+      err("choices_invalid_xml_char_label", `choices row ${excelRow}: label contains an invalid XML control character.`, { sheet: "choices", row: excelRow });
+    }
     if (!label) warn("choices_missing_label", `choices row ${excelRow}: label is empty.`, { sheet: "choices", row: excelRow });
     if (list) {
       listMembers.set(list, (listMembers.get(list) ?? 0) + 1);
       let set = listDupCheck.get(list);
       if (!set) { set = new Set(); listDupCheck.set(list, set); }
       if (name && set.has(name)) {
-        err("choices_duplicate", `choices row ${excelRow}: name "${name}" appears more than once in list "${list}".`, { sheet: "choices", row: excelRow });
+        err("choices_duplicate", `choices row ${excelRow}: (list_name="${list}", name="${name}") is duplicated.`, { sheet: "choices", row: excelRow });
       } else if (name) set.add(name);
     }
   });
