@@ -4664,6 +4664,60 @@ export type Database = {
           },
         ]
       }
+      kobo_webhook_events: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          kobo_uuid: string | null
+          matched_entry_id: string | null
+          payload: Json
+          source: string
+          status: string
+          submitted_at: string | null
+          submitted_by_kobo: string | null
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          kobo_uuid?: string | null
+          matched_entry_id?: string | null
+          payload: Json
+          source?: string
+          status?: string
+          submitted_at?: string | null
+          submitted_by_kobo?: string | null
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          kobo_uuid?: string | null
+          matched_entry_id?: string | null
+          payload?: Json
+          source?: string
+          status?: string
+          submitted_at?: string | null
+          submitted_by_kobo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kobo_webhook_events_matched_entry_id_fkey"
+            columns: ["matched_entry_id"]
+            isOneToOne: false
+            referencedRelation: "microplan_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kobo_webhook_events_matched_entry_id_fkey"
+            columns: ["matched_entry_id"]
+            isOneToOne: false
+            referencedRelation: "v_microplan_entries_enriched"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       learning_log_entries: {
         Row: {
           author_name: string | null
@@ -5334,6 +5388,8 @@ export type Database = {
           gps_overridden_by: string | null
           households_treated: number | null
           id: string
+          idempotency_key: string | null
+          is_custom_location: boolean
           lga: string
           medicine_reversed_other: string | null
           medicine_reversed_to: string | null
@@ -5406,6 +5462,8 @@ export type Database = {
           gps_overridden_by?: string | null
           households_treated?: number | null
           id?: string
+          idempotency_key?: string | null
+          is_custom_location?: boolean
           lga: string
           medicine_reversed_other?: string | null
           medicine_reversed_to?: string | null
@@ -5478,6 +5536,8 @@ export type Database = {
           gps_overridden_by?: string | null
           households_treated?: number | null
           id?: string
+          idempotency_key?: string | null
+          is_custom_location?: boolean
           lga?: string
           medicine_reversed_other?: string | null
           medicine_reversed_to?: string | null
