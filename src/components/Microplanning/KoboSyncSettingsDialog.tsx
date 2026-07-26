@@ -89,6 +89,8 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
   const [secret, setSecret] = useState<string | null>(null);
   const [secretError, setSecretError] = useState<string | null>(null);
   const [loadingSecret, setLoadingSecret] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [confirmingReset, setConfirmingReset] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(false);
 
