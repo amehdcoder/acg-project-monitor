@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-import { Copy, Download, Eye, EyeOff, Link2, Loader2, RefreshCw, Webhook } from "lucide-react";
+import { Copy, Download, Eye, EyeOff, Link2, Loader2, RefreshCw, RotateCw, Webhook } from "lucide-react";
 import * as XLSX from "xlsx";
 import KoboFormConfigPanel from "./KoboFormConfigPanel";
 
@@ -89,6 +89,8 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
   const [secret, setSecret] = useState<string | null>(null);
   const [secretError, setSecretError] = useState<string | null>(null);
   const [loadingSecret, setLoadingSecret] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [confirmingReset, setConfirmingReset] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -143,6 +145,29 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
       toast({ title: "Webhook Secret copied to clipboard!" });
     } catch {
       toast({ title: "Copy failed", variant: "destructive" });
+    }
+  };
+
+  const resetSecret = async () => {
+    setResetting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("kobo-form-manager", {
+        body: { action: "reset_webhook_secret" },
+      });
+      if (error) throw error;
+      if (!data?.secret) throw new Error(data?.error ?? "Rotation failed");
+      setSecret(data.secret as string);
+      setShowSecret(true);
+      setSecretError(null);
+      setConfirmingReset(false);
+      toast({
+        title: "New Webhook Secret generated",
+        description: "The previous key is now invalid. Copy and paste this into KoboToolbox.",
+      });
+    } catch (e: any) {
+      toast({ title: "Reset failed", description: e.message, variant: "destructive" });
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -219,6 +244,28 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
                   <Button size="sm" variant="ghost" onClick={fetchSecret}>Retry</Button>
                 </div>
               )}
+
+              {/* Rotate / Reset */}
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-primary/20 mt-1">
+                <div className="text-[11px] text-muted-foreground">
+                  Suspect the key leaked? Rotate it — the old value stops working immediately.
+                </div>
+                {confirmingReset ? (
+                  <div className="flex items-center gap-1.5">
+                    <Button size="sm" variant="ghost" onClick={() => setConfirmingReset(false)} disabled={resetting}>
+                      Cancel
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={resetSecret} disabled={resetting}>
+                      {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <RotateCw className="h-3.5 w-3.5 mr-1.5" />}
+                      Confirm reset
+                    </Button>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setConfirmingReset(true)} disabled={loadingSecret}>
+                    <RotateCw className="h-3.5 w-3.5 mr-1.5" /> Reset Secret
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="rounded-md border bg-background/60 p-2.5 text-[11px] space-y-1.5">

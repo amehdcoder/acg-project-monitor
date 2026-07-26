@@ -151,19 +151,59 @@ Deno.serve(async (req) => {
       return { ok: true, steps, asset, fields };
     }
 
-    if (action === "get_webhook_secret") {
-      // Restrict to Super Admin / Systems Admin / Owner
+    // Shared admin gate for secret ops
+    async function ensureAdmin(): Promise<Response | null> {
       const { data: roles } = await admin
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userRes.user.id);
+        .from("user_roles").select("role").eq("user_id", userRes.user.id);
       const allowed = (roles ?? []).some((r: any) =>
         ["super_admin", "systems_admin", "owner"].includes(String(r.role)),
       );
       if (!allowed) return j({ error: "Forbidden" }, 403);
-      const secret = Deno.env.get("KOBO_WEBHOOK_SECRET") ?? "";
+      return null;
+    }
+
+    // Read the current active secret from DB; fallback to env for legacy setups.
+    async function readActiveSecret(): Promise<string> {
+      const { data } = await admin
+        .from("kobo_webhook_secrets")
+        .select("secret")
+        .eq("active", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return (data?.secret as string | undefined) ?? Deno.env.get("KOBO_WEBHOOK_SECRET") ?? "";
+    }
+
+    if (action === "get_webhook_secret") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
+      const secret = await readActiveSecret();
       if (!secret) return j({ error: "KOBO_WEBHOOK_SECRET is not configured" }, 404);
       return j({ ok: true, secret });
+    }
+
+    if (action === "reset_webhook_secret") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
+      // Generate a URL-safe 48-char secret
+      const bytes = new Uint8Array(36);
+      crypto.getRandomValues(bytes);
+      const b64 = btoa(String.fromCharCode(...bytes))
+        .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      const newSecret = `kws_${b64}`;
+      // Deactivate previous active rows (old secrets stop working immediately)
+      await admin
+        .from("kobo_webhook_secrets")
+        .update({ active: false, deactivated_at: new Date().toISOString() })
+        .eq("active", true);
+      const { error: insErr } = await admin.from("kobo_webhook_secrets").insert({
+        secret: newSecret,
+        active: true,
+        rotated_by: userRes.user.id,
+        rotated_by_email: userRes.user.email ?? null,
+      });
+      if (insErr) return j({ error: insErr.message }, 500);
+      return j({ ok: true, secret: newSecret, rotated_at: new Date().toISOString() });
     }
 
     if (action === "test_connection" || action === "inspect") {

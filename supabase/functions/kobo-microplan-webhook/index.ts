@@ -39,19 +39,21 @@ function decodeBasic(header: string): string | null {
   }
 }
 
-function checkAuth(req: Request, secret: string): boolean {
+function checkAuth(req: Request, secrets: string[]): boolean {
+  const valid = new Set(secrets.filter(Boolean));
+  if (valid.size === 0) return false;
   const custom = req.headers.get("x-kobo-secret");
-  if (custom && custom === secret) return true;
+  if (custom && valid.has(custom)) return true;
   const auth = req.headers.get("authorization") ?? "";
   if (!auth) return false;
   if (/^Bearer\s+/i.test(auth)) {
-    return auth.replace(/^Bearer\s+/i, "").trim() === secret;
+    return valid.has(auth.replace(/^Bearer\s+/i, "").trim());
   }
   if (/^Basic\s+/i.test(auth)) {
     const pwd = decodeBasic(auth);
-    return pwd === secret;
+    return pwd != null && valid.has(pwd);
   }
-  return auth === secret;
+  return valid.has(auth);
 }
 
 function getFlat(obj: Record<string, unknown>, key: string): unknown {
@@ -113,8 +115,16 @@ Deno.serve(async (req) => {
     catch (e) { console.error("kobo_webhook_events insert failed:", (e as Error).message); }
   };
 
-  const secret = Deno.env.get("KOBO_WEBHOOK_SECRET");
-  if (!secret || !checkAuth(req, secret)) {
+  // Accept any currently-active DB secret; fall back to env for legacy setups.
+  const secrets: string[] = [];
+  try {
+    const { data } = await supabase
+      .from("kobo_webhook_secrets").select("secret").eq("active", true);
+    (data ?? []).forEach((r: any) => { if (r?.secret) secrets.push(String(r.secret)); });
+  } catch (_) { /* ignore, fall back to env */ }
+  const envSecret = Deno.env.get("KOBO_WEBHOOK_SECRET");
+  if (envSecret) secrets.push(envSecret);
+  if (secrets.length === 0 || !checkAuth(req, secrets)) {
     await logEvent({ status: "failed", error: "unauthorized", payload: {} });
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },

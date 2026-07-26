@@ -4831,6 +4831,36 @@ export type Database = {
           },
         ]
       }
+      kobo_webhook_secrets: {
+        Row: {
+          active: boolean
+          created_at: string
+          deactivated_at: string | null
+          id: string
+          rotated_by: string | null
+          rotated_by_email: string | null
+          secret: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          deactivated_at?: string | null
+          id?: string
+          rotated_by?: string | null
+          rotated_by_email?: string | null
+          secret: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          deactivated_at?: string | null
+          id?: string
+          rotated_by?: string | null
+          rotated_by_email?: string | null
+          secret?: string
+        }
+        Relationships: []
+      }
       learning_log_entries: {
         Row: {
           author_name: string | null
