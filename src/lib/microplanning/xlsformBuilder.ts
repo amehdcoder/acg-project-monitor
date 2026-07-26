@@ -52,7 +52,8 @@ const SURVEY_HEADER = [
 // so PyXForm's filter parser stays fast and unambiguous.
 const CHOICES_HEADER = ["list_name", "name", "label", "lga", "ward", "flhf", "community", "lat", "lng"];
 
-const SETTINGS_HEADER = ["form_title", "form_id", "version", "default_language", "style"];
+const SETTINGS_HEADER = ["form_title", "form_id", "version", "default_language", "style", "allow_choice_duplicates"];
+
 
 const q = (r: Partial<Record<(typeof SURVEY_HEADER)[number], string>>): Row =>
   SURVEY_HEADER.map((h) => (r as any)[h] ?? "");
