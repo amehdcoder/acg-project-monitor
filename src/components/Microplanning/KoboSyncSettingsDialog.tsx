@@ -244,6 +244,28 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
                   <Button size="sm" variant="ghost" onClick={fetchSecret}>Retry</Button>
                 </div>
               )}
+
+              {/* Rotate / Reset */}
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-primary/20 mt-1">
+                <div className="text-[11px] text-muted-foreground">
+                  Suspect the key leaked? Rotate it — the old value stops working immediately.
+                </div>
+                {confirmingReset ? (
+                  <div className="flex items-center gap-1.5">
+                    <Button size="sm" variant="ghost" onClick={() => setConfirmingReset(false)} disabled={resetting}>
+                      Cancel
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={resetSecret} disabled={resetting}>
+                      {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <RotateCw className="h-3.5 w-3.5 mr-1.5" />}
+                      Confirm reset
+                    </Button>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setConfirmingReset(true)} disabled={loadingSecret}>
+                    <RotateCw className="h-3.5 w-3.5 mr-1.5" /> Reset Secret
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="rounded-md border bg-background/60 p-2.5 text-[11px] space-y-1.5">
