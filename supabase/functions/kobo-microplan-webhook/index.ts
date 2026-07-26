@@ -126,10 +126,14 @@ Deno.serve(async (req) => {
   if (envSecret) secrets.push(envSecret);
   if (secrets.length === 0 || !checkAuth(req, secrets)) {
     await logEvent({ status: "failed", error: "unauthorized", payload: {} });
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+    const hint = secrets.length === 0
+      ? "No active webhook secret is configured. Open Kobo Sync → Reset Webhook Secret and paste the new value into KoboToolbox REST Services."
+      : "The Authorization header did not match any active webhook secret. In KoboToolbox → REST Services, ensure the Custom HTTP header 'x-kobo-secret' (or Basic Auth password) matches the value shown in Kobo Sync → Copy Secret. If it was rotated, re-paste the new value.";
+    return new Response(JSON.stringify({ error: "Unauthorized", code: "webhook_auth_failed", hint }), {
       status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+
 
   let payload: Record<string, unknown>;
   try { payload = await req.json(); }
