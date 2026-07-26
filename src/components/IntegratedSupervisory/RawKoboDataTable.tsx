@@ -170,7 +170,18 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
   const safePage = Math.min(page, totalPages - 1);
   const slice = filtered.slice(safePage * pageSize, safePage * pageSize + pageSize);
 
+  const validation = useMemo(() => cache?.validation ?? validateCache(cache), [cache]);
+
   const download = (mime: string, ext: string, cols: string[]) => {
+    if (validation && !validation.ok) {
+      toast.error("Export blocked", { description: validation.errors[0]?.message ?? "Schema validation failed. Re-sync from Kobo Sync." });
+      return;
+    }
+    if (validation && validation.warnings.length > 0) {
+      toast.warning(`Exporting with ${validation.warnings.length} schema warning${validation.warnings.length === 1 ? "" : "s"}`, {
+        description: validation.warnings[0]?.message,
+      });
+    }
     const csv = toCSV(filtered, cols);
     const blob = new Blob([csv], { type: mime });
     const url = URL.createObjectURL(blob);
@@ -178,6 +189,7 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
     a.href = url; a.download = `kobo-submissions-${new Date().toISOString().slice(0, 10)}.${ext}`;
     a.click(); URL.revokeObjectURL(url);
   };
+
 
   const cellDisplay = (v: unknown) => {
     if (v == null) return "—";
