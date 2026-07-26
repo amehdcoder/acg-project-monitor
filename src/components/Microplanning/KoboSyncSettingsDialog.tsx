@@ -400,27 +400,32 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
           <KoboFormConfigPanel />
 
 
-          {/* Complete XLSForm — full-fidelity mirror of the Geo-enabled Microplanning entry form */}
-          <div className="border rounded-lg p-3 space-y-2 bg-card">
-            <div className="flex items-center justify-between gap-3">
+          {/* Complete XLSForm — build → validate → download / save / upload workflow */}
+          <div className="border rounded-lg p-3 space-y-3 bg-card">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2 text-xs font-semibold">
-                <Download className="h-4 w-4 text-primary" /> Complete XLSForm — Geo-enabled Microplanning
+                <Download className="h-4 w-4 text-primary" /> Complete XLSForm — Build, Validate & Publish
               </div>
-              <Button size="sm" variant="default" onClick={handleDownloadXls} disabled={buildingXls}>
-                {buildingXls ? (
-                  <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Building…</>
-                ) : (
-                  <><Download className="h-3.5 w-3.5 mr-1.5" /> Download XLSForm (.xlsx)</>
-                )}
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <Button size="sm" variant="outline" onClick={() => setVersionsOpen(true)}>
+                  <History className="h-3.5 w-3.5 mr-1.5" /> Versions
+                </Button>
+                <Button size="sm" variant="default" onClick={handleBuildAndValidate} disabled={buildingXls}>
+                  {buildingXls ? (
+                    <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Building…</>
+                  ) : (
+                    <><ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Build & Validate</>
+                  )}
+                </Button>
+              </div>
             </div>
+
             <p className="text-[10px] text-muted-foreground leading-relaxed">
-              Ready-to-upload XLSForm mirroring every field, skip logic, calculation and validation of the
-              Geo-enabled Microplanning entry form. Includes the <b>complete GRID3 cascade</b> (State → LGA → Ward →
-              FLHF → Community → Settlement) with pre-loaded <b>GPS coordinates</b>, in-field <b>GPS override</b>,
-              and <b>“Other (specify manually)”</b> free-text entry for FLHFs, Communities and Settlements not in
-              GRID3. Upload in KoboToolbox → <b>New project → Import an XLSForm</b>.
+              Mirrors every field, skip logic and GRID3 cascade (State → LGA → Ward → FLHF → Community → Settlement)
+              with pre-loaded GPS, override capture and “Other (specify manually)”. Validation runs the Kobo-compatible
+              rule checker (types, name uniqueness, choice-list references, group balance) before you upload.
             </p>
+
             {buildingXls && xlsProgress && (
               <div className="text-[10px] text-primary font-medium">
                 {xlsProgress.phase === "states" && `Preparing admin cascade… ${xlsProgress.done}/${xlsProgress.total} states`}
@@ -428,6 +433,86 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
                 {xlsProgress.phase === "communities" && `Packing GRID3 Communities & Settlements… ${xlsProgress.done}/${xlsProgress.total} states`}
                 {xlsProgress.phase === "assemble" && "Assembling workbook…"}
                 {xlsProgress.phase === "done" && "Finalising…"}
+              </div>
+            )}
+
+            {report && (
+              <div className={`rounded-md border p-2.5 space-y-1.5 text-[11px] ${report.ok ? "border-emerald-500/50 bg-emerald-500/5" : "border-destructive/50 bg-destructive/5"}`}>
+                <div className="flex items-center gap-2 font-semibold">
+                  {report.ok
+                    ? <><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Passed Kobo-compatibility checks</>
+                    : <><XCircle className="h-3.5 w-3.5 text-destructive" /> {report.errors.length} error(s) — fix before uploading</>}
+                </div>
+                <div className="text-muted-foreground">
+                  {report.stats.questions} questions · {report.stats.groups} groups · {report.stats.choiceLists} choice lists ·
+                  form_id <code className="px-1 bg-muted rounded">{report.stats.formId ?? "—"}</code> · v{report.stats.version ?? "—"}
+                </div>
+                {report.errors.slice(0, 5).map((e, i) => (
+                  <div key={`e${i}`} className="text-destructive flex items-start gap-1.5"><XCircle className="h-3 w-3 mt-0.5 shrink-0" /><span>{e.message}</span></div>
+                ))}
+                {report.warnings.slice(0, 3).map((w, i) => (
+                  <div key={`w${i}`} className="text-amber-700 flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" /><span>{w.message}</span></div>
+                ))}
+                {(report.errors.length > 5 || report.warnings.length > 3) && (
+                  <div className="text-muted-foreground italic">…and {(report.errors.length - Math.min(5, report.errors.length)) + (report.warnings.length - Math.min(3, report.warnings.length))} more.</div>
+                )}
+              </div>
+            )}
+
+            {workbook && report && (
+              <div className="space-y-2 border-t pt-2.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Button size="sm" variant="outline" onClick={handleDownloadCurrent}>
+                    <Download className="h-3.5 w-3.5 mr-1.5" /> Download .xlsx
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => handleSaveVersion(false)} disabled={saving}>
+                    {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <History className="h-3.5 w-3.5 mr-1.5" />}
+                    Save version
+                  </Button>
+                  <Button size="sm" onClick={() => handleSaveVersion(true)} disabled={saving || !report.ok}>
+                    Save & set active
+                  </Button>
+                  {savedVersionNumber != null && (
+                    <Badge variant="outline" className="text-emerald-700 border-emerald-500">Saved v{savedVersionNumber}</Badge>
+                  )}
+                </div>
+                <Textarea
+                  value={changelog}
+                  onChange={(e) => setChangelog(e.target.value)}
+                  placeholder="Changelog / notes for this version (e.g. “Added Trachoma disaggregation, fixed FLHF distance calc”)"
+                  className="text-xs min-h-[60px]"
+                />
+
+                <div className="rounded-md border bg-background/60 p-2.5 space-y-2">
+                  <div className="text-xs font-semibold flex items-center gap-1.5">
+                    <Cloud className="h-3.5 w-3.5 text-primary" /> One-click upload to KoboToolbox
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <Input value={koboServer} onChange={(e) => setKoboServer(e.target.value)} placeholder="Server URL" className="text-xs font-mono" />
+                    <Input value={koboToken} onChange={(e) => setKoboToken(e.target.value)} placeholder="Kobo API token" type="password" className="text-xs font-mono" />
+                    <Input value={koboFormUid} onChange={(e) => setKoboFormUid(e.target.value)} placeholder="Existing form uid (optional — overwrites)" className="text-xs font-mono" />
+                  </div>
+                  <Button size="sm" onClick={handleUploadToKobo} disabled={uploading || !report.ok || !koboToken.trim()}>
+                    {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
+                    Upload & deploy
+                  </Button>
+                  {uploadResult && (
+                    <div className="text-[11px] rounded border border-emerald-500/50 bg-emerald-500/10 p-2">
+                      <div className="font-semibold text-emerald-700 flex items-center gap-1.5">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Accepted by KoboToolbox — status {uploadResult.status}
+                      </div>
+                      <div className="mt-1 space-y-0.5">
+                        <div><b>Form:</b> {uploadResult.form_title ?? "—"}</div>
+                        <div><b>form_id (uid):</b> <code className="px-1 bg-muted rounded">{uploadResult.form_uid ?? "—"}</code></div>
+                        <div><b>version_id:</b> <code className="px-1 bg-muted rounded">{uploadResult.version_id ?? "—"}</code></div>
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-muted-foreground">
+                    Leave <i>form uid</i> blank to create a new asset. Provide it to import into an existing form
+                    (⚠ overwrites its questions). Token from KoboToolbox → Account Settings → API.
+                  </p>
+                </div>
               </div>
             )}
           </div>
