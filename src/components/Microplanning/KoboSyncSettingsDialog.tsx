@@ -9,10 +9,20 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { Copy, Download, Eye, EyeOff, Link2, Loader2, RefreshCw, RotateCw, Webhook } from "lucide-react";
-import { downloadMicroplanningXlsForm, type BuildProgress } from "@/lib/microplanning/xlsformBuilder";
+import { AlertTriangle, CheckCircle2, Cloud, Copy, Download, Eye, EyeOff, History, Link2, Loader2, RefreshCw, RotateCw, ShieldCheck, Upload, Webhook, XCircle } from "lucide-react";
+import {
+  buildMicroplanningXlsForm,
+  downloadWorkbookBlob,
+  sha256Hex,
+  workbookToBase64,
+  type BuildProgress,
+} from "@/lib/microplanning/xlsformBuilder";
+import { validateMicroplanningXlsForm, type ValidationReport } from "@/lib/microplanning/xlsformValidator";
 import KoboFormConfigPanel from "./KoboFormConfigPanel";
+import XlsFormVersionsDialog from "./XlsFormVersionsDialog";
+import type * as XLSX from "xlsx";
 
 interface Props {
   open: boolean;
