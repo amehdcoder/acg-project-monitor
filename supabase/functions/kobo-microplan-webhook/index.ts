@@ -115,8 +115,16 @@ Deno.serve(async (req) => {
     catch (e) { console.error("kobo_webhook_events insert failed:", (e as Error).message); }
   };
 
-  const secret = Deno.env.get("KOBO_WEBHOOK_SECRET");
-  if (!secret || !checkAuth(req, secret)) {
+  // Accept any currently-active DB secret; fall back to env for legacy setups.
+  const secrets: string[] = [];
+  try {
+    const { data } = await supabase
+      .from("kobo_webhook_secrets").select("secret").eq("active", true);
+    (data ?? []).forEach((r: any) => { if (r?.secret) secrets.push(String(r.secret)); });
+  } catch (_) { /* ignore, fall back to env */ }
+  const envSecret = Deno.env.get("KOBO_WEBHOOK_SECRET");
+  if (envSecret) secrets.push(envSecret);
+  if (secrets.length === 0 || !checkAuth(req, secrets)) {
     await logEvent({ status: "failed", error: "unauthorized", payload: {} });
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
