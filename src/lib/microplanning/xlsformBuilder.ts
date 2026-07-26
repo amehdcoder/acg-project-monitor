@@ -515,3 +515,37 @@ export async function downloadMicroplanningXlsForm(onProgress?: (p: BuildProgres
   const wb = await buildMicroplanningXlsForm(onProgress);
   XLSX.writeFile(wb, `amehnities_geo_microplanning_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
+
+/**
+ * Serialize a workbook to a raw byte buffer + base64 string for storage/upload.
+ * Returns both the Uint8Array (for local download via Blob) and base64 (for
+ * DB persistence and edge-function upload to KoboToolbox).
+ */
+export function workbookToBase64(wb: XLSX.WorkBook): { bytes: Uint8Array; base64: string; size: number } {
+  const bytes = new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx" }));
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
+  }
+  return { bytes, base64: btoa(bin), size: bytes.length };
+}
+
+export function downloadWorkbookBlob(wb: XLSX.WorkBook, filename: string) {
+  const { bytes } = workbookToBase64(wb);
+  const buf = bytes.slice().buffer as ArrayBuffer;
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const hash = await crypto.subtle.digest("SHA-256", bytes.slice().buffer as ArrayBuffer);
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}

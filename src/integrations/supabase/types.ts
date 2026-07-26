@@ -5923,6 +5923,75 @@ export type Database = {
           },
         ]
       }
+      microplan_xlsform_versions: {
+        Row: {
+          changelog: string
+          choices_row_count: number
+          created_at: string
+          created_by: string | null
+          created_by_email: string | null
+          id: string
+          is_active: boolean
+          kobo_asset_uid: string | null
+          kobo_deployed_at: string | null
+          kobo_server_url: string | null
+          kobo_upload_response: Json | null
+          kobo_version_id: string | null
+          notes: string | null
+          sha256: string | null
+          size_bytes: number
+          survey_row_count: number
+          updated_at: string
+          validation_report: Json
+          version_number: number
+          xlsx_base64: string
+        }
+        Insert: {
+          changelog?: string
+          choices_row_count?: number
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          id?: string
+          is_active?: boolean
+          kobo_asset_uid?: string | null
+          kobo_deployed_at?: string | null
+          kobo_server_url?: string | null
+          kobo_upload_response?: Json | null
+          kobo_version_id?: string | null
+          notes?: string | null
+          sha256?: string | null
+          size_bytes?: number
+          survey_row_count?: number
+          updated_at?: string
+          validation_report?: Json
+          version_number: number
+          xlsx_base64: string
+        }
+        Update: {
+          changelog?: string
+          choices_row_count?: number
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          id?: string
+          is_active?: boolean
+          kobo_asset_uid?: string | null
+          kobo_deployed_at?: string | null
+          kobo_server_url?: string | null
+          kobo_upload_response?: Json | null
+          kobo_version_id?: string | null
+          notes?: string | null
+          sha256?: string | null
+          size_bytes?: number
+          survey_row_count?: number
+          updated_at?: string
+          validation_report?: Json
+          version_number?: number
+          xlsx_base64?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           category: string
