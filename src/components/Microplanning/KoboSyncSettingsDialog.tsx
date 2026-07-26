@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-import { Copy, Download, Eye, EyeOff, Link2, Loader2, RefreshCw, Webhook } from "lucide-react";
+import { Copy, Download, Eye, EyeOff, Link2, Loader2, RefreshCw, RotateCw, Webhook } from "lucide-react";
 import * as XLSX from "xlsx";
 import KoboFormConfigPanel from "./KoboFormConfigPanel";
 
