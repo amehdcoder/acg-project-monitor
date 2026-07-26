@@ -109,48 +109,79 @@ export default function KoboFormConfigPanel() {
     setEditingId(null); setServer("https://kf.kobotoolbox.org");
     setFormUid(""); setApiToken(""); setProjectId("");
     setFields(null); setIsEmpty(false); setFormTitle(null); setMapping({});
+    setTestSteps(null); setTestOk(null); setSubmissionCount(0);
   };
 
-  const inspect = async () => {
+  const applyInspectResult = (res: any) => {
+    setFields(res.fields ?? []);
+    setIsEmpty(Boolean(res.is_empty));
+    setFormTitle(res.form_title ?? null);
+    setSubmissionCount(Number(res.submission_count ?? 0));
+    setTestSteps(res.steps ?? null);
+    setTestOk(res.ok !== false);
+    // Auto-map by name equality
+    const auto: Record<string, string> = {};
+    const names = new Set((res.fields ?? []).map((f: KoboField) => f.name));
+    for (const t of TARGET_FIELDS) if (names.has(t.key)) auto[t.key] = t.key;
+    setMapping((prev) => ({ ...auto, ...prev }));
+  };
+
+  const testConnection = async () => {
     if (!formUid.trim() || !apiToken.trim()) {
       toast({ title: "Form UID and API token required", variant: "destructive" });
       return;
     }
-    setInspecting(true);
+    setTesting(true);
+    setTestSteps(null); setTestOk(null);
     try {
       const res = await invoke({
-        action: "inspect", server_url: server.trim(), form_uid: formUid.trim(), api_token: apiToken.trim(),
+        action: "test_connection", server_url: server.trim(), form_uid: formUid.trim(), api_token: apiToken.trim(),
       });
-      setFields(res.fields ?? []);
-      setIsEmpty(Boolean(res.is_empty));
-      setFormTitle(res.form_title ?? null);
-      // Auto-map by name equality
-      const auto: Record<string, string> = {};
-      const names = new Set((res.fields ?? []).map((f: KoboField) => f.name));
-      for (const t of TARGET_FIELDS) if (names.has(t.key)) auto[t.key] = t.key;
-      setMapping((prev) => ({ ...auto, ...prev }));
+      applyInspectResult(res);
       toast({
-        title: res.is_empty ? "Empty Kobo form detected" : `Found ${res.fields?.length ?? 0} fields`,
-        description: res.form_title ?? undefined,
+        title: res.ok ? "Kobo connection verified" : "Connection failed",
+        description: res.ok
+          ? `${res.form_title ?? formUid.trim()} · ${res.fields?.length ?? 0} question(s)`
+          : (res.steps?.find((s: TestStep) => !s.ok)?.detail ?? "See details below."),
+        variant: res.ok ? "default" : "destructive",
       });
     } catch (e: any) {
-      toast({ title: "Inspect failed", description: e.message, variant: "destructive" });
+      setTestOk(false);
+      setTestSteps([{ step: "request", ok: false, detail: e.message }]);
+      toast({ title: "Test failed", description: e.message, variant: "destructive" });
     } finally {
-      setInspecting(false);
+      setTesting(false);
     }
   };
 
-  const deploySchema = async () => {
+  const inspect = testConnection;
+
+  const deploySchema = async (force = false) => {
     setDeploying(true);
     try {
-      await invoke({
-        action: "deploy", server_url: server.trim(), form_uid: formUid.trim(), api_token: apiToken.trim(),
+      const res = await invoke({
+        action: "deploy", force,
+        server_url: server.trim(), form_uid: formUid.trim(), api_token: apiToken.trim(),
       });
+      if (res?.error === "refused_form_not_empty" || res?.error === "refused_has_submissions") {
+        // Should not reach — invoke() throws on data.error. Left as belt-and-braces.
+        throw new Error(res.detail ?? res.error);
+      }
       toast({ title: "Microplanning schema deployed to Kobo form" });
-      // Re-inspect to pull the new fields
-      await inspect();
+      await testConnection();
     } catch (e: any) {
-      toast({ title: "Deploy failed", description: e.message, variant: "destructive" });
+      const msg = String(e?.message ?? "");
+      if (msg.includes("refused_form_not_empty")) {
+        if (confirm(`This Kobo form already has questions. Deploying will OVERWRITE them.\n\nContinue anyway?`)) {
+          return deploySchema(true);
+        }
+      } else if (msg.includes("refused_has_submissions")) {
+        if (confirm(`This Kobo form already has submissions. Deploying will OVERWRITE its schema.\n\nContinue anyway?`)) {
+          return deploySchema(true);
+        }
+      } else {
+        toast({ title: "Deploy failed", description: msg, variant: "destructive" });
+      }
     } finally {
       setDeploying(false);
     }
