@@ -88,6 +88,8 @@ export default function KoboFormConfigPanel() {
   const [testOk, setTestOk] = useState<boolean | null>(null);
   const [submissionCount, setSubmissionCount] = useState<number>(0);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [historyOpenFor, setHistoryOpenFor] = useState<FormConfig | null>(null);
+
 
   const loadAll = async () => {
     setLoading(true);
