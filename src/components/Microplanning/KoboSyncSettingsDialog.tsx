@@ -74,22 +74,120 @@ const KoboSyncSettingsDialog = ({ open, onClose }: Props) => {
   const [loading, setLoading] = useState(false);
   const [buildingXls, setBuildingXls] = useState(false);
   const [xlsProgress, setXlsProgress] = useState<BuildProgress | null>(null);
+  const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
+  const [report, setReport] = useState<ValidationReport | null>(null);
+  const [changelog, setChangelog] = useState("");
+  const [savedVersionId, setSavedVersionId] = useState<string | null>(null);
+  const [savedVersionNumber, setSavedVersionNumber] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<null | { form_uid: string | null; version_id: string | null; status: string; form_title: string | null }>(null);
+  const [koboServer, setKoboServer] = useState("https://kf.kobotoolbox.org");
+  const [koboToken, setKoboToken] = useState("");
+  const [koboFormUid, setKoboFormUid] = useState("");
+  const [versionsOpen, setVersionsOpen] = useState(false);
 
-  const handleDownloadXls = async () => {
+  const resetPipeline = () => {
+    setWorkbook(null);
+    setReport(null);
+    setSavedVersionId(null);
+    setSavedVersionNumber(null);
+    setUploadResult(null);
+  };
+
+  const handleBuildAndValidate = async () => {
     setBuildingXls(true);
     setXlsProgress({ phase: "states", done: 0, total: 1 });
+    resetPipeline();
     try {
-      await downloadMicroplanningXlsForm((p) => setXlsProgress(p));
-      toast({
-        title: "XLSForm ready",
-        description: "Upload the file to KoboToolbox → New project → Import XLSForm.",
-      });
+      const wb = await buildMicroplanningXlsForm((p) => setXlsProgress(p));
+      const r = validateMicroplanningXlsForm(wb);
+      setWorkbook(wb);
+      setReport(r);
+      if (r.ok) {
+        toast({ title: "XLSForm built & validated", description: `${r.stats.questions} questions · ${r.stats.choiceLists} choice lists · ${r.warnings.length} warning(s).` });
+      } else {
+        toast({ title: "Validation failed", description: `${r.errors.length} error(s) — fix before uploading to Kobo.`, variant: "destructive" });
+      }
     } catch (e: any) {
       toast({ title: "XLSForm build failed", description: e?.message ?? "Unexpected error", variant: "destructive" });
     } finally {
       setBuildingXls(false);
       setXlsProgress(null);
     }
+  };
+
+  const handleDownloadCurrent = () => {
+    if (!workbook) return;
+    const name = `amehnities_geo_microplanning_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    downloadWorkbookBlob(workbook, name);
+  };
+
+  const handleSaveVersion = async (setActive: boolean) => {
+    if (!workbook || !report) return;
+    setSaving(true);
+    try {
+      const { base64, bytes, size } = workbookToBase64(workbook);
+      const hash = await sha256Hex(bytes);
+      const { data, error } = await supabase.functions.invoke("kobo-form-manager", {
+        body: {
+          action: "save_xlsform_version",
+          xlsx_base64: base64,
+          changelog: changelog.trim() || `Auto-saved on ${new Date().toLocaleString()}`,
+          size_bytes: size,
+          sha256: hash,
+          survey_row_count: report.stats.surveyRows,
+          choices_row_count: report.stats.choicesRows,
+          validation_report: report,
+          set_active: setActive,
+        },
+      });
+      if (error) throw error;
+      const v = data?.version;
+      setSavedVersionId(v?.id ?? null);
+      setSavedVersionNumber(v?.version_number ?? null);
+      toast({ title: `Saved as Version ${v?.version_number}`, description: setActive ? "Marked as the active XLSForm." : "Saved to history." });
+    } catch (e: any) {
+      toast({ title: "Save failed", description: e.message, variant: "destructive" });
+    } finally { setSaving(false); }
+  };
+
+  const handleUploadToKobo = async () => {
+    if (!workbook || !report || !report.ok) return;
+    if (!koboToken.trim()) {
+      toast({ title: "Kobo API token required", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    setUploadResult(null);
+    try {
+      const { base64 } = workbookToBase64(workbook);
+      const { data, error } = await supabase.functions.invoke("kobo-form-manager", {
+        body: {
+          action: "upload_xlsform_to_kobo",
+          server_url: koboServer.trim() || "https://kf.kobotoolbox.org",
+          api_token: koboToken.trim(),
+          xlsx_base64: base64,
+          form_uid: koboFormUid.trim() || undefined,
+          asset_name: `Amehnities Microplanning ${new Date().toISOString().slice(0, 10)}.xlsx`,
+          version_id: savedVersionId ?? undefined,
+        },
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.detail || data?.error || `Kobo import status: ${data?.status}`);
+      setUploadResult({
+        form_uid: data.form_uid ?? null,
+        version_id: data.version_id ?? null,
+        status: data.status,
+        form_title: data.form_title ?? null,
+      });
+      toast({
+        title: "Uploaded to KoboToolbox",
+        description: `Form ${data.form_title ?? data.form_uid} · version ${data.version_id ?? "—"}`,
+      });
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    } finally { setUploading(false); }
   };
 
   const loadEvents = async () => {
