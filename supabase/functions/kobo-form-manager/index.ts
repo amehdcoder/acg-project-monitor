@@ -253,7 +253,154 @@ Deno.serve(async (req) => {
       return j({ ok: true });
     }
 
+    // ---------- Versioned mapping history ----------
+
+    if (action === "save_mapping_version") {
+      const { config_id, field_mappings, change_summary } = params;
+      if (!config_id || !field_mappings) return j({ error: "Missing config_id/field_mappings" }, 400);
+
+      // Load current config for form_uid + project_id
+      const { data: cfg, error: cfgErr } = await admin
+        .from("kobo_form_configs")
+        .select("id, form_uid, project_id")
+        .eq("id", config_id)
+        .maybeSingle();
+      if (cfgErr) throw cfgErr;
+      if (!cfg) return j({ error: "Config not found" }, 404);
+
+      // Compute next version number
+      const { data: last } = await admin
+        .from("kobo_mapping_history")
+        .select("version_number")
+        .eq("config_id", config_id)
+        .order("version_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextVersion = ((last?.version_number as number | undefined) ?? 0) + 1;
+
+      const { data: hist, error: histErr } = await admin
+        .from("kobo_mapping_history")
+        .insert({
+          config_id,
+          project_id: cfg.project_id,
+          form_uid: cfg.form_uid,
+          version_number: nextVersion,
+          field_mappings,
+          change_summary: change_summary || "Manual mapping update",
+          created_by: userRes.user.id,
+        })
+        .select()
+        .maybeSingle();
+      if (histErr) throw histErr;
+
+      const { error: upErr } = await admin
+        .from("kobo_form_configs")
+        .update({ field_mappings, active_version_number: nextVersion })
+        .eq("id", config_id);
+      if (upErr) throw upErr;
+
+      return j({ ok: true, version: hist });
+    }
+
+    if (action === "list_mapping_versions") {
+      const { config_id } = params;
+      if (!config_id) return j({ error: "Missing config_id" }, 400);
+      const { data: rows, error } = await admin
+        .from("kobo_mapping_history")
+        .select("id, config_id, project_id, form_uid, version_number, field_mappings, change_summary, created_by, created_at")
+        .eq("config_id", config_id)
+        .order("version_number", { ascending: false });
+      if (error) throw error;
+
+      const ids = Array.from(new Set((rows ?? []).map((r) => r.created_by as string).filter(Boolean)));
+      let profileMap: Record<string, { first_name: string | null; last_name: string | null; email: string | null; avatar_url: string | null }> = {};
+      if (ids.length > 0) {
+        const { data: profs } = await admin
+          .from("profiles")
+          .select("user_id, first_name, last_name, email, avatar_url")
+          .in("user_id", ids);
+        for (const p of profs ?? []) {
+          profileMap[p.user_id as string] = {
+            first_name: (p.first_name as string | null) ?? null,
+            last_name: (p.last_name as string | null) ?? null,
+            email: (p.email as string | null) ?? null,
+            avatar_url: (p.avatar_url as string | null) ?? null,
+          };
+        }
+      }
+
+      const { data: cfg } = await admin
+        .from("kobo_form_configs")
+        .select("active_version_number")
+        .eq("id", config_id)
+        .maybeSingle();
+
+      return j({
+        ok: true,
+        active_version_number: (cfg?.active_version_number as number | undefined) ?? null,
+        versions: (rows ?? []).map((r) => ({
+          ...r,
+          author: profileMap[r.created_by as string] ?? null,
+        })),
+      });
+    }
+
+    if (action === "rollback_mapping_version") {
+      const { config_id, target_version_number } = params;
+      if (!config_id || !target_version_number) {
+        return j({ error: "Missing config_id/target_version_number" }, 400);
+      }
+      const { data: target, error: tgtErr } = await admin
+        .from("kobo_mapping_history")
+        .select("field_mappings, version_number")
+        .eq("config_id", config_id)
+        .eq("version_number", target_version_number)
+        .maybeSingle();
+      if (tgtErr) throw tgtErr;
+      if (!target) return j({ error: "Target version not found" }, 404);
+
+      const { data: cfg } = await admin
+        .from("kobo_form_configs")
+        .select("form_uid, project_id")
+        .eq("id", config_id)
+        .maybeSingle();
+      if (!cfg) return j({ error: "Config not found" }, 404);
+
+      const { data: last } = await admin
+        .from("kobo_mapping_history")
+        .select("version_number")
+        .eq("config_id", config_id)
+        .order("version_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextVersion = ((last?.version_number as number | undefined) ?? 0) + 1;
+
+      const { data: hist, error: histErr } = await admin
+        .from("kobo_mapping_history")
+        .insert({
+          config_id,
+          project_id: cfg.project_id,
+          form_uid: cfg.form_uid,
+          version_number: nextVersion,
+          field_mappings: target.field_mappings,
+          change_summary: `Rollback to v${target_version_number}`,
+          created_by: userRes.user.id,
+        })
+        .select()
+        .maybeSingle();
+      if (histErr) throw histErr;
+
+      const { error: upErr } = await admin
+        .from("kobo_form_configs")
+        .update({ field_mappings: target.field_mappings, active_version_number: nextVersion })
+        .eq("id", config_id);
+      if (upErr) throw upErr;
+
+      return j({ ok: true, restored_from: target_version_number, new_version: hist });
+    }
+
     return j({ error: `Unknown action: ${action}` }, 400);
+
   } catch (e) {
     console.error("kobo-form-manager error:", (e as Error).message);
     return j({ error: (e as Error).message }, 500);

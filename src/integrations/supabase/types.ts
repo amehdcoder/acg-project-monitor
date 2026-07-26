@@ -4666,6 +4666,7 @@ export type Database = {
       }
       kobo_form_configs: {
         Row: {
+          active_version_number: number
           api_token: string
           created_at: string
           created_by: string | null
@@ -4681,6 +4682,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active_version_number?: number
           api_token: string
           created_at?: string
           created_by?: string | null
@@ -4696,6 +4698,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active_version_number?: number
           api_token?: string
           created_at?: string
           created_by?: string | null
@@ -4720,12 +4723,64 @@ export type Database = {
           },
         ]
       }
+      kobo_mapping_history: {
+        Row: {
+          change_summary: string
+          config_id: string
+          created_at: string
+          created_by: string
+          field_mappings: Json
+          form_uid: string
+          id: string
+          project_id: string | null
+          version_number: number
+        }
+        Insert: {
+          change_summary?: string
+          config_id: string
+          created_at?: string
+          created_by: string
+          field_mappings?: Json
+          form_uid: string
+          id?: string
+          project_id?: string | null
+          version_number: number
+        }
+        Update: {
+          change_summary?: string
+          config_id?: string
+          created_at?: string
+          created_by?: string
+          field_mappings?: Json
+          form_uid?: string
+          id?: string
+          project_id?: string | null
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kobo_mapping_history_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "kobo_form_configs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kobo_mapping_history_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kobo_webhook_events: {
         Row: {
           created_at: string
           error: string | null
           id: string
           kobo_uuid: string | null
+          mapping_version_number: number | null
           matched_entry_id: string | null
           payload: Json
           source: string
@@ -4738,6 +4793,7 @@ export type Database = {
           error?: string | null
           id?: string
           kobo_uuid?: string | null
+          mapping_version_number?: number | null
           matched_entry_id?: string | null
           payload: Json
           source?: string
@@ -4750,6 +4806,7 @@ export type Database = {
           error?: string | null
           id?: string
           kobo_uuid?: string | null
+          mapping_version_number?: number | null
           matched_entry_id?: string | null
           payload?: Json
           source?: string
