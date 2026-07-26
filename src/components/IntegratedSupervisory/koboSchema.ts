@@ -160,3 +160,114 @@ export function coerceNumber(v: unknown): number {
   if (typeof v === "string") { const n = Number(v); return Number.isFinite(n) ? n : 0; }
   return 0;
 }
+
+// ---------------------------------------------------------------------------
+// Schema validation
+// ---------------------------------------------------------------------------
+
+export interface KoboAssetField { name: string; type: string; label?: string }
+
+export interface SchemaValidationIssue {
+  code: "missing_in_data" | "extra_in_data" | "type_mismatch" | "empty_dictionary" | "no_fields_metadata";
+  key: string;
+  message: string;
+  expected?: string;
+  actual?: string;
+}
+
+export interface SchemaValidationReport {
+  ok: boolean;
+  checkedAt: string;
+  fieldCount: number;
+  columnCount: number;
+  issues: SchemaValidationIssue[];
+  errors: SchemaValidationIssue[];   // hard blocks (empty dictionary)
+  warnings: SchemaValidationIssue[]; // non-blocking drift
+}
+
+const koboTypeToSemantic = (t: string): KoboFieldType => {
+  const v = String(t || "").toLowerCase();
+  if (/(integer|decimal|calculate|range)/.test(v)) return "number";
+  if (/(date|time)/.test(v)) return "date";
+  if (/(geopoint|geoshape|geotrace)/.test(v)) return "geo";
+  if (/select_multiple/.test(v)) return "array";
+  if (/^acknowledge$|^bool/.test(v)) return "boolean";
+  return "text";
+};
+
+/**
+ * Compare the computed data dictionary against the Kobo asset's declared survey
+ * fields. Ensures rendering/exports don't silently drop or mis-type columns.
+ * Empty/absent inputs degrade gracefully into a single warning.
+ */
+export function validateDataDictionary(
+  columns: KoboColumn[],
+  fields: KoboAssetField[] | null | undefined,
+): SchemaValidationReport {
+  const issues: SchemaValidationIssue[] = [];
+
+  if (!columns || columns.length === 0) {
+    issues.push({ code: "empty_dictionary", key: "*", message: "Data dictionary is empty — no columns to render or export." });
+  }
+
+  const colByKey = new Map(columns.map((c) => [c.key, c]));
+  const surveyFields = Array.isArray(fields) ? fields.filter((f) => f?.name) : [];
+
+  if (surveyFields.length === 0) {
+    issues.push({
+      code: "no_fields_metadata",
+      key: "*",
+      message: "Kobo asset did not return survey fields; skipping strict schema check.",
+    });
+  } else {
+    const seen = new Set<string>();
+    for (const f of surveyFields) {
+      // Kobo asset names use `group/leaf`; our dictionary uses `group.leaf`.
+      const key = f.name.replace(/\//g, ".");
+      seen.add(key);
+      const col = colByKey.get(key) ?? colByKey.get(f.name);
+      if (!col) {
+        issues.push({
+          code: "missing_in_data",
+          key,
+          message: `Field "${f.label || f.name}" declared in Kobo form but not present in any submission.`,
+        });
+        continue;
+      }
+      const expected = koboTypeToSemantic(f.type);
+      if (expected !== "text" && col.type !== "text" && expected !== col.type) {
+        issues.push({
+          code: "type_mismatch",
+          key: col.key,
+          expected,
+          actual: col.type,
+          message: `"${col.label}" expected ${expected} but data looks like ${col.type}.`,
+        });
+      }
+    }
+    for (const c of columns) {
+      if (c.system) continue;
+      if (!seen.has(c.key)) {
+        issues.push({
+          code: "extra_in_data",
+          key: c.key,
+          message: `Column "${c.label}" appears in submissions but is not in the current Kobo form schema.`,
+        });
+      }
+    }
+  }
+
+  const errors = issues.filter((i) => i.code === "empty_dictionary");
+  const warnings = issues.filter((i) => i.code !== "empty_dictionary");
+
+  return {
+    ok: errors.length === 0,
+    checkedAt: new Date().toISOString(),
+    fieldCount: surveyFields.length,
+    columnCount: columns.length,
+    issues,
+    errors,
+    warnings,
+  };
+}
+

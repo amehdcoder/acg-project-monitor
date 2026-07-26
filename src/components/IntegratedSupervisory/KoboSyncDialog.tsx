@@ -38,7 +38,10 @@ export default function KoboSyncDialog({ open, onOpenChange, onSynced }: Props) 
     try {
       const r = await testConnection(cfg);
       setStatus({ ok: !!r?.ok, message: r?.ok ? `Connected · ${r?.form_title ?? cfg.formUid} · ${r?.submission_count ?? 0} submissions` : "Connection failed" });
-    } catch (e: any) { setStatus({ ok: false, message: e?.message || "Connection failed" }); }
+    } catch (e: any) {
+      const msg = e?.hint ? `${e.message}. ${e.hint}` : (e?.message || "Connection failed");
+      setStatus({ ok: false, message: msg });
+    }
     finally { setTesting(false); }
   };
 
@@ -51,12 +54,20 @@ export default function KoboSyncDialog({ open, onOpenChange, onSynced }: Props) 
     setSyncing(true);
     try {
       const c = await fetchSubmissions(cfg);
-      toast({ title: "Sync complete", description: `${c.count} submissions loaded from KoboToolbox.` });
+      const warn = c.validation?.warnings?.length ?? 0;
+      toast({
+        title: "Sync complete",
+        description: warn > 0
+          ? `${c.count} submissions loaded · ${warn} schema warning${warn === 1 ? "" : "s"} — see banner above.`
+          : `${c.count} submissions loaded from KoboToolbox.`,
+      });
       onSynced?.();
     } catch (e: any) {
-      toast({ title: "Sync failed", description: e?.message || "Check API token and asset UID.", variant: "destructive" });
+      const description = e?.hint ? `${e.message}. ${e.hint}` : (e?.message || "Check API token and asset UID.");
+      toast({ title: "Sync failed", description, variant: "destructive" });
     } finally { setSyncing(false); }
   };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

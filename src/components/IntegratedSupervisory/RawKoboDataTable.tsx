@@ -12,8 +12,11 @@ import {
   FileSpreadsheet, Filter, Grid3x3, Lightbulb, MapPin, MoreVertical, RefreshCw, Search, Star, Users,
 } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import type { KoboCache } from "./koboClient";
+import { toast } from "sonner";
+import { AlertTriangle } from "lucide-react";
+import { validateCache, type KoboCache } from "./koboClient";
 import { buildDataDictionary, typeIcon, type KoboColumn } from "./koboSchema";
+
 
 type StatusKey = "approved" | "flagged" | "pending";
 
@@ -167,7 +170,18 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
   const safePage = Math.min(page, totalPages - 1);
   const slice = filtered.slice(safePage * pageSize, safePage * pageSize + pageSize);
 
+  const validation = useMemo(() => cache?.validation ?? validateCache(cache), [cache]);
+
   const download = (mime: string, ext: string, cols: string[]) => {
+    if (validation && !validation.ok) {
+      toast.error("Export blocked", { description: validation.errors[0]?.message ?? "Schema validation failed. Re-sync from Kobo Sync." });
+      return;
+    }
+    if (validation && validation.warnings.length > 0) {
+      toast.warning(`Exporting with ${validation.warnings.length} schema warning${validation.warnings.length === 1 ? "" : "s"}`, {
+        description: validation.warnings[0]?.message,
+      });
+    }
     const csv = toCSV(filtered, cols);
     const blob = new Blob([csv], { type: mime });
     const url = URL.createObjectURL(blob);
@@ -175,6 +189,7 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
     a.href = url; a.download = `kobo-submissions-${new Date().toISOString().slice(0, 10)}.${ext}`;
     a.click(); URL.revokeObjectURL(url);
   };
+
 
   const cellDisplay = (v: unknown) => {
     if (v == null) return "—";
@@ -242,7 +257,27 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
         </div>
       </div>
 
+      {/* Schema validation banner */}
+      {validation && (!validation.ok || validation.warnings.length > 0) && (
+        <div className={`mx-4 mb-2 rounded-lg border px-3 py-2 flex items-start gap-2 text-xs ${
+          validation.ok ? "bg-amber-50 border-amber-300 text-amber-900" : "bg-rose-50 border-rose-300 text-rose-900"
+        }`}>
+          <AlertTriangle className={`h-4 w-4 mt-0.5 flex-shrink-0 ${validation.ok ? "text-amber-600" : "text-rose-600"}`} />
+          <div className="min-w-0">
+            <div className="font-semibold">
+              {validation.ok
+                ? `Schema drift detected — ${validation.warnings.length} field${validation.warnings.length === 1 ? "" : "s"} out of sync with the Kobo form.`
+                : "Data dictionary invalid — rendering may be incomplete."}
+            </div>
+            <div className="opacity-90 truncate" title={validation.issues.map((i) => i.message).join("\n")}>
+              {(validation.errors[0] ?? validation.warnings[0])?.message}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
+
       <div className="px-4 pb-3">
         <div className="bg-white rounded-lg p-3 shadow-sm flex flex-wrap items-end gap-3">
           <FilterSelect label="State" value={fState} onChange={(v) => { setFState(v); setPage(0); }} options={stateOpts} placeholder="All States" />

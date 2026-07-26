@@ -8,18 +8,68 @@
  * that the Looker-style dashboard uses natively.
  */
 import { supabase } from "@/integrations/supabase/client";
-import { buildDataDictionary, flattenAll, type KoboColumn } from "./koboSchema";
+import { FunctionsHttpError } from "@supabase/supabase-js";
+import {
+  buildDataDictionary, flattenAll, validateDataDictionary,
+  type KoboColumn, type SchemaValidationReport,
+} from "./koboSchema";
 
 const CONFIG_KEY = "amehnities.integratedSupervisory.koboConfig";
 const CACHE_KEY = "amehnities.integratedSupervisory.koboCache";
 const LAYOUT_KEY = "amehnities.integratedSupervisory.layout";
 
-export interface KoboConfig {
-  serverUrl: string;
-  formUid: string;
-  apiToken: string;
-  autoSync?: boolean;
-  pollMinutes?: number;
+export type KoboErrorCode =
+  | "auth_failed" | "forbidden" | "not_found" | "rate_limited"
+  | "timeout" | "network" | "server_error" | "bad_response" | "unknown";
+
+export class KoboClientError extends Error {
+  code: KoboErrorCode;
+  status: number;
+  detail?: string;
+  hint: string;
+  constructor(code: KoboErrorCode, message: string, status = 0, detail?: string) {
+    super(message);
+    this.name = "KoboClientError";
+    this.code = code;
+    this.status = status;
+    this.detail = detail;
+    this.hint = friendlyHint(code);
+  }
+}
+
+function friendlyHint(code: KoboErrorCode): string {
+  switch (code) {
+    case "auth_failed":  return "Your KoboToolbox API token is invalid or expired. Open Kobo Sync Settings and paste a fresh token from KoboToolbox → Account Settings → API.";
+    case "forbidden":    return "This token doesn't have access to the requested form. Ask the form owner to share it with your Kobo account or use an admin token.";
+    case "not_found":    return "The form UID could not be found on this server. Double-check the Kobo Server URL and Form UID in Kobo Sync Settings.";
+    case "rate_limited": return "KoboToolbox is rate-limiting requests. Wait a minute before syncing again.";
+    case "timeout":      return "KoboToolbox took too long to respond. This is usually transient — try again in a moment.";
+    case "network":      return "Couldn't reach KoboToolbox. Check your internet connection or try again shortly.";
+    case "server_error": return "KoboToolbox returned a server error. It may be temporarily unavailable — retry in a few minutes.";
+    default:             return "Something went wrong talking to KoboToolbox. Please retry.";
+  }
+}
+
+async function parseInvokeError(err: unknown): Promise<KoboClientError> {
+  if (err instanceof FunctionsHttpError) {
+    try {
+      const body = await err.context.text();
+      let parsed: any = null;
+      try { parsed = JSON.parse(body); } catch {}
+      const code = (parsed?.code as KoboErrorCode) || "server_error";
+      const detail = parsed?.detail || parsed?.error || body;
+      const status = Number(parsed?.status) || 0;
+      return new KoboClientError(code, parsed?.error || "KoboToolbox request failed", status, detail);
+    } catch {
+      return new KoboClientError("server_error", "KoboToolbox request failed");
+    }
+  }
+  const msg = (err as Error)?.message || "Unknown error";
+  const lower = msg.toLowerCase();
+  const code: KoboErrorCode =
+    /timeout|aborted/.test(lower) ? "timeout" :
+    /network|failed to fetch/.test(lower) ? "network" : "unknown";
+  return new KoboClientError(code, msg);
 }
 
 export interface KoboField { name: string; type: string; label: string }
@@ -32,7 +82,18 @@ export interface KoboCache {
   flatResults: Record<string, unknown>[];      // fully flattened for widgets
   fields: KoboField[];                         // Kobo survey field schema (from asset)
   columns: KoboColumn[];                       // computed data dictionary
+  validation?: SchemaValidationReport;         // schema drift report (computed on fetch)
 }
+
+export interface KoboConfig {
+  serverUrl: string;
+  formUid: string;
+  apiToken: string;
+  autoSync?: boolean;
+  pollMinutes?: number;
+}
+
+
 
 export function loadKoboConfig(): KoboConfig | null {
   try { const raw = localStorage.getItem(CONFIG_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
@@ -76,7 +137,7 @@ export async function testConnection(cfg: KoboConfig) {
   const { data, error } = await supabase.functions.invoke("kobo-form-manager", {
     body: { action: "test_connection", server_url: cfg.serverUrl, form_uid: cfg.formUid, api_token: cfg.apiToken },
   });
-  if (error) throw error;
+  if (error) throw await parseInvokeError(error);
   return data as any;
 }
 
@@ -94,9 +155,11 @@ async function fetchPage(cfg: KoboConfig, page: number) {
       page,
     },
   });
-  if (error) throw error;
+  if (error) throw await parseInvokeError(error);
   const d = data as any;
-  if (d?.error) throw new Error(d.detail || d.error);
+  if (d?.error) {
+    throw new KoboClientError((d.code as KoboErrorCode) || "server_error", d.error, Number(d.status) || 0, d.detail);
+  }
   return d;
 }
 
@@ -115,15 +178,31 @@ export async function fetchSubmissions(cfg: KoboConfig): Promise<KoboCache> {
   }
   const flatResults = flattenAll(results);
   const columns = buildDataDictionary(flatResults);
+  const fields = Array.isArray(first?.fields) ? first.fields : [];
+  const validation = validateDataDictionary(columns, fields);
+  if (!validation.ok || validation.warnings.length > 0) {
+    console.warn("[Kobo] schema validation issues:", validation.issues);
+  }
   const cache: KoboCache = {
     fetchedAt: new Date().toISOString(),
     formTitle: first?.form_title ?? null,
     count: results.length,
     results,
     flatResults,
-    fields: Array.isArray(first?.fields) ? first.fields : [],
+    fields,
     columns,
+    validation,
   };
   saveKoboCache(cache);
   return cache;
 }
+
+/**
+ * Re-validate a cached dictionary against its stored schema without re-fetching.
+ * Used by consumers (dashboards, exports) as a last-line guard before rendering.
+ */
+export function validateCache(cache: KoboCache | null): SchemaValidationReport | null {
+  if (!cache) return null;
+  return validateDataDictionary(cache.columns ?? [], cache.fields ?? []);
+}
+
