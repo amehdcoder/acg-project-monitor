@@ -505,6 +505,16 @@ export default function KoboFormConfigPanel() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Mapping History & Versioning */}
+      <KoboMappingHistoryDialog
+        open={!!historyOpenFor}
+        onClose={() => setHistoryOpenFor(null)}
+        configId={historyOpenFor?.id ?? null}
+        formTitle={historyOpenFor?.form_title ?? historyOpenFor?.form_uid ?? null}
+        onRolledBack={() => { loadAll(); }}
+      />
     </div>
   );
+
 }
