@@ -42,6 +42,7 @@ import { FieldIntelligenceView } from "@/components/FieldIntelligence";
 import AdminSurveillanceView from "@/components/AdminSurveillanceView";
 import DataQualityView from "@/components/DataQualityView";
 import { MicroplanningView } from "@/components/Microplanning";
+import IntegratedSupervisoryView from "@/components/IntegratedSupervisory/IntegratedSupervisoryView";
 import { QuizBuilder } from "@/components/QuizBuilder";
 import ChangeEnvironmentView from "@/components/ChangeEnvironmentView";
 import PageAccessManager from "@/components/PageAccessManager";
@@ -283,6 +284,7 @@ const Index = () => {
       case "surveillance": return guardedPage("surveillance", <AdminSurveillanceView />);
       case "data-quality": return guardedPage("data-quality", <DataQualityView />);
       case "microplanning": return guardedPage("microplanning", <MicroplanningView />);
+      case "integrated-supervisory": return isAdmin ? <IntegratedSupervisoryView /> : guardedPage("__admin_only__", <></>);
       case "environment": return guardedPage("environment", <ChangeEnvironmentView />);
       case "quizzes": return isAdmin ? guardedPage("quizzes", <QuizBuilder />) : <QuizBuilder />;
       case "ntd-assessment": return <NTDAssessmentView />;

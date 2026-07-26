@@ -617,6 +617,32 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "fetch_submissions") {
+      const { server_url, form_uid, api_token, page_size, page } = params;
+      if (!server_url || !form_uid || !api_token) return j({ error: "Missing server_url/form_uid/api_token" }, 400);
+      const limit = Math.min(Math.max(Number(page_size) || 100, 1), 500);
+      const start = Math.max(Number(page) || 0, 0) * limit;
+      try {
+        const data = await koboFetch(
+          server_url,
+          `/api/v2/assets/${form_uid}/data/?format=json&limit=${limit}&start=${start}`,
+          api_token,
+        );
+        let asset: any = null;
+        try { asset = await koboFetch(server_url, `/api/v2/assets/${form_uid}/?format=json`, api_token); } catch {}
+        return j({
+          ok: true,
+          count: data?.count ?? (Array.isArray(data?.results) ? data.results.length : 0),
+          results: Array.isArray(data?.results) ? data.results : [],
+          form_title: asset?.name ?? null,
+          fields: asset ? extractSurveyFields(asset) : [],
+          fetched_at: new Date().toISOString(),
+        });
+      } catch (e) {
+        return j({ error: "Kobo fetch failed", detail: (e as Error).message }, 502);
+      }
+    }
+
     return j({ error: `Unknown action: ${action}` }, 400);
 
   } catch (e) {
