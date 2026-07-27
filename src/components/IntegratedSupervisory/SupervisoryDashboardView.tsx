@@ -713,6 +713,12 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
                       <input type="checkbox" checked={!!selected.showLegend} onChange={(e) => patch({ showLegend: e.target.checked })} />
                       Show legend
                     </label>
+                    {selected.type === "scorecard" && (
+                      <label className="flex items-center gap-2 text-xs text-[#3C4043]">
+                        <input type="checkbox" checked={!!selected.showTechnicalMeta} onChange={(e) => patch({ showTechnicalMeta: e.target.checked })} />
+                        Show technical subtitle
+                      </label>
+                    )}
                   </>
                 )}
               </TabsContent>
@@ -720,6 +726,20 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
           </aside>
         )}
       </div>
+
+      <ShareDashboardDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        dashboardId={cache?.formUid ?? "kobo-integrated-supervisory"}
+        dashboardLabel={docTitle}
+      />
+      <CalculatedFieldDialog
+        open={calcOpen}
+        onClose={() => setCalcOpen(false)}
+        columns={columns}
+        sampleRow={rows[0] ?? null}
+        onSave={(cf) => setCalcFields((prev) => [...prev.filter((x) => x.id !== cf.id), cf])}
+      />
     </div>
   );
 }
