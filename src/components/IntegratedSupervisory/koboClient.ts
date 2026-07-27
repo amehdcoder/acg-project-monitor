@@ -171,17 +171,29 @@ export async function fetchSubmissions(cfg: KoboConfig): Promise<KoboCache> {
   const total = Number(first?.count) || (first?.results?.length ?? 0);
   const results: any[] = [...(first?.results ?? [])];
   let page = 1;
-  while (results.length < total && results.length < HARD_CAP && (first?.results?.length ?? 0) === PAGE_SIZE) {
+  let lastLen = results.length;
+  while (
+    lastLen === PAGE_SIZE &&
+    results.length < total &&
+    results.length < HARD_CAP
+  ) {
     const next = await fetchPage(cfg, page);
     const chunk = Array.isArray(next?.results) ? next.results : [];
     if (chunk.length === 0) break;
     results.push(...chunk);
-    if (chunk.length < PAGE_SIZE) break;
+    lastLen = chunk.length;
     page++;
   }
-  const flatResults = flattenAll(results);
-  const columns = buildDataDictionary(flatResults);
+  // Preserve exact Kobo chronological order (newest first).
+  results.sort((a, b) => {
+    const ta = new Date(a?._submission_time ?? 0).getTime();
+    const tb = new Date(b?._submission_time ?? 0).getTime();
+    return tb - ta;
+  });
+  const survey = Array.isArray(first?.survey) ? first.survey : [];
   const fields = Array.isArray(first?.fields) ? first.fields : [];
+  const flatResults = flattenAll(results, survey.length ? survey : fields);
+  const columns = buildDataDictionary(flatResults, survey.length ? survey : fields);
   const validation = validateDataDictionary(columns, fields);
   if (!validation.ok || validation.warnings.length > 0) {
     console.warn("[Kobo] schema validation issues:", validation.issues);
@@ -195,13 +207,14 @@ export async function fetchSubmissions(cfg: KoboConfig): Promise<KoboCache> {
     fields,
     columns,
     validation,
-    survey: Array.isArray(first?.survey) ? first.survey : [],
+    survey,
     choices: Array.isArray(first?.choices) ? first.choices : [],
     formUid: cfg.formUid,
   };
   saveKoboCache(cache);
   return cache;
 }
+
 
 /**
  * Re-validate a cached dictionary against its stored schema without re-fetching.

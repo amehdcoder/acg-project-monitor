@@ -91,10 +91,12 @@ export default function RecordPreviewDrawer({ open, onClose, record, columns, re
                     {resolver?.resolveHeader(col.key) || col.label}
                   </label>
                   {value ? (
-                    Array.isArray(raw) || value.includes(",") ? (
+                    Array.isArray(raw) ? (
                       <div className="flex flex-wrap gap-1.5">
-                        {value.split(",").map((v, i) => (
-                          <Badge key={i} variant="secondary" className="bg-slate-100 text-slate-800 font-medium border-slate-200">{v.trim()}</Badge>
+                        {(raw as unknown[]).map((v, i) => (
+                          <Badge key={i} variant="secondary" className="bg-slate-100 text-slate-800 font-medium border-slate-200">
+                            {resolver ? resolver.resolveValue(col.key, v) : String(v)}
+                          </Badge>
                         ))}
                       </div>
                     ) : (
@@ -105,6 +107,7 @@ export default function RecordPreviewDrawer({ open, onClose, record, columns, re
                   ) : (
                     <div className="text-sm italic text-slate-400 font-normal">No Response</div>
                   )}
+
                 </div>
               ))}
             </div>
