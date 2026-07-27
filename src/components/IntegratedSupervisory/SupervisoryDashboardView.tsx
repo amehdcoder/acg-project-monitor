@@ -496,6 +496,14 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
             </>
           )}
           <Button variant="ghost" size="sm" className="h-8" onClick={exportCSV}><Download className="h-4 w-4 mr-1" /> Export</Button>
+          {editMode && (
+            <Button variant="ghost" size="sm" className="h-8" onClick={() => setCalcOpen(true)}>
+              <Calculator className="h-4 w-4 mr-1" /> Calculated field
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" className="h-8" onClick={() => setShareOpen(true)}>
+            <Share2 className="h-4 w-4 mr-1" /> Share
+          </Button>
           <div className="w-px h-6 bg-[#DADCE0] mx-1" />
           <Button
             variant={editMode ? "secondary" : "outline"} size="sm" className="h-8"
