@@ -11,19 +11,14 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  DndContext, PointerSensor, useSensor, useSensors, closestCenter, DragEndEvent,
-} from "@dnd-kit/core";
-import { arrayMove, SortableContext, useSortable, rectSortingStrategy } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, AreaChart, Area,
   PieChart, Pie, Cell, CartesianGrid, XAxis, YAxis, Tooltip, Legend,
 } from "recharts";
 import {
   BarChart3, Circle, Grid3x3, Palette, PieChart as PieIcon, Plus, Search,
-  Settings2, Sliders, Table as TableIcon, Trash2, GripVertical, Eye, Pencil,
-  RefreshCw, Undo2, Redo2, Download, LayoutGrid, LineChart as LineIcon, Type,
-  MapPin, Loader2, X,
+  Settings2, Sliders, Table as TableIcon, Trash2, Eye, Pencil,
+  RefreshCw, Undo2, Redo2, Download, LayoutGrid, LineChart as LineIcon,
+  MapPin, Loader2, X, Share2, Calculator,
 } from "lucide-react";
 import type { KoboCache } from "./koboClient";
 import { loadLayout, saveLayout } from "./koboClient";
@@ -31,6 +26,10 @@ import {
   buildDataDictionary, coerceNumber, partitionDimensionsMetrics, typeIcon,
   type KoboColumn,
 } from "./koboSchema";
+import { getResolver, type KoboLabelResolver } from "./koboLabelResolver";
+import CanvasGridLayout, { type CanvasItem } from "./CanvasGridLayout";
+import ShareDashboardDialog from "./ShareDashboardDialog";
+import CalculatedFieldDialog, { type CalculatedField, computeCalculatedField } from "./CalculatedFieldDialog";
 
 // ── Looker palette ────────────────────────────────────────────────────────
 const GOOGLE_PALETTE = ["#4285F4", "#34A853", "#FBBC04", "#EA4335", "#AB47BC", "#00ACC1", "#FF7043", "#9CCC65"];
@@ -47,9 +46,12 @@ interface Widget {
   agg?: "sum" | "avg" | "count" | "min" | "max";
   colspan: 3 | 4 | 6 | 8 | 12;
   rowspan: 1 | 2 | 3;
-  colorFrom?: number;   // palette offset
+  x?: number;
+  y?: number;
+  colorFrom?: number;
   bg?: string;
   showLegend?: boolean;
+  showTechnicalMeta?: boolean; // scorecard subtitle toggle — hidden by default
 }
 
 const DEFAULT_LAYOUT = (cols: KoboColumn[]): Widget[] => {
@@ -71,18 +73,19 @@ const DEFAULT_LAYOUT = (cols: KoboColumn[]): Widget[] => {
 };
 
 // ── Aggregation helpers ────────────────────────────────────────────────────
-function aggregate(rows: Record<string, unknown>[], w: Widget): { name: string; value: number }[] {
+function aggregate(rows: Record<string, unknown>[], w: Widget, resolver: KoboLabelResolver | null): { name: string; value: number }[] {
   if (!w.dimension) {
     return [{ name: w.title, value: rows.length }];
   }
   const groups = new Map<string, number[]>();
   for (const r of rows) {
     const raw = r[w.dimension];
-    const key = raw == null || raw === ""
-      ? "—"
-      : typeof raw === "object"
-        ? (raw as any)?.label ?? (raw as any)?.uid ?? JSON.stringify(raw)
-        : Array.isArray(raw) ? raw.join(", ") : String(raw);
+    let key: string;
+    if (raw == null || raw === "") key = "—";
+    else if (resolver) key = resolver.resolveValue(w.dimension, raw) || "—";
+    else if (typeof raw === "object") key = (raw as any)?.label ?? (raw as any)?.uid ?? JSON.stringify(raw);
+    else if (Array.isArray(raw)) key = raw.join(", ");
+    else key = String(raw);
     const metricVal = w.metric ? coerceNumber(r[w.metric]) : 1;
     const arr = groups.get(key) ?? [];
     arr.push(metricVal);
@@ -104,8 +107,8 @@ function aggregate(rows: Record<string, unknown>[], w: Widget): { name: string; 
 }
 
 // ── Chart body ────────────────────────────────────────────────────────────
-function ChartBody({ widget, data, columns }: { widget: Widget; data: Record<string, unknown>[]; columns: KoboColumn[] }) {
-  const series = useMemo(() => aggregate(data, widget), [data, widget]);
+function ChartBody({ widget, data, columns, resolver }: { widget: Widget; data: Record<string, unknown>[]; columns: KoboColumn[]; resolver: KoboLabelResolver | null }) {
+  const series = useMemo(() => aggregate(data, widget, resolver), [data, widget, resolver]);
   const colors = GOOGLE_PALETTE.slice(widget.colorFrom ?? 0).concat(GOOGLE_PALETTE);
 
   if (widget.type === "scorecard") {
@@ -115,8 +118,10 @@ function ChartBody({ widget, data, columns }: { widget: Widget; data: Record<str
     return (
       <div className="h-full w-full flex flex-col justify-center px-4">
         <div className="text-[11px] uppercase tracking-wide text-[#5F6368] font-medium">{widget.title}</div>
-        <div className="text-4xl font-semibold" style={{ color: colors[0] }}>{Number(value).toLocaleString()}</div>
-        <div className="text-[11px] text-[#5F6368] mt-1">{widget.dimension ? `Distinct ${widget.dimension}` : "Rows"}</div>
+        <div className="text-4xl font-bold mt-1" style={{ color: colors[0] }}>{Number(value).toLocaleString()}</div>
+        {widget.showTechnicalMeta && (
+          <div className="text-[10px] text-slate-400 mt-1 font-mono">{widget.dimension ? `Distinct ${widget.dimension}` : "Rows"}</div>
+        )}
       </div>
     );
   }
@@ -205,20 +210,19 @@ function ChartBody({ widget, data, columns }: { widget: Widget; data: Record<str
     );
   }
   if (widget.type === "table") {
-    // Show the first ~12 columns to keep the widget usable; the Raw Data tab has full width.
+    // Show the first ~8 columns to keep the widget usable; the Raw Data tab has full width.
     const cols = columns.filter((c) => !c.system).slice(0, 8);
     return (
       <div className="h-full overflow-auto text-xs">
         <table className="w-full border-collapse">
           <thead className="sticky top-0 bg-[#F8F9FA] border-b border-[#DADCE0]">
-            <tr>{cols.map((c) => <th key={c.key} className="text-left px-2 py-1.5 font-medium text-[#3C4043] whitespace-nowrap">{c.label}</th>)}</tr>
+            <tr>{cols.map((c) => <th key={c.key} className="text-left px-2 py-1.5 font-medium text-[#3C4043] whitespace-nowrap">{resolver?.resolveHeader(c.key) || c.label}</th>)}</tr>
           </thead>
           <tbody>
             {data.slice(0, 200).map((r, i) => (
               <tr key={i} className="border-b border-[#F1F3F4] hover:bg-[#F8F9FA]">
                 {cols.map((c) => {
-                  const v = r[c.key];
-                  const display = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+                  const display = resolver ? resolver.resolveValue(c.key, r[c.key]) : (r[c.key] == null ? "" : String(r[c.key]));
                   return <td key={c.key} className="px-2 py-1.5 max-w-[220px] truncate" title={display}>{display}</td>;
                 })}
               </tr>
