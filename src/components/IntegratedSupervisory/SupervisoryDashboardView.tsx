@@ -362,7 +362,7 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
     if (calcFields.length === 0) return filteredRows;
     return filteredRows.map((r) => {
       const out = { ...r };
-      for (const cf of calcFields) out[cf.name] = computeCalculatedField(cf, r);
+      for (const cf of calcFields) out[cf.name] = computeCalculatedField(cf.formula, r);
       return out;
     });
   }, [filteredRows, calcFields]);
