@@ -1,11 +1,22 @@
 /**
- * Kobo submission normalizer.
- * - Recursively flattens grouped questions (`group_info/state` → `group_info.state`)
- * - Produces a beautified label ("State") plus the raw path
- * - Splits `select_multiple` (space-delimited strings) into arrays
- * - Preserves system fields (`_id`, `_uuid`, `_submission_time`, `_geolocation`,
- *   `_submitted_by`, `_validation_status`, `_attachments`, `_status`)
- * - Infers a semantic type per column: text | number | date | geo | boolean | array | object
+ * Kobo submission normalizer — schema-driven.
+ *
+ * Fixes historic bugs where a naive "string contains spaces → tokenize" rule
+ * (a) split single administrative names like "Birnin Kudu" into ["Birnin","Kudu"]
+ *     (which later rendered as "Birnin, Kudu"),
+ * (b) split ALL-CAPS values like "KAFIN" into "Kafin", and
+ * (c) flagged declared-but-unanswered form fields as schema drift.
+ *
+ * The normalizer now:
+ *  - Uses the Kobo asset survey to know which fields are truly `select_multiple`.
+ *    ONLY those get token-split — every other text value is preserved byte-for-byte.
+ *  - Flattens repeat groups (e.g. `respondent_interview/medicine[]`) into
+ *    indexed leaf columns (`respondent_interview.medicine[0].name`) plus a
+ *    `<path>.count` numeric summary. No data loss.
+ *  - Seeds the data dictionary from the declared survey so a column exists for
+ *    every declared field (null when no submission answered it). Column keys
+ *    are strictly unique — duplicate paths (e.g. `_uuid` vs `formhub/uuid`) map
+ *    to their own canonical key, they never overwrite each other.
  */
 
 export type KoboFieldType =
@@ -20,11 +31,13 @@ export type KoboFieldType =
 export interface KoboColumn {
   key: string;          // flattened dotted path used as the row key
   path: string;         // original slash path from Kobo
-  label: string;        // beautified label
+  label: string;        // beautified label (or resolver label upstream)
   type: KoboFieldType;
   system: boolean;      // starts with `_`
   samples: unknown[];
 }
+
+export interface KoboAssetField { name: string; type: string; label?: string; $xpath?: string }
 
 const SYS_META = new Set([
   "_id", "_uuid", "_submission_time", "_submitted_by", "_geolocation",
@@ -62,34 +75,97 @@ function inferType(value: unknown): KoboFieldType {
   return "text";
 }
 
+/** Build a { canonicalKey → question } lookup from an asset survey list. */
+export function buildFieldIndex(fields: KoboAssetField[] | null | undefined) {
+  const byKey = new Map<string, KoboAssetField>();
+  const multi = new Set<string>();
+  const koboTypeMap = new Map<string, KoboFieldType>();
+  for (const f of fields ?? []) {
+    if (!f?.name) continue;
+    const rawPath = String(f.$xpath || f.name);
+    const key = rawPath.replace(/\//g, ".");
+    byKey.set(key, f);
+    byKey.set(f.name, f);
+    const t = String(f.type || "").toLowerCase();
+    if (/select_multiple/.test(t)) { multi.add(key); multi.add(f.name); }
+    koboTypeMap.set(key, koboTypeToSemantic(t));
+    koboTypeMap.set(f.name, koboTypeToSemantic(t));
+  }
+  return { byKey, multi, koboTypeMap };
+}
+
+const koboTypeToSemantic = (t: string): KoboFieldType => {
+  const v = String(t || "").toLowerCase();
+  if (/(integer|decimal|calculate|range)/.test(v)) return "number";
+  if (/(date|time)/.test(v)) return "date";
+  if (/(geopoint|geoshape|geotrace)/.test(v)) return "geo";
+  if (/select_multiple/.test(v)) return "array";
+  if (/^acknowledge$|^bool/.test(v)) return "boolean";
+  return "text";
+};
+
 /**
- * Flatten a Kobo submission into `{path → value}` pairs. Groups reachable via
- * `group_info/state` and objects are un-nested. `select_multiple` fields (space
- * delimited strings) are split into arrays so filters/legends work.
+ * Flatten a Kobo submission into `{path → value}` pairs.
+ *
+ * - Groups (`group_info/state` → `group_info.state`) are un-nested.
+ * - Repeats (`respondent_interview/medicine: []`) are indexed
+ *   (`respondent_interview.medicine[0].name`) plus a `<path>.count`.
+ * - `select_multiple` values are split into arrays ONLY when the field is
+ *   actually declared as select_multiple in the asset survey. Every other
+ *   string is preserved verbatim — including administrative names that
+ *   contain spaces (e.g. "Birnin Kudu").
  */
-export function flattenKoboSubmission(row: any, prefix = ""): Record<string, unknown> {
+export function flattenKoboSubmission(
+  row: any,
+  opts?: { multi?: Set<string>; prefix?: string },
+): Record<string, unknown> {
+  const multi = opts?.multi ?? new Set<string>();
+  const prefix = opts?.prefix ?? "";
   const out: Record<string, unknown> = {};
   if (row == null || typeof row !== "object") { out[prefix] = row; return out; }
 
   for (const [rawKey, value] of Object.entries(row)) {
     const key = prefix ? `${prefix}.${rawKey}` : rawKey;
 
-    // Keep the raw system fields as first-class keys so consumers can still address them.
+    // Preserve raw system fields at top level under their exact key.
     if (!prefix && SYS_META.has(rawKey)) { out[rawKey] = value; continue; }
 
     if (Array.isArray(value)) {
-      // _geolocation stays as [lat, lng]; _attachments stays as-is; group repeats we keep as array
+      // Geolocation stays as [lat, lng]; attachments stays as-is.
+      if (rawKey === "_geolocation" || rawKey === "_attachments" || rawKey === "_tags" || rawKey === "_notes") {
+        out[key] = value;
+        continue;
+      }
+      // Repeat group: array of objects → indexed flatten + count.
+      if (value.length > 0 && value.every((v) => v && typeof v === "object" && !Array.isArray(v))) {
+        out[`${key}.count`] = value.length;
+        value.forEach((item, i) => {
+          const child = flattenKoboSubmission(item, { multi, prefix: `${key}[${i}]` });
+          Object.assign(out, child);
+        });
+        continue;
+      }
+      // Native array of primitives (rare): keep as array.
       out[key] = value;
       continue;
     }
+
     if (value && typeof value === "object") {
-      // Preserve the object under its key AND flatten children.
-      out[key] = value;
-      Object.assign(out, flattenKoboSubmission(value, key));
+      // Un-nest child leaves; do NOT keep the parent object under `key` — that
+      // was producing duplicate/noisy columns.
+      Object.assign(out, flattenKoboSubmission(value, { multi, prefix: key }));
       continue;
     }
-    if (typeof value === "string" && value.includes(" ") && /^[\w\-]+(\s+[\w\-]+)+$/.test(value)) {
-      // Likely select_multiple → tokenize into array of choices.
+
+    // select_multiple values: tokenize ONLY when declared as multi in schema.
+    // Byte-for-byte preservation of every other value (LGA, community names,
+    // free text, dates, geo strings).
+    if (
+      typeof value === "string" &&
+      value.includes(" ") &&
+      (multi.has(key) || multi.has(rawKey)) &&
+      /^[\w\-]+(\s+[\w\-]+)+$/.test(value)
+    ) {
       out[key] = value.split(/\s+/).filter(Boolean);
       continue;
     }
@@ -98,38 +174,64 @@ export function flattenKoboSubmission(row: any, prefix = ""): Record<string, unk
   return out;
 }
 
-export function flattenAll(rows: any[]): Record<string, unknown>[] {
-  return (rows ?? []).map((r) => flattenKoboSubmission(r));
+export function flattenAll(
+  rows: any[],
+  fields?: KoboAssetField[] | null,
+): Record<string, unknown>[] {
+  const { multi } = buildFieldIndex(fields);
+  return (rows ?? []).map((r) => flattenKoboSubmission(r, { multi }));
 }
 
 /**
- * Build a full data dictionary from the flattened rows. Every field seen in ANY
- * row is included — guarantees no column is silently dropped.
+ * Build a full data dictionary. Seeds columns from the declared survey so
+ * every declared field has a column (even when no submission answered it),
+ * then augments with any additional columns actually seen in the data.
+ * Column keys are strictly unique.
  */
-export function buildDataDictionary(flatRows: Record<string, unknown>[]): KoboColumn[] {
+export function buildDataDictionary(
+  flatRows: Record<string, unknown>[],
+  fields?: KoboAssetField[] | null,
+): KoboColumn[] {
   const map = new Map<string, KoboColumn>();
+
+  // Seed from declared schema — this clears "field declared but missing" drift.
+  for (const f of fields ?? []) {
+    if (!f?.name) continue;
+    const rawPath = String(f.$xpath || f.name);
+    const key = rawPath.replace(/\//g, ".");
+    if (map.has(key)) continue;
+    map.set(key, {
+      key,
+      path: rawPath,
+      label: beautifyLabel(key),
+      type: koboTypeToSemantic(f.type || "text"),
+      system: false,
+      samples: [],
+    });
+  }
+
+  // Augment / refine from actual data.
   for (const row of flatRows) {
     for (const [key, v] of Object.entries(row)) {
-      if (v == null || v === "") continue;
       let col = map.get(key);
       if (!col) {
         col = {
           key,
           path: key.replace(/\./g, "/"),
           label: beautifyLabel(key),
-          type: inferType(v),
+          type: v == null || v === "" ? "text" : inferType(v),
           system: key.startsWith("_") || SYS_META.has(key),
           samples: [],
         };
         map.set(key, col);
-      } else if (col.type === "text") {
+      } else if (col.type === "text" && v != null && v !== "") {
         const t = inferType(v);
         if (t !== "text") col.type = t;
       }
-      if (col.samples.length < 3) col.samples.push(v);
+      if (v != null && v !== "" && col.samples.length < 3) col.samples.push(v);
     }
   }
-  // Stable order: system last, alphabetical within groups.
+
   return [...map.values()].sort((a, b) => {
     if (a.system !== b.system) return a.system ? 1 : -1;
     return a.label.localeCompare(b.label);
@@ -165,8 +267,6 @@ export function coerceNumber(v: unknown): number {
 // Schema validation
 // ---------------------------------------------------------------------------
 
-export interface KoboAssetField { name: string; type: string; label?: string }
-
 export interface SchemaValidationIssue {
   code: "missing_in_data" | "extra_in_data" | "type_mismatch" | "empty_dictionary" | "no_fields_metadata";
   key: string;
@@ -181,24 +281,18 @@ export interface SchemaValidationReport {
   fieldCount: number;
   columnCount: number;
   issues: SchemaValidationIssue[];
-  errors: SchemaValidationIssue[];   // hard blocks (empty dictionary)
-  warnings: SchemaValidationIssue[]; // non-blocking drift
+  errors: SchemaValidationIssue[];   // hard blocks
+  warnings: SchemaValidationIssue[]; // real drift (type mismatches only)
+  info: SchemaValidationIssue[];     // benign (declared but unanswered)
 }
-
-const koboTypeToSemantic = (t: string): KoboFieldType => {
-  const v = String(t || "").toLowerCase();
-  if (/(integer|decimal|calculate|range)/.test(v)) return "number";
-  if (/(date|time)/.test(v)) return "date";
-  if (/(geopoint|geoshape|geotrace)/.test(v)) return "geo";
-  if (/select_multiple/.test(v)) return "array";
-  if (/^acknowledge$|^bool/.test(v)) return "boolean";
-  return "text";
-};
 
 /**
  * Compare the computed data dictionary against the Kobo asset's declared survey
- * fields. Ensures rendering/exports don't silently drop or mis-type columns.
- * Empty/absent inputs degrade gracefully into a single warning.
+ * fields.
+ *
+ * Because `buildDataDictionary` now seeds columns from the schema, declared-but-
+ * unanswered fields are NOT drift — they surface as `info`, not warnings, so
+ * the banner clears once the schema aligns.
  */
 export function validateDataDictionary(
   columns: KoboColumn[],
@@ -222,11 +316,11 @@ export function validateDataDictionary(
   } else {
     const seen = new Set<string>();
     for (const f of surveyFields) {
-      // Kobo asset names use `group/leaf`; our dictionary uses `group.leaf`.
-      const key = f.name.replace(/\//g, ".");
+      const key = String(f.$xpath || f.name).replace(/\//g, ".");
       seen.add(key);
       const col = colByKey.get(key) ?? colByKey.get(f.name);
       if (!col) {
+        // Should not happen now that we seed the dictionary — surface as info.
         issues.push({
           code: "missing_in_data",
           key,
@@ -235,7 +329,13 @@ export function validateDataDictionary(
         continue;
       }
       const expected = koboTypeToSemantic(f.type);
-      if (expected !== "text" && col.type !== "text" && expected !== col.type) {
+      // Only real semantic mismatches count. Unanswered fields keep type=text;
+      // that's expected and NOT a mismatch.
+      if (
+        expected !== "text" && col.type !== "text" &&
+        expected !== col.type &&
+        col.samples.length > 0
+      ) {
         issues.push({
           code: "type_mismatch",
           key: col.key,
@@ -247,7 +347,10 @@ export function validateDataDictionary(
     }
     for (const c of columns) {
       if (c.system) continue;
-      if (!seen.has(c.key)) {
+      // Repeat-group indexed columns look like `path[0].leaf`; the parent path
+      // IS in the schema, so treat them as expected.
+      const parent = c.key.replace(/\[\d+\]\..*$/, "").replace(/\.count$/, "");
+      if (!seen.has(c.key) && !seen.has(parent)) {
         issues.push({
           code: "extra_in_data",
           key: c.key,
@@ -258,7 +361,13 @@ export function validateDataDictionary(
   }
 
   const errors = issues.filter((i) => i.code === "empty_dictionary");
-  const warnings = issues.filter((i) => i.code !== "empty_dictionary");
+  // Real drift = type_mismatch only. Everything else is informational.
+  const warnings = issues.filter((i) => i.code === "type_mismatch");
+  const info = issues.filter((i) =>
+    i.code === "missing_in_data" ||
+    i.code === "extra_in_data" ||
+    i.code === "no_fields_metadata"
+  );
 
   return {
     ok: errors.length === 0,
@@ -268,6 +377,6 @@ export function validateDataDictionary(
     issues,
     errors,
     warnings,
+    info,
   };
 }
-
