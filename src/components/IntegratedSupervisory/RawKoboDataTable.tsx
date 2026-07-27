@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -16,6 +15,9 @@ import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
 import { validateCache, type KoboCache } from "./koboClient";
 import { buildDataDictionary, typeIcon, type KoboColumn } from "./koboSchema";
+import { getResolver } from "./koboLabelResolver";
+import RecordPreviewDrawer from "./RecordPreviewDrawer";
+import { exportXlsx, exportCsv } from "./exportKoboData";
 
 
 type StatusKey = "approved" | "flagged" | "pending";
