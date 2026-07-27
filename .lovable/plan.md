@@ -1,56 +1,72 @@
-# TanStack Query + Server Aggregation Refactor
 
-You chose the most aggressive scope: rewrite every table view, move dashboard aggregation into SQL, and paginate everything. That touches ~200 hooks, ~500 components, and the entire dashboard layer. It cannot land safely in one turn — a single-shot rewrite will break offline sync, MDA/BMZ/ACSM/SBC dashboards, custom Dashboard Studio widgets, and the cascading location dropdowns. I need to sequence it across turns.
+## Scope
+Upgrade the Integrated Supervisory Dashboard (KoboToolbox) with 7 fixes. All work stays inside `src/components/IntegratedSupervisory/` plus tiny helpers, one new table for share configs, and two npm packages.
 
-Here is the phased plan. Each phase ends in a working app. I will pause for your OK before starting the next phase so we can verify nothing regressed.
+## Dependencies to add
+- `exceljs` — styled XLSX export
+- `react-grid-layout` + `@types/react-grid-layout` — freeform canvas
+- `expr-eval` — calculated field formulas
 
-## Phase 1 — Foundation (this turn)
+## Files to add
+1. `src/components/IntegratedSupervisory/koboLabelResolver.ts`
+   - `KoboLabelResolver` class built from `asset.content.survey` + `asset.content.choices`.
+   - `resolveValue(fieldKey, rawValue)` handles null, stringified JSON arrays (`["KAFIN","HAUSA"]`), space-delimited `select_multiple`, and arrays; joins labels with `", "`.
+   - `resolveHeader(fieldKey)` returns the question label.
+   - Exposed on `KoboCache` as a lazy singleton keyed by `formUid`.
 
-Installs the primitives every later phase depends on. No visible behavior change.
+2. `src/components/IntegratedSupervisory/RecordPreviewDrawer.tsx`
+   - Slide-over drawer (Radix `Sheet`) showing all schema questions grouped by group prefix, resolved values, badges for empty/multi-select, header in slate-900.
 
-1. Add `@tanstack/react-query` + devtools; wrap `App.tsx` in `QueryClientProvider` with `staleTime: 60_000`, `gcTime: 300_000`, `refetchOnWindowFocus: false`, `refetchOnReconnect: "always"`, `retry: 2` with exponential backoff.
-2. New primitives:
-   - `src/hooks/useDebouncedValue.ts` — 300ms debounce for search/filter inputs.
-   - `src/hooks/useSubmitLock.ts` — instant-disable wrapper for submit/refresh buttons.
-   - `src/hooks/useCursorQuery.ts` — 50/page cursor pagination using `range()` + `keepPreviousData`.
-   - `src/hooks/useSupabaseQuery.ts` — thin wrapper standardizing keys and error handling.
-3. Migration: B-Tree indexes on foreign keys, `user_id`, and hot `WHERE`/`ORDER BY` columns across `form_submissions`, `user_project_assignments`, `microplan_entries`, `attendance_records`, `bmz_monitoring`, `acsm_reports`, `sbc_reports`, `ces_household_visits`, `chat_messages`, `notifications`, `case_activities`, `submission_versions`. All `IF NOT EXISTS`, plain `CREATE INDEX` (migrations can't run `CONCURRENTLY`).
-4. Migration: pre-joined views with `security_invoker=on` so RLS on the base tables still applies:
-   - `v_form_submissions_enriched` — form_submissions ⨝ forms ⨝ profiles.
-   - `v_user_project_assignments_enriched` — assignments ⨝ projects ⨝ profiles.
-   - `v_microplan_entries_enriched` — microplan_entries ⨝ reference_locations.
+3. `src/components/IntegratedSupervisory/exportKoboData.ts`
+   - `exportXlsx(rows, columns, resolver)` — ExcelJS workbook, frozen header row (28px, `#1E293B`/white bold), auto column widths, thin `#E2E8F0` borders, wrap text, resolved values.
+   - `exportCsv(rows, columns, resolver)` — clean CSV using resolved values.
 
-## Phase 2 — Hot-path migration (next turn)
+4. `src/components/IntegratedSupervisory/CanvasGridLayout.tsx`
+   - Wraps `react-grid-layout` with `WidthProvider`, freeform (`compactType={null}`), persists layout via existing `saveLayout` helper.
 
-Migrate the top-traffic surfaces to the new primitives. Each becomes a `useQuery` with cursor pagination and debounced filters.
+5. `src/components/IntegratedSupervisory/CalculatedFieldDialog.tsx`
+   - Uses `expr-eval` to preview a formula against sample rows; stores calculated fields in the dashboard config; exposes them as pseudo-columns in the Data panel.
 
-- `UsersView`, `FormsView` (My Forms list), `MdaDashboardView`, `BmzDashboard`, `DigitalAttendanceView`, `AdminSubmissionEditor`.
-- All submit buttons in these flows adopt `useSubmitLock`.
-- Search inputs adopt `useDebouncedValue`.
+6. `src/components/IntegratedSupervisory/ShareDashboardDialog.tsx`
+   - Access levels: `PUBLIC_LINK`, `AUTHENTICATED`, `PROJECT_MEMBER`, `RESTRICTED` (email chip input).
+   - Realtime sync toggle. Copy-link button generates `/shared-dashboard/:token`.
 
-## Phase 3 — Server-side aggregation RPCs (turn after)
+## Files to modify
+- `koboClient.ts`: cache the raw asset content (`survey` + `choices`) alongside `fields`, and construct the resolver on load; add `assetContent` to `KoboCache`.
+- `RawKoboDataTable.tsx`:
+  - Remove `Status` column.
+  - Render all dynamic Kobo question columns without horizontal truncation (min-width per column, horizontal virtualization already present).
+  - Use resolver for every cell + header label.
+  - Add "Preview" button per row opening `RecordPreviewDrawer`.
+  - Swap Excel/CSV downloads to new `exportKoboData` helpers.
+- `SupervisoryDashboardView.tsx`:
+  - Replace dnd-kit canvas with `CanvasGridLayout`.
+  - Add "+ Calculated field" in Data panel.
+  - Add "Share" button in header opening `ShareDashboardDialog`.
+  - Route dimension values + filter dropdowns through resolver.
+- `KPICard` (scorecard widget): add `showTechnicalMeta` (default `false`); hide "Rows / Distinct …" subtext unless toggled in Setup/Style panel.
 
-For each dashboard that currently pulls the full dataset:
+## Database
+One migration for share configs:
+```
+create table public.dashboard_shares (
+  id uuid primary key default gen_random_uuid(),
+  dashboard_id text not null,
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  access_level text not null check (access_level in ('PUBLIC_LINK','AUTHENTICATED','PROJECT_MEMBER','RESTRICTED')),
+  share_token uuid unique,
+  allowed_user_ids uuid[] default '{}',
+  allowed_project_ids uuid[] default '{}',
+  allow_realtime boolean not null default true,
+  created_at timestamptz not null default now()
+);
+```
++ GRANTs (`anon` SELECT for PUBLIC_LINK lookups by token, `authenticated` full), RLS policies: owner full; SELECT allowed when access_level='PUBLIC_LINK', or 'AUTHENTICATED' with auth.uid() not null, or 'RESTRICTED' with uid in allowed_user_ids, or 'PROJECT_MEMBER' via existing project membership.
 
-- Add a `rpc_<name>_summary(project_id, from, to)` returning pre-aggregated KPI/chart rows.
-- Rewrite the dashboard hook (`useBmzDashboard`, `useAcsmDashboard`, `useSbcDashboard`, `useSeeClearDashboard`, `useMdaKpis`, `useIrfDashboard`) to call the RPC via `useQuery`.
-- Charts consume aggregated rows; raw-row tables inside the dashboard switch to cursor pagination.
+## Out of scope
+- No changes to Microplanning, MDA Checklist, or other modules.
+- No changes to Supabase auth or edge functions beyond what the resolver needs (the asset's `content.survey`/`content.choices` are already available from `kobo-form-manager`; if not returned today, `fetch_submissions` response will include them).
 
-## Phase 4 — Long tail
-
-Sweep remaining list views, secondary hooks, chat/notification streams, and offline sync consumers. Delete now-unused ad-hoc fetch helpers.
-
-## Technical notes
-
-- **Offline resilience is preserved.** The existing `warmCacheUserForms`, `offlineFormCache`, and IndexedDB seeding stay in place; React Query only owns the online cache. Offline reads continue to hit IndexedDB via the current adapters.
-- **RLS is untouched.** Views use `security_invoker=on` so `auth.uid()` still filters rows through the base-table policies. No new grants beyond `SELECT` on the views to `authenticated`.
-- **Query keys.** Standardized as `[domain, table, filters, cursor]` so identical concurrent requests dedupe automatically.
-- **Fetch chunking.** `fetchAllRows` / `fetchAllRowsKeyset` remain for aggregation code paths until their dashboards move to RPCs in Phase 3.
-- **Type parsing perf.** New helpers type `.select()` strings as plain `string` and use `.returns<T>()` to avoid the supabase-js type-parsing blowup on long selects.
-- **No client-side edits to `src/integrations/supabase/client.ts`** (auto-generated).
-
-## What ships this turn
-
-Only Phase 1: dependency install, provider setup, four hook primitives, indexes migration, three enriched views migration. No component behavior changes yet — so nothing that already works can break.
-
-Approve to proceed with Phase 1.
+## Verification
+- Run `tsgo` after edits, confirm no type errors.
+- Manual: sync a Kobo form, verify LGA/WARD values render as labels in table, KPIs, filters; preview drawer opens; XLSX opens in Excel with frozen header and borders; canvas widgets drag/resize; share dialog persists a row.
