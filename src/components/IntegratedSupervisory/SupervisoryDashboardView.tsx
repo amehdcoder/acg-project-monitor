@@ -391,12 +391,15 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
     setSelectedId(id);
   };
 
-  const onDragEnd = (e: DragEndEvent) => {
-    const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    const oldI = widgets.findIndex((w) => w.id === active.id);
-    const newI = widgets.findIndex((w) => w.id === over.id);
-    commit(arrayMove(widgets, oldI, newI));
+  const onLayoutChange = (layout: { i: string; x: number; y: number; w: number; h: number }[]) => {
+    const map = new Map(layout.map((l) => [l.i, l]));
+    const next = widgets.map((w) => {
+      const l = map.get(w.id);
+      return l ? { ...w, x: l.x, y: l.y, colspan: l.w as Widget["colspan"], rowspan: l.h as Widget["rowspan"] } : w;
+    });
+    // No history entry for pure drag: keep the layout live.
+    setWidgets(next);
+    saveLayout(next);
   };
 
   // Drag a field from the right panel onto the selected widget
