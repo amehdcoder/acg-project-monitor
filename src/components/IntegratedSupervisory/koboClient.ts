@@ -83,6 +83,9 @@ export interface KoboCache {
   fields: KoboField[];                         // Kobo survey field schema (from asset)
   columns: KoboColumn[];                       // computed data dictionary
   validation?: SchemaValidationReport;         // schema drift report (computed on fetch)
+  survey?: any[];                              // raw asset.content.survey (for label resolver)
+  choices?: any[];                             // raw asset.content.choices (for label resolver)
+  formUid?: string;                            // needed to key the resolver cache
 }
 
 export interface KoboConfig {
@@ -192,6 +195,9 @@ export async function fetchSubmissions(cfg: KoboConfig): Promise<KoboCache> {
     fields,
     columns,
     validation,
+    survey: Array.isArray(first?.survey) ? first.survey : [],
+    choices: Array.isArray(first?.choices) ? first.choices : [],
+    formUid: cfg.formUid,
   };
   saveKoboCache(cache);
   return cache;
