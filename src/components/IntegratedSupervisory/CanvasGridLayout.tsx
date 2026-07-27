@@ -2,12 +2,12 @@
  * react-grid-layout wrapper for the Looker-style dashboard canvas.
  * Freeform drag & drop with resize; edit/view mode toggle disables both.
  */
-import RGL, { WidthProvider, type Layout } from "react-grid-layout";
+import { GridLayout, WidthProvider, type Layout } from "react-grid-layout/legacy";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import type { ReactNode } from "react";
 
-const ReactGridLayout = WidthProvider(RGL);
+const ReactGridLayout = WidthProvider(GridLayout);
 
 export interface CanvasItem {
   id: string;
