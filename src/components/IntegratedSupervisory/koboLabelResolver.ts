@@ -81,16 +81,15 @@ export class KoboLabelResolver {
   private resolveSingle(q: KoboQuestion | undefined, val: unknown): string {
     if (val == null || val === "") return "";
     const s = typeof val === "object" ? JSON.stringify(val) : String(val);
+    // Only consult choice lists when the field is declared select_one/multiple.
+    // This prevents accidental "titlecasing" of arbitrary text values like
+    // administrative names (e.g. "Birnin Kudu", "KAFIN").
     if (q?.select_from_list_name) {
       const list = this.choiceMap.get(q.select_from_list_name);
       if (list?.has(s)) return list.get(s)!;
     }
-    // Global fallback: if any choice list has this value uniquely, use it.
-    for (const list of this.choiceMap.values()) {
-      if (list.has(s)) return list.get(s)!;
-    }
-    // Beautify code-like tokens (KAFIN → Kafin).
-    if (/^[A-Z0-9_]{2,}$/.test(s)) return titleCase(s);
+    // Preserve raw string exactly as submitted — including intentional spaces,
+    // capitalization, and commas within labels.
     return s;
   }
 
@@ -98,16 +97,16 @@ export class KoboLabelResolver {
   resolveValue(fieldKey: string, rawValue: unknown): string {
     if (rawValue == null || rawValue === "") return "";
     const q = this.lookupQuestion(fieldKey);
+    const isMulti = /select_multiple/.test(String(q?.type || ""));
 
     let value: unknown = rawValue;
 
-    // Stringified JSON arrays like ["KAFIN","HAUSA"]
-    if (typeof value === "string") {
+    // Only expand strings into arrays for TRUE select_multiple fields.
+    if (typeof value === "string" && isMulti) {
       const trimmed = value.trim();
       if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
         try { value = JSON.parse(trimmed); } catch { /* keep string */ }
-      } else if (trimmed.includes(" ") && /^[\w\-]+(\s+[\w\-]+)+$/.test(trimmed)) {
-        // Kobo select_multiple encoded as space-delimited tokens
+      } else if (/^[\w\-]+(\s+[\w\-]+)+$/.test(trimmed)) {
         value = trimmed.split(/\s+/).filter(Boolean);
       }
     }
@@ -121,6 +120,7 @@ export class KoboLabelResolver {
     }
     return this.resolveSingle(q, value);
   }
+
 }
 
 // Module-level cache so we don't rebuild per render.
