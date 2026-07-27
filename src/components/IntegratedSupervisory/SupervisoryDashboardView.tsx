@@ -235,33 +235,24 @@ function ChartBody({ widget, data, columns, resolver }: { widget: Widget; data: 
   return null;
 }
 
-// ── Sortable widget card ───────────────────────────────────────────────────
-function WidgetCard({ widget, data, columns, editMode, selected, onSelect, onDelete }:
-  { widget: Widget; data: Record<string, unknown>[]; columns: KoboColumn[]; editMode: boolean; selected: boolean; onSelect: () => void; onDelete: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: widget.id, disabled: !editMode });
-  const rowH = 140;
+// ── Widget shell (react-grid-layout child) ────────────────────────────────
+function WidgetShell({ widget, data, columns, resolver, editMode, selected, onSelect, onDelete }:
+  { widget: Widget; data: Record<string, unknown>[]; columns: KoboColumn[]; resolver: KoboLabelResolver | null; editMode: boolean; selected: boolean; onSelect: () => void; onDelete: () => void }) {
   return (
     <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1, gridColumn: `span ${widget.colspan} / span ${widget.colspan}` }}
+      onClick={editMode ? onSelect : undefined}
+      className={`h-full w-full bg-white rounded-lg border ${selected && editMode ? "border-[#4285F4] ring-2 ring-[#4285F4]/30" : "border-[#DADCE0]"} shadow-sm transition-all ${editMode ? "cursor-pointer hover:shadow-md" : ""} overflow-hidden flex flex-col`}
     >
-      <div
-        onClick={editMode ? onSelect : undefined}
-        className={`bg-white rounded-lg border ${selected && editMode ? "border-[#4285F4] ring-2 ring-[#4285F4]/30" : "border-[#DADCE0]"} shadow-sm transition-all ${editMode ? "cursor-pointer hover:shadow-md" : ""} overflow-hidden`}
-        style={{ height: rowH * widget.rowspan }}
-      >
-        <div className="flex items-center justify-between px-3 py-2 border-b border-[#F1F3F4] bg-[#FAFBFC]">
-          <div className="text-[13px] font-medium text-[#202124] truncate">{widget.title}</div>
-          {editMode && (
-            <div className="flex items-center gap-1">
-              <button {...attributes} {...listeners} className="p-1 text-[#5F6368] hover:text-[#202124] cursor-grab active:cursor-grabbing"><GripVertical className="h-3.5 w-3.5" /></button>
-              <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1 text-[#5F6368] hover:text-[#EA4335]"><Trash2 className="h-3.5 w-3.5" /></button>
-            </div>
-          )}
-        </div>
-        <div className="w-full" style={{ height: rowH * widget.rowspan - 40 }}>
-          <ChartBody widget={widget} data={data} columns={columns} />
-        </div>
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[#F1F3F4] bg-[#FAFBFC] widget-drag-handle">
+        <div className="text-[13px] font-medium text-[#202124] truncate">{widget.title}</div>
+        {editMode && (
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1 text-[#5F6368] hover:text-[#EA4335] widget-no-drag">
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      <div className="flex-1 min-h-0 widget-no-drag">
+        <ChartBody widget={widget} data={data} columns={columns} resolver={resolver} />
       </div>
     </div>
   );
@@ -289,6 +280,10 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
   const rows = cache?.flatResults ?? [];
   const columns = useMemo<KoboColumn[]>(() => cache?.columns ?? (rows.length ? buildDataDictionary(rows) : []), [cache, rows]);
   const { dimensions, metrics } = partitionDimensionsMetrics(columns);
+  const resolver = useMemo(
+    () => getResolver(cache?.formUid ?? "default", { survey: cache?.survey, choices: cache?.choices }),
+    [cache?.formUid, cache?.survey, cache?.choices],
+  );
 
   const [widgets, setWidgets] = useState<Widget[]>(() => loadLayout<Widget[]>() ?? []);
   const [history, setHistory] = useState<Widget[][]>([]);
@@ -298,6 +293,9 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
   const [panelTab, setPanelTab] = useState<"data" | "setup" | "style">("data");
   const [fieldSearch, setFieldSearch] = useState("");
   const [docTitle, setDocTitle] = useState("Supervisory Microplanning Master Dashboard");
+  const [shareOpen, setShareOpen] = useState(false);
+  const [calcOpen, setCalcOpen] = useState(false);
+  const [calcFields, setCalcFields] = useState<CalculatedField[]>([]);
 
   // Filters
   const [f, setF] = useState<Record<string, string>>({});
@@ -335,7 +333,9 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
     return r.slice(0, -1);
   });
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  // Apply calculated fields on top of filtered rows below.
+
+
 
   const filteredRows = useMemo(() => {
     return rows.filter((r) => {
@@ -357,6 +357,16 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
       return true;
     });
   }, [rows, f, dateFrom, dateTo, globalSearch]);
+
+  const enrichedRows = useMemo(() => {
+    if (calcFields.length === 0) return filteredRows;
+    return filteredRows.map((r) => {
+      const out = { ...r };
+      for (const cf of calcFields) out[cf.name] = computeCalculatedField(cf, r);
+      return out;
+    });
+  }, [filteredRows, calcFields]);
+
 
   const selected = widgets.find((w) => w.id === selectedId) ?? null;
   const patch = (p: Partial<Widget>) => {
