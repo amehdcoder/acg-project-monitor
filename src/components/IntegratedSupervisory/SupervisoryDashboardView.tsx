@@ -540,20 +540,38 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
               No submissions yet. Open <b>Kobo Sync</b> to link a form and run <b>Sync Now</b>.
             </Card>
           ) : (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-              <SortableContext items={widgets.map((w) => w.id)} strategy={rectSortingStrategy}>
-                <div className="grid grid-cols-12 gap-4">
-                  {widgets.map((w) => (
-                    <WidgetCard
-                      key={w.id} widget={w} data={filteredRows} columns={columns}
+            (() => {
+              // Auto-assign x/y for widgets missing coordinates (backward-compat with older layouts).
+              let cursorX = 0, cursorY = 0, rowMaxH = 0;
+              const items: CanvasItem[] = widgets.map((w) => {
+                let x = w.x, y = w.y;
+                if (x === undefined || y === undefined) {
+                  if (cursorX + w.colspan > 12) { cursorX = 0; cursorY += rowMaxH; rowMaxH = 0; }
+                  x = cursorX; y = cursorY;
+                  cursorX += w.colspan;
+                  rowMaxH = Math.max(rowMaxH, w.rowspan);
+                }
+                return {
+                  id: w.id, x, y, w: w.colspan, h: w.rowspan,
+                  content: (
+                    <WidgetShell
+                      widget={w} data={enrichedRows} columns={columns} resolver={resolver}
                       editMode={editMode} selected={selectedId === w.id}
                       onSelect={() => setSelectedId(w.id)}
                       onDelete={() => commit(widgets.filter((x) => x.id !== w.id))}
                     />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
+                  ),
+                };
+              });
+              return (
+                <CanvasGridLayout
+                  items={items}
+                  editMode={editMode}
+                  onLayoutChange={onLayoutChange}
+                  rowHeight={140}
+                />
+              );
+            })()
           )}
         </div>
 
