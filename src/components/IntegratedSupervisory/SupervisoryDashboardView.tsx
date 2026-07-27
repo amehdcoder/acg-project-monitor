@@ -11,19 +11,14 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  DndContext, PointerSensor, useSensor, useSensors, closestCenter, DragEndEvent,
-} from "@dnd-kit/core";
-import { arrayMove, SortableContext, useSortable, rectSortingStrategy } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, AreaChart, Area,
   PieChart, Pie, Cell, CartesianGrid, XAxis, YAxis, Tooltip, Legend,
 } from "recharts";
 import {
   BarChart3, Circle, Grid3x3, Palette, PieChart as PieIcon, Plus, Search,
-  Settings2, Sliders, Table as TableIcon, Trash2, GripVertical, Eye, Pencil,
-  RefreshCw, Undo2, Redo2, Download, LayoutGrid, LineChart as LineIcon, Type,
-  MapPin, Loader2, X,
+  Settings2, Sliders, Table as TableIcon, Trash2, Eye, Pencil,
+  RefreshCw, Undo2, Redo2, Download, LayoutGrid, LineChart as LineIcon,
+  MapPin, Loader2, X, Share2, Calculator,
 } from "lucide-react";
 import type { KoboCache } from "./koboClient";
 import { loadLayout, saveLayout } from "./koboClient";
@@ -31,6 +26,10 @@ import {
   buildDataDictionary, coerceNumber, partitionDimensionsMetrics, typeIcon,
   type KoboColumn,
 } from "./koboSchema";
+import { getResolver, type KoboLabelResolver } from "./koboLabelResolver";
+import CanvasGridLayout, { type CanvasItem } from "./CanvasGridLayout";
+import ShareDashboardDialog from "./ShareDashboardDialog";
+import CalculatedFieldDialog, { type CalculatedField, computeCalculatedField } from "./CalculatedFieldDialog";
 
 // ── Looker palette ────────────────────────────────────────────────────────
 const GOOGLE_PALETTE = ["#4285F4", "#34A853", "#FBBC04", "#EA4335", "#AB47BC", "#00ACC1", "#FF7043", "#9CCC65"];
@@ -47,9 +46,12 @@ interface Widget {
   agg?: "sum" | "avg" | "count" | "min" | "max";
   colspan: 3 | 4 | 6 | 8 | 12;
   rowspan: 1 | 2 | 3;
-  colorFrom?: number;   // palette offset
+  x?: number;
+  y?: number;
+  colorFrom?: number;
   bg?: string;
   showLegend?: boolean;
+  showTechnicalMeta?: boolean; // scorecard subtitle toggle — hidden by default
 }
 
 const DEFAULT_LAYOUT = (cols: KoboColumn[]): Widget[] => {
@@ -71,18 +73,19 @@ const DEFAULT_LAYOUT = (cols: KoboColumn[]): Widget[] => {
 };
 
 // ── Aggregation helpers ────────────────────────────────────────────────────
-function aggregate(rows: Record<string, unknown>[], w: Widget): { name: string; value: number }[] {
+function aggregate(rows: Record<string, unknown>[], w: Widget, resolver: KoboLabelResolver | null): { name: string; value: number }[] {
   if (!w.dimension) {
     return [{ name: w.title, value: rows.length }];
   }
   const groups = new Map<string, number[]>();
   for (const r of rows) {
     const raw = r[w.dimension];
-    const key = raw == null || raw === ""
-      ? "—"
-      : typeof raw === "object"
-        ? (raw as any)?.label ?? (raw as any)?.uid ?? JSON.stringify(raw)
-        : Array.isArray(raw) ? raw.join(", ") : String(raw);
+    let key: string;
+    if (raw == null || raw === "") key = "—";
+    else if (resolver) key = resolver.resolveValue(w.dimension, raw) || "—";
+    else if (typeof raw === "object") key = (raw as any)?.label ?? (raw as any)?.uid ?? JSON.stringify(raw);
+    else if (Array.isArray(raw)) key = raw.join(", ");
+    else key = String(raw);
     const metricVal = w.metric ? coerceNumber(r[w.metric]) : 1;
     const arr = groups.get(key) ?? [];
     arr.push(metricVal);
@@ -104,8 +107,8 @@ function aggregate(rows: Record<string, unknown>[], w: Widget): { name: string; 
 }
 
 // ── Chart body ────────────────────────────────────────────────────────────
-function ChartBody({ widget, data, columns }: { widget: Widget; data: Record<string, unknown>[]; columns: KoboColumn[] }) {
-  const series = useMemo(() => aggregate(data, widget), [data, widget]);
+function ChartBody({ widget, data, columns, resolver }: { widget: Widget; data: Record<string, unknown>[]; columns: KoboColumn[]; resolver: KoboLabelResolver | null }) {
+  const series = useMemo(() => aggregate(data, widget, resolver), [data, widget, resolver]);
   const colors = GOOGLE_PALETTE.slice(widget.colorFrom ?? 0).concat(GOOGLE_PALETTE);
 
   if (widget.type === "scorecard") {
@@ -115,8 +118,10 @@ function ChartBody({ widget, data, columns }: { widget: Widget; data: Record<str
     return (
       <div className="h-full w-full flex flex-col justify-center px-4">
         <div className="text-[11px] uppercase tracking-wide text-[#5F6368] font-medium">{widget.title}</div>
-        <div className="text-4xl font-semibold" style={{ color: colors[0] }}>{Number(value).toLocaleString()}</div>
-        <div className="text-[11px] text-[#5F6368] mt-1">{widget.dimension ? `Distinct ${widget.dimension}` : "Rows"}</div>
+        <div className="text-4xl font-bold mt-1" style={{ color: colors[0] }}>{Number(value).toLocaleString()}</div>
+        {widget.showTechnicalMeta && (
+          <div className="text-[10px] text-slate-400 mt-1 font-mono">{widget.dimension ? `Distinct ${widget.dimension}` : "Rows"}</div>
+        )}
       </div>
     );
   }
@@ -205,20 +210,19 @@ function ChartBody({ widget, data, columns }: { widget: Widget; data: Record<str
     );
   }
   if (widget.type === "table") {
-    // Show the first ~12 columns to keep the widget usable; the Raw Data tab has full width.
+    // Show the first ~8 columns to keep the widget usable; the Raw Data tab has full width.
     const cols = columns.filter((c) => !c.system).slice(0, 8);
     return (
       <div className="h-full overflow-auto text-xs">
         <table className="w-full border-collapse">
           <thead className="sticky top-0 bg-[#F8F9FA] border-b border-[#DADCE0]">
-            <tr>{cols.map((c) => <th key={c.key} className="text-left px-2 py-1.5 font-medium text-[#3C4043] whitespace-nowrap">{c.label}</th>)}</tr>
+            <tr>{cols.map((c) => <th key={c.key} className="text-left px-2 py-1.5 font-medium text-[#3C4043] whitespace-nowrap">{resolver?.resolveHeader(c.key) || c.label}</th>)}</tr>
           </thead>
           <tbody>
             {data.slice(0, 200).map((r, i) => (
               <tr key={i} className="border-b border-[#F1F3F4] hover:bg-[#F8F9FA]">
                 {cols.map((c) => {
-                  const v = r[c.key];
-                  const display = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+                  const display = resolver ? resolver.resolveValue(c.key, r[c.key]) : (r[c.key] == null ? "" : String(r[c.key]));
                   return <td key={c.key} className="px-2 py-1.5 max-w-[220px] truncate" title={display}>{display}</td>;
                 })}
               </tr>
@@ -231,33 +235,24 @@ function ChartBody({ widget, data, columns }: { widget: Widget; data: Record<str
   return null;
 }
 
-// ── Sortable widget card ───────────────────────────────────────────────────
-function WidgetCard({ widget, data, columns, editMode, selected, onSelect, onDelete }:
-  { widget: Widget; data: Record<string, unknown>[]; columns: KoboColumn[]; editMode: boolean; selected: boolean; onSelect: () => void; onDelete: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: widget.id, disabled: !editMode });
-  const rowH = 140;
+// ── Widget shell (react-grid-layout child) ────────────────────────────────
+function WidgetShell({ widget, data, columns, resolver, editMode, selected, onSelect, onDelete }:
+  { widget: Widget; data: Record<string, unknown>[]; columns: KoboColumn[]; resolver: KoboLabelResolver | null; editMode: boolean; selected: boolean; onSelect: () => void; onDelete: () => void }) {
   return (
     <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1, gridColumn: `span ${widget.colspan} / span ${widget.colspan}` }}
+      onClick={editMode ? onSelect : undefined}
+      className={`h-full w-full bg-white rounded-lg border ${selected && editMode ? "border-[#4285F4] ring-2 ring-[#4285F4]/30" : "border-[#DADCE0]"} shadow-sm transition-all ${editMode ? "cursor-pointer hover:shadow-md" : ""} overflow-hidden flex flex-col`}
     >
-      <div
-        onClick={editMode ? onSelect : undefined}
-        className={`bg-white rounded-lg border ${selected && editMode ? "border-[#4285F4] ring-2 ring-[#4285F4]/30" : "border-[#DADCE0]"} shadow-sm transition-all ${editMode ? "cursor-pointer hover:shadow-md" : ""} overflow-hidden`}
-        style={{ height: rowH * widget.rowspan }}
-      >
-        <div className="flex items-center justify-between px-3 py-2 border-b border-[#F1F3F4] bg-[#FAFBFC]">
-          <div className="text-[13px] font-medium text-[#202124] truncate">{widget.title}</div>
-          {editMode && (
-            <div className="flex items-center gap-1">
-              <button {...attributes} {...listeners} className="p-1 text-[#5F6368] hover:text-[#202124] cursor-grab active:cursor-grabbing"><GripVertical className="h-3.5 w-3.5" /></button>
-              <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1 text-[#5F6368] hover:text-[#EA4335]"><Trash2 className="h-3.5 w-3.5" /></button>
-            </div>
-          )}
-        </div>
-        <div className="w-full" style={{ height: rowH * widget.rowspan - 40 }}>
-          <ChartBody widget={widget} data={data} columns={columns} />
-        </div>
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[#F1F3F4] bg-[#FAFBFC] widget-drag-handle">
+        <div className="text-[13px] font-medium text-[#202124] truncate">{widget.title}</div>
+        {editMode && (
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1 text-[#5F6368] hover:text-[#EA4335] widget-no-drag">
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      <div className="flex-1 min-h-0 widget-no-drag">
+        <ChartBody widget={widget} data={data} columns={columns} resolver={resolver} />
       </div>
     </div>
   );
@@ -285,6 +280,10 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
   const rows = cache?.flatResults ?? [];
   const columns = useMemo<KoboColumn[]>(() => cache?.columns ?? (rows.length ? buildDataDictionary(rows) : []), [cache, rows]);
   const { dimensions, metrics } = partitionDimensionsMetrics(columns);
+  const resolver = useMemo(
+    () => getResolver(cache?.formUid ?? "default", { survey: cache?.survey, choices: cache?.choices }),
+    [cache?.formUid, cache?.survey, cache?.choices],
+  );
 
   const [widgets, setWidgets] = useState<Widget[]>(() => loadLayout<Widget[]>() ?? []);
   const [history, setHistory] = useState<Widget[][]>([]);
@@ -294,6 +293,9 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
   const [panelTab, setPanelTab] = useState<"data" | "setup" | "style">("data");
   const [fieldSearch, setFieldSearch] = useState("");
   const [docTitle, setDocTitle] = useState("Supervisory Microplanning Master Dashboard");
+  const [shareOpen, setShareOpen] = useState(false);
+  const [calcOpen, setCalcOpen] = useState(false);
+  const [calcFields, setCalcFields] = useState<CalculatedField[]>([]);
 
   // Filters
   const [f, setF] = useState<Record<string, string>>({});
@@ -331,7 +333,9 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
     return r.slice(0, -1);
   });
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  // Apply calculated fields on top of filtered rows below.
+
+
 
   const filteredRows = useMemo(() => {
     return rows.filter((r) => {
@@ -353,6 +357,16 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
       return true;
     });
   }, [rows, f, dateFrom, dateTo, globalSearch]);
+
+  const enrichedRows = useMemo(() => {
+    if (calcFields.length === 0) return filteredRows;
+    return filteredRows.map((r) => {
+      const out = { ...r };
+      for (const cf of calcFields) out[cf.name] = computeCalculatedField(cf.formula, r);
+      return out;
+    });
+  }, [filteredRows, calcFields]);
+
 
   const selected = widgets.find((w) => w.id === selectedId) ?? null;
   const patch = (p: Partial<Widget>) => {
@@ -377,12 +391,15 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
     setSelectedId(id);
   };
 
-  const onDragEnd = (e: DragEndEvent) => {
-    const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    const oldI = widgets.findIndex((w) => w.id === active.id);
-    const newI = widgets.findIndex((w) => w.id === over.id);
-    commit(arrayMove(widgets, oldI, newI));
+  const onLayoutChange = (layout: { i: string; x: number; y: number; w: number; h: number }[]) => {
+    const map = new Map(layout.map((l) => [l.i, l]));
+    const next = widgets.map((w) => {
+      const l = map.get(w.id);
+      return l ? { ...w, x: l.x, y: l.y, colspan: l.w as Widget["colspan"], rowspan: l.h as Widget["rowspan"] } : w;
+    });
+    // No history entry for pure drag: keep the layout live.
+    setWidgets(next);
+    saveLayout(next);
   };
 
   // Drag a field from the right panel onto the selected widget
@@ -479,6 +496,14 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
             </>
           )}
           <Button variant="ghost" size="sm" className="h-8" onClick={exportCSV}><Download className="h-4 w-4 mr-1" /> Export</Button>
+          {editMode && (
+            <Button variant="ghost" size="sm" className="h-8" onClick={() => setCalcOpen(true)}>
+              <Calculator className="h-4 w-4 mr-1" /> Calculated field
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" className="h-8" onClick={() => setShareOpen(true)}>
+            <Share2 className="h-4 w-4 mr-1" /> Share
+          </Button>
           <div className="w-px h-6 bg-[#DADCE0] mx-1" />
           <Button
             variant={editMode ? "secondary" : "outline"} size="sm" className="h-8"
@@ -523,20 +548,38 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
               No submissions yet. Open <b>Kobo Sync</b> to link a form and run <b>Sync Now</b>.
             </Card>
           ) : (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-              <SortableContext items={widgets.map((w) => w.id)} strategy={rectSortingStrategy}>
-                <div className="grid grid-cols-12 gap-4">
-                  {widgets.map((w) => (
-                    <WidgetCard
-                      key={w.id} widget={w} data={filteredRows} columns={columns}
+            (() => {
+              // Auto-assign x/y for widgets missing coordinates (backward-compat with older layouts).
+              let cursorX = 0, cursorY = 0, rowMaxH = 0;
+              const items: CanvasItem[] = widgets.map((w) => {
+                let x = w.x, y = w.y;
+                if (x === undefined || y === undefined) {
+                  if (cursorX + w.colspan > 12) { cursorX = 0; cursorY += rowMaxH; rowMaxH = 0; }
+                  x = cursorX; y = cursorY;
+                  cursorX += w.colspan;
+                  rowMaxH = Math.max(rowMaxH, w.rowspan);
+                }
+                return {
+                  id: w.id, x, y, w: w.colspan, h: w.rowspan,
+                  content: (
+                    <WidgetShell
+                      widget={w} data={enrichedRows} columns={columns} resolver={resolver}
                       editMode={editMode} selected={selectedId === w.id}
                       onSelect={() => setSelectedId(w.id)}
                       onDelete={() => commit(widgets.filter((x) => x.id !== w.id))}
                     />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
+                  ),
+                };
+              });
+              return (
+                <CanvasGridLayout
+                  items={items}
+                  editMode={editMode}
+                  onLayoutChange={onLayoutChange}
+                  rowHeight={140}
+                />
+              );
+            })()
           )}
         </div>
 
@@ -670,6 +713,12 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
                       <input type="checkbox" checked={!!selected.showLegend} onChange={(e) => patch({ showLegend: e.target.checked })} />
                       Show legend
                     </label>
+                    {selected.type === "scorecard" && (
+                      <label className="flex items-center gap-2 text-xs text-[#3C4043]">
+                        <input type="checkbox" checked={!!selected.showTechnicalMeta} onChange={(e) => patch({ showTechnicalMeta: e.target.checked })} />
+                        Show technical subtitle
+                      </label>
+                    )}
                   </>
                 )}
               </TabsContent>
@@ -677,6 +726,20 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
           </aside>
         )}
       </div>
+
+      <ShareDashboardDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        dashboardId={cache?.formUid ?? "kobo-integrated-supervisory"}
+        dashboardLabel={docTitle}
+      />
+      <CalculatedFieldDialog
+        open={calcOpen}
+        onClose={() => setCalcOpen(false)}
+        columns={columns}
+        sampleRow={rows[0] ?? null}
+        onSave={(cf) => setCalcFields((prev) => [...prev.filter((x) => x.id !== cf.id), cf])}
+      />
     </div>
   );
 }

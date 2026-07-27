@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -16,6 +15,9 @@ import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
 import { validateCache, type KoboCache } from "./koboClient";
 import { buildDataDictionary, typeIcon, type KoboColumn } from "./koboSchema";
+import { getResolver } from "./koboLabelResolver";
+import RecordPreviewDrawer from "./RecordPreviewDrawer";
+import { exportXlsx, exportCsv } from "./exportKoboData";
 
 
 type StatusKey = "approved" | "flagged" | "pending";
@@ -107,6 +109,10 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
     [cache],
   );
   const rows = cache?.flatResults ?? [];
+  const resolver = useMemo(
+    () => getResolver(cache?.formUid ?? "default", { survey: cache?.survey, choices: cache?.choices }),
+    [cache?.formUid, cache?.survey, cache?.choices],
+  );
 
   // Detect geo columns dynamically
   const geoKey = (name: string) =>
@@ -172,7 +178,7 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
 
   const validation = useMemo(() => cache?.validation ?? validateCache(cache), [cache]);
 
-  const download = (mime: string, ext: string, cols: string[]) => {
+  const doExport = async (kind: "xlsx" | "csv") => {
     if (validation && !validation.ok) {
       toast.error("Export blocked", { description: validation.errors[0]?.message ?? "Schema validation failed. Re-sync from Kobo Sync." });
       return;
@@ -182,20 +188,14 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
         description: validation.warnings[0]?.message,
       });
     }
-    const csv = toCSV(filtered, cols);
-    const blob = new Blob([csv], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `kobo-submissions-${new Date().toISOString().slice(0, 10)}.${ext}`;
-    a.click(); URL.revokeObjectURL(url);
+    const exportCols = columns.map((c) => ({ key: c.key, label: resolver.resolveHeader(c.key) || c.label }));
+    if (kind === "xlsx") await exportXlsx(filtered, exportCols, resolver);
+    else exportCsv(filtered, exportCols, resolver);
   };
 
-
-  const cellDisplay = (v: unknown) => {
-    if (v == null) return "—";
-    if (Array.isArray(v)) return v.map((x) => typeof x === "object" ? JSON.stringify(x) : String(x)).join(", ");
-    if (typeof v === "object") return JSON.stringify(v);
-    return String(v);
+  const cellDisplay = (fieldKey: string, v: unknown) => {
+    const resolved = resolver.resolveValue(fieldKey, v);
+    return resolved || "—";
   };
 
   const fmtInt = (n: number) => n.toLocaleString();
@@ -235,8 +235,8 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={onRefresh} className="bg-blue-500 hover:bg-blue-600 text-white h-9"><RefreshCw className="h-4 w-4 mr-2" /> Refresh Data</Button>
-          <Button onClick={() => download("application/vnd.ms-excel", "xls", columns.map((c) => c.key))} className="bg-emerald-500 hover:bg-emerald-600 text-white h-9"><FileSpreadsheet className="h-4 w-4 mr-2" /> Export Excel</Button>
-          <Button onClick={() => download("text/csv", "csv", columns.map((c) => c.key))} className="bg-sky-500 hover:bg-sky-600 text-white h-9"><Download className="h-4 w-4 mr-2" /> Export CSV</Button>
+          <Button onClick={() => doExport("xlsx")} className="bg-emerald-500 hover:bg-emerald-600 text-white h-9"><FileSpreadsheet className="h-4 w-4 mr-2" /> Export Excel</Button>
+          <Button onClick={() => doExport("csv")} className="bg-sky-500 hover:bg-sky-600 text-white h-9"><Download className="h-4 w-4 mr-2" /> Export CSV</Button>
           <Button size="icon" variant="ghost" className="text-white hover:bg-white/10 h-9 w-9"><MoreVertical className="h-5 w-5" /></Button>
         </div>
       </div>
@@ -340,9 +340,8 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
               <thead className="sticky top-0 z-10 bg-gradient-to-r from-[#12315F] to-[#1E4485] text-white">
                 <tr>
                   <th className="w-10 px-2 py-3"></th>
-                  <th className="w-16 px-2 py-3 text-left font-semibold whitespace-nowrap">Actions</th>
+                  <th className="w-20 px-2 py-3 text-left font-semibold whitespace-nowrap">Actions</th>
                   <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">↕ Submission Time</th>
-                  <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">Status</th>
                   <th className="w-10 px-2 py-3 text-center"><MapPin className="h-4 w-4 inline" /></th>
                   <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">Data Quality</th>
                   <th className="w-16 px-2 py-3 text-center font-semibold whitespace-nowrap">Photos</th>
@@ -350,10 +349,11 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
                     .filter((k) => k !== "_submission_time")
                     .map((k) => {
                       const c = columns.find((x) => x.key === k);
+                      const headerLabel = resolver.resolveHeader(k) || c?.label || k;
                       return (
-                        <th key={k} className="text-left px-3 py-3 font-semibold whitespace-nowrap">
+                        <th key={k} className="text-left px-3 py-3 font-semibold whitespace-nowrap min-w-[160px]">
                           <span className="font-mono text-[10px] font-bold text-blue-100 mr-1">{c ? typeIcon(c.type) : "ABC"}</span>
-                          {c?.label ?? k}
+                          {headerLabel}
                         </th>
                       );
                     })}
@@ -361,7 +361,6 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
               </thead>
               <tbody className="text-slate-700">
                 {slice.map((r, i) => {
-                  const st = submissionStatus(r);
                   const q = rowQuality(r, columns);
                   const gps = hasGps(r);
                   const photo = hasPhotos(r);
@@ -371,12 +370,11 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
                     <tr key={String(r._id ?? i)} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                       <td className="px-2 py-2"><Checkbox /></td>
                       <td className="px-2 py-2">
-                        <div className="flex items-center gap-1">
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-blue-600 hover:bg-blue-50" onClick={() => setDetail(r)}><Eye className="h-4 w-4" /></Button>
-                        </div>
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-blue-600 hover:bg-blue-50" onClick={() => setDetail(r)}>
+                          <Eye className="h-3.5 w-3.5 mr-1" /> Preview
+                        </Button>
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap text-slate-600">{timeStr}</td>
-                      <td className="px-3 py-2">{statusPill(st)}</td>
                       <td className="px-2 py-2 text-center">
                         {gps
                           ? <MapPin className="h-4 w-4 text-emerald-500 inline" />
@@ -391,14 +389,14 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
                       {visibleCols
                         .filter((k) => k !== "_submission_time")
                         .map((k) => {
-                          const val = cellDisplay(r[k]);
-                          return <td key={k} className="px-3 py-2 max-w-[240px] truncate" title={val}>{val}</td>;
+                          const val = cellDisplay(k, r[k]);
+                          return <td key={k} className="px-3 py-2 min-w-[160px] max-w-[280px] truncate" title={val}>{val}</td>;
                         })}
                     </tr>
                   );
                 })}
                 {slice.length === 0 && (
-                  <tr><td colSpan={visibleCols.length + 6} className="text-center text-sm text-slate-500 py-10">No matching submissions.</td></tr>
+                  <tr><td colSpan={visibleCols.length + 5} className="text-center text-sm text-slate-500 py-10">No matching submissions.</td></tr>
                 )}
               </tbody>
             </table>
@@ -457,38 +455,14 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
         </div>
       </div>
 
-      {/* Detail dialog */}
-      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">Submission {detail?._id ?? ""} {statusPill(submissionStatus(detail))}</DialogTitle>
-          </DialogHeader>
-          {detail && (
-            <div className="space-y-4">
-              {(detail._geolocation?.[0] ?? detail?.geolocation?.[0]) && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground"><MapPin className="h-4 w-4 text-emerald-600" />
-                  GPS: {detail._geolocation?.[0] ?? detail?.geolocation?.[0]}, {detail._geolocation?.[1] ?? detail?.geolocation?.[1]}
-                </div>
-              )}
-              {Array.isArray(detail._attachments) && detail._attachments.length > 0 && (
-                <div>
-                  <div className="text-xs font-semibold mb-1">Attachments ({detail._attachments.length})</div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {detail._attachments.slice(0, 6).map((a: any, i: number) => (
-                      <a key={i} href={a.download_url} target="_blank" rel="noreferrer" className="block border rounded overflow-hidden">
-                        {String(a.mimetype || "").startsWith("image/")
-                          ? <img src={a.download_url} alt={a.filename} className="w-full h-24 object-cover" />
-                          : <div className="p-2 text-[10px] truncate">{a.filename}</div>}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <pre className="bg-muted/40 rounded p-3 text-[11px] overflow-x-auto max-h-96">{JSON.stringify(detail, null, 2)}</pre>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Enketo-style preview drawer */}
+      <RecordPreviewDrawer
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        record={detail}
+        columns={columns}
+        resolver={resolver}
+      />
     </div>
   );
 }

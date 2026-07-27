@@ -663,6 +663,8 @@ Deno.serve(async (req) => {
           results: Array.isArray(data?.results) ? data.results : [],
           form_title: asset?.name ?? null,
           fields: asset ? extractSurveyFields(asset) : [],
+          survey: Array.isArray(asset?.content?.survey) ? asset.content.survey : [],
+          choices: Array.isArray(asset?.content?.choices) ? asset.content.choices : [],
           fetched_at: new Date().toISOString(),
         });
       } catch (e) {
