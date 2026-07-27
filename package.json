@@ -15,7 +15,7 @@
     "android:splash": "bash scripts/apply-android-splash.sh"
   },
   "dependencies": {
-    "@capacitor/cli": "^8.3.0",
+    "@capacitor/cli": "^8.4.2",
     "@capacitor/core": "^8.3.0",
     "@capacitor/geolocation": "^7.0.0",
     "@diffusionstudio/vits-web": "^1.0.3",
@@ -92,7 +92,7 @@
     "mapbox-gl": "^3.24.1",
     "next-themes": "^0.3.0",
     "onnxruntime-web": "^1.26.0",
-    "pdfjs-dist": "4.7.76",
+    "pdfjs-dist": "^6.1.200",
     "pptxgenjs": "^4.0.1",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
