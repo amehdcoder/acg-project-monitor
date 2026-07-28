@@ -566,7 +566,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
     <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-2 flex-1" style={{ scrollbarWidth: 'auto', scrollbarColor: 'hsl(var(--border)) transparent' }}>
       {/* Year & Campaign */}
-      <Section id="campaign" title="Campaign &amp; Year" icon={Calendar}>
+      <Section id="campaign" title="Campaign & Year" icon={Calendar}>
         <Field label="Year of Microplanning" required>
           <Input value={form.year_of_microplanning ?? ""} onChange={e => setNum("year_of_microplanning", e.target.value)} type="number" min={2000} max={2100} placeholder="2026" className="h-8 text-xs" />
         </Field>
@@ -764,7 +764,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* Terrain & Access */}
-      <Section id="terrain" title="Terrain &amp; Accessibility" icon={Shield}>
+      <Section id="terrain" title="Terrain & Accessibility" icon={Shield}>
         <Field label="Type of Terrain">
           <select className={nativeSelectClass} value={form.terrain_type} onChange={e => set("terrain_type", e.target.value)}>
             <option value="">Select terrain</option>
