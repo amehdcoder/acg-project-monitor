@@ -566,7 +566,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
     <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-2 flex-1" style={{ scrollbarWidth: 'auto', scrollbarColor: 'hsl(var(--border)) transparent' }}>
       {/* Year & Campaign */}
-      <Section title="Campaign & Year" icon={Calendar}>
+      <Section id="campaign" title="Campaign &amp; Year" icon={Calendar}>
         <Field label="Year of Microplanning" required>
           <Input value={form.year_of_microplanning ?? ""} onChange={e => setNum("year_of_microplanning", e.target.value)} type="number" min={2000} max={2100} placeholder="2026" className="h-8 text-xs" />
         </Field>
@@ -596,7 +596,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* Administrative Hierarchy - Cascaded */}
-      <Section title="Administrative Hierarchy" icon={Building2}>
+      <Section id="admin" title="Administrative Hierarchy" icon={Building2}>
         <Field label="State" required>
           <select className={nativeSelectClass} value={form.state} onChange={e => handleStateChange(e.target.value)}>
             <option value="">Select State</option>
@@ -654,7 +654,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* FLHF Information */}
-      <Section title="Frontline Health Facility (FLHF)" icon={Building2}>
+      <Section id="flhf" title="Frontline Health Facility (FLHF)" icon={Building2}>
         <SearchableFieldCombobox
           label="Name of FLHF"
           required
@@ -703,7 +703,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       )}
 
       {/* Community Information */}
-      <Section title="Community Information" icon={Users}>
+      <Section id="community" title="Community Information" icon={Users}>
         <Field label="Community Name" required>
           <Input value={form.community_name} onChange={e => set("community_name", e.target.value)} className="h-8 text-xs" placeholder="Type community name..." />
         </Field>
@@ -727,7 +727,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* Settlement Information */}
-      <Section title="Settlement Information" icon={MapPin}>
+      <Section id="settlement" title="Settlement Information" icon={MapPin}>
         <SearchableFieldCombobox
           label="Settlement Name"
           value={form.settlement_name}
@@ -764,7 +764,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* Terrain & Access */}
-      <Section title="Terrain & Accessibility" icon={Shield}>
+      <Section id="terrain" title="Terrain &amp; Accessibility" icon={Shield}>
         <Field label="Type of Terrain">
           <select className={nativeSelectClass} value={form.terrain_type} onChange={e => set("terrain_type", e.target.value)}>
             <option value="">Select terrain</option>
@@ -798,7 +798,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* Population Estimates - Standard */}
-      <Section title="Estimated Population (Standard)" icon={Users}>
+      <Section id="population" title="Estimated Population (Standard)" icon={Users}>
         <Field label="Total Population">
           <Input
             value={form.estimated_total_population ?? ""}
@@ -825,7 +825,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* Disability Disaggregation (by disability type) */}
-      <Section title="Disability Disaggregation (by Type)" icon={Users}>
+      <Section id="disability" title="Disability Disaggregation (by Type)" icon={Users}>
         <Field label="Total Persons with Disability">
           {(() => {
             const pwdSum =
@@ -905,7 +905,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Card>
 
       {/* CDD Information */}
-      <Section title="CDD Information" icon={UserCheck}>
+      <Section id="cdd" title="CDD Information" icon={UserCheck}>
         <Field label="Name(s) of CDD">
           <Input value={form.cdd_names} onChange={e => set("cdd_names", e.target.value)} placeholder="Comma-separated" className="h-8 text-xs" />
         </Field>
@@ -919,7 +919,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* Notes */}
-      <Section title="Additional Notes" icon={Info}>
+      <Section id="notes" title="Additional Notes" icon={Info}>
         <div className="col-span-1 sm:col-span-2 lg:col-span-3">
           <Field label="Notes">
             <Textarea value={form.notes} onChange={e => set("notes", e.target.value)} rows={2} className="text-xs" />
