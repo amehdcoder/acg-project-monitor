@@ -258,7 +258,45 @@ export default function KoboFormConfigPanel() {
     toast({ title: "Editing configuration", description: "Enter the API token and click Inspect to reload fields." });
   };
 
-  return (
+  const registerWebhook = async () => {
+    if (!formUid.trim() || !apiToken.trim()) {
+      toast({ title: "Form UID and API token required", variant: "destructive" });
+      return;
+    }
+    try {
+      const res: any = await invoke({
+        action: "register_webhook",
+        server_url: server.trim(),
+        form_uid: formUid.trim(),
+        api_token: apiToken.trim(),
+        project_id: projectId || null,
+      });
+      toast({ title: "Kobo REST Service registered", description: res?.hook?.endpoint ?? "Webhook active" });
+    } catch (e: any) {
+      toast({ title: "Auto-register failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const backfillConfig = async (c: FormConfig) => {
+    if (!confirm(`Reprocess up to 500 historical submissions for ${c.form_title ?? c.form_uid} through the current mapper?`)) return;
+    try {
+      const res: any = await invoke({
+        action: "backfill_submissions",
+        source: "events",
+        project_id: c.project_id,
+        form_uid: c.form_uid,
+        limit: 500,
+      });
+      toast({
+        title: "Backfill complete",
+        description: `${res.succeeded}/${res.processed} synced${res.failed ? ` · ${res.failed} failed` : ""}`,
+      });
+    } catch (e: any) {
+      toast({ title: "Backfill failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+
     <div className="border rounded-lg p-3 space-y-3 bg-card">
       <div className="flex items-center justify-between">
         <div className="text-xs font-semibold flex items-center gap-2">
