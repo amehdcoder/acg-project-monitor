@@ -130,7 +130,7 @@ export async function buildMicroplanningXlsForm(
   // row while KoboCollect renders only the image.
   survey.push(q({
     type: "note", name: "welcome_cover_note",
-    label: '&#160;',
+    label: " ",
     image: "home",
     appearance: "no-label",
   }));
