@@ -224,12 +224,19 @@ export async function buildMicroplanningXlsForm(
   }));
   survey.push(q({ type: "end_group", name: "flhf_grp_end" }));
 
+  // ── REPEAT: Community / Settlement (1-to-many under FLHF) ──
+  // Each iteration captures one community + optional settlement + population +
+  // context (terrain/access/security) so a single FLHF submission can carry
+  // any number of communities.
+  survey.push(q({
+    type: "begin_repeat", name: "community_repeat",
+    label: '<font color="#059669"><b>➕ Community / Settlement Entry</b></font>',
+    hint: '<font color="#059669"><b>Community #${position(..)}</b></font>',
+    appearance: "field-list",
+  }));
+
   // ── Section 4: Community ──
-  //
-  // Cascade parent is the WARD (data reality — GRID3 does not link
-  // community→FLHF, so filtering by flhf would return zero rows). We keep the
-  // `flhf` column empty on community rows and rely on ward filtering.
-  survey.push(q({ type: "begin_group", name: "community_grp", label: "4. Community", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "community_grp", label: '<font color="#059669"><b>🏘️ 4. Community</b></font>', appearance: "field-list" }));
   survey.push(q({
     type: "select_one communities", name: "community", label: "Community (GRID3)",
     hint: "Type to search. Choose 'Other (specify manually)' if the community is not listed.",
