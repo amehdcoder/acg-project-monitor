@@ -42,13 +42,13 @@ const KoboSyncStatusChip = ({ projectId, onNewSuccess }: Props) => {
         body: { action: "retry_submission", kobo_uuid: uuid },
       });
       if (error) throw error;
-      if ((data as any)?.ok) {
+      if ((data as any)?.success || (data as any)?.ok) {
         toast({ title: "Re-sync succeeded", description: `Submission ${uuid.slice(0, 8)}… ingested.` });
         onNewSuccess?.();
       } else {
         toast({
           title: "Re-sync failed",
-          description: (data as any)?.result?.hint ?? (data as any)?.result?.error ?? "Unknown error",
+          description: (data as any)?.error ?? (data as any)?.result?.hint ?? (data as any)?.result?.error ?? "Unknown error",
           variant: "destructive",
         });
       }
