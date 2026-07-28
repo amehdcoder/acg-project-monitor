@@ -133,6 +133,12 @@ function normalizeChoiceValue(
   return titleCase(stripKnownPrefix(raw, contexts));
 }
 
+const CLEARABLE_TEXT_COLS = new Set([
+  "state", "lga", "ward", "flhf_name", "community_name", "settlement_name",
+]);
+
+const SENTINEL_VALUES = new Set(["other", "__other__"]);
+
 function extractGeo(payload: Record<string, unknown>): { lat: number | null; lng: number | null } {
   const geo = payload["_geolocation"];
   if (Array.isArray(geo) && geo.length >= 2) {
@@ -354,7 +360,10 @@ Deno.serve(async (req) => {
   };
 
   for (const k of Object.keys(record)) {
-    if (record[k] == null) delete record[k];
+    if (typeof record[k] === "string" && SENTINEL_VALUES.has((record[k] as string).trim().toLowerCase())) {
+      record[k] = null;
+    }
+    if (record[k] == null && !CLEARABLE_TEXT_COLS.has(k)) delete record[k];
     else if (NUMERIC_COLS.has(k)) {
       const n = Number(record[k]);
       if (!Number.isFinite(n)) delete record[k];
