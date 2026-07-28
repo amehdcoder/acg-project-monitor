@@ -353,11 +353,21 @@ Deno.serve(async (req) => {
     community_longitude: lng,
     settlement_latitude: mappedNum("settlement_latitude", ["settlement_lat", "settlement_latitude"]) ?? lat,
     settlement_longitude: mappedNum("settlement_longitude", ["settlement_lng", "settlement_longitude"]) ?? lng,
-    flhf_latitude: mappedNum("flhf_latitude", ["flhf_lat", "flhf_latitude"]),
-    flhf_longitude: mappedNum("flhf_longitude", ["flhf_lng", "flhf_longitude"]),
+    flhf_latitude: mappedNum("flhf_latitude", ["flhf_lat", "flhf_latitude", "flhf_grp/flhf_latitude", "flhf_grp/flhf_lat_grid3"]),
+    flhf_longitude: mappedNum("flhf_longitude", ["flhf_lng", "flhf_longitude", "flhf_grp/flhf_longitude", "flhf_grp/flhf_lng_grid3"]),
+    terrain_type: (mapped("terrain_type", ["terrain_type", "context_grp/terrain_type", "type_of_terrain"]) || "").toLowerCase().trim() || null,
+    accessibility: (mapped("accessibility", ["accessibility", "context_grp/accessibility"]) || "").toLowerCase().trim() || null,
+    security_clearance: (mapped("security_clearance", ["security_clearance", "context_grp/security_clearance"]) || "").toLowerCase().trim() || null,
+    community_distance_to_flhf_km: mappedNum("community_distance_to_flhf_km", [
+      "community_distance_to_flhf_km", "community_grp/community_distance_to_flhf_km", "distance_community_flhf_km",
+    ]),
+    settlement_distance_to_flhf_km: mappedNum("settlement_distance_to_flhf_km", [
+      "settlement_distance_to_flhf_km", "settlement_grp/settlement_distance_to_flhf_km", "distance_settlement_flhf_km",
+    ]),
     is_custom_location: isCustom,
     notes: `Ingested from KoboToolbox (_uuid=${koboUuid}, form=${formUid ?? "unknown"}, submitted_by=${submittedBy ?? "unknown"})`,
   };
+
 
   for (const k of Object.keys(record)) {
     if (typeof record[k] === "string" && SENTINEL_VALUES.has((record[k] as string).trim().toLowerCase())) {
