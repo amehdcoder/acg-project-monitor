@@ -33,6 +33,32 @@ interface Props {
 const KoboSyncStatusChip = ({ projectId, onNewSuccess }: Props) => {
   const [events, setEvents] = useState<SyncEvent[]>([]);
   const [latest, setLatest] = useState<SyncEvent | null>(null);
+  const [retrying, setRetrying] = useState<string | null>(null);
+
+  const retry = async (uuid: string) => {
+    setRetrying(uuid);
+    try {
+      const { data, error } = await supabase.functions.invoke("kobo-form-manager", {
+        body: { action: "retry_submission", kobo_uuid: uuid },
+      });
+      if (error) throw error;
+      if ((data as any)?.ok) {
+        toast({ title: "Re-sync succeeded", description: `Submission ${uuid.slice(0, 8)}… ingested.` });
+        onNewSuccess?.();
+      } else {
+        toast({
+          title: "Re-sync failed",
+          description: (data as any)?.result?.hint ?? (data as any)?.result?.error ?? "Unknown error",
+          variant: "destructive",
+        });
+      }
+    } catch (e) {
+      toast({ title: "Re-sync failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setRetrying(null);
+    }
+  };
+  const [latest, setLatest] = useState<SyncEvent | null>(null);
 
   // Initial fetch of the most recent 50 events for this project.
   useEffect(() => {
