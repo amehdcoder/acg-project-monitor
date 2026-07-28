@@ -676,33 +676,54 @@ Deno.serve(async (req) => {
     }
 
     if (action === "retry_submission") {
-      const { kobo_uuid } = params;
-      if (!kobo_uuid) return j({ error: "Missing kobo_uuid" }, 400);
-      // Load the most recent stored payload for this Kobo submission.
-      const { data: evt, error: evtErr } = await admin
-        .from("kobo_webhook_events")
-        .select("payload")
-        .eq("kobo_uuid", kobo_uuid)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (evtErr) return j({ error: evtErr.message, code: "lookup_failed" }, 500);
-      if (!evt?.payload) return j({ error: "No stored payload found for that submission", code: "not_found" }, 404);
+      try {
+        const { kobo_uuid } = params;
+        if (!kobo_uuid) return j({ success: false, error: "Missing kobo_uuid" }, 200);
 
-      // Pick any active webhook secret to authenticate the internal call.
-      const { data: secretRow } = await admin
-        .from("kobo_webhook_secrets").select("secret").eq("active", true).limit(1).maybeSingle();
-      const secret = (secretRow?.secret as string | undefined) ?? Deno.env.get("KOBO_WEBHOOK_SECRET");
-      if (!secret) return j({ error: "No active webhook secret configured", code: "no_secret" }, 400);
+        const { data: evt, error: evtErr } = await admin
+          .from("kobo_webhook_events")
+          .select("payload")
+          .eq("kobo_uuid", kobo_uuid)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (evtErr) return j({ success: false, error: evtErr.message, code: "lookup_failed" }, 200);
+        if (!evt?.payload) return j({ success: false, error: "No stored payload found for that submission", code: "not_found" }, 200);
 
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/kobo-microplan-webhook`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-kobo-secret": secret },
-        body: JSON.stringify(evt.payload),
-      });
-      const text = await res.text();
-      let parsed: unknown = text; try { parsed = JSON.parse(text); } catch {}
-      return j({ ok: res.ok, status: res.status, result: parsed }, res.ok ? 200 : res.status);
+        const { data: secretRow } = await admin
+          .from("kobo_webhook_secrets").select("secret").eq("active", true).limit(1).maybeSingle();
+        const secret = (secretRow?.secret as string | undefined) ?? Deno.env.get("KOBO_WEBHOOK_SECRET");
+        if (!secret) return j({ success: false, error: "No active webhook secret configured", code: "no_secret" }, 200);
+
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/kobo-microplan-webhook`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-kobo-secret": secret },
+          body: JSON.stringify(evt.payload),
+        });
+        const text = await res.text();
+        let parsed: any = text; try { parsed = JSON.parse(text); } catch {}
+
+        if (res.ok) {
+          try {
+            await admin.from("kobo_sync_events").insert({
+              kobo_uuid,
+              entry_id: parsed?.entry_id ?? null,
+              status: "success",
+              message: "Synced successfully via manual re-sync",
+            });
+          } catch (_) { /* non-fatal */ }
+          return j({ success: true, ok: true, status: res.status, result: parsed }, 200);
+        }
+        return j({
+          success: false,
+          ok: false,
+          status: res.status,
+          error: parsed?.error ?? parsed?.hint ?? `Re-sync failed (HTTP ${res.status})`,
+          result: parsed,
+        }, 200);
+      } catch (err) {
+        return j({ success: false, error: (err as Error).message }, 200);
+      }
     }
 
     return j({ error: `Unknown action: ${action}` }, 400);
