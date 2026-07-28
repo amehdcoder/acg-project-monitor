@@ -503,6 +503,27 @@ Deno.serve(async (req) => {
 
   let firstId: string | null = null;
   let upsertError: { message: string; code?: string } | null = null;
+  if (upserts.length === 0) {
+    // Every repeat item failed validation — skip the upsert but still respond
+    // successfully so KoboToolbox does not retry. The rejected items are
+    // recorded in the audit log for supervisors to reconcile.
+    await logEvent({
+      status: "success", kobo_uuid: koboUuid,
+      submitted_by_kobo: submittedBy, submitted_at: submittedAt,
+      matched_entry_id: null, payload,
+      mapping_version_number: mappingVersion,
+      project_id: (record.project_id as string | null | undefined) ?? null,
+      error: `all_items_rejected: ${JSON.stringify(rejectedItems)}`,
+    });
+    return new Response(
+      JSON.stringify({
+        ok: true, entry_id: null, idempotency_key: koboUuid,
+        rows_written: 0, repeat_items: repeatItems.length,
+        rejected_items: rejectedItems,
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
   try {
     const res = await supabase
       .from("microplan_entries")
