@@ -557,6 +557,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
+  // Real-time: refresh entries whenever the Kobo webhook (or any other client)
+  // inserts / updates / deletes a row on the active project.
+  useRealtimeMicroplanEntries(selectedProjectId || null, fetchEntries);
   // Non-admin project members only get the Planning list + form. Force-reset
   // the view so analytics/dashboard tabs can never render for them.
   useEffect(() => { if (!isAdmin && activeView !== "list") setActiveView("list"); }, [isAdmin, activeView]);
