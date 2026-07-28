@@ -225,6 +225,9 @@ SearchableFieldCombobox.displayName = "SearchableFieldCombobox";
 
 const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting }: MicroplanEntryFormProps) => {
   const [form, setForm] = useState<MicroplanFormData>({ ...defaultFormData, ...initialData });
+  const formScrollRef = useRef<HTMLFormElement>(null) as unknown as React.RefObject<HTMLDivElement>;
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  useEffect(() => { setLastSavedAt(Date.now()); }, [form]);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [wardPickerOpen, setWardPickerOpen] = useState(false);
   const [showTrachoma, setShowTrachoma] = useState(() => {
