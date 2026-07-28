@@ -568,6 +568,7 @@ Deno.serve(async (req) => {
       idempotency_key: koboUuid,
       rows_written: upserts.length,
       repeat_items: repeatItems.length,
+      rejected_items: rejectedItems,
     }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
