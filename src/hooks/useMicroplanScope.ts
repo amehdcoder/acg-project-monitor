@@ -18,8 +18,16 @@ export interface MicroplanScope {
   designations: string[];
 }
 
-const norm = (s?: string | null) =>
-  (s ?? "").toLowerCase().replace(/^[a-z]+__/, "").replace(/[_\s-]+/g, "");
+const norm = (s?: string | null) => {
+  const value = (s ?? "").trim();
+  const lastScopePart = value.split("|").pop() ?? value;
+  return lastScopePart
+    .toLowerCase()
+    .replace(/^[a-z]+__/, "")
+    .replace(/^[a-z]+_[a-z0-9]+_/, "")
+    .replace(/^(c|s)__?/i, "")
+    .replace(/[_\s-]+/g, "");
+};
 
 const ok = (arr: string[] | null | undefined, v: string | null | undefined) =>
   !arr?.length || arr.some((a) => norm(a) === norm(v));

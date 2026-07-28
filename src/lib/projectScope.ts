@@ -22,6 +22,20 @@ export const lgaScopeKey = (state: string, lga: string) => `${state}|${lga}`;
 export const wardScopeKey = (state: string, lga: string, ward: string) =>
   `${state}|${lga}|${ward}`;
 
+const norm = (s?: string | null) => {
+  const value = (s ?? "").trim();
+  const lastScopePart = value.split("|").pop() ?? value;
+  return lastScopePart
+    .toLowerCase()
+    .replace(/^[a-z]+__/, "")
+    .replace(/^[a-z]+_[a-z0-9]+_/, "")
+    .replace(/^(c|s)__?/i, "")
+    .replace(/[_\s-]+/g, "");
+};
+
+const anyMatches = (values: string[] | undefined, raw: string | null | undefined) =>
+  !values?.length || values.some((value) => norm(value) === norm(raw));
+
 /** True when the project has no geographic restriction at all. */
 export const isUnrestricted = (s?: ProjectScope | null) =>
   !s || (s.states.length === 0 && s.lgas.length === 0 && s.wards.length === 0);
@@ -61,15 +75,18 @@ export function rowInScope(
   const l = (row.lga ?? "").trim();
   const w = (row.ward ?? "").trim();
 
-  if (scope!.states.length > 0 && !scope!.states.includes(s)) return false;
+  if (scope!.states.length > 0 && !anyMatches(scope!.states, s)) return false;
   if (scope!.lgas.length > 0) {
     // Only enforce LGA membership when this row's state actually has scoped LGAs.
-    const stateHasScopedLgas = scope!.lgas.some((k) => k.startsWith(`${s}|`));
-    if (stateHasScopedLgas && l && !scope!.lgas.includes(lgaScopeKey(s, l))) return false;
+    const stateHasScopedLgas = scope!.lgas.some((k) => norm(k.split("|")[0]) === norm(s));
+    if (stateHasScopedLgas && l && !anyMatches(scope!.lgas, l)) return false;
   }
   if (scope!.wards.length > 0) {
-    const lgaHasScopedWards = scope!.wards.some((k) => k.startsWith(`${s}|${l}|`));
-    if (lgaHasScopedWards && w && !scope!.wards.includes(wardScopeKey(s, l, w))) return false;
+    const lgaHasScopedWards = scope!.wards.some((k) => {
+      const parts = k.split("|");
+      return norm(parts[0]) === norm(s) && norm(parts[1]) === norm(l);
+    });
+    if (lgaHasScopedWards && w && !anyMatches(scope!.wards, w)) return false;
   }
   return true;
 }
