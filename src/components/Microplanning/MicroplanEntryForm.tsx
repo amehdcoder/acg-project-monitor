@@ -571,7 +571,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
     <form onSubmit={handleSubmit} ref={formScrollRef} className="space-y-3 overflow-y-auto px-1 pr-2 flex-1" style={{ scrollbarWidth: 'auto', scrollbarColor: 'hsl(var(--border)) transparent' }}>
       <MicroplanWizardChrome
         sections={MICROPLAN_WIZARD_SECTIONS as unknown as { id: string; title: string }[]}
-        scrollContainerRef={formScrollRef}
+        scrollContainerRef={formScrollRef as unknown as React.RefObject<HTMLDivElement>}
         lastSavedAt={lastSavedAt}
       />
       {/* Year & Campaign */}
