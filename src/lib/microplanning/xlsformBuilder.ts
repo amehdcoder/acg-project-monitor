@@ -628,8 +628,68 @@ export async function buildMicroplanningXlsForm(
   XLSX.utils.book_append_sheet(wb, surveySheet, "survey");
   XLSX.utils.book_append_sheet(wb, choicesSheet, "choices");
   XLSX.utils.book_append_sheet(wb, settingsSheet, "settings");
+  assertCoverPageIsHomeImageOnly(wb);
   onProgress?.({ phase: "done", done: 1, total: 1 });
   return wb;
+}
+
+/**
+ * Runtime guard: verifies the generated XLSForm's first user-visible screen
+ * contains ONLY the full-page `home` cover image and no additional controls.
+ *
+ * Fails loudly (throws) if the workbook structure changes in a way that would
+ * introduce other rendered controls on the cover page — this is invoked at the
+ * end of every build so a regression in the survey order surfaces immediately
+ * instead of silently shipping a broken KoboCollect experience.
+ *
+ * "First visible screen" = the first survey row whose `type` is not one of the
+ * ODK metadata types (start/end/today/deviceid/username/phonenumber). That row
+ * MUST be the `welcome_cover_note` with image=`home`, appearance=`no-label`,
+ * and a whitespace-only label.
+ */
+const META_TYPES = new Set([
+  "start", "end", "today", "deviceid", "username", "phonenumber", "phone_number", "audit",
+]);
+export function assertCoverPageIsHomeImageOnly(wb: XLSX.WorkBook): void {
+  const sheet = wb.Sheets["survey"];
+  if (!sheet) throw new Error("[xlsform-cover] survey sheet missing");
+  const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, defval: "" }) as string[][];
+  const header = rows[0] ?? [];
+  const idx = (h: string) => header.indexOf(h);
+  const iType = idx("type"), iName = idx("name"), iLabel = idx("label"),
+    iImage = idx("image"), iAppearance = idx("appearance"), iHint = idx("hint");
+  if (iType < 0 || iName < 0 || iLabel < 0 || iImage < 0) {
+    throw new Error("[xlsform-cover] survey header missing required columns");
+  }
+  const first = rows.slice(1).find((r) => {
+    const t = String(r[iType] ?? "").trim();
+    return t && !META_TYPES.has(t);
+  });
+  if (!first) throw new Error("[xlsform-cover] no visible cover row found");
+  const type = String(first[iType] ?? "").trim();
+  const name = String(first[iName] ?? "").trim();
+  const label = String(first[iLabel] ?? "");
+  const image = String(first[iImage] ?? "").trim();
+  const appearance = String(first[iAppearance] ?? "").trim();
+  const hint = String(first[iHint] ?? "").trim();
+  if (type !== "note") {
+    throw new Error(`[xlsform-cover] first visible row must be a note (got "${type}")`);
+  }
+  if (name !== "welcome_cover_note") {
+    throw new Error(`[xlsform-cover] first visible row must be welcome_cover_note (got "${name}")`);
+  }
+  if (image !== "home") {
+    throw new Error(`[xlsform-cover] cover image must be "home" (got "${image}")`);
+  }
+  if (!/no-label/.test(appearance)) {
+    throw new Error(`[xlsform-cover] cover row must use "no-label" appearance (got "${appearance}")`);
+  }
+  if (label.trim() !== "") {
+    throw new Error(`[xlsform-cover] cover label must be blank/whitespace only (got "${label}")`);
+  }
+  if (hint !== "") {
+    throw new Error(`[xlsform-cover] cover row must have no hint (got "${hint}")`);
+  }
 }
 
 export async function downloadMicroplanningXlsForm(
