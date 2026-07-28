@@ -4774,6 +4774,36 @@ export type Database = {
           },
         ]
       }
+      kobo_sync_events: {
+        Row: {
+          created_at: string
+          entry_id: string | null
+          id: string
+          kobo_uuid: string | null
+          message: string | null
+          project_id: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          entry_id?: string | null
+          id?: string
+          kobo_uuid?: string | null
+          message?: string | null
+          project_id?: string | null
+          status: string
+        }
+        Update: {
+          created_at?: string
+          entry_id?: string | null
+          id?: string
+          kobo_uuid?: string | null
+          message?: string | null
+          project_id?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       kobo_webhook_events: {
         Row: {
           created_at: string

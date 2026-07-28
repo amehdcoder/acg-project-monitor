@@ -25,6 +25,8 @@ import AllocationHistoryDialog from "./AllocationHistoryDialog";
 import MicroplanDeleteRequestDialog from "./MicroplanDeleteRequestDialog";
 import MicroplanDeleteRequestsPanel from "./MicroplanDeleteRequestsPanel";
 import KoboSyncSettingsDialog from "./KoboSyncSettingsDialog";
+import KoboSyncStatusChip from "./KoboSyncStatusChip";
+import useRealtimeMicroplanEntries from "@/hooks/useRealtimeMicroplanEntries";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useProjectScope } from "@/hooks/useProjectScope";
 import { rowInScope } from "@/lib/projectScope";
@@ -555,6 +557,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
+  // Real-time: refresh entries whenever the Kobo webhook (or any other client)
+  // inserts / updates / deletes a row on the active project.
+  useRealtimeMicroplanEntries(selectedProjectId || null, fetchEntries);
   // Non-admin project members only get the Planning list + form. Force-reset
   // the view so analytics/dashboard tabs can never render for them.
   useEffect(() => { if (!isAdmin && activeView !== "list") setActiveView("list"); }, [isAdmin, activeView]);
@@ -1766,6 +1771,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             <ShieldCheck className="h-3.5 w-3.5 mr-1" />
             {(isAdmin || isOwner) ? "Delete Requests" : "My Delete Requests"}
           </Button>
+          <KoboSyncStatusChip projectId={selectedProjectId || null} onNewSuccess={fetchEntries} />
           {isSuperAdmin && (
             <Button size="sm" variant="outline" onClick={() => setShowKoboSettings(true)} className="shadow-sm">
               <HistoryIcon className="h-3.5 w-3.5 mr-1" /> Kobo Sync

@@ -1,72 +1,77 @@
+# Microplanning Wizard Redesign + Real-Time Kobo Pipeline
 
-## Scope
-Upgrade the Integrated Supervisory Dashboard (KoboToolbox) with 7 fixes. All work stays inside `src/components/IntegratedSupervisory/` plus tiny helpers, one new table for share configs, and two npm packages.
+Two connected deliverables: (1) a modern, step-by-step wizard shell for the Geo-enabled Microplanning entry form, and (2) a real-time Kobo → Supabase → Dashboard sync path. Existing form logic, validation, and offline saving are preserved — only the shell, controls, and realtime plumbing change.
 
-## Dependencies to add
-- `exceljs` — styled XLSX export
-- `react-grid-layout` + `@types/react-grid-layout` — freeform canvas
-- `expr-eval` — calculated field formulas
+## 1. Wizard shell (new component: `MicroplanWizardForm`)
 
-## Files to add
-1. `src/components/IntegratedSupervisory/koboLabelResolver.ts`
-   - `KoboLabelResolver` class built from `asset.content.survey` + `asset.content.choices`.
-   - `resolveValue(fieldKey, rawValue)` handles null, stringified JSON arrays (`["KAFIN","HAUSA"]`), space-delimited `select_multiple`, and arrays; joins labels with `", "`.
-   - `resolveHeader(fieldKey)` returns the question label.
-   - Exposed on `KoboCache` as a lazy singleton keyed by `formUid`.
+Replaces the monolithic scrolling layout in `MicroplanEntryForm.tsx` with a stepper. Reuses all current field logic, validation, and submit path — only the container changes.
 
-2. `src/components/IntegratedSupervisory/RecordPreviewDrawer.tsx`
-   - Slide-over drawer (Radix `Sheet`) showing all schema questions grouped by group prefix, resolved values, badges for empty/multi-select, header in slate-900.
+**Sections** (mapped from the existing form):
+1. Campaign & Project
+2. Administrative Hierarchy (State → LGA → Ward)
+3. Frontline Health Facility (FLHF)
+4. Community
+5. Settlement
+6. GPS & Coordinates
+7. Population Estimates
+8. PWD Breakdown
+9. Medicines / Allocations
+10. Review & Submit
 
-3. `src/components/IntegratedSupervisory/exportKoboData.ts`
-   - `exportXlsx(rows, columns, resolver)` — ExcelJS workbook, frozen header row (28px, `#1E293B`/white bold), auto column widths, thin `#E2E8F0` borders, wrap text, resolved values.
-   - `exportCsv(rows, columns, resolver)` — clean CSV using resolved values.
+**Design tokens** (added to `index.css` as semantic tokens — no hardcoded colors in components):
+- Surface: `bg-slate-50/50`, cards `rounded-2xl bg-white shadow-sm`
+- Primary `#2563EB`, ink `#0F172A`
+- State chips: emerald (synced), amber (draft), rose (error)
+- Typography: Inter, generous line-height, strong h/label contrast
 
-4. `src/components/IntegratedSupervisory/CanvasGridLayout.tsx`
-   - Wraps `react-grid-layout` with `WidthProvider`, freeform (`compactType={null}`), persists layout via existing `saveLayout` helper.
+**Progress header**: sticky top bar with "Section X of 10 · <name>" and an animated `<Progress>` bar (shadcn) reflecting completed-required fields per step.
 
-5. `src/components/IntegratedSupervisory/CalculatedFieldDialog.tsx`
-   - Uses `expr-eval` to preview a formula against sample rows; stores calculated fields in the dashboard config; exposes them as pseudo-columns in the Data panel.
+**Quick Navigator drawer**: shadcn `Sheet` from the left listing all 10 sections with per-section badges — Complete / Incomplete / Missing Required — computed from current form values + validation results. Click to jump.
 
-6. `src/components/IntegratedSupervisory/ShareDashboardDialog.tsx`
-   - Access levels: `PUBLIC_LINK`, `AUTHENTICATED`, `PROJECT_MEMBER`, `RESTRICTED` (email chip input).
-   - Realtime sync toggle. Copy-link button generates `/shared-dashboard/:token`.
+**Sticky action bar** (bottom): Previous · Save Draft (with "Saved 2s ago") · Next / Submit. Submit shows loading + success micro-animation. Wired to existing `useSubmitLock` and offline queue.
 
-## Files to modify
-- `koboClient.ts`: cache the raw asset content (`survey` + `choices`) alongside `fields`, and construct the resolver on load; add `assetContent` to `KoboCache`.
-- `RawKoboDataTable.tsx`:
-  - Remove `Status` column.
-  - Render all dynamic Kobo question columns without horizontal truncation (min-width per column, horizontal virtualization already present).
-  - Use resolver for every cell + header label.
-  - Add "Preview" button per row opening `RecordPreviewDrawer`.
-  - Swap Excel/CSV downloads to new `exportKoboData` helpers.
-- `SupervisoryDashboardView.tsx`:
-  - Replace dnd-kit canvas with `CanvasGridLayout`.
-  - Add "+ Calculated field" in Data panel.
-  - Add "Share" button in header opening `ShareDashboardDialog`.
-  - Route dimension values + filter dropdowns through resolver.
-- `KPICard` (scorecard widget): add `showTechnicalMeta` (default `false`); hide "Rows / Distinct …" subtext unless toggled in Setup/Style panel.
+## 2. Enhanced field controls (in `src/components/Microplanning/fields/`)
 
-## Database
-One migration for share configs:
-```
-create table public.dashboard_shares (
-  id uuid primary key default gen_random_uuid(),
-  dashboard_id text not null,
-  owner_id uuid not null references auth.users(id) on delete cascade,
-  access_level text not null check (access_level in ('PUBLIC_LINK','AUTHENTICATED','PROJECT_MEMBER','RESTRICTED')),
-  share_token uuid unique,
-  allowed_user_ids uuid[] default '{}',
-  allowed_project_ids uuid[] default '{}',
-  allow_realtime boolean not null default true,
-  created_at timestamptz not null default now()
-);
-```
-+ GRANTs (`anon` SELECT for PUBLIC_LINK lookups by token, `authenticated` full), RLS policies: owner full; SELECT allowed when access_level='PUBLIC_LINK', or 'AUTHENTICATED' with auth.uid() not null, or 'RESTRICTED' with uid in allowed_user_ids, or 'PROJECT_MEMBER' via existing project membership.
+- `CascadingGeoSelect`: reuse GRID3 cascade, add instant search, "GRID3" badge when option comes from GRID3 dataset, inline "Other (specify)" text input when selected.
+- `PopulationStepper`: numeric input flanked by `-` / `+` touch targets (52px per mobile-ergonomics memory), live auto-sum of children 0–4 + 5–14 + adults 15+ displayed in a subtotal chip.
+- `GpsCaptureWidget`: replaces raw GPS field. Shows lat/lng, accuracy meter (`±Xm`), Leaflet mini-map preview, and a toggle "GRID3 pre-loaded ↔ Manual override". Uses existing `useGeolocation` + `gpsWarmer`.
+
+## 3. Real-time Kobo pipeline
+
+Existing `kobo-microplan-webhook` edge function already ingests + upserts on `idempotency_key`. Extend it and add realtime + UI:
+
+**a. Webhook function updates** (`supabase/functions/kobo-microplan-webhook/index.ts`)
+- Add `project_id` to the conflict target for the requested `(kobo_submission_id, project_id)` semantics: change upsert to `onConflict: "idempotency_key,project_id"` after adding a matching unique index.
+- Emit a `kobo_sync_events` row (`{ status, project_id, kobo_uuid, entry_id, at }`) that the UI subscribes to.
+
+**b. Migration**
+- Add composite unique index `microplan_entries (idempotency_key, project_id)`.
+- Create `public.kobo_sync_events` (project_id, kobo_uuid, entry_id, status, message, created_at), GRANTs, RLS: project admins + super admins read, service_role write.
+- `ALTER PUBLICATION supabase_realtime ADD TABLE public.microplan_entries, public.kobo_sync_events`.
+
+**c. Realtime in UI**
+- `useRealtimeMicroplanEntries(projectId)` hook: TanStack Query + `postgres_changes` on `microplan_entries` filtered by `project_id`; invalidates dashboard queries (`entries`, KPI counters, geotagged count).
+- `KoboSyncStatusChip`: header chip subscribing to `kobo_sync_events`, showing "Synced just now" / "Sync pending" / "Validation failed" with pulse animation.
+- `KoboSyncAuditDrawer`: slide-over listing the last 50 events, filterable by status.
+
+**d. Offline readiness**
+- Reuse existing offline queue. Draft badge in header shows "Saved locally — will sync when online" driven by `navigator.onLine` + queue length.
+
+## 4. Wiring
+
+- `MicroplanningView.tsx`: swap `MicroplanEntryForm` for `MicroplanWizardForm` behind a feature flag `wizard=true` (default on) so we can fall back if needed. Mount `KoboSyncStatusChip` in the tab header and the audit drawer trigger next to it.
+- Dashboards (`MdaAdaptiveDashboard`, KPI tiles): consume the same TanStack query keys the realtime hook invalidates — no direct changes needed beyond hook adoption.
+
+## Technical notes
+
+- Wizard state lives in the existing form store; per-step validity computed via existing `formFieldValidation` helpers.
+- Save Draft continues to write through `savedForms` / offline queue; timestamp comes from the last successful write.
+- Realtime channels torn down on unmount (per cloud-realtime rules) to avoid subscription leaks.
+- All new colors/shadows go through `index.css` tokens; no `bg-white`/`text-black` literals in components except via shadcn variants.
+- No changes to auth, RLS shape beyond the new table, or Kobo secret rotation flow.
 
 ## Out of scope
-- No changes to Microplanning, MDA Checklist, or other modules.
-- No changes to Supabase auth or edge functions beyond what the resolver needs (the asset's `content.survey`/`content.choices` are already available from `kobo-form-manager`; if not returned today, `fetch_submissions` response will include them).
 
-## Verification
-- Run `tsgo` after edits, confirm no type errors.
-- Manual: sync a Kobo form, verify LGA/WARD values render as labels in table, KPIs, filters; preview drawer opens; XLSX opens in Excel with frozen header and borders; canvas widgets drag/resize; share dialog persists a row.
+- Rewriting non-microplanning forms.
+- Changing Kobo mapping/versioning UI (already shipped).
+- Server-side XLSForm regeneration.

@@ -111,8 +111,19 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const logEvent = async (row: Record<string, unknown>) => {
+    // Legacy detailed log (payload + mapping version).
     try { await supabase.from("kobo_webhook_events").insert(row); }
     catch (e) { console.error("kobo_webhook_events insert failed:", (e as Error).message); }
+    // Compact real-time sync event stream consumed by the Microplanning UI.
+    try {
+      await supabase.from("kobo_sync_events").insert({
+        project_id: (row as { project_id?: string | null }).project_id ?? null,
+        kobo_uuid: (row as { kobo_uuid?: string | null }).kobo_uuid ?? null,
+        entry_id: (row as { matched_entry_id?: string | null }).matched_entry_id ?? null,
+        status: (row as { status?: string }).status ?? "unknown",
+        message: (row as { error?: string | null }).error ?? null,
+      });
+    } catch (e) { console.error("kobo_sync_events insert failed:", (e as Error).message); }
   };
 
   // Accept any currently-active DB secret; fall back to env for legacy setups.
@@ -264,6 +275,7 @@ Deno.serve(async (req) => {
       status: "failed", error: error.message, kobo_uuid: koboUuid,
       submitted_by_kobo: submittedBy, submitted_at: submittedAt, payload,
       mapping_version_number: mappingVersion,
+      project_id: (record.project_id as string | null | undefined) ?? null,
     });
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -275,6 +287,7 @@ Deno.serve(async (req) => {
     submitted_by_kobo: submittedBy, submitted_at: submittedAt,
     matched_entry_id: data?.id ?? null, payload,
     mapping_version_number: mappingVersion,
+    project_id: (record.project_id as string | null | undefined) ?? null,
   });
 
 

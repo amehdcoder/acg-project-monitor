@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect, memo, useMemo } from "react";
+import { useState, useCallback, useEffect, memo, useMemo, useRef } from "react";
+import MicroplanWizardChrome from "./MicroplanWizardChrome";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -102,8 +103,8 @@ const defaultFormData: MicroplanFormData = {
 
 const nativeSelectClass = "flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
-const Section = memo(({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) => (
-  <Card className="border-border/40 shadow-none">
+const Section = memo(({ id, title, icon: Icon, children }: { id?: string; title: string; icon: any; children: React.ReactNode }) => (
+  <Card id={id ? `section-${id}` : undefined} className="scroll-mt-24 rounded-2xl border-border/40 bg-white shadow-sm">
     <CardHeader className="pb-2 pt-3 px-3">
       <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
         <Icon className="h-3.5 w-3.5" />
@@ -116,6 +117,20 @@ const Section = memo(({ title, icon: Icon, children }: { title: string; icon: an
   </Card>
 ));
 Section.displayName = "Section";
+
+// Section ids used by the wizard chrome to anchor / navigate between steps.
+export const MICROPLAN_WIZARD_SECTIONS = [
+  { id: "campaign",     title: "Campaign & Year" },
+  { id: "admin",        title: "Administrative Hierarchy" },
+  { id: "flhf",         title: "Frontline Health Facility" },
+  { id: "community",    title: "Community Information" },
+  { id: "settlement",   title: "Settlement Information" },
+  { id: "terrain",      title: "Terrain & Accessibility" },
+  { id: "population",   title: "Estimated Population" },
+  { id: "disability",   title: "Disability Disaggregation" },
+  { id: "cdd",          title: "CDD Information" },
+  { id: "notes",        title: "Additional Notes" },
+] as const;
 
 const Field = memo(({ label, required, children, className }: { label: string; required?: boolean; children: React.ReactNode; className?: string }) => (
   <div className={`space-y-0.5 ${className || ""}`}>
@@ -210,6 +225,9 @@ SearchableFieldCombobox.displayName = "SearchableFieldCombobox";
 
 const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting }: MicroplanEntryFormProps) => {
   const [form, setForm] = useState<MicroplanFormData>({ ...defaultFormData, ...initialData });
+  const formScrollRef = useRef<HTMLFormElement | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  useEffect(() => { setLastSavedAt(Date.now()); }, [form]);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [wardPickerOpen, setWardPickerOpen] = useState(false);
   const [showTrachoma, setShowTrachoma] = useState(() => {
@@ -548,11 +566,16 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   const settlementDistAutoComputed = !!(form.settlement_latitude && form.settlement_longitude && form.flhf_latitude && form.flhf_longitude);
 
   return (
-    <div className="relative flex-1 flex flex-col">
+    <div className="relative flex-1 flex flex-col bg-slate-50/50">
 
-    <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-2 flex-1" style={{ scrollbarWidth: 'auto', scrollbarColor: 'hsl(var(--border)) transparent' }}>
+    <form onSubmit={handleSubmit} ref={formScrollRef} className="space-y-3 overflow-y-auto px-1 pr-2 flex-1" style={{ scrollbarWidth: 'auto', scrollbarColor: 'hsl(var(--border)) transparent' }}>
+      <MicroplanWizardChrome
+        sections={MICROPLAN_WIZARD_SECTIONS as unknown as { id: string; title: string }[]}
+        scrollContainerRef={formScrollRef as unknown as React.RefObject<HTMLDivElement>}
+        lastSavedAt={lastSavedAt}
+      />
       {/* Year & Campaign */}
-      <Section title="Campaign & Year" icon={Calendar}>
+      <Section id="campaign" title="Campaign & Year" icon={Calendar}>
         <Field label="Year of Microplanning" required>
           <Input value={form.year_of_microplanning ?? ""} onChange={e => setNum("year_of_microplanning", e.target.value)} type="number" min={2000} max={2100} placeholder="2026" className="h-8 text-xs" />
         </Field>
@@ -582,7 +605,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* Administrative Hierarchy - Cascaded */}
-      <Section title="Administrative Hierarchy" icon={Building2}>
+      <Section id="admin" title="Administrative Hierarchy" icon={Building2}>
         <Field label="State" required>
           <select className={nativeSelectClass} value={form.state} onChange={e => handleStateChange(e.target.value)}>
             <option value="">Select State</option>
@@ -640,7 +663,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* FLHF Information */}
-      <Section title="Frontline Health Facility (FLHF)" icon={Building2}>
+      <Section id="flhf" title="Frontline Health Facility (FLHF)" icon={Building2}>
         <SearchableFieldCombobox
           label="Name of FLHF"
           required
@@ -689,7 +712,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       )}
 
       {/* Community Information */}
-      <Section title="Community Information" icon={Users}>
+      <Section id="community" title="Community Information" icon={Users}>
         <Field label="Community Name" required>
           <Input value={form.community_name} onChange={e => set("community_name", e.target.value)} className="h-8 text-xs" placeholder="Type community name..." />
         </Field>
@@ -713,7 +736,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* Settlement Information */}
-      <Section title="Settlement Information" icon={MapPin}>
+      <Section id="settlement" title="Settlement Information" icon={MapPin}>
         <SearchableFieldCombobox
           label="Settlement Name"
           value={form.settlement_name}
@@ -750,7 +773,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* Terrain & Access */}
-      <Section title="Terrain & Accessibility" icon={Shield}>
+      <Section id="terrain" title="Terrain & Accessibility" icon={Shield}>
         <Field label="Type of Terrain">
           <select className={nativeSelectClass} value={form.terrain_type} onChange={e => set("terrain_type", e.target.value)}>
             <option value="">Select terrain</option>
@@ -784,7 +807,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* Population Estimates - Standard */}
-      <Section title="Estimated Population (Standard)" icon={Users}>
+      <Section id="population" title="Estimated Population (Standard)" icon={Users}>
         <Field label="Total Population">
           <Input
             value={form.estimated_total_population ?? ""}
@@ -811,7 +834,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* Disability Disaggregation (by disability type) */}
-      <Section title="Disability Disaggregation (by Type)" icon={Users}>
+      <Section id="disability" title="Disability Disaggregation (by Type)" icon={Users}>
         <Field label="Total Persons with Disability">
           {(() => {
             const pwdSum =
@@ -891,7 +914,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Card>
 
       {/* CDD Information */}
-      <Section title="CDD Information" icon={UserCheck}>
+      <Section id="cdd" title="CDD Information" icon={UserCheck}>
         <Field label="Name(s) of CDD">
           <Input value={form.cdd_names} onChange={e => set("cdd_names", e.target.value)} placeholder="Comma-separated" className="h-8 text-xs" />
         </Field>
@@ -905,7 +928,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* Notes */}
-      <Section title="Additional Notes" icon={Info}>
+      <Section id="notes" title="Additional Notes" icon={Info}>
         <div className="col-span-1 sm:col-span-2 lg:col-span-3">
           <Field label="Notes">
             <Textarea value={form.notes} onChange={e => set("notes", e.target.value)} rows={2} className="text-xs" />
