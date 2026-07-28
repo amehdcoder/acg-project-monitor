@@ -168,7 +168,7 @@ const NUMERIC_COLS = new Set([
   "settlement_distance_to_flhf_km","community_latitude","community_longitude",
   "settlement_latitude","settlement_longitude","flhf_latitude","flhf_longitude",
   "year_of_microplanning","total_treated","medicine_used","households_treated",
-  "total_households_reported","total_households_treated",
+  "total_households_reported","total_households_treated","target_population",
 ]);
 
 Deno.serve(async (req) => {
