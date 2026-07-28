@@ -57,8 +57,27 @@ const CHOICES_HEADER = ["list_name", "name", "label", "lga", "ward", "flhf", "co
 const SETTINGS_HEADER = ["form_title", "form_id", "version", "style", "allow_choice_duplicates"];
 
 
+/**
+ * Sanitize `${...}` interpolations inside a hint/message so they strictly
+ * reference valid XLSForm question names. PyXForm rejects rows where `${...}`
+ * contains XPath expressions like `position(..)` or `.`; we strip those unsafe
+ * interpolations (leaving surrounding literal text) so hints stay readable
+ * while eliminating KoboToolbox's XPath syntax error.
+ */
+const VALID_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+export const sanitizeInterpolations = (s: string): string =>
+  String(s ?? "").replace(/\$\{([^}]*)\}/g, (_m, inner) => {
+    const trimmed = String(inner).trim();
+    return VALID_NAME_RE.test(trimmed) ? `\${${trimmed}}` : "";
+  });
+
+const HINT_LIKE_COLS = new Set(["hint", "required_message", "constraint_message"]);
 const q = (r: Partial<Record<(typeof SURVEY_HEADER)[number], string>>): Row =>
-  SURVEY_HEADER.map((h) => (r as any)[h] ?? "");
+  SURVEY_HEADER.map((h) => {
+    const v = (r as any)[h];
+    if (v == null) return "";
+    return HINT_LIKE_COLS.has(h) ? sanitizeInterpolations(String(v)) : v;
+  });
 
 const ch = (r: Partial<Record<(typeof CHOICES_HEADER)[number], string | number>>): Row =>
   CHOICES_HEADER.map((h) => {
