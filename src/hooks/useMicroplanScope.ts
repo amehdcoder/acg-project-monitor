@@ -18,6 +18,20 @@ export interface MicroplanScope {
   designations: string[];
 }
 
+const norm = (s?: string | null) => {
+  const value = (s ?? "").trim();
+  const lastScopePart = value.split("|").pop() ?? value;
+  return lastScopePart
+    .toLowerCase()
+    .replace(/^[a-z]+__/, "")
+    .replace(/^[a-z]+_[a-z0-9]+_/, "")
+    .replace(/^(c|s)__?/i, "")
+    .replace(/[_\s-]+/g, "");
+};
+
+const ok = (arr: string[] | null | undefined, v: string | null | undefined) =>
+  !arr?.length || arr.some((a) => norm(a) === norm(v));
+
 /**
  * Reads the current user's microplan_designation_assignments and returns a
  * helper to check if a row is within their scope. Admins can be passed
@@ -63,10 +77,9 @@ export const useMicroplanScope = (bypass: boolean): MicroplanScope => {
 
   const isInScope: MicroplanScope["isInScope"] = useMemo(() => {
     if (bypass) return () => true;
+    if (hasNoRestriction) return () => true;
     if (rows.length === 0) return () => false; // No assignment → no edit access; admin bypass handles read for admins
     return (row) => rows.some(r => {
-      const ok = (arr: string[] | null | undefined, v: string | null | undefined) =>
-        !arr || arr.length === 0 || (v != null && arr.includes(v));
       return (
         ok(r.states, row.state ?? null) &&
         ok(r.lgas, row.lga ?? null) &&
@@ -76,7 +89,7 @@ export const useMicroplanScope = (bypass: boolean): MicroplanScope => {
         ok(r.settlements, row.settlement_name ?? null)
       );
     });
-  }, [rows, bypass]);
+  }, [rows, bypass, hasNoRestriction]);
 
   const designations = useMemo(() => [...new Set(rows.map(r => r.designation))], [rows]);
 

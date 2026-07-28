@@ -739,17 +739,22 @@ Deno.serve(async (req) => {
         source = "events",
         project_id,
         form_uid,
-        server_url,
-        api_token,
+        config_id,
         limit = 200,
         since,
       } = params;
+      let { server_url, api_token } = params;
 
       const secret = await readActiveSecret();
       if (!secret) return j({ error: "No active webhook secret configured" }, 400);
 
+      const capped = Math.min(Math.max(Number(limit) || 200, 1), 1000);
+      let payloads: Array<Record<string, unknown>> = [];
+      let resolvedProjectId = typeof project_id === "string" && project_id ? project_id : null;
+      let resolvedFormUid = typeof form_uid === "string" && form_uid ? form_uid : null;
+
       const replay = async (payload: Record<string, unknown>) => {
-        const qs = project_id ? `?project_id=${encodeURIComponent(project_id)}` : "";
+        const qs = resolvedProjectId ? `?project_id=${encodeURIComponent(resolvedProjectId)}` : "";
         const r = await fetch(`${SUPABASE_URL}/functions/v1/kobo-microplan-webhook${qs}`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-kobo-secret": secret },
@@ -759,17 +764,35 @@ Deno.serve(async (req) => {
         return { ok: r.ok, status: r.status, body: b };
       };
 
-      const capped = Math.min(Math.max(Number(limit) || 200, 1), 1000);
-      let payloads: Array<Record<string, unknown>> = [];
+      if (source === "kobo" || config_id || (!server_url && (resolvedProjectId || resolvedFormUid))) {
+        let cfgQuery = admin
+          .from("kobo_form_configs")
+          .select("id, project_id, kobo_server_url, form_uid, api_token")
+          .order("updated_at", { ascending: false })
+          .limit(1);
+        if (config_id) cfgQuery = cfgQuery.eq("id", config_id);
+        else if (resolvedFormUid) cfgQuery = cfgQuery.eq("form_uid", resolvedFormUid);
+        else if (resolvedProjectId) cfgQuery = cfgQuery.eq("project_id", resolvedProjectId);
+
+        const { data: cfgs, error: cfgErr } = await cfgQuery;
+        if (cfgErr) return j({ error: cfgErr.message }, 500);
+        const cfg = (cfgs ?? [])[0] as any;
+        if (cfg) {
+          resolvedProjectId = resolvedProjectId ?? (cfg.project_id as string | null) ?? null;
+          resolvedFormUid = resolvedFormUid ?? (cfg.form_uid as string | null) ?? null;
+          server_url = server_url ?? cfg.kobo_server_url;
+          api_token = api_token ?? cfg.api_token;
+        }
+      }
 
       if (source === "kobo") {
-        if (!server_url || !form_uid || !api_token) {
-          return j({ error: "server_url/form_uid/api_token required for source=kobo" }, 400);
+        if (!server_url || !resolvedFormUid || !api_token) {
+          return j({ error: "Kobo configuration not found. Save Sync Settings first, or provide server_url/form_uid/api_token." }, 400);
         }
         try {
           const data = await koboFetch(
             server_url,
-            `/api/v2/assets/${form_uid}/data/?format=json&limit=${capped}`,
+            `/api/v2/assets/${resolvedFormUid}/data/?format=json&limit=${capped}&sort=%7B%22_submission_time%22%3A1%7D`,
             api_token,
           );
           payloads = Array.isArray(data?.results) ? data.results : [];
@@ -784,14 +807,17 @@ Deno.serve(async (req) => {
         payloads = (data ?? [])
           .map((r: any) => r.payload)
           .filter((p: any) => p && typeof p === "object");
-        if (form_uid) {
-          payloads = payloads.filter((p) => (p as any)?._xform_id_string === form_uid);
+        if (resolvedFormUid) {
+          payloads = payloads.filter((p) => (p as any)?._xform_id_string === resolvedFormUid);
         }
       }
 
       let ok = 0, failed = 0;
       const errors: Array<{ uuid: string | null; status: number; error: unknown }> = [];
       for (const p of payloads) {
+        if (resolvedProjectId && !(p as any).project_id && !(p as any).amehnities_project_id) {
+          (p as any).amehnities_project_id = resolvedProjectId;
+        }
         const r = await replay(p);
         if (r.ok) ok++;
         else { failed++; errors.push({ uuid: (p as any)?._uuid ?? null, status: r.status, error: r.body?.error ?? r.body }); }

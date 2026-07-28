@@ -91,6 +91,54 @@ function pickNumber(obj: Record<string, unknown>, keys: string[]): number | null
   return Number.isFinite(n) ? n : null;
 }
 
+function slugPart(value: string | null): string | null {
+  if (!value) return null;
+  const cleaned = value.trim().toLowerCase().replace(/^[a-z]+__/, "");
+  const parts = cleaned.split(/__|_/).filter(Boolean);
+  return parts.at(-1) ?? null;
+}
+
+function titleCase(value: string): string {
+  return value
+    .replace(/__+/g, "_")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase()
+    .replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+function stripKnownPrefix(value: string, contexts: Array<string | null>): string {
+  let out = value.trim().toLowerCase().replace(/^[a-z]+__/, "");
+  const contextParts = contexts.map(slugPart).filter(Boolean) as string[];
+  if (contextParts.length > 0) {
+    const prefix = `${contextParts.join("_")}_`;
+    if (out.startsWith(prefix)) out = out.slice(prefix.length);
+  }
+  return out.replace(/^(c|s)__?/i, "");
+}
+
+function normalizeChoiceValue(
+  main: string | null,
+  custom: string | null,
+  contexts: Array<string | null> = [],
+): string | null {
+  const raw = main?.trim() ?? "";
+  const customRaw = custom?.trim() ?? "";
+  const lower = raw.toLowerCase();
+  if (lower === "other" || lower === "__other__") {
+    return customRaw ? titleCase(customRaw) : null;
+  }
+  if (!raw) return customRaw ? titleCase(customRaw) : null;
+  return titleCase(stripKnownPrefix(raw, contexts));
+}
+
+const CLEARABLE_TEXT_COLS = new Set([
+  "state", "lga", "ward", "flhf_name", "community_name", "settlement_name",
+]);
+
+const SENTINEL_VALUES = new Set(["other", "__other__"]);
+
 function extractGeo(payload: Record<string, unknown>): { lat: number | null; lng: number | null } {
   const geo = payload["_geolocation"];
   if (Array.isArray(geo) && geo.length >= 2) {
@@ -127,8 +175,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const logEvent = async (row: Record<string, unknown>) => {
-    // Legacy detailed log (payload + mapping version).
-    try { await supabase.from("kobo_webhook_events").insert(row); }
+    // Legacy detailed log (payload + mapping version). Keep this shape aligned
+    // with the table so event logging never fails before backfill can replay it.
+    const { project_id: _projectId, ...legacyRow } = row;
+    try { await supabase.from("kobo_webhook_events").insert(legacyRow); }
     catch (e) { console.error("kobo_webhook_events insert failed:", (e as Error).message); }
     // Compact real-time sync event stream consumed by the Microplanning UI.
     try {
@@ -237,24 +287,30 @@ Deno.serve(async (req) => {
     return Number.isFinite(n) ? n : null;
   };
 
-  const flhfName = mapped("flhf_name", ["flhf_name"]);
-  const flhfCustom = mapped("flhf_custom", ["flhf_custom", "flhf_other"]);
-  const communityName = mapped("community_name", ["community", "community_name"]);
-  const communityCustom = mapped("community_custom", ["community_custom", "community_other"]);
-  const settlementName = mapped("settlement_name", ["settlement", "settlement_name"]);
-  const settlementCustom = mapped("settlement_custom", ["settlement_custom", "settlement_other"]);
+  const stateRaw = mapped("state", ["state", "admin_hierarchy/state", "state_name", "location/state"]);
+  const stateCustom = mapped("state_custom", ["state_custom", "state_other", "admin_hierarchy/state_manual"]);
+  const lgaRaw = mapped("lga", ["lga", "lga_name", "admin_hierarchy/lga", "location/lga"]);
+  const lgaCustom = mapped("lga_custom", ["lga_custom", "lga_other", "admin_hierarchy/lga_manual"]);
+  const wardRaw = mapped("ward", ["ward", "ward_name", "admin_hierarchy/ward", "location/ward"]);
+  const wardCustom = mapped("ward_custom", ["ward_custom", "ward_other", "admin_hierarchy/ward_manual"]);
+  const flhfName = mapped("flhf_name", ["flhf_name", "flhf_grp/flhf", "flhf_grp/flhf_name"]);
+  const flhfCustom = mapped("flhf_custom", ["flhf_custom", "flhf_other", "flhf_manual", "flhf_grp/flhf_manual"]);
+  const communityName = mapped("community_name", ["community", "community_name", "community_grp/community", "community_grp/community_name"]);
+  const communityCustom = mapped("community_custom", ["community_custom", "community_other", "community_manual", "community_grp/community_manual"]);
+  const settlementName = mapped("settlement_name", ["settlement", "settlement_name", "settlement_grp/settlement", "settlement_grp/settlement_name"]);
+  const settlementCustom = mapped("settlement_custom", ["settlement_custom", "settlement_other", "settlement_manual", "settlement_grp/settlement_manual"]);
 
-  const finalize = (main: string | null, alt: string | null) =>
-    main && main.toLowerCase() !== "other" ? main : (alt ?? main ?? null);
-
-  const flhfFinal = finalize(flhfName, flhfCustom);
-  const communityFinal = finalize(communityName, communityCustom);
-  const settlementFinal = finalize(settlementName, settlementCustom);
+  const stateFinal = normalizeChoiceValue(stateRaw, stateCustom);
+  const lgaFinal = normalizeChoiceValue(lgaRaw, lgaCustom, [stateRaw]);
+  const wardFinal = normalizeChoiceValue(wardRaw, wardCustom, [stateRaw, lgaRaw]);
+  const flhfFinal = normalizeChoiceValue(flhfName, flhfCustom, [stateRaw, lgaRaw, wardRaw]);
+  const communityFinal = normalizeChoiceValue(communityName, communityCustom, [stateRaw, lgaRaw, wardRaw]);
+  const settlementFinal = normalizeChoiceValue(settlementName, settlementCustom, [stateRaw, lgaRaw, wardRaw, communityName]);
 
   const isCustom = Boolean(
-    (flhfName?.toLowerCase() === "other" && flhfCustom) ||
-    (communityName?.toLowerCase() === "other" && communityCustom) ||
-    (settlementName?.toLowerCase() === "other" && settlementCustom),
+    (["other", "__other__"].includes(flhfName?.toLowerCase() ?? "") && flhfCustom) ||
+    (["other", "__other__"].includes(communityName?.toLowerCase() ?? "") && communityCustom) ||
+    (["other", "__other__"].includes(settlementName?.toLowerCase() ?? "") && settlementCustom),
   );
 
   const { lat, lng } = extractGeo(payload);
@@ -266,9 +322,9 @@ Deno.serve(async (req) => {
   const record: Record<string, unknown> = {
     idempotency_key: koboUuid,
     project_id: projectIdResolved,
-    state: mapped("state", ["state", "admin_hierarchy/state", "state_name", "location/state"]),
-    lga: mapped("lga", ["lga", "lga_name", "admin_hierarchy/lga", "location/lga"]),
-    ward: mapped("ward", ["ward", "ward_name", "admin_hierarchy/ward", "location/ward"]),
+    state: stateFinal,
+    lga: lgaFinal,
+    ward: wardFinal,
     flhf_name: flhfFinal,
     flhf_incharge_name: mapped("flhf_incharge_name", ["flhf_incharge_name", "flhf_incharge"]),
     flhf_incharge_phone: mapped("flhf_incharge_phone", ["flhf_incharge_phone", "flhf_phone"]),
@@ -304,7 +360,10 @@ Deno.serve(async (req) => {
   };
 
   for (const k of Object.keys(record)) {
-    if (record[k] == null) delete record[k];
+    if (typeof record[k] === "string" && SENTINEL_VALUES.has((record[k] as string).trim().toLowerCase())) {
+      record[k] = null;
+    }
+    if (record[k] == null && !CLEARABLE_TEXT_COLS.has(k)) delete record[k];
     else if (NUMERIC_COLS.has(k)) {
       const n = Number(record[k]);
       if (!Number.isFinite(n)) delete record[k];
