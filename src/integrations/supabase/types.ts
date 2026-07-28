@@ -5545,7 +5545,7 @@ export type Database = {
           community_longitude: number | null
           community_name: string
           created_at: string
-          created_by: string
+          created_by: string | null
           estimated_adults_15_plus: number | null
           estimated_children_0_4: number | null
           estimated_children_5_14: number | null
@@ -5620,7 +5620,7 @@ export type Database = {
           community_longitude?: number | null
           community_name: string
           created_at?: string
-          created_by: string
+          created_by?: string | null
           estimated_adults_15_plus?: number | null
           estimated_children_0_4?: number | null
           estimated_children_5_14?: number | null
@@ -5695,7 +5695,7 @@ export type Database = {
           community_longitude?: number | null
           community_name?: string
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           estimated_adults_15_plus?: number | null
           estimated_children_0_4?: number | null
           estimated_children_5_14?: number | null
