@@ -174,7 +174,7 @@ export async function buildMicroplanningXlsForm(
   survey.push(q({ type: "end_group", name: "admin_hierarchy_end" }));
 
   // ── Section 3: FLHF ──
-  survey.push(q({ type: "begin_group", name: "flhf_grp", label: "3. Frontline Health Facility (FLHF)", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "flhf_grp", label: '<font color="#2563EB"><b>🏥 3. Frontline Health Facility (FLHF)</b></font>', appearance: "field-list" }));
   survey.push(q({
     type: "select_one flhfs", name: "flhf", label: "Name of FLHF (GRID3)",
     hint: "Type to search. Choose 'Other (specify manually)' if the FLHF is not listed.",
