@@ -405,7 +405,13 @@ export default function KoboFormConfigPanel() {
             Save & Enable Webhook
           </Button>
         )}
+        {fields && (
+          <Button size="sm" variant="outline" onClick={registerWebhook} title="Auto-register Amehnities webhook as a Kobo REST Service">
+            <Webhook className="h-3 w-3 mr-1" /> Auto-register Webhook
+          </Button>
+        )}
         {testOk === true && (
+
           <Badge className="bg-emerald-600 hover:bg-emerald-700"><CheckCircle2 className="h-3 w-3 mr-1" />Verified</Badge>
         )}
         {testOk === false && (
