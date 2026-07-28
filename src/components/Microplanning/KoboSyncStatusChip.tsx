@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, AlertTriangle, Clock, Radio, History as HistoryIcon } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Clock, Radio, History as HistoryIcon, RefreshCw, Loader2 } from "lucide-react";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "@/hooks/use-toast";
 
 type SyncEvent = {
   id: string;
