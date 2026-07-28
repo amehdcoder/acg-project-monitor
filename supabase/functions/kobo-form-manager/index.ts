@@ -726,6 +726,120 @@ Deno.serve(async (req) => {
       }
     }
 
+    if (action === "backfill_submissions") {
+      // Reprocess historical Kobo payloads through the current webhook mapper.
+      // Modes:
+      //   source = "events" (default) — replay every stored payload from
+      //     public.kobo_webhook_events for the given form/project.
+      //   source = "kobo"  — pull fresh submissions from KoboToolbox
+      //     (requires server_url/form_uid/api_token) and replay them.
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
+      const {
+        source = "events",
+        project_id,
+        form_uid,
+        server_url,
+        api_token,
+        limit = 200,
+        since,
+      } = params;
+
+      const secret = await readActiveSecret();
+      if (!secret) return j({ error: "No active webhook secret configured" }, 400);
+
+      const replay = async (payload: Record<string, unknown>) => {
+        const qs = project_id ? `?project_id=${encodeURIComponent(project_id)}` : "";
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/kobo-microplan-webhook${qs}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-kobo-secret": secret },
+          body: JSON.stringify(payload),
+        });
+        const t = await r.text(); let b: any = t; try { b = JSON.parse(t); } catch {}
+        return { ok: r.ok, status: r.status, body: b };
+      };
+
+      const capped = Math.min(Math.max(Number(limit) || 200, 1), 1000);
+      let payloads: Array<Record<string, unknown>> = [];
+
+      if (source === "kobo") {
+        if (!server_url || !form_uid || !api_token) {
+          return j({ error: "server_url/form_uid/api_token required for source=kobo" }, 400);
+        }
+        try {
+          const data = await koboFetch(
+            server_url,
+            `/api/v2/assets/${form_uid}/data/?format=json&limit=${capped}`,
+            api_token,
+          );
+          payloads = Array.isArray(data?.results) ? data.results : [];
+        } catch (e) {
+          return j({ error: "Kobo fetch failed", detail: (e as Error).message }, 502);
+        }
+      } else {
+        let q = admin.from("kobo_webhook_events").select("payload, created_at").order("created_at", { ascending: true }).limit(capped);
+        if (since) q = q.gte("created_at", since);
+        const { data, error } = await q;
+        if (error) return j({ error: error.message }, 500);
+        payloads = (data ?? [])
+          .map((r: any) => r.payload)
+          .filter((p: any) => p && typeof p === "object");
+        if (form_uid) {
+          payloads = payloads.filter((p) => (p as any)?._xform_id_string === form_uid);
+        }
+      }
+
+      let ok = 0, failed = 0;
+      const errors: Array<{ uuid: string | null; status: number; error: unknown }> = [];
+      for (const p of payloads) {
+        const r = await replay(p);
+        if (r.ok) ok++;
+        else { failed++; errors.push({ uuid: (p as any)?._uuid ?? null, status: r.status, error: r.body?.error ?? r.body }); }
+      }
+      return j({ ok: true, processed: payloads.length, succeeded: ok, failed, errors: errors.slice(0, 25) });
+    }
+
+    if (action === "register_webhook") {
+      // Auto-register the Amehnities webhook as a Kobo REST Service so new
+      // submissions stream in without manual REST Service setup.
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
+      const { server_url, form_uid, api_token, project_id } = params;
+      if (!server_url || !form_uid || !api_token) {
+        return j({ error: "Missing server_url/form_uid/api_token" }, 400);
+      }
+      const secret = await readActiveSecret();
+      if (!secret) return j({ error: "No active webhook secret configured" }, 400);
+      const endpoint = `${SUPABASE_URL}/functions/v1/kobo-microplan-webhook${project_id ? `?project_id=${encodeURIComponent(project_id)}` : ""}`;
+      const body = {
+        name: "Amehnities Microplanning Sync",
+        endpoint,
+        active: true,
+        subset_fields: [],
+        email_notification: false,
+        export_type: "json",
+        settings: { custom_headers: { "x-kobo-secret": secret } },
+      };
+      try {
+        // List existing hooks so we update instead of duplicate.
+        const existing = await koboFetch(server_url, `/api/v2/assets/${form_uid}/hooks/?format=json`, api_token);
+        const match = (existing?.results ?? []).find((h: any) => (h?.endpoint ?? "").includes("kobo-microplan-webhook"));
+        let hook: any;
+        if (match?.uid) {
+          hook = await koboFetch(server_url, `/api/v2/assets/${form_uid}/hooks/${match.uid}/`, api_token, {
+            method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+          });
+        } else {
+          hook = await koboFetch(server_url, `/api/v2/assets/${form_uid}/hooks/`, api_token, {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+          });
+        }
+        return j({ ok: true, hook: { uid: hook?.uid, endpoint: hook?.endpoint, active: hook?.active } });
+      } catch (e) {
+        return j({ error: "Failed to register Kobo REST Service", detail: (e as Error).message }, 502);
+      }
+    }
+
     return j({ error: `Unknown action: ${action}` }, 400);
 
   } catch (e) {

@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Search, Rocket, Save, Trash2, PlusCircle, PlugZap, CheckCircle2, XCircle, AlertTriangle, Eye, History } from "lucide-react";
+import { Loader2, Search, Rocket, Save, Trash2, PlusCircle, PlugZap, CheckCircle2, XCircle, AlertTriangle, Eye, History, Webhook, RefreshCcw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import KoboMappingHistoryDialog from "./KoboMappingHistoryDialog";
 
@@ -258,8 +258,47 @@ export default function KoboFormConfigPanel() {
     toast({ title: "Editing configuration", description: "Enter the API token and click Inspect to reload fields." });
   };
 
+  const registerWebhook = async () => {
+    if (!formUid.trim() || !apiToken.trim()) {
+      toast({ title: "Form UID and API token required", variant: "destructive" });
+      return;
+    }
+    try {
+      const res: any = await invoke({
+        action: "register_webhook",
+        server_url: server.trim(),
+        form_uid: formUid.trim(),
+        api_token: apiToken.trim(),
+        project_id: projectId || null,
+      });
+      toast({ title: "Kobo REST Service registered", description: res?.hook?.endpoint ?? "Webhook active" });
+    } catch (e: any) {
+      toast({ title: "Auto-register failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const backfillConfig = async (c: FormConfig) => {
+    if (!confirm(`Reprocess up to 500 historical submissions for ${c.form_title ?? c.form_uid} through the current mapper?`)) return;
+    try {
+      const res: any = await invoke({
+        action: "backfill_submissions",
+        source: "events",
+        project_id: c.project_id,
+        form_uid: c.form_uid,
+        limit: 500,
+      });
+      toast({
+        title: "Backfill complete",
+        description: `${res.succeeded}/${res.processed} synced${res.failed ? ` · ${res.failed} failed` : ""}`,
+      });
+    } catch (e: any) {
+      toast({ title: "Backfill failed", description: e.message, variant: "destructive" });
+    }
+  };
+
   return (
     <div className="border rounded-lg p-3 space-y-3 bg-card">
+
       <div className="flex items-center justify-between">
         <div className="text-xs font-semibold flex items-center gap-2">
           <PlusCircle className="h-4 w-4 text-primary" />
@@ -299,6 +338,9 @@ export default function KoboFormConfigPanel() {
                     <Badge variant="secondary">{Object.keys(c.field_mappings ?? {}).length} fields</Badge>
                   </td>
                   <td className="px-2 py-1 text-right space-x-1">
+                    <Button size="sm" variant="ghost" onClick={() => backfillConfig(c)} title="Reprocess history through current mapper">
+                      <RefreshCcw className="h-3 w-3" />
+                    </Button>
                     <Button size="sm" variant="ghost" onClick={() => setHistoryOpenFor(c)} title="Mapping history">
                       <History className="h-3 w-3" />
                     </Button>
@@ -307,6 +349,7 @@ export default function KoboFormConfigPanel() {
                       <Trash2 className="h-3 w-3 text-destructive" />
                     </Button>
                   </td>
+
 
                 </tr>
               ))}
@@ -362,7 +405,13 @@ export default function KoboFormConfigPanel() {
             Save & Enable Webhook
           </Button>
         )}
+        {fields && (
+          <Button size="sm" variant="outline" onClick={registerWebhook} title="Auto-register Amehnities webhook as a Kobo REST Service">
+            <Webhook className="h-3 w-3 mr-1" /> Auto-register Webhook
+          </Button>
+        )}
         {testOk === true && (
+
           <Badge className="bg-emerald-600 hover:bg-emerald-700"><CheckCircle2 className="h-3 w-3 mr-1" />Verified</Badge>
         )}
         {testOk === false && (
