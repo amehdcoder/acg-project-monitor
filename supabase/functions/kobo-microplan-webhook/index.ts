@@ -58,9 +58,19 @@ function checkAuth(req: Request, secrets: string[]): boolean {
 
 function getFlat(obj: Record<string, unknown>, key: string): unknown {
   if (key in obj) return obj[key];
-  // Support Kobo grouped notation "group/name"
+  const lowered = key.toLowerCase();
+  // Support Kobo grouped notation "group/name" and any nesting depth,
+  // as well as camelCase/underscore/case-insensitive matches.
   for (const [k, v] of Object.entries(obj)) {
-    if (k === key || k.endsWith(`/${key}`)) return v;
+    const kl = k.toLowerCase();
+    if (kl === lowered || kl.endsWith(`/${lowered}`)) return v;
+  }
+  // Recurse into nested objects (rare — Kobo usually flattens).
+  for (const v of Object.values(obj)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const found = getFlat(v as Record<string, unknown>, key);
+      if (found !== undefined) return found;
+    }
   }
   return undefined;
 }
@@ -77,7 +87,7 @@ function pickFirst(obj: Record<string, unknown>, keys: string[]): string | null 
 function pickNumber(obj: Record<string, unknown>, keys: string[]): number | null {
   const v = pickFirst(obj, keys);
   if (v == null) return null;
-  const n = Number(v);
+  const n = Number(String(v).replace(/,/g, ""));
   return Number.isFinite(n) ? n : null;
 }
 
@@ -85,17 +95,23 @@ function extractGeo(payload: Record<string, unknown>): { lat: number | null; lng
   const geo = payload["_geolocation"];
   if (Array.isArray(geo) && geo.length >= 2) {
     const [lat, lng] = geo;
-    if (typeof lat === "number" && typeof lng === "number") return { lat, lng };
-  }
-  const gpsStr = pickFirst(payload, ["community_gps", "settlement_gps", "gps", "_geopoint"]);
-  if (gpsStr) {
-    const parts = gpsStr.split(/\s+/).map(Number);
-    if (parts.length >= 2 && parts.every((n) => Number.isFinite(n))) {
-      return { lat: parts[0], lng: parts[1] };
+    if (typeof lat === "number" && typeof lng === "number" && (lat !== 0 || lng !== 0)) {
+      return { lat, lng };
     }
   }
+  const gpsStr = pickFirst(payload, [
+    "community_gps", "settlement_gps", "flhf_gps", "gps", "_geopoint", "geopoint", "location",
+  ]);
+  if (gpsStr) {
+    const parts = gpsStr.split(/[\s,]+/).map(Number).filter((n) => Number.isFinite(n));
+    if (parts.length >= 2) return { lat: parts[0], lng: parts[1] };
+  }
+  const lat = pickNumber(payload, ["gps_latitude", "latitude", "lat", "community_latitude"]);
+  const lng = pickNumber(payload, ["gps_longitude", "longitude", "lng", "lon", "community_longitude"]);
+  if (lat != null && lng != null) return { lat, lng };
   return { lat: null, lng: null };
 }
+
 
 // Numeric columns that should coerce string values
 const NUMERIC_COLS = new Set([
@@ -231,26 +247,39 @@ Deno.serve(async (req) => {
   );
 
   const { lat, lng } = extractGeo(payload);
+  const projectIdResolved =
+    mapped("project_id", ["project_id", "amehnities_project_id"]) ??
+    cfgProjectId ??
+    (new URL(req.url).searchParams.get("project_id"));
 
   const record: Record<string, unknown> = {
     idempotency_key: koboUuid,
-    project_id: mapped("project_id", ["project_id", "amehnities_project_id"]) ?? cfgProjectId,
-    state: mapped("state", ["state"]),
-    lga: mapped("lga", ["lga"]),
-    ward: mapped("ward", ["ward"]),
+    project_id: projectIdResolved,
+    state: mapped("state", ["state", "admin_hierarchy/state", "state_name"]),
+    lga: mapped("lga", ["lga", "lga_name", "admin_hierarchy/lga"]),
+    ward: mapped("ward", ["ward", "ward_name", "admin_hierarchy/ward"]),
     flhf_name: flhfFinal,
-    flhf_incharge_name: mapped("flhf_incharge_name", ["flhf_incharge_name"]),
-    flhf_incharge_phone: mapped("flhf_incharge_phone", ["flhf_incharge_phone"]),
+    flhf_incharge_name: mapped("flhf_incharge_name", ["flhf_incharge_name", "flhf_incharge"]),
+    flhf_incharge_phone: mapped("flhf_incharge_phone", ["flhf_incharge_phone", "flhf_phone"]),
     community_name: communityFinal,
-    community_leader_name: mapped("community_leader_name", ["community_leader_name"]),
-    community_leader_phone: mapped("community_leader_phone", ["community_leader_phone"]),
+    community_leader_name: mapped("community_leader_name", ["community_leader_name", "community_leader"]),
+    community_leader_phone: mapped("community_leader_phone", ["community_leader_phone", "community_phone"]),
     settlement_name: settlementFinal,
-    estimated_total_population: mappedNum("estimated_total_population", ["estimated_total_population"]),
-    number_of_households: mappedNum("number_of_households", ["number_of_households"]),
+    estimated_total_population: mappedNum("estimated_total_population", [
+      "estimated_total_population", "estimated_total_pop", "population", "total_population",
+    ]),
+    estimated_children_0_4: mappedNum("estimated_children_0_4", ["children_0_4", "estimated_children_0_4", "under5"]),
+    estimated_children_5_14: mappedNum("estimated_children_5_14", ["children_5_14", "estimated_children_5_14"]),
+    estimated_adults_15_plus: mappedNum("estimated_adults_15_plus", ["adults_15_plus", "estimated_adults_15_plus", "adults"]),
+    number_of_households: mappedNum("number_of_households", [
+      "number_of_households", "households", "total_households", "hh_count",
+    ]),
     community_latitude: lat,
     community_longitude: lng,
-    settlement_latitude: mappedNum("settlement_latitude", ["settlement_lat"]) ?? lat,
-    settlement_longitude: mappedNum("settlement_longitude", ["settlement_lng"]) ?? lng,
+    settlement_latitude: mappedNum("settlement_latitude", ["settlement_lat", "settlement_latitude"]) ?? lat,
+    settlement_longitude: mappedNum("settlement_longitude", ["settlement_lng", "settlement_longitude"]) ?? lng,
+    flhf_latitude: mappedNum("flhf_latitude", ["flhf_lat", "flhf_latitude"]),
+    flhf_longitude: mappedNum("flhf_longitude", ["flhf_lng", "flhf_longitude"]),
     is_custom_location: isCustom,
     notes: `Ingested from KoboToolbox (_uuid=${koboUuid}, form=${formUid ?? "unknown"}, submitted_by=${submittedBy ?? "unknown"})`,
   };
@@ -263,6 +292,7 @@ Deno.serve(async (req) => {
       else record[k] = n;
     }
   }
+
 
   let data: { id: string } | null = null;
   let upsertError: { message: string; code?: string } | null = null;
