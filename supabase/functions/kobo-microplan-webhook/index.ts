@@ -445,6 +445,14 @@ Deno.serve(async (req) => {
   };
 
   const upserts: Record<string, unknown>[] = [];
+  const rejectedItems: Array<{ index: number; reason: string; value?: unknown }> = [];
+  // Sane real-world bound — no ward-level community exceeds ~10M residents.
+  // Anything outside [0, 10_000_000] is treated as data entry / device corruption
+  // and dropped BEFORE upsert so the dashboard never shows bogus totals.
+  const TARGET_POP_MAX = 10_000_000;
+  const inRange = (n: number | null): boolean =>
+    n == null || (Number.isFinite(n) && n >= 0 && n <= TARGET_POP_MAX);
+
   if (repeatItems.length > 0) {
     repeatItems.forEach((item, idx) => {
       const cName = normalizeChoiceValue(
@@ -463,6 +471,16 @@ Deno.serve(async (req) => {
         const parts = childGps.split(/[\s,]+/).map(Number).filter((n) => Number.isFinite(n));
         if (parts.length >= 2) { cLat = parts[0]; cLng = parts[1]; }
       }
+      const targetPop = pickNumber(item, ["target_population", "target_pop"]);
+      const totalPop = pickNumber(item, ["estimated_total_population", "total_population"]);
+      if (!inRange(targetPop)) {
+        rejectedItems.push({ index: idx, reason: "target_population_out_of_range", value: targetPop });
+        return;
+      }
+      if (!inRange(totalPop)) {
+        rejectedItems.push({ index: idx, reason: "estimated_total_population_out_of_range", value: totalPop });
+        return;
+      }
       upserts.push(buildRecord({
         community_name: cName,
         settlement_name: sName,
@@ -471,7 +489,8 @@ Deno.serve(async (req) => {
         estimated_children_0_4: pickNumber(item, ["estimated_children_0_4", "children_0_4"]),
         estimated_children_5_14: pickNumber(item, ["estimated_children_5_14", "children_5_14"]),
         estimated_adults_15_plus: pickNumber(item, ["estimated_adults_15_plus", "adults_15_plus"]),
-        estimated_total_population: pickNumber(item, ["estimated_total_population", "total_population"]),
+        estimated_total_population: totalPop,
+        target_population: targetPop,
         number_of_households: pickNumber(item, ["number_of_households", "households"]),
         terrain_type: (pickFirst(item, ["terrain_type"]) || "").toLowerCase().trim() || null,
         accessibility: (pickFirst(item, ["accessibility", "access_status"]) || "").toLowerCase().trim() || null,
