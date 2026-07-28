@@ -5563,6 +5563,7 @@ export type Database = {
           id: string
           idempotency_key: string | null
           is_custom_location: boolean
+          kobo_submission_id: string | null
           lga: string
           medicine_reversed_other: string | null
           medicine_reversed_to: string | null
@@ -5637,6 +5638,7 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           is_custom_location?: boolean
+          kobo_submission_id?: string | null
           lga: string
           medicine_reversed_other?: string | null
           medicine_reversed_to?: string | null
@@ -5711,6 +5713,7 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           is_custom_location?: boolean
+          kobo_submission_id?: string | null
           lga?: string
           medicine_reversed_other?: string | null
           medicine_reversed_to?: string | null
