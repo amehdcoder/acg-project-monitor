@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, AlertTriangle, Clock, Radio, History as HistoryIcon } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Clock, Radio, History as HistoryIcon, RefreshCw, Loader2 } from "lucide-react";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "@/hooks/use-toast";
 
 type SyncEvent = {
   id: string;
@@ -32,6 +33,33 @@ interface Props {
 const KoboSyncStatusChip = ({ projectId, onNewSuccess }: Props) => {
   const [events, setEvents] = useState<SyncEvent[]>([]);
   const [latest, setLatest] = useState<SyncEvent | null>(null);
+  const [retrying, setRetrying] = useState<string | null>(null);
+
+  const retry = async (uuid: string) => {
+    setRetrying(uuid);
+    try {
+      const { data, error } = await supabase.functions.invoke("kobo-form-manager", {
+        body: { action: "retry_submission", kobo_uuid: uuid },
+      });
+      if (error) throw error;
+      if ((data as any)?.ok) {
+        toast({ title: "Re-sync succeeded", description: `Submission ${uuid.slice(0, 8)}… ingested.` });
+        onNewSuccess?.();
+      } else {
+        toast({
+          title: "Re-sync failed",
+          description: (data as any)?.result?.hint ?? (data as any)?.result?.error ?? "Unknown error",
+          variant: "destructive",
+        });
+      }
+    } catch (e) {
+      toast({ title: "Re-sync failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setRetrying(null);
+    }
+  };
+
+
 
   // Initial fetch of the most recent 50 events for this project.
   useEffect(() => {
@@ -162,6 +190,22 @@ const KoboSyncStatusChip = ({ projectId, onNewSuccess }: Props) => {
                 )}
                 {e.message && (
                   <p className="mt-1 text-[11px] leading-snug text-foreground/80">{e.message}</p>
+                )}
+                {!isOk && !isPending && e.kobo_uuid && (
+                  <div className="mt-2 flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1 border-rose-300 text-rose-700 hover:bg-rose-100"
+                      disabled={retrying === e.kobo_uuid}
+                      onClick={() => retry(e.kobo_uuid!)}
+                    >
+                      {retrying === e.kobo_uuid
+                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                        : <RefreshCw className="h-3 w-3" />}
+                      Re-sync
+                    </Button>
+                  </div>
                 )}
               </div>
             );
