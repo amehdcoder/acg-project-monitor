@@ -178,10 +178,6 @@ Deno.serve(async (req) => {
     null;
   const submittedAt = (payload["_submission_time"] as string | undefined) ?? null;
   const submittedBy = (payload["_submitted_by"] as string | undefined) ?? null;
-  const formUid =
-    (payload["_xform_id_string"] as string | undefined) ??
-    (payload["formhub/uuid"] as string | undefined) ??
-    null;
 
   if (!koboUuid) {
     await logEvent({ status: "failed", error: "missing_uuid", payload });
@@ -190,22 +186,37 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Load mapping for this form (if any). field_mappings shape:
-  //   { "<microplan_column>": "<kobo_question_name>" }
+  // Collect every possible identifier so we can bind the row to the right
+  // Amehnities project regardless of how the KoboToolbox REST Service was
+  // registered (URL query param, id_string, formhub uuid, or asset uid).
+  const url = new URL(req.url);
+  const qpFormUid = url.searchParams.get("form_uid");
+  const qpProjectId = url.searchParams.get("project_id");
+  const candidateUids = Array.from(new Set([
+    qpFormUid ?? "",
+    (payload["_xform_id_string"] as string | undefined) ?? "",
+    (payload["formhub/uuid"] as string | undefined) ?? "",
+    (payload["__version__"] as string | undefined) ?? "",
+  ].filter(Boolean)));
+
   let mapping: Record<string, string> = {};
   let cfgProjectId: string | null = null;
   let mappingVersion: number | null = null;
-  if (formUid) {
-    const { data: cfg } = await supabase
+  let formUid: string | null = qpFormUid ?? (payload["_xform_id_string"] as string | undefined) ?? null;
+
+  if (candidateUids.length > 0) {
+    const { data: cfgs } = await supabase
       .from("kobo_form_configs")
-      .select("field_mappings, project_id, active_version_number")
-      .eq("form_uid", formUid)
-      .maybeSingle();
+      .select("field_mappings, project_id, active_version_number, form_uid")
+      .in("form_uid", candidateUids)
+      .limit(1);
+    const cfg = (cfgs ?? [])[0];
     if (cfg?.field_mappings && typeof cfg.field_mappings === "object") {
       mapping = cfg.field_mappings as Record<string, string>;
     }
     cfgProjectId = (cfg?.project_id as string | null) ?? null;
     mappingVersion = (cfg?.active_version_number as number | null) ?? null;
+    formUid = (cfg?.form_uid as string | null) ?? formUid;
   }
 
 
