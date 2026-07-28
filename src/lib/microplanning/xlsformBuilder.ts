@@ -105,13 +105,21 @@ export async function buildMicroplanningXlsForm(
   survey.push(q({ type: "username", name: "username" }));
   survey.push(q({ type: "phonenumber", name: "phonenumber" }));
 
+  // Cover / welcome — rendered as the first screen. `image: home` references
+  // a media file uploaded to KoboToolbox named `home.png`/`home.jpg`.
+  survey.push(q({
+    type: "note", name: "welcome_cover_note",
+    label: '<h1><b><font color="#0F172A">🌍 Amehnities Geo-enabled Microplanning</font></b></h1><br/><i><font color="#2563EB">Community &amp; Health Facility Georeferenced Mapping Form</font></i>',
+    image: "home",
+  }));
+
   survey.push(q({
     type: "note", name: "intro",
-    label: "**Amehnities — Geo-enabled Microplanning Entry**\n\nComplete each section. Cascaded LGA → Ward → FLHF → Community/Settlement is powered by GRID3. Where a name is missing, select **Other (specify manually)** to type it in.",
+    label: '<font color="#0F172A"><b>Amehnities — Geo-enabled Microplanning Entry</b></font><br/>Complete each section. Cascaded LGA → Ward → FLHF → Community/Settlement is powered by GRID3. Where a name is missing, select <b>Other (specify manually)</b> to type it in.',
   }));
 
   // ── Section 1: Campaign & Year ──
-  survey.push(q({ type: "begin_group", name: "campaign_year", label: "1. Campaign & Year", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "campaign_year", label: '<font color="#0F172A"><b>📅 1. Campaign &amp; Year</b></font>', appearance: "field-list" }));
   survey.push(q({
     type: "integer", name: "year_of_microplanning", label: "Year of Microplanning",
     required: "yes", constraint: ". >= 2000 and . <= 2100",
