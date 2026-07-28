@@ -511,7 +511,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
           .select("*")
           .eq("project_id", selectedProjectId);
         if (entryOnly && user?.id) {
-          query = query.eq("created_by", user.id);
+          query = query.or(`created_by.eq.${user.id},created_by.is.null`);
         }
         if (afterId) query = query.gt("id", afterId);
         return query.order("id", { ascending: true }).limit(limit);
