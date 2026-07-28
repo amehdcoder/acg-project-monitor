@@ -103,7 +103,7 @@ describe("microplanning XLSForm cover page", () => {
     injected[rows[0].indexOf("label")] = "Should not appear on cover";
     rows.splice(1, 0, injected);
     wb.Sheets["survey"] = XLSX.utils.aoa_to_sheet(rows);
-    expect(() => assertCoverPageIsHomeImageOnly(wb)).toThrow(/welcome_cover_note/);
+    expect(() => assertCoverPageIsHomeImageOnly(wb)).toThrow(/first visible row must be a note/);
   });
 });
 
