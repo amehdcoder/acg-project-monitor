@@ -748,6 +748,11 @@ Deno.serve(async (req) => {
       const secret = await readActiveSecret();
       if (!secret) return j({ error: "No active webhook secret configured" }, 400);
 
+      const capped = Math.min(Math.max(Number(limit) || 200, 1), 1000);
+      let payloads: Array<Record<string, unknown>> = [];
+      let resolvedProjectId = typeof project_id === "string" && project_id ? project_id : null;
+      let resolvedFormUid = typeof form_uid === "string" && form_uid ? form_uid : null;
+
       const replay = async (payload: Record<string, unknown>) => {
         const qs = resolvedProjectId ? `?project_id=${encodeURIComponent(resolvedProjectId)}` : "";
         const r = await fetch(`${SUPABASE_URL}/functions/v1/kobo-microplan-webhook${qs}`, {
@@ -758,11 +763,6 @@ Deno.serve(async (req) => {
         const t = await r.text(); let b: any = t; try { b = JSON.parse(t); } catch {}
         return { ok: r.ok, status: r.status, body: b };
       };
-
-      const capped = Math.min(Math.max(Number(limit) || 200, 1), 1000);
-      let payloads: Array<Record<string, unknown>> = [];
-      let resolvedProjectId = typeof project_id === "string" && project_id ? project_id : null;
-      let resolvedFormUid = typeof form_uid === "string" && form_uid ? form_uid : null;
 
       if (source === "kobo" || config_id || (!server_url && (resolvedProjectId || resolvedFormUid))) {
         let cfgQuery = admin
