@@ -282,7 +282,8 @@ export default function KoboFormConfigPanel() {
     try {
       const res: any = await invoke({
         action: "backfill_submissions",
-        source: "events",
+        source: "kobo",
+        config_id: c.id,
         project_id: c.project_id,
         form_uid: c.form_uid,
         limit: 500,
