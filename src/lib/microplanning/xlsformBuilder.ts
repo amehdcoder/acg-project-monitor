@@ -591,7 +591,7 @@ export async function buildMicroplanningXlsForm(
   const formId = "amehnities_geo_microplanning";
   const settings: Row[] = [
     SETTINGS_HEADER as unknown as Row,
-    [formTitle, formId, versionStamp, "English (en)", "pages", "yes"],
+    [formTitle, formId, versionStamp, "theme-grid", "yes"],
   ];
 
 
