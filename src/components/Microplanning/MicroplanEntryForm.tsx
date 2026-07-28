@@ -102,8 +102,8 @@ const defaultFormData: MicroplanFormData = {
 
 const nativeSelectClass = "flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
-const Section = memo(({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) => (
-  <Card className="border-border/40 shadow-none">
+const Section = memo(({ id, title, icon: Icon, children }: { id?: string; title: string; icon: any; children: React.ReactNode }) => (
+  <Card id={id ? `section-${id}` : undefined} className="scroll-mt-24 rounded-2xl border-border/40 bg-white shadow-sm">
     <CardHeader className="pb-2 pt-3 px-3">
       <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
         <Icon className="h-3.5 w-3.5" />
@@ -116,6 +116,20 @@ const Section = memo(({ title, icon: Icon, children }: { title: string; icon: an
   </Card>
 ));
 Section.displayName = "Section";
+
+// Section ids used by the wizard chrome to anchor / navigate between steps.
+export const MICROPLAN_WIZARD_SECTIONS = [
+  { id: "campaign",     title: "Campaign & Year" },
+  { id: "admin",        title: "Administrative Hierarchy" },
+  { id: "flhf",         title: "Frontline Health Facility" },
+  { id: "community",    title: "Community Information" },
+  { id: "settlement",   title: "Settlement Information" },
+  { id: "terrain",      title: "Terrain & Accessibility" },
+  { id: "population",   title: "Estimated Population" },
+  { id: "disability",   title: "Disability Disaggregation" },
+  { id: "cdd",          title: "CDD Information" },
+  { id: "notes",        title: "Additional Notes" },
+] as const;
 
 const Field = memo(({ label, required, children, className }: { label: string; required?: boolean; children: React.ReactNode; className?: string }) => (
   <div className={`space-y-0.5 ${className || ""}`}>
