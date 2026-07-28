@@ -749,7 +749,7 @@ Deno.serve(async (req) => {
       if (!secret) return j({ error: "No active webhook secret configured" }, 400);
 
       const replay = async (payload: Record<string, unknown>) => {
-        const qs = project_id ? `?project_id=${encodeURIComponent(project_id)}` : "";
+        const qs = resolvedProjectId ? `?project_id=${encodeURIComponent(resolvedProjectId)}` : "";
         const r = await fetch(`${SUPABASE_URL}/functions/v1/kobo-microplan-webhook${qs}`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-kobo-secret": secret },
@@ -792,7 +792,7 @@ Deno.serve(async (req) => {
         try {
           const data = await koboFetch(
             server_url,
-            `/api/v2/assets/${resolvedFormUid}/data/?format=json&limit=${capped}&sort={\"_submission_time\":1}`,
+            `/api/v2/assets/${resolvedFormUid}/data/?format=json&limit=${capped}&sort=%7B%22_submission_time%22%3A1%7D`,
             api_token,
           );
           payloads = Array.isArray(data?.results) ? data.results : [];
