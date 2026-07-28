@@ -261,14 +261,14 @@ Deno.serve(async (req) => {
   const projectIdResolved =
     mapped("project_id", ["project_id", "amehnities_project_id"]) ??
     cfgProjectId ??
-    (new URL(req.url).searchParams.get("project_id"));
+    qpProjectId;
 
   const record: Record<string, unknown> = {
     idempotency_key: koboUuid,
     project_id: projectIdResolved,
-    state: mapped("state", ["state", "admin_hierarchy/state", "state_name"]),
-    lga: mapped("lga", ["lga", "lga_name", "admin_hierarchy/lga"]),
-    ward: mapped("ward", ["ward", "ward_name", "admin_hierarchy/ward"]),
+    state: mapped("state", ["state", "admin_hierarchy/state", "state_name", "location/state"]),
+    lga: mapped("lga", ["lga", "lga_name", "admin_hierarchy/lga", "location/lga"]),
+    ward: mapped("ward", ["ward", "ward_name", "admin_hierarchy/ward", "location/ward"]),
     flhf_name: flhfFinal,
     flhf_incharge_name: mapped("flhf_incharge_name", ["flhf_incharge_name", "flhf_incharge"]),
     flhf_incharge_phone: mapped("flhf_incharge_phone", ["flhf_incharge_phone", "flhf_phone"]),
@@ -277,13 +277,21 @@ Deno.serve(async (req) => {
     community_leader_phone: mapped("community_leader_phone", ["community_leader_phone", "community_phone"]),
     settlement_name: settlementFinal,
     estimated_total_population: mappedNum("estimated_total_population", [
-      "estimated_total_population", "estimated_total_pop", "population", "total_population",
+      "estimated_total_population", "estimated_total_pop", "population",
+      "total_population", "total_pop", "demographics/total_pop", "demographics/total_population",
     ]),
-    estimated_children_0_4: mappedNum("estimated_children_0_4", ["children_0_4", "estimated_children_0_4", "under5"]),
-    estimated_children_5_14: mappedNum("estimated_children_5_14", ["children_5_14", "estimated_children_5_14"]),
-    estimated_adults_15_plus: mappedNum("estimated_adults_15_plus", ["adults_15_plus", "estimated_adults_15_plus", "adults"]),
+    estimated_children_0_4: mappedNum("estimated_children_0_4", [
+      "children_0_4", "estimated_children_0_4", "under5", "demographics/children_0_4",
+    ]),
+    estimated_children_5_14: mappedNum("estimated_children_5_14", [
+      "children_5_14", "estimated_children_5_14", "demographics/children_5_14",
+    ]),
+    estimated_adults_15_plus: mappedNum("estimated_adults_15_plus", [
+      "adults_15_plus", "estimated_adults_15_plus", "adults", "demographics/adults_15_plus",
+    ]),
     number_of_households: mappedNum("number_of_households", [
       "number_of_households", "households", "total_households", "hh_count",
+      "demographics/households", "demographics/number_of_households",
     ]),
     community_latitude: lat,
     community_longitude: lng,
