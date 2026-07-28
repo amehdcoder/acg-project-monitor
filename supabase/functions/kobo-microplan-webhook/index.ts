@@ -58,9 +58,19 @@ function checkAuth(req: Request, secrets: string[]): boolean {
 
 function getFlat(obj: Record<string, unknown>, key: string): unknown {
   if (key in obj) return obj[key];
-  // Support Kobo grouped notation "group/name"
+  const lowered = key.toLowerCase();
+  // Support Kobo grouped notation "group/name" and any nesting depth,
+  // as well as camelCase/underscore/case-insensitive matches.
   for (const [k, v] of Object.entries(obj)) {
-    if (k === key || k.endsWith(`/${key}`)) return v;
+    const kl = k.toLowerCase();
+    if (kl === lowered || kl.endsWith(`/${lowered}`)) return v;
+  }
+  // Recurse into nested objects (rare — Kobo usually flattens).
+  for (const v of Object.values(obj)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const found = getFlat(v as Record<string, unknown>, key);
+      if (found !== undefined) return found;
+    }
   }
   return undefined;
 }
@@ -77,7 +87,7 @@ function pickFirst(obj: Record<string, unknown>, keys: string[]): string | null 
 function pickNumber(obj: Record<string, unknown>, keys: string[]): number | null {
   const v = pickFirst(obj, keys);
   if (v == null) return null;
-  const n = Number(v);
+  const n = Number(String(v).replace(/,/g, ""));
   return Number.isFinite(n) ? n : null;
 }
 
@@ -85,17 +95,23 @@ function extractGeo(payload: Record<string, unknown>): { lat: number | null; lng
   const geo = payload["_geolocation"];
   if (Array.isArray(geo) && geo.length >= 2) {
     const [lat, lng] = geo;
-    if (typeof lat === "number" && typeof lng === "number") return { lat, lng };
-  }
-  const gpsStr = pickFirst(payload, ["community_gps", "settlement_gps", "gps", "_geopoint"]);
-  if (gpsStr) {
-    const parts = gpsStr.split(/\s+/).map(Number);
-    if (parts.length >= 2 && parts.every((n) => Number.isFinite(n))) {
-      return { lat: parts[0], lng: parts[1] };
+    if (typeof lat === "number" && typeof lng === "number" && (lat !== 0 || lng !== 0)) {
+      return { lat, lng };
     }
   }
+  const gpsStr = pickFirst(payload, [
+    "community_gps", "settlement_gps", "flhf_gps", "gps", "_geopoint", "geopoint", "location",
+  ]);
+  if (gpsStr) {
+    const parts = gpsStr.split(/[\s,]+/).map(Number).filter((n) => Number.isFinite(n));
+    if (parts.length >= 2) return { lat: parts[0], lng: parts[1] };
+  }
+  const lat = pickNumber(payload, ["gps_latitude", "latitude", "lat", "community_latitude"]);
+  const lng = pickNumber(payload, ["gps_longitude", "longitude", "lng", "lon", "community_longitude"]);
+  if (lat != null && lng != null) return { lat, lng };
   return { lat: null, lng: null };
 }
+
 
 // Numeric columns that should coerce string values
 const NUMERIC_COLS = new Set([
