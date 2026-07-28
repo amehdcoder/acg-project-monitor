@@ -382,16 +382,93 @@ Deno.serve(async (req) => {
   }
 
 
-  let data: { id: string } | null = null;
+  // ── REPEAT UNROLLING ──────────────────────────────────────────────────
+  // When the submission comes from the new 1-to-many XLSForm, the payload
+  // contains a `community_repeat` array (Kobo also exposes it as `_children`
+  // in some flat exports). Each iteration becomes its own microplan_entries
+  // row inheriting the parent (state/lga/ward/flhf) fields, keyed by
+  // `${_uuid}_${index}` so retries stay idempotent per repeat item.
+  const repeatCandidate =
+    (payload["community_repeat"] as unknown) ??
+    (payload["_children"] as unknown);
+  const repeatItems: Array<Record<string, unknown>> = Array.isArray(repeatCandidate)
+    ? (repeatCandidate as Array<Record<string, unknown>>).filter((x) => x && typeof x === "object")
+    : [];
+
+  const buildRecord = (
+    extra: Record<string, unknown>,
+    idKey: string,
+    childGeo?: { lat: number | null; lng: number | null },
+  ): Record<string, unknown> => {
+    const geo = childGeo && (childGeo.lat != null || childGeo.lng != null)
+      ? childGeo
+      : { lat: record.community_latitude as number | null, lng: record.community_longitude as number | null };
+    const out: Record<string, unknown> = {
+      ...record,
+      ...extra,
+      idempotency_key: idKey,
+      community_latitude: geo.lat,
+      community_longitude: geo.lng,
+      geotagged: geo.lat != null && geo.lng != null && !(geo.lat === 0 && geo.lng === 0),
+    };
+    for (const k of Object.keys(out)) {
+      if (out[k] == null && !CLEARABLE_TEXT_COLS.has(k)) delete out[k];
+      else if (NUMERIC_COLS.has(k)) {
+        const n = Number(out[k]);
+        if (!Number.isFinite(n)) delete out[k];
+        else out[k] = n;
+      }
+    }
+    return out;
+  };
+
+  const upserts: Record<string, unknown>[] = [];
+  if (repeatItems.length > 0) {
+    repeatItems.forEach((item, idx) => {
+      const cName = normalizeChoiceValue(
+        pickFirst(item, ["community_name", "community"]),
+        pickFirst(item, ["community_manual", "community_custom"]),
+        [stateRaw, lgaRaw, wardRaw],
+      );
+      const sName = normalizeChoiceValue(
+        pickFirst(item, ["settlement_name", "settlement"]),
+        pickFirst(item, ["settlement_manual", "settlement_custom"]),
+        [stateRaw, lgaRaw, wardRaw, pickFirst(item, ["community"])],
+      );
+      const childGps = pickFirst(item, ["community_gps", "community_gps_override", "gps"]);
+      let cLat: number | null = null, cLng: number | null = null;
+      if (childGps) {
+        const parts = childGps.split(/[\s,]+/).map(Number).filter((n) => Number.isFinite(n));
+        if (parts.length >= 2) { cLat = parts[0]; cLng = parts[1]; }
+      }
+      upserts.push(buildRecord({
+        community_name: cName,
+        settlement_name: sName,
+        community_leader_name: pickFirst(item, ["community_leader_name", "community_leader"]),
+        community_leader_phone: pickFirst(item, ["community_leader_phone", "community_phone"]),
+        estimated_children_0_4: pickNumber(item, ["estimated_children_0_4", "children_0_4"]),
+        estimated_children_5_14: pickNumber(item, ["estimated_children_5_14", "children_5_14"]),
+        estimated_adults_15_plus: pickNumber(item, ["estimated_adults_15_plus", "adults_15_plus"]),
+        estimated_total_population: pickNumber(item, ["estimated_total_population", "total_population"]),
+        number_of_households: pickNumber(item, ["number_of_households", "households"]),
+        terrain_type: (pickFirst(item, ["terrain_type"]) || "").toLowerCase().trim() || null,
+        accessibility: (pickFirst(item, ["accessibility", "access_status"]) || "").toLowerCase().trim() || null,
+        security_clearance: (pickFirst(item, ["security_clearance", "security_status"]) || "").toLowerCase().trim() || null,
+      }, `${koboUuid}_${idx}`, { lat: cLat, lng: cLng }));
+    });
+  } else {
+    upserts.push(buildRecord({}, koboUuid));
+  }
+
+  let firstId: string | null = null;
   let upsertError: { message: string; code?: string } | null = null;
   try {
     const res = await supabase
       .from("microplan_entries")
-      .upsert(record, { onConflict: "idempotency_key,project_id", ignoreDuplicates: false })
-      .select("id")
-      .maybeSingle();
-    data = res.data as { id: string } | null;
-    upsertError = res.error ? { message: res.error.message, code: (res.error as any).code } : null;
+      .upsert(upserts, { onConflict: "idempotency_key,project_id", ignoreDuplicates: false })
+      .select("id");
+    if (res.error) upsertError = { message: res.error.message, code: (res.error as any).code };
+    else firstId = (res.data as Array<{ id: string }> | null)?.[0]?.id ?? null;
   } catch (e) {
     upsertError = { message: (e as Error).message };
   }
@@ -416,14 +493,20 @@ Deno.serve(async (req) => {
   await logEvent({
     status: "success", kobo_uuid: koboUuid,
     submitted_by_kobo: submittedBy, submitted_at: submittedAt,
-    matched_entry_id: data?.id ?? null, payload,
+    matched_entry_id: firstId, payload,
     mapping_version_number: mappingVersion,
     project_id: (record.project_id as string | null | undefined) ?? null,
   });
 
 
   return new Response(
-    JSON.stringify({ ok: true, entry_id: data?.id ?? null, idempotency_key: koboUuid }),
+    JSON.stringify({
+      ok: true,
+      entry_id: firstId,
+      idempotency_key: koboUuid,
+      rows_written: upserts.length,
+      repeat_items: repeatItems.length,
+    }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });

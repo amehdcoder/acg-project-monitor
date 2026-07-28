@@ -45,14 +45,16 @@ export const sanitize = (s: string): string => {
 const SURVEY_HEADER = [
   "type", "name", "label", "hint", "required", "required_message",
   "relevant", "constraint", "constraint_message", "calculation",
-  "choice_filter", "appearance", "default",
+  "choice_filter", "appearance", "default", "image", "repeat_count",
 ];
 
 // Choice parent columns follow the SIMPLIFIED cascade (single parent per level)
 // so PyXForm's filter parser stays fast and unambiguous.
 const CHOICES_HEADER = ["list_name", "name", "label", "lga", "ward", "flhf", "community", "lat", "lng"];
 
-const SETTINGS_HEADER = ["form_title", "form_id", "version", "default_language", "style", "allow_choice_duplicates"];
+// NOTE: `default_language` intentionally excluded — form is single-language and
+// including it forces PyXForm to require `label::English (en)` on every row.
+const SETTINGS_HEADER = ["form_title", "form_id", "version", "style", "allow_choice_duplicates"];
 
 
 const q = (r: Partial<Record<(typeof SURVEY_HEADER)[number], string>>): Row =>
@@ -103,13 +105,21 @@ export async function buildMicroplanningXlsForm(
   survey.push(q({ type: "username", name: "username" }));
   survey.push(q({ type: "phonenumber", name: "phonenumber" }));
 
+  // Cover / welcome — rendered as the first screen. `image: home` references
+  // a media file uploaded to KoboToolbox named `home.png`/`home.jpg`.
+  survey.push(q({
+    type: "note", name: "welcome_cover_note",
+    label: '<h1><b><font color="#0F172A">🌍 Amehnities Geo-enabled Microplanning</font></b></h1><br/><i><font color="#2563EB">Community &amp; Health Facility Georeferenced Mapping Form</font></i>',
+    image: "home",
+  }));
+
   survey.push(q({
     type: "note", name: "intro",
-    label: "**Amehnities — Geo-enabled Microplanning Entry**\n\nComplete each section. Cascaded LGA → Ward → FLHF → Community/Settlement is powered by GRID3. Where a name is missing, select **Other (specify manually)** to type it in.",
+    label: '<font color="#0F172A"><b>Amehnities — Geo-enabled Microplanning Entry</b></font><br/>Complete each section. Cascaded LGA → Ward → FLHF → Community/Settlement is powered by GRID3. Where a name is missing, select <b>Other (specify manually)</b> to type it in.',
   }));
 
   // ── Section 1: Campaign & Year ──
-  survey.push(q({ type: "begin_group", name: "campaign_year", label: "1. Campaign & Year", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "campaign_year", label: '<font color="#0F172A"><b>📅 1. Campaign &amp; Year</b></font>', appearance: "field-list" }));
   survey.push(q({
     type: "integer", name: "year_of_microplanning", label: "Year of Microplanning",
     required: "yes", constraint: ". >= 2000 and . <= 2100",
@@ -137,7 +147,7 @@ export async function buildMicroplanningXlsForm(
       : [];
   const singleState = scopedStates.length === 1 ? scopedStates[0] : null;
 
-  survey.push(q({ type: "begin_group", name: "admin_hierarchy", label: "2. Administrative Hierarchy (GRID3 cascade)", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "admin_hierarchy", label: '<font color="#0F172A"><b>📍 2. Administrative Hierarchy (GRID3 cascade)</b></font>', appearance: "field-list" }));
   if (singleState) {
     survey.push(q({
       type: "calculate", name: "state",
@@ -164,7 +174,7 @@ export async function buildMicroplanningXlsForm(
   survey.push(q({ type: "end_group", name: "admin_hierarchy_end" }));
 
   // ── Section 3: FLHF ──
-  survey.push(q({ type: "begin_group", name: "flhf_grp", label: "3. Frontline Health Facility (FLHF)", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "flhf_grp", label: '<font color="#2563EB"><b>🏥 3. Frontline Health Facility (FLHF)</b></font>', appearance: "field-list" }));
   survey.push(q({
     type: "select_one flhfs", name: "flhf", label: "Name of FLHF (GRID3)",
     hint: "Type to search. Choose 'Other (specify manually)' if the FLHF is not listed.",
@@ -214,12 +224,19 @@ export async function buildMicroplanningXlsForm(
   }));
   survey.push(q({ type: "end_group", name: "flhf_grp_end" }));
 
+  // ── REPEAT: Community / Settlement (1-to-many under FLHF) ──
+  // Each iteration captures one community + optional settlement + population +
+  // context (terrain/access/security) so a single FLHF submission can carry
+  // any number of communities.
+  survey.push(q({
+    type: "begin_repeat", name: "community_repeat",
+    label: '<font color="#059669"><b>➕ Community / Settlement Entry</b></font>',
+    hint: '<font color="#059669"><b>Community #${position(..)}</b></font>',
+    appearance: "field-list",
+  }));
+
   // ── Section 4: Community ──
-  //
-  // Cascade parent is the WARD (data reality — GRID3 does not link
-  // community→FLHF, so filtering by flhf would return zero rows). We keep the
-  // `flhf` column empty on community rows and rely on ward filtering.
-  survey.push(q({ type: "begin_group", name: "community_grp", label: "4. Community", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "community_grp", label: '<font color="#059669"><b>🏘️ 4. Community</b></font>', appearance: "field-list" }));
   survey.push(q({
     type: "select_one communities", name: "community", label: "Community (GRID3)",
     hint: "Type to search. Choose 'Other (specify manually)' if the community is not listed.",
@@ -282,7 +299,7 @@ export async function buildMicroplanningXlsForm(
   //
   // Settlements are keyed to the selected COMMUNITY when GRID3 links exist,
   // otherwise they fall back to ward-level filtering.
-  survey.push(q({ type: "begin_group", name: "settlement_grp", label: "5. Settlement (optional)", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "settlement_grp", label: '<font color="#059669"><b>🏘️ 5. Settlement (optional)</b></font>', appearance: "field-list" }));
   survey.push(q({
     type: "select_one settlements", name: "settlement", label: "Settlement (GRID3)",
     hint: "Optional. Choose 'Other (specify manually)' to type a name.",
@@ -331,14 +348,14 @@ export async function buildMicroplanningXlsForm(
   survey.push(q({ type: "end_group", name: "settlement_grp_end" }));
 
   // ── Section 6: Terrain, Access, Security ──
-  survey.push(q({ type: "begin_group", name: "context_grp", label: "6. Terrain, Access & Security", appearance: "field-list" }));
-  survey.push(q({ type: "select_one terrain_type", name: "terrain_type", label: "Type of Terrain", appearance: "minimal" }));
-  survey.push(q({ type: "select_one accessibility", name: "accessibility", label: "Accessibility", appearance: "minimal" }));
-  survey.push(q({ type: "select_one security_clearance", name: "security_clearance", label: "Security Clearance", appearance: "minimal" }));
+  survey.push(q({ type: "begin_group", name: "context_grp", label: '<font color="#D97706"><b>🔒 6. Terrain, Access &amp; Security</b></font>', appearance: "field-list" }));
+  survey.push(q({ type: "select_one terrain_type", name: "terrain_type", label: "Type of Terrain", appearance: "quick" }));
+  survey.push(q({ type: "select_one accessibility", name: "accessibility", label: "Accessibility", appearance: "quick" }));
+  survey.push(q({ type: "select_one security_clearance", name: "security_clearance", label: "Security Clearance", appearance: "quick" }));
   survey.push(q({ type: "end_group", name: "context_grp_end" }));
 
   // ── Section 7: Population Estimates ──
-  survey.push(q({ type: "begin_group", name: "pop_grp", label: "7. Population Estimates", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "pop_grp", label: '<font color="#4F46E5"><b>👥 7. Population Estimates</b></font>', appearance: "field-list" }));
   survey.push(q({ type: "integer", name: "estimated_children_0_4", label: "Children 0–4 years", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
   survey.push(q({ type: "integer", name: "estimated_children_5_14", label: "Children 5–14 years", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
   survey.push(q({ type: "integer", name: "estimated_adults_15_plus", label: "Adults 15+ years", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
@@ -346,9 +363,21 @@ export async function buildMicroplanningXlsForm(
     type: "calculate", name: "estimated_total_population",
     calculation: "coalesce(${estimated_children_0_4},0) + coalesce(${estimated_children_5_14},0) + coalesce(${estimated_adults_15_plus},0)",
   }));
-  survey.push(q({ type: "note", name: "pop_total_note", label: "**Estimated Total Population: ${estimated_total_population}** (auto-computed)" }));
+  survey.push(q({
+    type: "calculate", name: "total_population",
+    calculation: "${estimated_total_population}",
+  }));
+  survey.push(q({ type: "note", name: "pop_total_note", label: '<b>Estimated Total Population: ${estimated_total_population}</b> (auto-computed)' }));
+  survey.push(q({
+    type: "integer", name: "target_population", label: "Target Population (eligible for campaign)",
+    constraint: ". >= 0 and . <= ${estimated_total_population}",
+    constraint_message: '<font color="#DC2626">Target population cannot exceed total population!</font>',
+  }));
   survey.push(q({ type: "integer", name: "number_of_households", label: "Number of Households", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
   survey.push(q({ type: "end_group", name: "pop_grp_end" }));
+
+  // ── END REPEAT: community_repeat ──
+  survey.push(q({ type: "end_repeat", name: "community_repeat_end" }));
 
   // ── Section 8: Trachoma Age Disaggregation ──
   survey.push(q({ type: "begin_group", name: "trachoma_grp", label: "8. Trachoma Age Disaggregation (optional)", appearance: "field-list" }));
@@ -562,7 +591,7 @@ export async function buildMicroplanningXlsForm(
   const formId = "amehnities_geo_microplanning";
   const settings: Row[] = [
     SETTINGS_HEADER as unknown as Row,
-    [formTitle, formId, versionStamp, "English (en)", "pages", "yes"],
+    [formTitle, formId, versionStamp, "theme-grid", "yes"],
   ];
 
 
