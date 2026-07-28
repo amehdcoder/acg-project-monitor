@@ -105,12 +105,15 @@ export async function buildMicroplanningXlsForm(
   survey.push(q({ type: "username", name: "username" }));
   survey.push(q({ type: "phonenumber", name: "phonenumber" }));
 
-  // Cover / welcome — rendered as the first screen. `image: home` references
-  // a media file uploaded to KoboToolbox named `home.png`/`home.jpg`.
+  // Cover / welcome — rendered as the FIRST SCREEN with the `home` media file
+  // as a full-bleed image and NO other text/questions on the page. The note
+  // label is intentionally a single non-breaking space so PyXForm accepts the
+  // row while KoboCollect renders only the image.
   survey.push(q({
     type: "note", name: "welcome_cover_note",
-    label: '<h1><b><font color="#0F172A">🌍 Amehnities Geo-enabled Microplanning</font></b></h1><br/><i><font color="#2563EB">Community &amp; Health Facility Georeferenced Mapping Form</font></i>',
+    label: '&#160;',
     image: "home",
+    appearance: "no-label",
   }));
 
   survey.push(q({
