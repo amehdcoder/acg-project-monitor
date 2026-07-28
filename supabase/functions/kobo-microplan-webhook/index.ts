@@ -236,6 +236,29 @@ Deno.serve(async (req) => {
     });
   }
 
+  // ── MALFORMED community_repeat GUARD ─────────────────────────────────
+  // If the caller explicitly sends `community_repeat` it MUST be an array of
+  // objects. Anything else (a string, a scalar, or a heterogenous list) is a
+  // client bug — reject with 400 and write nothing. This mirrors Kobo's own
+  // "expected repeat group" import error and prevents ambiguous ingestion.
+  if ("community_repeat" in payload) {
+    const cr = payload["community_repeat"];
+    const isValidRepeat =
+      Array.isArray(cr) && cr.length > 0 &&
+      cr.every((x) => x !== null && typeof x === "object" && !Array.isArray(x));
+    if (!isValidRepeat) {
+      await logEvent({ status: "failed", error: "malformed_community_repeat", payload, kobo_uuid: koboUuid });
+      return new Response(
+        JSON.stringify({
+          error: "Malformed community_repeat",
+          code: "malformed_community_repeat",
+          hint: "community_repeat must be a non-empty array of community objects.",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+  }
+
   // Collect every possible identifier so we can bind the row to the right
   // Amehnities project regardless of how the KoboToolbox REST Service was
   // registered (URL query param, id_string, formhub uuid, or asset uid).
