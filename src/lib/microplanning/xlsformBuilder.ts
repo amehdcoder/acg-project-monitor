@@ -299,7 +299,7 @@ export async function buildMicroplanningXlsForm(
   //
   // Settlements are keyed to the selected COMMUNITY when GRID3 links exist,
   // otherwise they fall back to ward-level filtering.
-  survey.push(q({ type: "begin_group", name: "settlement_grp", label: "5. Settlement (optional)", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "settlement_grp", label: '<font color="#059669"><b>🏘️ 5. Settlement (optional)</b></font>', appearance: "field-list" }));
   survey.push(q({
     type: "select_one settlements", name: "settlement", label: "Settlement (GRID3)",
     hint: "Optional. Choose 'Other (specify manually)' to type a name.",
@@ -348,14 +348,14 @@ export async function buildMicroplanningXlsForm(
   survey.push(q({ type: "end_group", name: "settlement_grp_end" }));
 
   // ── Section 6: Terrain, Access, Security ──
-  survey.push(q({ type: "begin_group", name: "context_grp", label: "6. Terrain, Access & Security", appearance: "field-list" }));
-  survey.push(q({ type: "select_one terrain_type", name: "terrain_type", label: "Type of Terrain", appearance: "minimal" }));
-  survey.push(q({ type: "select_one accessibility", name: "accessibility", label: "Accessibility", appearance: "minimal" }));
-  survey.push(q({ type: "select_one security_clearance", name: "security_clearance", label: "Security Clearance", appearance: "minimal" }));
+  survey.push(q({ type: "begin_group", name: "context_grp", label: '<font color="#D97706"><b>🔒 6. Terrain, Access &amp; Security</b></font>', appearance: "field-list" }));
+  survey.push(q({ type: "select_one terrain_type", name: "terrain_type", label: "Type of Terrain", appearance: "quick" }));
+  survey.push(q({ type: "select_one accessibility", name: "accessibility", label: "Accessibility", appearance: "quick" }));
+  survey.push(q({ type: "select_one security_clearance", name: "security_clearance", label: "Security Clearance", appearance: "quick" }));
   survey.push(q({ type: "end_group", name: "context_grp_end" }));
 
   // ── Section 7: Population Estimates ──
-  survey.push(q({ type: "begin_group", name: "pop_grp", label: "7. Population Estimates", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "pop_grp", label: '<font color="#4F46E5"><b>👥 7. Population Estimates</b></font>', appearance: "field-list" }));
   survey.push(q({ type: "integer", name: "estimated_children_0_4", label: "Children 0–4 years", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
   survey.push(q({ type: "integer", name: "estimated_children_5_14", label: "Children 5–14 years", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
   survey.push(q({ type: "integer", name: "estimated_adults_15_plus", label: "Adults 15+ years", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
@@ -363,9 +363,21 @@ export async function buildMicroplanningXlsForm(
     type: "calculate", name: "estimated_total_population",
     calculation: "coalesce(${estimated_children_0_4},0) + coalesce(${estimated_children_5_14},0) + coalesce(${estimated_adults_15_plus},0)",
   }));
-  survey.push(q({ type: "note", name: "pop_total_note", label: "**Estimated Total Population: ${estimated_total_population}** (auto-computed)" }));
+  survey.push(q({
+    type: "calculate", name: "total_population",
+    calculation: "${estimated_total_population}",
+  }));
+  survey.push(q({ type: "note", name: "pop_total_note", label: '<b>Estimated Total Population: ${estimated_total_population}</b> (auto-computed)' }));
+  survey.push(q({
+    type: "integer", name: "target_population", label: "Target Population (eligible for campaign)",
+    constraint: ". >= 0 and . <= ${estimated_total_population}",
+    constraint_message: '<font color="#DC2626">Target population cannot exceed total population!</font>',
+  }));
   survey.push(q({ type: "integer", name: "number_of_households", label: "Number of Households", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
   survey.push(q({ type: "end_group", name: "pop_grp_end" }));
+
+  // ── END REPEAT: community_repeat ──
+  survey.push(q({ type: "end_repeat", name: "community_repeat_end" }));
 
   // ── Section 8: Trachoma Age Disaggregation ──
   survey.push(q({ type: "begin_group", name: "trachoma_grp", label: "8. Trachoma Age Disaggregation (optional)", appearance: "field-list" }));
