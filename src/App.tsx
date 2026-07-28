@@ -18,6 +18,8 @@ import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 import DataCleaner from "./pages/DataCleaner";
 import MdaAnalysesHarness from "./pages/MdaAnalysesHarness";
+import MicroplanKpiHarness from "./pages/MicroplanKpiHarness";
+import XlsFormCoverHarness from "./pages/XlsFormCoverHarness";
 import LearningLog from "./pages/LearningLog";
 import SharedDashboard from "./pages/SharedDashboard";
 import InstallBanner from "./components/InstallBanner";
@@ -155,6 +157,8 @@ const App = () => (
                    <Route path="/data-cleaner" element={<ProtectedRoute><DataCleaner /></ProtectedRoute>} />
                    <Route path="/learning-log" element={<ProtectedRoute><LearningLog /></ProtectedRoute>} />
                     <Route path="/__test/mda-analyses" element={<MdaAnalysesHarness />} />
+                    <Route path="/__test/microplan-kpi" element={<MicroplanKpiHarness />} />
+                    <Route path="/__test/xlsform-cover" element={<XlsFormCoverHarness />} />
                     <Route path="/shared/dashboard/:token" element={<SharedDashboard />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>

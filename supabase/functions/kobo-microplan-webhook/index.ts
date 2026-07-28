@@ -168,7 +168,7 @@ const NUMERIC_COLS = new Set([
   "settlement_distance_to_flhf_km","community_latitude","community_longitude",
   "settlement_latitude","settlement_longitude","flhf_latitude","flhf_longitude",
   "year_of_microplanning","total_treated","medicine_used","households_treated",
-  "total_households_reported","total_households_treated",
+  "total_households_reported","total_households_treated","target_population",
 ]);
 
 Deno.serve(async (req) => {
@@ -234,6 +234,29 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "Missing _uuid" }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+  }
+
+  // ── MALFORMED community_repeat GUARD ─────────────────────────────────
+  // If the caller explicitly sends `community_repeat` it MUST be an array of
+  // objects. Anything else (a string, a scalar, or a heterogenous list) is a
+  // client bug — reject with 400 and write nothing. This mirrors Kobo's own
+  // "expected repeat group" import error and prevents ambiguous ingestion.
+  if ("community_repeat" in payload) {
+    const cr = payload["community_repeat"];
+    const isValidRepeat =
+      Array.isArray(cr) && cr.length > 0 &&
+      cr.every((x) => x !== null && typeof x === "object" && !Array.isArray(x));
+    if (!isValidRepeat) {
+      await logEvent({ status: "failed", error: "malformed_community_repeat", payload, kobo_uuid: koboUuid });
+      return new Response(
+        JSON.stringify({
+          error: "Malformed community_repeat",
+          code: "malformed_community_repeat",
+          hint: "community_repeat must be a non-empty array of community objects.",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
   }
 
   // Collect every possible identifier so we can bind the row to the right
@@ -422,6 +445,14 @@ Deno.serve(async (req) => {
   };
 
   const upserts: Record<string, unknown>[] = [];
+  const rejectedItems: Array<{ index: number; reason: string; value?: unknown }> = [];
+  // Sane real-world bound — no ward-level community exceeds ~10M residents.
+  // Anything outside [0, 10_000_000] is treated as data entry / device corruption
+  // and dropped BEFORE upsert so the dashboard never shows bogus totals.
+  const TARGET_POP_MAX = 10_000_000;
+  const inRange = (n: number | null): boolean =>
+    n == null || (Number.isFinite(n) && n >= 0 && n <= TARGET_POP_MAX);
+
   if (repeatItems.length > 0) {
     repeatItems.forEach((item, idx) => {
       const cName = normalizeChoiceValue(
@@ -440,6 +471,16 @@ Deno.serve(async (req) => {
         const parts = childGps.split(/[\s,]+/).map(Number).filter((n) => Number.isFinite(n));
         if (parts.length >= 2) { cLat = parts[0]; cLng = parts[1]; }
       }
+      const targetPop = pickNumber(item, ["target_population", "target_pop"]);
+      const totalPop = pickNumber(item, ["estimated_total_population", "total_population"]);
+      if (!inRange(targetPop)) {
+        rejectedItems.push({ index: idx, reason: "target_population_out_of_range", value: targetPop });
+        return;
+      }
+      if (!inRange(totalPop)) {
+        rejectedItems.push({ index: idx, reason: "estimated_total_population_out_of_range", value: totalPop });
+        return;
+      }
       upserts.push(buildRecord({
         community_name: cName,
         settlement_name: sName,
@@ -448,7 +489,8 @@ Deno.serve(async (req) => {
         estimated_children_0_4: pickNumber(item, ["estimated_children_0_4", "children_0_4"]),
         estimated_children_5_14: pickNumber(item, ["estimated_children_5_14", "children_5_14"]),
         estimated_adults_15_plus: pickNumber(item, ["estimated_adults_15_plus", "adults_15_plus"]),
-        estimated_total_population: pickNumber(item, ["estimated_total_population", "total_population"]),
+        estimated_total_population: totalPop,
+        target_population: targetPop,
         number_of_households: pickNumber(item, ["number_of_households", "households"]),
         terrain_type: (pickFirst(item, ["terrain_type"]) || "").toLowerCase().trim() || null,
         accessibility: (pickFirst(item, ["accessibility", "access_status"]) || "").toLowerCase().trim() || null,
@@ -461,6 +503,27 @@ Deno.serve(async (req) => {
 
   let firstId: string | null = null;
   let upsertError: { message: string; code?: string } | null = null;
+  if (upserts.length === 0) {
+    // Every repeat item failed validation — skip the upsert but still respond
+    // successfully so KoboToolbox does not retry. The rejected items are
+    // recorded in the audit log for supervisors to reconcile.
+    await logEvent({
+      status: "success", kobo_uuid: koboUuid,
+      submitted_by_kobo: submittedBy, submitted_at: submittedAt,
+      matched_entry_id: null, payload,
+      mapping_version_number: mappingVersion,
+      project_id: (record.project_id as string | null | undefined) ?? null,
+      error: `all_items_rejected: ${JSON.stringify(rejectedItems)}`,
+    });
+    return new Response(
+      JSON.stringify({
+        ok: true, entry_id: null, idempotency_key: koboUuid,
+        rows_written: 0, repeat_items: repeatItems.length,
+        rejected_items: rejectedItems,
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
   try {
     const res = await supabase
       .from("microplan_entries")
@@ -505,6 +568,7 @@ Deno.serve(async (req) => {
       idempotency_key: koboUuid,
       rows_written: upserts.length,
       repeat_items: repeatItems.length,
+      rejected_items: rejectedItems,
     }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
