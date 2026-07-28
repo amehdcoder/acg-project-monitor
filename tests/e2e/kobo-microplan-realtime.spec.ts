@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
-import * as XLSX from "xlsx";
+
 
 /**
  * End-to-end verification of the KoboCollect → Amehnities realtime pipeline.
