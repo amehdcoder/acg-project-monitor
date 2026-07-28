@@ -191,6 +191,22 @@ const KoboSyncStatusChip = ({ projectId, onNewSuccess }: Props) => {
                 {e.message && (
                   <p className="mt-1 text-[11px] leading-snug text-foreground/80">{e.message}</p>
                 )}
+                {!isOk && !isPending && e.kobo_uuid && (
+                  <div className="mt-2 flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1 border-rose-300 text-rose-700 hover:bg-rose-100"
+                      disabled={retrying === e.kobo_uuid}
+                      onClick={() => retry(e.kobo_uuid!)}
+                    >
+                      {retrying === e.kobo_uuid
+                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                        : <RefreshCw className="h-3 w-3" />}
+                      Re-sync
+                    </Button>
+                  </div>
+                )}
               </div>
             );
           })}
