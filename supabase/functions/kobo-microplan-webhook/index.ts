@@ -409,7 +409,6 @@ Deno.serve(async (req) => {
       idempotency_key: idKey,
       community_latitude: geo.lat,
       community_longitude: geo.lng,
-      geotagged: geo.lat != null && geo.lng != null && !(geo.lat === 0 && geo.lng === 0),
     };
     for (const k of Object.keys(out)) {
       if (out[k] == null && !CLEARABLE_TEXT_COLS.has(k)) delete out[k];
