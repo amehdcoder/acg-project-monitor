@@ -264,22 +264,35 @@ Deno.serve(async (req) => {
     }
   }
 
-  const { data, error } = await supabase
-    .from("microplan_entries")
-    .upsert(record, { onConflict: "idempotency_key", ignoreDuplicates: false })
-    .select("id")
-    .maybeSingle();
+  let data: { id: string } | null = null;
+  let upsertError: { message: string; code?: string } | null = null;
+  try {
+    const res = await supabase
+      .from("microplan_entries")
+      .upsert(record, { onConflict: "idempotency_key,project_id", ignoreDuplicates: false })
+      .select("id")
+      .maybeSingle();
+    data = res.data as { id: string } | null;
+    upsertError = res.error ? { message: res.error.message, code: (res.error as any).code } : null;
+  } catch (e) {
+    upsertError = { message: (e as Error).message };
+  }
 
-  if (error) {
+  if (upsertError) {
+    const schemaMismatch = /on conflict|constraint|column .* does not exist/i.test(upsertError.message);
+    const hint = schemaMismatch
+      ? "Database schema mismatch on microplan_entries — ensure the unique index (idempotency_key, project_id) exists and the target columns are present."
+      : "Upsert failed. Check the payload against the microplan_entries schema and retry from the Kobo Sync audit log.";
     await logEvent({
-      status: "failed", error: error.message, kobo_uuid: koboUuid,
+      status: "failed", error: `${upsertError.message} :: ${hint}`, kobo_uuid: koboUuid,
       submitted_by_kobo: submittedBy, submitted_at: submittedAt, payload,
       mapping_version_number: mappingVersion,
       project_id: (record.project_id as string | null | undefined) ?? null,
     });
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: upsertError.message, code: "upsert_failed", hint }),
+      { status: schemaMismatch ? 400 : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   }
 
   await logEvent({
