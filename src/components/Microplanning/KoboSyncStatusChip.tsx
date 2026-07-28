@@ -58,7 +58,8 @@ const KoboSyncStatusChip = ({ projectId, onNewSuccess }: Props) => {
       setRetrying(null);
     }
   };
-  const [latest, setLatest] = useState<SyncEvent | null>(null);
+
+
 
   // Initial fetch of the most recent 50 events for this project.
   useEffect(() => {
