@@ -562,9 +562,14 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   const settlementDistAutoComputed = !!(form.settlement_latitude && form.settlement_longitude && form.flhf_latitude && form.flhf_longitude);
 
   return (
-    <div className="relative flex-1 flex flex-col">
+    <div className="relative flex-1 flex flex-col bg-slate-50/50">
 
-    <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-2 flex-1" style={{ scrollbarWidth: 'auto', scrollbarColor: 'hsl(var(--border)) transparent' }}>
+    <form onSubmit={handleSubmit} ref={formScrollRef} className="space-y-3 overflow-y-auto px-1 pr-2 flex-1" style={{ scrollbarWidth: 'auto', scrollbarColor: 'hsl(var(--border)) transparent' }}>
+      <MicroplanWizardChrome
+        sections={MICROPLAN_WIZARD_SECTIONS as unknown as { id: string; title: string }[]}
+        scrollContainerRef={formScrollRef}
+        lastSavedAt={lastSavedAt}
+      />
       {/* Year & Campaign */}
       <Section id="campaign" title="Campaign & Year" icon={Calendar}>
         <Field label="Year of Microplanning" required>
