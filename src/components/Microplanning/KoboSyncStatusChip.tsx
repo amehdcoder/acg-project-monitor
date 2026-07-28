@@ -102,6 +102,11 @@ const KoboSyncStatusChip = ({ projectId, onNewSuccess }: Props) => {
     return () => { supabase.removeChannel(channel); };
   }, [projectId, onNewSuccess]);
 
+  const isFreshSuccess = useMemo(() => {
+    if (!latest || latest.status !== "success") return false;
+    return Date.now() - new Date(latest.created_at).getTime() < 15_000;
+  }, [latest]);
+
   const chip = useMemo(() => {
     if (!latest) {
       return {
@@ -114,7 +119,7 @@ const KoboSyncStatusChip = ({ projectId, onNewSuccess }: Props) => {
     if (latest.status === "success") {
       return {
         icon: <CheckCircle2 className="h-3 w-3" />,
-        label: `Synced ${ago}`,
+        label: isFreshSuccess ? "Synced just now" : `Synced ${ago}`,
         cls: "bg-emerald-50 text-emerald-700 border-emerald-200",
       };
     }
@@ -130,20 +135,24 @@ const KoboSyncStatusChip = ({ projectId, onNewSuccess }: Props) => {
       label: `Validation failed ${ago}`,
       cls: "bg-rose-50 text-rose-700 border-rose-200",
     };
-  }, [latest]);
+  }, [latest, isFreshSuccess]);
 
   return (
     <Sheet>
       <SheetTrigger asChild>
         <button
           type="button"
-          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium shadow-sm transition hover:brightness-95 ${chip.cls}`}
+          className={`relative inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium shadow-sm transition hover:brightness-95 ${chip.cls}`}
           aria-label="Kobo sync status"
         >
+          {isFreshSuccess && (
+            <span className="absolute -inset-0.5 rounded-full ring-2 ring-emerald-400/70 animate-ping pointer-events-none" />
+          )}
           {chip.icon}
           <span>{chip.label}</span>
         </button>
       </SheetTrigger>
+
       <SheetContent side="right" className="w-full sm:max-w-md overflow-hidden flex flex-col">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
