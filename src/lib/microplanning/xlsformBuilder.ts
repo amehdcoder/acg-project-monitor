@@ -147,7 +147,7 @@ export async function buildMicroplanningXlsForm(
       : [];
   const singleState = scopedStates.length === 1 ? scopedStates[0] : null;
 
-  survey.push(q({ type: "begin_group", name: "admin_hierarchy", label: "2. Administrative Hierarchy (GRID3 cascade)", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "admin_hierarchy", label: '<font color="#0F172A"><b>📍 2. Administrative Hierarchy (GRID3 cascade)</b></font>', appearance: "field-list" }));
   if (singleState) {
     survey.push(q({
       type: "calculate", name: "state",
