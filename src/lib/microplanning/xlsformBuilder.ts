@@ -45,14 +45,16 @@ export const sanitize = (s: string): string => {
 const SURVEY_HEADER = [
   "type", "name", "label", "hint", "required", "required_message",
   "relevant", "constraint", "constraint_message", "calculation",
-  "choice_filter", "appearance", "default",
+  "choice_filter", "appearance", "default", "image", "repeat_count",
 ];
 
 // Choice parent columns follow the SIMPLIFIED cascade (single parent per level)
 // so PyXForm's filter parser stays fast and unambiguous.
 const CHOICES_HEADER = ["list_name", "name", "label", "lga", "ward", "flhf", "community", "lat", "lng"];
 
-const SETTINGS_HEADER = ["form_title", "form_id", "version", "default_language", "style", "allow_choice_duplicates"];
+// NOTE: `default_language` intentionally excluded — form is single-language and
+// including it forces PyXForm to require `label::English (en)` on every row.
+const SETTINGS_HEADER = ["form_title", "form_id", "version", "style", "allow_choice_duplicates"];
 
 
 const q = (r: Partial<Record<(typeof SURVEY_HEADER)[number], string>>): Row =>
