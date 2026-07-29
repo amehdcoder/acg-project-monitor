@@ -328,13 +328,14 @@ export async function buildMicroplanningXlsForm(
   //
   // Settlements are keyed to the selected COMMUNITY when GRID3 links exist,
   // otherwise they fall back to ward-level filtering.
-  survey.push(q({ type: "begin_group", name: "settlement_grp", label: '<font color="#059669"><b>🏘️ 5. Settlement (optional)</b></font>', appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "settlement_grp", label: "5. Settlement (optional)", appearance: "field-list" }));
   survey.push(q({
     type: "select_one settlements", name: "settlement", label: "Settlement (GRID3)",
     hint: "Optional. Choose 'Other (specify manually)' to type a name.",
     choice_filter: "(community=${community} or ward=${ward}) or name='__other__'",
-    appearance: "search autocomplete",
+    appearance: "minimal autocomplete",
   }));
+
   survey.push(q({
     type: "text", name: "settlement_manual", label: "Other Settlement — type the exact name",
     relevant: "${settlement} = '__other__'",
