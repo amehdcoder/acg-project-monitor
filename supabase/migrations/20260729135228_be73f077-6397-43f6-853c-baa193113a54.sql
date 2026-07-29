@@ -1,0 +1,1 @@
+ALTER TABLE public.microplan_coverage DROP COLUMN IF EXISTS target_population;

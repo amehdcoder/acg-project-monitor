@@ -5439,7 +5439,6 @@ export type Database = {
           state: string | null
           submitted_at: string | null
           submitted_by: string | null
-          target_population: number | null
           total_treated: number | null
           total_vaccinated: number | null
           updated_at: string
@@ -5464,7 +5463,6 @@ export type Database = {
           state?: string | null
           submitted_at?: string | null
           submitted_by?: string | null
-          target_population?: number | null
           total_treated?: number | null
           total_vaccinated?: number | null
           updated_at?: string
@@ -5489,7 +5487,6 @@ export type Database = {
           state?: string | null
           submitted_at?: string | null
           submitted_by?: string | null
-          target_population?: number | null
           total_treated?: number | null
           total_vaccinated?: number | null
           updated_at?: string
