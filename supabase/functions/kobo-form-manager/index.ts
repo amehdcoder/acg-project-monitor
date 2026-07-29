@@ -335,8 +335,15 @@ Deno.serve(async (req) => {
     }
 
     if (action === "save_config") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
       const { id, project_id, server_url, form_uid, form_title, api_token, field_mappings, form_status } = params;
       if (!form_uid || !api_token) return j({ error: "Missing form_uid/api_token" }, 400);
+      if (server_url) {
+        try { await assertSafeKoboUrl(server_url); }
+        catch (e) { return j({ error: (e as Error).message }, 400); }
+      }
+
       const row: Record<string, unknown> = {
         project_id: project_id ?? null,
         kobo_server_url: server_url ?? "https://kf.kobotoolbox.org",
