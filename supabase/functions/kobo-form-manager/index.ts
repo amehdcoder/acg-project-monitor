@@ -389,7 +389,10 @@ Deno.serve(async (req) => {
     // ---------- Versioned mapping history ----------
 
     if (action === "save_mapping_version") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
       const { config_id, field_mappings, change_summary } = params;
+
       if (!config_id || !field_mappings) return j({ error: "Missing config_id/field_mappings" }, 400);
 
       // Load current config for form_uid + project_id
