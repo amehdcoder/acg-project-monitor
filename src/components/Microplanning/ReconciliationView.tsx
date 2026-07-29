@@ -184,6 +184,23 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh }: Reconciliati
 
   return (
     <div className="space-y-4">
+      {/* Tab header — Download Reconciliation XLSForm */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <h3 className="text-sm font-semibold">Medicine & Supply Reconciliation</h3>
+          <p className="text-xs text-muted-foreground">Kobo submissions land in <code>microplan_reconciliation</code> in real time.</p>
+        </div>
+        <Button
+          variant="outline" size="sm" className="gap-1.5"
+          onClick={() => {
+            const file = downloadReconciliationXlsForm({});
+            toast({ title: "Reconciliation XLSForm ready", description: file });
+          }}
+        >
+          <Download className="h-3.5 w-3.5" />
+          Download Reconciliation XLSForm
+        </Button>
+      </div>
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <Card className="border-border/50 bg-gradient-to-br from-blue-50 to-background dark:from-blue-950/20">
