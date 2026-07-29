@@ -379,11 +379,12 @@ export async function buildMicroplanningXlsForm(
   survey.push(q({ type: "end_group", name: "settlement_grp_end" }));
 
   // ── Section 6: Terrain, Access, Security ──
-  survey.push(q({ type: "begin_group", name: "context_grp", label: '<font color="#D97706"><b>🔒 6. Terrain, Access &amp; Security</b></font>', appearance: "field-list" }));
-  survey.push(q({ type: "select_one terrain_type", name: "terrain_type", label: "Type of Terrain", appearance: "quick" }));
-  survey.push(q({ type: "select_one accessibility", name: "accessibility", label: "Accessibility", appearance: "quick" }));
-  survey.push(q({ type: "select_one security_clearance", name: "security_clearance", label: "Security Clearance", appearance: "quick" }));
+  survey.push(q({ type: "begin_group", name: "context_grp", label: "6. Terrain, Access & Security", appearance: "field-list" }));
+  survey.push(q({ type: "select_one terrain_type", name: "terrain_type", label: "Type of Terrain", appearance: "minimal" }));
+  survey.push(q({ type: "select_one accessibility", name: "accessibility", label: "Accessibility", appearance: "minimal" }));
+  survey.push(q({ type: "select_one security_clearance", name: "security_clearance", label: "Security Clearance", appearance: "minimal" }));
   survey.push(q({ type: "end_group", name: "context_grp_end" }));
+
 
   // ── Section 7: Population Estimates ──
   survey.push(q({ type: "begin_group", name: "pop_grp", label: '<font color="#4F46E5"><b>👥 7. Population Estimates</b></font>', appearance: "field-list" }));
