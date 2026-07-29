@@ -124,21 +124,25 @@ export async function buildMicroplanningXlsForm(
   survey.push(q({ type: "username", name: "username" }));
   survey.push(q({ type: "phonenumber", name: "phonenumber" }));
 
-  // Cover / welcome — rendered as the FIRST SCREEN with the `home` media file
-  // as a full-bleed image and NO other text/questions on the page. The note
-  // label is intentionally a single non-breaking space so PyXForm accepts the
-  // row while KoboCollect renders only the image.
+  // Cover / welcome — the FIRST SCREEN carries only the `home` media file as a
+  // full-bleed hero image. Wrapping the note in its own `field-list` group with
+  // `w100 no-label` on the note row lets KoboCollect and Enketo render the
+  // image edge-to-edge with no visible label text or additional controls. The
+  // label stays a single space so PyXForm accepts the row.
+  survey.push(q({ type: "begin_group", name: "grp_welcome", label: " ", appearance: "field-list" }));
   survey.push(q({
     type: "note", name: "welcome_cover_note",
     label: " ",
     image: "home",
-    appearance: "no-label",
+    appearance: "w100 no-label",
   }));
+  survey.push(q({ type: "end_group", name: "grp_welcome_end" }));
 
   survey.push(q({
     type: "note", name: "intro",
     label: "**Amehnities — Geo-enabled Microplanning Entry**\n\nComplete each section. Cascaded LGA → Ward → FLHF → Community/Settlement is powered by GRID3. Where a name is missing, select **Other (specify manually)** to type it in.",
   }));
+
 
 
   // ── Section 1: Campaign & Year ──
