@@ -295,6 +295,7 @@ const CoverageView = ({ entries, onRefresh, projectId }: CoverageViewProps) => {
         <div>
           <h3 className="text-sm font-semibold">Coverage Reporting</h3>
           <p className="text-xs text-muted-foreground">Kobo submissions land in <code>microplan_coverage</code> in real time.</p>
+          <div className="mt-1"><TabSyncStatus projectId={projectId ?? null} table="microplan_coverage" syncEventStatus="coverage_sync" /></div>
         </div>
         <Button
           variant="outline" size="sm" className="gap-1.5"
