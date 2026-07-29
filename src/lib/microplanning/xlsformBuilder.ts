@@ -409,10 +409,7 @@ export async function buildMicroplanningXlsForm(
   survey.push(q({ type: "integer", name: "number_of_households", label: "Number of Households", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
   survey.push(q({ type: "end_group", name: "pop_grp_end" }));
 
-  // ── END REPEAT: community_repeat ──
-  survey.push(q({ type: "end_repeat", name: "community_repeat_end" }));
-
-  // ── Section 8: Trachoma Age Disaggregation ──
+  // ── Section 8: Trachoma Age Disaggregation (per community) ──
   survey.push(q({ type: "begin_group", name: "trachoma_grp", label: "8. Trachoma Age Disaggregation (optional)", appearance: "field-list" }));
   survey.push(q({ type: "select_one yes_no", name: "include_trachoma", label: "Include trachoma-specific age disaggregation?", appearance: "minimal", default: "no" }));
   const tracRel = "${include_trachoma} = 'yes'";
@@ -422,7 +419,7 @@ export async function buildMicroplanningXlsForm(
   survey.push(q({ type: "integer", name: "trachoma_15_plus", label: "15+ years", relevant: tracRel, constraint: ". >= 0" }));
   survey.push(q({ type: "end_group", name: "trachoma_grp_end" }));
 
-  // ── Section 9: PWD ──
+  // ── Section 9: PWD (per community) ──
   survey.push(q({ type: "begin_group", name: "pwd_grp", label: "9. Persons With Disability (Disaggregation)", appearance: "field-list" }));
   const pwdFields: [string, string][] = [
     ["pwd_total", "PWD — Total"], ["pwd_visual", "Visual"], ["pwd_hearing", "Hearing"],
@@ -434,12 +431,15 @@ export async function buildMicroplanningXlsForm(
   }
   survey.push(q({ type: "end_group", name: "pwd_grp_end" }));
 
-  // ── Section 10: CDDs ──
+  // ── Section 10: CDDs (per community) ──
   survey.push(q({ type: "begin_group", name: "cdd_grp", label: "10. Community Directed Distributors (CDDs)", appearance: "field-list" }));
   survey.push(q({ type: "text", name: "cdd_names", label: "CDD Names (comma-separated)", appearance: "multiline" }));
   survey.push(q({ type: "text", name: "cdd_phone_numbers", label: "CDD Phone Numbers (comma-separated)", appearance: "multiline" }));
   survey.push(q({ type: "select_one yes_no", name: "cdd_from_community", label: "Is the CDD from this Community/Settlement?", appearance: "minimal" }));
   survey.push(q({ type: "end_group", name: "cdd_grp_end" }));
+
+  // ── END REPEAT: community_repeat ──
+  survey.push(q({ type: "end_repeat", name: "community_repeat_end" }));
 
   // ── Section 11: Notes ──
   survey.push(q({ type: "text", name: "notes", label: "Additional Notes", appearance: "multiline" }));
