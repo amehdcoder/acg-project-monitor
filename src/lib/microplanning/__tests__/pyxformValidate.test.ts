@@ -23,7 +23,29 @@ const pyxformAvailable = (() => {
 
 const maybe = pyxformAvailable ? describe : describe.skip;
 
+function ensureChoiceStubs(wb: XLSX.WorkBook, lists: string[]) {
+  const sheet = wb.Sheets["choices"];
+  const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, defval: "" }) as string[][];
+  const header = rows[0] ?? ["list_name", "name", "label"];
+  const listIdx = header.indexOf("list_name");
+  const present = new Set(rows.slice(1).map((r) => String(r[listIdx] ?? "")));
+  const additions: string[][] = [];
+  for (const l of lists) {
+    if (!present.has(l)) {
+      const row = header.map(() => "");
+      row[listIdx] = l;
+      const nIdx = header.indexOf("name"); if (nIdx >= 0) row[nIdx] = "stub";
+      const lbIdx = header.indexOf("label"); if (lbIdx >= 0) row[lbIdx] = "Stub";
+      additions.push(row);
+    }
+  }
+  if (additions.length) {
+    wb.Sheets["choices"] = XLSX.utils.aoa_to_sheet([...rows, ...additions]);
+  }
+}
+
 function convert(wb: XLSX.WorkBook, base: string): { xml: string; log: string } {
+  ensureChoiceStubs(wb, ["states", "lgas", "wards", "flhfs", "communities", "settlements"]);
   const dir = mkdtempSync(join(tmpdir(), "xlsform-"));
   const xlsx = join(dir, `${base}.xlsx`);
   const xml = join(dir, `${base}.xml`);
