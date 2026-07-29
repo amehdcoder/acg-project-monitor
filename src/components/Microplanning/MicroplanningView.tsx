@@ -26,6 +26,7 @@ import MicroplanDeleteRequestDialog from "./MicroplanDeleteRequestDialog";
 import MicroplanDeleteRequestsPanel from "./MicroplanDeleteRequestsPanel";
 import KoboSyncSettingsDialog from "./KoboSyncSettingsDialog";
 import KoboSyncStatusChip from "./KoboSyncStatusChip";
+import { TabSyncStatus } from "./TabSyncStatus";
 import useRealtimeMicroplanEntries from "@/hooks/useRealtimeMicroplanEntries";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useProjectScope } from "@/hooks/useProjectScope";
