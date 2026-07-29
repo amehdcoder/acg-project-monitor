@@ -266,7 +266,7 @@ export async function buildMicroplanningXlsForm(
   }));
 
   // ── Section 4: Community ──
-  survey.push(q({ type: "begin_group", name: "community_grp", label: "4. Community", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "grp_comm_location", label: "### 📍 Community Details", appearance: "field-list" }));
   survey.push(q({
     type: "select_one communities", name: "community", label: "Community (GRID3)",
     hint: "Type to search. Choose 'Other (specify manually)' if the community is not listed.",
