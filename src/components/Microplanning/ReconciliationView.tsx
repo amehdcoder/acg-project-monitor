@@ -6,8 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Save, PackageCheck, AlertTriangle, RotateCcw, Pill } from "lucide-react";
+import { Save, PackageCheck, AlertTriangle, RotateCcw, Pill, Download } from "lucide-react";
 import * as XLSX from "xlsx";
+import { downloadReconciliationXlsForm } from "@/lib/microplanning/generateReconciliationXLSForm";
 
 export interface AllocationRow {
   entryId: string;
