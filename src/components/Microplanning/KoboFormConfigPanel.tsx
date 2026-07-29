@@ -541,10 +541,19 @@ export default function KoboFormConfigPanel() {
       {/* Mapping UI */}
       {fields && !isEmpty && (
         <div className="border rounded p-2 space-y-1">
-          <div className="text-[11px] font-semibold">
-            Map Microplanning fields → Kobo questions
-            {formTitle && <span className="text-muted-foreground font-normal"> · {formTitle}</span>}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="text-[11px] font-semibold">
+              Map Microplanning fields → Kobo questions
+              {formTitle && <span className="text-muted-foreground font-normal"> · {formTitle}</span>}
+              <span className="ml-2 text-muted-foreground font-normal">
+                · {Object.keys(mapping).filter((k) => mapping[k]).length}/{TARGET_FIELDS.length} mapped
+              </span>
+            </div>
+            <Button size="sm" variant="secondary" onClick={autoMapUnmapped} className="h-7">
+              <Wand2 className="h-3 w-3 mr-1" /> Auto-Map All Unmapped Fields
+            </Button>
           </div>
+
           <div className="max-h-64 overflow-y-auto">
             <table className="w-full text-xs">
               <thead className="text-muted-foreground text-left">
