@@ -326,13 +326,14 @@ export async function buildMicroplanningXlsForm(
     relevant: "${community_distance_to_flhf_km} != ''",
   }));
 
-  survey.push(q({ type: "end_group", name: "community_grp_end" }));
+  survey.push(q({ type: "end_group", name: "grp_comm_location_end" }));
 
   // ── Section 5: Settlement (optional) ──
   //
   // Settlements are keyed to the selected COMMUNITY when GRID3 links exist,
   // otherwise they fall back to ward-level filtering.
-  survey.push(q({ type: "begin_group", name: "settlement_grp", label: "5. Settlement (optional)", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "grp_comm_settlement", label: "### 🏘️ Settlement (optional)", appearance: "field-list" }));
+
   survey.push(q({
     type: "select_one settlements", name: "settlement", label: "Settlement (GRID3)",
     hint: "Optional. Choose 'Other (specify manually)' to type a name.",
