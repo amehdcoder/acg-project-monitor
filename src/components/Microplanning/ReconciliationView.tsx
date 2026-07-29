@@ -9,6 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { Save, PackageCheck, AlertTriangle, RotateCcw, Pill, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import { downloadReconciliationXlsForm } from "@/lib/microplanning/generateReconciliationXLSForm";
+import useRealtimeReconciliationEntries from "@/hooks/useRealtimeReconciliationEntries";
 
 export interface AllocationRow {
   entryId: string;
