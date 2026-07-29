@@ -206,7 +206,6 @@ describe("cover-page .xlsx structure snapshot", () => {
             "type": "begin_group",
           },
         ],
-
         "sheetNames": [
           "survey",
           "choices",
