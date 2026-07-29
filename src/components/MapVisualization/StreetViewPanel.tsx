@@ -1,6 +1,7 @@
 /// <reference types="google.maps" />
 import { useState, useRef, useEffect, useCallback } from "react";
 import { X, Maximize2, Minimize2, RotateCcw, Compass, Move } from "lucide-react";
+import { loadGoogleMaps } from "@/lib/maps/googleMapsLoader";
 
 declare global {
   interface Window {
@@ -14,45 +15,6 @@ interface StreetViewPanelProps {
   onClose: () => void;
 }
 
-// Load Google Maps JS API once
-let googleMapsPromise: Promise<void> | null = null;
-const GOOGLE_MAPS_API_KEY = "AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8";
-
-const loadGoogleMaps = (): Promise<void> => {
-  if (googleMapsPromise) return googleMapsPromise;
-
-  googleMapsPromise = new Promise((resolve, reject) => {
-    if (window.google?.maps?.StreetViewPanorama) {
-      resolve();
-      return;
-    }
-
-    const existing = document.querySelector(
-      `script[src*="maps.googleapis.com/maps/api/js"]`
-    );
-    if (existing) {
-      if (window.google?.maps?.StreetViewPanorama) {
-        resolve();
-      } else {
-        existing.addEventListener("load", () => resolve());
-      }
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&v=weekly`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => {
-      googleMapsPromise = null;
-      reject(new Error("Failed to load Google Maps"));
-    };
-    document.head.appendChild(script);
-  });
-
-  return googleMapsPromise;
-};
 
 const StreetViewPanel = ({ lat, lng, onClose }: StreetViewPanelProps) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
