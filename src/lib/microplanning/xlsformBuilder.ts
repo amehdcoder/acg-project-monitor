@@ -318,9 +318,10 @@ export async function buildMicroplanningXlsForm(
   }));
   survey.push(q({
     type: "note", name: "community_distance_note",
-    label: "🛣️ Distance Community → FLHF: **${community_distance_to_flhf_km} km** (auto-computed)",
+    label: "Distance Community → FLHF: **${community_distance_to_flhf_km} km** (auto-computed)",
     relevant: "${community_distance_to_flhf_km} != ''",
   }));
+
   survey.push(q({ type: "end_group", name: "community_grp_end" }));
 
   // ── Section 5: Settlement (optional) ──
