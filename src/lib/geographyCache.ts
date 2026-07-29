@@ -229,7 +229,7 @@ import {
 
 // Bump this string whenever the shipped geography assets change structurally so
 // returning users re-seed their local IndexedDB copy on next login.
-export const GEO_SEEDED_VERSION = `${BUNDLED_VERSION}+grid3.v1`;
+export const GEO_SEEDED_VERSION = `${BUNDLED_VERSION}+grid3.v2`;
 const GEO_SEEDED_KEY = "geo_seeded_version";
 
 /** True when THIS device already holds the current full 5-tier dataset. */
