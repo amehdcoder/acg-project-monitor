@@ -194,18 +194,36 @@ export default function KoboFormConfigPanel() {
   };
 
   const applyInspectResult = (res: any) => {
-    setFields(res.fields ?? []);
+    const koboFields = (res.fields ?? []) as KoboField[];
+    setFields(koboFields);
     setIsEmpty(Boolean(res.is_empty));
     setFormTitle(res.form_title ?? null);
     setSubmissionCount(Number(res.submission_count ?? 0));
     setTestSteps(res.steps ?? null);
     setTestOk(res.ok !== false);
-    // Auto-map by name equality
-    const auto: Record<string, string> = {};
-    const names = new Set((res.fields ?? []).map((f: KoboField) => f.name));
-    for (const t of TARGET_FIELDS) if (names.has(t.key)) auto[t.key] = t.key;
+    // Full-coverage auto-map: name/alias/label normalization across ALL target
+    // fields. User-edited mappings win over auto values.
+    const auto = computeAutoMap(koboFields);
     setMapping((prev) => ({ ...auto, ...prev }));
   };
+
+  /** Dynamic "Auto-Map All Unmapped Fields" — re-runs the matcher against the
+   * currently-loaded Kobo schema and fills any target row the admin left blank. */
+  const autoMapUnmapped = () => {
+    if (!fields) return;
+    const auto = computeAutoMap(fields);
+    let filled = 0;
+    setMapping((prev) => {
+      const next = { ...prev };
+      for (const [k, v] of Object.entries(auto)) {
+        if (!next[k]) { next[k] = v; filled++; }
+      }
+      return next;
+    });
+    toast({ title: `Auto-mapped ${filled} field${filled === 1 ? "" : "s"}`, description: filled ? "Review and Save to persist." : "All target fields were already mapped." });
+  };
+
+
 
   const testConnection = async () => {
     if (!formUid.trim() || !apiToken.trim()) {
