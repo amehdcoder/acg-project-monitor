@@ -14,6 +14,7 @@ import "leaflet/dist/leaflet.css";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { useLeafletStreetView } from "@/components/maps/LeafletStreetView";
 import useRealtimeCoverageEntries from "@/hooks/useRealtimeCoverageEntries";
+import { TabSyncStatus } from "./TabSyncStatus";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isPersistedId = (id: string) => UUID_RE.test(id);
