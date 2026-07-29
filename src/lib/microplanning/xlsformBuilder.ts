@@ -224,9 +224,10 @@ export async function buildMicroplanningXlsForm(
     calculation: "if(${flhf}='' or ${flhf}='__other__', '', instance('flhfs')/root/item[name=${flhf}]/lng)",
   }));
   survey.push(q({ type: "note", name: "flhf_grid3_note",
-    label: "📍 GRID3 GPS: **${flhf_lat_grid3}, ${flhf_lng_grid3}** — capture below to override.",
+    label: "GRID3 GPS: **${flhf_lat_grid3}, ${flhf_lng_grid3}** — capture below to override.",
     relevant: "${flhf_lat_grid3} != '' and ${flhf_lng_grid3} != ''",
   }));
+
   survey.push(q({
     type: "geopoint", name: "flhf_gps_override", label: "FLHF GPS (override — optional)",
     hint: "Leave blank to keep the GRID3 coordinates.",
