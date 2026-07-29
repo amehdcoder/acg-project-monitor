@@ -40,6 +40,7 @@ interface ReconciliationViewProps {
   entries: MicroplanEntry[];
   allocationRows: AllocationRow[];
   onRefresh: () => void;
+  projectId?: string | null;
 }
 
 const REVERSAL_OPTIONS = [
@@ -51,7 +52,8 @@ const REVERSAL_OPTIONS = [
   { value: "Other", label: "Other" },
 ];
 
-const ReconciliationView = ({ entries, allocationRows, onRefresh }: ReconciliationViewProps) => {
+const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: ReconciliationViewProps) => {
+  useRealtimeReconciliationEntries(projectId ?? null, onRefresh);
   // local edits
   const [editedUsed, setEditedUsed] = useState<Record<string, string>>({});
   const [editedReversed, setEditedReversed] = useState<Record<string, string>>({});
