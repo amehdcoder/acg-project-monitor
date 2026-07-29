@@ -142,7 +142,7 @@ export async function buildMicroplanningXlsForm(
 
 
   // ── Section 1: Campaign & Year ──
-  survey.push(q({ type: "begin_group", name: "campaign_year", label: '<font color="#0F172A"><b>📅 1. Campaign &amp; Year</b></font>', appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "campaign_year", label: "1. Campaign & Year", appearance: "field-list" }));
   survey.push(q({
     type: "integer", name: "year_of_microplanning", label: "Year of Microplanning",
     required: "yes", constraint: ". >= 2000 and . <= 2100",
