@@ -91,7 +91,9 @@ const codeForStatus = (s: number): KoboErrCode =>
   s >= 500 ? "server_error" : "bad_response";
 
 async function koboFetch(server: string, path: string, token: string, init: RequestInit = {}, timeoutMs = 20_000) {
+  await assertSafeKoboUrl(server);
   const url = `${stripTrailingSlash(server)}${path}`;
+
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   let res: Response;
