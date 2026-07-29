@@ -47,7 +47,7 @@ export function buildCoverageXlsForm(options: CoverageBuildOptions = {}): XLSX.W
 
   survey.push(q({
     type: "note", name: "intro",
-    label: `<b>${title}</b><br/>Record treatment coverage per community. Use the ⊕ button to add another community under the same FLHF.`,
+    label: `**${title}**\n\nRecord treatment coverage per community. Use the + button to add another community under the same FLHF.`,
   }));
 
   // Header cascade — captured once at the top of the form
@@ -71,6 +71,7 @@ export function buildCoverageXlsForm(options: CoverageBuildOptions = {}): XLSX.W
   survey.push(q({ type: "geopoint", name: "community_gps", label: "Community GPS", appearance: "maps" }));
   survey.push(q({ type: "text", name: "notes", label: "Notes / Observations" }));
   survey.push(q({ type: "end_repeat", name: "community_repeat_end" }));
+
 
   const choices: Row[] = [CHOICES_HEADER as unknown as Row];
   // Placeholder list to satisfy strict validators

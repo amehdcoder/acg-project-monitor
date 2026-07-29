@@ -51,7 +51,7 @@ export function buildReconciliationXlsForm(options: ReconBuildOptions = {}): XLS
 
   survey.push(q({
     type: "note", name: "intro",
-    label: `<b>${title}</b><br/>Reconcile medicines received vs. administered at end of round.`,
+    label: `**${title}**\n\nReconcile medicines received vs. administered at end of round.`,
   }));
 
   survey.push(q({ type: "begin_group", name: "admin", label: "1. Facility", appearance: "field-list" }));
@@ -71,6 +71,7 @@ export function buildReconciliationXlsForm(options: ReconBuildOptions = {}): XLS
   survey.push(q({ type: "decimal", name: "returned_quantity", label: "Unopened Returned Quantity", constraint: ". >= 0", default: "0" }));
   survey.push(q({ type: "text", name: "discrepancy_notes", label: "Discrepancy Notes", appearance: "multiline" }));
   survey.push(q({ type: "end_repeat", name: "medicine_repeat_end" }));
+
 
   const choices: Row[] = [CHOICES_HEADER as unknown as Row];
   MEDICINES.forEach(([n, l]) => choices.push(["medicine_type", n, l]));
