@@ -567,82 +567,29 @@ Deno.serve(async (req) => {
       const forbid = await ensureAdmin();
       if (forbid) return forbid;
       const { server_url, api_token, xlsx_base64, form_uid, asset_name, version_id } = params;
-      if (!server_url || !api_token || !xlsx_base64) {
-        return j({ error: "Missing server_url/api_token/xlsx_base64" }, 400);
+
+      const { performKoboXlsformUpload, makeKoboFetcher } = await import("./upload.ts");
+      const result = await performKoboXlsformUpload(
+        { server_url, api_token, xlsx_base64, form_uid, asset_name, version_id },
+        {
+          fetcher: makeKoboFetcher(),
+          persistVersion: async (patch) => {
+            await admin.from("microplan_xlsform_versions").update({
+              kobo_asset_uid: patch.kobo_asset_uid,
+              kobo_version_id: patch.kobo_version_id,
+              kobo_server_url: patch.kobo_server_url,
+              kobo_deployed_at: patch.kobo_deployed_at,
+              kobo_upload_response: patch.kobo_upload_response,
+            }).eq("id", patch.version_id);
+          },
+        },
+      );
+      if (!result.ok && "error" in result) {
+        return j({ error: result.error, detail: result.detail, code: result.code }, result.status ?? 502);
       }
-
-      const importBody: Record<string, unknown> = {
-        base64Encoded: `base64:${xlsx_base64}`,
-        name: asset_name || `amehnities_microplanning_${new Date().toISOString().slice(0, 10)}.xlsx`,
-      };
-      if (form_uid) {
-        importBody.destination = `${stripTrailingSlash(server_url)}/api/v2/assets/${form_uid}/`;
-        importBody.assetUid = form_uid;
-      }
-
-      let importRes: any;
-      try {
-        importRes = await koboFetch(server_url, `/api/v2/imports/`, api_token, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(importBody),
-        });
-      } catch (e) {
-        return j({ error: "Kobo import failed", detail: (e as Error).message }, 502);
-      }
-
-      // Poll import status up to ~15s to confirm the asset was accepted.
-      const importUrl: string | undefined = importRes?.url;
-      let status = importRes?.status ?? "created";
-      let finalAsset: any = null;
-      let finalUid: string | null = form_uid ?? null;
-      const started = Date.now();
-      while (importUrl && Date.now() - started < 15000 && !["complete", "error"].includes(String(status))) {
-        await new Promise((r) => setTimeout(r, 1500));
-        try {
-          const path = importUrl.replace(/^https?:\/\/[^/]+/, "");
-          const poll = await koboFetch(server_url, path, api_token);
-          status = poll?.status ?? status;
-          finalUid = poll?.messages?.updated?.[0]?.uid || poll?.messages?.created?.[0]?.uid || finalUid;
-        } catch { break; }
-      }
-
-      if (finalUid) {
-        try {
-          finalAsset = await koboFetch(server_url, `/api/v2/assets/${finalUid}/?format=json`, api_token);
-        } catch { /* ignore */ }
-        // Best-effort (re)deploy so the asset is live.
-        try {
-          await koboFetch(server_url, `/api/v2/assets/${finalUid}/deployment/`, api_token, {
-            method: finalAsset?.has_deployment ? "PATCH" : "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ active: true }),
-          });
-        } catch { /* ignore */ }
-      }
-
-      const koboVersionId = finalAsset?.version_id ?? finalAsset?.deployed_version_id ?? null;
-
-      if (version_id) {
-        await admin.from("microplan_xlsform_versions").update({
-          kobo_asset_uid: finalUid,
-          kobo_version_id: koboVersionId,
-          kobo_server_url: server_url,
-          kobo_deployed_at: new Date().toISOString(),
-          kobo_upload_response: { import: importRes, status, asset: finalAsset ? { name: finalAsset.name, uid: finalAsset.uid, version_id: finalAsset.version_id, deployed_version_id: finalAsset.deployed_version_id, has_deployment: finalAsset.has_deployment } : null },
-        }).eq("id", version_id);
-      }
-
-      return j({
-        ok: status !== "error",
-        status,
-        form_uid: finalUid,
-        form_title: finalAsset?.name ?? null,
-        version_id: koboVersionId,
-        submission_count: finalAsset?.deployment__submission_count ?? 0,
-        import: importRes,
-      });
+      return j(result);
     }
+
 
     if (action === "fetch_submissions") {
       const { server_url, form_uid, api_token, page_size, page } = params;
