@@ -9,7 +9,7 @@ import { createClient } from "@supabase/supabase-js";
  *   1. Happy-path 3-community submission → 3 rows ingested + realtime broadcast
  *      + KPI counter visibly updates in the /__test/microplan-kpi harness.
  *   2. Idempotent re-submission does not duplicate rows.
- *   3. Out-of-range `target_population` items are rejected by the webhook
+ *   3. Out-of-range `estimated_total_population` items are rejected by the webhook
  *      guard and NOT ingested (other valid items in the same payload still
  *      land).
  *   4. Malformed `community_repeat` payload returns HTTP 400 with no writes.
