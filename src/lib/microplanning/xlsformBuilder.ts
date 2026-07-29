@@ -482,15 +482,22 @@ export async function buildMicroplanningXlsForm(
     ? allStates.filter((s) => scopedStates.includes(s))
     : allStates;
 
-  // Composite-key → sanitized id maps guarantee we only ever assign ONE id per
-  // real-world (state, lga, ward, flhf, community) tuple, even when GRID3
-  // returns the same admin unit across many rows.
+  // Composite-key → sanitized id maps enforce STRICT hierarchical uniqueness so
+  // GRID3 duplicates never leak into the `choices` sheet:
+  //   • LGA:        unique per (state + lga)
+  //   • Ward:       unique per (state + lga + ward)
+  //   • FLHF:       unique per (state + lga + ward + flhf_name)      [ward id already encodes state+lga+ward]
+  //   • Community:  unique per (state + lga + ward + community_name)
+  //   • Settlement: unique per (state + lga + ward + community + settlement)
+  // Cascade filters (`lga=${lga}`, `ward=${ward}`, `community=${community}`)
+  // therefore resolve against sanitized, orphan-free ids.
   const stateNameById = new Map<string, string>();      // state → sid
   const lgaNameById = new Map<string, string>();        // `${state}||${lga}` → lid
   const wardNameById = new Map<string, string>();       // `${state}||${lga}||${ward}` → wid
   const flhfIdByKey = new Map<string, string>();        // `${wid}||${slug}` → id
   const communityIdByKey = new Map<string, string>();   // `${wid}||${slug}` → id
   const settlementIdByKey = new Map<string, string>();  // `${cid}||${slug}` → id
+
 
   onProgress?.({ phase: "states", done: 0, total: targetStates.length });
   targetStates.forEach((s) => {
