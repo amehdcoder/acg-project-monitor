@@ -7,11 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Save, MapPin, AlertTriangle, CheckCircle2, Target, TrendingUp, Eye } from "lucide-react";
+import { Save, MapPin, AlertTriangle, CheckCircle2, Target, TrendingUp, Eye, Download } from "lucide-react";
+import { downloadCoverageXlsForm } from "@/lib/microplanning/generateCoverageXLSForm";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { useLeafletStreetView } from "@/components/maps/LeafletStreetView";
+import useRealtimeCoverageEntries from "@/hooks/useRealtimeCoverageEntries";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isPersistedId = (id: string) => UUID_RE.test(id);
@@ -47,9 +49,11 @@ interface CoverageEntry {
 interface CoverageViewProps {
   entries: CoverageEntry[];
   onRefresh: () => void;
+  projectId?: string | null;
 }
 
-const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
+const CoverageView = ({ entries, onRefresh, projectId }: CoverageViewProps) => {
+  useRealtimeCoverageEntries(projectId ?? null, onRefresh);
   const [editedTreated, setEditedTreated] = useState<Record<string, string>>({});
   const [editedUsed, setEditedUsed] = useState<Record<string, string>>({});
   const [editedHHReported, setEditedHHReported] = useState<Record<string, string>>({});
@@ -285,6 +289,23 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
 
   return (
     <div className="space-y-4">
+      {/* Tab header — Download Coverage XLSForm */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <h3 className="text-sm font-semibold">Coverage Reporting</h3>
+          <p className="text-xs text-muted-foreground">Kobo submissions land in <code>microplan_coverage</code> in real time.</p>
+        </div>
+        <Button
+          variant="outline" size="sm" className="gap-1.5"
+          onClick={() => {
+            const file = downloadCoverageXlsForm({});
+            toast({ title: "Coverage XLSForm ready", description: file });
+          }}
+        >
+          <Download className="h-3.5 w-3.5" />
+          Download Coverage XLSForm
+        </Button>
+      </div>
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="border-border/50 bg-gradient-to-br from-blue-50 to-background dark:from-blue-950/20">

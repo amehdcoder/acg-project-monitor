@@ -6,8 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Save, PackageCheck, AlertTriangle, RotateCcw, Pill } from "lucide-react";
+import { Save, PackageCheck, AlertTriangle, RotateCcw, Pill, Download } from "lucide-react";
 import * as XLSX from "xlsx";
+import { downloadReconciliationXlsForm } from "@/lib/microplanning/generateReconciliationXLSForm";
+import useRealtimeReconciliationEntries from "@/hooks/useRealtimeReconciliationEntries";
 
 export interface AllocationRow {
   entryId: string;
@@ -38,6 +40,7 @@ interface ReconciliationViewProps {
   entries: MicroplanEntry[];
   allocationRows: AllocationRow[];
   onRefresh: () => void;
+  projectId?: string | null;
 }
 
 const REVERSAL_OPTIONS = [
@@ -49,7 +52,8 @@ const REVERSAL_OPTIONS = [
   { value: "Other", label: "Other" },
 ];
 
-const ReconciliationView = ({ entries, allocationRows, onRefresh }: ReconciliationViewProps) => {
+const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: ReconciliationViewProps) => {
+  useRealtimeReconciliationEntries(projectId ?? null, onRefresh);
   // local edits
   const [editedUsed, setEditedUsed] = useState<Record<string, string>>({});
   const [editedReversed, setEditedReversed] = useState<Record<string, string>>({});
@@ -183,6 +187,23 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh }: Reconciliati
 
   return (
     <div className="space-y-4">
+      {/* Tab header — Download Reconciliation XLSForm */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <h3 className="text-sm font-semibold">Medicine & Supply Reconciliation</h3>
+          <p className="text-xs text-muted-foreground">Kobo submissions land in <code>microplan_reconciliation</code> in real time.</p>
+        </div>
+        <Button
+          variant="outline" size="sm" className="gap-1.5"
+          onClick={() => {
+            const file = downloadReconciliationXlsForm({});
+            toast({ title: "Reconciliation XLSForm ready", description: file });
+          }}
+        >
+          <Download className="h-3.5 w-3.5" />
+          Download Reconciliation XLSForm
+        </Button>
+      </div>
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <Card className="border-border/50 bg-gradient-to-br from-blue-50 to-background dark:from-blue-950/20">
