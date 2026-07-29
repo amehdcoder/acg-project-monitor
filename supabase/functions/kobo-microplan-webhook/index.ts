@@ -499,6 +499,9 @@ Deno.serve(async (req) => {
         terrain_type: (pickFirst(item, ["terrain_type"]) || "").toLowerCase().trim() || null,
         accessibility: (pickFirst(item, ["accessibility", "access_status"]) || "").toLowerCase().trim() || null,
         security_clearance: (pickFirst(item, ["security_clearance", "security_status"]) || "").toLowerCase().trim() || null,
+        // PWD, CDD and Trachoma disaggregations now live INSIDE community_repeat
+        // (per-community), so pass them through per row instead of the parent.
+        ...extractRepeatDisaggregations(item),
       }, `${koboUuid}_${idx}`, { lat: cLat, lng: cLng }));
     });
   } else {
