@@ -48,9 +48,13 @@ interface CoverageEntry {
 interface CoverageViewProps {
   entries: CoverageEntry[];
   onRefresh: () => void;
+  projectId?: string | null;
 }
 
-const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
+import useRealtimeCoverageEntries from "@/hooks/useRealtimeCoverageEntries";
+
+const CoverageView = ({ entries, onRefresh, projectId }: CoverageViewProps) => {
+  useRealtimeCoverageEntries(projectId ?? null, onRefresh);
   const [editedTreated, setEditedTreated] = useState<Record<string, string>>({});
   const [editedUsed, setEditedUsed] = useState<Record<string, string>>({});
   const [editedHHReported, setEditedHHReported] = useState<Record<string, string>>({});
