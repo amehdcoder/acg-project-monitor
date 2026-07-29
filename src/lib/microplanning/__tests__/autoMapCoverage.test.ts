@@ -35,11 +35,17 @@ const STRUCTURAL_TYPES = new Set([
 const UNMAPPED_ALLOWLIST = new Set<string>([
   // Composite geopoints — split into *_latitude / *_longitude before persistence.
   "flhf_gps", "community_gps", "settlement_gps",
+  // Manual GPS override capture — reconciled into the canonical *_latitude/_longitude columns.
+  "flhf_gps_override", "community_gps_override", "settlement_gps_override",
   // Search/UX affordances that never round-trip to DB.
   "flhf_search", "community_search", "settlement_search",
   // "Other (specify)" free-text pairs — merged into the canonical *_name column by the webhook.
   "flhf_name_other", "community_name_other", "settlement_name_other",
+  "flhf_manual", "community_manual", "settlement_manual",
+  // Conditional-section toggle — drives `relevant` on the trachoma group, not persisted.
+  "include_trachoma",
 ]);
+
 
 const readSurvey = (wb: XLSX.WorkBook): Record<string, string>[] => {
   const sheet = wb.Sheets["survey"];
