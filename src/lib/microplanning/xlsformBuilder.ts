@@ -387,7 +387,7 @@ export async function buildMicroplanningXlsForm(
 
 
   // ── Section 7: Population Estimates ──
-  survey.push(q({ type: "begin_group", name: "pop_grp", label: '<font color="#4F46E5"><b>👥 7. Population Estimates</b></font>', appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "pop_grp", label: "7. Population Estimates", appearance: "field-list" }));
   survey.push(q({ type: "integer", name: "estimated_children_0_4", label: "Children 0–4 years", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
   survey.push(q({ type: "integer", name: "estimated_children_5_14", label: "Children 5–14 years", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
   survey.push(q({ type: "integer", name: "estimated_adults_15_plus", label: "Adults 15+ years", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
@@ -399,12 +399,13 @@ export async function buildMicroplanningXlsForm(
     type: "calculate", name: "total_population",
     calculation: "${estimated_total_population}",
   }));
-  survey.push(q({ type: "note", name: "pop_total_note", label: '<b>Estimated Total Population: ${estimated_total_population}</b> (auto-computed)' }));
+  survey.push(q({ type: "note", name: "pop_total_note", label: "**Estimated Total Population: ${estimated_total_population}** (auto-computed)" }));
   survey.push(q({
     type: "integer", name: "target_population", label: "Target Population (eligible for campaign)",
     constraint: ". >= 0 and . <= ${estimated_total_population}",
-    constraint_message: '<font color="#DC2626">Target population cannot exceed total population!</font>',
+    constraint_message: "Target population cannot exceed total population.",
   }));
+
   survey.push(q({ type: "integer", name: "number_of_households", label: "Number of Households", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
   survey.push(q({ type: "end_group", name: "pop_grp_end" }));
 
