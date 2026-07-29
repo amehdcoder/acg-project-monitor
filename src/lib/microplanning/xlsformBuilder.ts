@@ -137,8 +137,9 @@ export async function buildMicroplanningXlsForm(
 
   survey.push(q({
     type: "note", name: "intro",
-    label: '<font color="#0F172A"><b>Amehnities — Geo-enabled Microplanning Entry</b></font><br/>Complete each section. Cascaded LGA → Ward → FLHF → Community/Settlement is powered by GRID3. Where a name is missing, select <b>Other (specify manually)</b> to type it in.',
+    label: "**Amehnities — Geo-enabled Microplanning Entry**\n\nComplete each section. Cascaded LGA → Ward → FLHF → Community/Settlement is powered by GRID3. Where a name is missing, select **Other (specify manually)** to type it in.",
   }));
+
 
   // ── Section 1: Campaign & Year ──
   survey.push(q({ type: "begin_group", name: "campaign_year", label: '<font color="#0F172A"><b>📅 1. Campaign &amp; Year</b></font>', appearance: "field-list" }));
