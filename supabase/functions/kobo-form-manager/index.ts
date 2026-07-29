@@ -439,8 +439,11 @@ Deno.serve(async (req) => {
     }
 
     if (action === "list_mapping_versions") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
       const { config_id } = params;
       if (!config_id) return j({ error: "Missing config_id" }, 400);
+
       const { data: rows, error } = await admin
         .from("kobo_mapping_history")
         .select("id, config_id, project_id, form_uid, version_number, field_mappings, change_summary, created_by, created_at")
