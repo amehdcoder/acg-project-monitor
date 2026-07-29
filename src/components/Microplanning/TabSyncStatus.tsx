@@ -1,19 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
-import { Radio, WifiOff, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Radio, WifiOff, Clock, RefreshCw } from "lucide-react";
 
 /**
  * Per-tab live sync indicator. Subscribes to a table's postgres_changes AND
  * matching `kobo_sync_events` broadcasts for the given project, and displays
  * a badge + a human-readable "Last synced" timestamp that updates as soon
- * as a realtime event lands.
+ * as a realtime event lands. If `onResync` is provided, renders a manual
+ * "Resync" button that triggers a fresh fetch and updates the indicator.
  */
 export interface TabSyncStatusProps {
   projectId: string | null | undefined;
   table: "microplan_entries" | "microplan_coverage" | "microplan_reconciliation";
   syncEventStatus: "microplan_sync" | "coverage_sync" | "reconciliation_sync";
   label?: string;
+  onResync?: () => void | Promise<void>;
 }
 
 function formatRelative(ts: number | null): string {
@@ -25,9 +28,10 @@ function formatRelative(ts: number | null): string {
   return new Date(ts).toLocaleTimeString();
 }
 
-export function TabSyncStatus({ projectId, table, syncEventStatus, label }: TabSyncStatusProps) {
+export function TabSyncStatus({ projectId, table, syncEventStatus, label, onResync }: TabSyncStatusProps) {
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [status, setStatus] = useState<"connecting" | "live" | "offline">("connecting");
+  const [resyncing, setResyncing] = useState(false);
   const [, forceTick] = useState(0);
 
   useEffect(() => {
@@ -59,6 +63,17 @@ export function TabSyncStatus({ projectId, table, syncEventStatus, label }: TabS
     return () => clearInterval(t);
   }, []);
 
+  const handleResync = useCallback(async () => {
+    if (!onResync || resyncing) return;
+    setResyncing(true);
+    try {
+      await onResync();
+      setLastSyncedAt(Date.now());
+    } finally {
+      setResyncing(false);
+    }
+  }, [onResync, resyncing]);
+
   const Icon = status === "live" ? Radio : status === "connecting" ? Clock : WifiOff;
   const tone =
     status === "live" ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300" :
@@ -80,6 +95,21 @@ export function TabSyncStatus({ projectId, table, syncEventStatus, label }: TabS
           {formatRelative(lastSyncedAt)}
         </span>
       </span>
+      {onResync && (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-6 px-2 gap-1 text-[11px]"
+          onClick={handleResync}
+          disabled={resyncing}
+          data-testid={`tab-sync-resync-${table}`}
+          aria-label="Resync"
+        >
+          <RefreshCw className={`h-3 w-3 ${resyncing ? "animate-spin" : ""}`} />
+          {resyncing ? "Resyncing…" : "Resync"}
+        </Button>
+      )}
     </div>
   );
 }
