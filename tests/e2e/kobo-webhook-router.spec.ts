@@ -75,9 +75,10 @@ test.describe("kobo-webhook multi-form router", () => {
         {
           community_name: `${runId}-C1`,
           community_latitude: 12.11, community_longitude: 9.71,
-          estimated_total_population: 200, target_population: 180,
+          estimated_total_population: 200,
         },
       ],
+
     };
     const res = await post(payload, "microplan");
     expect(res.ok, `router responded ${res.status}: ${await res.text().catch(() => "")}`).toBe(true);
@@ -100,7 +101,6 @@ test.describe("kobo-webhook multi-form router", () => {
       community_repeat: [
         {
           community_name: `${runId}-C1`,
-          target_population: 500,
           total_treated: 480,
           doses_administered: 480,
           refusals: 5,
@@ -109,12 +109,12 @@ test.describe("kobo-webhook multi-form router", () => {
         },
         {
           community_name: `${runId}-C2`,
-          target_population: 300,
           total_treated: 290,
           doses_administered: 290,
           community_gps: "12.13 9.73 0 5",
         },
       ],
+
     };
     const res = await post(payload, "coverage");
     expect(res.ok).toBe(true);
@@ -126,7 +126,7 @@ test.describe("kobo-webhook multi-form router", () => {
     for (let i = 0; i < 30; i++) {
       const { data } = await supabase
         .from("microplan_coverage")
-        .select("id, community_name, target_population, total_treated, latitude, longitude, state, lga, ward, flhf_name")
+        .select("id, community_name, total_treated, latitude, longitude, state, lga, ward, flhf_name")
         .eq("project_id", PROJECT_ID!)
         .eq("flhf_name", flhfName);
       rows = data ?? [];

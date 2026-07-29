@@ -124,21 +124,25 @@ export async function buildMicroplanningXlsForm(
   survey.push(q({ type: "username", name: "username" }));
   survey.push(q({ type: "phonenumber", name: "phonenumber" }));
 
-  // Cover / welcome — rendered as the FIRST SCREEN with the `home` media file
-  // as a full-bleed image and NO other text/questions on the page. The note
-  // label is intentionally a single non-breaking space so PyXForm accepts the
-  // row while KoboCollect renders only the image.
+  // Cover / welcome — the FIRST SCREEN carries only the `home` media file as a
+  // full-bleed hero image. Wrapping the note in its own `field-list` group with
+  // `w100 no-label` on the note row lets KoboCollect and Enketo render the
+  // image edge-to-edge with no visible label text or additional controls. The
+  // label stays a single space so PyXForm accepts the row.
+  survey.push(q({ type: "begin_group", name: "grp_welcome", label: " ", appearance: "field-list" }));
   survey.push(q({
     type: "note", name: "welcome_cover_note",
     label: " ",
     image: "home",
-    appearance: "no-label",
+    appearance: "w100 no-label",
   }));
+  survey.push(q({ type: "end_group", name: "grp_welcome_end" }));
 
   survey.push(q({
     type: "note", name: "intro",
     label: "**Amehnities — Geo-enabled Microplanning Entry**\n\nComplete each section. Cascaded LGA → Ward → FLHF → Community/Settlement is powered by GRID3. Where a name is missing, select **Other (specify manually)** to type it in.",
   }));
+
 
 
   // ── Section 1: Campaign & Year ──
@@ -262,7 +266,7 @@ export async function buildMicroplanningXlsForm(
   }));
 
   // ── Section 4: Community ──
-  survey.push(q({ type: "begin_group", name: "community_grp", label: "4. Community", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "grp_comm_location", label: "### 📍 Community Details", appearance: "field-list" }));
   survey.push(q({
     type: "select_one communities", name: "community", label: "Community (GRID3)",
     hint: "Type to search. Choose 'Other (specify manually)' if the community is not listed.",
@@ -322,13 +326,14 @@ export async function buildMicroplanningXlsForm(
     relevant: "${community_distance_to_flhf_km} != ''",
   }));
 
-  survey.push(q({ type: "end_group", name: "community_grp_end" }));
+  survey.push(q({ type: "end_group", name: "grp_comm_location_end" }));
 
   // ── Section 5: Settlement (optional) ──
   //
   // Settlements are keyed to the selected COMMUNITY when GRID3 links exist,
   // otherwise they fall back to ward-level filtering.
-  survey.push(q({ type: "begin_group", name: "settlement_grp", label: "5. Settlement (optional)", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "grp_comm_settlement", label: "### 🏘️ Settlement (optional)", appearance: "field-list" }));
+
   survey.push(q({
     type: "select_one settlements", name: "settlement", label: "Settlement (GRID3)",
     hint: "Optional. Choose 'Other (specify manually)' to type a name.",
@@ -376,18 +381,18 @@ export async function buildMicroplanningXlsForm(
       geopointExpr("${flhf_latitude}", "${flhf_longitude}") + ", " +
       geopointExpr("${settlement_latitude}", "${settlement_longitude}") + ") div 1000, 2))",
   }));
-  survey.push(q({ type: "end_group", name: "settlement_grp_end" }));
+  survey.push(q({ type: "end_group", name: "grp_comm_settlement_end" }));
 
   // ── Section 6: Terrain, Access, Security ──
-  survey.push(q({ type: "begin_group", name: "context_grp", label: "6. Terrain, Access & Security", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "grp_comm_context", label: "### 🗺️ Terrain, Access & Security", appearance: "field-list" }));
   survey.push(q({ type: "select_one terrain_type", name: "terrain_type", label: "Type of Terrain", appearance: "minimal" }));
   survey.push(q({ type: "select_one accessibility", name: "accessibility", label: "Accessibility", appearance: "minimal" }));
   survey.push(q({ type: "select_one security_clearance", name: "security_clearance", label: "Security Clearance", appearance: "minimal" }));
-  survey.push(q({ type: "end_group", name: "context_grp_end" }));
+  survey.push(q({ type: "end_group", name: "grp_comm_context_end" }));
 
 
-  // ── Section 7: Population Estimates ──
-  survey.push(q({ type: "begin_group", name: "pop_grp", label: "7. Population Estimates", appearance: "field-list" }));
+  // ── Section 7: Population & Demographics ──
+  survey.push(q({ type: "begin_group", name: "grp_comm_demographics", label: "### 👥 Population & Demographics", appearance: "field-list" }));
   survey.push(q({ type: "integer", name: "estimated_children_0_4", label: "Children 0–4 years", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
   survey.push(q({ type: "integer", name: "estimated_children_5_14", label: "Children 5–14 years", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
   survey.push(q({ type: "integer", name: "estimated_adults_15_plus", label: "Adults 15+ years", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
@@ -400,27 +405,22 @@ export async function buildMicroplanningXlsForm(
     calculation: "${estimated_total_population}",
   }));
   survey.push(q({ type: "note", name: "pop_total_note", label: "**Estimated Total Population: ${estimated_total_population}** (auto-computed)" }));
-  survey.push(q({
-    type: "integer", name: "target_population", label: "Target Population (eligible for campaign)",
-    constraint: ". >= 0 and . <= ${estimated_total_population}",
-    constraint_message: "Target population cannot exceed total population.",
-  }));
 
   survey.push(q({ type: "integer", name: "number_of_households", label: "Number of Households", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
-  survey.push(q({ type: "end_group", name: "pop_grp_end" }));
+  survey.push(q({ type: "end_group", name: "grp_comm_demographics_end" }));
 
   // ── Section 8: Trachoma Age Disaggregation (per community) ──
-  survey.push(q({ type: "begin_group", name: "trachoma_grp", label: "8. Trachoma Age Disaggregation (optional)", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "grp_comm_trachoma", label: "### 👁️ Trachoma Age Disaggregation (optional)", appearance: "field-list" }));
   survey.push(q({ type: "select_one yes_no", name: "include_trachoma", label: "Include trachoma-specific age disaggregation?", appearance: "minimal", default: "no" }));
   const tracRel = "${include_trachoma} = 'yes'";
   survey.push(q({ type: "integer", name: "trachoma_0_5_months", label: "0–5 months", relevant: tracRel, constraint: ". >= 0" }));
   survey.push(q({ type: "integer", name: "trachoma_6m_6y", label: "6 months – 6 years", relevant: tracRel, constraint: ". >= 0" }));
   survey.push(q({ type: "integer", name: "trachoma_7_14y", label: "7–14 years", relevant: tracRel, constraint: ". >= 0" }));
   survey.push(q({ type: "integer", name: "trachoma_15_plus", label: "15+ years", relevant: tracRel, constraint: ". >= 0" }));
-  survey.push(q({ type: "end_group", name: "trachoma_grp_end" }));
+  survey.push(q({ type: "end_group", name: "grp_comm_trachoma_end" }));
 
   // ── Section 9: PWD (per community) ──
-  survey.push(q({ type: "begin_group", name: "pwd_grp", label: "9. Persons With Disability (Disaggregation)", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "grp_comm_pwd", label: "### ♿ Persons with Disability", appearance: "field-list" }));
   const pwdFields: [string, string][] = [
     ["pwd_total", "PWD — Total"], ["pwd_visual", "Visual"], ["pwd_hearing", "Hearing"],
     ["pwd_physical", "Physical"], ["pwd_intellectual", "Intellectual"], ["pwd_communication", "Communication"],
@@ -429,20 +429,28 @@ export async function buildMicroplanningXlsForm(
   for (const [n, l] of pwdFields) {
     survey.push(q({ type: "integer", name: n, label: l, constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
   }
-  survey.push(q({ type: "end_group", name: "pwd_grp_end" }));
+  survey.push(q({ type: "end_group", name: "grp_comm_pwd_end" }));
 
   // ── Section 10: CDDs (per community) ──
-  survey.push(q({ type: "begin_group", name: "cdd_grp", label: "10. Community Directed Distributors (CDDs)", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "grp_comm_cdd", label: "### 🤝 CDD Information", appearance: "field-list" }));
   survey.push(q({ type: "text", name: "cdd_names", label: "CDD Names (comma-separated)", appearance: "multiline" }));
   survey.push(q({ type: "text", name: "cdd_phone_numbers", label: "CDD Phone Numbers (comma-separated)", appearance: "multiline" }));
   survey.push(q({ type: "select_one yes_no", name: "cdd_from_community", label: "Is the CDD from this Community/Settlement?", appearance: "minimal" }));
-  survey.push(q({ type: "end_group", name: "cdd_grp_end" }));
+  survey.push(q({ type: "end_group", name: "grp_comm_cdd_end" }));
+
+  // ── Section 11: Additional notes (per community) ──
+  survey.push(q({ type: "begin_group", name: "grp_comm_logistics_notes", label: "### 📝 Additional Notes", appearance: "field-list" }));
+  survey.push(q({
+    type: "text", name: "additional_notes",
+    label: "Additional notes / observations for this community",
+    appearance: "multiline",
+  }));
+  survey.push(q({ type: "end_group", name: "grp_comm_logistics_notes_end" }));
 
   // ── END REPEAT: community_repeat ──
   survey.push(q({ type: "end_repeat", name: "community_repeat_end" }));
 
-  // ── Section 11: Notes ──
-  survey.push(q({ type: "text", name: "notes", label: "Additional Notes", appearance: "multiline" }));
+
 
   // ─── CHOICES ───────────────────────────────────────────────────────────
   const choices: Row[] = [CHOICES_HEADER as unknown as Row];
@@ -668,6 +676,11 @@ export async function buildMicroplanningXlsForm(
 const META_TYPES = new Set([
   "start", "end", "today", "deviceid", "username", "phonenumber", "phone_number", "audit",
 ]);
+// The welcome cover may be wrapped in a `grp_welcome` field-list group so the
+// image renders full-screen. Skip the wrapper begin/end_group when locating
+// the first visible content row.
+const WRAPPER_TYPES = new Set(["begin_group", "end_group"]);
+const WRAPPER_NAMES = new Set(["grp_welcome", "grp_welcome_end"]);
 export function assertCoverPageIsHomeImageOnly(wb: XLSX.WorkBook): void {
   const sheet = wb.Sheets["survey"];
   if (!sheet) throw new Error("[xlsform-cover] survey sheet missing");
@@ -681,8 +694,12 @@ export function assertCoverPageIsHomeImageOnly(wb: XLSX.WorkBook): void {
   }
   const first = rows.slice(1).find((r) => {
     const t = String(r[iType] ?? "").trim();
-    return t && !META_TYPES.has(t);
+    const n = String(r[iName] ?? "").trim();
+    if (!t || META_TYPES.has(t)) return false;
+    if (WRAPPER_TYPES.has(t) && WRAPPER_NAMES.has(n)) return false;
+    return true;
   });
+
   if (!first) throw new Error("[xlsform-cover] no visible cover row found");
   const type = String(first[iType] ?? "").trim();
   const name = String(first[iName] ?? "").trim();

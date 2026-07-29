@@ -62,7 +62,9 @@ export function buildCoverageXlsForm(options: CoverageBuildOptions = {}): XLSX.W
   // Community repeat
   survey.push(q({ type: "begin_repeat", name: "community_repeat", label: "2. Community Coverage", appearance: "field-list" }));
   survey.push(q({ type: "text", name: "community_name", label: "Community Name", required: "yes" }));
-  survey.push(q({ type: "integer", name: "target_population", label: "Target Population", required: "yes", constraint: ". >= 0" }));
+  // NOTE: `target_population` intentionally removed from the pipeline — the
+  // eligible/target denominator is derived from planning data on the dashboard.
+
   survey.push(q({ type: "integer", name: "total_treated", label: "Number Treated", required: "yes", constraint: ". >= 0" }));
   survey.push(q({ type: "integer", name: "total_vaccinated", label: "Number Vaccinated", constraint: ". >= 0" }));
   survey.push(q({ type: "integer", name: "doses_administered", label: "Doses Administered", constraint: ". >= 0" }));

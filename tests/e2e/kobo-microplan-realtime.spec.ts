@@ -9,7 +9,7 @@ import { createClient } from "@supabase/supabase-js";
  *   1. Happy-path 3-community submission → 3 rows ingested + realtime broadcast
  *      + KPI counter visibly updates in the /__test/microplan-kpi harness.
  *   2. Idempotent re-submission does not duplicate rows.
- *   3. Out-of-range `target_population` items are rejected by the webhook
+ *   3. Out-of-range `estimated_total_population` items are rejected by the webhook
  *      guard and NOT ingested (other valid items in the same payload still
  *      land).
  *   4. Malformed `community_repeat` payload returns HTTP 400 with no writes.
@@ -81,9 +81,9 @@ test.describe("kobo microplan realtime", () => {
     }
 
     const communities = [
-      { name: `${runId}-C1`, lat: 12.001, lng: 9.601, pop: 120, target: 100 },
-      { name: `${runId}-C2`, lat: 12.002, lng: 9.602, pop: 240, target: 220 },
-      { name: `${runId}-C3`, lat: 12.003, lng: 9.603, pop: 360, target: 300 },
+      { name: `${runId}-C1`, lat: 12.001, lng: 9.601, pop: 120 },
+      { name: `${runId}-C2`, lat: 12.002, lng: 9.602, pop: 240 },
+      { name: `${runId}-C3`, lat: 12.003, lng: 9.603, pop: 360 },
     ];
     const payload = {
       _uuid: koboUuid,
@@ -105,9 +105,9 @@ test.describe("kobo microplan realtime", () => {
         "context_grp/terrain_type": "flat",
         "context_grp/security_clearance": "cleared",
         estimated_total_population: c.pop,
-        target_population: c.target,
       })),
     };
+
 
     const res = await post(payload);
     expect(res.ok, `webhook responded ${res.status}: ${await res.text().catch(() => "")}`).toBe(true);
@@ -116,7 +116,7 @@ test.describe("kobo microplan realtime", () => {
     for (let i = 0; i < 30; i++) {
       const { data, error } = await supabase
         .from("microplan_entries")
-        .select("id, idempotency_key, flhf_name, community_name, target_population, latitude, longitude")
+        .select("id, idempotency_key, flhf_name, community_name, estimated_total_population, latitude, longitude")
         .eq("project_id", PROJECT_ID!)
         .eq("flhf_name", flhfName);
       if (error) throw error;
@@ -156,13 +156,13 @@ test.describe("kobo microplan realtime", () => {
     await supabase.removeChannel(channel);
   });
 
-  test("out-of-range target_population items are rejected by the webhook guard", async () => {
+  test("out-of-range estimated_total_population items are rejected by the webhook guard", async () => {
     const supabase = createClient(SUPABASE_URL!, SUPABASE_ANON!);
     const runId = `e2e-guard-${Date.now()}`;
     const koboUuid = `uuid:${crypto.randomUUID()}`;
     const flhfName = `E2E Guard FLHF ${runId}`;
 
-    // C1 is valid; C2 has a negative target; C3 has an absurdly large target.
+    // C1 is valid; C2 has a negative population; C3 has an absurdly large one.
     // Only C1 must land — the other two must appear in `rejected_items`.
     const payload = {
       _uuid: koboUuid,
@@ -171,9 +171,9 @@ test.describe("kobo microplan realtime", () => {
       state: "jigawa", lga: "dutse", ward: "e2e_ward",
       flhf_name: flhfName,
       community_repeat: [
-        { community_name: `${runId}-ok`, target_population: 250, estimated_total_population: 300 },
-        { community_name: `${runId}-neg`, target_population: -50, estimated_total_population: 300 },
-        { community_name: `${runId}-huge`, target_population: 99_999_999_999, estimated_total_population: 300 },
+        { community_name: `${runId}-ok`, estimated_total_population: 300 },
+        { community_name: `${runId}-neg`, estimated_total_population: -50 },
+        { community_name: `${runId}-huge`, estimated_total_population: 99_999_999_999 },
       ],
     };
 
@@ -198,6 +198,7 @@ test.describe("kobo microplan realtime", () => {
       rows = data ?? [];
       if (rows.length >= 1) break;
       await new Promise((r) => setTimeout(r, 500));
+
     }
     expect(rows).toHaveLength(1);
     expect(rows[0].community_name).toBe(`${runId}-ok`);

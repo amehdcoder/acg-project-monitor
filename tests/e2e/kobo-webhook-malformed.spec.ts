@@ -87,7 +87,7 @@ test.describe("kobo-webhook malformed payloads", () => {
         _submission_time: new Date().toISOString(),
         _xform_id_string: "coverage_reporting_v1",
         state: "jigawa", lga: "dutse", ward: marker,
-        community_repeat: [{ community_name: marker, target_population: 10 }],
+        community_repeat: [{ community_name: marker, estimated_total_population: 10 }],
       },
       "coverage",
     );
@@ -113,7 +113,7 @@ test.describe("kobo-webhook malformed payloads", () => {
         _submission_time: new Date().toISOString(),
         _xform_id_string: "coverage_reporting_v1",
         state: "jigawa", lga: "dutse", ward: "malformed_ward",
-        community_repeat: [{ community_name: "malformed", target_population: 100 }],
+        community_repeat: [{ community_name: "malformed", estimated_total_population: 100 }],
       },
       "coverage",
       badProjectId,
@@ -158,7 +158,7 @@ test.describe("kobo-webhook malformed payloads", () => {
         _uuid: koboUuid,
         _submission_time: new Date().toISOString(),
         _xform_id_string: "coverage_reporting_v1",
-        community_repeat: [{ community_name: "unauth", target_population: 1 }],
+        community_repeat: [{ community_name: "unauth", estimated_total_population: 1 }],
       }),
     });
     expect(res.status).toBe(401);

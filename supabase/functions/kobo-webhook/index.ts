@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
           kobo_form_uid: formUid,
           state, lga, ward, flhf_name: flhf,
           community_name: pick(item, ["community_name", "community"]) ?? pick(payload, ["community_name"]),
-          target_population: pickNum(item, ["target_population"]),
+          // target_population removed from pipeline (2026-07-29).
           total_treated: pickNum(item, ["total_treated", "treated"]),
           total_vaccinated: pickNum(item, ["total_vaccinated", "vaccinated"]),
           doses_administered: pickNum(item, ["doses_administered", "doses"]),
