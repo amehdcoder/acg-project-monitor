@@ -193,7 +193,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
         <div>
           <h3 className="text-sm font-semibold">Medicine & Supply Reconciliation</h3>
           <p className="text-xs text-muted-foreground">Kobo submissions land in <code>microplan_reconciliation</code> in real time.</p>
-          <div className="mt-1"><TabSyncStatus projectId={projectId ?? null} table="microplan_reconciliation" syncEventStatus="reconciliation_sync" /></div>
+          <div className="mt-1"><TabSyncStatus projectId={projectId ?? null} table="microplan_reconciliation" syncEventStatus="reconciliation_sync" onResync={onRefresh} /></div>
         </div>
         <Button
           variant="outline" size="sm" className="gap-1.5"
