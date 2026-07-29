@@ -170,7 +170,7 @@ export async function buildMicroplanningXlsForm(
       : [];
   const singleState = scopedStates.length === 1 ? scopedStates[0] : null;
 
-  survey.push(q({ type: "begin_group", name: "admin_hierarchy", label: '<font color="#0F172A"><b>📍 2. Administrative Hierarchy (GRID3 cascade)</b></font>', appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "admin_hierarchy", label: "2. Administrative Hierarchy (GRID3 cascade)", appearance: "field-list" }));
   if (singleState) {
     survey.push(q({
       type: "calculate", name: "state",
@@ -178,23 +178,24 @@ export async function buildMicroplanningXlsForm(
     }));
     survey.push(q({
       type: "note", name: "state_locked_note",
-      label: `📍 Project state (locked): **${singleState}**`,
+      label: `Project state (locked): **${singleState}**`,
     }));
   } else {
     survey.push(q({
       type: "select_one states", name: "state", label: "State", required: "yes",
-      appearance: "minimal search",
+      appearance: "minimal autocomplete",
     }));
   }
   survey.push(q({
     type: "select_one lgas", name: "lga", label: "LGA / Local Government Area",
-    required: "yes", appearance: "minimal search",
+    required: "yes", appearance: "minimal autocomplete",
   }));
   survey.push(q({
     type: "select_one wards", name: "ward", label: "Ward", required: "yes",
-    choice_filter: "lga=${lga}", appearance: "minimal search",
+    choice_filter: "lga=${lga}", appearance: "minimal autocomplete",
   }));
   survey.push(q({ type: "end_group", name: "admin_hierarchy_end" }));
+
 
   // ── Section 3: FLHF ──
   survey.push(q({ type: "begin_group", name: "flhf_grp", label: '<font color="#2563EB"><b>🏥 3. Frontline Health Facility (FLHF)</b></font>', appearance: "field-list" }));
