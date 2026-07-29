@@ -676,6 +676,11 @@ export async function buildMicroplanningXlsForm(
 const META_TYPES = new Set([
   "start", "end", "today", "deviceid", "username", "phonenumber", "phone_number", "audit",
 ]);
+// The welcome cover may be wrapped in a `grp_welcome` field-list group so the
+// image renders full-screen. Skip the wrapper begin/end_group when locating
+// the first visible content row.
+const WRAPPER_TYPES = new Set(["begin_group", "end_group"]);
+const WRAPPER_NAMES = new Set(["grp_welcome", "grp_welcome_end"]);
 export function assertCoverPageIsHomeImageOnly(wb: XLSX.WorkBook): void {
   const sheet = wb.Sheets["survey"];
   if (!sheet) throw new Error("[xlsform-cover] survey sheet missing");
@@ -689,8 +694,12 @@ export function assertCoverPageIsHomeImageOnly(wb: XLSX.WorkBook): void {
   }
   const first = rows.slice(1).find((r) => {
     const t = String(r[iType] ?? "").trim();
-    return t && !META_TYPES.has(t);
+    const n = String(r[iName] ?? "").trim();
+    if (!t || META_TYPES.has(t)) return false;
+    if (WRAPPER_TYPES.has(t) && WRAPPER_NAMES.has(n)) return false;
+    return true;
   });
+
   if (!first) throw new Error("[xlsform-cover] no visible cover row found");
   const type = String(first[iType] ?? "").trim();
   const name = String(first[iName] ?? "").trim();
