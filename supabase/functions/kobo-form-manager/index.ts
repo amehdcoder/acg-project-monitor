@@ -30,6 +30,48 @@ const j = (body: unknown, status = 200) =>
 
 const stripTrailingSlash = (u: string) => u.replace(/\/+$/, "");
 
+// --- SSRF protection ------------------------------------------------------
+function isPrivateHostname(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal") || h.endsWith(".local")) return true;
+  if (h === "::1" || h === "::" || h.startsWith("fe80:") || h.startsWith("fc") || h.startsWith("fd")) return true;
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    if (a === 10 || a === 127 || a === 0) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true;
+    if (a >= 224) return true;
+  }
+  return false;
+}
+
+async function assertSafeKoboUrl(rawUrl: string): Promise<URL> {
+  let parsed: URL;
+  try { parsed = new URL(rawUrl); } catch { throw new KoboApiError("bad_response", 0, "Invalid server_url"); }
+  if (parsed.protocol !== "https:") {
+    throw new KoboApiError("bad_response", 0, "server_url must use https");
+  }
+  if (isPrivateHostname(parsed.hostname)) {
+    throw new KoboApiError("bad_response", 0, "server_url points to a disallowed internal/private address");
+  }
+  try {
+    const a = await Deno.resolveDns(parsed.hostname, "A").catch(() => [] as string[]);
+    const aaaa = await Deno.resolveDns(parsed.hostname, "AAAA").catch(() => [] as string[]);
+    for (const ip of [...a, ...aaaa]) {
+      if (isPrivateHostname(ip)) {
+        throw new KoboApiError("bad_response", 0, "server_url resolves to a disallowed internal/private address");
+      }
+    }
+  } catch (e) {
+    if (e instanceof KoboApiError) throw e;
+  }
+  return parsed;
+}
+
+
 export type KoboErrCode =
   | "auth_failed" | "forbidden" | "not_found" | "rate_limited"
   | "timeout" | "network" | "server_error" | "bad_response";
@@ -49,7 +91,9 @@ const codeForStatus = (s: number): KoboErrCode =>
   s >= 500 ? "server_error" : "bad_response";
 
 async function koboFetch(server: string, path: string, token: string, init: RequestInit = {}, timeoutMs = 20_000) {
+  await assertSafeKoboUrl(server);
   const url = `${stripTrailingSlash(server)}${path}`;
+
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   let res: Response;
@@ -291,8 +335,15 @@ Deno.serve(async (req) => {
     }
 
     if (action === "save_config") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
       const { id, project_id, server_url, form_uid, form_title, api_token, field_mappings, form_status } = params;
       if (!form_uid || !api_token) return j({ error: "Missing form_uid/api_token" }, 400);
+      if (server_url) {
+        try { await assertSafeKoboUrl(server_url); }
+        catch (e) { return j({ error: (e as Error).message }, 400); }
+      }
+
       const row: Record<string, unknown> = {
         project_id: project_id ?? null,
         kobo_server_url: server_url ?? "https://kf.kobotoolbox.org",
@@ -338,7 +389,10 @@ Deno.serve(async (req) => {
     // ---------- Versioned mapping history ----------
 
     if (action === "save_mapping_version") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
       const { config_id, field_mappings, change_summary } = params;
+
       if (!config_id || !field_mappings) return j({ error: "Missing config_id/field_mappings" }, 400);
 
       // Load current config for form_uid + project_id
@@ -385,8 +439,11 @@ Deno.serve(async (req) => {
     }
 
     if (action === "list_mapping_versions") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
       const { config_id } = params;
       if (!config_id) return j({ error: "Missing config_id" }, 400);
+
       const { data: rows, error } = await admin
         .from("kobo_mapping_history")
         .select("id, config_id, project_id, form_uid, version_number, field_mappings, change_summary, created_by, created_at")
@@ -428,10 +485,13 @@ Deno.serve(async (req) => {
     }
 
     if (action === "rollback_mapping_version") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
       const { config_id, target_version_number } = params;
       if (!config_id || !target_version_number) {
         return j({ error: "Missing config_id/target_version_number" }, 400);
       }
+
       const { data: target, error: tgtErr } = await admin
         .from("kobo_mapping_history")
         .select("field_mappings, version_number")
