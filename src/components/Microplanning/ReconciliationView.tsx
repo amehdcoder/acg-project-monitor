@@ -10,6 +10,7 @@ import { Save, PackageCheck, AlertTriangle, RotateCcw, Pill, Download } from "lu
 import * as XLSX from "xlsx";
 import { downloadReconciliationXlsForm } from "@/lib/microplanning/generateReconciliationXLSForm";
 import useRealtimeReconciliationEntries from "@/hooks/useRealtimeReconciliationEntries";
+import { TabSyncStatus } from "./TabSyncStatus";
 
 export interface AllocationRow {
   entryId: string;
@@ -192,6 +193,7 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
         <div>
           <h3 className="text-sm font-semibold">Medicine & Supply Reconciliation</h3>
           <p className="text-xs text-muted-foreground">Kobo submissions land in <code>microplan_reconciliation</code> in real time.</p>
+          <div className="mt-1"><TabSyncStatus projectId={projectId ?? null} table="microplan_reconciliation" syncEventStatus="reconciliation_sync" /></div>
         </div>
         <Button
           variant="outline" size="sm" className="gap-1.5"

@@ -14,6 +14,7 @@ import "leaflet/dist/leaflet.css";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { useLeafletStreetView } from "@/components/maps/LeafletStreetView";
 import useRealtimeCoverageEntries from "@/hooks/useRealtimeCoverageEntries";
+import { TabSyncStatus } from "./TabSyncStatus";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isPersistedId = (id: string) => UUID_RE.test(id);
@@ -294,6 +295,7 @@ const CoverageView = ({ entries, onRefresh, projectId }: CoverageViewProps) => {
         <div>
           <h3 className="text-sm font-semibold">Coverage Reporting</h3>
           <p className="text-xs text-muted-foreground">Kobo submissions land in <code>microplan_coverage</code> in real time.</p>
+          <div className="mt-1"><TabSyncStatus projectId={projectId ?? null} table="microplan_coverage" syncEventStatus="coverage_sync" /></div>
         </div>
         <Button
           variant="outline" size="sm" className="gap-1.5"

@@ -26,6 +26,7 @@ import MicroplanDeleteRequestDialog from "./MicroplanDeleteRequestDialog";
 import MicroplanDeleteRequestsPanel from "./MicroplanDeleteRequestsPanel";
 import KoboSyncSettingsDialog from "./KoboSyncSettingsDialog";
 import KoboSyncStatusChip from "./KoboSyncStatusChip";
+import { TabSyncStatus } from "./TabSyncStatus";
 import useRealtimeMicroplanEntries from "@/hooks/useRealtimeMicroplanEntries";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useProjectScope } from "@/hooks/useProjectScope";
@@ -1772,6 +1773,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             {(isAdmin || isOwner) ? "Delete Requests" : "My Delete Requests"}
           </Button>
           <KoboSyncStatusChip projectId={selectedProjectId || null} onNewSuccess={fetchEntries} />
+          <TabSyncStatus projectId={selectedProjectId || null} table="microplan_entries" syncEventStatus="microplan_sync" />
           {isSuperAdmin && (
             <Button size="sm" variant="outline" onClick={() => setShowKoboSettings(true)} className="shadow-sm">
               <HistoryIcon className="h-3.5 w-3.5 mr-1" /> Kobo Sync
