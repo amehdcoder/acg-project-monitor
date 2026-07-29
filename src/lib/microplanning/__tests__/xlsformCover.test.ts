@@ -40,20 +40,29 @@ describe("microplanning XLSForm cover page", () => {
     const col = (h: string) => header.indexOf(h);
 
     // Everything ABOVE the cover row must be ODK metadata (invisible in the
-    // KoboCollect UI). This is what makes the home image a true full-page cover.
+    // KoboCollect UI) or the `grp_welcome` field-list wrapper. This is what
+    // makes the home image a true full-page cover.
+    const WRAPPER_NAMES = new Set(["grp_welcome", "grp_welcome_end"]);
     const firstVisibleIdx = rows
       .slice(1)
       .findIndex((r) => {
         const t = String(r[col("type")] ?? "").trim();
-        return t && !META_TYPES.has(t);
+        const n = String(r[col("name")] ?? "").trim();
+        if (!t || META_TYPES.has(t)) return false;
+        if ((t === "begin_group" || t === "end_group") && WRAPPER_NAMES.has(n)) return false;
+        return true;
       });
     expect(firstVisibleIdx).toBeGreaterThanOrEqual(0);
 
     const preRows = rows.slice(1, 1 + firstVisibleIdx);
     for (const r of preRows) {
       const t = String(r[col("type")] ?? "").trim();
-      expect(META_TYPES.has(t)).toBe(true);
+      const n = String(r[col("name")] ?? "").trim();
+      const isMeta = META_TYPES.has(t);
+      const isWrapper = (t === "begin_group" || t === "end_group") && WRAPPER_NAMES.has(n);
+      expect(isMeta || isWrapper).toBe(true);
     }
+
 
     const cover = rows[1 + firstVisibleIdx];
     expect(String(cover[col("type")])).toBe("note");
@@ -151,7 +160,7 @@ describe("cover-page .xlsx structure snapshot", () => {
     }).toMatchInlineSnapshot(`
       {
         "coverRow": {
-          "appearance": "no-label",
+          "appearance": "w100 no-label",
           "calculation": "",
           "choice_filter": "",
           "constraint": "",
@@ -192,7 +201,12 @@ describe("cover-page .xlsx structure snapshot", () => {
             "name": "phonenumber",
             "type": "phonenumber",
           },
+          {
+            "name": "grp_welcome",
+            "type": "begin_group",
+          },
         ],
+
         "sheetNames": [
           "survey",
           "choices",
