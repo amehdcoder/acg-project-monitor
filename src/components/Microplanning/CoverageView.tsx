@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Save, MapPin, AlertTriangle, CheckCircle2, Target, TrendingUp, Eye } from "lucide-react";
+import { Save, MapPin, AlertTriangle, CheckCircle2, Target, TrendingUp, Eye, Download } from "lucide-react";
+import { downloadCoverageXlsForm } from "@/lib/microplanning/generateCoverageXLSForm";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
