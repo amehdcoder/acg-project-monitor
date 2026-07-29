@@ -353,9 +353,10 @@ export async function buildMicroplanningXlsForm(
     calculation: "if(${settlement}='' or ${settlement}='__other__', '', instance('settlements')/root/item[name=${settlement}]/lng)",
   }));
   survey.push(q({ type: "note", name: "settlement_grid3_note",
-    label: "📍 GRID3 GPS: **${settlement_lat_grid3}, ${settlement_lng_grid3}** — capture below to override.",
+    label: "GRID3 GPS: **${settlement_lat_grid3}, ${settlement_lng_grid3}** — capture below to override.",
     relevant: "${settlement_lat_grid3} != '' and ${settlement_lng_grid3} != ''",
   }));
+
   survey.push(q({
     type: "geopoint", name: "settlement_gps_override", label: "Settlement GPS (override — optional)",
     appearance: "placement-map",
