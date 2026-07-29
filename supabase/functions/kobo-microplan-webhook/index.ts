@@ -14,6 +14,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders as baseCors } from "npm:@supabase/supabase-js@2/cors";
+import { extractRepeatDisaggregations } from "../_shared/microplanRepeatItem.ts";
 
 const corsHeaders = {
   ...baseCors,
@@ -169,6 +170,9 @@ const NUMERIC_COLS = new Set([
   "settlement_latitude","settlement_longitude","flhf_latitude","flhf_longitude",
   "year_of_microplanning","total_treated","medicine_used","households_treated",
   "total_households_reported","total_households_treated","target_population",
+  "trachoma_0_5_months","trachoma_6m_6y","trachoma_7_14y","trachoma_15_plus",
+  "pwd_total","pwd_visual","pwd_hearing","pwd_physical","pwd_intellectual",
+  "pwd_communication","pwd_selfcare","pwd_albinism",
 ]);
 
 Deno.serve(async (req) => {
@@ -495,6 +499,9 @@ Deno.serve(async (req) => {
         terrain_type: (pickFirst(item, ["terrain_type"]) || "").toLowerCase().trim() || null,
         accessibility: (pickFirst(item, ["accessibility", "access_status"]) || "").toLowerCase().trim() || null,
         security_clearance: (pickFirst(item, ["security_clearance", "security_status"]) || "").toLowerCase().trim() || null,
+        // PWD, CDD and Trachoma disaggregations now live INSIDE community_repeat
+        // (per-community), so pass them through per row instead of the parent.
+        ...extractRepeatDisaggregations(item),
       }, `${koboUuid}_${idx}`, { lat: cLat, lng: cLng }));
     });
   } else {
