@@ -256,20 +256,21 @@ export async function buildMicroplanningXlsForm(
   // any number of communities.
   survey.push(q({
     type: "begin_repeat", name: "community_repeat",
-    label: '<font color="#059669"><b>➕ Community / Settlement Entry</b></font>',
-    hint: '<font color="#059669"><b>Community #${position(..)}</b></font>',
+    label: "Community / Settlement Entry",
+    hint: "Add one entry per community under this FLHF.",
     appearance: "field-list",
   }));
 
   // ── Section 4: Community ──
-  survey.push(q({ type: "begin_group", name: "community_grp", label: '<font color="#059669"><b>🏘️ 4. Community</b></font>', appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "community_grp", label: "4. Community", appearance: "field-list" }));
   survey.push(q({
     type: "select_one communities", name: "community", label: "Community (GRID3)",
     hint: "Type to search. Choose 'Other (specify manually)' if the community is not listed.",
     required: "yes",
     choice_filter: "ward=${ward} or name='__other__'",
-    appearance: "search autocomplete",
+    appearance: "minimal autocomplete",
   }));
+
   survey.push(q({
     type: "text", name: "community_manual", label: "Other Community — type the exact name",
     required: "yes", relevant: "${community} = '__other__'",
