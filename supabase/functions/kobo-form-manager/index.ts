@@ -485,10 +485,13 @@ Deno.serve(async (req) => {
     }
 
     if (action === "rollback_mapping_version") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
       const { config_id, target_version_number } = params;
       if (!config_id || !target_version_number) {
         return j({ error: "Missing config_id/target_version_number" }, 400);
       }
+
       const { data: target, error: tgtErr } = await admin
         .from("kobo_mapping_history")
         .select("field_mappings, version_number")
