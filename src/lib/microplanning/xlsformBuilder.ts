@@ -288,9 +288,10 @@ export async function buildMicroplanningXlsForm(
     calculation: "if(${community}='' or ${community}='__other__', '', instance('communities')/root/item[name=${community}]/lng)",
   }));
   survey.push(q({ type: "note", name: "community_grid3_note",
-    label: "📍 GRID3 GPS: **${community_lat_grid3}, ${community_lng_grid3}** — capture below to override.",
+    label: "GRID3 GPS: **${community_lat_grid3}, ${community_lng_grid3}** — capture below to override.",
     relevant: "${community_lat_grid3} != '' and ${community_lng_grid3} != ''",
   }));
+
   survey.push(q({
     type: "geopoint", name: "community_gps_override", label: "Community GPS (override — optional)",
     hint: "Leave blank to keep GRID3 coordinates.", appearance: "placement-map",
