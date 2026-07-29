@@ -10,6 +10,7 @@ import { Save, PackageCheck, AlertTriangle, RotateCcw, Pill, Download } from "lu
 import * as XLSX from "xlsx";
 import { downloadReconciliationXlsForm } from "@/lib/microplanning/generateReconciliationXLSForm";
 import useRealtimeReconciliationEntries from "@/hooks/useRealtimeReconciliationEntries";
+import { TabSyncStatus } from "./TabSyncStatus";
 
 export interface AllocationRow {
   entryId: string;
