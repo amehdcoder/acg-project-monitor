@@ -73,7 +73,7 @@ export const TARGET_FIELDS: Array<{ key: string; label: string; aliases?: string
   { key: "cdd_phone_numbers", label: "CDD Phone Numbers" },
   { key: "cdd_from_community", label: "CDD From Community" },
   // Meta
-  { key: "notes", label: "Additional Notes" },
+  { key: "notes", label: "Additional Notes", aliases: ["additional_notes"] },
   { key: "kobo_submission_id", label: "Kobo Submission ID", aliases: ["_id", "_uuid"] },
 ];
 
