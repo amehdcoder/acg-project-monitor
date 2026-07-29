@@ -240,5 +240,6 @@ export async function performKoboXlsformUpload(
     version_id: koboVersionId,
     submission_count: finalAsset?.deployment__submission_count ?? 0,
     import: importRes,
-  };
+  } as KoboUploadResult;
 }
+
