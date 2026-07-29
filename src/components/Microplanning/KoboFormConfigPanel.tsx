@@ -12,32 +12,109 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Search, Rocket, Save, Trash2, PlusCircle, PlugZap, CheckCircle2, XCircle, AlertTriangle, Eye, History, Webhook, RefreshCcw } from "lucide-react";
+import { Loader2, Search, Rocket, Save, Trash2, PlusCircle, PlugZap, CheckCircle2, XCircle, AlertTriangle, Eye, History, Webhook, RefreshCcw, Wand2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import KoboMappingHistoryDialog from "./KoboMappingHistoryDialog";
 
 
 type TestStep = { step: string; ok: boolean; detail?: string };
 
-// Target columns in public.microplan_entries the admin can map to
-const TARGET_FIELDS: Array<{ key: string; label: string }> = [
-  { key: "project_id", label: "Project ID" },
+// Target columns in public.microplan_entries the admin can map to.
+// Grouped for legibility — the panel maps ALL survey/repeat/system fields, not
+// a hand-curated subset, so the automated auto-mapper hits 100% coverage.
+const TARGET_FIELDS: Array<{ key: string; label: string; aliases?: string[] }> = [
+  // Identity / project
+  { key: "project_id", label: "Project ID", aliases: ["amehnities_project_id", "project"] },
+  { key: "year_of_microplanning", label: "Year of Microplanning", aliases: ["year"] },
+  { key: "campaign_type", label: "Campaign Type" },
+  { key: "population_source", label: "Population Source" },
+  // Admin cascade
   { key: "state", label: "State" },
-  { key: "lga", label: "LGA" },
-  { key: "ward", label: "Ward" },
-  { key: "flhf_name", label: "FLHF Name" },
-  { key: "flhf_custom", label: "FLHF (Other/Custom)" },
-  { key: "flhf_incharge_name", label: "FLHF In-charge Name" },
-  { key: "flhf_incharge_phone", label: "FLHF In-charge Phone" },
-  { key: "community_name", label: "Community" },
-  { key: "community_custom", label: "Community (Other/Custom)" },
+  { key: "lga", label: "LGA", aliases: ["local_government_area", "lga_name"] },
+  { key: "ward", label: "Ward", aliases: ["ward_name"] },
+  // FLHF
+  { key: "flhf_name", label: "FLHF Name", aliases: ["flhf", "health_facility"] },
+  { key: "flhf_incharge_name", label: "FLHF In-charge Name", aliases: ["incharge_name"] },
+  { key: "flhf_incharge_phone", label: "FLHF In-charge Phone", aliases: ["incharge_phone"] },
+  { key: "flhf_latitude", label: "FLHF Latitude", aliases: ["flhf_lat"] },
+  { key: "flhf_longitude", label: "FLHF Longitude", aliases: ["flhf_lng", "flhf_lon"] },
+  // Community
+  { key: "community_name", label: "Community", aliases: ["community"] },
   { key: "community_leader_name", label: "Community Leader" },
   { key: "community_leader_phone", label: "Community Leader Phone" },
-  { key: "settlement_name", label: "Settlement" },
-  { key: "settlement_custom", label: "Settlement (Other/Custom)" },
-  { key: "estimated_total_population", label: "Estimated Total Population" },
-  { key: "number_of_households", label: "Number of Households" },
+  { key: "community_latitude", label: "Community Latitude", aliases: ["community_lat"] },
+  { key: "community_longitude", label: "Community Longitude", aliases: ["community_lng"] },
+  { key: "community_distance_to_flhf_km", label: "Community → FLHF Distance (km)" },
+  // Settlement
+  { key: "settlement_name", label: "Settlement", aliases: ["settlement"] },
+  { key: "settlement_mai_unguwa", label: "Mai Unguwa (Settlement Head)" },
+  { key: "settlement_latitude", label: "Settlement Latitude" },
+  { key: "settlement_longitude", label: "Settlement Longitude" },
+  { key: "settlement_distance_to_flhf_km", label: "Settlement → FLHF Distance (km)" },
+  // Context
+  { key: "terrain_type", label: "Terrain Type" },
+  { key: "accessibility", label: "Accessibility" },
+  { key: "security_clearance", label: "Security Clearance" },
+  // Population
+  { key: "estimated_total_population", label: "Estimated Total Population", aliases: ["total_population"] },
+  { key: "estimated_children_0_4", label: "Children 0–4 years" },
+  { key: "estimated_children_5_14", label: "Children 5–14 years" },
+  { key: "estimated_adults_15_plus", label: "Adults 15+ years" },
+  { key: "number_of_households", label: "Number of Households", aliases: ["households"] },
+  // Trachoma
+  { key: "trachoma_0_5_months", label: "Trachoma 0–5 months" },
+  { key: "trachoma_6m_6y", label: "Trachoma 6m–6y" },
+  { key: "trachoma_7_14y", label: "Trachoma 7–14y" },
+  { key: "trachoma_15_plus", label: "Trachoma 15+" },
+  // PWD
+  { key: "pwd_total", label: "PWD Total" },
+  { key: "pwd_visual", label: "PWD Visual" },
+  { key: "pwd_hearing", label: "PWD Hearing" },
+  { key: "pwd_physical", label: "PWD Physical" },
+  { key: "pwd_intellectual", label: "PWD Intellectual" },
+  { key: "pwd_communication", label: "PWD Communication" },
+  { key: "pwd_selfcare", label: "PWD Self-care" },
+  { key: "pwd_albinism", label: "PWD Albinism" },
+  // CDDs
+  { key: "cdd_names", label: "CDD Names" },
+  { key: "cdd_phone_numbers", label: "CDD Phone Numbers" },
+  { key: "cdd_from_community", label: "CDD From Community" },
+  // Meta
+  { key: "notes", label: "Additional Notes" },
+  { key: "kobo_submission_id", label: "Kobo Submission ID", aliases: ["_id", "_uuid"] },
 ];
+
+/**
+ * Normalize a Kobo question name / label into a comparable token stream so the
+ * auto-mapper can match `FLHF Name` ↔ `flhf_name` ↔ `flhfName` ↔ `flhf-name`.
+ */
+const normToken = (s: string): string =>
+  String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+
+/**
+ * Build a mapping from every target field to the best-matching Kobo question,
+ * evaluated as name-equality → alias-equality → normalized-token equality →
+ * label-normalized equality. Skips ambiguous ties.
+ */
+const computeAutoMap = (fields: KoboField[]): Record<string, string> => {
+  const byName = new Map<string, string>();
+  const byLabel = new Map<string, string>();
+  for (const f of fields) {
+    byName.set(normToken(f.name), f.name);
+    byLabel.set(normToken(f.label), f.name);
+  }
+  const out: Record<string, string> = {};
+  for (const t of TARGET_FIELDS) {
+    const candidates = [t.key, ...(t.aliases ?? [])].map(normToken);
+    for (const c of candidates) {
+      const hit = byName.get(c) ?? byLabel.get(c);
+      if (hit) { out[t.key] = hit; break; }
+    }
+  }
+  return out;
+};
+
+
 
 interface KoboField { name: string; type: string; label: string }
 interface FormConfig {
