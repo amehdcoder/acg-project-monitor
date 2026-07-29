@@ -169,11 +169,12 @@ const NUMERIC_COLS = new Set([
   "settlement_distance_to_flhf_km","community_latitude","community_longitude",
   "settlement_latitude","settlement_longitude","flhf_latitude","flhf_longitude",
   "year_of_microplanning","total_treated","medicine_used","households_treated",
-  "total_households_reported","total_households_treated","target_population",
+  "total_households_reported","total_households_treated",
   "trachoma_0_5_months","trachoma_6m_6y","trachoma_7_14y","trachoma_15_plus",
   "pwd_total","pwd_visual","pwd_hearing","pwd_physical","pwd_intellectual",
   "pwd_communication","pwd_selfcare","pwd_albinism",
 ]);
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -475,12 +476,7 @@ Deno.serve(async (req) => {
         const parts = childGps.split(/[\s,]+/).map(Number).filter((n) => Number.isFinite(n));
         if (parts.length >= 2) { cLat = parts[0]; cLng = parts[1]; }
       }
-      const targetPop = pickNumber(item, ["target_population", "target_pop"]);
       const totalPop = pickNumber(item, ["estimated_total_population", "total_population"]);
-      if (!inRange(targetPop)) {
-        rejectedItems.push({ index: idx, reason: "target_population_out_of_range", value: targetPop });
-        return;
-      }
       if (!inRange(totalPop)) {
         rejectedItems.push({ index: idx, reason: "estimated_total_population_out_of_range", value: totalPop });
         return;
@@ -494,16 +490,19 @@ Deno.serve(async (req) => {
         estimated_children_5_14: pickNumber(item, ["estimated_children_5_14", "children_5_14"]),
         estimated_adults_15_plus: pickNumber(item, ["estimated_adults_15_plus", "adults_15_plus"]),
         estimated_total_population: totalPop,
-        target_population: targetPop,
         number_of_households: pickNumber(item, ["number_of_households", "households"]),
         terrain_type: (pickFirst(item, ["terrain_type"]) || "").toLowerCase().trim() || null,
         accessibility: (pickFirst(item, ["accessibility", "access_status"]) || "").toLowerCase().trim() || null,
         security_clearance: (pickFirst(item, ["security_clearance", "security_status"]) || "").toLowerCase().trim() || null,
+        // additional_notes now lives inside the community_repeat so each
+        // community carries its own free-text observations through to the DB.
+        notes: pickFirst(item, ["additional_notes", "notes"]) ?? null,
         // PWD, CDD and Trachoma disaggregations now live INSIDE community_repeat
         // (per-community), so pass them through per row instead of the parent.
         ...extractRepeatDisaggregations(item),
       }, `${koboUuid}_${idx}`, { lat: cLat, lng: cLng }));
     });
+
   } else {
     upserts.push(buildRecord({}, koboUuid));
   }

@@ -46,9 +46,11 @@ describe("Coverage XLSForm generator", () => {
     expect(endIdx).toBeGreaterThan(beginIdx);
 
     const inside = survey.slice(beginIdx + 1, endIdx).map((r) => String(r[nameIdx]));
-    ["community_name", "target_population", "total_treated", "doses_administered", "refusals", "missed_population", "community_gps"].forEach((n) =>
+    ["community_name", "total_treated", "doses_administered", "refusals", "missed_population", "community_gps"].forEach((n) =>
       expect(inside, `community_repeat missing ${n}`).toContain(n),
     );
+    expect(inside, "target_population must be removed from the coverage form").not.toContain("target_population");
+
   });
 
   it("uses a geopoint field for community GPS", () => {

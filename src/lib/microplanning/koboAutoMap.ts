@@ -48,7 +48,7 @@ export const TARGET_FIELDS: Array<{ key: string; label: string; aliases?: string
   { key: "security_clearance", label: "Security Clearance" },
   // Population
   { key: "estimated_total_population", label: "Estimated Total Population", aliases: ["total_population"] },
-  { key: "target_population", label: "Target Population" },
+
 
   { key: "estimated_children_0_4", label: "Children 0–4 years" },
   { key: "estimated_children_5_14", label: "Children 5–14 years" },
