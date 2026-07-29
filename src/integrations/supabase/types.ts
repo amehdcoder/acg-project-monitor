@@ -5419,6 +5419,84 @@ export type Database = {
         }
         Relationships: []
       }
+      microplan_coverage: {
+        Row: {
+          community_name: string | null
+          created_at: string
+          doses_administered: number | null
+          flhf_name: string | null
+          id: string
+          idempotency_key: string
+          kobo_form_uid: string | null
+          latitude: number | null
+          lga: string | null
+          longitude: number | null
+          missed_population: number | null
+          notes: string | null
+          payload: Json | null
+          project_id: string | null
+          refusals: number | null
+          state: string | null
+          submitted_at: string | null
+          submitted_by: string | null
+          target_population: number | null
+          total_treated: number | null
+          total_vaccinated: number | null
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          community_name?: string | null
+          created_at?: string
+          doses_administered?: number | null
+          flhf_name?: string | null
+          id?: string
+          idempotency_key: string
+          kobo_form_uid?: string | null
+          latitude?: number | null
+          lga?: string | null
+          longitude?: number | null
+          missed_population?: number | null
+          notes?: string | null
+          payload?: Json | null
+          project_id?: string | null
+          refusals?: number | null
+          state?: string | null
+          submitted_at?: string | null
+          submitted_by?: string | null
+          target_population?: number | null
+          total_treated?: number | null
+          total_vaccinated?: number | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          community_name?: string | null
+          created_at?: string
+          doses_administered?: number | null
+          flhf_name?: string | null
+          id?: string
+          idempotency_key?: string
+          kobo_form_uid?: string | null
+          latitude?: number | null
+          lga?: string | null
+          longitude?: number | null
+          missed_population?: number | null
+          notes?: string | null
+          payload?: Json | null
+          project_id?: string | null
+          refusals?: number | null
+          state?: string | null
+          submitted_at?: string | null
+          submitted_by?: string | null
+          target_population?: number | null
+          total_treated?: number | null
+          total_vaccinated?: number | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: []
+      }
       microplan_delete_requests: {
         Row: {
           created_at: string
@@ -5955,6 +6033,72 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      microplan_reconciliation: {
+        Row: {
+          administered_quantity: number | null
+          created_at: string
+          discrepancy_notes: string | null
+          flhf_name: string | null
+          id: string
+          idempotency_key: string
+          kobo_form_uid: string | null
+          lga: string | null
+          medicine_name: string | null
+          payload: Json | null
+          project_id: string | null
+          received_quantity: number | null
+          returned_quantity: number | null
+          state: string | null
+          submitted_at: string | null
+          submitted_by: string | null
+          updated_at: string
+          ward: string | null
+          wasted_quantity: number | null
+        }
+        Insert: {
+          administered_quantity?: number | null
+          created_at?: string
+          discrepancy_notes?: string | null
+          flhf_name?: string | null
+          id?: string
+          idempotency_key: string
+          kobo_form_uid?: string | null
+          lga?: string | null
+          medicine_name?: string | null
+          payload?: Json | null
+          project_id?: string | null
+          received_quantity?: number | null
+          returned_quantity?: number | null
+          state?: string | null
+          submitted_at?: string | null
+          submitted_by?: string | null
+          updated_at?: string
+          ward?: string | null
+          wasted_quantity?: number | null
+        }
+        Update: {
+          administered_quantity?: number | null
+          created_at?: string
+          discrepancy_notes?: string | null
+          flhf_name?: string | null
+          id?: string
+          idempotency_key?: string
+          kobo_form_uid?: string | null
+          lga?: string | null
+          medicine_name?: string | null
+          payload?: Json | null
+          project_id?: string | null
+          received_quantity?: number | null
+          returned_quantity?: number | null
+          state?: string | null
+          submitted_at?: string | null
+          submitted_by?: string | null
+          updated_at?: string
+          ward?: string | null
+          wasted_quantity?: number | null
+        }
+        Relationships: []
       }
       microplan_xlsform_versions: {
         Row: {
