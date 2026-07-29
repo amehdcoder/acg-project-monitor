@@ -30,6 +30,48 @@ const j = (body: unknown, status = 200) =>
 
 const stripTrailingSlash = (u: string) => u.replace(/\/+$/, "");
 
+// --- SSRF protection ------------------------------------------------------
+function isPrivateHostname(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal") || h.endsWith(".local")) return true;
+  if (h === "::1" || h === "::" || h.startsWith("fe80:") || h.startsWith("fc") || h.startsWith("fd")) return true;
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    if (a === 10 || a === 127 || a === 0) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true;
+    if (a >= 224) return true;
+  }
+  return false;
+}
+
+async function assertSafeKoboUrl(rawUrl: string): Promise<URL> {
+  let parsed: URL;
+  try { parsed = new URL(rawUrl); } catch { throw new KoboApiError("bad_response", 0, "Invalid server_url"); }
+  if (parsed.protocol !== "https:") {
+    throw new KoboApiError("bad_response", 0, "server_url must use https");
+  }
+  if (isPrivateHostname(parsed.hostname)) {
+    throw new KoboApiError("bad_response", 0, "server_url points to a disallowed internal/private address");
+  }
+  try {
+    const a = await Deno.resolveDns(parsed.hostname, "A").catch(() => [] as string[]);
+    const aaaa = await Deno.resolveDns(parsed.hostname, "AAAA").catch(() => [] as string[]);
+    for (const ip of [...a, ...aaaa]) {
+      if (isPrivateHostname(ip)) {
+        throw new KoboApiError("bad_response", 0, "server_url resolves to a disallowed internal/private address");
+      }
+    }
+  } catch (e) {
+    if (e instanceof KoboApiError) throw e;
+  }
+  return parsed;
+}
+
+
 export type KoboErrCode =
   | "auth_failed" | "forbidden" | "not_found" | "rate_limited"
   | "timeout" | "network" | "server_error" | "bad_response";
