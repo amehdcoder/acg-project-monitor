@@ -169,6 +169,9 @@ const NUMERIC_COLS = new Set([
   "settlement_latitude","settlement_longitude","flhf_latitude","flhf_longitude",
   "year_of_microplanning","total_treated","medicine_used","households_treated",
   "total_households_reported","total_households_treated","target_population",
+  "trachoma_0_5_months","trachoma_6m_6y","trachoma_7_14y","trachoma_15_plus",
+  "pwd_total","pwd_visual","pwd_hearing","pwd_physical","pwd_intellectual",
+  "pwd_communication","pwd_selfcare","pwd_albinism",
 ]);
 
 Deno.serve(async (req) => {
