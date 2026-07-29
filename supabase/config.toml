@@ -78,3 +78,6 @@ verify_jwt = false
 
 [functions.kobo-microplan-webhook]
 verify_jwt = false
+
+[functions.kobo-webhook]
+verify_jwt = false
