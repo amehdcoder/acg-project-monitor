@@ -126,13 +126,22 @@ describe("community_repeat unpacking with free-text location names", () => {
     expect(rows[0].settlement_name).toBe("Unguwar Sarki");
     expect(rows[0].settlement_mai_unguwa).toBe("Alhaji Bala");
     expect(rows[0].community_latitude).toBeCloseTo(11.71, 4);
+    // Disaggregation fields must be present on the mapped row and match source.
+    for (const key of ["pwd_total", "pwd_visual", "cdd_names", "cdd_phone_numbers", "trachoma_7_14y"] as const) {
+      expect(rows[0]).toHaveProperty(key);
+    }
     expect(rows[0].pwd_total).toBe(9);
+    expect(rows[0].pwd_visual).toBe(3);
     expect(rows[0].cdd_names).toBe("Aisha, Musa");
+    expect(rows[0].cdd_phone_numbers).toBe("08031234567");
     expect(rows[0].trachoma_7_14y).toBe(12);
     expect(rows[0].notes).toBe("Riverine access");
     // Second item has no geopoint — manual lat/long fallback must apply.
     expect(rows[1].community_latitude).toBeCloseTo(11.9, 4);
     expect(rows[1].community_longitude).toBeCloseTo(9.1, 4);
     expect(rows[1].settlement_name).toBeNull();
+    expect(rows[1].pwd_total).toBe(2);
+    expect(rows[1].cdd_names).toBe("Hauwa");
+    expect(rows[1].trachoma_7_14y).toBeNull();
   });
 });
