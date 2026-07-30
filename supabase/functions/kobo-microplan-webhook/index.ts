@@ -553,7 +553,7 @@ Deno.serve(async (req) => {
         extra_metadata: item,
         // PWD, CDD and Trachoma disaggregations now live INSIDE community_repeat
         // (per-community), so pass them through per row instead of the parent.
-        ...extractRepeatDisaggregations(item),
+        ...disaggregations,
       }, `${koboUuid}_${idx}`, { lat: cLat, lng: cLng }));
     });
 
