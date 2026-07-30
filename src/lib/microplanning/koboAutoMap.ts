@@ -27,20 +27,20 @@ export const TARGET_FIELDS: Array<{ key: string; label: string; aliases?: string
   { key: "flhf_name", label: "FLHF Name", aliases: ["flhf", "health_facility"] },
   { key: "flhf_incharge_name", label: "FLHF In-charge Name", aliases: ["incharge_name"] },
   { key: "flhf_incharge_phone", label: "FLHF In-charge Phone", aliases: ["incharge_phone"] },
-  { key: "flhf_latitude", label: "FLHF Latitude", aliases: ["flhf_lat"] },
-  { key: "flhf_longitude", label: "FLHF Longitude", aliases: ["flhf_lng", "flhf_lon"] },
+  { key: "flhf_latitude", label: "FLHF Latitude", aliases: ["flhf_lat", "flhf_manual_latitude"] },
+  { key: "flhf_longitude", label: "FLHF Longitude", aliases: ["flhf_lng", "flhf_lon", "flhf_manual_longitude"] },
   // Community
   { key: "community_name", label: "Community", aliases: ["community"] },
   { key: "community_leader_name", label: "Community Leader" },
   { key: "community_leader_phone", label: "Community Leader Phone" },
-  { key: "community_latitude", label: "Community Latitude", aliases: ["community_lat"] },
-  { key: "community_longitude", label: "Community Longitude", aliases: ["community_lng"] },
+  { key: "community_latitude", label: "Community Latitude", aliases: ["community_lat", "community_manual_latitude", "manual_latitude", "latitude"] },
+  { key: "community_longitude", label: "Community Longitude", aliases: ["community_lng", "community_manual_longitude", "manual_longitude", "longitude"] },
   { key: "community_distance_to_flhf_km", label: "Community → FLHF Distance (km)" },
   // Settlement
   { key: "settlement_name", label: "Settlement", aliases: ["settlement"] },
   { key: "settlement_mai_unguwa", label: "Mai Unguwa (Settlement Head)" },
-  { key: "settlement_latitude", label: "Settlement Latitude" },
-  { key: "settlement_longitude", label: "Settlement Longitude" },
+  { key: "settlement_latitude", label: "Settlement Latitude", aliases: ["settlement_manual_latitude"] },
+  { key: "settlement_longitude", label: "Settlement Longitude", aliases: ["settlement_manual_longitude"] },
   { key: "settlement_distance_to_flhf_km", label: "Settlement → FLHF Distance (km)" },
   // Context
   { key: "terrain_type", label: "Terrain Type" },
@@ -75,6 +75,8 @@ export const TARGET_FIELDS: Array<{ key: string; label: string; aliases?: string
   // Meta
   { key: "notes", label: "Additional Notes", aliases: ["additional_notes"] },
   { key: "kobo_submission_id", label: "Kobo Submission ID", aliases: ["_id", "_uuid"] },
+  { key: "geotagged", label: "Geotagged" },
+  { key: "extra_metadata", label: "Extra Metadata" },
 ];
 
 export const normToken = (s: string): string =>

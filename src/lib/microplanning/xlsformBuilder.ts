@@ -133,8 +133,8 @@ export async function buildMicroplanningXlsForm(
   survey.push(q({ type: "start", name: "start" }));
   survey.push(q({ type: "end", name: "end" }));
   survey.push(q({ type: "today", name: "today" }));
-  survey.push(q({ type: "username", name: "username" }));
   survey.push(q({ type: "deviceid", name: "deviceid" }));
+  survey.push(q({ type: "username", name: "username" }));
   survey.push(q({ type: "phonenumber", name: "phonenumber" }));
 
   // ── Cover: full-bleed `home` image, nothing else on the screen ──
