@@ -56,6 +56,7 @@ function checkAuth(req: Request, secrets: string[]): boolean {
   }
   return valid.has(auth);
 }
+const FLHF_FALLBACK = "Unspecified FLHF";
 
 function getFlat(obj: Record<string, unknown>, key: string): unknown {
   if (key in obj) return obj[key];
