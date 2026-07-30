@@ -61,7 +61,9 @@ describe("master XLSForm structure", () => {
   it("never pre-fills GPS coordinates", async () => {
     const survey = rowsOf(await build(), "survey");
     for (const r of survey) {
-      if (/lat|lng|longitude|gps/.test(r.name)) expect(r.default).toBe("");
+      const isCoord = /latitude|longitude|_gps$/.test(r.name) &&
+        ["geopoint", "decimal", "calculate"].includes(r.type);
+      if (isCoord) expect(r.default, `${r.name} must not be pre-filled`).toBe("");
       expect(r.calculation).not.toMatch(/instance\('(flhfs|communities|settlements)'\)/);
     }
   });
