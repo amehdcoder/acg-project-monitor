@@ -36,9 +36,44 @@ export function pickNumber(obj: AnyRec, keys: string[]): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// Explicit contract with the public.microplan_entries columns — keep these
+// names in sync with the table (do NOT rename).
+export interface RepeatDisaggregations {
+  trachoma_0_5_months: number | null;
+  trachoma_6m_6y: number | null;
+  trachoma_7_14y: number | null;
+  trachoma_15_plus: number | null;
+  pwd_total: number | null;
+  pwd_visual: number | null;
+  pwd_hearing: number | null;
+  pwd_physical: number | null;
+  pwd_intellectual: number | null;
+  pwd_communication: number | null;
+  pwd_selfcare: number | null;
+  pwd_albinism: number | null;
+  cdd_names: string | null;
+  cdd_phone_numbers: string | null;
+  cdd_from_community: string | null;
+}
+
+// The shape a single community_repeat item is mapped into before upsert.
+export interface MicroplanRepeatRow extends RepeatDisaggregations {
+  idempotency_key: string;
+  project_id: string | null;
+  flhf_name: string | null;
+  community_name: string | null;
+  settlement_name: string | null;
+  settlement_mai_unguwa: string | null;
+  estimated_children_0_4: number | null;
+  notes: string | null;
+  community_latitude: number | null;
+  community_longitude: number | null;
+  geotagged: boolean;
+}
+
 // Extract the PWD / CDD / Trachoma sub-fields now nested inside
 // community_repeat so the webhook can pass them through to microplan_entries.
-export function extractRepeatDisaggregations(item: AnyRec): AnyRec {
+export function extractRepeatDisaggregations(item: AnyRec): RepeatDisaggregations {
   return {
     // Trachoma
     trachoma_0_5_months: pickNumber(item, ["trachoma_0_5_months", "trachoma_grp/trachoma_0_5_months"]),
