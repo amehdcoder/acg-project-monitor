@@ -70,7 +70,24 @@ export function buildCoverageXlsForm(options: CoverageBuildOptions = {}): XLSX.W
   survey.push(q({ type: "integer", name: "doses_administered", label: "Doses Administered", constraint: ". >= 0" }));
   survey.push(q({ type: "integer", name: "refusals", label: "Refusals", constraint: ". >= 0" }));
   survey.push(q({ type: "integer", name: "missed_population", label: "Missed Population", constraint: ". >= 0" }));
-  survey.push(q({ type: "geopoint", name: "community_gps", label: "Community GPS", appearance: "maps" }));
+  // Dual GPS — native geopoint first, manual decimal lat/long as fallback.
+  survey.push(q({ type: "geopoint", name: "community_gps", label: "Community GPS" }));
+  survey.push(q({
+    type: "decimal", name: "manual_latitude", label: "Latitude (type manually if GPS unavailable)",
+    constraint: ". >= -90 and . <= 90", constraint_message: "Latitude must be between -90 and 90.",
+  }));
+  survey.push(q({
+    type: "decimal", name: "manual_longitude", label: "Longitude (type manually if GPS unavailable)",
+    constraint: ". >= -180 and . <= 180", constraint_message: "Longitude must be between -180 and 180.",
+  }));
+  survey.push(q({
+    type: "calculate", name: "latitude",
+    calculation: "if(${community_gps} = '', ${manual_latitude}, selected-at(${community_gps}, 0))",
+  }));
+  survey.push(q({
+    type: "calculate", name: "longitude",
+    calculation: "if(${community_gps} = '', ${manual_longitude}, selected-at(${community_gps}, 1))",
+  }));
   survey.push(q({ type: "text", name: "notes", label: "Notes / Observations" }));
   survey.push(q({ type: "end_repeat", name: "community_repeat_end" }));
 

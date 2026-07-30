@@ -12,6 +12,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders as baseCors } from "npm:@supabase/supabase-js@2/cors";
+import { resolveCoordinates } from "../_shared/microplanRepeatItem.ts";
 
 const corsHeaders = {
   ...baseCors,
@@ -74,20 +75,14 @@ function pickNum(obj: Record<string, unknown>, keys: string[]): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function extractGeo(obj: Record<string, unknown>): { lat: number | null; lng: number | null } {
-  const geo = obj["_geolocation"];
-  if (Array.isArray(geo) && geo.length >= 2 && typeof geo[0] === "number") {
-    return { lat: geo[0] as number, lng: geo[1] as number };
-  }
-  const gps = pick(obj, ["community_gps", "gps", "geopoint", "_geopoint"]);
-  if (gps) {
-    const parts = gps.split(/[\s,]+/).map(Number).filter((n) => Number.isFinite(n));
-    if (parts.length >= 2) return { lat: parts[0], lng: parts[1] };
-  }
-  return {
-    lat: pickNum(obj, ["latitude", "lat"]),
-    lng: pickNum(obj, ["longitude", "lng", "lon"]),
-  };
+// Dual GPS: native geopoint first, manually typed lat/long as fallback.
+function extractGeo(obj: Record<string, unknown>): { lat: number | null; lng: number | null; geotagged: boolean } {
+  const r = resolveCoordinates(obj, {
+    geopointKeys: ["community_gps", "gps_location", "gps_capture", "gps", "geopoint", "_geopoint", "location"],
+    latKeys: ["manual_latitude", "community_manual_latitude", "latitude", "community_latitude", "lat"],
+    lngKeys: ["manual_longitude", "community_manual_longitude", "longitude", "community_longitude", "lng", "lon"],
+  });
+  return { lat: r.lat, lng: r.lng, geotagged: r.geotagged };
 }
 
 type FormKind = "microplan" | "coverage" | "reconciliation";

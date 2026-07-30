@@ -14,7 +14,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders as baseCors } from "npm:@supabase/supabase-js@2/cors";
-import { extractRepeatDisaggregations } from "../_shared/microplanRepeatItem.ts";
+import { extractRepeatDisaggregations, resolveCoordinates } from "../_shared/microplanRepeatItem.ts";
 
 const corsHeaders = {
   ...baseCors,
@@ -174,6 +174,9 @@ const NUMERIC_COLS = new Set([
   "pwd_total","pwd_visual","pwd_hearing","pwd_physical","pwd_intellectual",
   "pwd_communication","pwd_selfcare","pwd_albinism",
 ]);
+
+// Columns that must survive the null-pruning pass even when falsy.
+const PRESERVED_COLS = new Set(["geotagged", "extra_metadata"]);
 
 
 Deno.serve(async (req) => {
@@ -341,7 +344,22 @@ Deno.serve(async (req) => {
     (["other", "__other__"].includes(settlementName?.toLowerCase() ?? "") && settlementCustom),
   );
 
-  const { lat, lng } = extractGeo(payload);
+  // Dual-GPS: native geopoint first, manual decimal lat/long as fallback.
+  const parentCoords = resolveCoordinates(payload, {
+    geopointKeys: ["community_gps", "gps_location", "gps_capture", "flhf_gps", "settlement_gps", "gps", "geopoint", "_geopoint", "location"],
+    latKeys: ["community_manual_latitude", "manual_latitude", "community_latitude", "latitude", "lat", "gps_latitude"],
+    lngKeys: ["community_manual_longitude", "manual_longitude", "community_longitude", "longitude", "lng", "lon", "gps_longitude"],
+  });
+  let { lat, lng } = parentCoords;
+  if (lat == null || lng == null) {
+    const legacy = extractGeo(payload);
+    lat = legacy.lat; lng = legacy.lng;
+  }
+  const flhfCoords = resolveCoordinates(payload, {
+    geopointKeys: ["flhf_gps", "flhf_gps_override"],
+    latKeys: ["flhf_manual_latitude", "flhf_latitude", "flhf_lat"],
+    lngKeys: ["flhf_manual_longitude", "flhf_longitude", "flhf_lng"],
+  });
   const projectIdResolved =
     mapped("project_id", ["project_id", "amehnities_project_id"]) ??
     cfgProjectId ??
@@ -381,8 +399,8 @@ Deno.serve(async (req) => {
     community_longitude: lng,
     settlement_latitude: mappedNum("settlement_latitude", ["settlement_lat", "settlement_latitude"]) ?? lat,
     settlement_longitude: mappedNum("settlement_longitude", ["settlement_lng", "settlement_longitude"]) ?? lng,
-    flhf_latitude: mappedNum("flhf_latitude", ["flhf_lat", "flhf_latitude", "flhf_grp/flhf_latitude", "flhf_grp/flhf_lat_grid3"]),
-    flhf_longitude: mappedNum("flhf_longitude", ["flhf_lng", "flhf_longitude", "flhf_grp/flhf_longitude", "flhf_grp/flhf_lng_grid3"]),
+    flhf_latitude: flhfCoords.lat ?? mappedNum("flhf_latitude", ["flhf_lat", "flhf_latitude", "flhf_grp/flhf_latitude"]),
+    flhf_longitude: flhfCoords.lng ?? mappedNum("flhf_longitude", ["flhf_lng", "flhf_longitude", "flhf_grp/flhf_longitude"]),
     terrain_type: (mapped("terrain_type", ["terrain_type", "context_grp/terrain_type", "type_of_terrain"]) || "").toLowerCase().trim() || null,
     accessibility: (mapped("accessibility", ["accessibility", "context_grp/accessibility"]) || "").toLowerCase().trim() || null,
     security_clearance: (mapped("security_clearance", ["security_clearance", "context_grp/security_clearance"]) || "").toLowerCase().trim() || null,
@@ -393,6 +411,8 @@ Deno.serve(async (req) => {
       "settlement_distance_to_flhf_km", "settlement_grp/settlement_distance_to_flhf_km", "distance_settlement_flhf_km",
     ]),
     is_custom_location: isCustom,
+    geotagged: lat != null && lng != null,
+    extra_metadata: payload,
     notes: `Ingested from KoboToolbox (_uuid=${koboUuid}, form=${formUid ?? "unknown"}, submitted_by=${submittedBy ?? "unknown"})`,
   };
 
@@ -401,6 +421,7 @@ Deno.serve(async (req) => {
     if (typeof record[k] === "string" && SENTINEL_VALUES.has((record[k] as string).trim().toLowerCase())) {
       record[k] = null;
     }
+    if (PRESERVED_COLS.has(k)) continue;
     if (record[k] == null && !CLEARABLE_TEXT_COLS.has(k)) delete record[k];
     else if (NUMERIC_COLS.has(k)) {
       const n = Number(record[k]);
@@ -437,8 +458,10 @@ Deno.serve(async (req) => {
       idempotency_key: idKey,
       community_latitude: geo.lat,
       community_longitude: geo.lng,
+      geotagged: geo.lat != null && geo.lng != null,
     };
     for (const k of Object.keys(out)) {
+      if (PRESERVED_COLS.has(k)) continue;
       if (out[k] == null && !CLEARABLE_TEXT_COLS.has(k)) delete out[k];
       else if (NUMERIC_COLS.has(k)) {
         const n = Number(out[k]);
@@ -470,12 +493,19 @@ Deno.serve(async (req) => {
         pickFirst(item, ["settlement_manual", "settlement_custom"]),
         [stateRaw, lgaRaw, wardRaw, pickFirst(item, ["community"])],
       );
-      const childGps = pickFirst(item, ["community_gps", "community_gps_override", "gps"]);
-      let cLat: number | null = null, cLng: number | null = null;
-      if (childGps) {
-        const parts = childGps.split(/[\s,]+/).map(Number).filter((n) => Number.isFinite(n));
-        if (parts.length >= 2) { cLat = parts[0]; cLng = parts[1]; }
-      }
+      // Dual-GPS per community: native geopoint wins, manual lat/long is the
+      // fallback; the parent submission coordinates are the last resort.
+      const childCoords = resolveCoordinates(item, {
+        geopointKeys: ["community_gps", "community_gps_override", "gps_location", "gps_capture", "gps", "geopoint"],
+        latKeys: ["community_manual_latitude", "manual_latitude", "community_latitude", "latitude", "lat"],
+        lngKeys: ["community_manual_longitude", "manual_longitude", "community_longitude", "longitude", "lng", "lon"],
+      });
+      const cLat = childCoords.lat, cLng = childCoords.lng;
+      const settlementCoords = resolveCoordinates(item, {
+        geopointKeys: ["settlement_gps", "settlement_gps_override"],
+        latKeys: ["settlement_manual_latitude", "settlement_latitude", "settlement_lat"],
+        lngKeys: ["settlement_manual_longitude", "settlement_longitude", "settlement_lng"],
+      });
       const totalPop = pickNumber(item, ["estimated_total_population", "total_population"]);
       if (!inRange(totalPop)) {
         rejectedItems.push({ index: idx, reason: "estimated_total_population_out_of_range", value: totalPop });
@@ -497,6 +527,14 @@ Deno.serve(async (req) => {
         // additional_notes now lives inside the community_repeat so each
         // community carries its own free-text observations through to the DB.
         notes: pickFirst(item, ["additional_notes", "notes"]) ?? null,
+        settlement_mai_unguwa: pickFirst(item, ["settlement_mai_unguwa", "mai_unguwa"]),
+        settlement_latitude: settlementCoords.lat,
+        settlement_longitude: settlementCoords.lng,
+        settlement_distance_to_flhf_km: pickNumber(item, ["settlement_distance_to_flhf_km"]),
+        community_distance_to_flhf_km: pickNumber(item, ["community_distance_to_flhf_km"]),
+        flhf_name: pickFirst(item, ["flhf_name"]) ?? (record.flhf_name as string | null) ?? null,
+        // Anything collected without a dedicated column is preserved as JSONB.
+        extra_metadata: item,
         // PWD, CDD and Trachoma disaggregations now live INSIDE community_repeat
         // (per-community), so pass them through per row instead of the parent.
         ...extractRepeatDisaggregations(item),

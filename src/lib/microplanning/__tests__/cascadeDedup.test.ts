@@ -80,21 +80,12 @@ describe("cascade dedup + orphan-free choice filters", () => {
     }
   });
 
-  it("every FLHF, community and settlement resolves to an existing parent ward/community", async () => {
+  it("does NOT emit FLHF / community / settlement choice lists (they are free text)", async () => {
     const wb = await buildMicroplanningXlsForm(undefined, { projectStates: ["Testland"] });
     const rows = readChoices(wb);
-    const wardIds = new Set(rows.filter((r) => r.list_name === "wards").map((r) => r.name));
-    const communityIds = new Set(rows.filter((r) => r.list_name === "communities").map((r) => r.name));
-
-    for (const f of rows.filter((r) => r.list_name === "flhfs" && r.name !== "__other__")) {
-      expect(wardIds.has(String(f.ward)), `orphan FLHF "${f.label}" → ward=${f.ward}`).toBe(true);
-    }
-    for (const c of rows.filter((r) => r.list_name === "communities" && r.name !== "__other__")) {
-      expect(wardIds.has(String(c.ward)), `orphan community "${c.label}" → ward=${c.ward}`).toBe(true);
-    }
-    for (const s of rows.filter((r) => r.list_name === "settlements" && r.name !== "__other__")) {
-      expect(wardIds.has(String(s.ward)), `orphan settlement "${s.label}" → ward=${s.ward}`).toBe(true);
-      expect(communityIds.has(String(s.community)), `orphan settlement "${s.label}" → community=${s.community}`).toBe(true);
+    const lists = new Set(rows.map((r) => r.list_name));
+    for (const banned of ["flhfs", "communities", "settlements"]) {
+      expect(lists.has(banned), `${banned} must not be a choice list`).toBe(false);
     }
   });
 
