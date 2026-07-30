@@ -640,13 +640,12 @@ Deno.serve(async (req) => {
       }
       const disaggregations = validation.data;
       const cName = normalizeChoiceValue(
-
-        pickFirst(item, ["community_name", "community"]),
+        pickFirst(item, [...A.community_name]),
         pickFirst(item, ["community_manual", "community_custom"]),
         [stateRaw, lgaRaw, wardRaw],
       );
       const sName = normalizeChoiceValue(
-        pickFirst(item, ["settlement_name", "settlement"]),
+        pickFirst(item, [...A.settlement_name]),
         pickFirst(item, ["settlement_manual", "settlement_custom"]),
         [stateRaw, lgaRaw, wardRaw, pickFirst(item, ["community"])],
       );
@@ -663,34 +662,36 @@ Deno.serve(async (req) => {
         latKeys: ["settlement_manual_latitude", "settlement_latitude", "settlement_lat"],
         lngKeys: ["settlement_manual_longitude", "settlement_longitude", "settlement_lng"],
       });
-      const totalPop = pickNumber(item, ["estimated_total_population", "total_population"]);
+      const totalPop = pickNumber(item, [...A.total_population]);
       if (!inRange(totalPop)) {
         rejectedItems.push({ index: idx, reason: "estimated_total_population_out_of_range", value: totalPop });
         return;
       }
-      upserts.push(buildRecord({
+      // Per-item values win; anything the roster omits falls back to the
+      // parent submission so no populated question is ever lost.
+      const itemFields: Record<string, unknown> = {
         community_name: cName,
         settlement_name: sName,
-        community_leader_name: pickFirst(item, ["community_leader_name", "community_leader"]),
-        community_leader_phone: pickFirst(item, ["community_leader_phone", "community_phone"]),
-        estimated_children_0_4: pickNumber(item, ["estimated_children_0_4", "children_0_4"]),
-        estimated_children_5_14: pickNumber(item, ["estimated_children_5_14", "children_5_14"]),
-        estimated_adults_15_plus: pickNumber(item, ["estimated_adults_15_plus", "adults_15_plus"]),
+        community_leader_name: pickFirst(item, [...A.community_leader_name]),
+        community_leader_phone: pickFirst(item, [...A.community_leader_phone]),
+        estimated_children_0_4: pickNumber(item, [...A.children_0_4]),
+        estimated_children_5_14: pickNumber(item, [...A.children_5_14]),
+        estimated_adults_15_plus: pickNumber(item, [...A.adults_15_plus]),
         estimated_total_population: totalPop,
-        number_of_households: pickNumber(item, ["number_of_households", "households"]),
-        terrain_type: (pickFirst(item, ["terrain_type"]) || "").toLowerCase().trim() || null,
-        accessibility: (pickFirst(item, ["accessibility", "access_status"]) || "").toLowerCase().trim() || null,
-        security_clearance: (pickFirst(item, ["security_clearance", "security_status"]) || "").toLowerCase().trim() || null,
+        number_of_households: pickNumber(item, [...A.households]),
+        terrain_type: normEnum(pickFirst(item, [...A.terrain])),
+        accessibility: normEnum(pickFirst(item, [...A.accessibility])),
+        security_clearance: normEnum(pickFirst(item, [...A.security])),
         // additional_notes now lives inside the community_repeat so each
         // community carries its own free-text observations through to the DB.
-        notes: pickFirst(item, ["additional_notes", "notes"]) ?? null,
-        settlement_mai_unguwa: pickFirst(item, ["settlement_mai_unguwa", "mai_unguwa"]),
+        notes: pickFirst(item, [...A.notes]),
+        settlement_mai_unguwa: pickFirst(item, [...A.settlement_mai_unguwa]),
         settlement_latitude: settlementCoords.lat,
         settlement_longitude: settlementCoords.lng,
-        settlement_distance_to_flhf_km: pickNumber(item, ["settlement_distance_to_flhf_km"]),
-        community_distance_to_flhf_km: pickNumber(item, ["community_distance_to_flhf_km"]),
+        settlement_distance_to_flhf_km: pickNumber(item, [...A.settlement_dist]),
+        community_distance_to_flhf_km: pickNumber(item, [...A.community_dist]),
         flhf_name:
-          (pickFirst(item, ["flhf_name"]) ?? "").trim() ||
+          (pickFirst(item, [...A.flhf_name]) ?? "").trim() ||
           ((record.flhf_name as string | null) ?? "").trim() ||
           FLHF_FALLBACK,
         // Anything collected without a dedicated column is preserved as JSONB.
@@ -698,7 +699,12 @@ Deno.serve(async (req) => {
         // PWD, CDD and Trachoma disaggregations now live INSIDE community_repeat
         // (per-community), so pass them through per row instead of the parent.
         ...disaggregations,
-      }, `${koboUuid}_${idx}`, { lat: cLat, lng: cLng }));
+        ...extractDisaggregations(item),
+      };
+      for (const k of Object.keys(itemFields)) {
+        if (itemFields[k] == null && record[k] != null) delete itemFields[k];
+      }
+      upserts.push(buildRecord(itemFields, `${koboUuid}_${idx}`, { lat: cLat, lng: cLng }));
     });
 
   } else {
