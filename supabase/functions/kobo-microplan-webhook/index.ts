@@ -483,7 +483,23 @@ Deno.serve(async (req) => {
 
   if (repeatItems.length > 0) {
     repeatItems.forEach((item, idx) => {
+      // Runtime validation of the disaggregation columns BEFORE mapping.
+      // Malformed values (non-numeric / negative / non-text) fail fast and the
+      // item is rejected with a clear, auditable reason instead of writing junk.
+      const validation = validateRepeatDisaggregations(item, {
+        requireDisaggregations: strictDisaggregations,
+      });
+      if (!validation.success) {
+        rejectedItems.push({
+          index: idx,
+          reason: "invalid_disaggregations",
+          value: validation.error.issues,
+        });
+        return;
+      }
+      const disaggregations = validation.data;
       const cName = normalizeChoiceValue(
+
         pickFirst(item, ["community_name", "community"]),
         pickFirst(item, ["community_manual", "community_custom"]),
         [stateRaw, lgaRaw, wardRaw],
