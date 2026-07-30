@@ -81,7 +81,9 @@ const q = (r: Partial<Record<(typeof SURVEY_HEADER)[number], string>>): Row =>
     const v = (r as any)[h];
     if (v == null) return "";
     let out = String(v);
-    if (TEXTY_COLS.has(h)) out = stripHtml(out);
+    // Whitespace-only labels (the cover note) are intentional — PyXForm
+    // requires a non-empty label cell, so never collapse them to "".
+    if (TEXTY_COLS.has(h) && out.trim() !== "") out = stripHtml(out);
     if (HINT_LIKE_COLS.has(h)) out = sanitizeInterpolations(out);
     return out;
   });
