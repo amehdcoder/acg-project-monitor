@@ -60,3 +60,74 @@ export function extractRepeatDisaggregations(item: AnyRec): AnyRec {
     cdd_from_community: pickFirst(item, ["cdd_from_community", "cdd_grp/cdd_from_community"]),
   };
 }
+
+// ── DUAL GPS RESOLUTION ────────────────────────────────────────────────
+// Strict precedence:
+//   1. Native Kobo `geopoint` string ("lat lng alt acc") — including the
+//      `_geolocation` array Kobo attaches to the submission root.
+//   2. Manually typed decimal latitude/longitude fields.
+// A coordinate pair is only accepted when both values are finite, inside
+// valid WGS84 ranges, and not the (0,0) null-island sentinel.
+
+export interface ResolvedCoords {
+  lat: number | null;
+  lng: number | null;
+  source: "geopoint" | "manual" | "none";
+  geotagged: boolean;
+}
+
+const validPair = (lat: number | null, lng: number | null): boolean =>
+  lat != null && lng != null &&
+  Number.isFinite(lat) && Number.isFinite(lng) &&
+  Math.abs(lat) <= 90 && Math.abs(lng) <= 180 &&
+  !(lat === 0 && lng === 0);
+
+export function parseGeopoint(value: unknown): { lat: number | null; lng: number | null } {
+  if (Array.isArray(value) && value.length >= 2) {
+    const lat = Number(value[0]), lng = Number(value[1]);
+    return validPair(lat, lng) ? { lat, lng } : { lat: null, lng: null };
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parts = value.trim().split(/[\s,]+/).map(Number).filter((n) => Number.isFinite(n));
+    if (parts.length >= 2 && validPair(parts[0], parts[1])) return { lat: parts[0], lng: parts[1] };
+  }
+  return { lat: null, lng: null };
+}
+
+/**
+ * Resolve final coordinates for a record from native geopoint fields first,
+ * then manually typed lat/long fields.
+ */
+export function resolveCoordinates(
+  obj: AnyRec,
+  opts: { geopointKeys?: string[]; latKeys?: string[]; lngKeys?: string[] } = {},
+): ResolvedCoords {
+  const geopointKeys = opts.geopointKeys ?? [
+    "community_gps", "gps_location", "gps_capture", "gps", "geopoint", "_geopoint", "location",
+  ];
+  const latKeys = opts.latKeys ?? [
+    "manual_latitude", "community_manual_latitude", "latitude", "community_latitude", "lat", "gps_latitude",
+  ];
+  const lngKeys = opts.lngKeys ?? [
+    "manual_longitude", "community_manual_longitude", "longitude", "community_longitude", "lng", "lon", "gps_longitude",
+  ];
+
+  // 1 — native geopoint (array form first, then string forms)
+  const geoArray = parseGeopoint(getFlat(obj, "_geolocation"));
+  if (validPair(geoArray.lat, geoArray.lng)) {
+    return { ...geoArray, source: "geopoint", geotagged: true };
+  }
+  for (const key of geopointKeys) {
+    const parsed = parseGeopoint(getFlat(obj, key));
+    if (validPair(parsed.lat, parsed.lng)) {
+      return { ...parsed, source: "geopoint", geotagged: true };
+    }
+  }
+
+  // 2 — manual decimal fallback
+  const lat = pickNumber(obj, latKeys);
+  const lng = pickNumber(obj, lngKeys);
+  if (validPair(lat, lng)) return { lat, lng, source: "manual", geotagged: true };
+
+  return { lat: null, lng: null, source: "none", geotagged: false };
+}
