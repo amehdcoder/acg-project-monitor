@@ -273,6 +273,12 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const qpFormUid = url.searchParams.get("form_uid");
   const qpProjectId = url.searchParams.get("project_id");
+  // Opt-in strict mode: require pwd_total / cdd_names / trachoma_7_14y on every
+  // repeat item (?strict_disaggregations=1 or "strict_disaggregations": true).
+  const strictDisaggregations =
+    ["1", "true", "yes"].includes((url.searchParams.get("strict_disaggregations") ?? "").toLowerCase()) ||
+    payload["strict_disaggregations"] === true;
+
   const candidateUids = Array.from(new Set([
     qpFormUid ?? "",
     (payload["_xform_id_string"] as string | undefined) ?? "",
