@@ -14,7 +14,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders as baseCors } from "npm:@supabase/supabase-js@2/cors";
-import { extractRepeatDisaggregations, resolveCoordinates } from "../_shared/microplanRepeatItem.ts";
+import { extractRepeatDisaggregations, resolveCoordinates, validateRepeatDisaggregations } from "../_shared/microplanRepeatItem.ts";
 
 const corsHeaders = {
   ...baseCors,
