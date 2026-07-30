@@ -58,14 +58,25 @@ function checkAuth(req: Request, secrets: string[]): boolean {
 }
 const FLHF_FALLBACK = "Unspecified FLHF";
 
+// Kobo auto-generates question names with arbitrary casing, punctuation and
+// random group prefixes (e.g. "group_kj94k59/Name_of_FLHF"). Normalising to a
+// bare alphanumeric token lets one alias match every spelling variant.
+const normToken = (s: string): string =>
+  s.toLowerCase().replace(/^.*\//, "").replace(/[^a-z0-9]/g, "");
+
 function getFlat(obj: Record<string, unknown>, key: string): unknown {
   if (key in obj) return obj[key];
   const lowered = key.toLowerCase();
+  const target = normToken(key);
   // Support Kobo grouped notation "group/name" and any nesting depth,
   // as well as camelCase/underscore/case-insensitive matches.
   for (const [k, v] of Object.entries(obj)) {
     const kl = k.toLowerCase();
     if (kl === lowered || kl.endsWith(`/${lowered}`)) return v;
+  }
+  // Punctuation/case-insensitive last-segment match ("Name_of_FLHF" ≈ "name_of_flhf").
+  for (const [k, v] of Object.entries(obj)) {
+    if (normToken(k) === target) return v;
   }
   // Recurse into nested objects (rare — Kobo usually flattens).
   for (const v of Object.values(obj)) {
@@ -92,6 +103,126 @@ function pickNumber(obj: Record<string, unknown>, keys: string[]): number | null
   const n = Number(String(v).replace(/,/g, ""));
   return Number.isFinite(n) ? n : null;
 }
+
+// yes/no/true/1 → boolean (Kobo select_one yes_no questions).
+function pickBool(obj: Record<string, unknown>, keys: string[]): boolean | null {
+  const v = pickFirst(obj, keys);
+  if (v == null) return null;
+  const s = v.trim().toLowerCase();
+  if (["yes", "true", "1", "y"].includes(s)) return true;
+  if (["no", "false", "0", "n"].includes(s)) return false;
+  return null;
+}
+
+// Kobo choice codes often carry a list prefix ("__mountainous", "ntd__mda").
+function normEnum(v: string | null): string | null {
+  if (!v) return null;
+  const out = v.trim().toLowerCase().replace(/^_+/, "").replace(/_{2,}/g, "_");
+  return out || null;
+}
+
+// Aliases shared by the parent submission and every community_repeat item, so
+// hand-built Kobo forms sync exactly like the Amehnities-generated XLSForm.
+const A = {
+  flhf_name: ["flhf_name", "name_of_flhf", "flhf", "health_facility_name", "name_of_health_facility", "flhf_grp/flhf"],
+  flhf_incharge_name: ["flhf_incharge_name", "flhf_in_charge_name", "flhf_incharge", "name_of_flhf_in_charge"],
+  flhf_incharge_phone: ["flhf_incharge_phone", "flhf_in_charge_phone_number", "flhf_in_charge_phone", "flhf_phone"],
+  community_name: ["community_name", "community", "name_of_community"],
+  community_leader_name: ["community_leader_name", "community_leader", "name_of_community_leader"],
+  community_leader_phone: ["community_leader_phone", "community_leader_phone_number", "community_phone"],
+  settlement_name: ["settlement_name", "settlement", "name_of_settlement"],
+  settlement_mai_unguwa: ["settlement_mai_unguwa", "mai_unguwa", "name_of_mai_unguwa"],
+  total_population: ["estimated_total_population", "total_population", "estimated_total_pop", "population", "total_pop"],
+  children_0_4: ["estimated_children_0_4", "children_0_4", "children_0_4_yrs", "under5", "children_under_5"],
+  children_5_14: ["estimated_children_5_14", "children_5_14", "children_5_14_yrs"],
+  adults_15_plus: ["estimated_adults_15_plus", "adults_15_plus", "adults_15_yrs", "adults"],
+  households: ["number_of_households", "households", "total_households", "hh_count"],
+  terrain: ["terrain_type", "type_of_terrain", "terrain"],
+  accessibility: ["accessibility", "access_status", "community_accessibility"],
+  security: ["security_clearance", "security_status"],
+  community_dist: ["community_distance_to_flhf_km", "flhf_community_dist_km", "distance_community_flhf_km", "distance_to_flhf_km"],
+  settlement_dist: ["settlement_distance_to_flhf_km", "flhf_settlement_dist_km", "distance_settlement_flhf_km"],
+  cdd_names: ["cdd_names", "name_s_of_cdd", "names_of_cdd", "name_of_cdds", "cdd_name"],
+  cdd_phones: ["cdd_phone_numbers", "cdd_phone", "phone_number_s_of_cdd", "cdd_phone_number"],
+  cdd_from_community: ["cdd_from_community", "is_cdd_s_from_community_settlement", "is_cdd_from_community"],
+  campaign_type: ["campaign_type", "type_of_campaign"],
+  population_source: ["population_source", "source_of_population_data"],
+  year: ["year_of_microplanning", "microplanning_year", "year"],
+  notes: ["additional_notes", "notes", "comment", "comments", "remarks"],
+} as const;
+
+const PWD_ALIASES: Record<string, string[]> = {
+  pwd_visual: ["pwd_visual", "visual_seeing", "visual", "seeing"],
+  pwd_hearing: ["pwd_hearing", "hearing"],
+  pwd_physical: ["pwd_physical", "physical_mobility", "mobility"],
+  pwd_intellectual: ["pwd_intellectual", "intellectual_cognitive", "cognitive"],
+  pwd_communication: ["pwd_communication", "communication_speech", "speech"],
+  pwd_selfcare: ["pwd_selfcare", "self_care", "selfcare"],
+  pwd_albinism: ["pwd_albinism", "albinism"],
+};
+
+const TRACHOMA_ALIASES: Record<string, string[]> = {
+  trachoma_0_5_months: ["trachoma_0_5_months", "trachoma_0_5months", "trachoma_0_5m"],
+  trachoma_6m_6y: ["trachoma_6m_6y", "trachoma_6months_6yrs", "trachoma_6m_6yrs"],
+  trachoma_7_14y: ["trachoma_7_14y", "trachoma_7_14yrs", "trachoma_7_14"],
+  trachoma_15_plus: ["trachoma_15_plus", "trachoma_15plus", "trachoma_15_yrs_above"],
+};
+
+// Extracts PWD / trachoma / CDD disaggregations from any Kobo naming style.
+function extractDisaggregations(src: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  let pwdSum = 0;
+  let sawPwd = false;
+  for (const [col, aliases] of Object.entries(PWD_ALIASES)) {
+    const n = pickNumber(src, aliases);
+    if (n != null) { out[col] = n; pwdSum += n; sawPwd = true; }
+  }
+  const explicitTotal = pickNumber(src, ["pwd_total", "total_pwd", "total_number_of_pwds"]);
+  if (explicitTotal != null) out.pwd_total = explicitTotal;
+  else if (sawPwd) out.pwd_total = pwdSum;
+
+  for (const [col, aliases] of Object.entries(TRACHOMA_ALIASES)) {
+    const n = pickNumber(src, aliases);
+    if (n != null) out[col] = n;
+  }
+  const cdd = pickFirst(src, A.cdd_names as unknown as string[]);
+  if (cdd) out.cdd_names = cdd;
+  const cddPhone = pickFirst(src, A.cdd_phones as unknown as string[]);
+  if (cddPhone) out.cdd_phone_numbers = cddPhone;
+  const cddFrom = pickBool(src, A.cdd_from_community as unknown as string[]);
+  if (cddFrom != null) out.cdd_from_community = cddFrom;
+  return out;
+}
+
+// Kobo repeat groups are emitted under auto-generated names ("group_yf5bw16"),
+// so detect the community roster structurally when the canonical key is absent.
+const RESERVED_ARRAY_KEYS = new Set([
+  "_attachments", "_notes", "_geolocation", "_validation_status", "_tags",
+  "_supplementaldetails", "_supplementalDetails",
+]);
+
+function detectRepeatArray(payload: Record<string, unknown>): Array<Record<string, unknown>> {
+  const explicit = payload["community_repeat"] ?? payload["_children"];
+  if (Array.isArray(explicit)) {
+    return explicit.filter((x) => x && typeof x === "object" && !Array.isArray(x)) as Array<Record<string, unknown>>;
+  }
+  let best: Array<Record<string, unknown>> = [];
+  let bestScore = 0;
+  for (const [k, v] of Object.entries(payload)) {
+    if (RESERVED_ARRAY_KEYS.has(k) || RESERVED_ARRAY_KEYS.has(k.toLowerCase())) continue;
+    if (!Array.isArray(v) || v.length === 0) continue;
+    const items = v.filter((x) => x && typeof x === "object" && !Array.isArray(x)) as Array<Record<string, unknown>>;
+    if (items.length === 0) continue;
+    const tokens = Object.keys(items[0]).map(normToken);
+    const score = [
+      "communityname", "community", "totalpopulation", "numberofhouseholds",
+      "communitygps", "settlementname", "typeofterrain", "accessibility",
+    ].filter((t) => tokens.some((k2) => k2.includes(t))).length;
+    if (score > bestScore) { bestScore = score; best = items; }
+  }
+  return bestScore >= 2 ? best : [];
+}
+
 
 function slugPart(value: string | null): string | null {
   if (!value) return null;
@@ -331,11 +462,11 @@ Deno.serve(async (req) => {
   const lgaCustom = mapped("lga_custom", ["lga_custom", "lga_other", "admin_hierarchy/lga_manual"]);
   const wardRaw = mapped("ward", ["ward", "ward_name", "admin_hierarchy/ward", "location/ward"]);
   const wardCustom = mapped("ward_custom", ["ward_custom", "ward_other", "admin_hierarchy/ward_manual"]);
-  const flhfName = mapped("flhf_name", ["flhf_name", "flhf_grp/flhf", "flhf_grp/flhf_name"]);
+  const flhfName = mapped("flhf_name", [...A.flhf_name, "flhf_grp/flhf_name"]);
   const flhfCustom = mapped("flhf_custom", ["flhf_custom", "flhf_other", "flhf_manual", "flhf_grp/flhf_manual"]);
-  const communityName = mapped("community_name", ["community", "community_name", "community_grp/community", "community_grp/community_name"]);
+  const communityName = mapped("community_name", [...A.community_name, "community_grp/community", "community_grp/community_name"]);
   const communityCustom = mapped("community_custom", ["community_custom", "community_other", "community_manual", "community_grp/community_manual"]);
-  const settlementName = mapped("settlement_name", ["settlement", "settlement_name", "settlement_grp/settlement", "settlement_grp/settlement_name"]);
+  const settlementName = mapped("settlement_name", [...A.settlement_name, "settlement_grp/settlement", "settlement_grp/settlement_name"]);
   const settlementCustom = mapped("settlement_custom", ["settlement_custom", "settlement_other", "settlement_manual", "settlement_grp/settlement_manual"]);
 
   const stateFinal = normalizeChoiceValue(stateRaw, stateCustom);
@@ -383,44 +514,46 @@ Deno.serve(async (req) => {
     lga: lgaFinal,
     ward: wardFinal,
     flhf_name: flhfFinal,
-    flhf_incharge_name: mapped("flhf_incharge_name", ["flhf_incharge_name", "flhf_incharge"]),
-    flhf_incharge_phone: mapped("flhf_incharge_phone", ["flhf_incharge_phone", "flhf_phone"]),
+    flhf_incharge_name: mapped("flhf_incharge_name", [...A.flhf_incharge_name]),
+    flhf_incharge_phone: mapped("flhf_incharge_phone", [...A.flhf_incharge_phone]),
     community_name: communityFinal,
-    community_leader_name: mapped("community_leader_name", ["community_leader_name", "community_leader"]),
-    community_leader_phone: mapped("community_leader_phone", ["community_leader_phone", "community_phone"]),
+    community_leader_name: mapped("community_leader_name", [...A.community_leader_name]),
+    community_leader_phone: mapped("community_leader_phone", [...A.community_leader_phone]),
     settlement_name: settlementFinal,
+    settlement_mai_unguwa: mapped("settlement_mai_unguwa", [...A.settlement_mai_unguwa]),
     estimated_total_population: mappedNum("estimated_total_population", [
-      "estimated_total_population", "estimated_total_pop", "population",
-      "total_population", "total_pop", "demographics/total_pop", "demographics/total_population",
+      ...A.total_population, "demographics/total_pop", "demographics/total_population",
     ]),
-    estimated_children_0_4: mappedNum("estimated_children_0_4", [
-      "children_0_4", "estimated_children_0_4", "under5", "demographics/children_0_4",
-    ]),
-    estimated_children_5_14: mappedNum("estimated_children_5_14", [
-      "children_5_14", "estimated_children_5_14", "demographics/children_5_14",
-    ]),
-    estimated_adults_15_plus: mappedNum("estimated_adults_15_plus", [
-      "adults_15_plus", "estimated_adults_15_plus", "adults", "demographics/adults_15_plus",
-    ]),
+    estimated_children_0_4: mappedNum("estimated_children_0_4", [...A.children_0_4, "demographics/children_0_4"]),
+    estimated_children_5_14: mappedNum("estimated_children_5_14", [...A.children_5_14, "demographics/children_5_14"]),
+    estimated_adults_15_plus: mappedNum("estimated_adults_15_plus", [...A.adults_15_plus, "demographics/adults_15_plus"]),
     number_of_households: mappedNum("number_of_households", [
-      "number_of_households", "households", "total_households", "hh_count",
-      "demographics/households", "demographics/number_of_households",
+      ...A.households, "demographics/households", "demographics/number_of_households",
     ]),
+    campaign_type: normEnum(mapped("campaign_type", [...A.campaign_type])),
+    population_source: normEnum(mapped("population_source", [...A.population_source])),
+    year_of_microplanning: (() => {
+      const raw = mapped("year_of_microplanning", [...A.year]);
+      if (!raw) return null;
+      const m = String(raw).match(/\d{4}/);
+      return m ? Number(m[0]) : null;
+    })(),
     community_latitude: lat,
     community_longitude: lng,
     settlement_latitude: mappedNum("settlement_latitude", ["settlement_lat", "settlement_latitude"]) ?? lat,
     settlement_longitude: mappedNum("settlement_longitude", ["settlement_lng", "settlement_longitude"]) ?? lng,
     flhf_latitude: flhfCoords.lat ?? mappedNum("flhf_latitude", ["flhf_lat", "flhf_latitude", "flhf_grp/flhf_latitude"]),
     flhf_longitude: flhfCoords.lng ?? mappedNum("flhf_longitude", ["flhf_lng", "flhf_longitude", "flhf_grp/flhf_longitude"]),
-    terrain_type: (mapped("terrain_type", ["terrain_type", "context_grp/terrain_type", "type_of_terrain"]) || "").toLowerCase().trim() || null,
-    accessibility: (mapped("accessibility", ["accessibility", "context_grp/accessibility"]) || "").toLowerCase().trim() || null,
-    security_clearance: (mapped("security_clearance", ["security_clearance", "context_grp/security_clearance"]) || "").toLowerCase().trim() || null,
+    terrain_type: normEnum(mapped("terrain_type", [...A.terrain, "context_grp/terrain_type"])),
+    accessibility: normEnum(mapped("accessibility", [...A.accessibility, "context_grp/accessibility"])),
+    security_clearance: normEnum(mapped("security_clearance", [...A.security, "context_grp/security_clearance"])),
     community_distance_to_flhf_km: mappedNum("community_distance_to_flhf_km", [
-      "community_distance_to_flhf_km", "community_grp/community_distance_to_flhf_km", "distance_community_flhf_km",
+      ...A.community_dist, "community_grp/community_distance_to_flhf_km",
     ]),
     settlement_distance_to_flhf_km: mappedNum("settlement_distance_to_flhf_km", [
-      "settlement_distance_to_flhf_km", "settlement_grp/settlement_distance_to_flhf_km", "distance_settlement_flhf_km",
+      ...A.settlement_dist, "settlement_grp/settlement_distance_to_flhf_km",
     ]),
+    ...extractDisaggregations(payload),
     is_custom_location: isCustom,
     geotagged: lat != null && lng != null,
     extra_metadata: payload,
@@ -448,12 +581,9 @@ Deno.serve(async (req) => {
   // in some flat exports). Each iteration becomes its own microplan_entries
   // row inheriting the parent (state/lga/ward/flhf) fields, keyed by
   // `${_uuid}_${index}` so retries stay idempotent per repeat item.
-  const repeatCandidate =
-    (payload["community_repeat"] as unknown) ??
-    (payload["_children"] as unknown);
-  const repeatItems: Array<Record<string, unknown>> = Array.isArray(repeatCandidate)
-    ? (repeatCandidate as Array<Record<string, unknown>>).filter((x) => x && typeof x === "object")
-    : [];
+  // Hand-built Kobo forms name the roster with a random group id
+  // ("group_yf5bw16"), so fall back to structural detection.
+  const repeatItems: Array<Record<string, unknown>> = detectRepeatArray(payload);
 
   const buildRecord = (
     extra: Record<string, unknown>,
@@ -510,13 +640,12 @@ Deno.serve(async (req) => {
       }
       const disaggregations = validation.data;
       const cName = normalizeChoiceValue(
-
-        pickFirst(item, ["community_name", "community"]),
+        pickFirst(item, [...A.community_name]),
         pickFirst(item, ["community_manual", "community_custom"]),
         [stateRaw, lgaRaw, wardRaw],
       );
       const sName = normalizeChoiceValue(
-        pickFirst(item, ["settlement_name", "settlement"]),
+        pickFirst(item, [...A.settlement_name]),
         pickFirst(item, ["settlement_manual", "settlement_custom"]),
         [stateRaw, lgaRaw, wardRaw, pickFirst(item, ["community"])],
       );
@@ -533,34 +662,36 @@ Deno.serve(async (req) => {
         latKeys: ["settlement_manual_latitude", "settlement_latitude", "settlement_lat"],
         lngKeys: ["settlement_manual_longitude", "settlement_longitude", "settlement_lng"],
       });
-      const totalPop = pickNumber(item, ["estimated_total_population", "total_population"]);
+      const totalPop = pickNumber(item, [...A.total_population]);
       if (!inRange(totalPop)) {
         rejectedItems.push({ index: idx, reason: "estimated_total_population_out_of_range", value: totalPop });
         return;
       }
-      upserts.push(buildRecord({
+      // Per-item values win; anything the roster omits falls back to the
+      // parent submission so no populated question is ever lost.
+      const itemFields: Record<string, unknown> = {
         community_name: cName,
         settlement_name: sName,
-        community_leader_name: pickFirst(item, ["community_leader_name", "community_leader"]),
-        community_leader_phone: pickFirst(item, ["community_leader_phone", "community_phone"]),
-        estimated_children_0_4: pickNumber(item, ["estimated_children_0_4", "children_0_4"]),
-        estimated_children_5_14: pickNumber(item, ["estimated_children_5_14", "children_5_14"]),
-        estimated_adults_15_plus: pickNumber(item, ["estimated_adults_15_plus", "adults_15_plus"]),
+        community_leader_name: pickFirst(item, [...A.community_leader_name]),
+        community_leader_phone: pickFirst(item, [...A.community_leader_phone]),
+        estimated_children_0_4: pickNumber(item, [...A.children_0_4]),
+        estimated_children_5_14: pickNumber(item, [...A.children_5_14]),
+        estimated_adults_15_plus: pickNumber(item, [...A.adults_15_plus]),
         estimated_total_population: totalPop,
-        number_of_households: pickNumber(item, ["number_of_households", "households"]),
-        terrain_type: (pickFirst(item, ["terrain_type"]) || "").toLowerCase().trim() || null,
-        accessibility: (pickFirst(item, ["accessibility", "access_status"]) || "").toLowerCase().trim() || null,
-        security_clearance: (pickFirst(item, ["security_clearance", "security_status"]) || "").toLowerCase().trim() || null,
+        number_of_households: pickNumber(item, [...A.households]),
+        terrain_type: normEnum(pickFirst(item, [...A.terrain])),
+        accessibility: normEnum(pickFirst(item, [...A.accessibility])),
+        security_clearance: normEnum(pickFirst(item, [...A.security])),
         // additional_notes now lives inside the community_repeat so each
         // community carries its own free-text observations through to the DB.
-        notes: pickFirst(item, ["additional_notes", "notes"]) ?? null,
-        settlement_mai_unguwa: pickFirst(item, ["settlement_mai_unguwa", "mai_unguwa"]),
+        notes: pickFirst(item, [...A.notes]),
+        settlement_mai_unguwa: pickFirst(item, [...A.settlement_mai_unguwa]),
         settlement_latitude: settlementCoords.lat,
         settlement_longitude: settlementCoords.lng,
-        settlement_distance_to_flhf_km: pickNumber(item, ["settlement_distance_to_flhf_km"]),
-        community_distance_to_flhf_km: pickNumber(item, ["community_distance_to_flhf_km"]),
+        settlement_distance_to_flhf_km: pickNumber(item, [...A.settlement_dist]),
+        community_distance_to_flhf_km: pickNumber(item, [...A.community_dist]),
         flhf_name:
-          (pickFirst(item, ["flhf_name"]) ?? "").trim() ||
+          (pickFirst(item, [...A.flhf_name]) ?? "").trim() ||
           ((record.flhf_name as string | null) ?? "").trim() ||
           FLHF_FALLBACK,
         // Anything collected without a dedicated column is preserved as JSONB.
@@ -568,7 +699,12 @@ Deno.serve(async (req) => {
         // PWD, CDD and Trachoma disaggregations now live INSIDE community_repeat
         // (per-community), so pass them through per row instead of the parent.
         ...disaggregations,
-      }, `${koboUuid}_${idx}`, { lat: cLat, lng: cLng }));
+        ...extractDisaggregations(item),
+      };
+      for (const k of Object.keys(itemFields)) {
+        if (itemFields[k] == null && record[k] != null) delete itemFields[k];
+      }
+      upserts.push(buildRecord(itemFields, `${koboUuid}_${idx}`, { lat: cLat, lng: cLng }));
     });
 
   } else {
