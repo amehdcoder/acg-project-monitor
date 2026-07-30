@@ -514,44 +514,46 @@ Deno.serve(async (req) => {
     lga: lgaFinal,
     ward: wardFinal,
     flhf_name: flhfFinal,
-    flhf_incharge_name: mapped("flhf_incharge_name", ["flhf_incharge_name", "flhf_incharge"]),
-    flhf_incharge_phone: mapped("flhf_incharge_phone", ["flhf_incharge_phone", "flhf_phone"]),
+    flhf_incharge_name: mapped("flhf_incharge_name", [...A.flhf_incharge_name]),
+    flhf_incharge_phone: mapped("flhf_incharge_phone", [...A.flhf_incharge_phone]),
     community_name: communityFinal,
-    community_leader_name: mapped("community_leader_name", ["community_leader_name", "community_leader"]),
-    community_leader_phone: mapped("community_leader_phone", ["community_leader_phone", "community_phone"]),
+    community_leader_name: mapped("community_leader_name", [...A.community_leader_name]),
+    community_leader_phone: mapped("community_leader_phone", [...A.community_leader_phone]),
     settlement_name: settlementFinal,
+    settlement_mai_unguwa: mapped("settlement_mai_unguwa", [...A.settlement_mai_unguwa]),
     estimated_total_population: mappedNum("estimated_total_population", [
-      "estimated_total_population", "estimated_total_pop", "population",
-      "total_population", "total_pop", "demographics/total_pop", "demographics/total_population",
+      ...A.total_population, "demographics/total_pop", "demographics/total_population",
     ]),
-    estimated_children_0_4: mappedNum("estimated_children_0_4", [
-      "children_0_4", "estimated_children_0_4", "under5", "demographics/children_0_4",
-    ]),
-    estimated_children_5_14: mappedNum("estimated_children_5_14", [
-      "children_5_14", "estimated_children_5_14", "demographics/children_5_14",
-    ]),
-    estimated_adults_15_plus: mappedNum("estimated_adults_15_plus", [
-      "adults_15_plus", "estimated_adults_15_plus", "adults", "demographics/adults_15_plus",
-    ]),
+    estimated_children_0_4: mappedNum("estimated_children_0_4", [...A.children_0_4, "demographics/children_0_4"]),
+    estimated_children_5_14: mappedNum("estimated_children_5_14", [...A.children_5_14, "demographics/children_5_14"]),
+    estimated_adults_15_plus: mappedNum("estimated_adults_15_plus", [...A.adults_15_plus, "demographics/adults_15_plus"]),
     number_of_households: mappedNum("number_of_households", [
-      "number_of_households", "households", "total_households", "hh_count",
-      "demographics/households", "demographics/number_of_households",
+      ...A.households, "demographics/households", "demographics/number_of_households",
     ]),
+    campaign_type: normEnum(mapped("campaign_type", [...A.campaign_type])),
+    population_source: normEnum(mapped("population_source", [...A.population_source])),
+    year_of_microplanning: (() => {
+      const raw = mapped("year_of_microplanning", [...A.year]);
+      if (!raw) return null;
+      const m = String(raw).match(/\d{4}/);
+      return m ? Number(m[0]) : null;
+    })(),
     community_latitude: lat,
     community_longitude: lng,
     settlement_latitude: mappedNum("settlement_latitude", ["settlement_lat", "settlement_latitude"]) ?? lat,
     settlement_longitude: mappedNum("settlement_longitude", ["settlement_lng", "settlement_longitude"]) ?? lng,
     flhf_latitude: flhfCoords.lat ?? mappedNum("flhf_latitude", ["flhf_lat", "flhf_latitude", "flhf_grp/flhf_latitude"]),
     flhf_longitude: flhfCoords.lng ?? mappedNum("flhf_longitude", ["flhf_lng", "flhf_longitude", "flhf_grp/flhf_longitude"]),
-    terrain_type: (mapped("terrain_type", ["terrain_type", "context_grp/terrain_type", "type_of_terrain"]) || "").toLowerCase().trim() || null,
-    accessibility: (mapped("accessibility", ["accessibility", "context_grp/accessibility"]) || "").toLowerCase().trim() || null,
-    security_clearance: (mapped("security_clearance", ["security_clearance", "context_grp/security_clearance"]) || "").toLowerCase().trim() || null,
+    terrain_type: normEnum(mapped("terrain_type", [...A.terrain, "context_grp/terrain_type"])),
+    accessibility: normEnum(mapped("accessibility", [...A.accessibility, "context_grp/accessibility"])),
+    security_clearance: normEnum(mapped("security_clearance", [...A.security, "context_grp/security_clearance"])),
     community_distance_to_flhf_km: mappedNum("community_distance_to_flhf_km", [
-      "community_distance_to_flhf_km", "community_grp/community_distance_to_flhf_km", "distance_community_flhf_km",
+      ...A.community_dist, "community_grp/community_distance_to_flhf_km",
     ]),
     settlement_distance_to_flhf_km: mappedNum("settlement_distance_to_flhf_km", [
-      "settlement_distance_to_flhf_km", "settlement_grp/settlement_distance_to_flhf_km", "distance_settlement_flhf_km",
+      ...A.settlement_dist, "settlement_grp/settlement_distance_to_flhf_km",
     ]),
+    ...extractDisaggregations(payload),
     is_custom_location: isCustom,
     geotagged: lat != null && lng != null,
     extra_metadata: payload,
