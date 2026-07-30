@@ -559,7 +559,10 @@ Deno.serve(async (req) => {
         settlement_longitude: settlementCoords.lng,
         settlement_distance_to_flhf_km: pickNumber(item, ["settlement_distance_to_flhf_km"]),
         community_distance_to_flhf_km: pickNumber(item, ["community_distance_to_flhf_km"]),
-        flhf_name: pickFirst(item, ["flhf_name"]) ?? (record.flhf_name as string | null) ?? null,
+        flhf_name:
+          (pickFirst(item, ["flhf_name"]) ?? "").trim() ||
+          ((record.flhf_name as string | null) ?? "").trim() ||
+          FLHF_FALLBACK,
         // Anything collected without a dedicated column is preserved as JSONB.
         extra_metadata: item,
         // PWD, CDD and Trachoma disaggregations now live INSIDE community_repeat
