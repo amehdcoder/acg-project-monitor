@@ -71,7 +71,106 @@ export interface MicroplanRepeatRow extends RepeatDisaggregations {
   geotagged: boolean;
 }
 
+// ── RUNTIME VALIDATION (zod-style, dependency-free) ───────────────────
+// The shared module is imported by BOTH the Deno edge runtime and vitest
+// (Node), so we ship a tiny self-contained schema instead of a package that
+// would need two different specifiers. The API mirrors zod: `safeParse`
+// returns `{ success, data | error }`, `parse` throws on the first failure.
+
+export interface RepeatItemIssue {
+  field: string;
+  code: "required" | "invalid_type";
+  message: string;
+}
+
+export class RepeatItemValidationError extends Error {
+  readonly issues: RepeatItemIssue[];
+  constructor(issues: RepeatItemIssue[]) {
+    super(
+      `Invalid community_repeat item: ${issues
+        .map((i) => `${i.field} (${i.code}) — ${i.message}`)
+        .join("; ")}`,
+    );
+    this.name = "RepeatItemValidationError";
+    this.issues = issues;
+  }
+}
+
+const NUMERIC_DISAGG_FIELDS = [
+  "trachoma_0_5_months", "trachoma_6m_6y", "trachoma_7_14y", "trachoma_15_plus",
+  "pwd_total", "pwd_visual", "pwd_hearing", "pwd_physical",
+  "pwd_intellectual", "pwd_communication", "pwd_selfcare", "pwd_albinism",
+] as const;
+
+const TEXT_DISAGG_FIELDS = ["cdd_names", "cdd_phone_numbers", "cdd_from_community"] as const;
+
+/** Disaggregation columns that must be present when strict mode is enabled. */
+export const REQUIRED_DISAGGREGATION_FIELDS = ["pwd_total", "cdd_names", "trachoma_7_14y"] as const;
+
+const isBlank = (v: unknown) =>
+  v === undefined || v === null || (typeof v === "string" && v.trim() === "");
+
+export interface ValidateRepeatOptions {
+  /** Require REQUIRED_DISAGGREGATION_FIELDS (or a custom list) to be present. */
+  requireDisaggregations?: boolean;
+  requiredFields?: readonly string[];
+}
+
+/**
+ * Validate the disaggregation portion of a community_repeat item BEFORE it is
+ * mapped onto microplan_entries columns. Type errors are always reported;
+ * missing-field errors only when `requireDisaggregations` is set.
+ */
+export function validateRepeatDisaggregations(
+  item: AnyRec,
+  opts: ValidateRepeatOptions = {},
+): { success: true; data: RepeatDisaggregations } | { success: false; error: RepeatItemValidationError } {
+  const issues: RepeatItemIssue[] = [];
+
+  for (const field of NUMERIC_DISAGG_FIELDS) {
+    const raw = getFlat(item, field);
+    if (isBlank(raw)) continue;
+    const n = typeof raw === "number" ? raw : Number(String(raw).replace(/,/g, ""));
+    if (!Number.isFinite(n)) {
+      issues.push({ field, code: "invalid_type", message: `expected a number, received ${JSON.stringify(raw)}` });
+    } else if (n < 0) {
+      issues.push({ field, code: "invalid_type", message: `expected a non-negative number, received ${n}` });
+    }
+  }
+
+  for (const field of TEXT_DISAGG_FIELDS) {
+    const raw = getFlat(item, field);
+    if (isBlank(raw)) continue;
+    if (typeof raw !== "string" && typeof raw !== "number") {
+      issues.push({ field, code: "invalid_type", message: `expected text, received ${typeof raw}` });
+    }
+  }
+
+  if (opts.requireDisaggregations) {
+    const required = opts.requiredFields ?? REQUIRED_DISAGGREGATION_FIELDS;
+    for (const field of required) {
+      if (isBlank(getFlat(item, field))) {
+        issues.push({ field, code: "required", message: "field is missing or empty in the webhook payload" });
+      }
+    }
+  }
+
+  if (issues.length > 0) return { success: false, error: new RepeatItemValidationError(issues) };
+  return { success: true, data: extractRepeatDisaggregations(item) };
+}
+
+/** Fail-fast variant: throws `RepeatItemValidationError` with a clear message. */
+export function parseRepeatDisaggregations(
+  item: AnyRec,
+  opts: ValidateRepeatOptions = {},
+): RepeatDisaggregations {
+  const result = validateRepeatDisaggregations(item, opts);
+  if (!result.success) throw result.error;
+  return result.data;
+}
+
 // Extract the PWD / CDD / Trachoma sub-fields now nested inside
+
 // community_repeat so the webhook can pass them through to microplan_entries.
 export function extractRepeatDisaggregations(item: AnyRec): RepeatDisaggregations {
   return {
