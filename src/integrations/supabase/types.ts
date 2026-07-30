@@ -5625,6 +5625,7 @@ export type Database = {
           estimated_children_0_4: number | null
           estimated_children_5_14: number | null
           estimated_total_population: number | null
+          extra_metadata: Json
           flhf_incharge_name: string | null
           flhf_incharge_phone: string | null
           flhf_lat_override: number | null
@@ -5632,6 +5633,7 @@ export type Database = {
           flhf_lng_override: number | null
           flhf_longitude: number | null
           flhf_name: string
+          geotagged: boolean
           gps_overridden_at: string | null
           gps_overridden_by: string | null
           households_treated: number | null
@@ -5700,6 +5702,7 @@ export type Database = {
           estimated_children_0_4?: number | null
           estimated_children_5_14?: number | null
           estimated_total_population?: number | null
+          extra_metadata?: Json
           flhf_incharge_name?: string | null
           flhf_incharge_phone?: string | null
           flhf_lat_override?: number | null
@@ -5707,6 +5710,7 @@ export type Database = {
           flhf_lng_override?: number | null
           flhf_longitude?: number | null
           flhf_name: string
+          geotagged?: boolean
           gps_overridden_at?: string | null
           gps_overridden_by?: string | null
           households_treated?: number | null
@@ -5775,6 +5779,7 @@ export type Database = {
           estimated_children_0_4?: number | null
           estimated_children_5_14?: number | null
           estimated_total_population?: number | null
+          extra_metadata?: Json
           flhf_incharge_name?: string | null
           flhf_incharge_phone?: string | null
           flhf_lat_override?: number | null
@@ -5782,6 +5787,7 @@ export type Database = {
           flhf_lng_override?: number | null
           flhf_longitude?: number | null
           flhf_name?: string
+          geotagged?: boolean
           gps_overridden_at?: string | null
           gps_overridden_by?: string | null
           households_treated?: number | null
