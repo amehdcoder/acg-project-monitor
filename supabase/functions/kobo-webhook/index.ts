@@ -191,7 +191,6 @@ Deno.serve(async (req) => {
           refusals: pickNum(item, ["refusals"]),
           missed_population: pickNum(item, ["missed_population", "missed"]),
           latitude: geo.lat, longitude: geo.lng,
-          geotagged: geo.geotagged,
           notes: pick(item, ["notes"]) ?? null,
           payload: item,
           submitted_at: submittedAt,
