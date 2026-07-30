@@ -97,7 +97,7 @@ describe("community_repeat unpacking with free-text location names", () => {
   };
 
   it("unpacks each repeat item with typed names, coordinates and project binding", () => {
-    const rows: Record<string, any>[] = payload.community_repeat.map((item, idx) => ({
+    const rows: MicroplanRepeatRow[] = payload.community_repeat.map((item, idx) => ({
       idempotency_key: `${payload._uuid}_${idx}`,
       project_id: payload.project_id,
       flhf_name: pickFirst(item, ["flhf_name"]) ?? payload.flhf_name,
