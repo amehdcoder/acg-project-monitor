@@ -581,12 +581,9 @@ Deno.serve(async (req) => {
   // in some flat exports). Each iteration becomes its own microplan_entries
   // row inheriting the parent (state/lga/ward/flhf) fields, keyed by
   // `${_uuid}_${index}` so retries stay idempotent per repeat item.
-  const repeatCandidate =
-    (payload["community_repeat"] as unknown) ??
-    (payload["_children"] as unknown);
-  const repeatItems: Array<Record<string, unknown>> = Array.isArray(repeatCandidate)
-    ? (repeatCandidate as Array<Record<string, unknown>>).filter((x) => x && typeof x === "object")
-    : [];
+  // Hand-built Kobo forms name the roster with a random group id
+  // ("group_yf5bw16"), so fall back to structural detection.
+  const repeatItems: Array<Record<string, unknown>> = detectRepeatArray(payload);
 
   const buildRecord = (
     extra: Record<string, unknown>,
