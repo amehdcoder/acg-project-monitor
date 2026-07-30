@@ -56,6 +56,7 @@ function checkAuth(req: Request, secrets: string[]): boolean {
   }
   return valid.has(auth);
 }
+const FLHF_FALLBACK = "Unspecified FLHF";
 
 function getFlat(obj: Record<string, unknown>, key: string): unknown {
   if (key in obj) return obj[key];
@@ -340,7 +341,11 @@ Deno.serve(async (req) => {
   const stateFinal = normalizeChoiceValue(stateRaw, stateCustom);
   const lgaFinal = normalizeChoiceValue(lgaRaw, lgaCustom, [stateRaw]);
   const wardFinal = normalizeChoiceValue(wardRaw, wardCustom, [stateRaw, lgaRaw]);
-  const flhfFinal = normalizeChoiceValue(flhfName, flhfCustom, [stateRaw, lgaRaw, wardRaw]);
+  // `flhf_name` is NOT NULL in the DB — never let a blank/missing typed value
+  // reach the upsert (an explicit null bypasses the column default).
+  const flhfFinal =
+    (normalizeChoiceValue(flhfName, flhfCustom, [stateRaw, lgaRaw, wardRaw]) ?? "").trim() ||
+    FLHF_FALLBACK;
   const communityFinal = normalizeChoiceValue(communityName, communityCustom, [stateRaw, lgaRaw, wardRaw]);
   const settlementFinal = normalizeChoiceValue(settlementName, settlementCustom, [stateRaw, lgaRaw, wardRaw, communityName]);
 
@@ -554,7 +559,10 @@ Deno.serve(async (req) => {
         settlement_longitude: settlementCoords.lng,
         settlement_distance_to_flhf_km: pickNumber(item, ["settlement_distance_to_flhf_km"]),
         community_distance_to_flhf_km: pickNumber(item, ["community_distance_to_flhf_km"]),
-        flhf_name: pickFirst(item, ["flhf_name"]) ?? (record.flhf_name as string | null) ?? null,
+        flhf_name:
+          (pickFirst(item, ["flhf_name"]) ?? "").trim() ||
+          ((record.flhf_name as string | null) ?? "").trim() ||
+          FLHF_FALLBACK,
         // Anything collected without a dedicated column is preserved as JSONB.
         extra_metadata: item,
         // PWD, CDD and Trachoma disaggregations now live INSIDE community_repeat

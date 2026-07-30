@@ -5709,7 +5709,7 @@ export type Database = {
           flhf_latitude?: number | null
           flhf_lng_override?: number | null
           flhf_longitude?: number | null
-          flhf_name: string
+          flhf_name?: string
           geotagged?: boolean
           gps_overridden_at?: string | null
           gps_overridden_by?: string | null
