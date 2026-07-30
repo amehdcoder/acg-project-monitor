@@ -52,6 +52,24 @@ describe.each([
     expect(offenders, `select fields missing minimal appearance:\n${offenders.join("\n")}`).toEqual([]);
   });
 
+  it("every begin_group uses appearance: field-list", async () => {
+    const books = await loadBooks();
+    const wb = books[which];
+    const survey = rowsOf(wb, "survey");
+    const h = survey[0];
+    const typeIdx = h.indexOf("type");
+    const appIdx = h.indexOf("appearance");
+    const nameIdx = h.indexOf("name");
+    const offenders: string[] = [];
+    for (const r of survey.slice(1)) {
+      if (String(r[typeIdx] ?? "").trim() !== "begin_group") continue;
+      if (!/field-list/.test(String(r[appIdx] ?? ""))) {
+        offenders.push(`${String(r[nameIdx])} → "${String(r[appIdx] ?? "")}"`);
+      }
+    }
+    expect(offenders, `groups missing field-list:\n${offenders.join("\n")}`).toEqual([]);
+  });
+
   it("no forbidden HTML tags in labels/hints/headers/choices", async () => {
     const books = await loadBooks();
     const wb = books[which];
