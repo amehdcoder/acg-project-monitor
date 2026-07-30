@@ -8,6 +8,7 @@ import {
   pickFirst,
   pickNumber,
   resolveCoordinates,
+  type MicroplanRepeatRow,
 } from "../../../../supabase/functions/_shared/microplanRepeatItem";
 
 describe("extractRepeatDisaggregations", () => {
