@@ -343,7 +343,6 @@ Deno.serve(async (req) => {
   const wardFinal = normalizeChoiceValue(wardRaw, wardCustom, [stateRaw, lgaRaw]);
   // `flhf_name` is NOT NULL in the DB — never let a blank/missing typed value
   // reach the upsert (an explicit null bypasses the column default).
-  const FLHF_FALLBACK = "Unspecified FLHF";
   const flhfFinal =
     (normalizeChoiceValue(flhfName, flhfCustom, [stateRaw, lgaRaw, wardRaw]) ?? "").trim() ||
     FLHF_FALLBACK;
