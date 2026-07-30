@@ -121,10 +121,14 @@ export interface ValidateRepeatOptions {
  * mapped onto microplan_entries columns. Type errors are always reported;
  * missing-field errors only when `requireDisaggregations` is set.
  */
+export type RepeatValidationResult =
+  | { success: true; data: RepeatDisaggregations; error?: undefined }
+  | { success: false; error: RepeatItemValidationError; data?: undefined };
+
 export function validateRepeatDisaggregations(
   item: AnyRec,
   opts: ValidateRepeatOptions = {},
-): { success: true; data: RepeatDisaggregations } | { success: false; error: RepeatItemValidationError } {
+): RepeatValidationResult {
   const issues: RepeatItemIssue[] = [];
 
   for (const field of NUMERIC_DISAGG_FIELDS) {
