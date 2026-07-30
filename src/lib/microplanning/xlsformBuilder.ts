@@ -1,27 +1,26 @@
-// Complete XLSForm exporter for the Geo-enabled Microplanning entry form.
+// Geo-enabled Microplanning XLSForm exporter.
 //
-// Produces an ODK / KoboToolbox / PyXForm-compatible .xlsx workbook with three
-// sheets (`survey`, `choices`, `settings`) mirroring MicroplanEntryForm.tsx.
+// STRUCTURE SOURCE OF TRUTH: the master workbook supplied by the programme
+// team (`aH2UfUo8VDqDmqNUUeJ4bJ (1).xlsx`). Its survey order, groups, choice
+// lists and settings are reproduced here, with three deliberate hardening
+// changes required by Amehnities:
 //
-// Design goals (updated for KoboToolbox PyXForm-strict imports):
-//   1. STRICT SANITIZATION — every `name` value in survey & choices is passed
-//      through `sanitize()` (see below). No spaces, hyphens, slashes; never
-//      starts with a digit; only [a-z0-9_].
-//   2. UNIQUE CHOICE IDENTIFIERS — each choice `name` is scoped by its parent
-//      chain (e.g. settlements: `<ward>__<settlement>__<idx>`) so that
-//      (list_name, name) pairs are globally unique.
-//   3. STATE-SCOPED CHOICES — GRID3 rows are limited to the active project's
-//      locked states. Exporting the full national list caused PyXForm to
-//      time out on Kobo import; state-scoped exports import in seconds.
-//   4. SIMPLIFIED CHOICE FILTERS — one parent per level (`lga=${lga}`,
-//      `ward=${ward}`, `flhf=${flhf}`, `community=${community}`) matching the
-//      exact lower-case variable names PyXForm expects.
-//   5. PER-PROJECT SETTINGS — form_title/form_id/version are stamped from the
-//      caller project so each export is a distinct Kobo asset.
+//   1. NO RAW HTML — the master used <span style="color: blue;">…</span> in
+//      group labels. KoboCollect escapes those, so every label is emitted as
+//      clean Markdown (`### 📍 Community Details`).
+//   2. FREE-TEXT FLHF / COMMUNITY / SETTLEMENT — these are typed by the
+//      enumerator (`type: text`), never picked from a pre-populated GRID3
+//      choice list, and no GPS is pre-filled for them.
+//   3. DUAL GPS — every location captures a native `geopoint` PLUS manual
+//      decimal latitude/longitude inputs. A `calculate` resolves the final
+//      coordinate with geopoint-first precedence; the webhook applies the same
+//      fallback hierarchy server-side.
+//
+// The State → LGA → Ward cascade stays dynamic and is generated from the
+// GRID3/INEC registry (37 states / 774 LGAs / 9,410 wards).
 
 import * as XLSX from "xlsx";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
-import { getGrid3FullStateEntries } from "@/lib/grid3NigeriaData";
 
 type Row = (string | number)[];
 
@@ -48,21 +47,25 @@ const SURVEY_HEADER = [
   "choice_filter", "appearance", "default", "image", "repeat_count",
 ];
 
-// Choice parent columns follow the SIMPLIFIED cascade (single parent per level)
-// so PyXForm's filter parser stays fast and unambiguous.
-const CHOICES_HEADER = ["list_name", "name", "label", "lga", "ward", "flhf", "community", "lat", "lng"];
+// Cascade parent columns: LGA rows carry `state`, Ward rows carry `lga`.
+const CHOICES_HEADER = ["list_name", "name", "label", "state", "lga"];
 
-// NOTE: `default_language` intentionally excluded — form is single-language and
-// including it forces PyXForm to require `label::English (en)` on every row.
 const SETTINGS_HEADER = ["form_title", "form_id", "version", "style", "allow_choice_duplicates"];
 
+/**
+ * Strip raw HTML markup from any label/hint. The master workbook shipped
+ * <span style="…"> wrappers; KoboCollect renders those as literal text.
+ */
+export const stripHtml = (s: string): string =>
+  String(s ?? "")
+    .replace(/<\s*\/?\s*[a-zA-Z][^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
 
 /**
  * Sanitize `${...}` interpolations inside a hint/message so they strictly
- * reference valid XLSForm question names. PyXForm rejects rows where `${...}`
- * contains XPath expressions like `position(..)` or `.`; we strip those unsafe
- * interpolations (leaving surrounding literal text) so hints stay readable
- * while eliminating KoboToolbox's XPath syntax error.
+ * reference valid XLSForm question names.
  */
 const VALID_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 export const sanitizeInterpolations = (s: string): string =>
@@ -72,21 +75,32 @@ export const sanitizeInterpolations = (s: string): string =>
   });
 
 const HINT_LIKE_COLS = new Set(["hint", "required_message", "constraint_message"]);
+const TEXTY_COLS = new Set(["label", "hint", "required_message", "constraint_message"]);
 const q = (r: Partial<Record<(typeof SURVEY_HEADER)[number], string>>): Row =>
   SURVEY_HEADER.map((h) => {
     const v = (r as any)[h];
     if (v == null) return "";
-    return HINT_LIKE_COLS.has(h) ? sanitizeInterpolations(String(v)) : v;
+    let out = String(v);
+    if (TEXTY_COLS.has(h)) out = stripHtml(out);
+    if (HINT_LIKE_COLS.has(h)) out = sanitizeInterpolations(out);
+    return out;
   });
 
 const ch = (r: Partial<Record<(typeof CHOICES_HEADER)[number], string | number>>): Row =>
   CHOICES_HEADER.map((h) => {
     const v = (r as any)[h];
-    return v == null ? "" : v;
+    return v == null ? "" : (typeof v === "string" ? stripHtml(v) : v);
   });
 
 const geopointExpr = (lat: string, lng: string) =>
   `if(${lat}='' or ${lng}='', '', concat(${lat}, ' ', ${lng}, ' 0 0'))`;
+
+/**
+ * Dual-GPS resolver expression: prefer the native geopoint reading, fall back
+ * to the manually typed decimal when the geopoint was not captured.
+ */
+const dualGps = (geopoint: string, manual: string, index: 0 | 1) =>
+  `if(${geopoint} = '', ${manual}, selected-at(${geopoint}, ${index}))`;
 
 export interface BuildProgress {
   phase: "states" | "flhfs" | "communities" | "assemble" | "done";
@@ -95,15 +109,14 @@ export interface BuildProgress {
 }
 
 export interface BuildOptions {
-  /** Optional: name of the active project — stamped into form_title/form_id. */
+  /** Optional: name of the active project — stamped into form_title. */
   projectName?: string | null;
   /** Optional: monotonically-increasing version integer (falls back to date stamp). */
   versionInt?: number | null;
   /**
    * Optional list of state names the project is locked to. When provided AND
-   * non-empty, GRID3 choices are restricted to those states. When empty/null,
-   * the FULL national list is exported (legacy behaviour — beware of Kobo
-   * import timeouts on huge datasets).
+   * non-empty, the cascade is restricted to those states; otherwise the full
+   * 37-state / 774-LGA / 9,410-ward registry is exported.
    */
   projectStates?: string[] | null;
 }
@@ -120,33 +133,20 @@ export async function buildMicroplanningXlsForm(
   survey.push(q({ type: "start", name: "start" }));
   survey.push(q({ type: "end", name: "end" }));
   survey.push(q({ type: "today", name: "today" }));
-  survey.push(q({ type: "deviceid", name: "deviceid" }));
   survey.push(q({ type: "username", name: "username" }));
+  survey.push(q({ type: "deviceid", name: "deviceid" }));
   survey.push(q({ type: "phonenumber", name: "phonenumber" }));
 
-  // Cover / welcome — the FIRST SCREEN carries only the `home` media file as a
-  // full-bleed hero image. Wrapping the note in its own `field-list` group with
-  // `w100 no-label` on the note row lets KoboCollect and Enketo render the
-  // image edge-to-edge with no visible label text or additional controls. The
-  // label stays a single space so PyXForm accepts the row.
+  // ── Cover: full-bleed `home` image, nothing else on the screen ──
   survey.push(q({ type: "begin_group", name: "grp_welcome", label: " ", appearance: "field-list" }));
   survey.push(q({
     type: "note", name: "welcome_cover_note",
-    label: " ",
-    image: "home",
-    appearance: "w100 no-label",
+    label: " ", image: "home", appearance: "w100 no-label",
   }));
   survey.push(q({ type: "end_group", name: "grp_welcome_end" }));
 
-  survey.push(q({
-    type: "note", name: "intro",
-    label: "**Amehnities — Geo-enabled Microplanning Entry**\n\nComplete each section. Cascaded LGA → Ward → FLHF → Community/Settlement is powered by GRID3. Where a name is missing, select **Other (specify manually)** to type it in.",
-  }));
-
-
-
   // ── Section 1: Campaign & Year ──
-  survey.push(q({ type: "begin_group", name: "campaign_year", label: "1. Campaign & Year", appearance: "field-list" }));
+  survey.push(q({ type: "begin_group", name: "grp_campaign_year", label: "### 📅 Campaign & Year", appearance: "field-list" }));
   survey.push(q({
     type: "integer", name: "year_of_microplanning", label: "Year of Microplanning",
     required: "yes", constraint: ". >= 2000 and . <= 2100",
@@ -159,161 +159,83 @@ export async function buildMicroplanningXlsForm(
   }));
   survey.push(q({
     type: "select_one population_source", name: "population_source",
-    label: "Source of Population Data", appearance: "minimal",
+    label: "Source of Population Data", required: "yes",
+    default: "health_facility", appearance: "minimal",
   }));
-  survey.push(q({ type: "end_group", name: "campaign_year_end" }));
+  survey.push(q({ type: "end_group", name: "grp_campaign_year_end" }));
 
-  // ── Section 2: Administrative Hierarchy ──
-  //
-  // NOTE: When projectStates has exactly one entry we DROP the state select and
-  // hard-code the state via a calculate — the export is scoped to that state
-  // so a picker adds no value and shortens the form.
+  // ── Section 2: Administrative Hierarchy (dynamic GRID3 cascade) ──
   const scopedStates =
     Array.isArray(projectStates) && projectStates.length > 0
       ? [...new Set(projectStates.map((s) => s.trim()).filter(Boolean))]
       : [];
-  const singleState = scopedStates.length === 1 ? scopedStates[0] : null;
 
-  survey.push(q({ type: "begin_group", name: "admin_hierarchy", label: "2. Administrative Hierarchy (GRID3 cascade)", appearance: "field-list" }));
-  if (singleState) {
-    survey.push(q({
-      type: "calculate", name: "state",
-      calculation: `'${sanitize(singleState)}'`,
-    }));
-    survey.push(q({
-      type: "note", name: "state_locked_note",
-      label: `Project state (locked): **${singleState}**`,
-    }));
-  } else {
-    survey.push(q({
-      type: "select_one states", name: "state", label: "State", required: "yes",
-      appearance: "minimal autocomplete",
-    }));
-  }
+  survey.push(q({ type: "begin_group", name: "grp_admin_hierarchy", label: "### 🏛️ Administrative Hierarchy", appearance: "field-list" }));
   survey.push(q({
-    type: "select_one lgas", name: "lga", label: "LGA / Local Government Area",
-    required: "yes", appearance: "minimal autocomplete",
+    type: "select_one states", name: "state", label: "State", required: "yes",
+    appearance: "minimal autocomplete",
+  }));
+  survey.push(q({
+    type: "select_one lgas", name: "lga", label: "LGA", required: "yes",
+    choice_filter: "state=${state}", appearance: "minimal autocomplete",
   }));
   survey.push(q({
     type: "select_one wards", name: "ward", label: "Ward", required: "yes",
     choice_filter: "lga=${lga}", appearance: "minimal autocomplete",
   }));
-  survey.push(q({ type: "end_group", name: "admin_hierarchy_end" }));
+  survey.push(q({ type: "end_group", name: "grp_admin_hierarchy_end" }));
 
-
-  // ── Section 3: FLHF ──
-  survey.push(q({ type: "begin_group", name: "flhf_grp", label: "3. Frontline Health Facility (FLHF)", appearance: "field-list" }));
+  // ── Section 3: FLHF (free text + dual GPS) ──
+  survey.push(q({ type: "begin_group", name: "grp_flhf", label: "### 🏥 Frontline Health Facility (FLHF)", appearance: "field-list" }));
+  survey.push(q({ type: "text", name: "flhf_name", label: "Name of FLHF", required: "yes" }));
+  survey.push(q({ type: "text", name: "flhf_incharge_name", label: "FLHF In-charge Name", required: "yes" }));
   survey.push(q({
-    type: "select_one flhfs", name: "flhf", label: "Name of FLHF (GRID3)",
-    hint: "Type to search. Choose 'Other (specify manually)' if the FLHF is not listed.",
-    required: "yes",
-    choice_filter: "ward=${ward} or name='__other__'",
-    appearance: "minimal autocomplete",
-  }));
-
-  survey.push(q({
-    type: "text", name: "flhf_manual", label: "Other FLHF — type the exact name",
-    required: "yes", relevant: "${flhf} = '__other__'",
-  }));
-  survey.push(q({
-    type: "calculate", name: "flhf_name",
-    calculation: "if(${flhf}='__other__', ${flhf_manual}, jr:choice-name(${flhf}, '${flhf}'))",
-  }));
-  survey.push(q({
-    type: "calculate", name: "flhf_lat_grid3",
-    calculation: "if(${flhf}='' or ${flhf}='__other__', '', instance('flhfs')/root/item[name=${flhf}]/lat)",
-  }));
-  survey.push(q({
-    type: "calculate", name: "flhf_lng_grid3",
-    calculation: "if(${flhf}='' or ${flhf}='__other__', '', instance('flhfs')/root/item[name=${flhf}]/lng)",
-  }));
-  survey.push(q({ type: "note", name: "flhf_grid3_note",
-    label: "GRID3 GPS: **${flhf_lat_grid3}, ${flhf_lng_grid3}** — capture below to override.",
-    relevant: "${flhf_lat_grid3} != '' and ${flhf_lng_grid3} != ''",
-  }));
-
-  survey.push(q({
-    type: "geopoint", name: "flhf_gps_override", label: "FLHF GPS (override — optional)",
-    hint: "Leave blank to keep the GRID3 coordinates.",
-    appearance: "placement-map",
-  }));
-  survey.push(q({
-    type: "calculate", name: "flhf_latitude",
-    calculation: "if(${flhf_gps_override}='', ${flhf_lat_grid3}, selected-at(${flhf_gps_override}, 0))",
-  }));
-  survey.push(q({
-    type: "calculate", name: "flhf_longitude",
-    calculation: "if(${flhf_gps_override}='', ${flhf_lng_grid3}, selected-at(${flhf_gps_override}, 1))",
-  }));
-  survey.push(q({ type: "text", name: "flhf_incharge_name", label: "FLHF In-charge Name" }));
-  survey.push(q({
-    type: "text", name: "flhf_incharge_phone", label: "FLHF In-charge Phone",
-    constraint: "regex(., '^[0-9+\\\\- ]{7,20}$') or .=''",
-    constraint_message: "Enter a valid phone number (digits, +, -, space; 7–20 chars).",
+    type: "text", name: "flhf_incharge_phone", label: "FLHF In-charge Phone Number",
+    constraint: "regex(., '^(\\+234|234|0)[789][01][0-9]{8}$') or .=''",
+    constraint_message: "Enter a valid 11-digit Nigerian phone number.",
     appearance: "numbers",
   }));
-  survey.push(q({ type: "end_group", name: "flhf_grp_end" }));
+  survey.push(q({ type: "geopoint", name: "flhf_gps", label: "Capture FLHF GPS Location" }));
+  survey.push(q({
+    type: "decimal", name: "flhf_manual_latitude", label: "FLHF Latitude (type manually if GPS unavailable)",
+    constraint: ". >= -90 and . <= 90", constraint_message: "Latitude must be between -90 and 90.",
+  }));
+  survey.push(q({
+    type: "decimal", name: "flhf_manual_longitude", label: "FLHF Longitude (type manually if GPS unavailable)",
+    constraint: ". >= -180 and . <= 180", constraint_message: "Longitude must be between -180 and 180.",
+  }));
+  survey.push(q({ type: "calculate", name: "flhf_latitude", calculation: dualGps("${flhf_gps}", "${flhf_manual_latitude}", 0) }));
+  survey.push(q({ type: "calculate", name: "flhf_longitude", calculation: dualGps("${flhf_gps}", "${flhf_manual_longitude}", 1) }));
+  survey.push(q({ type: "end_group", name: "grp_flhf_end" }));
 
-  // ── REPEAT: Community / Settlement (1-to-many under FLHF) ──
-  // Each iteration captures one community + optional settlement + population +
-  // context (terrain/access/security) so a single FLHF submission can carry
-  // any number of communities.
+  // ── REPEAT: one iteration per community under this FLHF ──
   survey.push(q({
     type: "begin_repeat", name: "community_repeat",
-    label: "Community / Settlement Entry",
+    label: "Additional Community",
     hint: "Add one entry per community under this FLHF.",
-    appearance: "field-list",
   }));
 
-  // ── Section 4: Community ──
+  // Section 4: Community details
   survey.push(q({ type: "begin_group", name: "grp_comm_location", label: "### 📍 Community Details", appearance: "field-list" }));
+  survey.push(q({ type: "text", name: "community_name", label: "Community Name", required: "yes" }));
+  survey.push(q({ type: "text", name: "community_leader_name", label: "Community Leader's Name" }));
   survey.push(q({
-    type: "select_one communities", name: "community", label: "Community (GRID3)",
-    hint: "Type to search. Choose 'Other (specify manually)' if the community is not listed.",
-    required: "yes",
-    choice_filter: "ward=${ward} or name='__other__'",
-    appearance: "minimal autocomplete",
+    type: "text", name: "community_leader_phone", label: "Community Leader's Phone Number",
+    constraint: "regex(., '^(\\+234|234|0)[789][01][0-9]{8}$') or .=''",
+    constraint_message: "Enter a valid 11-digit Nigerian phone number.",
+    appearance: "numbers",
   }));
-
+  survey.push(q({ type: "geopoint", name: "community_gps", label: "Capture Community GPS Location" }));
   survey.push(q({
-    type: "text", name: "community_manual", label: "Other Community — type the exact name",
-    required: "yes", relevant: "${community} = '__other__'",
-  }));
-  survey.push(q({
-    type: "calculate", name: "community_name",
-    calculation: "if(${community}='__other__', ${community_manual}, jr:choice-name(${community}, '${community}'))",
+    type: "decimal", name: "community_manual_latitude", label: "Community Latitude (type manually if GPS unavailable)",
+    constraint: ". >= -90 and . <= 90", constraint_message: "Latitude must be between -90 and 90.",
   }));
   survey.push(q({
-    type: "calculate", name: "community_lat_grid3",
-    calculation: "if(${community}='' or ${community}='__other__', '', instance('communities')/root/item[name=${community}]/lat)",
+    type: "decimal", name: "community_manual_longitude", label: "Community Longitude (type manually if GPS unavailable)",
+    constraint: ". >= -180 and . <= 180", constraint_message: "Longitude must be between -180 and 180.",
   }));
-  survey.push(q({
-    type: "calculate", name: "community_lng_grid3",
-    calculation: "if(${community}='' or ${community}='__other__', '', instance('communities')/root/item[name=${community}]/lng)",
-  }));
-  survey.push(q({ type: "note", name: "community_grid3_note",
-    label: "GRID3 GPS: **${community_lat_grid3}, ${community_lng_grid3}** — capture below to override.",
-    relevant: "${community_lat_grid3} != '' and ${community_lng_grid3} != ''",
-  }));
-
-  survey.push(q({
-    type: "geopoint", name: "community_gps_override", label: "Community GPS (override — optional)",
-    hint: "Leave blank to keep GRID3 coordinates.", appearance: "placement-map",
-  }));
-  survey.push(q({
-    type: "calculate", name: "community_latitude",
-    calculation: "if(${community_gps_override}='', ${community_lat_grid3}, selected-at(${community_gps_override}, 0))",
-  }));
-  survey.push(q({
-    type: "calculate", name: "community_longitude",
-    calculation: "if(${community_gps_override}='', ${community_lng_grid3}, selected-at(${community_gps_override}, 1))",
-  }));
-  survey.push(q({ type: "text", name: "community_leader_name", label: "Community Leader" }));
-  survey.push(q({
-    type: "text", name: "community_leader_phone", label: "Leader Phone",
-    constraint: "regex(., '^[0-9+\\\\- ]{7,20}$') or .=''",
-    constraint_message: "Enter a valid phone number.", appearance: "numbers",
-  }));
+  survey.push(q({ type: "calculate", name: "community_latitude", calculation: dualGps("${community_gps}", "${community_manual_latitude}", 0) }));
+  survey.push(q({ type: "calculate", name: "community_longitude", calculation: dualGps("${community_gps}", "${community_manual_longitude}", 1) }));
   survey.push(q({
     type: "calculate", name: "community_distance_to_flhf_km",
     calculation: "if(${flhf_latitude}='' or ${community_latitude}='', '', round(distance(" +
@@ -322,59 +244,26 @@ export async function buildMicroplanningXlsForm(
   }));
   survey.push(q({
     type: "note", name: "community_distance_note",
-    label: "Distance Community → FLHF: **${community_distance_to_flhf_km} km** (auto-computed)",
+    label: "Distance from FLHF to Community: **${community_distance_to_flhf_km} km**",
     relevant: "${community_distance_to_flhf_km} != ''",
   }));
-
   survey.push(q({ type: "end_group", name: "grp_comm_location_end" }));
 
-  // ── Section 5: Settlement (optional) ──
-  //
-  // Settlements are keyed to the selected COMMUNITY when GRID3 links exist,
-  // otherwise they fall back to ward-level filtering.
-  survey.push(q({ type: "begin_group", name: "grp_comm_settlement", label: "### 🏘️ Settlement (optional)", appearance: "field-list" }));
-
-  survey.push(q({
-    type: "select_one settlements", name: "settlement", label: "Settlement (GRID3)",
-    hint: "Optional. Choose 'Other (specify manually)' to type a name.",
-    choice_filter: "(community=${community} or ward=${ward}) or name='__other__'",
-    appearance: "minimal autocomplete",
-  }));
-
-  survey.push(q({
-    type: "text", name: "settlement_manual", label: "Other Settlement — type the exact name",
-    relevant: "${settlement} = '__other__'",
-  }));
-  survey.push(q({
-    type: "calculate", name: "settlement_name",
-    calculation: "if(${settlement}='', '', if(${settlement}='__other__', ${settlement_manual}, jr:choice-name(${settlement}, '${settlement}')))",
-  }));
-  survey.push(q({
-    type: "calculate", name: "settlement_lat_grid3",
-    calculation: "if(${settlement}='' or ${settlement}='__other__', '', instance('settlements')/root/item[name=${settlement}]/lat)",
-  }));
-  survey.push(q({
-    type: "calculate", name: "settlement_lng_grid3",
-    calculation: "if(${settlement}='' or ${settlement}='__other__', '', instance('settlements')/root/item[name=${settlement}]/lng)",
-  }));
-  survey.push(q({ type: "note", name: "settlement_grid3_note",
-    label: "GRID3 GPS: **${settlement_lat_grid3}, ${settlement_lng_grid3}** — capture below to override.",
-    relevant: "${settlement_lat_grid3} != '' and ${settlement_lng_grid3} != ''",
-  }));
-
-  survey.push(q({
-    type: "geopoint", name: "settlement_gps_override", label: "Settlement GPS (override — optional)",
-    appearance: "placement-map",
-  }));
-  survey.push(q({
-    type: "calculate", name: "settlement_latitude",
-    calculation: "if(${settlement_gps_override}='', ${settlement_lat_grid3}, selected-at(${settlement_gps_override}, 0))",
-  }));
-  survey.push(q({
-    type: "calculate", name: "settlement_longitude",
-    calculation: "if(${settlement_gps_override}='', ${settlement_lng_grid3}, selected-at(${settlement_gps_override}, 1))",
-  }));
+  // Section 5: Settlement
+  survey.push(q({ type: "begin_group", name: "grp_comm_settlement", label: "### 🛖 Settlement Information", appearance: "field-list" }));
+  survey.push(q({ type: "text", name: "settlement_name", label: "Settlement Name" }));
   survey.push(q({ type: "text", name: "settlement_mai_unguwa", label: "Mai Unguwa (Settlement Head)" }));
+  survey.push(q({ type: "geopoint", name: "settlement_gps", label: "Capture Settlement GPS Location" }));
+  survey.push(q({
+    type: "decimal", name: "settlement_manual_latitude", label: "Settlement Latitude (type manually if GPS unavailable)",
+    constraint: ". >= -90 and . <= 90", constraint_message: "Latitude must be between -90 and 90.",
+  }));
+  survey.push(q({
+    type: "decimal", name: "settlement_manual_longitude", label: "Settlement Longitude (type manually if GPS unavailable)",
+    constraint: ". >= -180 and . <= 180", constraint_message: "Longitude must be between -180 and 180.",
+  }));
+  survey.push(q({ type: "calculate", name: "settlement_latitude", calculation: dualGps("${settlement_gps}", "${settlement_manual_latitude}", 0) }));
+  survey.push(q({ type: "calculate", name: "settlement_longitude", calculation: dualGps("${settlement_gps}", "${settlement_manual_longitude}", 1) }));
   survey.push(q({
     type: "calculate", name: "settlement_distance_to_flhf_km",
     calculation: "if(${flhf_latitude}='' or ${settlement_latitude}='', '', round(distance(" +
@@ -383,80 +272,69 @@ export async function buildMicroplanningXlsForm(
   }));
   survey.push(q({ type: "end_group", name: "grp_comm_settlement_end" }));
 
-  // ── Section 6: Terrain, Access, Security ──
+  // Section 6: Terrain, access, security
   survey.push(q({ type: "begin_group", name: "grp_comm_context", label: "### 🗺️ Terrain, Access & Security", appearance: "field-list" }));
-  survey.push(q({ type: "select_one terrain_type", name: "terrain_type", label: "Type of Terrain", appearance: "minimal" }));
-  survey.push(q({ type: "select_one accessibility", name: "accessibility", label: "Accessibility", appearance: "minimal" }));
-  survey.push(q({ type: "select_one security_clearance", name: "security_clearance", label: "Security Clearance", appearance: "minimal" }));
+  survey.push(q({ type: "select_one terrain_type", name: "terrain_type", label: "Type of Terrain", required: "yes", appearance: "minimal" }));
+  survey.push(q({ type: "select_one accessibility", name: "accessibility", label: "Accessibility", required: "yes", appearance: "minimal" }));
+  survey.push(q({ type: "select_one security_clearance", name: "security_clearance", label: "Security Clearance", required: "yes", appearance: "minimal" }));
   survey.push(q({ type: "end_group", name: "grp_comm_context_end" }));
 
-
-  // ── Section 7: Population & Demographics ──
-  survey.push(q({ type: "begin_group", name: "grp_comm_demographics", label: "### 👥 Population & Demographics", appearance: "field-list" }));
-  survey.push(q({ type: "integer", name: "estimated_children_0_4", label: "Children 0–4 years", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
-  survey.push(q({ type: "integer", name: "estimated_children_5_14", label: "Children 5–14 years", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
-  survey.push(q({ type: "integer", name: "estimated_adults_15_plus", label: "Adults 15+ years", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
+  // Section 7: Population & demographics
+  survey.push(q({ type: "begin_group", name: "grp_comm_demographics", label: "### 👥 Estimated Population", appearance: "field-list" }));
+  survey.push(q({ type: "integer", name: "estimated_children_0_4", label: "Children 0–4 yrs", required: "yes", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
+  survey.push(q({ type: "integer", name: "estimated_children_5_14", label: "Children 5–14 yrs", required: "yes", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
+  survey.push(q({ type: "integer", name: "estimated_adults_15_plus", label: "Adults 15+ yrs", required: "yes", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
   survey.push(q({
     type: "calculate", name: "estimated_total_population",
     calculation: "coalesce(${estimated_children_0_4},0) + coalesce(${estimated_children_5_14},0) + coalesce(${estimated_adults_15_plus},0)",
   }));
-  survey.push(q({
-    type: "calculate", name: "total_population",
-    calculation: "${estimated_total_population}",
-  }));
-  survey.push(q({ type: "note", name: "pop_total_note", label: "**Estimated Total Population: ${estimated_total_population}** (auto-computed)" }));
-
-  survey.push(q({ type: "integer", name: "number_of_households", label: "Number of Households", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
+  survey.push(q({ type: "note", name: "pop_total_note", label: "**Total Population = ${estimated_total_population}**" }));
+  survey.push(q({ type: "integer", name: "number_of_households", label: "Number of Households", required: "yes", constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
   survey.push(q({ type: "end_group", name: "grp_comm_demographics_end" }));
 
-  // ── Section 8: Trachoma Age Disaggregation (per community) ──
+  // Section 8: Trachoma age disaggregation (optional)
   survey.push(q({ type: "begin_group", name: "grp_comm_trachoma", label: "### 👁️ Trachoma Age Disaggregation (optional)", appearance: "field-list" }));
   survey.push(q({ type: "select_one yes_no", name: "include_trachoma", label: "Include trachoma-specific age disaggregation?", appearance: "minimal", default: "no" }));
   const tracRel = "${include_trachoma} = 'yes'";
-  survey.push(q({ type: "integer", name: "trachoma_0_5_months", label: "0–5 months", relevant: tracRel, constraint: ". >= 0" }));
-  survey.push(q({ type: "integer", name: "trachoma_6m_6y", label: "6 months – 6 years", relevant: tracRel, constraint: ". >= 0" }));
-  survey.push(q({ type: "integer", name: "trachoma_7_14y", label: "7–14 years", relevant: tracRel, constraint: ". >= 0" }));
-  survey.push(q({ type: "integer", name: "trachoma_15_plus", label: "15+ years", relevant: tracRel, constraint: ". >= 0" }));
+  survey.push(q({ type: "integer", name: "trachoma_0_5_months", label: "0–5 Months", relevant: tracRel, constraint: ". >= 0", default: "0" }));
+  survey.push(q({ type: "integer", name: "trachoma_6m_6y", label: "6 Months – 6 Years", relevant: tracRel, constraint: ". >= 0", default: "0" }));
+  survey.push(q({ type: "integer", name: "trachoma_7_14y", label: "7 – 14 Years", relevant: tracRel, constraint: ". >= 0", default: "0" }));
+  survey.push(q({ type: "integer", name: "trachoma_15_plus", label: "15+ Years", relevant: tracRel, constraint: ". >= 0", default: "0" }));
   survey.push(q({ type: "end_group", name: "grp_comm_trachoma_end" }));
 
-  // ── Section 9: PWD (per community) ──
-  survey.push(q({ type: "begin_group", name: "grp_comm_pwd", label: "### ♿ Persons with Disability", appearance: "field-list" }));
+  // Section 9: Disability disaggregation
+  survey.push(q({ type: "begin_group", name: "grp_comm_pwd", label: "### ♿ Disability Disaggregation", appearance: "field-list" }));
   const pwdFields: [string, string][] = [
-    ["pwd_total", "PWD — Total"], ["pwd_visual", "Visual"], ["pwd_hearing", "Hearing"],
-    ["pwd_physical", "Physical"], ["pwd_intellectual", "Intellectual"], ["pwd_communication", "Communication"],
-    ["pwd_selfcare", "Self-care"], ["pwd_albinism", "Albinism"],
+    ["pwd_total", "PWD — Total"], ["pwd_visual", "Visual/Seeing"], ["pwd_hearing", "Hearing"],
+    ["pwd_physical", "Physical/Mobility"], ["pwd_intellectual", "Intellectual/Cognitive"],
+    ["pwd_communication", "Communication/Speech"], ["pwd_selfcare", "Self-care"], ["pwd_albinism", "Albinism"],
   ];
   for (const [n, l] of pwdFields) {
-    survey.push(q({ type: "integer", name: n, label: l, constraint: ". >= 0", constraint_message: "Must be zero or greater." }));
+    survey.push(q({ type: "integer", name: n, label: l, constraint: ". >= 0", constraint_message: "Must be zero or greater.", default: "0" }));
   }
   survey.push(q({ type: "end_group", name: "grp_comm_pwd_end" }));
 
-  // ── Section 10: CDDs (per community) ──
-  survey.push(q({ type: "begin_group", name: "grp_comm_cdd", label: "### 🤝 CDD Information", appearance: "field-list" }));
-  survey.push(q({ type: "text", name: "cdd_names", label: "CDD Names (comma-separated)", appearance: "multiline" }));
-  survey.push(q({ type: "text", name: "cdd_phone_numbers", label: "CDD Phone Numbers (comma-separated)", appearance: "multiline" }));
+  // Section 10: CDDs
+  survey.push(q({ type: "begin_group", name: "grp_comm_cdd", label: "### 🤝 CDDs Information", appearance: "field-list" }));
+  survey.push(q({ type: "text", name: "cdd_names", label: "Name(s) of CDD", appearance: "multiline" }));
+  survey.push(q({
+    type: "text", name: "cdd_phone_numbers", label: "Phone Number(s) of CDD(s)",
+    constraint: "regex(., '^0[789][01][0-9]{8}([ ]*,[ ]*0[789][01][0-9]{8})*$') or .=''",
+    constraint_message: "Enter valid 11-digit Nigerian phone number(s), comma-separated.",
+    appearance: "multiline",
+  }));
   survey.push(q({ type: "select_one yes_no", name: "cdd_from_community", label: "Is the CDD from this Community/Settlement?", appearance: "minimal" }));
   survey.push(q({ type: "end_group", name: "grp_comm_cdd_end" }));
 
-  // ── Section 11: Additional notes (per community) ──
+  // Section 11: Notes
   survey.push(q({ type: "begin_group", name: "grp_comm_logistics_notes", label: "### 📝 Additional Notes", appearance: "field-list" }));
-  survey.push(q({
-    type: "text", name: "additional_notes",
-    label: "Additional notes / observations for this community",
-    appearance: "multiline",
-  }));
+  survey.push(q({ type: "text", name: "additional_notes", label: "Notes / observations for this community", appearance: "multiline" }));
   survey.push(q({ type: "end_group", name: "grp_comm_logistics_notes_end" }));
 
-  // ── END REPEAT: community_repeat ──
   survey.push(q({ type: "end_repeat", name: "community_repeat_end" }));
-
-
 
   // ─── CHOICES ───────────────────────────────────────────────────────────
   const choices: Row[] = [CHOICES_HEADER as unknown as Row];
-
-  // Global (list_name, name) dedup gate — every push goes through this to
-  // guarantee PyXForm never sees "name appears more than once in list …".
   const choiceKeys = new Set<string>();
   const pushChoice = (row: Partial<Record<(typeof CHOICES_HEADER)[number], string | number>>) => {
     const list = String(row.list_name ?? "");
@@ -474,7 +352,7 @@ export async function buildMicroplanningXlsForm(
   for (const [n, l] of [
     ["ntd", "NTD (MDA)"], ["polio", "Polio (SIA)"], ["malaria", "Malaria (ITN/IRS)"],
     ["routine_immunization", "Routine Immunization"], ["covid19", "COVID-19 Vaccination"],
-    ["nutrition", "Nutrition"], ["other", "Other"],
+    ["nutrition", "Nutrition"], ["dmpa_sc", "DMPA-SC"], ["other", "Other"],
   ]) pushChoice({ list_name: "campaign_type", name: n, label: l });
 
   for (const [n, l] of [
@@ -484,164 +362,58 @@ export async function buildMicroplanningXlsForm(
   ]) pushChoice({ list_name: "population_source", name: n, label: l });
 
   for (const [n, l] of [
-    ["flat", "Flat"], ["hilly", "Hilly"], ["mountainous", "Mountainous"],
-    ["riverine", "Riverine"], ["swampy", "Swampy"], ["desert", "Desert"], ["forest", "Forest"],
+    ["flat", "🌾 Flat"], ["hilly", "⛰️ Hilly"], ["mountainous", "🗻 Mountainous"],
+    ["riverine", "🌊 Riverine"], ["swampy", "🏝️ Swampy"], ["desert", "🏜️ Desert"], ["forest", "🌳 Forest"],
   ]) pushChoice({ list_name: "terrain_type", name: n, label: l });
   for (const [n, l] of [
-    ["accessible", "Accessible"], ["hard_to_reach", "Hard to Reach"],
-    ["inaccessible", "Inaccessible"], ["seasonal", "Seasonal Access"],
+    ["accessible", "🛣️ Accessible"], ["hard_to_reach", "⚠️ Hard to Reach"],
+    ["inaccessible", "⛔ Inaccessible"], ["seasonal", "🌦️ Seasonal Access"],
   ]) pushChoice({ list_name: "accessibility", name: n, label: l });
   for (const [n, l] of [
-    ["cleared", "Cleared"], ["partial", "Partial"], ["not_cleared", "Not Cleared"], ["unknown", "Unknown"],
+    ["cleared", "🟢 Cleared"], ["partial", "🟡 Partial"],
+    ["not_cleared", "🔴 Not Cleared"], ["unknown", "⚪ Unknown"],
   ]) pushChoice({ list_name: "security_clearance", name: n, label: l });
 
-  // ── GRID3 cascade — SCOPED to project states ──
+  // ── Dynamic State → LGA → Ward cascade ──
   const allStates = getAllStates();
   const targetStates = scopedStates.length > 0
     ? allStates.filter((s) => scopedStates.includes(s))
     : allStates;
 
-  // Composite-key → sanitized id maps enforce STRICT hierarchical uniqueness so
-  // GRID3 duplicates never leak into the `choices` sheet:
-  //   • LGA:        unique per (state + lga)
-  //   • Ward:       unique per (state + lga + ward)
-  //   • FLHF:       unique per (state + lga + ward + flhf_name)      [ward id already encodes state+lga+ward]
-  //   • Community:  unique per (state + lga + ward + community_name)
-  //   • Settlement: unique per (state + lga + ward + community + settlement)
-  // Cascade filters (`lga=${lga}`, `ward=${ward}`, `community=${community}`)
-  // therefore resolve against sanitized, orphan-free ids.
-  const stateNameById = new Map<string, string>();      // state → sid
-  const lgaNameById = new Map<string, string>();        // `${state}||${lga}` → lid
-  const wardNameById = new Map<string, string>();       // `${state}||${lga}||${ward}` → wid
-  const flhfIdByKey = new Map<string, string>();        // `${wid}||${slug}` → id
-  const communityIdByKey = new Map<string, string>();   // `${wid}||${slug}` → id
-  const settlementIdByKey = new Map<string, string>();  // `${cid}||${slug}` → id
-
-
   onProgress?.({ phase: "states", done: 0, total: targetStates.length });
+  const stateIdByName = new Map<string, string>();
   targetStates.forEach((s) => {
     const id = sanitize(s);
-    stateNameById.set(s, id);
-    if (!singleState) pushChoice({ list_name: "states", name: id, label: s });
+    stateIdByName.set(s, id);
+    pushChoice({ list_name: "states", name: id, label: s });
   });
 
   targetStates.forEach((s, i) => {
-    const sid = stateNameById.get(s)!;
+    const sid = stateIdByName.get(s)!;
     for (const lga of getLGAsForState(s)) {
-      const lgaKey = `${s}||${lga}`;
-      let lid = lgaNameById.get(lgaKey);
-      if (!lid) {
-        lid = `${sid}__${sanitize(lga)}`.slice(0, 60);
-        lgaNameById.set(lgaKey, lid);
-      }
-      pushChoice({ list_name: "lgas", name: lid, label: lga });
+      const lid = sanitize(`${sid}__${sanitize(lga)}`);
+      pushChoice({ list_name: "lgas", name: lid, label: lga, state: sid });
       for (const ward of getWardsForLGA(s, lga)) {
-        const wardKey = `${s}||${lga}||${ward}`;
-        let wid = wardNameById.get(wardKey);
-        if (!wid) {
-          wid = sanitize(`${lid}__${sanitize(ward)}`);
-          wardNameById.set(wardKey, wid);
-        }
+        const wid = sanitize(`${lid}__${sanitize(ward)}`);
         pushChoice({ list_name: "wards", name: wid, label: ward, lga: lid });
       }
     }
     onProgress?.({ phase: "states", done: i + 1, total: targetStates.length });
   });
-
-  const resolveWardId = (state: string, lga: string, ward: string): { lid: string; wid: string } => {
-    const sid = stateNameById.get(state) ?? sanitize(state);
-    const lgaKey = `${state}||${lga}`;
-    let lid = lgaNameById.get(lgaKey);
-    if (!lid) {
-      lid = `${sid}__${sanitize(lga)}`.slice(0, 60);
-      lgaNameById.set(lgaKey, lid);
-      pushChoice({ list_name: "lgas", name: lid, label: lga });
-    }
-    const wardKey = `${state}||${lga}||${ward}`;
-    let wid = wardNameById.get(wardKey);
-    if (!wid) {
-      wid = sanitize(`${lid}__${sanitize(ward)}`);
-      wardNameById.set(wardKey, wid);
-      pushChoice({ list_name: "wards", name: wid, label: ward, lga: lid });
-    }
-    return { lid, wid };
-  };
-
-  // FLHFs — dedup by (ward, sanitized-name)
-  pushChoice({ list_name: "flhfs", name: "__other__", label: "Other (specify manually)" });
-  for (let i = 0; i < targetStates.length; i++) {
-    const s = targetStates[i];
-    onProgress?.({ phase: "flhfs", done: i, total: targetStates.length });
-    let entries: Awaited<ReturnType<typeof getGrid3FullStateEntries>> = [];
-    try { entries = await getGrid3FullStateEntries("fac", s); } catch { entries = []; }
-    for (const e of entries) {
-      const { wid } = resolveWardId(s, e.lga, e.ward);
-      const slug = sanitize(e.name);
-      const key = `${wid}||${slug}`;
-      if (flhfIdByKey.has(key)) continue;
-      const id = sanitize(`${wid}__f_${slug}`);
-      flhfIdByKey.set(key, id);
-      pushChoice({
-        list_name: "flhfs", name: id, label: e.name,
-        ward: wid,
-        lat: e.latitude ?? "", lng: e.longitude ?? "",
-      });
-    }
-  }
   onProgress?.({ phase: "flhfs", done: targetStates.length, total: targetStates.length });
-
-  // Communities & Settlements — dedup community by (ward, slug) so multiple
-  // settlement rows sharing the same parent community reuse the SAME id.
-  pushChoice({ list_name: "communities", name: "__other__", label: "Other (specify manually)" });
-  pushChoice({ list_name: "settlements", name: "__other__", label: "Other (specify manually)" });
-  for (let i = 0; i < targetStates.length; i++) {
-    const s = targetStates[i];
-    onProgress?.({ phase: "communities", done: i, total: targetStates.length });
-    let entries: Awaited<ReturnType<typeof getGrid3FullStateEntries>> = [];
-    try { entries = await getGrid3FullStateEntries("set", s); } catch { entries = []; }
-    for (const e of entries) {
-      const { wid } = resolveWardId(s, e.lga, e.ward);
-      const slug = sanitize(e.name);
-      const cKey = `${wid}||${slug}`;
-      let cId = communityIdByKey.get(cKey);
-      if (!cId) {
-        cId = sanitize(`${wid}__c_${slug}`);
-        communityIdByKey.set(cKey, cId);
-        pushChoice({
-          list_name: "communities", name: cId, label: e.name,
-          ward: wid,
-          lat: e.latitude ?? "", lng: e.longitude ?? "",
-        });
-      }
-      const sKey = `${cId}||${slug}`;
-      if (settlementIdByKey.has(sKey)) continue;
-      const xId = sanitize(`${cId}__s_${slug}`);
-      settlementIdByKey.set(sKey, xId);
-      pushChoice({
-        list_name: "settlements", name: xId, label: e.name,
-        ward: wid, community: cId,
-        lat: e.latitude ?? "", lng: e.longitude ?? "",
-      });
-    }
-  }
   onProgress?.({ phase: "communities", done: targetStates.length, total: targetStates.length });
 
   // ─── SETTINGS ──────────────────────────────────────────────────────────
   onProgress?.({ phase: "assemble", done: 0, total: 1 });
-  // YYYYMMDDHHmm (12 chars) — matches request spec.
   const versionStamp = versionInt != null
     ? String(versionInt)
     : new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 12);
-  const formTitle = projectName
-    ? `${projectName} — Geo Microplanning`
-    : "Geo Microplanning";
-  // Canonical stable form_id so Kobo overwrites the same asset on re-upload.
+  const formTitle = projectName ? `${projectName} — Geo Microplanning` : "Geo Microplanning";
   const formId = "amehnities_geo_microplanning";
   const settings: Row[] = [
     SETTINGS_HEADER as unknown as Row,
-    [formTitle, formId, versionStamp, "theme-grid", "yes"],
+    [formTitle, formId, versionStamp, "theme-grid no-text-transform", "yes"],
   ];
-
 
   const wb = XLSX.utils.book_new();
   const surveySheet = XLSX.utils.aoa_to_sheet(survey);
@@ -662,23 +434,10 @@ export async function buildMicroplanningXlsForm(
 /**
  * Runtime guard: verifies the generated XLSForm's first user-visible screen
  * contains ONLY the full-page `home` cover image and no additional controls.
- *
- * Fails loudly (throws) if the workbook structure changes in a way that would
- * introduce other rendered controls on the cover page — this is invoked at the
- * end of every build so a regression in the survey order surfaces immediately
- * instead of silently shipping a broken KoboCollect experience.
- *
- * "First visible screen" = the first survey row whose `type` is not one of the
- * ODK metadata types (start/end/today/deviceid/username/phonenumber). That row
- * MUST be the `welcome_cover_note` with image=`home`, appearance=`no-label`,
- * and a whitespace-only label.
  */
 const META_TYPES = new Set([
   "start", "end", "today", "deviceid", "username", "phonenumber", "phone_number", "audit",
 ]);
-// The welcome cover may be wrapped in a `grp_welcome` field-list group so the
-// image renders full-screen. Skip the wrapper begin/end_group when locating
-// the first visible content row.
 const WRAPPER_TYPES = new Set(["begin_group", "end_group"]);
 const WRAPPER_NAMES = new Set(["grp_welcome", "grp_welcome_end"]);
 export function assertCoverPageIsHomeImageOnly(wb: XLSX.WorkBook): void {
