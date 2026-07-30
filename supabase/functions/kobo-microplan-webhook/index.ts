@@ -462,11 +462,11 @@ Deno.serve(async (req) => {
   const lgaCustom = mapped("lga_custom", ["lga_custom", "lga_other", "admin_hierarchy/lga_manual"]);
   const wardRaw = mapped("ward", ["ward", "ward_name", "admin_hierarchy/ward", "location/ward"]);
   const wardCustom = mapped("ward_custom", ["ward_custom", "ward_other", "admin_hierarchy/ward_manual"]);
-  const flhfName = mapped("flhf_name", ["flhf_name", "flhf_grp/flhf", "flhf_grp/flhf_name"]);
+  const flhfName = mapped("flhf_name", [...A.flhf_name, "flhf_grp/flhf_name"]);
   const flhfCustom = mapped("flhf_custom", ["flhf_custom", "flhf_other", "flhf_manual", "flhf_grp/flhf_manual"]);
-  const communityName = mapped("community_name", ["community", "community_name", "community_grp/community", "community_grp/community_name"]);
+  const communityName = mapped("community_name", [...A.community_name, "community_grp/community", "community_grp/community_name"]);
   const communityCustom = mapped("community_custom", ["community_custom", "community_other", "community_manual", "community_grp/community_manual"]);
-  const settlementName = mapped("settlement_name", ["settlement", "settlement_name", "settlement_grp/settlement", "settlement_grp/settlement_name"]);
+  const settlementName = mapped("settlement_name", [...A.settlement_name, "settlement_grp/settlement", "settlement_grp/settlement_name"]);
   const settlementCustom = mapped("settlement_custom", ["settlement_custom", "settlement_other", "settlement_manual", "settlement_grp/settlement_manual"]);
 
   const stateFinal = normalizeChoiceValue(stateRaw, stateCustom);
