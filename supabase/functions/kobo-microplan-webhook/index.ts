@@ -14,7 +14,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders as baseCors } from "npm:@supabase/supabase-js@2/cors";
-import { extractRepeatDisaggregations, resolveCoordinates } from "../_shared/microplanRepeatItem.ts";
+import { resolveCoordinates, validateRepeatDisaggregations } from "../_shared/microplanRepeatItem.ts";
 
 const corsHeaders = {
   ...baseCors,
@@ -273,6 +273,12 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const qpFormUid = url.searchParams.get("form_uid");
   const qpProjectId = url.searchParams.get("project_id");
+  // Opt-in strict mode: require pwd_total / cdd_names / trachoma_7_14y on every
+  // repeat item (?strict_disaggregations=1 or "strict_disaggregations": true).
+  const strictDisaggregations =
+    ["1", "true", "yes"].includes((url.searchParams.get("strict_disaggregations") ?? "").toLowerCase()) ||
+    payload["strict_disaggregations"] === true;
+
   const candidateUids = Array.from(new Set([
     qpFormUid ?? "",
     (payload["_xform_id_string"] as string | undefined) ?? "",
@@ -483,7 +489,23 @@ Deno.serve(async (req) => {
 
   if (repeatItems.length > 0) {
     repeatItems.forEach((item, idx) => {
+      // Runtime validation of the disaggregation columns BEFORE mapping.
+      // Malformed values (non-numeric / negative / non-text) fail fast and the
+      // item is rejected with a clear, auditable reason instead of writing junk.
+      const validation = validateRepeatDisaggregations(item, {
+        requireDisaggregations: strictDisaggregations,
+      });
+      if (!validation.success) {
+        rejectedItems.push({
+          index: idx,
+          reason: "invalid_disaggregations",
+          value: validation.error.issues,
+        });
+        return;
+      }
+      const disaggregations = validation.data;
       const cName = normalizeChoiceValue(
+
         pickFirst(item, ["community_name", "community"]),
         pickFirst(item, ["community_manual", "community_custom"]),
         [stateRaw, lgaRaw, wardRaw],
@@ -537,7 +559,7 @@ Deno.serve(async (req) => {
         extra_metadata: item,
         // PWD, CDD and Trachoma disaggregations now live INSIDE community_repeat
         // (per-community), so pass them through per row instead of the parent.
-        ...extractRepeatDisaggregations(item),
+        ...disaggregations,
       }, `${koboUuid}_${idx}`, { lat: cLat, lng: cLng }));
     });
 

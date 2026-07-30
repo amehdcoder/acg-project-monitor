@@ -8,6 +8,9 @@ import {
   pickFirst,
   pickNumber,
   resolveCoordinates,
+  validateRepeatDisaggregations,
+  parseRepeatDisaggregations,
+  RepeatItemValidationError,
   type MicroplanRepeatRow,
 } from "../../../../supabase/functions/_shared/microplanRepeatItem";
 
@@ -143,5 +146,130 @@ describe("community_repeat unpacking with free-text location names", () => {
     expect(rows[1].pwd_total).toBe(2);
     expect(rows[1].cdd_names).toBe("Hauwa");
     expect(rows[1].trachoma_7_14y).toBeNull();
+  });
+});
+
+// ── RUNTIME VALIDATION OF DISAGGREGATION COLUMNS ───────────────────────
+
+describe("validateRepeatDisaggregations (runtime schema)", () => {
+  const complete = {
+    community_name: "Nayinawa",
+    pwd_total: 9,
+    cdd_names: "Aisha, Musa",
+    trachoma_7_14y: 12,
+  };
+
+  it("accepts a complete item in strict mode and returns mapped data", () => {
+    const res = validateRepeatDisaggregations(complete, { requireDisaggregations: true });
+    expect(res.success).toBe(true);
+    if (res.success) {
+      expect(res.data.pwd_total).toBe(9);
+      expect(res.data.cdd_names).toBe("Aisha, Musa");
+      expect(res.data.trachoma_7_14y).toBe(12);
+    }
+  });
+
+  it.each([
+    ["pwd_total", { ...complete, pwd_total: undefined }],
+    ["cdd_names", { ...complete, cdd_names: "   " }],
+    ["trachoma_7_14y", { ...complete, trachoma_7_14y: null }],
+  ])("fails fast with a clear error when %s is missing", (field, item) => {
+    const res = validateRepeatDisaggregations(item as Record<string, unknown>, {
+      requireDisaggregations: true,
+    });
+    expect(res.success).toBe(false);
+    if (!res.success) {
+      expect(res.error.issues).toEqual([
+        { field, code: "required", message: "field is missing or empty in the webhook payload" },
+      ]);
+      expect(res.error.message).toContain(field);
+      expect(res.error.message).toContain("required");
+    }
+    expect(() =>
+      parseRepeatDisaggregations(item as Record<string, unknown>, { requireDisaggregations: true }),
+    ).toThrow(RepeatItemValidationError);
+  });
+
+  it("reports every missing required field at once", () => {
+    const res = validateRepeatDisaggregations({ community_name: "Kachi" }, { requireDisaggregations: true });
+    expect(res.success).toBe(false);
+    if (!res.success) {
+      expect(res.error.issues.map((i) => i.field).sort()).toEqual([
+        "cdd_names", "pwd_total", "trachoma_7_14y",
+      ]);
+    }
+  });
+
+  it("rejects malformed types even outside strict mode", () => {
+    const res = validateRepeatDisaggregations({
+      pwd_total: "not-a-number",
+      trachoma_7_14y: -4,
+      cdd_names: { first: "Aisha" },
+    });
+    expect(res.success).toBe(false);
+    if (!res.success) {
+      const byField = Object.fromEntries(res.error.issues.map((i) => [i.field, i]));
+      expect(byField.pwd_total.code).toBe("invalid_type");
+      expect(byField.trachoma_7_14y.message).toContain("non-negative");
+      expect(byField.cdd_names.message).toContain("expected text");
+    }
+  });
+
+  it("does not require disaggregations by default (backward compatible)", () => {
+    expect(validateRepeatDisaggregations({ community_name: "Kachi" }).success).toBe(true);
+  });
+});
+
+// ── EXACT VALUE PARITY: mapped row vs source payload, multiple fixtures ──
+
+describe("mapped row disaggregation values match the source payload exactly", () => {
+  const fixtures: Array<{
+    name: string;
+    item: Record<string, unknown>;
+    expected: { pwd_total: number | null; cdd_names: string | null; trachoma_7_14y: number | null };
+  }> = [
+    {
+      name: "flat numeric keys",
+      item: { pwd_total: 9, cdd_names: "Aisha, Musa", trachoma_7_14y: 12 },
+      expected: { pwd_total: 9, cdd_names: "Aisha, Musa", trachoma_7_14y: 12 },
+    },
+    {
+      name: "numeric strings from KoboCollect",
+      item: { pwd_total: "17", cdd_names: " Zainab ", trachoma_7_14y: "3" },
+      expected: { pwd_total: 17, cdd_names: "Zainab", trachoma_7_14y: 3 },
+    },
+    {
+      name: "grouped Kobo paths",
+      item: {
+        "pwd_grp/pwd_total": "5",
+        "cdd_grp/cdd_names": "Hauwa; Bala",
+        "trachoma_grp/trachoma_7_14y": 22,
+      },
+      expected: { pwd_total: 5, cdd_names: "Hauwa; Bala", trachoma_7_14y: 22 },
+    },
+    {
+      name: "thousands separators",
+      item: { pwd_total: "1,204", cdd_names: "Musa", trachoma_7_14y: "2,000" },
+      expected: { pwd_total: 1204, cdd_names: "Musa", trachoma_7_14y: 2000 },
+    },
+    {
+      name: "zero values are preserved (not coerced to null)",
+      item: { pwd_total: 0, cdd_names: "None", trachoma_7_14y: 0 },
+      expected: { pwd_total: 0, cdd_names: "None", trachoma_7_14y: 0 },
+    },
+  ];
+
+  it.each(fixtures)("$name", ({ item, expected }) => {
+    const row: MicroplanRepeatRow = {
+      idempotency_key: "fx_0",
+      project_id: "11111111-1111-1111-1111-111111111111",
+      flhf_name: null, community_name: null, settlement_name: null,
+      settlement_mai_unguwa: null, estimated_children_0_4: null, notes: null,
+      community_latitude: null, community_longitude: null, geotagged: false,
+      ...parseRepeatDisaggregations(item),
+    };
+    expect(row.pwd_total).toBe(expected.pwd_total);
+    expect(row.cdd_names).toBe(expected.cdd_names);
+    expect(row.trachoma_7_14y).toBe(expected.trachoma_7_14y);
   });
 });
