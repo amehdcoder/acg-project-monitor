@@ -340,7 +340,12 @@ Deno.serve(async (req) => {
   const stateFinal = normalizeChoiceValue(stateRaw, stateCustom);
   const lgaFinal = normalizeChoiceValue(lgaRaw, lgaCustom, [stateRaw]);
   const wardFinal = normalizeChoiceValue(wardRaw, wardCustom, [stateRaw, lgaRaw]);
-  const flhfFinal = normalizeChoiceValue(flhfName, flhfCustom, [stateRaw, lgaRaw, wardRaw]);
+  // `flhf_name` is NOT NULL in the DB — never let a blank/missing typed value
+  // reach the upsert (an explicit null bypasses the column default).
+  const FLHF_FALLBACK = "Unspecified FLHF";
+  const flhfFinal =
+    (normalizeChoiceValue(flhfName, flhfCustom, [stateRaw, lgaRaw, wardRaw]) ?? "").trim() ||
+    FLHF_FALLBACK;
   const communityFinal = normalizeChoiceValue(communityName, communityCustom, [stateRaw, lgaRaw, wardRaw]);
   const settlementFinal = normalizeChoiceValue(settlementName, settlementCustom, [stateRaw, lgaRaw, wardRaw, communityName]);
 
