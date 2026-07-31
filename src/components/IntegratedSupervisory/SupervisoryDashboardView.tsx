@@ -3,7 +3,7 @@
  * Everything drives off the flat schema in koboSchema.ts so the dashboard sees
  * 100% of the Kobo fields (no truncation).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import StudioPresetBar, { type FilterState } from "./StudioPresetBar";
 import { exportSnapshotPDF, exportSnapshotPNG } from "@/lib/isc/snapshotExport";
@@ -520,7 +520,23 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
               </Select>
             </>
           )}
-          <Button variant="ghost" size="sm" className="h-8" onClick={exportCSV}><Download className="h-4 w-4 mr-1" /> Export</Button>
+          <StudioPresetBar
+            connectionId={connectionId}
+            current={{ f, dateFrom, dateTo, globalSearch }}
+            onApply={applyPreset}
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8" disabled={snapshotting}>
+                <Download className="h-4 w-4 mr-1" /> {snapshotting ? "Exporting…" : "Export"}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={exportCSV}>Export data (CSV)</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => snapshot("png")}>Dashboard snapshot (PNG)</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => snapshot("pdf")}>Dashboard snapshot (PDF)</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {editMode && (
             <Button variant="ghost" size="sm" className="h-8" onClick={() => setCalcOpen(true)}>
               <Calculator className="h-4 w-4 mr-1" /> Calculated field
@@ -561,7 +577,7 @@ export default function SupervisoryDashboardView({ cache, onRefresh, syncing }:
       </div>
 
       {/* Canvas + right panel */}
-      <div className="flex" style={{ minHeight: 600 }}>
+      <div className="flex" style={{ minHeight: 600 }} ref={snapshotRef}>
         <div
           className="flex-1 p-6"
           style={editMode ? { backgroundImage: "radial-gradient(#E8EAED 1px, transparent 1px)", backgroundSize: "16px 16px" } : undefined}
