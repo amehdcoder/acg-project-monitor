@@ -6,7 +6,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  CheckCircle2, CircleDashed, Loader, OctagonPause, PauseCircle,
+  Ban, CheckCircle2, CircleDashed, Loader, PauseCircle,
 } from "lucide-react";
 import { resolveChecklistValue } from "./checklistSchema";
 
@@ -29,7 +29,7 @@ export const STATUS_META: Record<
     badge: "bg-amber-100 text-amber-800 border-amber-200",
   },
   not_started: {
-    label: "Not Started", color: "hsl(0,72%,48%)", icon: OctagonPause,
+    label: "Not Started", color: "hsl(0,72%,48%)", icon: Ban,
     badge: "bg-rose-100 text-rose-800 border-rose-200",
   },
   unknown: {
