@@ -180,7 +180,7 @@ export default function IntegratedSupervisoryView() {
           <TabsTrigger value="checklist"><ClipboardList className="h-4 w-4 mr-1" /> Checklist Dashboard</TabsTrigger>
           <TabsTrigger value="records"><Database className="h-4 w-4 mr-1" /> Raw Kobo Data</TabsTrigger>
           <TabsTrigger value="studio"><LayoutDashboard className="h-4 w-4 mr-1" /> Dashboard Studio</TabsTrigger>
-          <TabsTrigger value="explorer"><Database className="h-4 w-4 mr-1" /> Data Explorer</TabsTrigger>
+          
           <TabsTrigger value="reconciliation"><GitCompareArrows className="h-4 w-4 mr-1" /> Reconciliation</TabsTrigger>
         </TabsList>
         <TabsContent value="checklist" className="mt-4">
