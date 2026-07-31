@@ -1,10 +1,16 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader,
+  DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Activity, AlertTriangle, ClipboardCheck, Droplets, Loader2, MapPin,
-  PlayCircle, RefreshCw, ShieldAlert, Users,
+  PlayCircle, RefreshCw, Settings2, ShieldAlert, UserCheck, Users,
 } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart,
@@ -22,7 +28,20 @@ const PALETTE = [
   "hsl(320,50%,50%)",
 ];
 
+/** Semantic colours for the Status of MDA bar chart. */
+const MDA_STATUS_COLORS: { match: RegExp; color: string }[] = [
+  { match: /complete/i, color: "hsl(142,71%,38%)" },   // green
+  { match: /not\s*start|no[t]?\s*commenc|yet\s*to/i, color: "hsl(0,72%,48%)" },  // red
+  { match: /halt|stopp|suspend|paus/i, color: "hsl(45,95%,50%)" },  // yellow
+  { match: /ongoing|on-?going|progress|started|commenc/i, color: "hsl(214,85%,48%)" }, // blue
+];
+const mdaStatusColor = (name: string) =>
+  MDA_STATUS_COLORS.find((c) => c.match.test(name))?.color ?? "hsl(215,15%,55%)";
+
+const GEO_DENOM_KEY = "isc.geoCoverageDenominator";
+
 const yes = (v: unknown) => String(v ?? "").trim().toLowerCase() === "yes";
+
 
 function tally(values: unknown[], field: string) {
   const m = new Map<string, number>();
