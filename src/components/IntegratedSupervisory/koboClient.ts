@@ -268,7 +268,7 @@ async function fetchPage(cfg: KoboConfig, page: number) {
   return d;
 }
 
-export async function fetchSubmissions(cfg: KoboConfig): Promise<KoboCache> {
+export async function fetchSubmissions(cfg: KoboConfig, connectionId?: string | null): Promise<KoboCache> {
   const first = await fetchPage(cfg, 0);
   const total = Number(first?.count) || (first?.results?.length ?? 0);
   const results: any[] = [...(first?.results ?? [])];
@@ -313,7 +313,7 @@ export async function fetchSubmissions(cfg: KoboConfig): Promise<KoboCache> {
     choices: Array.isArray(first?.choices) ? first.choices : [],
     formUid: cfg.formUid,
   };
-  saveKoboCache(cache);
+  saveKoboCache(cache, connectionId);
   return cache;
 }
 
