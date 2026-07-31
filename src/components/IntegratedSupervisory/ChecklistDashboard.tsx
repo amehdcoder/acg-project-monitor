@@ -466,11 +466,38 @@ export default function ChecklistDashboard({
         <Panel title="Medicine Sufficiency" icon={ClipboardCheck}><DonutChart data={sufficiency} /></Panel>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Treatment Register Available" icon={ClipboardCheck}><DonutChart data={register} /></Panel>
         <Panel title="Register Entries Correct" icon={ClipboardCheck}><DonutChart data={registerCorrect} /></Panel>
-        <Panel title="Status of MDA" icon={Activity}><DonutChart data={mdaStatus} /></Panel>
       </div>
+
+      <Panel
+        title="Status of MDA"
+        icon={Activity}
+        right={
+          <div className="flex items-center gap-2.5 text-[10px] font-medium text-muted-foreground">
+            {[["Completed", "hsl(142,71%,38%)"], ["Ongoing", "hsl(214,85%,48%)"], ["Halted", "hsl(45,95%,50%)"], ["Not Started", "hsl(0,72%,48%)"]].map(([l, c]) => (
+              <span key={l} className="flex items-center gap-1">
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: c }} /> {l}
+              </span>
+            ))}
+          </div>
+        }
+      >
+        <StatusBarChart data={mdaStatus} />
+      </Panel>
+
+      {/* Field-worker accountability */}
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Panel title="Independent Monitor Performance" icon={UserCheck}>
+          <PerformanceTable rows={monitorPerf} headLabel="Independent Monitor's Name" />
+        </Panel>
+        <Panel title="Performance by Designation" icon={Users}>
+          <PerformanceTable rows={designationPerf} headLabel="Designation" />
+        </Panel>
+      </div>
+
+
 
       {/* Supervision & CDD engagement */}
       <div className="grid gap-4 lg:grid-cols-2">
