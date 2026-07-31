@@ -93,6 +93,7 @@ const KpiCard = ({
 );
 
 export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCache | null; onRefresh?: () => void }) {
+  const { canExport } = useChecklistPermissions();
   const [search, setSearch] = useState("");
   const dq = useDebouncedValue(search, 300);
   const [pageSize, setPageSize] = useState(10);
