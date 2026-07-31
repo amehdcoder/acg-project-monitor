@@ -387,7 +387,19 @@ export default function ChecklistDashboard({
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Kpi icon={ClipboardCheck} label="Total Submissions" value={kpi.total.toLocaleString()} sub="Supervisory checklists" tone="bg-[hsl(214,80%,40%)]" />
-        <Kpi icon={MapPin} label="Geographic Coverage" value={`${kpi.communities}`} sub={`${kpi.states} states · ${kpi.lgas} LGAs · ${kpi.wards} wards`} tone="bg-[hsl(160,55%,35%)]" />
+        <Kpi
+          icon={MapPin}
+          label="Geographic Coverage"
+          value={geoTarget ? `${((kpi.communities / geoTarget) * 100).toFixed(1)}%` : "—"}
+          sub={
+            geoTarget
+              ? `${kpi.communities.toLocaleString()} of ${geoTarget.toLocaleString()} communities · ${kpi.lgas} LGAs`
+              : `${kpi.communities.toLocaleString()} communities visited · set target →`
+          }
+          tone="bg-[hsl(160,55%,35%)]"
+          action={<CoverageTargetDialog value={geoTarget} onSave={saveGeoTarget} />}
+        />
+
         <Kpi icon={Users} label="Respondents Reached" value={kpi.respondents.toLocaleString()} sub={`${cddTotal.toLocaleString()} CDDs counted`} tone="bg-[hsl(265,50%,48%)]" />
         <Kpi icon={PlayCircle} label="Treatment Commenced" value={kpi.started.toLocaleString()} sub={`${kpi.notStarted.toLocaleString()} not started`} tone="bg-[hsl(35,85%,45%)]" />
         <Kpi icon={ShieldAlert} label="SAE Alerts" value={kpi.sae.toLocaleString()} sub={kpi.sae > 0 ? "Requires review" : "None reported"} tone={kpi.sae > 0 ? "bg-[hsl(350,70%,45%)] animate-pulse" : "bg-[hsl(215,15%,45%)]"} />
