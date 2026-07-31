@@ -9,6 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { Copy, Eye, EyeOff, KeyRound, Loader2, RefreshCw, Server, ShieldCheck, Wifi, WifiOff } from "lucide-react";
 import { fetchSubmissions, fetchWebhookSecret, loadKoboCache, loadKoboConfig, saveKoboConfig, testConnection, type KoboConfig } from "./koboClient";
+import FieldMappingStatusPanel from "./FieldMappingStatusPanel";
+
 
 interface Props { open: boolean; onOpenChange: (o: boolean) => void; onSynced?: () => void }
 
@@ -73,9 +75,10 @@ export default function KoboSyncDialog({ open, onOpenChange, onSynced }: Props) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Server className="h-5 w-5 text-primary" /> Kobo Sync — Integrated Supervisory</DialogTitle>
-          <DialogDescription>Link a KoboToolbox form and stream supervisory submissions into the dashboard.</DialogDescription>
+          <DialogTitle className="flex items-center gap-2"><Server className="h-5 w-5 text-primary" /> Kobo Sync — Integrated Supervisory Checklist</DialogTitle>
+          <DialogDescription>Link a KoboToolbox form and stream supervisory checklist submissions into the dashboard.</DialogDescription>
         </DialogHeader>
+
 
         <div className="space-y-5">
           {/* Webhook secret card */}
@@ -134,7 +137,16 @@ export default function KoboSyncDialog({ open, onOpenChange, onSynced }: Props) 
               <span>Last synced <b>{new Date(cache.fetchedAt).toLocaleString()}</b> · <Badge variant="outline">{cache.count} records</Badge></span>
             </div>
           )}
+
+          <div className="space-y-2">
+            <div className="text-sm font-semibold">Field mapping status</div>
+            <p className="text-xs text-muted-foreground">
+              1:1 alignment between the Integrated MDA Supervisory Checklist XLSForm schema and the KoboToolbox API payload.
+            </p>
+            <FieldMappingStatusPanel cache={cache} />
+          </div>
         </div>
+
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={runTest} disabled={testing || !cfg.formUid || !cfg.apiToken}>

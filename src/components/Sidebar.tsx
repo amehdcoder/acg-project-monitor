@@ -119,7 +119,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "satellite-messenger", label: "Satellite Messenger", icon: SatelliteDish, adminOnly: false, showForUsers: true },
     { id: "offline-form-share", label: "Offline Form Share", icon: ArrowRightLeft, adminOnly: false, showForUsers: true },
     { id: "microplanning", label: "Geo Microplanning", icon: MapPin, adminOnly: true },
-    { id: "integrated-supervisory", label: "Integrated Supervisory", icon: LayoutDashboard, adminOnly: true },
+    { id: "integrated-supervisory", label: "Integrated Supervisory Checklist", icon: LayoutDashboard, adminOnly: true },
     { id: "coverage-eval", label: "Coverage Evaluation 3D", icon: Boxes, adminOnly: false, showForUsers: true },
     { id: "environment", label: "Change Environment", icon: ArrowRightLeft, adminOnly: true },
     { id: "quizzes", label: "Quizzes", icon: BookOpen, adminOnly: false, showForUsers: true },
