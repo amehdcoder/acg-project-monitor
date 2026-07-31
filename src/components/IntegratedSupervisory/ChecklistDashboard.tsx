@@ -1,10 +1,16 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader,
+  DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Activity, AlertTriangle, ClipboardCheck, Droplets, Loader2, MapPin,
-  PlayCircle, RefreshCw, ShieldAlert, Users,
+  PlayCircle, RefreshCw, Settings2, ShieldAlert, UserCheck, Users,
 } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart,
@@ -22,7 +28,20 @@ const PALETTE = [
   "hsl(320,50%,50%)",
 ];
 
+/** Semantic colours for the Status of MDA bar chart. */
+const MDA_STATUS_COLORS: { match: RegExp; color: string }[] = [
+  { match: /complete/i, color: "hsl(142,71%,38%)" },   // green
+  { match: /not\s*start|no[t]?\s*commenc|yet\s*to/i, color: "hsl(0,72%,48%)" },  // red
+  { match: /halt|stopp|suspend|paus/i, color: "hsl(45,95%,50%)" },  // yellow
+  { match: /ongoing|on-?going|progress|started|commenc/i, color: "hsl(214,85%,48%)" }, // blue
+];
+const mdaStatusColor = (name: string) =>
+  MDA_STATUS_COLORS.find((c) => c.match.test(name))?.color ?? "hsl(215,15%,55%)";
+
+const GEO_DENOM_KEY = "isc.geoCoverageDenominator";
+
 const yes = (v: unknown) => String(v ?? "").trim().toLowerCase() === "yes";
+
 
 function tally(values: unknown[], field: string) {
   const m = new Map<string, number>();
@@ -46,10 +65,11 @@ function tallyMulti(values: unknown[], field: string) {
 }
 
 const Kpi = ({
-  icon: Icon, label, value, sub, tone,
-}: { icon: React.ElementType; label: string; value: string; sub?: string; tone: string }) => (
-  <div className={`rounded-xl p-4 text-white shadow-card transition-transform duration-300 hover:-translate-y-1 ${tone}`}>
-    <div className="flex items-center gap-1.5 mb-1.5">
+  icon: Icon, label, value, sub, tone, action,
+}: { icon: React.ElementType; label: string; value: string; sub?: string; tone: string; action?: React.ReactNode }) => (
+  <div className={`relative rounded-xl p-4 text-white shadow-card transition-transform duration-300 hover:-translate-y-1 ${tone}`}>
+    {action}
+    <div className="flex items-center gap-1.5 mb-1.5 pr-6">
       <Icon className="h-4 w-4" />
       <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide leading-tight">{label}</p>
     </div>
@@ -57,6 +77,7 @@ const Kpi = ({
     {sub && <p className="mt-1.5 text-[11px] font-medium text-white/85">{sub}</p>}
   </div>
 );
+
 
 const Panel = ({
   title, icon: Icon, children, right,
@@ -106,6 +127,159 @@ function HBarChart({ data, color = PALETTE[0] }: { data: { name: string; value: 
   );
 }
 
+/** Vertical bar chart with semantic per-status colours. */
+function StatusBarChart({ data }: { data: { name: string; value: number }[] }) {
+  if (data.length === 0) return <Empty />;
+  return (
+    <ResponsiveContainer width="100%" height={260}>
+      <BarChart data={data} margin={{ left: 4, right: 12, top: 12 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+        <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} height={48} angle={-12} textAnchor="end" />
+        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+        <Tooltip formatter={(v: number) => [`${v} submission${v === 1 ? "" : "s"}`, "Count"]} />
+        <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={72}>
+          {data.map((d, i) => <Cell key={i} fill={mdaStatusColor(d.name)} />)}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export interface PerfRow {
+  name: string;
+  submissions: number;
+  respondents: number;
+  avgRespondents: number;
+  days: number;
+}
+
+/** Submissions / respondents / average / days-worked table. */
+function PerformanceTable({ rows, headLabel }: { rows: PerfRow[]; headLabel: string }) {
+  if (rows.length === 0) return <Empty />;
+  const totals = rows.reduce(
+    (a, r) => ({ s: a.s + r.submissions, r: a.r + r.respondents, d: a.d + r.days }),
+    { s: 0, r: 0, d: 0 },
+  );
+  return (
+    <div className="max-h-[340px] overflow-auto rounded-md border">
+      <table className="w-full text-xs">
+        <thead className="bg-muted/60 sticky top-0 z-10">
+          <tr>
+            <th className="text-left px-2 py-2 font-semibold">{headLabel}</th>
+            <th className="text-right px-2 py-2 font-semibold">Checklists</th>
+            <th className="text-right px-2 py-2 font-semibold">Respondents</th>
+            <th className="text-right px-2 py-2 font-semibold">Avg / checklist</th>
+            <th className="text-right px-2 py-2 font-semibold">Days worked</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.name} className="border-t hover:bg-muted/30">
+              <td className="px-2 py-1.5 font-medium">{r.name}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{r.submissions.toLocaleString()}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{r.respondents.toLocaleString()}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{r.avgRespondents.toFixed(1)}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{r.days.toLocaleString()}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot className="bg-muted/50 sticky bottom-0">
+          <tr className="border-t font-semibold">
+            <td className="px-2 py-1.5">Total</td>
+            <td className="px-2 py-1.5 text-right tabular-nums">{totals.s.toLocaleString()}</td>
+            <td className="px-2 py-1.5 text-right tabular-nums">{totals.r.toLocaleString()}</td>
+            <td className="px-2 py-1.5 text-right tabular-nums">{totals.s ? (totals.r / totals.s).toFixed(1) : "0.0"}</td>
+            <td className="px-2 py-1.5 text-right tabular-nums">{totals.d.toLocaleString()}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+/** Group parents by a field and compute performance metrics. */
+function performanceBy(
+  parents: Record<string, unknown>[],
+  field: string,
+): PerfRow[] {
+  const m = new Map<string, { subs: number; resp: number; days: Set<string> }>();
+  for (const p of parents) {
+    const name = resolveChecklistValue(field, p[field]) || "Unspecified";
+    const rec = m.get(name) ?? { subs: 0, resp: 0, days: new Set<string>() };
+    rec.subs += 1;
+    rec.resp += Number(p.respondent_count) || 0;
+    const t = String(p._submission_time ?? "").slice(0, 10);
+    if (t) rec.days.add(t);
+    m.set(name, rec);
+  }
+  return [...m.entries()]
+    .map(([name, r]) => ({
+      name,
+      submissions: r.subs,
+      respondents: r.resp,
+      avgRespondents: r.subs ? r.resp / r.subs : 0,
+      days: r.days.size,
+    }))
+    .sort((a, b) => b.submissions - a.submissions);
+}
+
+/** Editable denominator control for the Geographic Coverage KPI. */
+function CoverageTargetDialog({
+  value, onSave,
+}: { value: number | null; onSave: (v: number | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value != null ? String(value) : "");
+  useEffect(() => { if (open) setDraft(value != null ? String(value) : ""); }, [open, value]);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="absolute top-2 right-2 rounded-md bg-white/20 p-1 text-white hover:bg-white/30 transition-colors"
+          aria-label="Set total communities targeted"
+        >
+          <Settings2 className="h-3.5 w-3.5" />
+        </button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Geographic coverage target</DialogTitle>
+          <DialogDescription>
+            Enter the total number of communities targeted for this campaign. Coverage is
+            computed as communities visited ÷ communities targeted.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="geo-denominator">Total communities targeted</Label>
+          <Input
+            id="geo-denominator"
+            type="number"
+            min={0}
+            inputMode="numeric"
+            placeholder="e.g. 1200"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+        </div>
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button variant="ghost" onClick={() => { onSave(null); setOpen(false); }}>Clear</Button>
+          <Button
+            onClick={() => {
+              const n = Number(draft);
+              onSave(draft.trim() === "" || !Number.isFinite(n) || n <= 0 ? null : Math.round(n));
+              setOpen(false);
+            }}
+          >
+            Save target
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+
 export default function ChecklistDashboard({
   cache, onRefresh, syncing,
 }: { cache: KoboCache | null; onRefresh?: () => void; syncing?: boolean }) {
@@ -113,6 +287,27 @@ export default function ChecklistDashboard({
     () => buildChecklistDataset(cache?.results ?? []),
     [cache],
   );
+
+  const [geoTarget, setGeoTarget] = useState<number | null>(() => {
+    const raw = typeof window !== "undefined" ? window.localStorage.getItem(GEO_DENOM_KEY) : null;
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  });
+  const saveGeoTarget = (v: number | null) => {
+    setGeoTarget(v);
+    try {
+      if (v == null) window.localStorage.removeItem(GEO_DENOM_KEY);
+      else window.localStorage.setItem(GEO_DENOM_KEY, String(v));
+    } catch { /* storage unavailable */ }
+  };
+
+  const monitorPerf = useMemo(
+    () => performanceBy(parents, "Independent_Monitor_s_Name"),
+    [parents],
+  );
+  const designationPerf = useMemo(() => performanceBy(parents, "Designation"), [parents]);
+
+
 
   const kpi = useMemo(() => {
     const states = new Set<string>(), lgas = new Set<string>(), communities = new Set<string>(), wards = new Set<string>();
@@ -192,7 +387,19 @@ export default function ChecklistDashboard({
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Kpi icon={ClipboardCheck} label="Total Submissions" value={kpi.total.toLocaleString()} sub="Supervisory checklists" tone="bg-[hsl(214,80%,40%)]" />
-        <Kpi icon={MapPin} label="Geographic Coverage" value={`${kpi.communities}`} sub={`${kpi.states} states · ${kpi.lgas} LGAs · ${kpi.wards} wards`} tone="bg-[hsl(160,55%,35%)]" />
+        <Kpi
+          icon={MapPin}
+          label="Geographic Coverage"
+          value={geoTarget ? `${((kpi.communities / geoTarget) * 100).toFixed(1)}%` : "—"}
+          sub={
+            geoTarget
+              ? `${kpi.communities.toLocaleString()} of ${geoTarget.toLocaleString()} communities · ${kpi.lgas} LGAs`
+              : `${kpi.communities.toLocaleString()} communities visited · set target →`
+          }
+          tone="bg-[hsl(160,55%,35%)]"
+          action={<CoverageTargetDialog value={geoTarget} onSave={saveGeoTarget} />}
+        />
+
         <Kpi icon={Users} label="Respondents Reached" value={kpi.respondents.toLocaleString()} sub={`${cddTotal.toLocaleString()} CDDs counted`} tone="bg-[hsl(265,50%,48%)]" />
         <Kpi icon={PlayCircle} label="Treatment Commenced" value={kpi.started.toLocaleString()} sub={`${kpi.notStarted.toLocaleString()} not started`} tone="bg-[hsl(35,85%,45%)]" />
         <Kpi icon={ShieldAlert} label="SAE Alerts" value={kpi.sae.toLocaleString()} sub={kpi.sae > 0 ? "Requires review" : "None reported"} tone={kpi.sae > 0 ? "bg-[hsl(350,70%,45%)] animate-pulse" : "bg-[hsl(215,15%,45%)]"} />
@@ -259,11 +466,38 @@ export default function ChecklistDashboard({
         <Panel title="Medicine Sufficiency" icon={ClipboardCheck}><DonutChart data={sufficiency} /></Panel>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Treatment Register Available" icon={ClipboardCheck}><DonutChart data={register} /></Panel>
         <Panel title="Register Entries Correct" icon={ClipboardCheck}><DonutChart data={registerCorrect} /></Panel>
-        <Panel title="Status of MDA" icon={Activity}><DonutChart data={mdaStatus} /></Panel>
       </div>
+
+      <Panel
+        title="Status of MDA"
+        icon={Activity}
+        right={
+          <div className="flex items-center gap-2.5 text-[10px] font-medium text-muted-foreground">
+            {[["Completed", "hsl(142,71%,38%)"], ["Ongoing", "hsl(214,85%,48%)"], ["Halted", "hsl(45,95%,50%)"], ["Not Started", "hsl(0,72%,48%)"]].map(([l, c]) => (
+              <span key={l} className="flex items-center gap-1">
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: c }} /> {l}
+              </span>
+            ))}
+          </div>
+        }
+      >
+        <StatusBarChart data={mdaStatus} />
+      </Panel>
+
+      {/* Field-worker accountability */}
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Panel title="Independent Monitor Performance" icon={UserCheck}>
+          <PerformanceTable rows={monitorPerf} headLabel="Independent Monitor's Name" />
+        </Panel>
+        <Panel title="Performance by Designation" icon={Users}>
+          <PerformanceTable rows={designationPerf} headLabel="Designation" />
+        </Panel>
+      </div>
+
+
 
       {/* Supervision & CDD engagement */}
       <div className="grid gap-4 lg:grid-cols-2">
