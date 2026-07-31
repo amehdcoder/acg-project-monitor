@@ -341,7 +341,12 @@ export default function ChecklistDashboard({
       if (p.State) states.add(String(p.State));
       if (p.LGA) lgas.add(`${p.State}|${p.LGA}`);
       if (p.Ward) wards.add(`${p.LGA}|${p.Ward}`);
-      if (p.COMMUNITIES) communities.add(`${p.LGA}|${p.COMMUNITIES}`);
+      if (p.COMMUNITIES) {
+        // deduplicate community names within the same State|LGA|Ward
+        communities.add(
+          `${String(p.State ?? "").trim().toLowerCase()}|${String(p.LGA ?? "").trim().toLowerCase()}|${String(p.Ward ?? "").trim().toLowerCase()}|${String(p.COMMUNITIES).trim().toLowerCase()}`,
+        );
+      }
       if (String(p.has_treatment_commenced ?? "").toLowerCase() === "yes") started++;
       else if (String(p.has_treatment_commenced ?? "").toLowerCase() === "no") notStarted++;
       if (yes(p.Any_SAE_Complain)) sae++;
