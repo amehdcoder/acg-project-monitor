@@ -206,9 +206,12 @@ function PerformanceTable({ rows, headLabel }: { rows: PerfRow[]; headLabel: str
             <td className="px-2 py-1.5 text-right tabular-nums">{totals.s.toLocaleString()}</td>
             <td className="px-2 py-1.5 text-right tabular-nums">{totals.r.toLocaleString()}</td>
             <td className="px-2 py-1.5 text-right tabular-nums">{totals.s ? (totals.r / totals.s).toFixed(1) : "0.0"}</td>
-            <td className="px-2 py-1.5 text-right tabular-nums">{totals.d.toLocaleString()}</td>
+            <td className="px-2 py-1.5 text-right tabular-nums" title="Average days worked per row (not a sum)">
+              {rows.length ? (totals.d / rows.length).toFixed(1) : "0.0"}
+            </td>
           </tr>
         </tfoot>
+
       </table>
     </div>
   );
