@@ -27,6 +27,7 @@ import {
   StatusCommunityTables, StatusDrilldownDialog, useStatusDrilldown,
 } from "./ChecklistStatusTables";
 import ChecklistPredictive from "./ChecklistPredictive";
+import MlIntelligenceHub from "./MlIntelligenceHub";
 
 
 
@@ -424,6 +425,8 @@ export default function ChecklistDashboard({
 
   return (
     <div className="space-y-4">
+      <MlIntelligenceHub />
+
       <ChecklistFilters parents={allParents} value={filters} onChange={setFilters} />
 
       {/* KPI cards */}
