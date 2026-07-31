@@ -428,7 +428,6 @@ export default function ChecklistDashboard({
 
   return (
     <div className="space-y-4">
-      <MlIntelligenceHub />
 
       <ChecklistFilters parents={allParents} value={filters} onChange={setFilters} />
 
@@ -612,6 +611,17 @@ export default function ChecklistDashboard({
         <Panel title="Top LGAs by Supervision Volume" icon={MapPin}><HBarChart data={topLgas} /></Panel>
         <Panel title="Reasons for Not Swallowing" icon={AlertTriangle}><HBarChart data={refusalReasons} color={PALETTE[3]} /></Panel>
       </div>
+
+      <MlIntelligenceHub
+        parents={parents}
+        respondents={respondents}
+        filterSummary={
+          Object.values(filters).filter(Boolean).length
+            ? `${Object.values(filters).filter(Boolean).length} shared filter(s) applied`
+            : "no filters applied"
+        }
+      />
+
     </div>
   );
 }
