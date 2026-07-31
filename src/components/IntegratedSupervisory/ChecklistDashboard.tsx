@@ -548,8 +548,12 @@ export default function ChecklistDashboard({
 
       <StatusDrilldownDialog statusLabel={drill.status} rows={drillRows} onClose={drill.close} />
 
-      {/* Predictive modelling: completion timeline + disease prevalence */}
+      {/* Geospatial: community status + household medicine-offer maps */}
+      <ChecklistMaps parents={parents} respondents={respondents} filters={filters} />
+
+      {/* Predictive modelling: completion timeline */}
       <ChecklistPredictive parents={parents} respondents={respondents} geoTarget={geoTarget} />
+
 
 
       {/* Community status registers */}
