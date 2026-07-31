@@ -5,6 +5,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import StudioPresetBar, { type FilterState } from "./StudioPresetBar";
 import { exportSnapshotPDF, exportSnapshotPNG } from "@/lib/isc/snapshotExport";
 import { getActiveConnectionId } from "./koboClient";
