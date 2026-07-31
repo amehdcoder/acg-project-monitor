@@ -428,7 +428,6 @@ export default function ChecklistDashboard({
 
   return (
     <div className="space-y-4">
-      <MlIntelligenceHub />
 
       <ChecklistFilters parents={allParents} value={filters} onChange={setFilters} />
 
