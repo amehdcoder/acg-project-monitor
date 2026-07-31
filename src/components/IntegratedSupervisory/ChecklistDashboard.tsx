@@ -134,7 +134,9 @@ function HBarChart({ data, color = PALETTE[0] }: { data: { name: string; value: 
 }
 
 /** Vertical bar chart with semantic per-status colours. */
-function StatusBarChart({ data }: { data: { name: string; value: number }[] }) {
+function StatusBarChart({
+  data, onSelect,
+}: { data: { name: string; value: number }[]; onSelect?: (name: string) => void }) {
   if (data.length === 0) return <Empty />;
   return (
     <ResponsiveContainer width="100%" height={260}>
@@ -142,8 +144,14 @@ function StatusBarChart({ data }: { data: { name: string; value: number }[] }) {
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} height={48} angle={-12} textAnchor="end" />
         <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-        <Tooltip formatter={(v: number) => [`${v} submission${v === 1 ? "" : "s"}`, "Count"]} />
-        <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={72}>
+        <Tooltip formatter={(v: number) => [`${v} submission${v === 1 ? "" : "s"} — click to drill down`, "Count"]} />
+        <Bar
+          dataKey="value"
+          radius={[6, 6, 0, 0]}
+          maxBarSize={72}
+          cursor={onSelect ? "pointer" : undefined}
+          onClick={(d: any) => onSelect?.(String(d?.name ?? d?.payload?.name ?? ""))}
+        >
           {data.map((d, i) => <Cell key={i} fill={mdaStatusColor(d.name)} />)}
         </Bar>
       </BarChart>
