@@ -288,6 +288,27 @@ export default function ChecklistDashboard({
     [cache],
   );
 
+  const [geoTarget, setGeoTarget] = useState<number | null>(() => {
+    const raw = typeof window !== "undefined" ? window.localStorage.getItem(GEO_DENOM_KEY) : null;
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  });
+  const saveGeoTarget = (v: number | null) => {
+    setGeoTarget(v);
+    try {
+      if (v == null) window.localStorage.removeItem(GEO_DENOM_KEY);
+      else window.localStorage.setItem(GEO_DENOM_KEY, String(v));
+    } catch { /* storage unavailable */ }
+  };
+
+  const monitorPerf = useMemo(
+    () => performanceBy(parents, "Independent_Monitor_s_Name"),
+    [parents],
+  );
+  const designationPerf = useMemo(() => performanceBy(parents, "Designation"), [parents]);
+
+
+
   const kpi = useMemo(() => {
     const states = new Set<string>(), lgas = new Set<string>(), communities = new Set<string>(), wards = new Set<string>();
     let started = 0, notStarted = 0, sae = 0;
