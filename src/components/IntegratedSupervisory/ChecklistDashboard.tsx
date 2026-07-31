@@ -9,7 +9,7 @@ import {
   DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Activity, AlertTriangle, ClipboardCheck, Droplets, Loader2, MapPin,
+  Activity, AlertTriangle, ClipboardCheck, Droplets, Home, Loader2, MapPin,
   PlayCircle, RefreshCw, Settings2, ShieldAlert, UserCheck, Users,
 } from "lucide-react";
 import {
@@ -20,6 +20,12 @@ import type { KoboCache } from "./koboClient";
 import {
   buildChecklistDataset, resolveChecklistValue, splitMulti,
 } from "./checklistSchema";
+import ChecklistFilters, {
+  applyChecklistFilters, EMPTY_FILTERS, type ChecklistFilterState,
+} from "./ChecklistFilters";
+import {
+  StatusCommunityTables, StatusDrilldownDialog, useStatusDrilldown,
+} from "./ChecklistStatusTables";
 
 
 const PALETTE = [
@@ -128,7 +134,9 @@ function HBarChart({ data, color = PALETTE[0] }: { data: { name: string; value: 
 }
 
 /** Vertical bar chart with semantic per-status colours. */
-function StatusBarChart({ data }: { data: { name: string; value: number }[] }) {
+function StatusBarChart({
+  data, onSelect,
+}: { data: { name: string; value: number }[]; onSelect?: (name: string) => void }) {
   if (data.length === 0) return <Empty />;
   return (
     <ResponsiveContainer width="100%" height={260}>
@@ -136,8 +144,14 @@ function StatusBarChart({ data }: { data: { name: string; value: number }[] }) {
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} height={48} angle={-12} textAnchor="end" />
         <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-        <Tooltip formatter={(v: number) => [`${v} submission${v === 1 ? "" : "s"}`, "Count"]} />
-        <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={72}>
+        <Tooltip formatter={(v: number) => [`${v} submission${v === 1 ? "" : "s"} — click to drill down`, "Count"]} />
+        <Bar
+          dataKey="value"
+          radius={[6, 6, 0, 0]}
+          maxBarSize={72}
+          cursor={onSelect ? "pointer" : undefined}
+          onClick={(d: any) => onSelect?.(String(d?.name ?? d?.payload?.name ?? ""))}
+        >
           {data.map((d, i) => <Cell key={i} fill={mdaStatusColor(d.name)} />)}
         </Bar>
       </BarChart>
@@ -283,9 +297,28 @@ function CoverageTargetDialog({
 export default function ChecklistDashboard({
   cache, onRefresh, syncing,
 }: { cache: KoboCache | null; onRefresh?: () => void; syncing?: boolean }) {
-  const { parents, respondents } = useMemo(
+  const { parents: allParents, respondents: allRespondents } = useMemo(
     () => buildChecklistDataset(cache?.results ?? []),
     [cache],
+  );
+
+  const [filters, setFilters] = useState<ChecklistFilterState>({ ...EMPTY_FILTERS });
+  const parents = useMemo(() => applyChecklistFilters(allParents, filters), [allParents, filters]);
+  const parentKeys = useMemo(
+    () => new Set(parents.map((p) => `${p._uuid ?? ""}|${p._id ?? ""}`)),
+    [parents],
+  );
+  const respondents = useMemo(
+    () => allRespondents.filter((r) => parentKeys.has(`${r.parent_uuid ?? ""}|${r.parent_id ?? ""}`)),
+    [allRespondents, parentKeys],
+  );
+
+  const drill = useStatusDrilldown();
+  const drillRows = useMemo(
+    () => (drill.status
+      ? parents.filter((p) => (resolveChecklistValue("Status_of_MDA", p.Status_of_MDA) || String(p.Status_of_MDA ?? "") || "—") === drill.status)
+      : []),
+    [parents, drill.status],
   );
 
   const [geoTarget, setGeoTarget] = useState<number | null>(() => {
@@ -316,7 +349,12 @@ export default function ChecklistDashboard({
       if (p.State) states.add(String(p.State));
       if (p.LGA) lgas.add(`${p.State}|${p.LGA}`);
       if (p.Ward) wards.add(`${p.LGA}|${p.Ward}`);
-      if (p.COMMUNITIES) communities.add(`${p.LGA}|${p.COMMUNITIES}`);
+      if (p.COMMUNITIES) {
+        // deduplicate community names within the same State|LGA|Ward
+        communities.add(
+          `${String(p.State ?? "").trim().toLowerCase()}|${String(p.LGA ?? "").trim().toLowerCase()}|${String(p.Ward ?? "").trim().toLowerCase()}|${String(p.COMMUNITIES).trim().toLowerCase()}`,
+        );
+      }
       if (String(p.has_treatment_commenced ?? "").toLowerCase() === "yes") started++;
       else if (String(p.has_treatment_commenced ?? "").toLowerCase() === "no") notStarted++;
       if (yes(p.Any_SAE_Complain)) sae++;
@@ -384,9 +422,18 @@ export default function ChecklistDashboard({
 
   return (
     <div className="space-y-4">
+      <ChecklistFilters parents={allParents} value={filters} onChange={setFilters} />
+
       {/* KPI cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         <Kpi icon={ClipboardCheck} label="Total Submissions" value={kpi.total.toLocaleString()} sub="Supervisory checklists" tone="bg-[hsl(214,80%,40%)]" />
+        <Kpi
+          icon={Home}
+          label="Communities Visited"
+          value={kpi.communities.toLocaleString()}
+          sub={`Deduplicated · ${kpi.wards} wards · ${kpi.lgas} LGAs`}
+          tone="bg-[hsl(190,65%,34%)]"
+        />
         <Kpi
           icon={MapPin}
           label="Geographic Coverage"
@@ -404,6 +451,7 @@ export default function ChecklistDashboard({
         <Kpi icon={PlayCircle} label="Treatment Commenced" value={kpi.started.toLocaleString()} sub={`${kpi.notStarted.toLocaleString()} not started`} tone="bg-[hsl(35,85%,45%)]" />
         <Kpi icon={ShieldAlert} label="SAE Alerts" value={kpi.sae.toLocaleString()} sub={kpi.sae > 0 ? "Requires review" : "None reported"} tone={kpi.sae > 0 ? "bg-[hsl(350,70%,45%)] animate-pulse" : "bg-[hsl(215,15%,45%)]"} />
       </div>
+
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
@@ -484,8 +532,16 @@ export default function ChecklistDashboard({
           </div>
         }
       >
-        <StatusBarChart data={mdaStatus} />
+        <StatusBarChart data={mdaStatus} onSelect={(n) => n && drill.open(n)} />
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Tip: click any bar to drill down into the exact checklist records behind that status.
+        </p>
       </Panel>
+
+      <StatusDrilldownDialog statusLabel={drill.status} rows={drillRows} onClose={drill.close} />
+
+      {/* Community status registers */}
+      <StatusCommunityTables parents={parents} />
 
       {/* Field-worker accountability */}
       <div className="grid gap-4 xl:grid-cols-2">
