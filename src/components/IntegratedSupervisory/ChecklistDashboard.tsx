@@ -13,8 +13,8 @@ import {
 import type { KoboCache } from "./koboClient";
 import {
   buildChecklistDataset, resolveChecklistValue, splitMulti,
-  CHECKLIST_CHOICES,
 } from "./checklistSchema";
+
 
 const PALETTE = [
   "hsl(214,80%,45%)", "hsl(160,60%,40%)", "hsl(35,90%,50%)", "hsl(350,70%,52%)",
