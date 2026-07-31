@@ -505,13 +505,20 @@ function IntegrityModule({
 const tabClass =
   "text-xs font-semibold text-slate-100 data-[state=active]:bg-white/15 data-[state=active]:text-white";
 
+/** Auto-refresh cadence shared with the rest of the Checklist Dashboard. */
+export const ML_HUB_REFRESH_MS = 60_000;
+
 export default function MlIntelligenceHub({
-  parents, respondents, lastSyncLabel, filterSummary,
+  parents, respondents, lastSyncLabel, filterSummary, syncedAt, onRefresh, syncing,
 }: {
   parents: Row[];
   respondents: Row[];
   lastSyncLabel?: string;
   filterSummary?: string;
+  /** Timestamp of the last Kobo sync (drives the cadence countdown). */
+  syncedAt?: string | number;
+  onRefresh?: () => void;
+  syncing?: boolean;
 }) {
   const cov = useMemo(() => coverage(respondents), [respondents]);
   const points = useMemo(() => mapPoints(respondents), [respondents]);
