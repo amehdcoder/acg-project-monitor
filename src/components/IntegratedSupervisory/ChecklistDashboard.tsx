@@ -27,6 +27,7 @@ import {
   StatusCommunityTables, StatusDrilldownDialog, useStatusDrilldown,
 } from "./ChecklistStatusTables";
 import ChecklistPredictive from "./ChecklistPredictive";
+import ChecklistMaps from "./ChecklistMaps";
 import MlIntelligenceHub from "./MlIntelligenceHub";
 
 
