@@ -186,7 +186,7 @@ function PerformanceTable({ rows, headLabel }: { rows: PerfRow[]; headLabel: str
             <th className="text-right px-2 py-2 font-semibold">Checklists</th>
             <th className="text-right px-2 py-2 font-semibold">Respondents</th>
             <th className="text-right px-2 py-2 font-semibold">Avg / checklist</th>
-            <th className="text-right px-2 py-2 font-semibold">Days worked</th>
+            <th className="text-right px-2 py-2 font-semibold">Days worked <span className="font-normal text-muted-foreground">(avg in total)</span></th>
           </tr>
         </thead>
         <tbody>
@@ -206,9 +206,12 @@ function PerformanceTable({ rows, headLabel }: { rows: PerfRow[]; headLabel: str
             <td className="px-2 py-1.5 text-right tabular-nums">{totals.s.toLocaleString()}</td>
             <td className="px-2 py-1.5 text-right tabular-nums">{totals.r.toLocaleString()}</td>
             <td className="px-2 py-1.5 text-right tabular-nums">{totals.s ? (totals.r / totals.s).toFixed(1) : "0.0"}</td>
-            <td className="px-2 py-1.5 text-right tabular-nums">{totals.d.toLocaleString()}</td>
+            <td className="px-2 py-1.5 text-right tabular-nums" title="Average days worked per row (not a sum)">
+              {rows.length ? (totals.d / rows.length).toFixed(1) : "0.0"}
+            </td>
           </tr>
         </tfoot>
+
       </table>
     </div>
   );
