@@ -186,7 +186,7 @@ function PerformanceTable({ rows, headLabel }: { rows: PerfRow[]; headLabel: str
             <th className="text-right px-2 py-2 font-semibold">Checklists</th>
             <th className="text-right px-2 py-2 font-semibold">Respondents</th>
             <th className="text-right px-2 py-2 font-semibold">Avg / checklist</th>
-            <th className="text-right px-2 py-2 font-semibold">Days worked</th>
+            <th className="text-right px-2 py-2 font-semibold">Days worked <span className="font-normal text-muted-foreground">(avg in total)</span></th>
           </tr>
         </thead>
         <tbody>
