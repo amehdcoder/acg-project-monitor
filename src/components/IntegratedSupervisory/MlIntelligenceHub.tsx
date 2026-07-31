@@ -563,6 +563,22 @@ export default function MlIntelligenceHub({
     });
   };
 
+  // ── Real-time refresh cadence (same tempo as the dashboard above) ────────
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    if (!onRefresh) return;
+    const t = setInterval(() => onRefresh(), ML_HUB_REFRESH_MS);
+    return () => clearInterval(t);
+  }, [onRefresh]);
+
+  const syncedMs = syncedAt ? new Date(syncedAt).getTime() : 0;
+  const ageSec = syncedMs ? Math.max(0, Math.round((now - syncedMs) / 1000)) : null;
+  const nextIn = Math.max(0, Math.ceil((ML_HUB_REFRESH_MS - ((now - syncedMs) % ML_HUB_REFRESH_MS)) / 1000));
+
   return (
     <div className="rounded-2xl p-4 text-slate-100" style={{ background: NAVY }}>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -577,10 +593,24 @@ export default function MlIntelligenceHub({
             {respondents.length.toLocaleString()} respondents
           </p>
         </div>
-        <p className="max-w-[420px] rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-slate-300">
-          Reads the same live, filtered dataset as the dashboard above{filterSummary ? ` · ${filterSummary}` : ""}.
-        </p>
+        <div className="flex max-w-[460px] flex-col items-end gap-1.5">
+          <span
+            className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+            style={{ borderColor: `${EMERALD}55`, background: `${EMERALD}18`, color: EMERALD }}
+            title={`Charts re-compute on every Kobo event and auto-refresh every ${ML_HUB_REFRESH_MS / 1000}s`}
+          >
+            <Radio className={`h-3.5 w-3.5 ${syncing ? "animate-pulse" : ""}`} />
+            {syncing
+              ? "Refreshing…"
+              : `Live · auto-refresh ${ML_HUB_REFRESH_MS / 1000}s · next in ${nextIn}s`}
+          </span>
+          <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-right text-[11px] text-slate-300">
+            Reads the same live, filtered dataset as the dashboard above{filterSummary ? ` · ${filterSummary}` : ""}
+            {ageSec != null ? ` · data ${ageSec}s old` : ""}.
+          </p>
+        </div>
       </div>
+
 
       {/* KPI row */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
