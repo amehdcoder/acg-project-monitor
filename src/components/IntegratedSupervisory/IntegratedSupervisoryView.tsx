@@ -10,7 +10,6 @@ import {
 import { toast } from "@/hooks/use-toast";
 import KoboSyncDialog from "./KoboSyncDialog";
 import SupervisoryDashboardView from "./SupervisoryDashboardView";
-import RawKoboDataTable from "./RawKoboDataTable";
 import ChecklistDashboard from "./ChecklistDashboard";
 import ChecklistDataTable from "./ChecklistDataTable";
 import ChecklistReconciliation from "./ChecklistReconciliation";
@@ -191,9 +190,6 @@ export default function IntegratedSupervisoryView() {
         </TabsContent>
         <TabsContent value="studio" className="mt-4">
           <SupervisoryDashboardView cache={cache} onRefresh={() => refresh(false)} syncing={syncing} />
-        </TabsContent>
-        <TabsContent value="explorer" className="mt-4">
-          <RawKoboDataTable cache={cache} onRefresh={() => refresh(false)} />
         </TabsContent>
         <TabsContent value="reconciliation" className="mt-4">
           <ChecklistReconciliation cache={cache} canExport={perms.canExport} />
