@@ -20,6 +20,12 @@ import type { KoboCache } from "./koboClient";
 import {
   buildChecklistDataset, resolveChecklistValue, splitMulti,
 } from "./checklistSchema";
+import ChecklistFilters, {
+  applyChecklistFilters, EMPTY_FILTERS, type ChecklistFilterState,
+} from "./ChecklistFilters";
+import {
+  StatusCommunityTables, StatusDrilldownDialog, useStatusDrilldown,
+} from "./ChecklistStatusTables";
 
 
 const PALETTE = [
