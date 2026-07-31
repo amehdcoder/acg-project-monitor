@@ -65,10 +65,11 @@ function tallyMulti(values: unknown[], field: string) {
 }
 
 const Kpi = ({
-  icon: Icon, label, value, sub, tone,
-}: { icon: React.ElementType; label: string; value: string; sub?: string; tone: string }) => (
-  <div className={`rounded-xl p-4 text-white shadow-card transition-transform duration-300 hover:-translate-y-1 ${tone}`}>
-    <div className="flex items-center gap-1.5 mb-1.5">
+  icon: Icon, label, value, sub, tone, action,
+}: { icon: React.ElementType; label: string; value: string; sub?: string; tone: string; action?: React.ReactNode }) => (
+  <div className={`relative rounded-xl p-4 text-white shadow-card transition-transform duration-300 hover:-translate-y-1 ${tone}`}>
+    {action}
+    <div className="flex items-center gap-1.5 mb-1.5 pr-6">
       <Icon className="h-4 w-4" />
       <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide leading-tight">{label}</p>
     </div>
@@ -76,6 +77,7 @@ const Kpi = ({
     {sub && <p className="mt-1.5 text-[11px] font-medium text-white/85">{sub}</p>}
   </div>
 );
+
 
 const Panel = ({
   title, icon: Icon, children, right,
