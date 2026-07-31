@@ -283,9 +283,28 @@ function CoverageTargetDialog({
 export default function ChecklistDashboard({
   cache, onRefresh, syncing,
 }: { cache: KoboCache | null; onRefresh?: () => void; syncing?: boolean }) {
-  const { parents, respondents } = useMemo(
+  const { parents: allParents, respondents: allRespondents } = useMemo(
     () => buildChecklistDataset(cache?.results ?? []),
     [cache],
+  );
+
+  const [filters, setFilters] = useState<ChecklistFilterState>({ ...EMPTY_FILTERS });
+  const parents = useMemo(() => applyChecklistFilters(allParents, filters), [allParents, filters]);
+  const parentKeys = useMemo(
+    () => new Set(parents.map((p) => `${p._uuid ?? ""}|${p._id ?? ""}`)),
+    [parents],
+  );
+  const respondents = useMemo(
+    () => allRespondents.filter((r) => parentKeys.has(`${r.parent_uuid ?? ""}|${r.parent_id ?? ""}`)),
+    [allRespondents, parentKeys],
+  );
+
+  const drill = useStatusDrilldown();
+  const drillRows = useMemo(
+    () => (drill.status
+      ? parents.filter((p) => (resolveChecklistValue("Status_of_MDA", p.Status_of_MDA) || String(p.Status_of_MDA ?? "") || "—") === drill.status)
+      : []),
+    [parents, drill.status],
   );
 
   const [geoTarget, setGeoTarget] = useState<number | null>(() => {
