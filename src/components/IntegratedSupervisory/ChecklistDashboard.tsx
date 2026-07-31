@@ -414,9 +414,18 @@ export default function ChecklistDashboard({
 
   return (
     <div className="space-y-4">
+      <ChecklistFilters parents={allParents} value={filters} onChange={setFilters} />
+
       {/* KPI cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         <Kpi icon={ClipboardCheck} label="Total Submissions" value={kpi.total.toLocaleString()} sub="Supervisory checklists" tone="bg-[hsl(214,80%,40%)]" />
+        <Kpi
+          icon={Home}
+          label="Communities Visited"
+          value={kpi.communities.toLocaleString()}
+          sub={`Deduplicated · ${kpi.wards} wards · ${kpi.lgas} LGAs`}
+          tone="bg-[hsl(190,65%,34%)]"
+        />
         <Kpi
           icon={MapPin}
           label="Geographic Coverage"
@@ -434,6 +443,7 @@ export default function ChecklistDashboard({
         <Kpi icon={PlayCircle} label="Treatment Commenced" value={kpi.started.toLocaleString()} sub={`${kpi.notStarted.toLocaleString()} not started`} tone="bg-[hsl(35,85%,45%)]" />
         <Kpi icon={ShieldAlert} label="SAE Alerts" value={kpi.sae.toLocaleString()} sub={kpi.sae > 0 ? "Requires review" : "None reported"} tone={kpi.sae > 0 ? "bg-[hsl(350,70%,45%)] animate-pulse" : "bg-[hsl(215,15%,45%)]"} />
       </div>
+
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
