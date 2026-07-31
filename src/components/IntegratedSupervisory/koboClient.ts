@@ -98,15 +98,114 @@ export interface KoboConfig {
 
 
 
-export function loadKoboConfig(): KoboConfig | null {
-  try { const raw = localStorage.getItem(CONFIG_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
-}
-export function saveKoboConfig(cfg: KoboConfig) { localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg)); }
-export function clearKoboConfig() { localStorage.removeItem(CONFIG_KEY); }
+/* ──────────────────────────────────────────────────────────────────────────
+ * MULTI-INTEGRATION REGISTRY
+ * Several KoboToolbox forms can be linked at once; each one is an independent
+ * "integration" with its own config, submission cache and dashboard layout,
+ * so a user can build several dashboards from several Kobo forms.
+ * Legacy single-connection storage is migrated transparently on first read.
+ * ────────────────────────────────────────────────────────────────────────── */
 
-export function loadKoboCache(): KoboCache | null {
+const REGISTRY_KEY = "amehnities.integratedSupervisory.connections";
+const ACTIVE_KEY = "amehnities.integratedSupervisory.activeConnection";
+
+export interface KoboConnection {
+  id: string;
+  name: string;
+  config: KoboConfig;
+  createdAt: string;
+}
+
+const readJSON = <T,>(key: string): T | null => {
+  try { const raw = localStorage.getItem(key); return raw ? (JSON.parse(raw) as T) : null; } catch { return null; }
+};
+const writeJSON = (key: string, value: unknown) => {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* quota */ }
+};
+
+export const newConnectionId = () => `kc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+
+export function listConnections(): KoboConnection[] {
+  const existing = readJSON<KoboConnection[]>(REGISTRY_KEY);
+  if (existing && Array.isArray(existing) && existing.length) return existing;
+  // Migrate a legacy single connection, preserving its cache/layout.
+  const legacy = readJSON<KoboConfig>(CONFIG_KEY);
+  if (legacy?.formUid) {
+    const conn: KoboConnection = {
+      id: "legacy",
+      name: "Integrated MDA Supervisory Checklist",
+      config: legacy,
+      createdAt: new Date().toISOString(),
+    };
+    writeJSON(REGISTRY_KEY, [conn]);
+    return [conn];
+  }
+  return [];
+}
+
+export function saveConnection(conn: KoboConnection) {
+  const all = listConnections();
+  const idx = all.findIndex((c) => c.id === conn.id);
+  if (idx >= 0) all[idx] = conn; else all.push(conn);
+  writeJSON(REGISTRY_KEY, all);
+}
+
+export function deleteConnection(id: string) {
+  writeJSON(REGISTRY_KEY, listConnections().filter((c) => c.id !== id));
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    localStorage.removeItem(`${CACHE_KEY}:${id}`);
+    localStorage.removeItem(`${LAYOUT_KEY}:${id}`);
+  } catch { /* ignore */ }
+  if (getActiveConnectionId() === id) {
+    const next = listConnections()[0]?.id ?? null;
+    if (next) setActiveConnectionId(next); else { try { localStorage.removeItem(ACTIVE_KEY); } catch { /* ignore */ } }
+  }
+}
+
+export function getActiveConnectionId(): string | null {
+  const stored = (() => { try { return localStorage.getItem(ACTIVE_KEY); } catch { return null; } })();
+  const all = listConnections();
+  if (stored && all.some((c) => c.id === stored)) return stored;
+  return all[0]?.id ?? null;
+}
+
+export function setActiveConnectionId(id: string) {
+  try { localStorage.setItem(ACTIVE_KEY, id); } catch { /* ignore */ }
+}
+
+export function getConnection(id?: string | null): KoboConnection | null {
+  const target = id ?? getActiveConnectionId();
+  if (!target) return null;
+  return listConnections().find((c) => c.id === target) ?? null;
+}
+
+/** Storage key scoped to a connection (legacy connection keeps the old key). */
+const scoped = (base: string, id: string | null) => (!id || id === "legacy" ? base : `${base}:${id}`);
+
+export function loadKoboConfig(connectionId?: string | null): KoboConfig | null {
+  const conn = getConnection(connectionId);
+  if (conn) return conn.config;
+  return readJSON<KoboConfig>(CONFIG_KEY);
+}
+export function saveKoboConfig(cfg: KoboConfig, connectionId?: string | null) {
+  const id = connectionId ?? getActiveConnectionId();
+  if (id) {
+    const conn = getConnection(id);
+    saveConnection({
+      id,
+      name: conn?.name || cfg.formUid || "Kobo integration",
+      config: cfg,
+      createdAt: conn?.createdAt || new Date().toISOString(),
+    });
+  }
+  writeJSON(CONFIG_KEY, cfg);
+}
+export function clearKoboConfig() { try { localStorage.removeItem(CONFIG_KEY); } catch { /* ignore */ } }
+
+export function loadKoboCache(connectionId?: string | null): KoboCache | null {
+  const id = connectionId ?? getActiveConnectionId();
+  try {
+    const raw = localStorage.getItem(scoped(CACHE_KEY, id));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as KoboCache;
     // Backfill computed fields for caches written by an older build.
@@ -115,15 +214,18 @@ export function loadKoboCache(): KoboCache | null {
     return parsed;
   } catch { return null; }
 }
-export function saveKoboCache(cache: KoboCache) {
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch { /* quota */ }
+export function saveKoboCache(cache: KoboCache, connectionId?: string | null) {
+  const id = connectionId ?? getActiveConnectionId();
+  try { localStorage.setItem(scoped(CACHE_KEY, id), JSON.stringify(cache)); } catch { /* quota */ }
 }
 
-export function loadLayout<T>(): T | null {
-  try { const raw = localStorage.getItem(LAYOUT_KEY); return raw ? (JSON.parse(raw) as T) : null; } catch { return null; }
+export function loadLayout<T>(connectionId?: string | null): T | null {
+  const id = connectionId ?? getActiveConnectionId();
+  return readJSON<T>(scoped(LAYOUT_KEY, id));
 }
-export function saveLayout<T>(layout: T) {
-  try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch { /* quota */ }
+export function saveLayout<T>(layout: T, connectionId?: string | null) {
+  const id = connectionId ?? getActiveConnectionId();
+  writeJSON(scoped(LAYOUT_KEY, id), layout);
 }
 
 export async function fetchWebhookSecret(): Promise<string | null> {
@@ -166,7 +268,7 @@ async function fetchPage(cfg: KoboConfig, page: number) {
   return d;
 }
 
-export async function fetchSubmissions(cfg: KoboConfig): Promise<KoboCache> {
+export async function fetchSubmissions(cfg: KoboConfig, connectionId?: string | null): Promise<KoboCache> {
   const first = await fetchPage(cfg, 0);
   const total = Number(first?.count) || (first?.results?.length ?? 0);
   const results: any[] = [...(first?.results ?? [])];
@@ -211,7 +313,7 @@ export async function fetchSubmissions(cfg: KoboConfig): Promise<KoboCache> {
     choices: Array.isArray(first?.choices) ? first.choices : [],
     formUid: cfg.formUid,
   };
-  saveKoboCache(cache);
+  saveKoboCache(cache, connectionId);
   return cache;
 }
 

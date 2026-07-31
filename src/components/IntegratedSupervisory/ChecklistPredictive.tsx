@@ -28,6 +28,7 @@ import {
   estimatePrevalence, forecastCompletion, pct, DISEASE_PRIORS, DEFAULT_PRIOR,
   type CoveragePoint, type ObservedRecord, type PrevalenceInput, type PrevalenceUnit,
 } from "@/lib/isc/predictiveModels";
+import ChecklistScenarioBuilder from "./ChecklistScenarioBuilder";
 
 const OBS_KEY = "isc.observedPrevalence";
 
@@ -465,6 +466,13 @@ export default function ChecklistPredictive({
           )}
         </CardContent>
       </Card>
+
+      {/* ── Scenario builder ── */}
+      <ChecklistScenarioBuilder
+        points={coveragePoints}
+        target={geoTarget}
+        baseline={{ offeredRate, haltedShare: statusShares.halted, completedShare: statusShares.completed }}
+      />
 
       {/* ── Prevalence modelling ── */}
       <Card className="overflow-hidden">

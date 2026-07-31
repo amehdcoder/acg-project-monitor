@@ -8,13 +8,19 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { Copy, Eye, EyeOff, KeyRound, Loader2, RefreshCw, Server, ShieldCheck, Wifi, WifiOff } from "lucide-react";
-import { fetchSubmissions, fetchWebhookSecret, loadKoboCache, loadKoboConfig, saveKoboConfig, testConnection, type KoboConfig } from "./koboClient";
+import { fetchSubmissions, fetchWebhookSecret, getConnection, loadKoboCache, loadKoboConfig, newConnectionId, saveConnection, saveKoboConfig, setActiveConnectionId, testConnection, type KoboConfig } from "./koboClient";
 import FieldMappingStatusPanel from "./FieldMappingStatusPanel";
 
 
-interface Props { open: boolean; onOpenChange: (o: boolean) => void; onSynced?: () => void }
+interface Props {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onSynced?: () => void;
+  /** Integration being edited. Omit / pass "new" to create another dashboard integration. */
+  connectionId?: string | null;
+}
 
-export default function KoboSyncDialog({ open, onOpenChange, onSynced }: Props) {
+export default function KoboSyncDialog({ open, onOpenChange, onSynced, connectionId }: Props) {
   const [cfg, setCfg] = useState<KoboConfig>({ serverUrl: "https://kf.kobotoolbox.org", formUid: "", apiToken: "", autoSync: false, pollMinutes: 15 });
   const [secret, setSecret] = useState<string | null>(null);
   const [showToken, setShowToken] = useState(false);
@@ -22,14 +28,27 @@ export default function KoboSyncDialog({ open, onOpenChange, onSynced }: Props) 
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [status, setStatus] = useState<{ ok: boolean; message: string } | null>(null);
-  const cache = loadKoboCache();
+  const isNew = !connectionId || connectionId === "new";
+  const [name, setName] = useState("");
+  const [id, setId] = useState<string>(() => (isNew ? newConnectionId() : (connectionId as string)));
+  const cache = loadKoboCache(isNew ? null : connectionId);
 
   useEffect(() => {
     if (!open) return;
-    const existing = loadKoboConfig();
-    if (existing) setCfg(existing);
+    if (isNew) {
+      const fresh = newConnectionId();
+      setId(fresh);
+      setName("");
+      setCfg({ serverUrl: "https://kf.kobotoolbox.org", formUid: "", apiToken: "", autoSync: false, pollMinutes: 15 });
+    } else {
+      setId(connectionId as string);
+      const conn = getConnection(connectionId);
+      setName(conn?.name ?? "");
+      const existing = conn?.config ?? loadKoboConfig(connectionId);
+      if (existing) setCfg(existing);
+    }
     fetchWebhookSecret().then(setSecret).catch(() => setSecret(null));
-  }, [open]);
+  }, [open, connectionId, isNew]);
 
   const copy = async (v: string, label: string) => {
     try { await navigator.clipboard.writeText(v); toast({ title: `${label} copied` }); } catch {}
@@ -52,10 +71,17 @@ export default function KoboSyncDialog({ open, onOpenChange, onSynced }: Props) 
       toast({ title: "Missing config", description: "Server, Asset UID and API token are required.", variant: "destructive" });
       return;
     }
-    saveKoboConfig(cfg);
+    saveConnection({
+      id,
+      name: name.trim() || cfg.formUid || "Kobo integration",
+      config: cfg,
+      createdAt: getConnection(id)?.createdAt || new Date().toISOString(),
+    });
+    setActiveConnectionId(id);
+    saveKoboConfig(cfg, id);
     setSyncing(true);
     try {
-      const c = await fetchSubmissions(cfg);
+      const c = await fetchSubmissions(cfg, id);
       const warn = c.validation?.warnings?.length ?? 0;
       toast({
         title: "Sync complete",
@@ -98,6 +124,11 @@ export default function KoboSyncDialog({ open, onOpenChange, onSynced }: Props) 
 
           {/* Config */}
           <div className="grid gap-3">
+            <div>
+              <Label>Dashboard / integration name</Label>
+              <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Jigawa MDA Supervisory Checklist" />
+              <p className="mt-1 text-[11px] text-muted-foreground">Each integration keeps its own submissions cache, dashboard layout and filter presets.</p>
+            </div>
             <div>
               <Label>Kobo Server URL</Label>
               <Input value={cfg.serverUrl} onChange={e => setCfg({ ...cfg, serverUrl: e.target.value })} placeholder="https://kf.kobotoolbox.org" />

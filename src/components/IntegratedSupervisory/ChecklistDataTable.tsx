@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   ChevronLeft, ChevronRight, Columns3, Database, Download, FileSpreadsheet, Layers, Search,
 } from "lucide-react";
+import { useChecklistPermissions } from "@/hooks/useChecklistPermissions";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import type { KoboCache } from "./koboClient";
 import {
@@ -36,6 +37,7 @@ const FilterSelect = ({
 );
 
 export default function ChecklistDataTable({ cache }: { cache: KoboCache | null }) {
+  const { canExport } = useChecklistPermissions();
   const [mode, setMode] = useState<ViewMode>("flat");
   const [search, setSearch] = useState("");
   const dq = useDebouncedValue(search, 300);
@@ -126,12 +128,12 @@ export default function ChecklistDataTable({ cache }: { cache: KoboCache | null 
               className={`px-3 h-9 text-xs font-semibold ${mode === "raw" ? "bg-white text-slate-900" : "text-white/85 hover:bg-white/10"}`}
             >Raw Submission View</button>
           </div>
-          <Button className="h-9 bg-emerald-500 hover:bg-emerald-600 text-white" onClick={() => exportXlsx(exportRows, exportCols, null, `${base}_${stamp}.xlsx`)}>
+          {canExport && <><Button className="h-9 bg-emerald-500 hover:bg-emerald-600 text-white" onClick={() => exportXlsx(exportRows, exportCols, null, `${base}_${stamp}.xlsx`)}>
             <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
           </Button>
           <Button className="h-9 bg-sky-500 hover:bg-sky-600 text-white" onClick={() => exportCsv(exportRows, exportCols, null, `${base}_${stamp}.csv`)}>
             <Download className="h-4 w-4 mr-2" /> CSV
-          </Button>
+          </Button></>}
         </div>
       </div>
 

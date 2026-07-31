@@ -13,6 +13,7 @@ import {
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
+import { useChecklistPermissions } from "@/hooks/useChecklistPermissions";
 import { validateCache, type KoboCache } from "./koboClient";
 import { buildDataDictionary, typeIcon, type KoboColumn } from "./koboSchema";
 import { getResolver } from "./koboLabelResolver";
@@ -92,6 +93,7 @@ const KpiCard = ({
 );
 
 export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCache | null; onRefresh?: () => void }) {
+  const { canExport } = useChecklistPermissions();
   const [search, setSearch] = useState("");
   const dq = useDebouncedValue(search, 300);
   const [pageSize, setPageSize] = useState(10);
@@ -179,6 +181,7 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
   const validation = useMemo(() => cache?.validation ?? validateCache(cache), [cache]);
 
   const doExport = async (kind: "xlsx" | "csv") => {
+    if (!canExport) { toast.error("Export restricted", { description: "You don't have permission to export supervisory checklist data." }); return; }
     if (validation && !validation.ok) {
       toast.error("Export blocked", { description: validation.errors[0]?.message ?? "Schema validation failed. Re-sync from Kobo Sync." });
       return;
@@ -235,8 +238,8 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={onRefresh} className="bg-blue-500 hover:bg-blue-600 text-white h-9"><RefreshCw className="h-4 w-4 mr-2" /> Refresh Data</Button>
-          <Button onClick={() => doExport("xlsx")} className="bg-emerald-500 hover:bg-emerald-600 text-white h-9"><FileSpreadsheet className="h-4 w-4 mr-2" /> Export Excel</Button>
-          <Button onClick={() => doExport("csv")} className="bg-sky-500 hover:bg-sky-600 text-white h-9"><Download className="h-4 w-4 mr-2" /> Export CSV</Button>
+          {canExport && <><Button onClick={() => doExport("xlsx")} className="bg-emerald-500 hover:bg-emerald-600 text-white h-9"><FileSpreadsheet className="h-4 w-4 mr-2" /> Export Excel</Button>
+          <Button onClick={() => doExport("csv")} className="bg-sky-500 hover:bg-sky-600 text-white h-9"><Download className="h-4 w-4 mr-2" /> Export CSV</Button></>}
           <Button size="icon" variant="ghost" className="text-white hover:bg-white/10 h-9 w-9"><MoreVertical className="h-5 w-5" /></Button>
         </div>
       </div>
