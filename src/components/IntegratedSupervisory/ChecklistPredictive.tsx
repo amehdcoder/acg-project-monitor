@@ -2,46 +2,24 @@
  * Predictive Modelling panel for the Integrated Supervisory Checklist.
  *
  *  • Campaign completion forecast (days from today, calendar date, 95% CI)
- *  • Hierarchical disease-prevalence estimates (State → LGA → Ward) with 95% CI,
- *    observed-prevalence entry and empirical-Bayes model refinement
+ *  • Scenario builder comparison
  *  • Full methodology disclosure
  */
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader,
-  DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  BrainCircuit, CalendarClock, ChevronDown, ChevronRight, FlaskConical,
-  Gauge, Microscope, Target, TrendingUp,
-} from "lucide-react";
-import {
-  Bar, BarChart, CartesianGrid, ErrorBar, ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from "recharts";
+import { BrainCircuit, CalendarClock, FlaskConical, Gauge, Target } from "lucide-react";
 import { resolveChecklistValue } from "./checklistSchema";
 import {
-  estimatePrevalence, forecastCompletion, pct, DISEASE_PRIORS, DEFAULT_PRIOR,
-  type CoveragePoint, type ObservedRecord, type PrevalenceInput, type PrevalenceUnit,
+  forecastCompletion, pct, type CoveragePoint,
 } from "@/lib/isc/predictiveModels";
 import ChecklistScenarioBuilder from "./ChecklistScenarioBuilder";
 
-const OBS_KEY = "isc.observedPrevalence";
-
 const norm = (v: unknown) => String(v ?? "").trim();
 const lower = (v: unknown) => norm(v).toLowerCase();
-
-function loadObservations(): ObservedRecord[] {
-  try {
-    const raw = window.localStorage.getItem(OBS_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
-}
 
 // ── Methodology ─────────────────────────────────────────────────────────────
 
@@ -114,156 +92,15 @@ completion date = today() + days`}</Formula>
             </p>
           </Block>
 
-          <Block title="2. Disease prevalence — hierarchical estimator with Wilson intervals">
-            <p>
-              Diseases are taken from <strong>MDA Campaign Type</strong>; each respondent
-              interview is attributed to the campaign type of its parent checklist and to the
-              State, LGA and Ward of that visit. A respondent is classified as{" "}
-              <em>untreated</em> when they were not offered the medicine(s) or did not swallow
-              them.
-            </p>
-            <Formula>{`untreatedRate = untreated respondents ⁄ respondents (per unit)
-prior(d)      = endemic untreated-population baseline for disease d
-p̂_raw        = prior(d) × (0.35 + 0.65 × untreatedRate)`}</Formula>
-            <p>
-              The 0.35 floor encodes residual prevalence retained by a fully treated
-              population in the season following MDA; a fully untreated population regresses
-              to the endemic baseline. The 95% interval is a <strong>Wilson score
-              interval</strong> on the untreated proportion, propagated through the same
-              transformation (Wilson is used in preference to Wald because ward-level
-              sample sizes are small):
-            </p>
-            <Formula>{`centre = (p + z²/2n) ⁄ (1 + z²/n)
-margin = z ⁄ (1 + z²/n) × √( p(1−p)/n + z²/4n² )      z = 1.96
-CI(p̂) = prior(d) × (0.35 + 0.65 × [centre ∓ margin]) × κ`}</Formula>
-          </Block>
-
-          <Block title="3. Learning from observed prevalence — empirical-Bayes calibration">
-            <p>
-              When a real-world observed prevalence is entered for any administrative level,
-              the model records the log-ratio between observation and model output and uses it
-              as a calibration signal for all subsequent analyses:
-            </p>
-            <Formula>{`rᵢ = ln( observedᵢ ⁄ p̂_rawᵢ )        wᵢ = √nᵢ
-κ_unit = exp( Σwᵢrᵢ ⁄ (Σwᵢ + k) )     k = 2  (shrinkage pseudo-count)`}</Formula>
-            <p>
-              The shrinkage constant <em>k</em> keeps a single small-sample observation from
-              overwhelming the model: with little evidence κ stays near 1, and it converges to
-              the observed ratio as evidence accumulates. Observations also propagate upward
-              (Ward → LGA → State → disease-global) at 60% and 40% weight respectively, so
-              unvisited siblings inherit a partially-pooled correction — a standard
-              partial-pooling / hierarchical shrinkage design. Where a unit has no observation
-              of its own, κ is composed down the hierarchy with a 0.35 decay per level.
-            </p>
-            <p>
-              Refinement is therefore incremental and monotone: each new observation reduces
-              the residual |observed − predicted| shown in the table, and the refined estimates
-              are applied immediately to every subsequent State, LGA and Ward analysis.
-            </p>
-          </Block>
-
           <Block title="Caveats">
             <p>
-              Prevalence estimates are model-based inferences from supervisory coverage data,
-              not from clinical diagnosis; they are intended for programme triage and should be
-              validated with prevalence surveys. Forecasts assume the current operating tempo
-              and resourcing continue unchanged.
+              Forecasts assume the current operating tempo and resourcing continue unchanged,
+              and are intended for programme triage rather than contractual planning.
             </p>
           </Block>
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-// ── Observed-prevalence entry ───────────────────────────────────────────────
-
-function ObservedDialog({
-  unit, onSave,
-}: { unit: PrevalenceUnit; onSave: (value: number | null) => void }) {
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(unit.observed != null ? String(unit.observed * 100) : "");
-  useEffect(() => { if (open) setDraft(unit.observed != null ? String(unit.observed * 100) : ""); }, [open, unit.observed]);
-  const label = [unit.state, unit.lga, unit.ward].filter(Boolean).join(" › ");
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant={unit.observed != null ? "secondary" : "outline"} size="sm" className="h-7 px-2 text-[11px]">
-          {unit.observed != null ? pct(unit.observed) : "Enter"}
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Observed prevalence</DialogTitle>
-          <DialogDescription>
-            {unit.disease} — {label}. Enter the prevalence measured on the ground (%). The
-            model learns from this value and refines all subsequent estimates.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="observed-prevalence">Observed prevalence (%)</Label>
-          <Input
-            id="observed-prevalence"
-            type="number" min={0} max={100} step="0.1" inputMode="decimal"
-            placeholder="e.g. 12.5"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <p className="text-[11px] text-muted-foreground">
-            Current model estimate: <strong>{pct(unit.predicted)}</strong> (95% CI {pct(unit.low)} – {pct(unit.high)}, n={unit.n}).
-          </p>
-        </div>
-        <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="ghost" onClick={() => { onSave(null); setOpen(false); }}>Clear</Button>
-          <Button
-            onClick={() => {
-              const n = Number(draft);
-              onSave(draft.trim() === "" || !Number.isFinite(n) || n < 0 ? null : Math.min(n, 100) / 100);
-              setOpen(false);
-            }}
-          >
-            Save &amp; refine model
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ── Prevalence cascade rows ─────────────────────────────────────────────────
-
-function UnitRow({
-  unit, depth, expandable, expanded, onToggle, onObserve,
-}: {
-  unit: PrevalenceUnit; depth: number; expandable: boolean; expanded: boolean;
-  onToggle: () => void; onObserve: (v: number | null) => void;
-}) {
-  const name = unit.ward || unit.lga || unit.state;
-  return (
-    <tr className="border-t hover:bg-muted/30">
-      <td className="px-2 py-1.5" style={{ paddingLeft: 8 + depth * 18 }}>
-        <div className="flex items-center gap-1">
-          {expandable ? (
-            <button type="button" onClick={onToggle} className="text-muted-foreground hover:text-foreground" aria-label="Toggle">
-              {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-            </button>
-          ) : <span className="w-3.5" />}
-          <span className={depth === 0 ? "font-semibold" : depth === 1 ? "font-medium" : ""}>{name}</span>
-          <Badge variant="outline" className="ml-1 h-4 px-1 text-[9px] uppercase">{unit.level}</Badge>
-        </div>
-      </td>
-      <td className="px-2 py-1.5 text-right tabular-nums">{unit.n.toLocaleString()}</td>
-      <td className="px-2 py-1.5 text-right tabular-nums">{pct(unit.n ? unit.untreated / unit.n : 0)}</td>
-      <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{pct(unit.predicted)}</td>
-      <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">{pct(unit.low)} – {pct(unit.high)}</td>
-      <td className="px-2 py-1.5 text-right tabular-nums">
-        {unit.factor === 1 ? <span className="text-muted-foreground">—</span> : `×${unit.factor.toFixed(2)}`}
-      </td>
-      <td className="px-2 py-1.5 text-right">
-        {unit.residual != null && <span className="mr-2 text-[10px] text-muted-foreground">Δ {pct(unit.residual)}</span>}
-        <ObservedDialog unit={unit} onSave={onObserve} />
-      </td>
-    </tr>
   );
 }
 
@@ -276,31 +113,6 @@ export default function ChecklistPredictive({
   respondents: Record<string, unknown>[];
   geoTarget: number | null;
 }) {
-  const [observations, setObservations] = useState<ObservedRecord[]>(loadObservations);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [disease, setDisease] = useState<string>("");
-
-  const persist = (next: ObservedRecord[]) => {
-    setObservations(next);
-    try { window.localStorage.setItem(OBS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-  };
-  const setObserved = (u: PrevalenceUnit, value: number | null) => {
-    const id = `${u.disease}::${u.key}`;
-    const rest = observations.filter((o) => o.id !== id);
-    persist(value == null ? rest : [...rest, {
-      id, disease: u.disease, key: u.key, level: u.level, value,
-      updatedAt: new Date().toISOString(),
-    }]);
-  };
-
-  // Parent lookup for respondent → geography / campaign attribution.
-  const parentByKey = useMemo(() => {
-    const m = new Map<string, Record<string, unknown>>();
-    for (const p of parents) m.set(`${p._uuid ?? ""}|${p._id ?? ""}`, p);
-    return m;
-  }, [parents]);
-
-  // ── Completion forecast inputs
   const coveragePoints = useMemo<CoveragePoint[]>(() => {
     const byDay = new Map<string, Set<string>>();
     for (const p of parents) {
@@ -353,58 +165,6 @@ export default function ChecklistPredictive({
     }),
     [coveragePoints, geoTarget, offeredRate, statusShares],
   );
-
-  // ── Prevalence inputs
-  const prevalenceRows = useMemo<PrevalenceInput[]>(() => {
-    const rows: PrevalenceInput[] = [];
-    for (const r of respondents) {
-      const p = parentByKey.get(`${r.parent_uuid ?? ""}|${r.parent_id ?? ""}`);
-      if (!p) continue;
-      const dis = resolveChecklistValue("MDA_Campaign_Type", p.MDA_Campaign_Type) || norm(p.MDA_Campaign_Type);
-      if (!dis) continue;
-      const offered = lower(resolveChecklistValue("Were_you_OFFERED_the_medicine_s", r.Were_you_OFFERED_the_medicine_s) || r.Were_you_OFFERED_the_medicine_s);
-      const swallowed = lower(resolveChecklistValue("swallow", r.swallow) || r.swallow);
-      const untreated = !(offered.startsWith("yes") && swallowed.startsWith("yes"));
-      rows.push({
-        disease: dis,
-        state: norm(p.State), lga: norm(p.LGA), ward: norm(p.Ward),
-        untreated,
-      });
-    }
-    return rows;
-  }, [respondents, parentByKey]);
-
-  const units = useMemo(() => estimatePrevalence(prevalenceRows, observations), [prevalenceRows, observations]);
-
-  const diseases = useMemo(
-    () => [...new Set(units.map((u) => u.disease))].sort(),
-    [units],
-  );
-  const activeDisease = disease && diseases.includes(disease) ? disease : diseases[0] ?? "";
-
-  const forDisease = useMemo(() => units.filter((u) => u.disease === activeDisease), [units, activeDisease]);
-  const states = useMemo(() => forDisease.filter((u) => u.level === "state"), [forDisease]);
-  const childrenOf = (key: string, level: "lga" | "ward") =>
-    forDisease.filter((u) => u.level === level && u.key.startsWith(key + "|"));
-
-  const toggle = (key: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-  };
-
-  const chartData = useMemo(
-    () => states.map((s) => ({
-      name: s.state,
-      value: s.predicted * 100,
-      err: [(s.predicted - s.low) * 100, (s.high - s.predicted) * 100] as [number, number],
-    })),
-    [states],
-  );
-
-  const learnedCount = observations.filter((o) => o.disease === activeDisease).length;
 
   return (
     <div className="space-y-4">
@@ -473,119 +233,6 @@ export default function ChecklistPredictive({
         target={geoTarget}
         baseline={{ offeredRate, haltedShare: statusShares.halted, completedShare: statusShares.completed }}
       />
-
-      {/* ── Prevalence modelling ── */}
-      <Card className="overflow-hidden">
-        <CardHeader className="py-3 px-4 border-b bg-muted/40 flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Microscope className="h-4 w-4 text-primary" /> Predicted Disease Prevalence (95% CI)
-          </CardTitle>
-          <Badge variant={learnedCount ? "secondary" : "outline"} className="text-[10px]">
-            {learnedCount ? `${learnedCount} observation${learnedCount === 1 ? "" : "s"} learned` : "Model uncalibrated"}
-          </Badge>
-        </CardHeader>
-        <CardContent className="p-4 space-y-4">
-          {diseases.length === 0 ? (
-            <div className="rounded-md border border-dashed p-4 text-xs text-muted-foreground">
-              No respondent interviews with an MDA Campaign Type are available for modelling.
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {diseases.map((d) => (
-                  <Button
-                    key={d}
-                    size="sm"
-                    variant={d === activeDisease ? "default" : "outline"}
-                    className="h-7 px-2.5 text-[11px]"
-                    onClick={() => setDisease(d)}
-                  >
-                    {d}
-                  </Button>
-                ))}
-              </div>
-
-              <p className="text-[11px] text-muted-foreground">
-                Endemic baseline prior for <strong>{activeDisease}</strong>:{" "}
-                {pct(DISEASE_PRIORS[activeDisease] ?? DEFAULT_PRIOR)} · estimates derive from the
-                untreated share of respondents (not offered or did not swallow the medicine(s))
-                and are calibrated by any observed prevalence entered below.
-              </p>
-
-              {chartData.length > 0 && (
-                <ResponsiveContainer width="100%" height={Math.max(200, chartData.length * 46)}>
-                  <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 32 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11 }} unit="%" />
-                    <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={(v: number) => [`${Number(v).toFixed(1)}%`, "Predicted prevalence"]} />
-                    <Bar dataKey="value" fill="hsl(265,55%,55%)" radius={[0, 4, 4, 0]} maxBarSize={28}>
-                      <ErrorBar dataKey="err" width={5} strokeWidth={1.5} stroke="hsl(215,25%,35%)" direction="x" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-
-              <div className="max-h-[460px] overflow-auto rounded-md border">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 z-10 bg-muted/60">
-                    <tr>
-                      <th className="px-2 py-2 text-left font-semibold">State › LGA › Ward</th>
-                      <th className="px-2 py-2 text-right font-semibold">n</th>
-                      <th className="px-2 py-2 text-right font-semibold">Untreated</th>
-                      <th className="px-2 py-2 text-right font-semibold">Predicted</th>
-                      <th className="px-2 py-2 text-right font-semibold">95% CI</th>
-                      <th className="px-2 py-2 text-right font-semibold">κ</th>
-                      <th className="px-2 py-2 text-right font-semibold">Observed</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {states.map((s) => {
-                      const lgas = childrenOf(s.key, "lga");
-                      const sOpen = expanded.has(s.key);
-                      return (
-                        <>
-                          <UnitRow
-                            key={s.key} unit={s} depth={0} expandable={lgas.length > 0}
-                            expanded={sOpen} onToggle={() => toggle(s.key)}
-                            onObserve={(v) => setObserved(s, v)}
-                          />
-                          {sOpen && lgas.map((l) => {
-                            const wards = childrenOf(l.key, "ward");
-                            const lOpen = expanded.has(l.key);
-                            return (
-                              <>
-                                <UnitRow
-                                  key={l.key} unit={l} depth={1} expandable={wards.length > 0}
-                                  expanded={lOpen} onToggle={() => toggle(l.key)}
-                                  onObserve={(v) => setObserved(l, v)}
-                                />
-                                {lOpen && wards.map((w) => (
-                                  <UnitRow
-                                    key={w.key} unit={w} depth={2} expandable={false}
-                                    expanded={false} onToggle={() => {}}
-                                    onObserve={(v) => setObserved(w, v)}
-                                  />
-                                ))}
-                              </>
-                            );
-                          })}
-                        </>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <TrendingUp className="h-3.5 w-3.5" />
-                κ is the learned calibration multiplier. Entering an observed prevalence updates κ
-                immediately and refines every subsequent State, LGA and Ward estimate.
-              </p>
-            </>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

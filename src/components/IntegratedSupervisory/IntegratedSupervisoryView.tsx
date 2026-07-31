@@ -10,7 +10,6 @@ import {
 import { toast } from "@/hooks/use-toast";
 import KoboSyncDialog from "./KoboSyncDialog";
 import SupervisoryDashboardView from "./SupervisoryDashboardView";
-import RawKoboDataTable from "./RawKoboDataTable";
 import ChecklistDashboard from "./ChecklistDashboard";
 import ChecklistDataTable from "./ChecklistDataTable";
 import ChecklistReconciliation from "./ChecklistReconciliation";
@@ -180,7 +179,7 @@ export default function IntegratedSupervisoryView() {
           <TabsTrigger value="checklist"><ClipboardList className="h-4 w-4 mr-1" /> Checklist Dashboard</TabsTrigger>
           <TabsTrigger value="records"><Database className="h-4 w-4 mr-1" /> Raw Kobo Data</TabsTrigger>
           <TabsTrigger value="studio"><LayoutDashboard className="h-4 w-4 mr-1" /> Dashboard Studio</TabsTrigger>
-          <TabsTrigger value="explorer"><Database className="h-4 w-4 mr-1" /> Data Explorer</TabsTrigger>
+          
           <TabsTrigger value="reconciliation"><GitCompareArrows className="h-4 w-4 mr-1" /> Reconciliation</TabsTrigger>
         </TabsList>
         <TabsContent value="checklist" className="mt-4">
@@ -191,9 +190,6 @@ export default function IntegratedSupervisoryView() {
         </TabsContent>
         <TabsContent value="studio" className="mt-4">
           <SupervisoryDashboardView cache={cache} onRefresh={() => refresh(false)} syncing={syncing} />
-        </TabsContent>
-        <TabsContent value="explorer" className="mt-4">
-          <RawKoboDataTable cache={cache} onRefresh={() => refresh(false)} />
         </TabsContent>
         <TabsContent value="reconciliation" className="mt-4">
           <ChecklistReconciliation cache={cache} canExport={perms.canExport} />

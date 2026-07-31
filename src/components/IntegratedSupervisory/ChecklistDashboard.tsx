@@ -27,6 +27,7 @@ import {
   StatusCommunityTables, StatusDrilldownDialog, useStatusDrilldown,
 } from "./ChecklistStatusTables";
 import ChecklistPredictive from "./ChecklistPredictive";
+import ChecklistMaps from "./ChecklistMaps";
 import MlIntelligenceHub from "./MlIntelligenceHub";
 
 
@@ -547,8 +548,12 @@ export default function ChecklistDashboard({
 
       <StatusDrilldownDialog statusLabel={drill.status} rows={drillRows} onClose={drill.close} />
 
-      {/* Predictive modelling: completion timeline + disease prevalence */}
+      {/* Geospatial: community status + household medicine-offer maps */}
+      <ChecklistMaps parents={parents} respondents={respondents} filters={filters} />
+
+      {/* Predictive modelling: completion timeline */}
       <ChecklistPredictive parents={parents} respondents={respondents} geoTarget={geoTarget} />
+
 
 
       {/* Community status registers */}
@@ -615,12 +620,17 @@ export default function ChecklistDashboard({
       <MlIntelligenceHub
         parents={parents}
         respondents={respondents}
+        lastSyncLabel={cache ? `Synced ${new Date(cache.fetchedAt).toLocaleTimeString()}` : undefined}
+        syncedAt={cache?.fetchedAt}
+        onRefresh={onRefresh}
+        syncing={syncing}
         filterSummary={
           Object.values(filters).filter(Boolean).length
             ? `${Object.values(filters).filter(Boolean).length} shared filter(s) applied`
             : "no filters applied"
         }
       />
+
 
     </div>
   );
