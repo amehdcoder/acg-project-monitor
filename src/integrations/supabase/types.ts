@@ -9270,6 +9270,7 @@ export type Database = {
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_owner_level: { Args: { _user_id: string }; Returns: boolean }
       is_owner_or_co_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_platform_owner: { Args: { _user_id: string }; Returns: boolean }
       is_project_member: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
@@ -9402,6 +9403,8 @@ export type Database = {
         Returns: Json
       }
       owner_restore_records: { Args: { _record_ids: string[] }; Returns: Json }
+      profile_co_owner_flag: { Args: { _user_id: string }; Returns: boolean }
+      profile_owner_flag: { Args: { _user_id: string }; Returns: boolean }
       record_inactive_login_attempt: {
         Args: {
           _attempted_user_id?: string
