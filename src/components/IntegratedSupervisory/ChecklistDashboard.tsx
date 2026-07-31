@@ -532,8 +532,16 @@ export default function ChecklistDashboard({
           </div>
         }
       >
-        <StatusBarChart data={mdaStatus} />
+        <StatusBarChart data={mdaStatus} onSelect={(n) => n && drill.open(n)} />
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Tip: click any bar to drill down into the exact checklist records behind that status.
+        </p>
       </Panel>
+
+      <StatusDrilldownDialog statusLabel={drill.status} rows={drillRows} onClose={drill.close} />
+
+      {/* Community status registers */}
+      <StatusCommunityTables parents={parents} />
 
       {/* Field-worker accountability */}
       <div className="grid gap-4 xl:grid-cols-2">
