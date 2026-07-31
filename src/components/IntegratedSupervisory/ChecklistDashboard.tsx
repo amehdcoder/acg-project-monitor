@@ -9,7 +9,7 @@ import {
   DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Activity, AlertTriangle, ClipboardCheck, Droplets, Loader2, MapPin,
+  Activity, AlertTriangle, ClipboardCheck, Droplets, Home, Loader2, MapPin,
   PlayCircle, RefreshCw, Settings2, ShieldAlert, UserCheck, Users,
 } from "lucide-react";
 import {
