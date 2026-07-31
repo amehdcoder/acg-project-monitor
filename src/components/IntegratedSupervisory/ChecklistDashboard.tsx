@@ -26,6 +26,8 @@ import ChecklistFilters, {
 import {
   StatusCommunityTables, StatusDrilldownDialog, useStatusDrilldown,
 } from "./ChecklistStatusTables";
+import ChecklistPredictive from "./ChecklistPredictive";
+
 
 
 const PALETTE = [
