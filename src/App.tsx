@@ -17,6 +17,7 @@ import ConfirmEmail from "./pages/ConfirmEmail";
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 import DataCleaner from "./pages/DataCleaner";
+import KoboHubPage from "./components/KoboHub/KoboHubPage";
 import MdaAnalysesHarness from "./pages/MdaAnalysesHarness";
 import MicroplanKpiHarness from "./pages/MicroplanKpiHarness";
 import XlsFormCoverHarness from "./pages/XlsFormCoverHarness";
@@ -155,6 +156,8 @@ const App = () => (
                     <Route path="/witness/:surveyId/:hhId" element={<CESWitnessForm />} />
                     <Route path="/satellite-messenger" element={<ProtectedRoute><OffGridSatelliteMessenger /></ProtectedRoute>} />
                    <Route path="/data-cleaner" element={<ProtectedRoute><DataCleaner /></ProtectedRoute>} />
+                   <Route path="/kobo-hub" element={<ProtectedRoute><KoboHubPage /></ProtectedRoute>} />
+                   <Route path="/kobo-hub/manage" element={<ProtectedRoute><KoboHubPage manage /></ProtectedRoute>} />
                    <Route path="/learning-log" element={<ProtectedRoute><LearningLog /></ProtectedRoute>} />
                     <Route path="/__test/mda-analyses" element={<MdaAnalysesHarness />} />
                     <Route path="/__test/microplan-kpi" element={<MicroplanKpiHarness />} />
