@@ -552,6 +552,11 @@ export default function ChecklistDashboard({
       {/* Geospatial: community status + household medicine-offer maps */}
       <ChecklistMaps parents={parents} respondents={respondents} filters={filters} />
 
+      {/* Household survey coverage generalised to Community → Ward → LGA → State */}
+      <HouseholdCoverageAnalysis respondents={respondents} />
+
+
+
       {/* Predictive modelling: completion timeline */}
       <ChecklistPredictive parents={parents} respondents={respondents} geoTarget={geoTarget} />
 
