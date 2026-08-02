@@ -120,6 +120,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "offline-form-share", label: "Offline Form Share", icon: ArrowRightLeft, adminOnly: false, showForUsers: true },
     { id: "microplanning", label: "Geo Microplanning", icon: MapPin, adminOnly: true },
     { id: "integrated-supervisory", label: "Integrated Supervisory Checklist", icon: LayoutDashboard, adminOnly: true },
+    { id: "kobo-hub", label: "Universal Kobo Analytics", icon: BarChart3, adminOnly: true, route: "/kobo-hub" },
     { id: "coverage-eval", label: "Coverage Evaluation 3D", icon: Boxes, adminOnly: false, showForUsers: true },
     { id: "environment", label: "Change Environment", icon: ArrowRightLeft, adminOnly: true },
     { id: "quizzes", label: "Quizzes", icon: BookOpen, adminOnly: false, showForUsers: true },
