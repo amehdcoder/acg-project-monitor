@@ -28,6 +28,7 @@ import {
 } from "./ChecklistStatusTables";
 import ChecklistPredictive from "./ChecklistPredictive";
 import ChecklistMaps from "./ChecklistMaps";
+import HouseholdCoverageAnalysis from "./HouseholdCoverageAnalysis";
 import MlIntelligenceHub from "./MlIntelligenceHub";
 
 
