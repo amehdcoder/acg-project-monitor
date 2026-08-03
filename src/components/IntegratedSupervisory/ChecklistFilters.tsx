@@ -17,10 +17,11 @@ export interface ChecklistFilterState {
   ward: string;
   designation: string;
   monitor: string;
+  campaign: string;
 }
 
 export const EMPTY_FILTERS: ChecklistFilterState = {
-  from: "", to: "", state: "", lga: "", ward: "", designation: "", monitor: "",
+  from: "", to: "", state: "", lga: "", ward: "", designation: "", monitor: "", campaign: "",
 };
 
 const ALL = "__all__";
@@ -44,6 +45,7 @@ export function applyChecklistFilters<T extends Record<string, unknown>>(
     if (f.ward && label("Ward", p.Ward) !== f.ward) return false;
     if (f.designation && label("Designation", p.Designation) !== f.designation) return false;
     if (f.monitor && label("Independent_Monitor_s_Name", p.Independent_Monitor_s_Name) !== f.monitor) return false;
+    if (f.campaign && label("MDA_Campaign_Type", p.MDA_Campaign_Type) !== f.campaign) return false;
     return true;
   });
 }
@@ -109,6 +111,7 @@ export default function ChecklistFilters({
     [byWard, value.designation],
   );
   const monitors = useMemo(() => uniq(byDesig, "Independent_Monitor_s_Name"), [byDesig]);
+  const campaigns = useMemo(() => uniq(byWard, "MDA_Campaign_Type"), [byWard]);
 
   const set = (patch: Partial<ChecklistFilterState>) => {
     const next = { ...value, ...patch };
@@ -134,7 +137,7 @@ export default function ChecklistFilters({
           </Button>
         )}
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
         <div className="space-y-1">
           <Label htmlFor="isc-from" className="text-[11px] font-semibold text-muted-foreground">From date</Label>
           <Input id="isc-from" type="date" className="h-9 text-xs" value={value.from}
@@ -155,6 +158,8 @@ export default function ChecklistFilters({
           onChange={(v) => set({ designation: v })} />
         <FilterSelect id="isc-monitor" title="Monitors" value={value.monitor} options={monitors}
           onChange={(v) => set({ monitor: v })} />
+        <FilterSelect id="isc-campaign" title="MDA Campaign Types" value={value.campaign} options={campaigns}
+          onChange={(v) => set({ campaign: v })} />
       </div>
     </Card>
   );
