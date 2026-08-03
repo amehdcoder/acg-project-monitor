@@ -242,8 +242,9 @@ export default function HouseholdCoverageAnalysis({
             <div className="rounded-lg border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground flex items-start gap-2">
               <Info className="h-3.5 w-3.5 mt-[1px] shrink-0 text-primary" />
               <span>
-                {rows.length.toLocaleString()} household respondents interviewed across{" "}
-                {totalClusters.toLocaleString()} community clusters. Coverage is estimated with a
+                {rows.length.toLocaleString()} household / class respondents interviewed across{" "}
+                {totalClusters.toLocaleString()} community clusters
+                {campaignFilter ? ` for the ${campaignFilter} campaign` : " across all MDA campaign types"}. Coverage is estimated with a
                 cluster-sample ratio estimator and generalised to all households in each unit —
                 point estimates are shown with their 95% confidence interval, design effect (DEFF)
                 and effective sample size.
@@ -255,7 +256,7 @@ export default function HouseholdCoverageAnalysis({
               <p className="text-xs font-semibold flex items-center gap-1.5 mb-2">
                 <HeartPulse className="h-3.5 w-3.5 text-rose-600" /> Medicine coverage &amp; uptake
               </p>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {medicine.map((ind) => (
                   <IndicatorCard key={ind.key} ind={ind} est={overall[ind.key]} />
                 ))}
@@ -267,7 +268,7 @@ export default function HouseholdCoverageAnalysis({
               <p className="text-xs font-semibold flex items-center gap-1.5 mb-2">
                 <Droplets className="h-3.5 w-3.5 text-sky-600" /> WASH infrastructure &amp; practice
               </p>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {wash.map((ind) => (
                   <IndicatorCard key={ind.key} ind={ind} est={overall[ind.key]} />
                 ))}
@@ -278,10 +279,10 @@ export default function HouseholdCoverageAnalysis({
             {epi && epi.n > 0 && (
               <div className="grid gap-3 sm:grid-cols-4 text-[11px]">
                 {[
-                  { l: "Effective sample size", v: Math.round(epi.neff).toLocaleString(), s: `of ${epi.n.toLocaleString()} interviews` },
-                  { l: "Design effect (DEFF)", v: epi.deff.toFixed(2), s: epi.deff > 2 ? "strong clustering" : "acceptable clustering" },
-                  { l: "Intra-cluster correlation", v: epi.icc.toFixed(3), s: "ρ implied by DEFF" },
-                  { l: "Margin of error", v: `±${epi.marginPct.toFixed(1)} pp`, s: "on epidemiological coverage" },
+                  { l: "Effective sample size", v: Math.round(epi.neff).toLocaleString(), s: `The ${epi.n.toLocaleString()} interviews carry only as much statistical information as this many independent households, because neighbours answer alike.` },
+                  { l: "Design effect (DEFF)", v: epi.deff.toFixed(2), s: `How much clustering inflates uncertainty versus a random household sample — ${epi.deff > 2 ? "strong clustering, widen your sample across more communities" : "acceptable clustering"}.` },
+                  { l: "Intra-cluster correlation (ρ)", v: epi.icc.toFixed(3), s: "Similarity between households in the same community: 0 = independent, 1 = identical answers." },
+                  { l: "Margin of error", v: `±${epi.marginPct.toFixed(1)} pp`, s: "Half-width of the 95% interval on treatment (swallowed) coverage, in percentage points." },
                 ].map((k) => (
                   <div key={k.l} className="rounded-lg border bg-muted/20 px-3 py-2">
                     <p className="uppercase tracking-wide text-[10px] font-semibold text-muted-foreground">{k.l}</p>
