@@ -31,7 +31,7 @@ export const wasOffered = (r: Row): boolean => {
   if (c === OFFER_NONE) return false;
   const label = lbl("Were_you_OFFERED_the_medicine_s", c).toLowerCase();
   if (/^\s*(no|none)\b/.test(label) || /not\s*offered/.test(label)) return false;
-  return /offer/.test(label) || /^yes/.test(label) || true;
+  return true;
 };
 
 export const didSwallow = (r: Row): boolean => {
@@ -156,18 +156,31 @@ const refusalText = (r: Row) =>
     s(r.OTHER_REASON_why_res_ALLOW_the_medicine_s),
   ].filter(Boolean).join(" ");
 
+/**
+ * Every respondent who did not end up swallowing is a coverage loss and is
+ * classified — those with a stated reason by keyword rules, those never reached
+ * by the distribution team as a supply-side gap, and the remainder as
+ * "Reason not recorded" so the totals always reconcile with the coverage KPIs.
+ */
+function classifyRespondent(r: Row): { topic: string; sentiment: number } | null {
+  if (!answeredOffer(r)) return null;
+  if (didSwallow(r)) return null;
+  const txt = refusalText(r);
+  if (txt) return classifyRefusal(txt);
+  if (!wasOffered(r)) return { topic: "Team never arrived", sentiment: -0.55 };
+  return { topic: "Reason not recorded", sentiment: -0.2 };
+}
+
 export function refusalTopics(respondents: Row[]) {
   const m = new Map<string, { count: number; sentiment: number }>();
   let analysed = 0;
   for (const r of respondents) {
-    if (didSwallow(r)) continue;
-    const txt = refusalText(r);
-    if (!txt) continue;
+    const hit = classifyRespondent(r);
+    if (!hit) continue;
     analysed++;
-    const { topic, sentiment } = classifyRefusal(txt);
-    const rec = m.get(topic) ?? { count: 0, sentiment };
-    rec.count += 1; rec.sentiment = sentiment;
-    m.set(topic, rec);
+    const rec = m.get(hit.topic) ?? { count: 0, sentiment: hit.sentiment };
+    rec.count += 1; rec.sentiment = hit.sentiment;
+    m.set(hit.topic, rec);
   }
   return {
     analysed,
@@ -182,15 +195,13 @@ export function wardRefusalTopics(respondents: Row[]) {
   const m = new Map<string, Map<string, number>>();
   const sentiments = new Map<string, number[]>();
   for (const r of respondents) {
-    if (didSwallow(r)) continue;
-    const txt = refusalText(r);
-    if (!txt) continue;
+    const hit = classifyRespondent(r);
+    if (!hit) continue;
     const ward = s(r.Ward) || "—";
-    const { topic, sentiment } = classifyRefusal(txt);
     const inner = m.get(ward) ?? new Map<string, number>();
-    inner.set(topic, (inner.get(topic) ?? 0) + 1);
+    inner.set(hit.topic, (inner.get(hit.topic) ?? 0) + 1);
     m.set(ward, inner);
-    sentiments.set(ward, [...(sentiments.get(ward) ?? []), sentiment]);
+    sentiments.set(ward, [...(sentiments.get(ward) ?? []), hit.sentiment]);
   }
   return [...m.entries()]
     .map(([ward, inner]) => {
