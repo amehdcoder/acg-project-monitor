@@ -386,7 +386,6 @@ export default function ChecklistDashboard({
   const waste = useMemo(() => tallyMulti(respondents.map((r) => r.How_do_you_Dispose_D_your_class_household), "How_do_you_Dispose_D_your_class_household"), [respondents]);
   const waterWithin = useMemo(() => tally(parents.map((p) => p.Are_all_sources_of_water_used_), "Are_all_sources_of_water_used_"), [parents]);
 
-  const designation = useMemo(() => tally(parents.map((p) => p.Designation), "Designation"), [parents]);
   const dosePole = useMemo(() => tally(parents.map((p) => p.Is_Dose_Pole_Available), "Is_Dose_Pole_Available"), [parents]);
   const dosePoleKnow = useMemo(() => tally(parents.map((p) => p.Does_CDI_CDD_Know_how_to_use_Dose_Pole), "Does_CDI_CDD_Know_how_to_use_Dose_Pole"), [parents]);
   const posters = useMemo(() => tally(parents.map((p) => p.Are_any_NTD_posters_the_School_Community), "Are_any_NTD_posters_the_School_Community"), [parents]);
@@ -397,9 +396,6 @@ export default function ChecklistDashboard({
     [parents],
   );
 
-  const offered = useMemo(() => tally(respondents.map((r) => r.Were_you_OFFERED_the_medicine_s), "Were_you_OFFERED_the_medicine_s"), [respondents]);
-  const swallowed = useMemo(() => tally(respondents.map((r) => r.swallow), "swallow"), [respondents]);
-  const refusalReasons = useMemo(() => tally(respondents.map((r) => r.Reason_respondent_DID_NOT_SWAL), "Reason_respondent_DID_NOT_SWAL"), [respondents]);
 
   const saeTypes = useMemo(() => tallyMulti(parents.map((p) => p.If_YES_what_type_of_SAE), "If_YES_what_type_of_SAE"), [parents]);
   const saeRows = useMemo(
@@ -553,7 +549,7 @@ export default function ChecklistDashboard({
       <ChecklistMaps parents={parents} respondents={respondents} filters={filters} />
 
       {/* Household survey coverage generalised to Community → Ward → LGA → State */}
-      <HouseholdCoverageAnalysis respondents={respondents} />
+      <HouseholdCoverageAnalysis respondents={respondents} campaignFilter={filters.campaign || null} />
 
 
 
@@ -578,7 +574,7 @@ export default function ChecklistDashboard({
 
 
       {/* Supervision & CDD engagement */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4">
         <Panel title="Supervision Visit Trend" icon={Activity}>
           {trend.length === 0 ? <Empty /> : (
             <ResponsiveContainer width="100%" height={240}>
@@ -592,7 +588,6 @@ export default function ChecklistDashboard({
             </ResponsiveContainer>
           )}
         </Panel>
-        <Panel title="Supervisor Designation Mix" icon={Users}><DonutChart data={designation} /></Panel>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-4">
@@ -602,10 +597,8 @@ export default function ChecklistDashboard({
         <Panel title="CDD Knows Dose Pole Use" icon={ClipboardCheck}><DonutChart data={dosePoleKnow} /></Panel>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4">
         <Panel title="NTD Posters Displayed" icon={ClipboardCheck}><DonutChart data={posters} /></Panel>
-        <Panel title="Medicines Offered (Respondents)" icon={Users}><DonutChart data={offered} /></Panel>
-        <Panel title="Medicines Swallowed (Respondents)" icon={Users}><DonutChart data={swallowed} /></Panel>
       </div>
 
       {/* WASH */}
@@ -618,9 +611,8 @@ export default function ChecklistDashboard({
         <Panel title="Community Water Source Proximity" icon={Droplets}><DonutChart data={waterWithin} /></Panel>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4">
         <Panel title="Top LGAs by Supervision Volume" icon={MapPin}><HBarChart data={topLgas} /></Panel>
-        <Panel title="Reasons for Not Swallowing" icon={AlertTriangle}><HBarChart data={refusalReasons} color={PALETTE[3]} /></Panel>
       </div>
 
       <MlIntelligenceHub
