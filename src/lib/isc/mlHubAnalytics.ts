@@ -13,6 +13,39 @@ export const s = (v: unknown) => String(v ?? "").trim();
 export const isYes = (v: unknown) => s(v).toLowerCase() === "yes";
 const lbl = (field: string, v: unknown) => resolveChecklistValue(field, v) || s(v);
 
+
+/* ------------------------------------------- medicine offer / swallow codes */
+/**
+ * The Kobo choice lists for these two questions are NOT Yes/No — they are
+ * "Offered all required" / "Offered (but not all required)" / "Not offered any
+ * required" and "Swallowed all offered" / "Swallowed (but not all offered)" /
+ * "Did not swallow any offered". Testing them with a Yes/No comparison made
+ * every derived metric collapse to zero, so they are decoded explicitly here.
+ */
+const OFFER_NONE = "Not_offered_any_required_1";
+const SWALLOW_NONE = "Did_not_swallow_any_offered_1";
+
+export const wasOffered = (r: Row): boolean => {
+  const c = s(r.Were_you_OFFERED_the_medicine_s);
+  if (!c) return false;
+  if (c === OFFER_NONE) return false;
+  const label = lbl("Were_you_OFFERED_the_medicine_s", c).toLowerCase();
+  if (/^\s*(no|none)\b/.test(label) || /not\s*offered/.test(label)) return false;
+  return /offer/.test(label) || /^yes/.test(label) || true;
+};
+
+export const didSwallow = (r: Row): boolean => {
+  const c = s(r.swallow);
+  if (!c) return false;
+  if (c === SWALLOW_NONE) return false;
+  const label = lbl("swallow", c).toLowerCase();
+  if (/did\s*not\s*swallow/.test(label) || /^\s*(no|none)\b/.test(label)) return false;
+  return true;
+};
+
+/** Respondent answered the offer question at all (denominator membership). */
+export const answeredOffer = (r: Row): boolean => s(r.Were_you_OFFERED_the_medicine_s) !== "";
+
 /* ------------------------------------------------------------------- GPS */
 
 export interface Gps { lat: number; long: number; altitude: number; accuracy: number }
@@ -47,8 +80,8 @@ export function mapPoints(respondents: Row[]): MapPointRow[] {
       community: s(r.COMMUNITIES) || "—", ward: s(r.Ward) || "—",
       lga: s(r.LGA) || "—", state: s(r.State) || "—",
       campaign: lbl("MDA_Campaign_Type", r.MDA_Campaign_Type) || "—",
-      offered: isYes(lbl("Were_you_OFFERED_the_medicine_s", r.Were_you_OFFERED_the_medicine_s)),
-      swallowed: isYes(lbl("swallow", r.swallow)),
+      offered: wasOffered(r),
+      swallowed: didSwallow(r),
     });
   });
   return out;
@@ -59,8 +92,8 @@ export function mapPoints(respondents: Row[]): MapPointRow[] {
 export function coverage(respondents: Row[]) {
   let offered = 0, swallowed = 0;
   for (const r of respondents) {
-    if (isYes(lbl("Were_you_OFFERED_the_medicine_s", r.Were_you_OFFERED_the_medicine_s))) offered++;
-    if (isYes(lbl("swallow", r.swallow))) swallowed++;
+    if (wasOffered(r)) offered++;
+    if (didSwallow(r)) swallowed++;
   }
   return { offered, swallowed, rate: offered ? (swallowed / offered) * 100 : 0, total: respondents.length };
 }
@@ -79,7 +112,7 @@ export function coldspots(parents: Row[], respondents: Row[]): Coldspot[] {
     const key = `${s(r.State)}|${s(r.LGA)}|${s(r.Ward)}`;
     const rec = m.get(key) ?? { state: s(r.State) || "—", lga: s(r.LGA) || "—", ward: s(r.Ward) || "—", hh: 0, sw: 0, teams: new Set<string>() };
     rec.hh += 1;
-    if (isYes(lbl("swallow", r.swallow))) rec.sw += 1;
+    if (didSwallow(r)) rec.sw += 1;
     m.set(key, rec);
   }
   for (const p of parents) {
@@ -127,7 +160,7 @@ export function refusalTopics(respondents: Row[]) {
   const m = new Map<string, { count: number; sentiment: number }>();
   let analysed = 0;
   for (const r of respondents) {
-    if (isYes(lbl("swallow", r.swallow))) continue;
+    if (didSwallow(r)) continue;
     const txt = refusalText(r);
     if (!txt) continue;
     analysed++;
@@ -149,7 +182,7 @@ export function wardRefusalTopics(respondents: Row[]) {
   const m = new Map<string, Map<string, number>>();
   const sentiments = new Map<string, number[]>();
   for (const r of respondents) {
-    if (isYes(lbl("swallow", r.swallow))) continue;
+    if (didSwallow(r)) continue;
     const txt = refusalText(r);
     if (!txt) continue;
     const ward = s(r.Ward) || "—";
@@ -234,7 +267,7 @@ export function washMatrix(respondents: Row[]) {
     const k = `${water}|${latrine}`;
     const rec = cells.get(k) ?? { n: 0, sw: 0 };
     rec.n += 1;
-    if (isYes(lbl("swallow", r.swallow))) rec.sw += 1;
+    if (didSwallow(r)) rec.sw += 1;
     cells.set(k, rec);
   }
   const rows = [...waters].sort().map((water) => ({
@@ -256,7 +289,7 @@ export function washHotspots(respondents: Row[]) {
       community: s(r.COMMUNITIES) || "—", n: 0, sw: 0, water: new Map(), latrine: new Map(),
     };
     rec.n += 1;
-    if (isYes(lbl("swallow", r.swallow))) rec.sw += 1;
+    if (didSwallow(r)) rec.sw += 1;
     const w = splitMulti(r.What_water_source_i_your_class_household)
       .map((c) => resolveChecklistValue("What_water_source_i_your_class_household", c) || c)[0];
     if (w) rec.water.set(w, (rec.water.get(w) ?? 0) + 1);
