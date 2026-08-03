@@ -13,9 +13,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertTriangle, BookOpen, CheckCircle2, Droplets, HeartPulse, Home,
@@ -25,7 +22,7 @@ import {
   Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import {
-  COVERAGE_INDICATORS, campaignOptions, coverageByLevel, estimateIndicator,
+  COVERAGE_INDICATORS, coverageByLevel, estimateIndicator,
   pct, reasonBreakdown,
   type CoverageEstimate, type CoverageLevel, type IndicatorDef, type Row,
 } from "@/lib/isc/householdCoverage";
@@ -51,10 +48,13 @@ function IndicatorCard({ ind, est }: { ind: IndicatorDef; est: CoverageEstimate 
   const color = toneFor(est, ind.positive);
   const lo = est.ciLow * 100, hi = est.ciHigh * 100, p = est.p * 100;
   return (
-    <div className="rounded-xl border bg-card p-3 shadow-sm transition-transform duration-300 hover:-translate-y-0.5">
+    <div
+      className="rounded-xl border bg-card p-3 shadow-sm transition-transform duration-300 hover:-translate-y-0.5"
+      title={`${ind.label} — ${ind.description} Numerator: households meeting this definition. Denominator: ${ind.denominator}.`}
+    >
       <div className="flex items-start justify-between gap-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground leading-tight">
-          {ind.short}
+          {ind.label}
         </p>
         {ind.positive
           ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color }} />
@@ -64,7 +64,9 @@ function IndicatorCard({ ind, est }: { ind: IndicatorDef; est: CoverageEstimate 
         {est.n ? pct(est.p) : "—"}
       </p>
       <p className="mt-1 text-[11px] text-muted-foreground tabular-nums">
-        {est.n ? `95% CI ${lo.toFixed(1)}–${hi.toFixed(1)}%` : "no data"}
+        {est.n
+          ? `95% confident the true value is between ${lo.toFixed(1)}% and ${hi.toFixed(1)}%`
+          : "no respondent answered this question yet"}
       </p>
       {/* CI band */}
       <div className="relative mt-2 h-1.5 w-full rounded-full bg-muted overflow-hidden">
@@ -74,8 +76,14 @@ function IndicatorCard({ ind, est }: { ind: IndicatorDef; est: CoverageEstimate 
         />
         <div className="absolute h-full w-[2px]" style={{ left: `${Math.min(99.5, p)}%`, background: color }} />
       </div>
-      <p className="mt-1.5 text-[10px] text-muted-foreground">
-        n = {est.n.toLocaleString()} · {est.clusters} cluster{est.clusters === 1 ? "" : "s"} · DEFF {est.deff.toFixed(2)}
+      <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
+        {ind.description}
+      </p>
+      <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+        <span className="font-medium text-foreground/80">{est.x.toLocaleString()}</span> of{" "}
+        <span className="font-medium text-foreground/80">{est.n.toLocaleString()}</span>{" "}
+        {ind.denominator.toLowerCase()} · {est.clusters} community cluster{est.clusters === 1 ? "" : "s"} ·
+        design effect {est.deff.toFixed(2)} (clustering penalty on precision)
       </p>
       {est.lowPrecision && est.n > 0 && (
         <p className="mt-1 text-[10px] font-medium text-amber-700 flex items-center gap-1">
@@ -173,17 +181,11 @@ function MethodologyDialog() {
   );
 }
 
-export default function HouseholdCoverageAnalysis({ respondents }: { respondents: Row[] }) {
+export default function HouseholdCoverageAnalysis({
+  respondents, campaignFilter,
+}: { respondents: Row[]; campaignFilter?: string | null }) {
   const [level, setLevel] = useState<CoverageLevel>("Ward");
-  const [campaign, setCampaign] = useState<string>("all");
-
-  const campaigns = useMemo(() => campaignOptions(respondents), [respondents]);
-  const rows = useMemo(
-    () => (campaign === "all"
-      ? respondents
-      : respondents.filter((r) => String(r.MDA_Campaign_Type ?? "").trim() === campaign)),
-    [respondents, campaign],
-  );
+  const rows = respondents;
 
   const overall = useMemo(() => {
     const m: Record<string, CoverageEstimate> = {};
@@ -223,17 +225,11 @@ export default function HouseholdCoverageAnalysis({ respondents }: { respondents
           </Badge>
         </CardTitle>
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={campaign} onValueChange={setCampaign}>
-            <SelectTrigger className="h-7 w-[230px] text-[11px]">
-              <SelectValue placeholder="MDA campaign type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All MDA campaign types</SelectItem>
-              {campaigns.map((c) => (
-                <SelectItem key={c.code} value={c.code}>{c.label} ({c.n})</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Badge variant="secondary" className="text-[10px] font-medium">
+            {campaignFilter
+              ? `Campaign: ${campaignFilter}`
+              : "All MDA campaign types (use the dashboard filter bar)"}
+          </Badge>
           <MethodologyDialog />
         </div>
       </CardHeader>
@@ -246,8 +242,9 @@ export default function HouseholdCoverageAnalysis({ respondents }: { respondents
             <div className="rounded-lg border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground flex items-start gap-2">
               <Info className="h-3.5 w-3.5 mt-[1px] shrink-0 text-primary" />
               <span>
-                {rows.length.toLocaleString()} household respondents interviewed across{" "}
-                {totalClusters.toLocaleString()} community clusters. Coverage is estimated with a
+                {rows.length.toLocaleString()} household / class respondents interviewed across{" "}
+                {totalClusters.toLocaleString()} community clusters
+                {campaignFilter ? ` for the ${campaignFilter} campaign` : " across all MDA campaign types"}. Coverage is estimated with a
                 cluster-sample ratio estimator and generalised to all households in each unit —
                 point estimates are shown with their 95% confidence interval, design effect (DEFF)
                 and effective sample size.
@@ -259,7 +256,7 @@ export default function HouseholdCoverageAnalysis({ respondents }: { respondents
               <p className="text-xs font-semibold flex items-center gap-1.5 mb-2">
                 <HeartPulse className="h-3.5 w-3.5 text-rose-600" /> Medicine coverage &amp; uptake
               </p>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {medicine.map((ind) => (
                   <IndicatorCard key={ind.key} ind={ind} est={overall[ind.key]} />
                 ))}
@@ -271,7 +268,7 @@ export default function HouseholdCoverageAnalysis({ respondents }: { respondents
               <p className="text-xs font-semibold flex items-center gap-1.5 mb-2">
                 <Droplets className="h-3.5 w-3.5 text-sky-600" /> WASH infrastructure &amp; practice
               </p>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {wash.map((ind) => (
                   <IndicatorCard key={ind.key} ind={ind} est={overall[ind.key]} />
                 ))}
@@ -282,10 +279,10 @@ export default function HouseholdCoverageAnalysis({ respondents }: { respondents
             {epi && epi.n > 0 && (
               <div className="grid gap-3 sm:grid-cols-4 text-[11px]">
                 {[
-                  { l: "Effective sample size", v: Math.round(epi.neff).toLocaleString(), s: `of ${epi.n.toLocaleString()} interviews` },
-                  { l: "Design effect (DEFF)", v: epi.deff.toFixed(2), s: epi.deff > 2 ? "strong clustering" : "acceptable clustering" },
-                  { l: "Intra-cluster correlation", v: epi.icc.toFixed(3), s: "ρ implied by DEFF" },
-                  { l: "Margin of error", v: `±${epi.marginPct.toFixed(1)} pp`, s: "on epidemiological coverage" },
+                  { l: "Effective sample size", v: Math.round(epi.neff).toLocaleString(), s: `The ${epi.n.toLocaleString()} interviews carry only as much statistical information as this many independent households, because neighbours answer alike.` },
+                  { l: "Design effect (DEFF)", v: epi.deff.toFixed(2), s: `How much clustering inflates uncertainty versus a random household sample — ${epi.deff > 2 ? "strong clustering, widen your sample across more communities" : "acceptable clustering"}.` },
+                  { l: "Intra-cluster correlation (ρ)", v: epi.icc.toFixed(3), s: "Similarity between households in the same community: 0 = independent, 1 = identical answers." },
+                  { l: "Margin of error", v: `±${epi.marginPct.toFixed(1)} pp`, s: "Half-width of the 95% interval on treatment (swallowed) coverage, in percentage points." },
                 ].map((k) => (
                   <div key={k.l} className="rounded-lg border bg-muted/20 px-3 py-2">
                     <p className="uppercase tracking-wide text-[10px] font-semibold text-muted-foreground">{k.l}</p>
@@ -319,17 +316,44 @@ export default function HouseholdCoverageAnalysis({ respondents }: { respondents
                   <table className="w-full text-xs">
                     <thead className="bg-muted/60 sticky top-0 z-10">
                       <tr>
-                        <th className="text-left px-2 py-2 font-semibold">{level}</th>
-                        {level !== "State" && <th className="text-left px-2 py-2 font-semibold">Within</th>}
-                        <th className="text-right px-2 py-2 font-semibold">Clusters</th>
-                        <th className="text-right px-2 py-2 font-semibold">Households</th>
+                        <th className="text-left px-2 py-2 font-semibold align-bottom">
+                          {level}
+                          <span className="block text-[9px] font-normal text-muted-foreground">
+                            Administrative unit the estimate applies to
+                          </span>
+                        </th>
+                        {level !== "State" && (
+                          <th className="text-left px-2 py-2 font-semibold align-bottom">
+                            Located within
+                            <span className="block text-[9px] font-normal text-muted-foreground">
+                              Parent LGA / State
+                            </span>
+                          </th>
+                        )}
+                        <th className="text-right px-2 py-2 font-semibold align-bottom" title="Number of distinct communities (primary sampling units) surveyed inside this unit. More clusters = a more generalisable estimate.">
+                          Communities sampled
+                          <span className="block text-[9px] font-normal text-muted-foreground">
+                            Clusters (≥5 needed)
+                          </span>
+                        </th>
+                        <th className="text-right px-2 py-2 font-semibold align-bottom" title="Total household / class respondents interviewed inside this unit.">
+                          Households interviewed
+                          <span className="block text-[9px] font-normal text-muted-foreground">Sample size (n)</span>
+                        </th>
                         {tableIndicators.map((ind) => (
-                          <th key={ind.key} className="text-right px-2 py-2 font-semibold whitespace-nowrap" title={`${ind.description} · Denominator: ${ind.denominator}`}>
-                            {ind.short}
-                            <span className="block text-[9px] font-normal text-muted-foreground">% (95% CI)</span>
+                          <th key={ind.key} className="text-right px-2 py-2 font-semibold whitespace-nowrap align-bottom" title={`${ind.label} — ${ind.description} Denominator: ${ind.denominator}.`}>
+                            {ind.label}
+                            <span className="block text-[9px] font-normal text-muted-foreground">
+                              % of {ind.denominator.toLowerCase()} · 95% CI
+                            </span>
                           </th>
                         ))}
-                        <th className="text-left px-2 py-2 font-semibold">Precision</th>
+                        <th className="text-left px-2 py-2 font-semibold align-bottom" title="Whether the estimate is precise enough to be reported as the coverage of the whole unit.">
+                          Can this be generalised?
+                          <span className="block text-[9px] font-normal text-muted-foreground">
+                            Precision verdict
+                          </span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
