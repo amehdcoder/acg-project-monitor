@@ -79,11 +79,13 @@ function FilterSelect({
 
 /** Cascaded filter bar: date range → State → LGA → Ward, plus person filters. */
 export default function ChecklistFilters({
-  parents, value, onChange,
+  parents, value, onChange, presetSlot,
 }: {
   parents: Record<string, unknown>[];
   value: ChecklistFilterState;
   onChange: (v: ChecklistFilterState) => void;
+  /** Optional saved-view controls rendered in the filter bar header. */
+  presetSlot?: React.ReactNode;
 }) {
   const dateScoped = useMemo(
     () => applyChecklistFilters(parents, { ...EMPTY_FILTERS, from: value.from, to: value.to }),
@@ -126,16 +128,19 @@ export default function ChecklistFilters({
 
   return (
     <Card className="p-3">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <p className="text-xs font-semibold flex items-center gap-1.5">
           <Filter className="h-3.5 w-3.5 text-primary" /> Filters
           {active > 0 && <span className="text-muted-foreground font-normal">({active} active)</span>}
         </p>
-        {active > 0 && (
-          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onChange({ ...EMPTY_FILTERS })}>
-            <X className="h-3.5 w-3.5 mr-1" /> Clear all
-          </Button>
-        )}
+        <div className="flex items-center gap-1.5">
+          {presetSlot}
+          {active > 0 && (
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onChange({ ...EMPTY_FILTERS })}>
+              <X className="h-3.5 w-3.5 mr-1" /> Clear all
+            </Button>
+          )}
+        </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
         <div className="space-y-1">

@@ -16,7 +16,7 @@ import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import type { KoboCache } from "./koboClient";
+import { getActiveConnectionId, type KoboCache } from "./koboClient";
 import {
   buildChecklistDataset, resolveChecklistValue, splitMulti,
 } from "./checklistSchema";
@@ -30,6 +30,7 @@ import ChecklistPredictive from "./ChecklistPredictive";
 import ChecklistMaps from "./ChecklistMaps";
 import HouseholdCoverageAnalysis from "./HouseholdCoverageAnalysis";
 import MlIntelligenceHub from "./MlIntelligenceHub";
+import ChecklistPresetBar from "./ChecklistPresetBar";
 
 
 
@@ -181,24 +182,24 @@ function PerformanceTable({ rows, headLabel }: { rows: PerfRow[]; headLabel: str
   );
   return (
     <div className="max-h-[340px] overflow-auto rounded-md border">
-      <table className="w-full text-xs">
+      <table className="w-full min-w-[620px] text-xs">
         <thead className="bg-muted/60 sticky top-0 z-10">
           <tr>
-            <th className="text-left px-2 py-2 font-semibold">{headLabel}</th>
-            <th className="text-right px-2 py-2 font-semibold">Checklists</th>
-            <th className="text-right px-2 py-2 font-semibold">Respondents</th>
-            <th className="text-right px-2 py-2 font-semibold">Avg / checklist</th>
-            <th className="text-right px-2 py-2 font-semibold">Days worked <span className="font-normal text-muted-foreground">(avg in total)</span></th>
+            <th className="text-left px-2 py-2 font-semibold whitespace-nowrap">{headLabel}</th>
+            <th className="text-right px-2 py-2 font-semibold whitespace-nowrap">Checklists</th>
+            <th className="text-right px-2 py-2 font-semibold whitespace-nowrap">Respondents</th>
+            <th className="text-right px-2 py-2 font-semibold whitespace-nowrap">Avg / checklist</th>
+            <th className="text-right px-2 py-2 font-semibold whitespace-nowrap">Days worked <span className="font-normal text-muted-foreground">(avg)</span></th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.name} className="border-t hover:bg-muted/30">
-              <td className="px-2 py-1.5 font-medium">{r.name}</td>
-              <td className="px-2 py-1.5 text-right tabular-nums">{r.submissions.toLocaleString()}</td>
-              <td className="px-2 py-1.5 text-right tabular-nums">{r.respondents.toLocaleString()}</td>
-              <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{r.avgRespondents.toFixed(1)}</td>
-              <td className="px-2 py-1.5 text-right tabular-nums">{r.days.toLocaleString()}</td>
+              <td className="px-2 py-1.5 font-medium align-top whitespace-normal break-words">{r.name}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap align-top">{r.submissions.toLocaleString()}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap align-top">{r.respondents.toLocaleString()}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums font-semibold whitespace-nowrap align-top">{r.avgRespondents.toFixed(1)}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap align-top">{r.days.toLocaleString()}</td>
             </tr>
           ))}
         </tbody>
@@ -427,7 +428,18 @@ export default function ChecklistDashboard({
   return (
     <div className="space-y-4">
 
-      <ChecklistFilters parents={allParents} value={filters} onChange={setFilters} />
+      <ChecklistFilters
+        parents={allParents}
+        value={filters}
+        onChange={setFilters}
+        presetSlot={
+          <ChecklistPresetBar
+            connectionId={getActiveConnectionId()}
+            value={filters}
+            onApply={setFilters}
+          />
+        }
+      />
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
@@ -483,26 +495,26 @@ export default function ChecklistDashboard({
             <p className="text-xs font-semibold text-muted-foreground mb-2">SAE types reported</p>
             {saeTypes.length ? <HBarChart data={saeTypes} color="hsl(350,70%,52%)" /> : <Empty />}
           </div>
-          <div className="max-h-[280px] overflow-y-auto rounded-md border bg-background">
+          <div className="max-h-[280px] overflow-auto rounded-md border bg-background">
             {saeRows.length === 0 ? (
               <div className="p-6 text-center text-xs text-muted-foreground">No SAE complaints reported.</div>
             ) : (
-              <table className="w-full text-xs">
+              <table className="w-full min-w-[520px] text-xs">
                 <thead className="bg-muted/60 sticky top-0">
                   <tr>
-                    <th className="text-left px-2 py-1.5 font-semibold">Community</th>
-                    <th className="text-left px-2 py-1.5 font-semibold">LGA</th>
-                    <th className="text-left px-2 py-1.5 font-semibold">Type(s)</th>
-                    <th className="text-left px-2 py-1.5 font-semibold">Other</th>
+                    <th className="text-left px-2 py-1.5 font-semibold whitespace-nowrap">Community</th>
+                    <th className="text-left px-2 py-1.5 font-semibold whitespace-nowrap">LGA</th>
+                    <th className="text-left px-2 py-1.5 font-semibold whitespace-nowrap">Type(s)</th>
+                    <th className="text-left px-2 py-1.5 font-semibold whitespace-nowrap">Other</th>
                   </tr>
                 </thead>
                 <tbody>
                   {saeRows.map((p, i) => (
                     <tr key={i} className="border-t">
-                      <td className="px-2 py-1.5">{String(p.COMMUNITIES ?? "—")}</td>
-                      <td className="px-2 py-1.5">{String(p.LGA ?? "—")}</td>
-                      <td className="px-2 py-1.5">{resolveChecklistValue("If_YES_what_type_of_SAE", p.If_YES_what_type_of_SAE) || "—"}</td>
-                      <td className="px-2 py-1.5">{String(p.Specify_the_OTHER_type_of_SAE ?? "—")}</td>
+                      <td className="px-2 py-1.5 align-top whitespace-normal break-words">{String(p.COMMUNITIES ?? "—")}</td>
+                      <td className="px-2 py-1.5 align-top whitespace-normal break-words">{String(p.LGA ?? "—")}</td>
+                      <td className="px-2 py-1.5 align-top whitespace-normal break-words">{resolveChecklistValue("If_YES_what_type_of_SAE", p.If_YES_what_type_of_SAE) || "—"}</td>
+                      <td className="px-2 py-1.5 align-top whitespace-normal break-words">{String(p.Specify_the_OTHER_type_of_SAE ?? "—")}</td>
                     </tr>
                   ))}
                 </tbody>

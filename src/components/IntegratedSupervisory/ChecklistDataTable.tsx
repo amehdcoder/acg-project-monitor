@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  ChevronLeft, ChevronRight, Columns3, Database, Download, FileSpreadsheet, Layers, Search,
+  ChevronLeft, ChevronRight, Columns3, Database, Download, FileSpreadsheet, Layers, Search, WrapText,
 } from "lucide-react";
 import { useChecklistPermissions } from "@/hooks/useChecklistPermissions";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -43,6 +43,7 @@ export default function ChecklistDataTable({ cache }: { cache: KoboCache | null 
   const dq = useDebouncedValue(search, 300);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
+  const [wrap, setWrap] = useState(true);
   const [fState, setFState] = useState("__all");
   const [fLga, setFLga] = useState("__all");
   const [fStatus, setFStatus] = useState("__all");
@@ -158,6 +159,14 @@ export default function ChecklistDataTable({ cache }: { cache: KoboCache | null 
               <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search all fields..." className="pl-8 h-9" />
             </div>
           </div>
+          <Button
+            variant={wrap ? "default" : "outline"}
+            className="h-9"
+            onClick={() => setWrap((w) => !w)}
+            title={wrap ? "Text wraps so every value is fully visible" : "Text is truncated to one line"}
+          >
+            <WrapText className="h-4 w-4 mr-1.5" /> {wrap ? "Wrap on" : "Wrap off"}
+          </Button>
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className="h-9"><Columns3 className="h-4 w-4 mr-1.5" /> Columns</Button>
@@ -202,7 +211,7 @@ export default function ChecklistDataTable({ cache }: { cache: KoboCache | null 
             <thead className="sticky top-0 z-10">
               <tr className="bg-[hsl(214,60%,18%)] text-white">
                 {visibleColumns.map((c) => (
-                  <th key={c.key} className="text-left px-3 py-2 font-semibold whitespace-nowrap border-r border-white/10" title={c.section}>
+                  <th key={c.key} className="text-left px-3 py-2 font-semibold whitespace-nowrap border-r border-white/10 min-w-[150px] align-bottom" title={c.section}>
                     {c.label}
                   </th>
                 ))}
@@ -214,7 +223,11 @@ export default function ChecklistDataTable({ cache }: { cache: KoboCache | null 
               ) : slice.map((r, i) => (
                 <tr key={i} className={i % 2 ? "bg-muted/30" : ""}>
                   {visibleColumns.map((c) => (
-                    <td key={c.key} className="px-3 py-1.5 border-t align-top whitespace-nowrap max-w-[280px] truncate" title={displayCell(c, r)}>
+                    <td
+                      key={c.key}
+                      className={`px-3 py-1.5 border-t align-top min-w-[150px] ${wrap ? "whitespace-normal break-words max-w-[320px]" : "whitespace-nowrap max-w-[280px] truncate"}`}
+                      title={displayCell(c, r)}
+                    >
                       {displayCell(c, r)}
                     </td>
                   ))}
