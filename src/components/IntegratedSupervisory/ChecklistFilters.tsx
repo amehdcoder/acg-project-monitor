@@ -79,11 +79,13 @@ function FilterSelect({
 
 /** Cascaded filter bar: date range → State → LGA → Ward, plus person filters. */
 export default function ChecklistFilters({
-  parents, value, onChange,
+  parents, value, onChange, presetSlot,
 }: {
   parents: Record<string, unknown>[];
   value: ChecklistFilterState;
   onChange: (v: ChecklistFilterState) => void;
+  /** Optional saved-view controls rendered in the filter bar header. */
+  presetSlot?: React.ReactNode;
 }) {
   const dateScoped = useMemo(
     () => applyChecklistFilters(parents, { ...EMPTY_FILTERS, from: value.from, to: value.to }),
