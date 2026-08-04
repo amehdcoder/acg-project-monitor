@@ -313,30 +313,30 @@ export default function HouseholdCoverageAnalysis({
                 <Empty label="No units at this level" />
               ) : (
                 <div className="max-h-[460px] overflow-auto rounded-md border">
-                  <table className="w-full text-xs">
+                  <table className="w-full min-w-[1080px] text-xs">
                     <thead className="bg-muted/60 sticky top-0 z-10">
                       <tr>
-                        <th className="text-left px-2 py-2 font-semibold align-bottom">
+                        <th className="text-left px-2 py-2 font-semibold align-bottom whitespace-nowrap">
                           {level}
                           <span className="block text-[9px] font-normal text-muted-foreground">
                             Administrative unit the estimate applies to
                           </span>
                         </th>
                         {level !== "State" && (
-                          <th className="text-left px-2 py-2 font-semibold align-bottom">
+                          <th className="text-left px-2 py-2 font-semibold align-bottom whitespace-nowrap">
                             Located within
                             <span className="block text-[9px] font-normal text-muted-foreground">
                               Parent LGA / State
                             </span>
                           </th>
                         )}
-                        <th className="text-right px-2 py-2 font-semibold align-bottom" title="Number of distinct communities (primary sampling units) surveyed inside this unit. More clusters = a more generalisable estimate.">
+                        <th className="text-right px-2 py-2 font-semibold align-bottom whitespace-nowrap" title="Number of distinct communities (primary sampling units) surveyed inside this unit. More clusters = a more generalisable estimate.">
                           Communities sampled
                           <span className="block text-[9px] font-normal text-muted-foreground">
                             Clusters (≥5 needed)
                           </span>
                         </th>
-                        <th className="text-right px-2 py-2 font-semibold align-bottom" title="Total household / class respondents interviewed inside this unit.">
+                        <th className="text-right px-2 py-2 font-semibold align-bottom whitespace-nowrap" title="Total household / class respondents interviewed inside this unit.">
                           Households interviewed
                           <span className="block text-[9px] font-normal text-muted-foreground">Sample size (n)</span>
                         </th>
@@ -348,7 +348,7 @@ export default function HouseholdCoverageAnalysis({
                             </span>
                           </th>
                         ))}
-                        <th className="text-left px-2 py-2 font-semibold align-bottom" title="Whether the estimate is precise enough to be reported as the coverage of the whole unit.">
+                        <th className="text-left px-2 py-2 font-semibold align-bottom whitespace-nowrap" title="Whether the estimate is precise enough to be reported as the coverage of the whole unit.">
                           Can this be generalised?
                           <span className="block text-[9px] font-normal text-muted-foreground">
                             Precision verdict

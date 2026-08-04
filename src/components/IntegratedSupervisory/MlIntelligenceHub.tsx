@@ -138,7 +138,7 @@ function SpatialModule({
         </div>
         <div className="max-h-[300px] flex-1 overflow-auto">
           {spots.length === 0 ? <EmptyBlock label="No ward-level respondent data yet." /> : (
-            <table className="w-full text-xs">
+            <table className="w-full min-w-[640px] text-xs">
               <thead className="bg-white/5 text-slate-300">
                 <tr>
                   <th className="px-3 py-2 text-left font-semibold">LGA → Ward</th>
@@ -349,7 +349,7 @@ function WashModule({
         </p>
         {matrix.rows.length === 0 ? <EmptyBlock label="No respondent WASH answers in the current selection." /> : (
           <div className="overflow-auto">
-            <table className="w-full text-xs">
+            <table className="w-full min-w-[640px] text-xs">
               <thead>
                 <tr className="text-slate-300">
                   <th className="px-2 py-1.5 text-left font-semibold">Water source</th>
@@ -390,7 +390,7 @@ function WashModule({
         </div>
         <div className="max-h-[320px] flex-1 overflow-auto">
           {hotspots.length === 0 ? <EmptyBlock label="No community-level WASH data yet." /> : (
-            <table className="w-full text-xs">
+            <table className="w-full min-w-[640px] text-xs">
               <thead className="bg-white/5 text-slate-300">
                 <tr>
                   <th className="px-3 py-2 text-left font-semibold">LGA → Community</th>
@@ -447,7 +447,7 @@ function IntegrityModule({
       </div>
       <div className="max-h-[420px] overflow-auto">
         {rows.length === 0 ? <EmptyBlock label="No anomalies detected in the current selection." /> : (
-          <table className="w-full text-xs">
+          <table className="w-full min-w-[640px] text-xs">
             <thead className="bg-white/5 text-slate-300">
               <tr>
                 <th className="px-3 py-2 text-left font-semibold">Submission</th>

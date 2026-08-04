@@ -76,32 +76,32 @@ export function StatusRecordsTable({
   }
   return (
     <div className={`overflow-auto rounded-md border ${dense ? "max-h-[300px]" : "max-h-[420px]"}`}>
-      <table className="w-full text-xs">
+      <table className="w-full min-w-[980px] text-xs">
         <thead className="bg-muted/60 sticky top-0 z-10">
           <tr>
-            <th className="text-left px-2 py-2 font-semibold">#</th>
-            <th className="text-left px-2 py-2 font-semibold">State</th>
-            <th className="text-left px-2 py-2 font-semibold">LGA</th>
-            <th className="text-left px-2 py-2 font-semibold">Ward</th>
-            <th className="text-left px-2 py-2 font-semibold">FLHF</th>
-            <th className="text-left px-2 py-2 font-semibold">Community</th>
-            <th className="text-left px-2 py-2 font-semibold">Independent Monitor</th>
-            <th className="text-left px-2 py-2 font-semibold">Designation</th>
-            <th className="text-right px-2 py-2 font-semibold">Respondents</th>
-            <th className="text-left px-2 py-2 font-semibold">Date</th>
+            <th className="text-left px-2 py-2 font-semibold whitespace-nowrap">#</th>
+            <th className="text-left px-2 py-2 font-semibold whitespace-nowrap">State</th>
+            <th className="text-left px-2 py-2 font-semibold whitespace-nowrap">LGA</th>
+            <th className="text-left px-2 py-2 font-semibold whitespace-nowrap">Ward</th>
+            <th className="text-left px-2 py-2 font-semibold whitespace-nowrap">FLHF</th>
+            <th className="text-left px-2 py-2 font-semibold whitespace-nowrap">Community</th>
+            <th className="text-left px-2 py-2 font-semibold whitespace-nowrap">Independent Monitor</th>
+            <th className="text-left px-2 py-2 font-semibold whitespace-nowrap">Designation</th>
+            <th className="text-right px-2 py-2 font-semibold whitespace-nowrap">Respondents</th>
+            <th className="text-left px-2 py-2 font-semibold whitespace-nowrap">Date</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r, i) => (
             <tr key={`${r._uuid ?? i}`} className="border-t hover:bg-muted/30">
-              <td className="px-2 py-1.5 tabular-nums text-muted-foreground">{i + 1}</td>
-              <td className="px-2 py-1.5">{txt(resolveChecklistValue("State", r.State))}</td>
-              <td className="px-2 py-1.5">{txt(resolveChecklistValue("LGA", r.LGA))}</td>
-              <td className="px-2 py-1.5">{txt(resolveChecklistValue("Ward", r.Ward))}</td>
-              <td className="px-2 py-1.5">{txt(r.FLHF)}</td>
-              <td className="px-2 py-1.5 font-medium">{txt(r.COMMUNITIES)}</td>
-              <td className="px-2 py-1.5">{txt(r.Independent_Monitor_s_Name)}</td>
-              <td className="px-2 py-1.5">{txt(resolveChecklistValue("Designation", r.Designation))}</td>
+              <td className="px-2 py-1.5 tabular-nums text-muted-foreground align-top">{i + 1}</td>
+              <td className="px-2 py-1.5 align-top whitespace-normal break-words">{txt(resolveChecklistValue("State", r.State))}</td>
+              <td className="px-2 py-1.5 align-top whitespace-normal break-words">{txt(resolveChecklistValue("LGA", r.LGA))}</td>
+              <td className="px-2 py-1.5 align-top whitespace-normal break-words">{txt(resolveChecklistValue("Ward", r.Ward))}</td>
+              <td className="px-2 py-1.5 align-top whitespace-normal break-words">{txt(r.FLHF)}</td>
+              <td className="px-2 py-1.5 font-medium align-top whitespace-normal break-words">{txt(r.COMMUNITIES)}</td>
+              <td className="px-2 py-1.5 align-top whitespace-normal break-words">{txt(r.Independent_Monitor_s_Name)}</td>
+              <td className="px-2 py-1.5 align-top whitespace-normal break-words">{txt(resolveChecklistValue("Designation", r.Designation))}</td>
               <td className="px-2 py-1.5 text-right tabular-nums">{Number(r.respondent_count ?? 0)}</td>
               <td className="px-2 py-1.5 whitespace-nowrap">{fmtDate(r._submission_time)}</td>
             </tr>
@@ -172,7 +172,7 @@ export function StatusDrilldownDialog({
   const respondents = rows.reduce((s, r) => s + (Number(r.respondent_count) || 0), 0);
   return (
     <Dialog open={!!statusLabel} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-6xl">
+      <DialogContent className="max-w-6xl max-h-[88vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Icon className="h-5 w-5" style={{ color: meta.color }} />
