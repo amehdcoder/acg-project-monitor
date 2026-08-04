@@ -5,7 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  ClipboardList, Database, GitCompareArrows, LayoutDashboard, Loader2, Lock, Plus, Radio, Server, Settings2, Trash2,
+  ClipboardList, Database, GitCompareArrows, LayoutDashboard, Loader2, Lock, Plus, Radio, Server, Settings2, ShieldCheck, Trash2,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import KoboSyncDialog from "./KoboSyncDialog";
@@ -13,6 +13,7 @@ import SupervisoryDashboardView from "./SupervisoryDashboardView";
 import ChecklistDashboard from "./ChecklistDashboard";
 import ChecklistDataTable from "./ChecklistDataTable";
 import ChecklistReconciliation from "./ChecklistReconciliation";
+import ChecklistAccessManager from "./ChecklistAccessManager";
 import {
   deleteConnection, fetchSubmissions, getActiveConnectionId, listConnections, loadKoboCache,
   loadKoboConfig, setActiveConnectionId, type KoboCache, type KoboConnection,
@@ -29,6 +30,7 @@ export default function IntegratedSupervisoryView() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [cache, setCache] = useState<KoboCache | null>(() => loadKoboCache());
   const [syncing, setSyncing] = useState(false);
+  const [openAccess, setOpenAccess] = useState(false);
 
   const activeConnection = useMemo(
     () => connections.find((c) => c.id === activeId) ?? null,
@@ -140,6 +142,16 @@ export default function IntegratedSupervisoryView() {
               </Badge>
             )}
 
+            {perms.canManageAccess && (
+              <Button
+                variant="outline"
+                className="border-primary/40 bg-gradient-to-r from-primary/10 to-fuchsia-500/10 hover:from-primary/20"
+                onClick={() => setOpenAccess(true)}
+              >
+                <ShieldCheck className="h-4 w-4 mr-1 text-primary" /> Access
+              </Button>
+            )}
+
             {perms.canManageIntegrations && (
               <>
                 <Button variant="outline" onClick={() => { setEditingId(activeId ?? "new"); setOpenSync(true); }}>
@@ -177,7 +189,9 @@ export default function IntegratedSupervisoryView() {
       <Tabs defaultValue="checklist" className="w-full">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="checklist"><ClipboardList className="h-4 w-4 mr-1" /> Checklist Dashboard</TabsTrigger>
-          <TabsTrigger value="records"><Database className="h-4 w-4 mr-1" /> Raw Kobo Data</TabsTrigger>
+          {perms.canViewRawData && (
+            <TabsTrigger value="records"><Database className="h-4 w-4 mr-1" /> Raw Kobo Data</TabsTrigger>
+          )}
           <TabsTrigger value="studio"><LayoutDashboard className="h-4 w-4 mr-1" /> Dashboard Studio</TabsTrigger>
           
           <TabsTrigger value="reconciliation"><GitCompareArrows className="h-4 w-4 mr-1" /> Reconciliation</TabsTrigger>
@@ -185,9 +199,11 @@ export default function IntegratedSupervisoryView() {
         <TabsContent value="checklist" className="mt-4">
           <ChecklistDashboard cache={cache} onRefresh={() => refresh(false)} syncing={syncing} />
         </TabsContent>
-        <TabsContent value="records" className="mt-4">
-          <ChecklistDataTable cache={cache} />
-        </TabsContent>
+        {perms.canViewRawData && (
+          <TabsContent value="records" className="mt-4">
+            <ChecklistDataTable cache={cache} />
+          </TabsContent>
+        )}
         <TabsContent value="studio" className="mt-4">
           <SupervisoryDashboardView cache={cache} onRefresh={() => refresh(false)} syncing={syncing} />
         </TabsContent>
@@ -195,6 +211,10 @@ export default function IntegratedSupervisoryView() {
           <ChecklistReconciliation cache={cache} canExport={perms.canExport} />
         </TabsContent>
       </Tabs>
+
+      {perms.canManageAccess && (
+        <ChecklistAccessManager open={openAccess} onOpenChange={setOpenAccess} />
+      )}
 
       {perms.canManageIntegrations && (
         <KoboSyncDialog

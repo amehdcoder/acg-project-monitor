@@ -58,7 +58,7 @@ export function useChecklistPermissions(): ChecklistPermissions {
     const designation = String(profile?.designation ?? "").toLowerCase();
     const viewerByDesignation = VIEWER_DESIGNATIONS.has(designation);
 
-    const canView = admin || granted || viewerByDesignation;
+    const canView = admin || granted || grantedRaw || viewerByDesignation;
 
     return {
       canView,
