@@ -26,10 +26,14 @@ const VIEWER_DESIGNATIONS = new Set([
 
 export interface ChecklistPermissions {
   canView: boolean;
+  /** View the record-level Raw Kobo Data tab. */
+  canViewRawData: boolean;
   /** Download raw/flattened data (Excel, CSV, PDF/PNG snapshots). */
   canExport: boolean;
   /** Add, edit or remove KoboToolbox integrations and run syncs. */
   canManageIntegrations: boolean;
+  /** Grant or revoke per-user access to the dashboard / raw data. */
+  canManageAccess: boolean;
   /** Edit dashboards in the Studio (widgets, calculated fields, presets). */
   canEditDashboards: boolean;
   loading: boolean;
@@ -45,9 +49,11 @@ export function useChecklistPermissions(): ChecklistPermissions {
       !!isOwner || !!isCoOwner || !!isSuperAdmin || !!isAdmin ||
       role === "super_admin" || role === "systems_admin";
 
-    const granted = (() => {
-      try { return canAccessPage("integrated-supervisory"); } catch { return false; }
-    })();
+    const check = (page: string) => {
+      try { return canAccessPage(page); } catch { return false; }
+    };
+    const granted = check("integrated-supervisory");
+    const grantedRaw = check("integrated-supervisory-raw");
 
     const designation = String(profile?.designation ?? "").toLowerCase();
     const viewerByDesignation = VIEWER_DESIGNATIONS.has(designation);
@@ -56,17 +62,21 @@ export function useChecklistPermissions(): ChecklistPermissions {
 
     return {
       canView,
-      canExport: admin || granted,
+      canViewRawData: admin || granted || grantedRaw,
+      canExport: admin || granted || grantedRaw,
       canManageIntegrations: admin,
+      canManageAccess: !!isOwner || !!isCoOwner,
       canEditDashboards: admin || granted,
       loading: loading || loadingAccess,
       roleLabel: admin
         ? "Administrator"
         : granted
           ? "Granted analyst"
-          : viewerByDesignation
-            ? "Supervisory viewer"
-            : "No access",
+          : grantedRaw
+            ? "Raw-data analyst"
+            : viewerByDesignation
+              ? "Supervisory viewer"
+              : "No access",
     };
   }, [profile?.designation, role, isOwner, isCoOwner, isSuperAdmin, isAdmin, loading, loadingAccess, canAccessPage]);
 }
