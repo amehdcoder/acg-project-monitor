@@ -334,6 +334,8 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
           <TabsTrigger value="facilities"><PackageX className="h-4 w-4 mr-1" /> Stockout risk</TabsTrigger>
           <TabsTrigger value="batches"><CalendarClock className="h-4 w-4 mr-1" /> Batches & expiry</TabsTrigger>
           <TabsTrigger value="leadtime"><Timer className="h-4 w-4 mr-1" /> Lead time & POD</TabsTrigger>
+          <TabsTrigger value="supply"><Scale className="h-4 w-4 mr-1" /> Integrity, loss & equity</TabsTrigger>
+
           <TabsTrigger value="integrity"><ShieldAlert className="h-4 w-4 mr-1" /> Data integrity</TabsTrigger>
         </TabsList>
 
