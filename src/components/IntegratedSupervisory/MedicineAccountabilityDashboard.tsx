@@ -278,10 +278,34 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
             <Button variant="outline" size="sm" onClick={() => setOpenConnect(true)}>
               <PlugZap className="h-4 w-4 mr-1" /> {connected ? "Integration" : "Link Kobo form"}
             </Button>
+            <KpiDocsDrawer />
             {canExport && (
-              <Button variant="outline" size="sm" onClick={exportCsv} disabled={!summary.byMedicine.length}>
-                <Download className="h-4 w-4 mr-1" /> Export
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-1" /> Export</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72">
+                  <DropdownMenuLabel className="text-[11px]">Medicine accountability dashboard</DropdownMenuLabel>
+                  <DropdownMenuItem className="text-xs" disabled={!summary.byMedicine.length}
+                    onClick={() => exportAccountabilityPdf(exportBundle())}>
+                    <FileText className="h-3.5 w-3.5 mr-2" /> PDF — supervision pack (with definitions)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-xs" disabled={!summary.byMedicine.length}
+                    onClick={() => exportAccountabilityCsv(exportBundle())}>
+                    <FileSpreadsheet className="h-3.5 w-3.5 mr-2" /> CSV — all indicator tables
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-[11px]">Data integrity reconciliation</DropdownMenuLabel>
+                  <DropdownMenuItem className="text-xs" disabled={!checklistCache}
+                    onClick={() => exportReconciliationPdf({ ...recon, scope: scopeLabel })}>
+                    <FileText className="h-3.5 w-3.5 mr-2" /> PDF — reconciliation report
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-xs" disabled={!checklistCache}
+                    onClick={() => exportReconciliationCsv({ ...recon, scope: scopeLabel })}>
+                    <FileSpreadsheet className="h-3.5 w-3.5 mr-2" /> CSV — reconciliation findings
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             <Button size="sm" onClick={() => refresh(false)} disabled={syncing}>
               {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />} Sync
