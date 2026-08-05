@@ -715,7 +715,7 @@ export function computeSupplyIntegrity(
   for (const a of allocations) {
     const qty = Number(a.quantity) || 0;
     if (qty <= 0) continue;
-    if (qty <= 0) continue;
+
     const rec = receipts.filter(
       (r) => r.medicine === a.medicine && r.state === a.state && (!a.lga || r.lga === a.lga),
     );
