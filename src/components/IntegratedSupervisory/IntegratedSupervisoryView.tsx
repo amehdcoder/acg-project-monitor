@@ -12,7 +12,7 @@ import KoboSyncDialog from "./KoboSyncDialog";
 import SupervisoryDashboardView from "./SupervisoryDashboardView";
 import ChecklistDashboard from "./ChecklistDashboard";
 import ChecklistDataTable from "./ChecklistDataTable";
-import ChecklistReconciliation from "./ChecklistReconciliation";
+import MedicineAccountabilityDashboard from "./MedicineAccountabilityDashboard";
 import ChecklistAccessManager from "./ChecklistAccessManager";
 import {
   deleteConnection, fetchSubmissions, getActiveConnectionId, listConnections, loadKoboCache,
