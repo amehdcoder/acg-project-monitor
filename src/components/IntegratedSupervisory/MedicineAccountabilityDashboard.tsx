@@ -16,10 +16,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip as UiTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
-  Activity, AlertTriangle, Boxes, CalendarClock, CheckCircle2, ClipboardCheck, Download, Filter,
-  Gauge, Loader2, PackageCheck, PackageX, PlugZap, RefreshCw, Route, Scale, ShieldAlert, Timer,
-  TrendingDown, Truck, Warehouse,
+  Activity, AlertTriangle, BookOpen, Boxes, CalendarClock, CheckCircle2, ClipboardCheck, Download, FileSpreadsheet,
+  FileText, Filter, Gauge, Loader2, Maximize2, PackageCheck, PackageX, PlugZap, RefreshCw, Route, Scale, ShieldAlert,
+  Timer, TrendingDown, Truck, Warehouse,
 } from "lucide-react";
 
 import {
@@ -30,9 +32,19 @@ import {
   applyFilters, computeAccountability, computeSupplyIntegrity, loadAllocations, medicineLabel, parseLogistics,
   saveAllocations, type Allocation, type Filters,
 } from "@/lib/isc/medicineAccountability";
+import {
+  buildDrilldown, evaluateAlerts, loadThresholds, type AlertThresholds, type DrillKey, type DrillReport,
+} from "@/lib/isc/medicineDrilldown";
+import { DOC_GROUPS, KPI_DOCS, kpiDoc } from "@/lib/isc/medicineKpiDocs";
+import { computeReconciliation } from "@/lib/isc/reconciliationReport";
+import {
+  exportAccountabilityCsv, exportAccountabilityPdf, exportReconciliationCsv, exportReconciliationPdf,
+} from "@/lib/isc/medicineExport";
 import { loadMedLogCache, loadMedLogConfig, syncMedLog } from "./medicineKoboClient";
 import MedicineKoboConnectDialog from "./MedicineKoboConnectDialog";
 import MedicineAllocationDialog from "./MedicineAllocationDialog";
+import MedicineDrilldownDialog from "./MedicineDrilldownDialog";
+import MedicineAlertsPanel from "./MedicineAlertsPanel";
 import SupplyIntegrityPanel from "./SupplyIntegrityPanel";
 import ChecklistReconciliation from "./ChecklistReconciliation";
 
