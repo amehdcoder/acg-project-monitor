@@ -363,46 +363,46 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
 
       {/* KPIs */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi icon={PackageCheck} label="Received vs distributed" value={`${fmt(summary.totals.received)} / ${fmt(summary.totals.issuedToFlhf)}`}
+        <Kpi icon={PackageCheck} label="Received vs distributed" docId="received-distributed" value={`${fmt(summary.totals.received)} / ${fmt(summary.totals.issuedToFlhf)}`}
           sub={`Net usable ${fmt(summary.totals.netUsable)} · to CDDs ${fmt(summary.totals.issuedToCdd)}`}
           hint="Total units logged at LGA level (Level 1) versus total units dispatched down to health facilities (Level 2) and CDDs (Level 3)." />
-        <Kpi icon={TrendingDown} label="Wastage / stock loss" value={pctf(summary.wastageRate)} tone={summary.wastageRate > 0.05 ? "danger" : "success"}
+        <Kpi icon={TrendingDown} label="Wastage / stock loss" docId="wastage" value={pctf(summary.wastageRate)} tone={summary.wastageRate > 0.05 ? "danger" : "success"}
           sub={`${fmt(summary.totals.damaged)} units damaged / expired on arrival`}
           hint="Share of received stock recorded as damaged, expired or otherwise unusable on arrival at the LGA store." />
-        <Kpi icon={Boxes} label="Tiered stock balance" value={fmt(summary.totals.lgaBalance + summary.totals.flhfBalance)}
+        <Kpi icon={Boxes} label="Tiered stock balance" docId="balances" value={fmt(summary.totals.lgaBalance + summary.totals.flhfBalance)}
           sub={`LGA warehouses ${fmt(summary.totals.lgaBalance)} · facility stores ${fmt(summary.totals.flhfBalance)}`}
           hint="Live remaining stock: LGA balance = net usable received − issued to facilities; facility balance = received − issued to CDDs." />
-        <Kpi icon={ShieldAlert} label="Stockout vulnerability" value={`${summary.stockoutIndex.atRisk} (${pctf(summary.stockoutIndex.pct)})`}
+        <Kpi icon={ShieldAlert} label="Stockout vulnerability" docId="stockout" value={`${summary.stockoutIndex.atRisk} (${pctf(summary.stockoutIndex.pct)})`}
           tone={summary.stockoutIndex.pct > 0.2 ? "danger" : "warn"}
           sub={`${summary.stockoutIndex.stockout} at zero stock of ${summary.stockoutIndex.facilities} facilities`}
           hint="Health facilities reporting zero or critically low inventory ahead of the MDA round (balance ≤ 0, or under 15% of what they received)." />
-        <Kpi icon={Route} label="Downstream push rate" value={pctf(summary.pushRate)} tone={summary.pushRate < 0.6 ? "warn" : "success"}
+        <Kpi icon={Route} label="Downstream push rate" docId="push-rate" value={pctf(summary.pushRate)} tone={summary.pushRate < 0.6 ? "warn" : "success"}
           sub={`${pctf(summary.pushRateOnTime)} of batches pushed within ${summary.targetWindowDays} days`}
           hint="Proportion of usable LGA stock disbursed to frontline health facilities, plus the share of batches moved within the target timeframe." />
-        <Kpi icon={Timer} label="Cascade lead time" value={summary.leadTimes[1].avgDays !== null ? `${summary.leadTimes[1].avgDays!.toFixed(1)} d` : "—"}
+        <Kpi icon={Timer} label="Cascade lead time" docId="lead-time" value={summary.leadTimes[1].avgDays !== null ? `${summary.leadTimes[1].avgDays!.toFixed(1)} d` : "—"}
           sub={`State→LGA ${summary.leadTimes[0].avgDays?.toFixed(1) ?? "—"} d · FLHF→CDD ${summary.leadTimes[2].avgDays?.toFixed(1) ?? "—"} d`}
           hint="Average days a batch takes to move through each tier. State → LGA uses the dispatch date entered with allocations." />
-        <Kpi icon={CalendarClock} label="Expiry exposure" value={`${summary.expiry.expired + summary.expiry.within90}`} tone={summary.expiry.expired ? "danger" : "warn"}
+        <Kpi icon={CalendarClock} label="Expiry exposure" docId="expiry-exposure" value={`${summary.expiry.expired + summary.expiry.within90}`} tone={summary.expiry.expired ? "danger" : "warn"}
           sub={`${summary.expiry.expired} expired · ${summary.expiry.within90} within 90 days · ${fmt(summary.expiry.unitsAtRisk)} units at risk`}
           hint="Batches already expired or expiring within 90 days, with the units still un-dispatched in those batches." />
-        <Kpi icon={ClipboardCheck} label="Proof-of-delivery compliance" value={pctf(summary.podCompliance.overall)}
+        <Kpi icon={ClipboardCheck} label="Proof-of-delivery compliance" docId="pod" value={pctf(summary.podCompliance.overall)}
           tone={summary.podCompliance.overall > 0.85 ? "success" : "warn"}
           sub={`L1 ${pctf(summary.podCompliance.l1)} · L2 ${pctf(summary.podCompliance.l2)} · L3 ${pctf(summary.podCompliance.l3)}`}
           hint="Share of transactions carrying a verified waybill photo, EDO acknowledgment signature, facility confirmation signature or CDD receipt photo." />
-        <Kpi icon={ShieldAlert} label="Transit shrinkage rate" value={pctf(integrity.shrinkage.overall.rate)}
+        <Kpi icon={ShieldAlert} label="Transit shrinkage rate" docId="shrinkage" onClick={() => setDrillKey("shrinkage")} value={pctf(integrity.shrinkage.overall.rate)}
           tone={integrity.shrinkage.overall.rate > 0.05 ? "danger" : integrity.shrinkage.overall.rate > 0.02 ? "warn" : "success"}
           sub={`${fmt(integrity.shrinkage.overall.variance)} units unaccounted across ${integrity.shrinkage.legs.length} cascade legs`}
           hint="(Quantity issued upstream − quantity confirmed received downstream) ÷ quantity issued, aggregated over every cascade leg. Positive values flag stock lost, diverted or unrecorded in transit." />
-        <Kpi icon={CalendarClock} label={`Expiry risk index (${expiryWindow}d)`} value={pctf(integrity.expiryRisk.index)}
+        <Kpi icon={CalendarClock} label={`Expiry risk index (${expiryWindow}d)`} docId="expiry-risk" onClick={() => setDrillKey("expiry")} value={pctf(integrity.expiryRisk.index)}
           tone={integrity.expiryRisk.index > 0.15 ? "danger" : integrity.expiryRisk.index > 0.05 ? "warn" : "success"}
           sub={`${fmt(integrity.expiryRisk.stockAtRisk)} of ${fmt(integrity.expiryRisk.totalStock)} units on hand are short-dated`}
           hint={`Share of stock currently sitting at LGA or health facility stores that belongs to batches expiring within ${expiryWindow} days.`} />
-        <Kpi icon={Warehouse} label="Buffer retention ratio"
+        <Kpi icon={Warehouse} label="Buffer retention ratio" docId="buffer" onClick={() => setDrillKey("buffer")}
           value={integrity.buffer.ratio === null ? "—" : `${integrity.buffer.ratio.toFixed(2)} : 1`}
           tone={integrity.buffer.band === "balanced" ? "success" : integrity.buffer.band === "under-deployed" ? "danger" : "warn"}
           sub={`${fmt(integrity.buffer.retained)} retained vs ${fmt(integrity.buffer.deployedCdd)} deployed to CDDs · ${integrity.buffer.band}`}
           hint="Stock still held in LGA and facility warehouses relative to stock already deployed to CDDs — measured up to the campaign kickoff date when one is set." />
-        <Kpi icon={Scale} label="Facility equity index (CV)"
+        <Kpi icon={Scale} label="Facility equity index (CV)" docId="equity" onClick={() => setDrillKey("equity")}
           value={integrity.equity.rows.length ? integrity.equity.weightedCv.toFixed(2) : "—"}
           tone={integrity.equity.weightedCv <= 0.25 ? "success" : integrity.equity.weightedCv <= 0.5 ? "warn" : "danger"}
           sub={`${integrity.equity.facilities} facilities across ${integrity.equity.lgas} LGAs compared`}
