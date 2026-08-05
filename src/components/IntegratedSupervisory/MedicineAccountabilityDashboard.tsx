@@ -16,10 +16,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip as UiTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
-  Activity, AlertTriangle, Boxes, CalendarClock, CheckCircle2, ClipboardCheck, Download, Filter,
-  Gauge, Loader2, PackageCheck, PackageX, PlugZap, RefreshCw, Route, Scale, ShieldAlert, Timer,
-  TrendingDown, Truck, Warehouse,
+  Activity, AlertTriangle, BookOpen, Boxes, CalendarClock, CheckCircle2, ClipboardCheck, Download, FileSpreadsheet,
+  FileText, Filter, Gauge, Loader2, Maximize2, PackageCheck, PackageX, PlugZap, RefreshCw, Route, Scale, ShieldAlert,
+  Timer, TrendingDown, Truck, Warehouse,
 } from "lucide-react";
 
 import {
@@ -30,9 +32,19 @@ import {
   applyFilters, computeAccountability, computeSupplyIntegrity, loadAllocations, medicineLabel, parseLogistics,
   saveAllocations, type Allocation, type Filters,
 } from "@/lib/isc/medicineAccountability";
+import {
+  buildDrilldown, evaluateAlerts, loadThresholds, type AlertThresholds, type DrillKey, type DrillReport,
+} from "@/lib/isc/medicineDrilldown";
+import { DOC_GROUPS, KPI_DOCS, kpiDoc } from "@/lib/isc/medicineKpiDocs";
+import { computeReconciliation } from "@/lib/isc/reconciliationReport";
+import {
+  exportAccountabilityCsv, exportAccountabilityPdf, exportReconciliationCsv, exportReconciliationPdf,
+} from "@/lib/isc/medicineExport";
 import { loadMedLogCache, loadMedLogConfig, syncMedLog } from "./medicineKoboClient";
 import MedicineKoboConnectDialog from "./MedicineKoboConnectDialog";
 import MedicineAllocationDialog from "./MedicineAllocationDialog";
+import MedicineDrilldownDialog from "./MedicineDrilldownDialog";
+import MedicineAlertsPanel from "./MedicineAlertsPanel";
 import SupplyIntegrityPanel from "./SupplyIntegrityPanel";
 import ChecklistReconciliation from "./ChecklistReconciliation";
 
@@ -47,27 +59,89 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 function Kpi({
-  icon: Icon, label, value, sub, tone = "primary", hint,
-}: { icon: any; label: string; value: string; sub?: string; tone?: string; hint?: string }) {
+  icon: Icon, label, value, sub, tone = "primary", hint, docId, onClick,
+}: { icon: any; label: string; value: string; sub?: string; tone?: string; hint?: string; docId?: string; onClick?: () => void }) {
   const toneCls =
     tone === "danger" ? "border-destructive/40 bg-destructive/5" :
     tone === "warn" ? "border-amber-300 bg-amber-50" :
     tone === "success" ? "border-emerald-300 bg-emerald-50" : "border-primary/30 bg-primary/5";
+  const doc = docId ? kpiDoc(docId) : undefined;
+  const body = (
+    <div
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
+      className={`rounded-xl border p-3 ${toneCls} ${onClick ? "cursor-pointer transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/40" : ""}`}
+    >
+      <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <Icon className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{label}</span>
+        {onClick && <Maximize2 className="h-3 w-3 ml-auto shrink-0 opacity-60" />}
+      </div>
+      <p className="font-display text-2xl font-bold leading-tight mt-1">{value}</p>
+      {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
+      {onClick && <p className="text-[10px] text-primary mt-1 font-medium">Click to drill down</p>}
+    </div>
+  );
+  const tip = doc
+    ? `${doc.definition}\n\nFormula: ${doc.formula}${doc.quality.length ? `\n\nData quality: ${doc.quality.join(" ")}` : ""}`
+    : hint;
+  if (!tip) return body;
   return (
     <TooltipProvider>
       <UiTooltip>
-        <TooltipTrigger asChild>
-          <div className={`rounded-xl border p-3 ${toneCls}`}>
-            <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              <Icon className="h-3.5 w-3.5" /> <span className="truncate">{label}</span>
-            </div>
-            <p className="font-display text-2xl font-bold leading-tight mt-1">{value}</p>
-            {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
-          </div>
-        </TooltipTrigger>
-        {hint && <TooltipContent className="max-w-xs text-xs">{hint}</TooltipContent>}
+        <TooltipTrigger asChild>{body}</TooltipTrigger>
+        <TooltipContent className="max-w-sm text-xs whitespace-pre-line">{tip}</TooltipContent>
       </UiTooltip>
     </TooltipProvider>
+  );
+}
+
+/** Documentation drawer listing every KPI definition, formula and caveat. */
+function KpiDocsDrawer() {
+  return (
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button variant="outline" size="sm"><BookOpen className="h-4 w-4 mr-1" /> KPI guide</Button>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="text-base">Indicator definitions & data-quality notes</SheetTitle>
+          <p className="text-xs text-muted-foreground">
+            Every indicator on this dashboard, with the exact formula used, how to interpret the value, and the data
+            conditions that can distort it.
+          </p>
+        </SheetHeader>
+        <div className="mt-4 space-y-5">
+          {DOC_GROUPS.map((g) => (
+            <section key={g.id}>
+              <h3 className="text-xs font-bold uppercase tracking-wide text-primary">{g.label}</h3>
+              <p className="text-[11px] text-muted-foreground mb-2">{g.blurb}</p>
+              <div className="space-y-2">
+                {KPI_DOCS.filter((d) => d.group === g.id).map((d) => (
+                  <div key={d.id} className="rounded-lg border p-3">
+                    <p className="text-xs font-semibold">{d.label}</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">{d.definition}</p>
+                    <p className="mt-1.5 rounded bg-muted/50 px-2 py-1 font-mono text-[10px] leading-snug break-words">{d.formula}</p>
+                    <p className="mt-1.5 text-[10px] text-foreground/80"><span className="font-semibold">How to read it: </span>{d.interpretation}</p>
+
+                    {d.quality.length > 0 && (
+                      <ul className="mt-1.5 space-y-0.5">
+                        {d.quality.map((q, i) => (
+                          <li key={i} className="text-[10px] text-muted-foreground flex gap-1">
+                            <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5 text-amber-500" />{q}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -126,6 +200,39 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
     [filtered, scopedAllocations, summary, expiryWindow, kickoff],
   );
 
+  /* ── drill-downs, alerts & exports ─────────────────────────────────────── */
+  const [thresholds, setThresholds] = useState<AlertThresholds>(() => loadThresholds());
+  const [drillKey, setDrillKey] = useState<DrillKey | null>(null);
+
+  const reports = useMemo(() => {
+    const keys: DrillKey[] = ["shrinkage", "expiry", "buffer", "equity"];
+    const map = {} as Record<DrillKey, DrillReport>;
+    for (const k of keys) map[k] = buildDrilldown(k, filtered, scopedAllocations, summary, integrity);
+    return map;
+  }, [filtered, scopedAllocations, summary, integrity]);
+
+  const scopeLabel = useMemo(() => {
+    const bits = [
+      filters.state ?? "All states",
+      filters.lga ? `${filters.lga} LGA` : null,
+      filters.medicine ? medicineLabel(filters.medicine) : "All medicines",
+      filters.from || filters.to ? `${filters.from || "start"} → ${filters.to || "today"}` : null,
+    ].filter(Boolean);
+    return bits.join(" · ");
+  }, [filters]);
+
+  const alerts = useMemo(() => evaluateAlerts(integrity, {
+    shrinkageLga: reports.shrinkage.tables.find((t) => t.id === "lga")?.rows,
+    expiryLga: reports.expiry.tables.find((t) => t.id === "lga")?.rows,
+    bufferLga: reports.buffer.tables.find((t) => t.id === "lga")?.rows,
+  }, thresholds), [integrity, reports, thresholds]);
+
+  const recon = useMemo(() => computeReconciliation(checklistCache ?? null), [checklistCache]);
+
+  const exportBundle = () => ({
+    summary, integrity, alerts, scope: scopeLabel,
+    drilldowns: [reports.shrinkage, reports.expiry, reports.buffer, reports.equity],
+  });
 
   const allRows = [...dataset.receipts, ...dataset.issues, ...dataset.cddIssues];
   const states = useMemo(() => Array.from(new Set(allRows.map((r) => r.state).filter(Boolean))).sort(), [dataset]);
@@ -137,21 +244,6 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
 
   const persistAllocations = (rows: Allocation[]) => { setAllocations(rows); saveAllocations(rows); };
 
-  const exportCsv = () => {
-    const head = ["Level", "State", "LGA", "Medicine", "Allocated", "Received", "Damaged", "Net usable", "Issued to FLHF", "Issued to CDD", "LGA balance", "FLHF balance", "Wastage %", "Push rate %"];
-    const rows = [
-      ...summary.byState.map((r) => ["State", r.state, "", "All", r.allocated, r.received, r.damaged, r.netUsable, r.issuedToFlhf, r.issuedToCdd, r.lgaBalance, r.flhfBalance, (r.wastageRate * 100).toFixed(2), (r.pushRate * 100).toFixed(2)]),
-      ...summary.byLga.map((r) => ["LGA", r.state, r.lga, "All", r.allocated, r.received, r.damaged, r.netUsable, r.issuedToFlhf, r.issuedToCdd, r.lgaBalance, r.flhfBalance, (r.wastageRate * 100).toFixed(2), (r.pushRate * 100).toFixed(2)]),
-      ...summary.byMedicine.map((r) => ["Medicine", "", "", medicineLabel(r.medicine), r.allocated, r.received, r.damaged, r.netUsable, r.issuedToFlhf, r.issuedToCdd, r.lgaBalance, r.flhfBalance, (r.wastageRate * 100).toFixed(2), (r.pushRate * 100).toFixed(2)]),
-    ];
-    const csv = [head, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `medicine-accountability-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   const connected = !!loadMedLogConfig()?.formUid;
   const medChart = summary.byMedicine.map((m) => ({
@@ -186,10 +278,34 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
             <Button variant="outline" size="sm" onClick={() => setOpenConnect(true)}>
               <PlugZap className="h-4 w-4 mr-1" /> {connected ? "Integration" : "Link Kobo form"}
             </Button>
+            <KpiDocsDrawer />
             {canExport && (
-              <Button variant="outline" size="sm" onClick={exportCsv} disabled={!summary.byMedicine.length}>
-                <Download className="h-4 w-4 mr-1" /> Export
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-1" /> Export</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72">
+                  <DropdownMenuLabel className="text-[11px]">Medicine accountability dashboard</DropdownMenuLabel>
+                  <DropdownMenuItem className="text-xs" disabled={!summary.byMedicine.length}
+                    onClick={() => exportAccountabilityPdf(exportBundle())}>
+                    <FileText className="h-3.5 w-3.5 mr-2" /> PDF — supervision pack (with definitions)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-xs" disabled={!summary.byMedicine.length}
+                    onClick={() => exportAccountabilityCsv(exportBundle())}>
+                    <FileSpreadsheet className="h-3.5 w-3.5 mr-2" /> CSV — all indicator tables
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-[11px]">Data integrity reconciliation</DropdownMenuLabel>
+                  <DropdownMenuItem className="text-xs" disabled={!checklistCache}
+                    onClick={() => exportReconciliationPdf({ ...recon, scope: scopeLabel })}>
+                    <FileText className="h-3.5 w-3.5 mr-2" /> PDF — reconciliation report
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-xs" disabled={!checklistCache}
+                    onClick={() => exportReconciliationCsv({ ...recon, scope: scopeLabel })}>
+                    <FileSpreadsheet className="h-3.5 w-3.5 mr-2" /> CSV — reconciliation findings
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             <Button size="sm" onClick={() => refresh(false)} disabled={syncing}>
               {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />} Sync
@@ -247,51 +363,67 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
 
       {/* KPIs */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi icon={PackageCheck} label="Received vs distributed" value={`${fmt(summary.totals.received)} / ${fmt(summary.totals.issuedToFlhf)}`}
+        <Kpi icon={PackageCheck} label="Received vs distributed" docId="received-distributed" value={`${fmt(summary.totals.received)} / ${fmt(summary.totals.issuedToFlhf)}`}
           sub={`Net usable ${fmt(summary.totals.netUsable)} · to CDDs ${fmt(summary.totals.issuedToCdd)}`}
           hint="Total units logged at LGA level (Level 1) versus total units dispatched down to health facilities (Level 2) and CDDs (Level 3)." />
-        <Kpi icon={TrendingDown} label="Wastage / stock loss" value={pctf(summary.wastageRate)} tone={summary.wastageRate > 0.05 ? "danger" : "success"}
+        <Kpi icon={TrendingDown} label="Wastage / stock loss" docId="wastage" value={pctf(summary.wastageRate)} tone={summary.wastageRate > 0.05 ? "danger" : "success"}
           sub={`${fmt(summary.totals.damaged)} units damaged / expired on arrival`}
           hint="Share of received stock recorded as damaged, expired or otherwise unusable on arrival at the LGA store." />
-        <Kpi icon={Boxes} label="Tiered stock balance" value={fmt(summary.totals.lgaBalance + summary.totals.flhfBalance)}
+        <Kpi icon={Boxes} label="Tiered stock balance" docId="balances" value={fmt(summary.totals.lgaBalance + summary.totals.flhfBalance)}
           sub={`LGA warehouses ${fmt(summary.totals.lgaBalance)} · facility stores ${fmt(summary.totals.flhfBalance)}`}
           hint="Live remaining stock: LGA balance = net usable received − issued to facilities; facility balance = received − issued to CDDs." />
-        <Kpi icon={ShieldAlert} label="Stockout vulnerability" value={`${summary.stockoutIndex.atRisk} (${pctf(summary.stockoutIndex.pct)})`}
+        <Kpi icon={ShieldAlert} label="Stockout vulnerability" docId="stockout" value={`${summary.stockoutIndex.atRisk} (${pctf(summary.stockoutIndex.pct)})`}
           tone={summary.stockoutIndex.pct > 0.2 ? "danger" : "warn"}
           sub={`${summary.stockoutIndex.stockout} at zero stock of ${summary.stockoutIndex.facilities} facilities`}
           hint="Health facilities reporting zero or critically low inventory ahead of the MDA round (balance ≤ 0, or under 15% of what they received)." />
-        <Kpi icon={Route} label="Downstream push rate" value={pctf(summary.pushRate)} tone={summary.pushRate < 0.6 ? "warn" : "success"}
+        <Kpi icon={Route} label="Downstream push rate" docId="push-rate" value={pctf(summary.pushRate)} tone={summary.pushRate < 0.6 ? "warn" : "success"}
           sub={`${pctf(summary.pushRateOnTime)} of batches pushed within ${summary.targetWindowDays} days`}
           hint="Proportion of usable LGA stock disbursed to frontline health facilities, plus the share of batches moved within the target timeframe." />
-        <Kpi icon={Timer} label="Cascade lead time" value={summary.leadTimes[1].avgDays !== null ? `${summary.leadTimes[1].avgDays!.toFixed(1)} d` : "—"}
+        <Kpi icon={Timer} label="Cascade lead time" docId="lead-time" value={summary.leadTimes[1].avgDays !== null ? `${summary.leadTimes[1].avgDays!.toFixed(1)} d` : "—"}
           sub={`State→LGA ${summary.leadTimes[0].avgDays?.toFixed(1) ?? "—"} d · FLHF→CDD ${summary.leadTimes[2].avgDays?.toFixed(1) ?? "—"} d`}
           hint="Average days a batch takes to move through each tier. State → LGA uses the dispatch date entered with allocations." />
-        <Kpi icon={CalendarClock} label="Expiry exposure" value={`${summary.expiry.expired + summary.expiry.within90}`} tone={summary.expiry.expired ? "danger" : "warn"}
+        <Kpi icon={CalendarClock} label="Expiry exposure" docId="expiry-exposure" value={`${summary.expiry.expired + summary.expiry.within90}`} tone={summary.expiry.expired ? "danger" : "warn"}
           sub={`${summary.expiry.expired} expired · ${summary.expiry.within90} within 90 days · ${fmt(summary.expiry.unitsAtRisk)} units at risk`}
           hint="Batches already expired or expiring within 90 days, with the units still un-dispatched in those batches." />
-        <Kpi icon={ClipboardCheck} label="Proof-of-delivery compliance" value={pctf(summary.podCompliance.overall)}
+        <Kpi icon={ClipboardCheck} label="Proof-of-delivery compliance" docId="pod" value={pctf(summary.podCompliance.overall)}
           tone={summary.podCompliance.overall > 0.85 ? "success" : "warn"}
           sub={`L1 ${pctf(summary.podCompliance.l1)} · L2 ${pctf(summary.podCompliance.l2)} · L3 ${pctf(summary.podCompliance.l3)}`}
           hint="Share of transactions carrying a verified waybill photo, EDO acknowledgment signature, facility confirmation signature or CDD receipt photo." />
-        <Kpi icon={ShieldAlert} label="Transit shrinkage rate" value={pctf(integrity.shrinkage.overall.rate)}
+        <Kpi icon={ShieldAlert} label="Transit shrinkage rate" docId="shrinkage" onClick={() => setDrillKey("shrinkage")} value={pctf(integrity.shrinkage.overall.rate)}
           tone={integrity.shrinkage.overall.rate > 0.05 ? "danger" : integrity.shrinkage.overall.rate > 0.02 ? "warn" : "success"}
           sub={`${fmt(integrity.shrinkage.overall.variance)} units unaccounted across ${integrity.shrinkage.legs.length} cascade legs`}
           hint="(Quantity issued upstream − quantity confirmed received downstream) ÷ quantity issued, aggregated over every cascade leg. Positive values flag stock lost, diverted or unrecorded in transit." />
-        <Kpi icon={CalendarClock} label={`Expiry risk index (${expiryWindow}d)`} value={pctf(integrity.expiryRisk.index)}
+        <Kpi icon={CalendarClock} label={`Expiry risk index (${expiryWindow}d)`} docId="expiry-risk" onClick={() => setDrillKey("expiry")} value={pctf(integrity.expiryRisk.index)}
           tone={integrity.expiryRisk.index > 0.15 ? "danger" : integrity.expiryRisk.index > 0.05 ? "warn" : "success"}
           sub={`${fmt(integrity.expiryRisk.stockAtRisk)} of ${fmt(integrity.expiryRisk.totalStock)} units on hand are short-dated`}
           hint={`Share of stock currently sitting at LGA or health facility stores that belongs to batches expiring within ${expiryWindow} days.`} />
-        <Kpi icon={Warehouse} label="Buffer retention ratio"
+        <Kpi icon={Warehouse} label="Buffer retention ratio" docId="buffer" onClick={() => setDrillKey("buffer")}
           value={integrity.buffer.ratio === null ? "—" : `${integrity.buffer.ratio.toFixed(2)} : 1`}
           tone={integrity.buffer.band === "balanced" ? "success" : integrity.buffer.band === "under-deployed" ? "danger" : "warn"}
           sub={`${fmt(integrity.buffer.retained)} retained vs ${fmt(integrity.buffer.deployedCdd)} deployed to CDDs · ${integrity.buffer.band}`}
           hint="Stock still held in LGA and facility warehouses relative to stock already deployed to CDDs — measured up to the campaign kickoff date when one is set." />
-        <Kpi icon={Scale} label="Facility equity index (CV)"
+        <Kpi icon={Scale} label="Facility equity index (CV)" docId="equity" onClick={() => setDrillKey("equity")}
           value={integrity.equity.rows.length ? integrity.equity.weightedCv.toFixed(2) : "—"}
           tone={integrity.equity.weightedCv <= 0.25 ? "success" : integrity.equity.weightedCv <= 0.5 ? "warn" : "danger"}
           sub={`${integrity.equity.facilities} facilities across ${integrity.equity.lgas} LGAs compared`}
           hint="Coefficient of variation of medicine quantities issued to facilities within the same LGA. Low values mean an even spread; high values expose over-served and under-served catchment areas." />
       </div>
+
+      {/* Threshold-driven alerts */}
+      <MedicineAlertsPanel
+        alerts={alerts}
+        thresholds={thresholds}
+        onThresholds={setThresholds}
+        scope={scopeLabel}
+        onDrill={(k) => setDrillKey(k)}
+      />
+
+      <MedicineDrilldownDialog
+        report={drillKey ? reports[drillKey] : null}
+        onOpenChange={(o) => { if (!o) setDrillKey(null); }}
+      />
+
+
 
 
       {/* Allocation fulfilment */}
