@@ -648,7 +648,18 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
           </Card>
         </TabsContent>
 
+        <TabsContent value="supply" className="mt-4">
+          <SupplyIntegrityPanel
+            integrity={integrity}
+            expiryWindow={expiryWindow}
+            onExpiryWindow={setExpiryWindow}
+            kickoff={kickoff}
+            onKickoff={setKickoff}
+          />
+        </TabsContent>
+
         <TabsContent value="integrity" className="mt-4">
+
           <ChecklistReconciliation cache={checklistCache} canExport={canExport} />
         </TabsContent>
       </Tabs>
