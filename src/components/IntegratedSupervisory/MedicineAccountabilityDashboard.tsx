@@ -59,8 +59,10 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 function Kpi({
-  icon: Icon, label, value, sub, tone = "primary", hint, docId, onClick,
-}: { icon: any; label: string; value: string; sub?: string; tone?: string; hint?: string; docId?: string; onClick?: () => void }) {
+  icon: Icon, label, value, sub, tone = "primary", hint, docId, onClick, flags,
+}: { icon: any; label: string; value: string; sub?: string; tone?: string; hint?: string; docId?: string; onClick?: () => void; flags?: DqFlag[] }) {
+  const dqTone = flagTone(flags);
+  if (dqTone === "danger") tone = "danger";
   const toneCls =
     tone === "danger" ? "border-destructive/40 bg-destructive/5" :
     tone === "warn" ? "border-amber-300 bg-amber-50" :
