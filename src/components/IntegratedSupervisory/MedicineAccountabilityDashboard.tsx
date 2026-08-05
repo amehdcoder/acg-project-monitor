@@ -392,48 +392,81 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
         </CardContent>
       </Card>
 
+      {/* Data-quality validation banner */}
+      <Card className={dq.issues.length ? "border-amber-300 bg-amber-50/60" : "border-emerald-300 bg-emerald-50/60"}>
+        <CardContent className="p-3 flex flex-wrap items-center gap-3">
+          {dq.issues.length ? (
+            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+          )}
+          <div className="min-w-[220px]">
+            <p className="text-xs font-semibold">
+              {dq.issues.length
+                ? `${dq.issues.length.toLocaleString()} data-quality issue${dq.issues.length === 1 ? "" : "s"} detected`
+                : "Data-quality checks passed"}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              {dq.affectedRecords.toLocaleString()} of {dq.totalRecords.toLocaleString()} records affected ·{" "}
+              {pctf(dq.cleanRate)} clean
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {(Object.keys(dq.counts) as (keyof typeof dq.counts)[]).filter((c) => dq.counts[c] > 0).map((c) => (
+              <Badge key={c} variant="outline" className="text-[10px] border-amber-400 text-amber-700">
+                {DQ_LABELS[c]}: {dq.counts[c].toLocaleString()}
+              </Badge>
+            ))}
+          </div>
+          <Button size="sm" variant="outline" className="h-8 text-xs ml-auto"
+            disabled={!dq.issues.length} onClick={() => setDqOpen(true)}>
+            <ShieldAlert className="h-3.5 w-3.5 mr-1" /> Review records
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* KPIs */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi icon={PackageCheck} label="Received vs distributed" docId="received-distributed" value={`${fmt(summary.totals.received)} / ${fmt(summary.totals.issuedToFlhf)}`}
+        <Kpi icon={PackageCheck} label="Received vs distributed" docId="received-distributed" flags={dq.byKpi["received-distributed"]} value={`${fmt(summary.totals.received)} / ${fmt(summary.totals.issuedToFlhf)}`}
           sub={`Net usable ${fmt(summary.totals.netUsable)} · to CDDs ${fmt(summary.totals.issuedToCdd)}`}
           hint="Total units logged at LGA level (Level 1) versus total units dispatched down to health facilities (Level 2) and CDDs (Level 3)." />
-        <Kpi icon={TrendingDown} label="Wastage / stock loss" docId="wastage" value={pctf(summary.wastageRate)} tone={summary.wastageRate > 0.05 ? "danger" : "success"}
+        <Kpi icon={TrendingDown} label="Wastage / stock loss" docId="wastage" flags={dq.byKpi["wastage"]} value={pctf(summary.wastageRate)} tone={summary.wastageRate > 0.05 ? "danger" : "success"}
           sub={`${fmt(summary.totals.damaged)} units damaged / expired on arrival`}
           hint="Share of received stock recorded as damaged, expired or otherwise unusable on arrival at the LGA store." />
-        <Kpi icon={Boxes} label="Tiered stock balance" docId="balances" value={fmt(summary.totals.lgaBalance + summary.totals.flhfBalance)}
+        <Kpi icon={Boxes} label="Tiered stock balance" docId="balances" flags={dq.byKpi["balances"]} value={fmt(summary.totals.lgaBalance + summary.totals.flhfBalance)}
           sub={`LGA warehouses ${fmt(summary.totals.lgaBalance)} · facility stores ${fmt(summary.totals.flhfBalance)}`}
           hint="Live remaining stock: LGA balance = net usable received − issued to facilities; facility balance = received − issued to CDDs." />
-        <Kpi icon={ShieldAlert} label="Stockout vulnerability" docId="stockout" value={`${summary.stockoutIndex.atRisk} (${pctf(summary.stockoutIndex.pct)})`}
+        <Kpi icon={ShieldAlert} label="Stockout vulnerability" docId="stockout" flags={dq.byKpi["stockout"]} value={`${summary.stockoutIndex.atRisk} (${pctf(summary.stockoutIndex.pct)})`}
           tone={summary.stockoutIndex.pct > 0.2 ? "danger" : "warn"}
           sub={`${summary.stockoutIndex.stockout} at zero stock of ${summary.stockoutIndex.facilities} facilities`}
           hint="Health facilities reporting zero or critically low inventory ahead of the MDA round (balance ≤ 0, or under 15% of what they received)." />
-        <Kpi icon={Route} label="Downstream push rate" docId="push-rate" value={pctf(summary.pushRate)} tone={summary.pushRate < 0.6 ? "warn" : "success"}
+        <Kpi icon={Route} label="Downstream push rate" docId="push-rate" flags={dq.byKpi["push-rate"]} value={pctf(summary.pushRate)} tone={summary.pushRate < 0.6 ? "warn" : "success"}
           sub={`${pctf(summary.pushRateOnTime)} of batches pushed within ${summary.targetWindowDays} days`}
           hint="Proportion of usable LGA stock disbursed to frontline health facilities, plus the share of batches moved within the target timeframe." />
-        <Kpi icon={Timer} label="Cascade lead time" docId="lead-time" value={summary.leadTimes[1].avgDays !== null ? `${summary.leadTimes[1].avgDays!.toFixed(1)} d` : "—"}
+        <Kpi icon={Timer} label="Cascade lead time" docId="lead-time" flags={dq.byKpi["lead-time"]} value={summary.leadTimes[1].avgDays !== null ? `${summary.leadTimes[1].avgDays!.toFixed(1)} d` : "—"}
           sub={`State→LGA ${summary.leadTimes[0].avgDays?.toFixed(1) ?? "—"} d · FLHF→CDD ${summary.leadTimes[2].avgDays?.toFixed(1) ?? "—"} d`}
           hint="Average days a batch takes to move through each tier. State → LGA uses the dispatch date entered with allocations." />
-        <Kpi icon={CalendarClock} label="Expiry exposure" docId="expiry-exposure" value={`${summary.expiry.expired + summary.expiry.within90}`} tone={summary.expiry.expired ? "danger" : "warn"}
+        <Kpi icon={CalendarClock} label="Expiry exposure" docId="expiry-exposure" flags={dq.byKpi["expiry-exposure"]} value={`${summary.expiry.expired + summary.expiry.within90}`} tone={summary.expiry.expired ? "danger" : "warn"}
           sub={`${summary.expiry.expired} expired · ${summary.expiry.within90} within 90 days · ${fmt(summary.expiry.unitsAtRisk)} units at risk`}
           hint="Batches already expired or expiring within 90 days, with the units still un-dispatched in those batches." />
-        <Kpi icon={ClipboardCheck} label="Proof-of-delivery compliance" docId="pod" value={pctf(summary.podCompliance.overall)}
+        <Kpi icon={ClipboardCheck} label="Proof-of-delivery compliance" docId="pod" flags={dq.byKpi["pod"]} value={pctf(summary.podCompliance.overall)}
           tone={summary.podCompliance.overall > 0.85 ? "success" : "warn"}
           sub={`L1 ${pctf(summary.podCompliance.l1)} · L2 ${pctf(summary.podCompliance.l2)} · L3 ${pctf(summary.podCompliance.l3)}`}
           hint="Share of transactions carrying a verified waybill photo, EDO acknowledgment signature, facility confirmation signature or CDD receipt photo." />
-        <Kpi icon={ShieldAlert} label="Transit shrinkage rate" docId="shrinkage" onClick={() => setDrillKey("shrinkage")} value={pctf(integrity.shrinkage.overall.rate)}
+        <Kpi icon={ShieldAlert} label="Transit shrinkage rate" docId="shrinkage" flags={dq.byKpi["shrinkage"]} onClick={() => setDrillKey("shrinkage")} value={pctf(integrity.shrinkage.overall.rate)}
           tone={integrity.shrinkage.overall.rate > 0.05 ? "danger" : integrity.shrinkage.overall.rate > 0.02 ? "warn" : "success"}
           sub={`${fmt(integrity.shrinkage.overall.variance)} units unaccounted across ${integrity.shrinkage.legs.length} cascade legs`}
           hint="(Quantity issued upstream − quantity confirmed received downstream) ÷ quantity issued, aggregated over every cascade leg. Positive values flag stock lost, diverted or unrecorded in transit." />
-        <Kpi icon={CalendarClock} label={`Expiry risk index (${expiryWindow}d)`} docId="expiry-risk" onClick={() => setDrillKey("expiry")} value={pctf(integrity.expiryRisk.index)}
+        <Kpi icon={CalendarClock} label={`Expiry risk index (${expiryWindow}d)`} docId="expiry-risk" flags={dq.byKpi["expiry-risk"]} onClick={() => setDrillKey("expiry")} value={pctf(integrity.expiryRisk.index)}
           tone={integrity.expiryRisk.index > 0.15 ? "danger" : integrity.expiryRisk.index > 0.05 ? "warn" : "success"}
           sub={`${fmt(integrity.expiryRisk.stockAtRisk)} of ${fmt(integrity.expiryRisk.totalStock)} units on hand are short-dated`}
           hint={`Share of stock currently sitting at LGA or health facility stores that belongs to batches expiring within ${expiryWindow} days.`} />
-        <Kpi icon={Warehouse} label="Buffer retention ratio" docId="buffer" onClick={() => setDrillKey("buffer")}
+        <Kpi icon={Warehouse} label="Buffer retention ratio" docId="buffer" flags={dq.byKpi["buffer"]} onClick={() => setDrillKey("buffer")}
           value={integrity.buffer.ratio === null ? "—" : `${integrity.buffer.ratio.toFixed(2)} : 1`}
           tone={integrity.buffer.band === "balanced" ? "success" : integrity.buffer.band === "under-deployed" ? "danger" : "warn"}
           sub={`${fmt(integrity.buffer.retained)} retained vs ${fmt(integrity.buffer.deployedCdd)} deployed to CDDs · ${integrity.buffer.band}`}
           hint="Stock still held in LGA and facility warehouses relative to stock already deployed to CDDs — measured up to the campaign kickoff date when one is set." />
-        <Kpi icon={Scale} label="Facility equity index (CV)" docId="equity" onClick={() => setDrillKey("equity")}
+        <Kpi icon={Scale} label="Facility equity index (CV)" docId="equity" flags={dq.byKpi["equity"]} onClick={() => setDrillKey("equity")}
           value={integrity.equity.rows.length ? integrity.equity.weightedCv.toFixed(2) : "—"}
           tone={integrity.equity.weightedCv <= 0.25 ? "success" : integrity.equity.weightedCv <= 0.5 ? "warn" : "danger"}
           sub={`${integrity.equity.facilities} facilities across ${integrity.equity.lgas} LGAs compared`}
@@ -452,6 +485,11 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
       <MedicineDrilldownDialog
         report={drillKey ? reports[drillKey] : null}
         onOpenChange={(o) => { if (!o) setDrillKey(null); }}
+      />
+
+      <MedicineDrilldownDialog
+        report={dqOpen ? dqReport : null}
+        onOpenChange={(o) => { if (!o) setDqOpen(false); }}
       />
 
 
