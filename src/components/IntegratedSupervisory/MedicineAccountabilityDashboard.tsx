@@ -105,13 +105,25 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
 
   const dataset = useMemo(() => parseLogistics(cache?.results ?? []), [cache]);
   const filtered = useMemo(() => applyFilters(dataset, filters), [dataset, filters]);
-  const summary = useMemo(
-    () => computeAccountability(filtered, allocations.filter((a) =>
+  const scopedAllocations = useMemo(
+    () => allocations.filter((a) =>
       (!filters.state || a.state === filters.state) &&
       (!filters.lga || !a.lga || a.lga === filters.lga) &&
-      (!filters.medicine || a.medicine === filters.medicine)), { targetWindowDays: targetWindow }),
-    [filtered, allocations, filters, targetWindow],
+      (!filters.medicine || a.medicine === filters.medicine)),
+    [allocations, filters],
   );
+  const summary = useMemo(
+    () => computeAccountability(filtered, scopedAllocations, { targetWindowDays: targetWindow }),
+    [filtered, scopedAllocations, targetWindow],
+  );
+  const integrity = useMemo(
+    () => computeSupplyIntegrity(filtered, scopedAllocations, summary, {
+      expiryWindowDays: expiryWindow,
+      kickoffDate: kickoff || undefined,
+    }),
+    [filtered, scopedAllocations, summary, expiryWindow, kickoff],
+  );
+
 
   const allRows = [...dataset.receipts, ...dataset.issues, ...dataset.cddIssues];
   const states = useMemo(() => Array.from(new Set(allRows.map((r) => r.state).filter(Boolean))).sort(), [dataset]);
