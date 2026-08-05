@@ -218,16 +218,29 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
     [filtered, scopedAllocations, summary, expiryWindow, kickoff],
   );
 
+  /* ── data-quality validation ───────────────────────────────────────────── */
+  const dq = useMemo(
+    () => assessDataQuality(filtered, scopedAllocations, summary, integrity),
+    [filtered, scopedAllocations, summary, integrity],
+  );
+
   /* ── drill-downs, alerts & exports ─────────────────────────────────────── */
   const [thresholds, setThresholds] = useState<AlertThresholds>(() => loadThresholds());
   const [drillKey, setDrillKey] = useState<DrillKey | null>(null);
 
+  const DRILL_DOC: Record<DrillKey, string> = {
+    shrinkage: "shrinkage", expiry: "expiry-risk", buffer: "buffer", equity: "equity",
+  };
+
   const reports = useMemo(() => {
     const keys: DrillKey[] = ["shrinkage", "expiry", "buffer", "equity"];
     const map = {} as Record<DrillKey, DrillReport>;
-    for (const k of keys) map[k] = buildDrilldown(k, filtered, scopedAllocations, summary, integrity);
+    for (const k of keys) {
+      const report = buildDrilldown(k, filtered, scopedAllocations, summary, integrity);
+      map[k] = { ...report, tables: [...report.tables, dataQualityTable(dq, DRILL_DOC[k])] };
+    }
     return map;
-  }, [filtered, scopedAllocations, summary, integrity]);
+  }, [filtered, scopedAllocations, summary, integrity, dq]);
 
   const scopeLabel = useMemo(() => {
     const bits = [
