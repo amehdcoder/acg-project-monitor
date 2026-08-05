@@ -78,16 +78,29 @@ function Kpi({
     >
       <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         <Icon className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{label}</span>
+        {dqTone && (
+          <AlertTriangle className={`h-3.5 w-3.5 shrink-0 ${dqTone === "danger" ? "text-destructive" : "text-amber-500"}`} />
+        )}
         {onClick && <Maximize2 className="h-3 w-3 ml-auto shrink-0 opacity-60" />}
       </div>
       <p className="font-display text-2xl font-bold leading-tight mt-1">{value}</p>
       {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
+      {flags?.length ? (
+        <p className={`mt-1 text-[10px] font-medium leading-snug ${dqTone === "danger" ? "text-destructive" : "text-amber-600"}`}>
+          {flags.slice(0, 2).map((f) => (f.category === "zero_division"
+            ? "Undefined — zero denominator"
+            : `${DQ_LABELS[f.category]}: ${f.count.toLocaleString()}`)).join(" · ")}
+          {flags.length > 2 ? ` · +${flags.length - 2} more` : ""}
+        </p>
+      ) : null}
       {onClick && <p className="text-[10px] text-primary mt-1 font-medium">Click to drill down</p>}
     </div>
   );
-  const tip = doc
-    ? `${doc.definition}\n\nFormula: ${doc.formula}${doc.quality.length ? `\n\nData quality: ${doc.quality.join(" ")}` : ""}`
-    : hint;
+  const dqTip = flagSummary(flags);
+  const tip = [
+    doc ? `${doc.definition}\n\nFormula: ${doc.formula}${doc.quality.length ? `\n\nData quality: ${doc.quality.join(" ")}` : ""}` : hint,
+    dqTip ? `Data-quality validation:\n${dqTip}` : "",
+  ].filter(Boolean).join("\n\n");
   if (!tip) return body;
   return (
     <TooltipProvider>
