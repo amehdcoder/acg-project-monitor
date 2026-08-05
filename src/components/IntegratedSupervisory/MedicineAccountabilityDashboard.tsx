@@ -36,6 +36,9 @@ import {
   buildDrilldown, evaluateAlerts, loadThresholds, type AlertThresholds, type DrillKey, type DrillReport,
 } from "@/lib/isc/medicineDrilldown";
 import { DOC_GROUPS, KPI_DOCS, kpiDoc } from "@/lib/isc/medicineKpiDocs";
+import {
+  assessDataQuality, dataQualityTable, flagSummary, flagTone, DQ_LABELS, type DqFlag,
+} from "@/lib/isc/medicineDataQuality";
 import { computeReconciliation } from "@/lib/isc/reconciliationReport";
 import {
   exportAccountabilityCsv, exportAccountabilityPdf, exportReconciliationCsv, exportReconciliationPdf,
