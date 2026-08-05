@@ -683,9 +683,12 @@ Deno.serve(async (req) => {
     }
 
     if (action === "retry_submission") {
+      const forbid = await ensureAdmin();
+      if (forbid) return forbid;
       try {
         const { kobo_uuid } = params;
         if (!kobo_uuid) return j({ success: false, error: "Missing kobo_uuid" }, 200);
+
 
         const { data: evt, error: evtErr } = await admin
           .from("kobo_webhook_events")
