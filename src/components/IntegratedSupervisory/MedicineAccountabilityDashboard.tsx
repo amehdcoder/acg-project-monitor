@@ -18,8 +18,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip as UiTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Activity, AlertTriangle, Boxes, CalendarClock, CheckCircle2, ClipboardCheck, Download, Filter,
-  Gauge, Loader2, PackageCheck, PackageX, PlugZap, RefreshCw, Route, ShieldAlert, Timer, TrendingDown, Truck,
+  Gauge, Loader2, PackageCheck, PackageX, PlugZap, RefreshCw, Route, Scale, ShieldAlert, Timer,
+  TrendingDown, Truck, Warehouse,
 } from "lucide-react";
+
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
