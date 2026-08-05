@@ -200,6 +200,39 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
     [filtered, scopedAllocations, summary, expiryWindow, kickoff],
   );
 
+  /* ── drill-downs, alerts & exports ─────────────────────────────────────── */
+  const [thresholds, setThresholds] = useState<AlertThresholds>(() => loadThresholds());
+  const [drillKey, setDrillKey] = useState<DrillKey | null>(null);
+
+  const reports = useMemo(() => {
+    const keys: DrillKey[] = ["shrinkage", "expiry", "buffer", "equity"];
+    const map = {} as Record<DrillKey, DrillReport>;
+    for (const k of keys) map[k] = buildDrilldown(k, filtered, scopedAllocations, summary, integrity);
+    return map;
+  }, [filtered, scopedAllocations, summary, integrity]);
+
+  const scopeLabel = useMemo(() => {
+    const bits = [
+      filters.state ?? "All states",
+      filters.lga ? `${filters.lga} LGA` : null,
+      filters.medicine ? medicineLabel(filters.medicine) : "All medicines",
+      filters.from || filters.to ? `${filters.from || "start"} → ${filters.to || "today"}` : null,
+    ].filter(Boolean);
+    return bits.join(" · ");
+  }, [filters]);
+
+  const alerts = useMemo(() => evaluateAlerts(integrity, {
+    shrinkageLga: reports.shrinkage.tables.find((t) => t.id === "lga")?.rows,
+    expiryLga: reports.expiry.tables.find((t) => t.id === "lga")?.rows,
+    bufferLga: reports.buffer.tables.find((t) => t.id === "lga")?.rows,
+  }, thresholds), [integrity, reports, thresholds]);
+
+  const recon = useMemo(() => computeReconciliation(checklistCache ?? null), [checklistCache]);
+
+  const exportBundle = () => ({
+    summary, integrity, alerts, scope: scopeLabel,
+    drilldowns: [reports.shrinkage, reports.expiry, reports.buffer, reports.equity],
+  });
 
   const allRows = [...dataset.receipts, ...dataset.issues, ...dataset.cddIssues];
   const states = useMemo(() => Array.from(new Set(allRows.map((r) => r.state).filter(Boolean))).sort(), [dataset]);
@@ -211,21 +244,6 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
 
   const persistAllocations = (rows: Allocation[]) => { setAllocations(rows); saveAllocations(rows); };
 
-  const exportCsv = () => {
-    const head = ["Level", "State", "LGA", "Medicine", "Allocated", "Received", "Damaged", "Net usable", "Issued to FLHF", "Issued to CDD", "LGA balance", "FLHF balance", "Wastage %", "Push rate %"];
-    const rows = [
-      ...summary.byState.map((r) => ["State", r.state, "", "All", r.allocated, r.received, r.damaged, r.netUsable, r.issuedToFlhf, r.issuedToCdd, r.lgaBalance, r.flhfBalance, (r.wastageRate * 100).toFixed(2), (r.pushRate * 100).toFixed(2)]),
-      ...summary.byLga.map((r) => ["LGA", r.state, r.lga, "All", r.allocated, r.received, r.damaged, r.netUsable, r.issuedToFlhf, r.issuedToCdd, r.lgaBalance, r.flhfBalance, (r.wastageRate * 100).toFixed(2), (r.pushRate * 100).toFixed(2)]),
-      ...summary.byMedicine.map((r) => ["Medicine", "", "", medicineLabel(r.medicine), r.allocated, r.received, r.damaged, r.netUsable, r.issuedToFlhf, r.issuedToCdd, r.lgaBalance, r.flhfBalance, (r.wastageRate * 100).toFixed(2), (r.pushRate * 100).toFixed(2)]),
-    ];
-    const csv = [head, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `medicine-accountability-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   const connected = !!loadMedLogConfig()?.formUid;
   const medChart = summary.byMedicine.map((m) => ({
