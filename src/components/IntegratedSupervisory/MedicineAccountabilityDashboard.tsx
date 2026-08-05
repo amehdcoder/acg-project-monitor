@@ -111,13 +111,8 @@ function KpiDocsDrawer() {
                     <p className="text-xs font-semibold">{d.label}</p>
                     <p className="text-[11px] text-muted-foreground mt-1">{d.definition}</p>
                     <p className="mt-1.5 rounded bg-muted/50 px-2 py-1 font-mono text-[10px] leading-snug break-words">{d.formula}</p>
-                    {d.bands?.length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {d.bands.map((b, i) => (
-                          <Badge key={i} variant="outline" className="text-[10px]">{b.label}: {b.range}</Badge>
-                        ))}
-                      </div>
-                    )}
+                    <p className="mt-1.5 text-[10px] text-foreground/80"><span className="font-semibold">How to read it: </span>{d.interpretation}</p>
+
                     {d.quality.length > 0 && (
                       <ul className="mt-1.5 space-y-0.5">
                         {d.quality.map((q, i) => (
