@@ -409,6 +409,22 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
           hint="Coefficient of variation of medicine quantities issued to facilities within the same LGA. Low values mean an even spread; high values expose over-served and under-served catchment areas." />
       </div>
 
+      {/* Threshold-driven alerts */}
+      <MedicineAlertsPanel
+        alerts={alerts}
+        thresholds={thresholds}
+        onThresholds={setThresholds}
+        scope={scopeLabel}
+        onDrill={(k) => setDrillKey(k)}
+      />
+
+      <MedicineDrilldownDialog
+        report={drillKey ? reports[drillKey] : null}
+        onOpenChange={(o) => { if (!o) setDrillKey(null); }}
+      />
+
+
+
 
       {/* Allocation fulfilment */}
       {summary.totals.allocated > 0 && (
