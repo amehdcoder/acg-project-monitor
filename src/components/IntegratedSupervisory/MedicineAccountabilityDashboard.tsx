@@ -47,27 +47,94 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 function Kpi({
-  icon: Icon, label, value, sub, tone = "primary", hint,
-}: { icon: any; label: string; value: string; sub?: string; tone?: string; hint?: string }) {
+  icon: Icon, label, value, sub, tone = "primary", hint, docId, onClick,
+}: { icon: any; label: string; value: string; sub?: string; tone?: string; hint?: string; docId?: string; onClick?: () => void }) {
   const toneCls =
     tone === "danger" ? "border-destructive/40 bg-destructive/5" :
     tone === "warn" ? "border-amber-300 bg-amber-50" :
     tone === "success" ? "border-emerald-300 bg-emerald-50" : "border-primary/30 bg-primary/5";
+  const doc = docId ? kpiDoc(docId) : undefined;
+  const body = (
+    <div
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
+      className={`rounded-xl border p-3 ${toneCls} ${onClick ? "cursor-pointer transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/40" : ""}`}
+    >
+      <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <Icon className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{label}</span>
+        {onClick && <Maximize2 className="h-3 w-3 ml-auto shrink-0 opacity-60" />}
+      </div>
+      <p className="font-display text-2xl font-bold leading-tight mt-1">{value}</p>
+      {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
+      {onClick && <p className="text-[10px] text-primary mt-1 font-medium">Click to drill down</p>}
+    </div>
+  );
+  const tip = doc
+    ? `${doc.definition}\n\nFormula: ${doc.formula}${doc.quality.length ? `\n\nData quality: ${doc.quality.join(" ")}` : ""}`
+    : hint;
+  if (!tip) return body;
   return (
     <TooltipProvider>
       <UiTooltip>
-        <TooltipTrigger asChild>
-          <div className={`rounded-xl border p-3 ${toneCls}`}>
-            <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              <Icon className="h-3.5 w-3.5" /> <span className="truncate">{label}</span>
-            </div>
-            <p className="font-display text-2xl font-bold leading-tight mt-1">{value}</p>
-            {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
-          </div>
-        </TooltipTrigger>
-        {hint && <TooltipContent className="max-w-xs text-xs">{hint}</TooltipContent>}
+        <TooltipTrigger asChild>{body}</TooltipTrigger>
+        <TooltipContent className="max-w-sm text-xs whitespace-pre-line">{tip}</TooltipContent>
       </UiTooltip>
     </TooltipProvider>
+  );
+}
+
+/** Documentation drawer listing every KPI definition, formula and caveat. */
+function KpiDocsDrawer() {
+  return (
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button variant="outline" size="sm"><BookOpen className="h-4 w-4 mr-1" /> KPI guide</Button>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="text-base">Indicator definitions & data-quality notes</SheetTitle>
+          <p className="text-xs text-muted-foreground">
+            Every indicator on this dashboard, with the exact formula used, how to interpret the value, and the data
+            conditions that can distort it.
+          </p>
+        </SheetHeader>
+        <div className="mt-4 space-y-5">
+          {DOC_GROUPS.map((g) => (
+            <section key={g.id}>
+              <h3 className="text-xs font-bold uppercase tracking-wide text-primary">{g.label}</h3>
+              <p className="text-[11px] text-muted-foreground mb-2">{g.blurb}</p>
+              <div className="space-y-2">
+                {KPI_DOCS.filter((d) => d.group === g.id).map((d) => (
+                  <div key={d.id} className="rounded-lg border p-3">
+                    <p className="text-xs font-semibold">{d.label}</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">{d.definition}</p>
+                    <p className="mt-1.5 rounded bg-muted/50 px-2 py-1 font-mono text-[10px] leading-snug break-words">{d.formula}</p>
+                    {d.bands?.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {d.bands.map((b, i) => (
+                          <Badge key={i} variant="outline" className="text-[10px]">{b.label}: {b.range}</Badge>
+                        ))}
+                      </div>
+                    )}
+                    {d.quality.length > 0 && (
+                      <ul className="mt-1.5 space-y-0.5">
+                        {d.quality.map((q, i) => (
+                          <li key={i} className="text-[10px] text-muted-foreground flex gap-1">
+                            <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5 text-amber-500" />{q}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
