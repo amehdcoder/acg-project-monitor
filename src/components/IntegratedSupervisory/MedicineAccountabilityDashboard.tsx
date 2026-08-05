@@ -25,13 +25,15 @@ import {
 } from "recharts";
 import { toast } from "@/hooks/use-toast";
 import {
-  applyFilters, computeAccountability, loadAllocations, medicineLabel, parseLogistics, saveAllocations,
-  type Allocation, type Filters,
+  applyFilters, computeAccountability, computeSupplyIntegrity, loadAllocations, medicineLabel, parseLogistics,
+  saveAllocations, type Allocation, type Filters,
 } from "@/lib/isc/medicineAccountability";
 import { loadMedLogCache, loadMedLogConfig, syncMedLog } from "./medicineKoboClient";
 import MedicineKoboConnectDialog from "./MedicineKoboConnectDialog";
 import MedicineAllocationDialog from "./MedicineAllocationDialog";
+import SupplyIntegrityPanel from "./SupplyIntegrityPanel";
 import ChecklistReconciliation from "./ChecklistReconciliation";
+
 import type { KoboCache } from "./koboClient";
 
 const fmt = (n: number) => Math.round(n).toLocaleString();
