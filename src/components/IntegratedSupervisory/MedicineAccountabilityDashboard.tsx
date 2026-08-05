@@ -18,20 +18,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip as UiTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Activity, AlertTriangle, Boxes, CalendarClock, CheckCircle2, ClipboardCheck, Download, Filter,
-  Gauge, Loader2, PackageCheck, PackageX, PlugZap, RefreshCw, Route, ShieldAlert, Timer, TrendingDown, Truck,
+  Gauge, Loader2, PackageCheck, PackageX, PlugZap, RefreshCw, Route, Scale, ShieldAlert, Timer,
+  TrendingDown, Truck, Warehouse,
 } from "lucide-react";
+
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { toast } from "@/hooks/use-toast";
 import {
-  applyFilters, computeAccountability, loadAllocations, medicineLabel, parseLogistics, saveAllocations,
-  type Allocation, type Filters,
+  applyFilters, computeAccountability, computeSupplyIntegrity, loadAllocations, medicineLabel, parseLogistics,
+  saveAllocations, type Allocation, type Filters,
 } from "@/lib/isc/medicineAccountability";
 import { loadMedLogCache, loadMedLogConfig, syncMedLog } from "./medicineKoboClient";
 import MedicineKoboConnectDialog from "./MedicineKoboConnectDialog";
 import MedicineAllocationDialog from "./MedicineAllocationDialog";
+import SupplyIntegrityPanel from "./SupplyIntegrityPanel";
 import ChecklistReconciliation from "./ChecklistReconciliation";
+
 import type { KoboCache } from "./koboClient";
 
 const fmt = (n: number) => Math.round(n).toLocaleString();
@@ -77,6 +81,9 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
   const [allocations, setAllocations] = useState<Allocation[]>(() => loadAllocations());
   const [filters, setFilters] = useState<Filters>({});
   const [targetWindow, setTargetWindow] = useState(7);
+  const [expiryWindow, setExpiryWindow] = useState(60);
+  const [kickoff, setKickoff] = useState("");
+
 
   const refresh = useCallback(async (silent = false) => {
     const cfg = loadMedLogConfig();
@@ -100,13 +107,25 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
 
   const dataset = useMemo(() => parseLogistics(cache?.results ?? []), [cache]);
   const filtered = useMemo(() => applyFilters(dataset, filters), [dataset, filters]);
-  const summary = useMemo(
-    () => computeAccountability(filtered, allocations.filter((a) =>
+  const scopedAllocations = useMemo(
+    () => allocations.filter((a) =>
       (!filters.state || a.state === filters.state) &&
       (!filters.lga || !a.lga || a.lga === filters.lga) &&
-      (!filters.medicine || a.medicine === filters.medicine)), { targetWindowDays: targetWindow }),
-    [filtered, allocations, filters, targetWindow],
+      (!filters.medicine || a.medicine === filters.medicine)),
+    [allocations, filters],
   );
+  const summary = useMemo(
+    () => computeAccountability(filtered, scopedAllocations, { targetWindowDays: targetWindow }),
+    [filtered, scopedAllocations, targetWindow],
+  );
+  const integrity = useMemo(
+    () => computeSupplyIntegrity(filtered, scopedAllocations, summary, {
+      expiryWindowDays: expiryWindow,
+      kickoffDate: kickoff || undefined,
+    }),
+    [filtered, scopedAllocations, summary, expiryWindow, kickoff],
+  );
+
 
   const allRows = [...dataset.receipts, ...dataset.issues, ...dataset.cddIssues];
   const states = useMemo(() => Array.from(new Set(allRows.map((r) => r.state).filter(Boolean))).sort(), [dataset]);
@@ -254,7 +273,26 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
           tone={summary.podCompliance.overall > 0.85 ? "success" : "warn"}
           sub={`L1 ${pctf(summary.podCompliance.l1)} · L2 ${pctf(summary.podCompliance.l2)} · L3 ${pctf(summary.podCompliance.l3)}`}
           hint="Share of transactions carrying a verified waybill photo, EDO acknowledgment signature, facility confirmation signature or CDD receipt photo." />
+        <Kpi icon={ShieldAlert} label="Transit shrinkage rate" value={pctf(integrity.shrinkage.overall.rate)}
+          tone={integrity.shrinkage.overall.rate > 0.05 ? "danger" : integrity.shrinkage.overall.rate > 0.02 ? "warn" : "success"}
+          sub={`${fmt(integrity.shrinkage.overall.variance)} units unaccounted across ${integrity.shrinkage.legs.length} cascade legs`}
+          hint="(Quantity issued upstream − quantity confirmed received downstream) ÷ quantity issued, aggregated over every cascade leg. Positive values flag stock lost, diverted or unrecorded in transit." />
+        <Kpi icon={CalendarClock} label={`Expiry risk index (${expiryWindow}d)`} value={pctf(integrity.expiryRisk.index)}
+          tone={integrity.expiryRisk.index > 0.15 ? "danger" : integrity.expiryRisk.index > 0.05 ? "warn" : "success"}
+          sub={`${fmt(integrity.expiryRisk.stockAtRisk)} of ${fmt(integrity.expiryRisk.totalStock)} units on hand are short-dated`}
+          hint={`Share of stock currently sitting at LGA or health facility stores that belongs to batches expiring within ${expiryWindow} days.`} />
+        <Kpi icon={Warehouse} label="Buffer retention ratio"
+          value={integrity.buffer.ratio === null ? "—" : `${integrity.buffer.ratio.toFixed(2)} : 1`}
+          tone={integrity.buffer.band === "balanced" ? "success" : integrity.buffer.band === "under-deployed" ? "danger" : "warn"}
+          sub={`${fmt(integrity.buffer.retained)} retained vs ${fmt(integrity.buffer.deployedCdd)} deployed to CDDs · ${integrity.buffer.band}`}
+          hint="Stock still held in LGA and facility warehouses relative to stock already deployed to CDDs — measured up to the campaign kickoff date when one is set." />
+        <Kpi icon={Scale} label="Facility equity index (CV)"
+          value={integrity.equity.rows.length ? integrity.equity.weightedCv.toFixed(2) : "—"}
+          tone={integrity.equity.weightedCv <= 0.25 ? "success" : integrity.equity.weightedCv <= 0.5 ? "warn" : "danger"}
+          sub={`${integrity.equity.facilities} facilities across ${integrity.equity.lgas} LGAs compared`}
+          hint="Coefficient of variation of medicine quantities issued to facilities within the same LGA. Low values mean an even spread; high values expose over-served and under-served catchment areas." />
       </div>
+
 
       {/* Allocation fulfilment */}
       {summary.totals.allocated > 0 && (
@@ -296,6 +334,8 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
           <TabsTrigger value="facilities"><PackageX className="h-4 w-4 mr-1" /> Stockout risk</TabsTrigger>
           <TabsTrigger value="batches"><CalendarClock className="h-4 w-4 mr-1" /> Batches & expiry</TabsTrigger>
           <TabsTrigger value="leadtime"><Timer className="h-4 w-4 mr-1" /> Lead time & POD</TabsTrigger>
+          <TabsTrigger value="supply"><Scale className="h-4 w-4 mr-1" /> Integrity, loss & equity</TabsTrigger>
+
           <TabsTrigger value="integrity"><ShieldAlert className="h-4 w-4 mr-1" /> Data integrity</TabsTrigger>
         </TabsList>
 
@@ -608,7 +648,18 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
           </Card>
         </TabsContent>
 
+        <TabsContent value="supply" className="mt-4">
+          <SupplyIntegrityPanel
+            integrity={integrity}
+            expiryWindow={expiryWindow}
+            onExpiryWindow={setExpiryWindow}
+            kickoff={kickoff}
+            onKickoff={setKickoff}
+          />
+        </TabsContent>
+
         <TabsContent value="integrity" className="mt-4">
+
           <ChecklistReconciliation cache={checklistCache} canExport={canExport} />
         </TabsContent>
       </Tabs>

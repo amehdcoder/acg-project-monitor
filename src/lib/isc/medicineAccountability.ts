@@ -620,7 +620,245 @@ export function computeAccountability(
   };
 }
 
+/* ── supply-chain integrity, expiry risk, buffer retention & equity ──────── */
+
+export interface ShrinkageLeg {
+  stage: string;
+  basis: string;
+  issued: number;      // quantity leaving the upstream tier (L1)
+  received: number;    // quantity confirmed downstream (L2)
+  variance: number;    // issued − received (positive = loss in transit)
+  rate: number;        // variance / issued
+  n: number;           // number of matched consignment lines
+}
+
+export interface EquityRow {
+  state: string;
+  lga: string;
+  facilities: number;
+  total: number;
+  mean: number;
+  sd: number;
+  cv: number;          // coefficient of variation (sd / mean)
+  min: number;
+  max: number;
+  gini: number;
+  overServed: number;  // facilities receiving > 1.5 × LGA mean
+  underServed: number; // facilities receiving < 0.5 × LGA mean
+  band: "equitable" | "moderate" | "inequitable";
+}
+
+export interface SupplyIntegrity {
+  shrinkage: {
+    legs: ShrinkageLeg[];
+    overall: { issued: number; received: number; variance: number; rate: number };
+  };
+  expiryRisk: {
+    windowDays: number;
+    stockAtRisk: number;
+    totalStock: number;
+    index: number;
+    batchesAtRisk: BatchRow[];
+  };
+  buffer: {
+    kickoff: string | null;
+    retainedLga: number;
+    retainedFlhf: number;
+    retained: number;
+    deployedCdd: number;
+    ratio: number | null;   // retained : deployed
+    retainedShare: number;  // retained / (retained + deployed)
+    band: "under-deployed" | "balanced" | "over-deployed";
+  };
+  equity: {
+    rows: EquityRow[];
+    weightedCv: number;
+    facilities: number;
+    lgas: number;
+  };
+}
+
+export interface IntegrityOptions {
+  expiryWindowDays?: number; // default 60
+  kickoffDate?: string;      // ISO date; buffer ratio measured on/before this date
+}
+
+function sd(xs: number[]) {
+  if (xs.length < 2) return 0;
+  const m = xs.reduce((a, b) => a + b, 0) / xs.length;
+  return Math.sqrt(xs.reduce((a, b) => a + (b - m) ** 2, 0) / (xs.length - 1));
+}
+
+function gini(xs: number[]) {
+  const s = xs.filter((x) => x >= 0).sort((a, b) => a - b);
+  const n = s.length;
+  const total = s.reduce((a, b) => a + b, 0);
+  if (n < 2 || total <= 0) return 0;
+  let cum = 0;
+  for (let i = 0; i < n; i++) cum += (2 * (i + 1) - n - 1) * s[i];
+  return cum / (n * total);
+}
+
+export function computeSupplyIntegrity(
+  ds: LogisticsDataset,
+  allocations: Allocation[],
+  summary: AccountabilitySummary,
+  opts: IntegrityOptions = {},
+): SupplyIntegrity {
+  const windowDays = opts.expiryWindowDays ?? 60;
+  const kickoff = opts.kickoffDate || null;
+  const { receipts, issues, cddIssues } = ds;
+
+  /* ── 1. Transit shrinkage ─────────────────────────────────────────────── */
+  // Leg A: State dispatch (manual allocation) → confirmed LGA receipt.
+  let aIssued = 0, aReceived = 0, aN = 0;
+  for (const a of allocations) {
+    const qty = Number(a.quantity) || 0;
+    if (qty <= 0) continue;
+
+    const rec = receipts.filter(
+      (r) => r.medicine === a.medicine && r.state === a.state && (!a.lga || r.lga === a.lga),
+    );
+    if (!rec.length) continue;
+    aIssued += qty;
+    aReceived += rec.reduce((s, r) => s + r.qtyReceived, 0);
+    aN++;
+  }
+
+  // Leg B: LGA book variance — expected closing balance vs the balance the
+  // LGA store actually reports on its most recent issue line.
+  const expected = new Map<string, number>();
+  for (const r of receipts) {
+    const k = `${r.state}||${r.lga}||${r.medicine}`;
+    expected.set(k, (expected.get(k) ?? 0) + r.netUsable);
+  }
+  const reported = new Map<string, { date: string; value: number }>();
+  for (const i of issues) {
+    const k = `${i.state}||${i.lga}||${i.medicine}`;
+    expected.set(k, (expected.get(k) ?? 0) - i.qtyIssued);
+    const cur = reported.get(k);
+    if (!cur || i.date >= cur.date) reported.set(k, { date: i.date, value: i.remainingLga });
+  }
+  let bIssued = 0, bReceived = 0, bN = 0;
+  for (const [k, rep] of reported) {
+    const exp = expected.get(k);
+    if (exp === undefined || exp <= 0) continue;
+    bIssued += exp;
+    bReceived += Math.max(0, rep.value);
+    bN++;
+  }
+
+  // Leg C: Facility onward accountability — quantity pushed to facilities that
+  // have started CDD distribution vs quantity they confirm issuing onward.
+  const activeFacilities = new Set(cddIssues.map((c) => `${c.facility}||${c.lga}`));
+  const cIssued = issues
+    .filter((i) => activeFacilities.has(`${i.facility}||${i.lga}`))
+    .reduce((a, i) => a + i.qtyIssued, 0);
+  const cReceived = cddIssues.reduce((a, c) => a + c.qtyIssued, 0);
+
+  const mkLeg = (stage: string, basis: string, issued: number, received: number, n: number): ShrinkageLeg => ({
+    stage, basis, issued, received,
+    variance: issued - received,
+    rate: issued > 0 ? (issued - received) / issued : 0,
+    n,
+  });
+
+  const legs = [
+    mkLeg("State → LGA", "Allocation dispatched vs quantity confirmed received at the LGA store", aIssued, aReceived, aN),
+    mkLeg("LGA store ledger", "Expected closing balance (net usable − issued) vs balance reported by the LGA store", bIssued, bReceived, bN),
+    mkLeg("FLHF → CDD", "Issued to actively distributing facilities vs quantity they confirm issuing to CDDs", cIssued, cReceived, activeFacilities.size),
+  ].filter((l) => l.issued > 0);
+
+  const ovIssued = legs.reduce((a, l) => a + l.issued, 0);
+  const ovReceived = legs.reduce((a, l) => a + l.received, 0);
+
+  /* ── 2. Expiry risk index ─────────────────────────────────────────────── */
+  const holdings = summary.batches.filter((b) => b.balance > 0);
+  const totalStock = holdings.reduce((a, b) => a + b.balance, 0);
+  const batchesAtRisk = holdings.filter((b) => b.daysToExpiry !== null && b.daysToExpiry <= windowDays);
+  const stockAtRisk = batchesAtRisk.reduce((a, b) => a + b.balance, 0);
+
+  /* ── 3. Buffer retention ratio ────────────────────────────────────────── */
+  const before = (d: string) => (!kickoff ? true : !!d && d <= kickoff);
+  const netUsableK = receipts.filter((r) => before(r.date)).reduce((a, r) => a + r.netUsable, 0);
+  const toFlhfK = issues.filter((i) => before(i.date)).reduce((a, i) => a + i.qtyIssued, 0);
+  const toCddK = cddIssues.filter((c) => before(c.date)).reduce((a, c) => a + c.qtyIssued, 0);
+  const retainedLga = Math.max(0, netUsableK - toFlhfK);
+  const retainedFlhf = Math.max(0, toFlhfK - toCddK);
+  const retained = retainedLga + retainedFlhf;
+  const retainedShare = retained + toCddK > 0 ? retained / (retained + toCddK) : 0;
+  const ratio = toCddK > 0 ? retained / toCddK : null;
+
+  /* ── 4. Facility equity index (coefficient of variation) ──────────────── */
+  const perFacility = new Map<string, number>();
+  for (const i of issues) {
+    const k = `${i.state}||${i.lga}||${i.facility}`;
+    perFacility.set(k, (perFacility.get(k) ?? 0) + i.qtyIssued);
+  }
+  const byLgaFac = new Map<string, { state: string; lga: string; values: number[] }>();
+  for (const [k, v] of perFacility) {
+    const [state, lga] = k.split("||");
+    const key = `${state}||${lga}`;
+    const row = byLgaFac.get(key) ?? { state, lga, values: [] };
+    row.values.push(v);
+    byLgaFac.set(key, row);
+  }
+  const rows: EquityRow[] = Array.from(byLgaFac.values())
+    .filter((r) => r.values.length >= 2)
+    .map((r) => {
+      const total = r.values.reduce((a, b) => a + b, 0);
+      const mean = total / r.values.length;
+      const s = sd(r.values);
+      const cv = mean > 0 ? s / mean : 0;
+      return {
+        state: r.state,
+        lga: r.lga,
+        facilities: r.values.length,
+        total,
+        mean,
+        sd: s,
+        cv,
+        min: Math.min(...r.values),
+        max: Math.max(...r.values),
+        gini: gini(r.values),
+        overServed: r.values.filter((v) => v > mean * 1.5).length,
+        underServed: r.values.filter((v) => v < mean * 0.5).length,
+        band: cv <= 0.25 ? "equitable" : cv <= 0.5 ? "moderate" : "inequitable",
+      } as EquityRow;
+    })
+    .sort((a, b) => b.cv - a.cv);
+
+  const wTotal = rows.reduce((a, r) => a + r.total, 0);
+  const weightedCv = wTotal > 0 ? rows.reduce((a, r) => a + r.cv * r.total, 0) / wTotal : 0;
+
+  return {
+    shrinkage: {
+      legs,
+      overall: {
+        issued: ovIssued, received: ovReceived,
+        variance: ovIssued - ovReceived,
+        rate: ovIssued > 0 ? (ovIssued - ovReceived) / ovIssued : 0,
+      },
+    },
+    expiryRisk: {
+      windowDays, stockAtRisk, totalStock,
+      index: totalStock > 0 ? stockAtRisk / totalStock : 0,
+      batchesAtRisk,
+    },
+    buffer: {
+      kickoff, retainedLga, retainedFlhf, retained, deployedCdd: toCddK, ratio, retainedShare,
+      band: retainedShare > 0.6 ? "under-deployed" : retainedShare < 0.2 ? "over-deployed" : "balanced",
+    },
+    equity: {
+      rows, weightedCv,
+      facilities: perFacility.size,
+      lgas: rows.length,
+    },
+  };
+}
+
 /* ── manual allocation persistence ───────────────────────────────────────── */
+
 
 const ALLOC_KEY = "amehnities.isc.medicineAllocations";
 
