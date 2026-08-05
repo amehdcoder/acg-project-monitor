@@ -194,7 +194,7 @@ export default function IntegratedSupervisoryView() {
           )}
           <TabsTrigger value="studio"><LayoutDashboard className="h-4 w-4 mr-1" /> Dashboard Studio</TabsTrigger>
           
-          <TabsTrigger value="reconciliation"><GitCompareArrows className="h-4 w-4 mr-1" /> Reconciliation</TabsTrigger>
+          <TabsTrigger value="reconciliation"><GitCompareArrows className="h-4 w-4 mr-1" /> Medicine Accountability</TabsTrigger>
         </TabsList>
         <TabsContent value="checklist" className="mt-4">
           <ChecklistDashboard cache={cache} onRefresh={() => refresh(false)} syncing={syncing} />
@@ -208,7 +208,7 @@ export default function IntegratedSupervisoryView() {
           <SupervisoryDashboardView cache={cache} onRefresh={() => refresh(false)} syncing={syncing} />
         </TabsContent>
         <TabsContent value="reconciliation" className="mt-4">
-          <ChecklistReconciliation cache={cache} canExport={perms.canExport} />
+          <MedicineAccountabilityDashboard canExport={perms.canExport} checklistCache={cache} />
         </TabsContent>
       </Tabs>
 
