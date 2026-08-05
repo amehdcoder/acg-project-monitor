@@ -79,6 +79,9 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
   const [allocations, setAllocations] = useState<Allocation[]>(() => loadAllocations());
   const [filters, setFilters] = useState<Filters>({});
   const [targetWindow, setTargetWindow] = useState(7);
+  const [expiryWindow, setExpiryWindow] = useState(60);
+  const [kickoff, setKickoff] = useState("");
+
 
   const refresh = useCallback(async (silent = false) => {
     const cfg = loadMedLogConfig();
