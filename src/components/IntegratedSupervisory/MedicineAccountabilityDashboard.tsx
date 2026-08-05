@@ -219,10 +219,24 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
   );
 
   /* ── data-quality validation ───────────────────────────────────────────── */
+  const [dqOpen, setDqOpen] = useState(false);
   const dq = useMemo(
     () => assessDataQuality(filtered, scopedAllocations, summary, integrity),
     [filtered, scopedAllocations, summary, integrity],
   );
+  const dqReport = useMemo<DrillReport>(() => ({
+    key: "shrinkage",
+    title: "Data-quality validation — records distorting the indicators",
+    subtitle: `${dq.issues.length.toLocaleString()} issues across ${dq.affectedRecords.toLocaleString()} of ${dq.totalRecords.toLocaleString()} records`,
+    formula: "Checks: batch/lot number present · quantity present and > 0 · no negative balances · no zero denominators",
+    quality: [
+      "“Unreliable” rows materially change the KPI they feed — correct them at source before quoting the figure.",
+      "Zero-denominator entries mean the indicator is undefined, not zero; the card shows a placeholder value.",
+      "Aggregate rows (negative LGA/facility balances) come from summed transactions, not a single submission.",
+    ],
+    tables: [dataQualityTable(dq)],
+  }), [dq]);
+
 
   /* ── drill-downs, alerts & exports ─────────────────────────────────────── */
   const [thresholds, setThresholds] = useState<AlertThresholds>(() => loadThresholds());
