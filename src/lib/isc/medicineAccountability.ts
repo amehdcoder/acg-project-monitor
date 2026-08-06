@@ -416,6 +416,8 @@ const matches = (t: { state: string; lga: string; medicine: string; date: string
 
 export function applyFilters(ds: LogisticsDataset, f: Filters): LogisticsDataset {
   return {
+    dispatches: ds.dispatches.filter((t) => matches(t, f)),
+
     receipts: ds.receipts.filter((t) => matches(t, f)),
     issues: ds.issues.filter((t) => matches(t, f)),
     cddIssues: ds.cddIssues.filter((t) => matches(t, f)),
