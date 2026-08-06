@@ -11,7 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import KoboSyncDialog from "./KoboSyncDialog";
 import SupervisoryDashboardView from "./SupervisoryDashboardView";
 import ChecklistDashboard from "./ChecklistDashboard";
-import ChecklistDataTable from "./ChecklistDataTable";
+import RawKoboDataTabs from "./RawKoboDataTabs";
 import MedicineAccountabilityDashboard from "./MedicineAccountabilityDashboard";
 import ChecklistAccessManager from "./ChecklistAccessManager";
 import {
