@@ -374,17 +374,26 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
 }
 
 
-/* ── manual allocations (entered by programme managers) ──────────────────── */
+/* ── Federal allocations (Federal Medical Store, Oshodi → State) ─────────── */
 
 export interface Allocation {
   id: string;
   state: string;
-  lga: string;          // "" = state-level allocation
+  lga: string;          // "" = allocation held at the State medical store
   medicine: string;
   quantity: number;
-  dispatchDate: string; // state dispatch date → powers State→LGA lead time
+  dispatchDate: string; // Federal dispatch date → powers Federal → State lead time
   note?: string;
+  /** Origin of the consignment; defaults to the Federal Medical Store, Oshodi. */
+  source?: string;
+  /** Federal waybill / consignment number for physical verification. */
+  waybill?: string;
+  /** Barcode / QR code printed on the consignment, when captured. */
+  barcode?: string;
+  batch?: string;
+  expiry?: string;
 }
+
 
 /* ── indicator computation ───────────────────────────────────────────────── */
 
