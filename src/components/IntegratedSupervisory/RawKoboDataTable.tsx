@@ -95,13 +95,23 @@ const KpiCard = ({
   </div>
 );
 
-export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCache | null; onRefresh?: () => void }) {
+export default function RawKoboDataTable({
+  cache, onRefresh, cfg = null, title = "Kobo Data Explorer", subtitle = "MDA Supervisory Data Overview",
+}: {
+  cache: KoboCache | null;
+  onRefresh?: () => void;
+  cfg?: KoboConfig | null;
+  title?: string;
+  subtitle?: string;
+}) {
   const { canExport } = useChecklistPermissions();
   const [search, setSearch] = useState("");
   const dq = useDebouncedValue(search, 300);
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(0);
   const [detail, setDetail] = useState<any | null>(null);
+  const [lightbox, setLightbox] = useState<{ items: KoboAttachment[]; index: number }>({ items: [], index: -1 });
+
 
   const [fState, setFState] = useState<string>("__all");
   const [fLga, setFLga] = useState<string>("__all");
