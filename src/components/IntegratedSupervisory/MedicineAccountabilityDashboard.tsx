@@ -337,8 +337,9 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
               </Badge>
             )}
             <Button variant="outline" size="sm" onClick={() => setOpenAlloc(true)}>
-              <Boxes className="h-4 w-4 mr-1" /> Allocations ({allocations.length})
+              <Warehouse className="h-4 w-4 mr-1" /> Federal allocations ({allocations.length})
             </Button>
+
             <Button variant="outline" size="sm" onClick={() => setOpenConnect(true)}>
               <PlugZap className="h-4 w-4 mr-1" /> {connected ? "Integration" : "Link Kobo form"}
             </Button>
