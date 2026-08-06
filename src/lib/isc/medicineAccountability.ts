@@ -31,10 +31,15 @@ export const medicineLabel = (code: string) =>
   MEDICINE_LABELS[code] ?? (code ? code.replace(/_+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()) : "Unspecified");
 
 export const LEVEL_LABELS: Record<string, string> = {
+  level_0: "Level 0 — Federal store → State → LGA dispatch",
   level_1: "Level 1 — State → LGA receipt",
   level_2: "Level 2 — LGA → Health Facility",
   level_3: "Level 3 — Facility → CDD",
 };
+
+/** The national supply origin for all Federal allocations. */
+export const FEDERAL_SOURCE = "Federal Medical Store, Oshodi";
+
 
 /* ── low-level helpers ───────────────────────────────────────────────────── */
 
