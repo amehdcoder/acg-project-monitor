@@ -214,6 +214,30 @@ export default function RawKoboDataTable({
     return resolved || "—";
   };
 
+  /** Media-aware cell: photo/signature answers render as clickable thumbnails. */
+  const renderCell = (row: any, fieldKey: string) => {
+    const v = row[fieldKey];
+    if (looksLikeMedia(v)) {
+      const att = matchAttachment(row, v);
+      if (att?.isImage) {
+        const rowImages = listAttachments(row).filter((a) => a.isImage);
+        const idx = Math.max(0, rowImages.findIndex((a) => a.downloadUrl === att.downloadUrl));
+        return (
+          <KoboThumb
+            cfg={cfg}
+            attachment={att}
+            label={resolver.resolveHeader(fieldKey) || fieldKey}
+            size={38}
+            onOpen={() => setLightbox({ items: rowImages, index: idx })}
+          />
+        );
+      }
+    }
+    const val = cellDisplay(fieldKey, v);
+    return <span title={val}>{val}</span>;
+  };
+
+
   const fmtInt = (n: number) => n.toLocaleString();
   const fmtPct = (n: number) => `${n.toFixed(1)}%`;
   const lastSync = cache?.fetchedAt ? new Date(cache.fetchedAt) : null;
