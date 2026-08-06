@@ -161,8 +161,26 @@ export interface BaseTx {
   state: string;
   lga: string;
   ward: string;
-  level: "level_1" | "level_2" | "level_3";
+  level: "level_0" | "level_1" | "level_2" | "level_3";
   submittedBy: string;
+  /** Barcode / QR code captured by the scanner question (empty when not scanned). */
+  barcode: string;
+}
+
+/** Level 0 — State medical store dispatching a consignment down to an LGA. */
+export interface DispatchTx extends BaseTx {
+  level: "level_0";
+  medicine: string;
+  batch: string;
+  expiry: string;
+  qtyDispatched: number;
+  qtyDamaged: number;
+  destinationLga: string;
+  sloName: string;
+  receivingOfficer: string;
+  waybill: string;
+  hasWaybill: boolean;
+  hasSignature: boolean;
 }
 
 export interface ReceiptTx extends BaseTx {
@@ -202,11 +220,13 @@ export interface CddTx extends BaseTx {
 }
 
 export interface LogisticsDataset {
+  dispatches: DispatchTx[];
   receipts: ReceiptTx[];
   issues: IssueTx[];
   cddIssues: CddTx[];
   submissions: number;
 }
+
 
 /* ── parsing ─────────────────────────────────────────────────────────────── */
 
