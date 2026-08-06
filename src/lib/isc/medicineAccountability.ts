@@ -165,7 +165,10 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
     };
     const roleRaw = str(get(raw, "Transaction_Level_User_Role")).toLowerCase();
     const hasWaybill = hasMedia(get(raw, "Proof_of_Delivery_Waybill_Photo"));
-    const hasSignature = hasMedia(get(raw, "EDO_Acknowledgment_Signature"));
+    const hasSignature =
+      hasMedia(get(raw, "EDO_Acknowledgment_Signature")) ||
+      hasMedia(get(raw, "Logistics_Officer_Acknowledgment_Signature")) ||
+      hasMedia(get(raw, "LGA_Logistics_Officer_Signature"));
 
     // Level 1 — receipt at LGA
     for (const item of repeats(raw, "group_ff5wt15")) {
@@ -182,7 +185,10 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
         qtyReceived,
         qtyDamaged,
         netUsable: Math.max(0, num(get(item, "l1_net_usable_qty")) || qtyReceived - qtyDamaged),
-        edoName: str(get(raw, "LGA_Essential_Drug_Officer_EDO_Name")) || "—",
+        edoName:
+          str(get(raw, "LGA_Essential_Drug_Officer_EDO_Name")) ||
+          str(get(raw, "LGA_Logistics_Officer_Name")) ||
+          str(get(raw, "Logistics_Officer_Name")) || "—",
         sloName: str(get(raw, "State_Logistics_Officer_SLO_Name")) || "—",
         hasWaybill,
         hasSignature,

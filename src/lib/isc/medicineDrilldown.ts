@@ -551,7 +551,7 @@ export function evaluateAlerts(
       detail: `${r0(integrity.shrinkage.overall.variance).toLocaleString()} units issued upstream were never confirmed downstream.`,
       value: p1(sr),
       threshold: `≥ ${p1(sr >= t.shrinkageCrit ? t.shrinkageCrit : t.shrinkageWarn)}`,
-      action: "Audit waybills and EDO acknowledgements for the worst-performing LGAs before the next dispatch round.",
+      action: "Audit waybills and EDO / Logistic Officer acknowledgements for the worst-performing LGAs before the next dispatch round.",
     });
   }
   for (const r of integrity.shrinkage.legs) {
@@ -658,7 +658,7 @@ export function evaluateAlerts(
         detail: `${Number(r.retained).toLocaleString()} units retained versus ${Number(r.deployed).toLocaleString()} deployed.`,
         value: String(r.share),
         threshold: `> ${p1(t.bufferMax)}`,
-        action: "Follow up with the LGA EDO on the outstanding facility dispatch plan.",
+        action: "Follow up with the LGA EDO / Logistic Officer on the outstanding facility dispatch plan.",
       });
     }
   }

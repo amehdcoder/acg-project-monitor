@@ -466,7 +466,7 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
         <Kpi icon={ClipboardCheck} label="Proof-of-delivery compliance" docId="pod" flags={dq.byKpi["pod"]} value={pctf(summary.podCompliance.overall)}
           tone={summary.podCompliance.overall > 0.85 ? "success" : "warn"}
           sub={`L1 ${pctf(summary.podCompliance.l1)} · L2 ${pctf(summary.podCompliance.l2)} · L3 ${pctf(summary.podCompliance.l3)}`}
-          hint="Share of transactions carrying a verified waybill photo, EDO acknowledgment signature, facility confirmation signature or CDD receipt photo." />
+          hint="Share of transactions carrying a verified waybill photo, EDO / Logistic Officer acknowledgment signature, facility confirmation signature or CDD receipt photo." />
         <Kpi icon={ShieldAlert} label="Transit shrinkage rate" docId="shrinkage" flags={dq.byKpi["shrinkage"]} onClick={() => setDrillKey("shrinkage")} value={pctf(integrity.shrinkage.overall.rate)}
           tone={integrity.shrinkage.overall.rate > 0.05 ? "danger" : integrity.shrinkage.overall.rate > 0.02 ? "warn" : "success"}
           sub={`${fmt(integrity.shrinkage.overall.variance)} units unaccounted across ${integrity.shrinkage.legs.length} cascade legs`}
@@ -820,7 +820,7 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
             </CardHeader>
             <CardContent className="p-4 space-y-4">
               {[
-                { label: "Level 1 — waybill photo / EDO signature", v: summary.podCompliance.l1, n: summary.podCompliance.l1n },
+                { label: "Level 1 — waybill photo / EDO or Logistic Officer signature", v: summary.podCompliance.l1, n: summary.podCompliance.l1n },
                 { label: "Level 2 — facility in-charge signature", v: summary.podCompliance.l2, n: summary.podCompliance.l2n },
                 { label: "Level 3 — CDD receipt photo", v: summary.podCompliance.l3, n: summary.podCompliance.l3n },
               ].map((r) => (

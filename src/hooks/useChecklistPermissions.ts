@@ -28,6 +28,8 @@ export interface ChecklistPermissions {
   canView: boolean;
   /** View the record-level Raw Kobo Data tab. */
   canViewRawData: boolean;
+  /** View the Medicine Accountability dashboard. */
+  canViewMedicineAccountability: boolean;
   /** Download raw/flattened data (Excel, CSV, PDF/PNG snapshots). */
   canExport: boolean;
   /** Add, edit or remove KoboToolbox integrations and run syncs. */
@@ -63,6 +65,7 @@ export function useChecklistPermissions(): ChecklistPermissions {
     return {
       canView,
       canViewRawData: admin || granted || grantedRaw,
+      canViewMedicineAccountability: canView,
       canExport: admin || granted || grantedRaw,
       canManageIntegrations: admin,
       canManageAccess: !!isOwner || !!isCoOwner,
