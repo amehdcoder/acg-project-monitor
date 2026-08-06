@@ -30,6 +30,7 @@ export default function IntegratedSupervisoryView() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [cache, setCache] = useState<KoboCache | null>(() => loadKoboCache());
   const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<{ message: string; hint?: string } | null>(null);
   const [openAccess, setOpenAccess] = useState(false);
 
   const activeConnection = useMemo(
@@ -62,9 +63,11 @@ export default function IntegratedSupervisoryView() {
     try {
       const c = await fetchSubmissions(cfg, id);
       setCache(c);
+      setSyncError(null);
       if (!silent) toast({ title: "Data refreshed", description: `${c.count} submissions from KoboToolbox.` });
     } catch (e: any) {
-      if (!silent) toast({ title: "Refresh failed", description: e?.message || "Unable to reach KoboToolbox.", variant: "destructive" });
+      setSyncError({ message: e?.message || "Unable to reach KoboToolbox.", hint: e?.hint });
+      if (!silent) toast({ title: "Refresh failed", description: e?.hint || e?.message || "Unable to reach KoboToolbox.", variant: "destructive" });
     } finally { setSyncing(false); }
   }, [perms.canManageIntegrations]);
 
@@ -73,14 +76,29 @@ export default function IntegratedSupervisoryView() {
     enabled: perms.canView && !!activeConnection,
   });
 
-  // Optional background auto-sync
+  // Automatic background sync: always on (configurable interval, default 5 min),
+  // plus an immediate catch-up when the tab regains focus or the device reconnects.
   useEffect(() => {
+    if (!perms.canView || !activeConnection) return;
     const cfg = loadKoboConfig(activeId);
-    if (!cfg?.autoSync) return;
-    const min = Math.max(1, cfg.pollMinutes ?? 15);
-    const id = setInterval(() => { refresh(true); }, min * 60 * 1000);
-    return () => clearInterval(id);
-  }, [refresh, activeId]);
+    const min = Math.max(1, cfg?.pollMinutes ?? 5);
+    const timer = setInterval(() => { if (navigator.onLine !== false) void refresh(true); }, min * 60 * 1000);
+    const catchUp = () => { if (document.visibilityState === "visible" && navigator.onLine !== false) void refresh(true); };
+    document.addEventListener("visibilitychange", catchUp);
+    window.addEventListener("online", catchUp);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", catchUp);
+      window.removeEventListener("online", catchUp);
+    };
+  }, [refresh, activeId, perms.canView, activeConnection]);
+
+  // Initial auto-sync on mount so the dashboard is fresh without pressing Sync.
+  useEffect(() => {
+    if (perms.canView && activeConnection) void refresh(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perms.canView, activeId]);
+
 
   if (!perms.loading && !perms.canView) {
     return (
