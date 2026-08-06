@@ -20,9 +20,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   Activity, AlertTriangle, BookOpen, Boxes, CalendarClock, CheckCircle2, ClipboardCheck, Download, FileSpreadsheet,
-  FileText, Filter, Gauge, Loader2, Maximize2, PackageCheck, PackageX, PlugZap, RefreshCw, Route, Scale, ShieldAlert,
-  Timer, TrendingDown, Truck, Warehouse,
+  FileText, Filter, Gauge, Loader2, Maximize2, PackageCheck, PackageX, PlugZap, QrCode, RefreshCw, Route, Scale,
+  ShieldAlert, Timer, TrendingDown, Truck, Warehouse,
 } from "lucide-react";
+
 
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
