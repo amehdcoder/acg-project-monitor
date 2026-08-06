@@ -20,9 +20,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   Activity, AlertTriangle, BookOpen, Boxes, CalendarClock, CheckCircle2, ClipboardCheck, Download, FileSpreadsheet,
-  FileText, Filter, Gauge, Loader2, Maximize2, PackageCheck, PackageX, PlugZap, RefreshCw, Route, Scale, ShieldAlert,
-  Timer, TrendingDown, Truck, Warehouse,
+  FileText, Filter, Gauge, Loader2, Maximize2, PackageCheck, PackageX, PlugZap, QrCode, RefreshCw, Route, Scale,
+  ShieldAlert, Timer, TrendingDown, Truck, Warehouse,
 } from "lucide-react";
+
 
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -50,6 +51,10 @@ import MedicineDrilldownDialog from "./MedicineDrilldownDialog";
 import MedicineAlertsPanel from "./MedicineAlertsPanel";
 import SupplyIntegrityPanel from "./SupplyIntegrityPanel";
 import ChecklistReconciliation from "./ChecklistReconciliation";
+import CascadeVerificationPanel from "./CascadeVerificationPanel";
+import BarcodeTraceabilityPanel from "./BarcodeTraceabilityPanel";
+import { computeBarcodeTrace, computeCascade, computeLevelBalances, stateLedger } from "@/lib/isc/medicineCascade";
+
 
 import type { KoboCache } from "./koboClient";
 
@@ -218,6 +223,17 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
     [filtered, scopedAllocations, summary, expiryWindow, kickoff],
   );
 
+  /* ── Level 0 cascade verification & barcode traceability ───────────────── */
+  const [tolerance, setTolerance] = useState(0.02);
+  const levelBalances = useMemo(
+    () => computeLevelBalances(filtered, scopedAllocations), [filtered, scopedAllocations]);
+  const cascade = useMemo(
+    () => computeCascade(filtered, scopedAllocations, tolerance), [filtered, scopedAllocations, tolerance]);
+  const ledger = useMemo(() => stateLedger(cascade, scopedAllocations), [cascade, scopedAllocations]);
+  const trace = useMemo(() => computeBarcodeTrace(filtered), [filtered]);
+
+
+
   /* ── data-quality validation ───────────────────────────────────────────── */
   const [dqOpen, setDqOpen] = useState(false);
   const dq = useMemo(
@@ -307,9 +323,12 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
               <Truck className="h-5 w-5 text-primary" /> Medicine Accountability & Cascade Tracking
             </h2>
             <p className="text-xs text-muted-foreground">
-              State → LGA → Health Facility → CDD logistics ledger · {dataset.submissions.toLocaleString()} logistics submissions ·
-              {" "}{dataset.receipts.length} receipts · {dataset.issues.length} facility issues · {dataset.cddIssues.length} CDD issues
+              Federal Medical Store (Oshodi) → State → LGA → Health Facility → CDD ledger · {dataset.submissions.toLocaleString()} logistics submissions ·
+              {" "}{dataset.dispatches.length} State dispatches · {dataset.receipts.length} LGA receipts ·
+              {" "}{dataset.issues.length} facility issues · {dataset.cddIssues.length} CDD issues ·
+              {" "}{trace.uniqueCodes} barcodes scanned
             </p>
+
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {cache && (
@@ -318,8 +337,9 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
               </Badge>
             )}
             <Button variant="outline" size="sm" onClick={() => setOpenAlloc(true)}>
-              <Boxes className="h-4 w-4 mr-1" /> Allocations ({allocations.length})
+              <Warehouse className="h-4 w-4 mr-1" /> Federal allocations ({allocations.length})
             </Button>
+
             <Button variant="outline" size="sm" onClick={() => setOpenConnect(true)}>
               <PlugZap className="h-4 w-4 mr-1" /> {connected ? "Integration" : "Link Kobo form"}
             </Button>
@@ -542,10 +562,12 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
         </Card>
       )}
 
-      <Tabs defaultValue="flow">
+      <Tabs defaultValue="cascade">
         <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="cascade"><Warehouse className="h-4 w-4 mr-1" /> Federal → State → LGA</TabsTrigger>
           <TabsTrigger value="flow"><Activity className="h-4 w-4 mr-1" /> Flow & wastage</TabsTrigger>
           <TabsTrigger value="balances"><Boxes className="h-4 w-4 mr-1" /> Tiered balances</TabsTrigger>
+          <TabsTrigger value="barcode"><QrCode className="h-4 w-4 mr-1" /> Barcode traceability</TabsTrigger>
           <TabsTrigger value="facilities"><PackageX className="h-4 w-4 mr-1" /> Stockout risk</TabsTrigger>
           <TabsTrigger value="batches"><CalendarClock className="h-4 w-4 mr-1" /> Batches & expiry</TabsTrigger>
           <TabsTrigger value="leadtime"><Timer className="h-4 w-4 mr-1" /> Lead time & POD</TabsTrigger>
@@ -553,6 +575,20 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
 
           <TabsTrigger value="integrity"><ShieldAlert className="h-4 w-4 mr-1" /> Data integrity</TabsTrigger>
         </TabsList>
+
+        {/* Level 0 cascade verification */}
+        <TabsContent value="cascade" className="mt-4">
+          <CascadeVerificationPanel
+            cascade={cascade} levels={levelBalances} states={ledger}
+            tolerance={tolerance} onTolerance={setTolerance} canExport={canExport}
+          />
+        </TabsContent>
+
+        {/* Barcode / QR traceability */}
+        <TabsContent value="barcode" className="mt-4">
+          <BarcodeTraceabilityPanel trace={trace} />
+        </TabsContent>
+
 
         {/* Flow */}
         <TabsContent value="flow" className="mt-4 space-y-4">

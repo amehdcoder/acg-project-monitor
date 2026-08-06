@@ -31,10 +31,15 @@ export const medicineLabel = (code: string) =>
   MEDICINE_LABELS[code] ?? (code ? code.replace(/_+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()) : "Unspecified");
 
 export const LEVEL_LABELS: Record<string, string> = {
+  level_0: "Level 0 — Federal store → State → LGA dispatch",
   level_1: "Level 1 — State → LGA receipt",
   level_2: "Level 2 — LGA → Health Facility",
   level_3: "Level 3 — Facility → CDD",
 };
+
+/** The national supply origin for all Federal allocations. */
+export const FEDERAL_SOURCE = "Federal Medical Store, Oshodi";
+
 
 /* ── low-level helpers ───────────────────────────────────────────────────── */
 
@@ -82,6 +87,63 @@ const hasMedia = (v: any) => {
   return !!s && s !== "0" && s.toLowerCase() !== "null";
 };
 
+/** First non-empty value across a list of candidate leaf names. */
+function getAny(obj: any, names: string[]): any {
+  for (const n of names) {
+    const v = get(obj, n);
+    if (v !== undefined && str(v) !== "") return v;
+  }
+  return undefined;
+}
+
+/** Any leaf whose name looks like a barcode / QR scan capture. */
+const BARCODE_RE = /(barcode|bar_code|qr_?code|qr_?scan|scanned_?code|gtin|gs1|serial_?code)/i;
+
+function scanCode(obj: any): string {
+  if (!obj || typeof obj !== "object") return "";
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === null || typeof v === "object") continue;
+    if (BARCODE_RE.test(leaf(k))) {
+      const s = str(v);
+      if (s && s.toLowerCase() !== "null") return s;
+    }
+  }
+  for (const v of Object.values(obj)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const hit = scanCode(v);
+      if (hit) return hit;
+    }
+  }
+  return "";
+}
+
+/** Barcode captured on the repeat item, falling back to the parent submission. */
+const findCode = (...objs: any[]) => {
+  for (const o of objs) { const c = scanCode(o); if (c) return c; }
+  return "";
+};
+
+const hasLeafPrefix = (item: any, prefix: string) =>
+  Object.keys(item ?? {}).some((k) => leaf(k).toLowerCase().startsWith(prefix));
+
+/** Discover repeat arrays by shape (used for newly added groups with opaque ids). */
+function repeatsWhere(obj: any, pred: (item: any) => boolean): any[] {
+  const out: any[] = [];
+  const walk = (o: any) => {
+    if (!o || typeof o !== "object") return;
+    for (const v of Object.values(o)) {
+      if (Array.isArray(v)) {
+        const items = v.filter((i) => i && typeof i === "object");
+        if (items.length && items.some(pred)) out.push(...items.filter(pred));
+        items.forEach(walk);
+      } else if (v && typeof v === "object") walk(v);
+    }
+  };
+  walk(obj);
+  return out;
+}
+
+
 const dayDiff = (a?: string, b?: string) => {
   if (!a || !b) return null;
   const ta = new Date(a).getTime();
@@ -99,8 +161,26 @@ export interface BaseTx {
   state: string;
   lga: string;
   ward: string;
-  level: "level_1" | "level_2" | "level_3";
+  level: "level_0" | "level_1" | "level_2" | "level_3";
   submittedBy: string;
+  /** Barcode / QR code captured by the scanner question (empty when not scanned). */
+  barcode: string;
+}
+
+/** Level 0 — State medical store dispatching a consignment down to an LGA. */
+export interface DispatchTx extends BaseTx {
+  level: "level_0";
+  medicine: string;
+  batch: string;
+  expiry: string;
+  qtyDispatched: number;
+  qtyDamaged: number;
+  destinationLga: string;
+  sloName: string;
+  receivingOfficer: string;
+  waybill: string;
+  hasWaybill: boolean;
+  hasSignature: boolean;
 }
 
 export interface ReceiptTx extends BaseTx {
@@ -140,20 +220,24 @@ export interface CddTx extends BaseTx {
 }
 
 export interface LogisticsDataset {
+  dispatches: DispatchTx[];
   receipts: ReceiptTx[];
   issues: IssueTx[];
   cddIssues: CddTx[];
   submissions: number;
 }
 
+
 /* ── parsing ─────────────────────────────────────────────────────────────── */
 
 export function parseLogistics(raws: any[]): LogisticsDataset {
+  const dispatches: DispatchTx[] = [];
   const receipts: ReceiptTx[] = [];
   const issues: IssueTx[] = [];
   const cddIssues: CddTx[] = [];
 
   for (const raw of raws ?? []) {
+    const submissionCode = scanCode(raw);
     const base = {
       submissionId: str(raw?._id) || "—",
       uuid: str(raw?._uuid),
@@ -162,6 +246,7 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
       lga: str(get(raw, "LGA")),
       ward: str(get(raw, "Ward")),
       submittedBy: str(get(raw, "username")) || str(raw?._submitted_by) || "—",
+      barcode: submissionCode,
     };
     const roleRaw = str(get(raw, "Transaction_Level_User_Role")).toLowerCase();
     const hasWaybill = hasMedia(get(raw, "Proof_of_Delivery_Waybill_Photo"));
@@ -169,6 +254,51 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
       hasMedia(get(raw, "EDO_Acknowledgment_Signature")) ||
       hasMedia(get(raw, "Logistics_Officer_Acknowledgment_Signature")) ||
       hasMedia(get(raw, "LGA_Logistics_Officer_Signature"));
+
+    // Level 0 — State medical store → LGA dispatch. The group id of the newly
+    // added section is not fixed, so repeats are discovered by their `l0_*`
+    // fields (with the named group kept as a fast path).
+    const l0Items = [
+      ...repeats(raw, "group_l0"),
+      ...repeatsWhere(raw, (i) => hasLeafPrefix(i, "l0_")),
+    ];
+    const seenL0 = new Set<any>();
+    for (const item of l0Items) {
+      if (seenL0.has(item)) continue;
+      seenL0.add(item);
+      const medicine = str(getAny(item, [
+        "Medicine_Dispatched", "Medicine_Dispatched_to_LGA", "Medicine_IssuedtoLGA",
+        "Medicine_Allocated_to_LGA", "l0_medicine", "Medicine_Allocated",
+      ]));
+      const qtyDispatched = num(getAny(item, [
+        "l0_qty_dispatched", "l0_qty_issued", "l0_quantity_dispatched",
+        "Quantity_Dispatched_to_LGA", "Quantity_Issued_to_LGA", "l0_qty",
+      ]));
+      if (!medicine && !qtyDispatched) continue;
+      dispatches.push({
+        ...base,
+        level: "level_0",
+        medicine: medicine || "unspecified",
+        batch: str(getAny(item, ["Batch_Lot_Number_000", "l0_batch_lot_number", "Batch_Lot_Number"])) || "—",
+        expiry: str(getAny(item, ["l0_expiry_date", "Expiry_Date_000", "expiry_date"])),
+        qtyDispatched,
+        qtyDamaged: num(getAny(item, ["l0_qty_damaged", "l0_damaged"])),
+        destinationLga: str(getAny(item, [
+          "l0_destination_lga", "Destination_LGA", "Receiving_LGA", "LGA_Destination",
+        ])) || base.lga,
+        sloName: str(getAny(raw, [
+          "State_Logistics_Officer_SLO_Name", "SLO_Name", "State_Store_Officer_Name",
+        ])) || "—",
+        receivingOfficer: str(getAny(raw, [
+          "LGA_Essential_Drug_Officer_EDO_Name", "LGA_Logistics_Officer_Name",
+          "Logistics_Officer_Name", "Receiving_Officer_Name",
+        ])) || "—",
+        waybill: str(getAny(item, ["l0_waybill_number", "Waybill_Number", "waybill_no"])) || "—",
+        hasWaybill: hasWaybill || hasMedia(getAny(item, ["l0_waybill_photo", "Waybill_Photo"])),
+        hasSignature,
+        barcode: findCode(item, raw),
+      });
+    }
 
     // Level 1 — receipt at LGA
     for (const item of repeats(raw, "group_ff5wt15")) {
@@ -192,6 +322,7 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
         sloName: str(get(raw, "State_Logistics_Officer_SLO_Name")) || "—",
         hasWaybill,
         hasSignature,
+        barcode: findCode(item, raw),
       });
     }
 
@@ -210,6 +341,7 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
         qtyIssued: num(get(item, "qiflhf")),
         remainingLga: num(get(item, "l2_lga_rem_stock")),
         hasSignature: hasMedia(get(item, "FLHF_In_Charge_Confirmation_Signature")),
+        barcode: findCode(item, raw),
       });
     }
 
@@ -230,6 +362,7 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
           cddName,
           qtyIssued: num(get(item, "Quantity_Issued_to_CDD")),
           hasPhoto: hasMedia(get(item, "CDD_Receipt_Photo_Confirmation")),
+          barcode: findCode(item, community, raw),
         });
       }
     }
@@ -237,20 +370,30 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
     if (!roleRaw) continue; // role is only used for context; parsing is data-driven
   }
 
-  return { receipts, issues, cddIssues, submissions: (raws ?? []).length };
+  return { dispatches, receipts, issues, cddIssues, submissions: (raws ?? []).length };
 }
 
-/* ── manual allocations (entered by programme managers) ──────────────────── */
+
+/* ── Federal allocations (Federal Medical Store, Oshodi → State) ─────────── */
 
 export interface Allocation {
   id: string;
   state: string;
-  lga: string;          // "" = state-level allocation
+  lga: string;          // "" = allocation held at the State medical store
   medicine: string;
   quantity: number;
-  dispatchDate: string; // state dispatch date → powers State→LGA lead time
+  dispatchDate: string; // Federal dispatch date → powers Federal → State lead time
   note?: string;
+  /** Origin of the consignment; defaults to the Federal Medical Store, Oshodi. */
+  source?: string;
+  /** Federal waybill / consignment number for physical verification. */
+  waybill?: string;
+  /** Barcode / QR code printed on the consignment, when captured. */
+  barcode?: string;
+  batch?: string;
+  expiry?: string;
 }
+
 
 /* ── indicator computation ───────────────────────────────────────────────── */
 
@@ -273,6 +416,8 @@ const matches = (t: { state: string; lga: string; medicine: string; date: string
 
 export function applyFilters(ds: LogisticsDataset, f: Filters): LogisticsDataset {
   return {
+    dispatches: ds.dispatches.filter((t) => matches(t, f)),
+
     receipts: ds.receipts.filter((t) => matches(t, f)),
     issues: ds.issues.filter((t) => matches(t, f)),
     cddIssues: ds.cddIssues.filter((t) => matches(t, f)),
