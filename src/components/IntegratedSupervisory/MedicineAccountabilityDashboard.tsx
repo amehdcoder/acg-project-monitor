@@ -51,6 +51,10 @@ import MedicineDrilldownDialog from "./MedicineDrilldownDialog";
 import MedicineAlertsPanel from "./MedicineAlertsPanel";
 import SupplyIntegrityPanel from "./SupplyIntegrityPanel";
 import ChecklistReconciliation from "./ChecklistReconciliation";
+import CascadeVerificationPanel from "./CascadeVerificationPanel";
+import BarcodeTraceabilityPanel from "./BarcodeTraceabilityPanel";
+import { computeBarcodeTrace, computeCascade, computeLevelBalances, stateLedger } from "@/lib/isc/medicineCascade";
+
 
 import type { KoboCache } from "./koboClient";
 
