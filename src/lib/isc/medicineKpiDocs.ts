@@ -104,7 +104,7 @@ export const KPI_DOCS: KpiDoc[] = [
     label: "Proof-of-delivery compliance",
     group: "assurance",
     definition: "Share of transactions carrying verifiable delivery evidence at each level.",
-    formula: "POD % = (L1 waybill/EDO signature + L2 facility signature + L3 CDD receipt photo present) ÷ total transactions × 100",
+    formula: "POD % = (L1 waybill/EDO or Logistic Officer signature + L2 facility signature + L3 CDD receipt photo present) ÷ total transactions × 100",
     interpretation: "Below 85% weakens audit defensibility; each missing proof is an unverifiable transfer.",
     quality: [
       "Attachment fields are treated as present when Kobo stores any non-empty filename — the image itself is not inspected for legibility.",
