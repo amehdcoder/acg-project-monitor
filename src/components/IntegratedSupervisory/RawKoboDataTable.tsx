@@ -14,11 +14,14 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
 import { useChecklistPermissions } from "@/hooks/useChecklistPermissions";
-import { validateCache, type KoboCache } from "./koboClient";
+import { validateCache, type KoboCache, type KoboConfig } from "./koboClient";
 import { buildDataDictionary, typeIcon, type KoboColumn } from "./koboSchema";
 import { getResolver } from "./koboLabelResolver";
 import RecordPreviewDrawer from "./RecordPreviewDrawer";
 import { exportXlsx, exportCsv } from "./exportKoboData";
+import { listAttachments, looksLikeMedia, matchAttachment, type KoboAttachment } from "./koboMedia";
+import { KoboLightbox, KoboThumb } from "./KoboMediaViewer";
+
 
 
 type StatusKey = "approved" | "flagged" | "pending";
