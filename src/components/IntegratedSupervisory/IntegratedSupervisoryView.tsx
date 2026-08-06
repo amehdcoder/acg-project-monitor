@@ -145,20 +145,16 @@ export default function IntegratedSupervisoryView() {
               </Select>
             )}
 
-            <Badge
-              variant="outline"
-              className={connected ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-muted text-muted-foreground"}
-              title={lastEventAt ? `Last Kobo event ${lastEventAt.toLocaleTimeString()}` : "Waiting for Kobo submissions"}
-            >
-              <Radio className={`h-3 w-3 mr-1 ${connected ? "animate-pulse" : ""}`} />
-              {connected ? "Live" : "Offline"}
-            </Badge>
+            <KoboSyncStatus
+              phase={syncing ? "syncing" : syncError ? "error" : "synced"}
+              lastSyncedAt={cache?.fetchedAt ?? null}
+              live={connected}
+              lastEventAt={lastEventAt}
+              recordCount={cache?.count ?? null}
+              error={syncError}
+              onRetry={() => refresh(false)}
+            />
 
-            {cache && (
-              <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">
-                {cache.count.toLocaleString()} records · {new Date(cache.fetchedAt).toLocaleString()}
-              </Badge>
-            )}
 
             {perms.canManageAccess && (
               <Button
