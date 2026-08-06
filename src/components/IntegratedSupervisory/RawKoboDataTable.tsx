@@ -269,8 +269,9 @@ export default function RawKoboDataTable({
             <Database className="h-6 w-6 text-white" />
           </div>
           <div>
-            <div className="text-xl font-bold tracking-tight">Kobo Data Explorer</div>
-            <div className="text-xs text-blue-100/80">MDA Supervisory Data Overview</div>
+            <div className="text-xl font-bold tracking-tight">{title}</div>
+            <div className="text-xs text-blue-100/80">{subtitle}</div>
+
           </div>
         </div>
         <div className="flex items-center gap-2">
