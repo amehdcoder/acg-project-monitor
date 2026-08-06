@@ -223,6 +223,17 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
     [filtered, scopedAllocations, summary, expiryWindow, kickoff],
   );
 
+  /* ── Level 0 cascade verification & barcode traceability ───────────────── */
+  const [tolerance, setTolerance] = useState(0.02);
+  const levelBalances = useMemo(
+    () => computeLevelBalances(filtered, scopedAllocations), [filtered, scopedAllocations]);
+  const cascade = useMemo(
+    () => computeCascade(filtered, scopedAllocations, tolerance), [filtered, scopedAllocations, tolerance]);
+  const ledger = useMemo(() => stateLedger(cascade, scopedAllocations), [cascade, scopedAllocations]);
+  const trace = useMemo(() => computeBarcodeTrace(filtered), [filtered]);
+
+
+
   /* ── data-quality validation ───────────────────────────────────────────── */
   const [dqOpen, setDqOpen] = useState(false);
   const dq = useMemo(
