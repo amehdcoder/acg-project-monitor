@@ -11,7 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import KoboSyncDialog from "./KoboSyncDialog";
 import SupervisoryDashboardView from "./SupervisoryDashboardView";
 import ChecklistDashboard from "./ChecklistDashboard";
-import ChecklistDataTable from "./ChecklistDataTable";
+import RawKoboDataTabs from "./RawKoboDataTabs";
 import MedicineAccountabilityDashboard from "./MedicineAccountabilityDashboard";
 import ChecklistAccessManager from "./ChecklistAccessManager";
 import {
@@ -203,9 +203,10 @@ export default function IntegratedSupervisoryView() {
         </TabsContent>
         {perms.canViewRawData && (
           <TabsContent value="records" className="mt-4">
-            <ChecklistDataTable cache={cache} />
+            <RawKoboDataTabs cache={cache} onRefresh={() => refresh(false)} />
           </TabsContent>
         )}
+
         <TabsContent value="studio" className="mt-4">
           <SupervisoryDashboardView cache={cache} onRefresh={() => refresh(false)} syncing={syncing} />
         </TabsContent>

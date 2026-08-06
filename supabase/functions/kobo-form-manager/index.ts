@@ -682,6 +682,47 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Proxy a KoboToolbox attachment (photo / signature / barcode image) and
+    // return it as a base64 data URL so the browser can render it without
+    // exposing the Kobo API token.
+    if (action === "fetch_attachment") {
+      const { server_url, api_token, attachment_url } = params;
+      if (!server_url || !api_token || !attachment_url) {
+        return j({ error: "Missing server_url/api_token/attachment_url" }, 400);
+      }
+      let target: URL;
+      try { target = new URL(String(attachment_url)); } catch { return j({ error: "Invalid attachment_url" }, 400); }
+      let base: URL;
+      try { base = await assertSafeKoboUrl(String(server_url)); } catch { return j({ error: "Invalid server_url" }, 400); }
+      const sameHost = target.hostname === base.hostname
+        || target.hostname.endsWith(`.${base.hostname.split(".").slice(-2).join(".")}`);
+      if (target.protocol !== "https:" || !sameHost || isPrivateHostname(target.hostname)) {
+        return j({ error: "attachment_url is not on the configured Kobo server" }, 400);
+      }
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 25_000);
+        const res = await fetch(target.toString(), {
+          signal: ctrl.signal,
+          headers: { Authorization: `Token ${api_token}` },
+        }).finally(() => clearTimeout(t));
+        if (!res.ok) {
+          const body = await res.text();
+          return j({ error: "Attachment fetch failed", status: res.status, detail: body.slice(0, 300) }, res.status);
+        }
+        const mime = res.headers.get("content-type") || "image/jpeg";
+        const buf = new Uint8Array(await res.arrayBuffer());
+        if (buf.byteLength > 12_000_000) return j({ error: "Attachment too large to preview" }, 413);
+        let bin = "";
+        for (let i = 0; i < buf.length; i += 8192) bin += String.fromCharCode(...buf.subarray(i, i + 8192));
+        return j({ ok: true, mime, data_url: `data:${mime};base64,${btoa(bin)}` });
+      } catch (e) {
+        return j({ error: "Attachment fetch failed", detail: (e as Error).message }, 502);
+      }
+    }
+
+
+
     if (action === "retry_submission") {
       const forbid = await ensureAdmin();
       if (forbid) return forbid;

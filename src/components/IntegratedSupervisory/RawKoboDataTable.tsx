@@ -14,11 +14,14 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
 import { useChecklistPermissions } from "@/hooks/useChecklistPermissions";
-import { validateCache, type KoboCache } from "./koboClient";
+import { validateCache, type KoboCache, type KoboConfig } from "./koboClient";
 import { buildDataDictionary, typeIcon, type KoboColumn } from "./koboSchema";
 import { getResolver } from "./koboLabelResolver";
 import RecordPreviewDrawer from "./RecordPreviewDrawer";
 import { exportXlsx, exportCsv } from "./exportKoboData";
+import { listAttachments, looksLikeMedia, matchAttachment, type KoboAttachment } from "./koboMedia";
+import { KoboLightbox, KoboThumb } from "./KoboMediaViewer";
+
 
 
 type StatusKey = "approved" | "flagged" | "pending";
@@ -92,13 +95,23 @@ const KpiCard = ({
   </div>
 );
 
-export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCache | null; onRefresh?: () => void }) {
+export default function RawKoboDataTable({
+  cache, onRefresh, cfg = null, title = "Kobo Data Explorer", subtitle = "MDA Supervisory Data Overview",
+}: {
+  cache: KoboCache | null;
+  onRefresh?: () => void;
+  cfg?: KoboConfig | null;
+  title?: string;
+  subtitle?: string;
+}) {
   const { canExport } = useChecklistPermissions();
   const [search, setSearch] = useState("");
   const dq = useDebouncedValue(search, 300);
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(0);
   const [detail, setDetail] = useState<any | null>(null);
+  const [lightbox, setLightbox] = useState<{ items: KoboAttachment[]; index: number }>({ items: [], index: -1 });
+
 
   const [fState, setFState] = useState<string>("__all");
   const [fLga, setFLga] = useState<string>("__all");
@@ -201,6 +214,30 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
     return resolved || "—";
   };
 
+  /** Media-aware cell: photo/signature answers render as clickable thumbnails. */
+  const renderCell = (row: any, fieldKey: string) => {
+    const v = row[fieldKey];
+    if (looksLikeMedia(v)) {
+      const att = matchAttachment(row, v);
+      if (att?.isImage) {
+        const rowImages = listAttachments(row).filter((a) => a.isImage);
+        const idx = Math.max(0, rowImages.findIndex((a) => a.downloadUrl === att.downloadUrl));
+        return (
+          <KoboThumb
+            cfg={cfg}
+            attachment={att}
+            label={resolver.resolveHeader(fieldKey) || fieldKey}
+            size={38}
+            onOpen={() => setLightbox({ items: rowImages, index: idx })}
+          />
+        );
+      }
+    }
+    const val = cellDisplay(fieldKey, v);
+    return <span title={val}>{val}</span>;
+  };
+
+
   const fmtInt = (n: number) => n.toLocaleString();
   const fmtPct = (n: number) => `${n.toFixed(1)}%`;
   const lastSync = cache?.fetchedAt ? new Date(cache.fetchedAt) : null;
@@ -232,8 +269,9 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
             <Database className="h-6 w-6 text-white" />
           </div>
           <div>
-            <div className="text-xl font-bold tracking-tight">Kobo Data Explorer</div>
-            <div className="text-xs text-blue-100/80">MDA Supervisory Data Overview</div>
+            <div className="text-xl font-bold tracking-tight">{title}</div>
+            <div className="text-xs text-blue-100/80">{subtitle}</div>
+
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -391,10 +429,12 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
                       </td>
                       {visibleCols
                         .filter((k) => k !== "_submission_time")
-                        .map((k) => {
-                          const val = cellDisplay(k, r[k]);
-                          return <td key={k} className="px-3 py-2 min-w-[160px] max-w-[280px] truncate" title={val}>{val}</td>;
-                        })}
+                        .map((k) => (
+                          <td key={k} className="px-3 py-2 min-w-[160px] max-w-[280px] truncate">
+                            {renderCell(r, k)}
+                          </td>
+                        ))}
+
                     </tr>
                   );
                 })}
@@ -466,7 +506,16 @@ export default function RawKoboDataTable({ cache, onRefresh }: { cache: KoboCach
         columns={columns}
         resolver={resolver}
       />
+
+      <KoboLightbox
+        cfg={cfg}
+        items={lightbox.items}
+        index={lightbox.index}
+        onIndexChange={(i) => setLightbox((s) => ({ ...s, index: i }))}
+        onClose={() => setLightbox({ items: [], index: -1 })}
+      />
     </div>
+
   );
 }
 
