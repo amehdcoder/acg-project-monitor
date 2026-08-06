@@ -59,9 +59,13 @@ export default function RawKoboDataTabs({
         )}
       </TabsContent>
 
-      <TabsContent value="media">
-        <KoboMediaGallery cache={galleryCache} cfg={medCfg ?? cfg} />
+      <TabsContent value="media" className="space-y-6">
+        <KoboMediaGallery cache={cache} cfg={cfg} title="Supervisory checklist — photos & signatures" />
+        {medCache && (
+          <KoboMediaGallery cache={medCache} cfg={medCfg} title="Medicine logistics — proof of delivery, signatures & receipts" />
+        )}
       </TabsContent>
+
     </Tabs>
   );
 }
