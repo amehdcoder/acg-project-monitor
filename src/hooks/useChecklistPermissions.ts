@@ -65,6 +65,7 @@ export function useChecklistPermissions(): ChecklistPermissions {
     return {
       canView,
       canViewRawData: admin || granted || grantedRaw,
+      canViewMedicineAccountability: canView,
       canExport: admin || granted || grantedRaw,
       canManageIntegrations: admin,
       canManageAccess: !!isOwner || !!isCoOwner,
