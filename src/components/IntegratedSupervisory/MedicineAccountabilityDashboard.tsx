@@ -558,10 +558,12 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
         </Card>
       )}
 
-      <Tabs defaultValue="flow">
+      <Tabs defaultValue="cascade">
         <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="cascade"><Warehouse className="h-4 w-4 mr-1" /> Federal → State → LGA</TabsTrigger>
           <TabsTrigger value="flow"><Activity className="h-4 w-4 mr-1" /> Flow & wastage</TabsTrigger>
           <TabsTrigger value="balances"><Boxes className="h-4 w-4 mr-1" /> Tiered balances</TabsTrigger>
+          <TabsTrigger value="barcode"><QrCode className="h-4 w-4 mr-1" /> Barcode traceability</TabsTrigger>
           <TabsTrigger value="facilities"><PackageX className="h-4 w-4 mr-1" /> Stockout risk</TabsTrigger>
           <TabsTrigger value="batches"><CalendarClock className="h-4 w-4 mr-1" /> Batches & expiry</TabsTrigger>
           <TabsTrigger value="leadtime"><Timer className="h-4 w-4 mr-1" /> Lead time & POD</TabsTrigger>
@@ -569,6 +571,20 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
 
           <TabsTrigger value="integrity"><ShieldAlert className="h-4 w-4 mr-1" /> Data integrity</TabsTrigger>
         </TabsList>
+
+        {/* Level 0 cascade verification */}
+        <TabsContent value="cascade" className="mt-4">
+          <CascadeVerificationPanel
+            cascade={cascade} levels={levelBalances} states={ledger}
+            tolerance={tolerance} onTolerance={setTolerance} canExport={canExport}
+          />
+        </TabsContent>
+
+        {/* Barcode / QR traceability */}
+        <TabsContent value="barcode" className="mt-4">
+          <BarcodeTraceabilityPanel trace={trace} />
+        </TabsContent>
+
 
         {/* Flow */}
         <TabsContent value="flow" className="mt-4 space-y-4">
