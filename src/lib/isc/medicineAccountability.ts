@@ -87,6 +87,63 @@ const hasMedia = (v: any) => {
   return !!s && s !== "0" && s.toLowerCase() !== "null";
 };
 
+/** First non-empty value across a list of candidate leaf names. */
+function getAny(obj: any, names: string[]): any {
+  for (const n of names) {
+    const v = get(obj, n);
+    if (v !== undefined && str(v) !== "") return v;
+  }
+  return undefined;
+}
+
+/** Any leaf whose name looks like a barcode / QR scan capture. */
+const BARCODE_RE = /(barcode|bar_code|qr_?code|qr_?scan|scanned_?code|gtin|gs1|serial_?code)/i;
+
+function scanCode(obj: any): string {
+  if (!obj || typeof obj !== "object") return "";
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === null || typeof v === "object") continue;
+    if (BARCODE_RE.test(leaf(k))) {
+      const s = str(v);
+      if (s && s.toLowerCase() !== "null") return s;
+    }
+  }
+  for (const v of Object.values(obj)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const hit = scanCode(v);
+      if (hit) return hit;
+    }
+  }
+  return "";
+}
+
+/** Barcode captured on the repeat item, falling back to the parent submission. */
+const findCode = (...objs: any[]) => {
+  for (const o of objs) { const c = scanCode(o); if (c) return c; }
+  return "";
+};
+
+const hasLeafPrefix = (item: any, prefix: string) =>
+  Object.keys(item ?? {}).some((k) => leaf(k).toLowerCase().startsWith(prefix));
+
+/** Discover repeat arrays by shape (used for newly added groups with opaque ids). */
+function repeatsWhere(obj: any, pred: (item: any) => boolean): any[] {
+  const out: any[] = [];
+  const walk = (o: any) => {
+    if (!o || typeof o !== "object") return;
+    for (const v of Object.values(o)) {
+      if (Array.isArray(v)) {
+        const items = v.filter((i) => i && typeof i === "object");
+        if (items.length && items.some(pred)) out.push(...items.filter(pred));
+        items.forEach(walk);
+      } else if (v && typeof v === "object") walk(v);
+    }
+  };
+  walk(obj);
+  return out;
+}
+
+
 const dayDiff = (a?: string, b?: string) => {
   if (!a || !b) return null;
   const ta = new Date(a).getTime();
