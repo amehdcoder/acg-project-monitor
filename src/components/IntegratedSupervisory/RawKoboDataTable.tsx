@@ -428,10 +428,12 @@ export default function RawKoboDataTable({
                       </td>
                       {visibleCols
                         .filter((k) => k !== "_submission_time")
-                        .map((k) => {
-                          const val = cellDisplay(k, r[k]);
-                          return <td key={k} className="px-3 py-2 min-w-[160px] max-w-[280px] truncate" title={val}>{val}</td>;
-                        })}
+                        .map((k) => (
+                          <td key={k} className="px-3 py-2 min-w-[160px] max-w-[280px] truncate">
+                            {renderCell(r, k)}
+                          </td>
+                        ))}
+
                     </tr>
                   );
                 })}
