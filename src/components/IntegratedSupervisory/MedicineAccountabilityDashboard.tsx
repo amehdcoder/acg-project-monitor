@@ -323,9 +323,12 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
               <Truck className="h-5 w-5 text-primary" /> Medicine Accountability & Cascade Tracking
             </h2>
             <p className="text-xs text-muted-foreground">
-              State → LGA → Health Facility → CDD logistics ledger · {dataset.submissions.toLocaleString()} logistics submissions ·
-              {" "}{dataset.receipts.length} receipts · {dataset.issues.length} facility issues · {dataset.cddIssues.length} CDD issues
+              Federal Medical Store (Oshodi) → State → LGA → Health Facility → CDD ledger · {dataset.submissions.toLocaleString()} logistics submissions ·
+              {" "}{dataset.dispatches.length} State dispatches · {dataset.receipts.length} LGA receipts ·
+              {" "}{dataset.issues.length} facility issues · {dataset.cddIssues.length} CDD issues ·
+              {" "}{trace.uniqueCodes} barcodes scanned
             </p>
+
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {cache && (
