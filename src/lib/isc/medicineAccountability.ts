@@ -185,7 +185,10 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
         qtyReceived,
         qtyDamaged,
         netUsable: Math.max(0, num(get(item, "l1_net_usable_qty")) || qtyReceived - qtyDamaged),
-        edoName: str(get(raw, "LGA_Essential_Drug_Officer_EDO_Name")) || "—",
+        edoName:
+          str(get(raw, "LGA_Essential_Drug_Officer_EDO_Name")) ||
+          str(get(raw, "LGA_Logistics_Officer_Name")) ||
+          str(get(raw, "Logistics_Officer_Name")) || "—",
         sloName: str(get(raw, "State_Logistics_Officer_SLO_Name")) || "—",
         hasWaybill,
         hasSignature,
