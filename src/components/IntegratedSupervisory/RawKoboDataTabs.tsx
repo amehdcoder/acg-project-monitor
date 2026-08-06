@@ -23,12 +23,8 @@ export default function RawKoboDataTabs({
   const medCache = useMemo(() => loadMedLogCache(), [cache]);
   const medCfg = useMemo(() => loadMedLogConfig(), [cache]);
 
-  const galleryCache = useMemo<KoboCache | null>(() => {
-    if (!cache && !medCache) return null;
-    if (!medCache) return cache;
-    if (!cache) return medCache;
-    return { ...cache, results: [...(cache.results ?? []), ...(medCache.results ?? [])] };
-  }, [cache, medCache]);
+
+
 
   return (
     <Tabs defaultValue="checklist" className="space-y-3">
