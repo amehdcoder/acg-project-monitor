@@ -506,7 +506,16 @@ export default function RawKoboDataTable({
         columns={columns}
         resolver={resolver}
       />
+
+      <KoboLightbox
+        cfg={cfg}
+        items={lightbox.items}
+        index={lightbox.index}
+        onIndexChange={(i) => setLightbox((s) => ({ ...s, index: i }))}
+        onClose={() => setLightbox({ items: [], index: -1 })}
+      />
     </div>
+
   );
 }
 
