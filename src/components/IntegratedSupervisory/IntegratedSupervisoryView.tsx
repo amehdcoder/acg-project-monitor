@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import KoboSyncDialog from "./KoboSyncDialog";
+import KoboSyncStatus from "./KoboSyncStatus";
 import SupervisoryDashboardView from "./SupervisoryDashboardView";
 import ChecklistDashboard from "./ChecklistDashboard";
 import RawKoboDataTabs from "./RawKoboDataTabs";
