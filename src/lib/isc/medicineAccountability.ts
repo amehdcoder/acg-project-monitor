@@ -255,22 +255,25 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
       hasMedia(get(raw, "Logistics_Officer_Acknowledgment_Signature")) ||
       hasMedia(get(raw, "LGA_Logistics_Officer_Signature"));
 
-    // Level 0 — State medical store → LGA dispatch. The group id of the newly
-    // added section is not fixed, so repeats are discovered by their `l0_*`
-    // fields (with the named group kept as a fast path).
+    // Level 0 — State medical store → LGA dispatch.
+    // In the current XLSForm this is a FLAT group (`group_jf7mg53`, one medicine
+    // per submission); older revisions used a repeat, so both shapes are parsed.
     const l0Items = [
+      ...repeats(raw, "group_jf7mg53"),
       ...repeats(raw, "group_l0"),
       ...repeatsWhere(raw, (i) => hasLeafPrefix(i, "l0_")),
     ];
+    const l0Sources: any[] = l0Items.length ? l0Items : [raw];
     const seenL0 = new Set<any>();
-    for (const item of l0Items) {
+    for (const item of l0Sources) {
       if (seenL0.has(item)) continue;
       seenL0.add(item);
       const medicine = str(getAny(item, [
-        "Medicine_Dispatched", "Medicine_Dispatched_to_LGA", "Medicine_IssuedtoLGA",
-        "Medicine_Allocated_to_LGA", "l0_medicine", "Medicine_Allocated",
+        "State_Medicineallocated", "Medicine_Dispatched", "Medicine_Dispatched_to_LGA",
+        "Medicine_IssuedtoLGA", "Medicine_Allocated_to_LGA", "l0_medicine",
       ]));
       const qtyDispatched = num(getAny(item, [
+        "Quantity_of_medicine_s_LGA_Tablets_Units",
         "l0_qty_dispatched", "l0_qty_issued", "l0_quantity_dispatched",
         "Quantity_Dispatched_to_LGA", "Quantity_Issued_to_LGA", "l0_qty",
       ]));
@@ -279,15 +282,16 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
         ...base,
         level: "level_0",
         medicine: medicine || "unspecified",
-        batch: str(getAny(item, ["Batch_Lot_Number_000", "l0_batch_lot_number", "Batch_Lot_Number"])) || "—",
-        expiry: str(getAny(item, ["l0_expiry_date", "Expiry_Date_000", "expiry_date"])),
+        batch: str(getAny(item, ["Batch_Lot_Number_002", "Batch_Lot_Number_000", "l0_batch_lot_number"])) || "—",
+        expiry: str(getAny(item, ["Expiry_Date", "l0_expiry_date", "Expiry_Date_000", "expiry_date"])),
         qtyDispatched,
         qtyDamaged: num(getAny(item, ["l0_qty_damaged", "l0_damaged"])),
         destinationLga: str(getAny(item, [
           "l0_destination_lga", "Destination_LGA", "Receiving_LGA", "LGA_Destination",
         ])) || base.lga,
         sloName: str(getAny(raw, [
-          "State_Logistics_Officer_SLO_Name", "SLO_Name", "State_Store_Officer_Name",
+          "Name_of_State_Logistic_Officer_SLO", "State_Logistics_Officer_SLO_Name",
+          "SLO_Name", "State_Store_Officer_Name",
         ])) || "—",
         receivingOfficer: str(getAny(raw, [
           "LGA_Essential_Drug_Officer_EDO_Name", "LGA_Logistics_Officer_Name",
@@ -296,9 +300,10 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
         waybill: str(getAny(item, ["l0_waybill_number", "Waybill_Number", "waybill_no"])) || "—",
         hasWaybill: hasWaybill || hasMedia(getAny(item, ["l0_waybill_photo", "Waybill_Photo"])),
         hasSignature,
-        barcode: findCode(item, raw),
+        barcode: str(getAny(item, ["Scan_Bar_QR_Code_on_Medicine_package"])) || findCode(item, raw),
       });
     }
+
 
     // Level 1 — receipt at LGA
     for (const item of repeats(raw, "group_ff5wt15")) {
