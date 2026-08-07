@@ -131,7 +131,8 @@ export function useMdaLens(): MdaLensState {
       "postgres_changes" as any,
       { event: "*", schema: "public", table: "mda_lens_grants", filter: `user_id=eq.${user.id}` },
       (payload) => {
-        if (payload.eventType === "DELETE") {
+        const eventType = (payload as unknown as { eventType?: string }).eventType;
+        if (eventType === "DELETE") {
           writeCachedLens(user.id, null);
           setLens(null);
           setLoading(false);
