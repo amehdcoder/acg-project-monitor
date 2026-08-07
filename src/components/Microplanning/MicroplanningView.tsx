@@ -31,6 +31,8 @@ import useRealtimeMicroplanEntries from "@/hooks/useRealtimeMicroplanEntries";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useMdaLens } from "@/hooks/useMdaLens";
 import { campaignInLensScope, projectInLensScope, rowInLensScope, MICROPLAN_TABS } from "@/lib/mdaLens/config";
+import LensScopeBanner, { lensScopeSummary } from "@/components/MdaLens/LensScopeBanner";
+
 import MdaLensExportButton from "@/components/UserManagement/MdaLensExportButton";
 import { useProjectScope } from "@/hooks/useProjectScope";
 import { rowInScope } from "@/lib/projectScope";
