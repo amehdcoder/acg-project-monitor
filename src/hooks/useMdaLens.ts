@@ -56,7 +56,7 @@ export function useMdaLens(): MdaLensState {
     );
     setLens(data ? ({ wards: [], project_ids: [], campaign_types: [], ...data } as MdaLensGrant) : null);
     setLoading(false);
-  }, [user, authLoading]);
+  }, [user, authLoading, injected]);
 
   useEffect(() => { void load(); }, [load]);
 
