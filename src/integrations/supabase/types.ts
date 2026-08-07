@@ -5058,6 +5058,45 @@ export type Database = {
           },
         ]
       }
+      mda_lens_access_events: {
+        Row: {
+          access_granted: boolean | null
+          created_at: string
+          detail: Json
+          event_type: string
+          grant_state: string | null
+          id: string
+          latency_ms: number | null
+          page: string | null
+          tab: string | null
+          user_id: string
+        }
+        Insert: {
+          access_granted?: boolean | null
+          created_at?: string
+          detail?: Json
+          event_type: string
+          grant_state?: string | null
+          id?: string
+          latency_ms?: number | null
+          page?: string | null
+          tab?: string | null
+          user_id: string
+        }
+        Update: {
+          access_granted?: boolean | null
+          created_at?: string
+          detail?: Json
+          event_type?: string
+          grant_state?: string | null
+          id?: string
+          latency_ms?: number | null
+          page?: string | null
+          tab?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       mda_lens_grants: {
         Row: {
           campaign_types: string[]
@@ -9473,6 +9512,7 @@ export type Database = {
       owner_restore_records: { Args: { _record_ids: string[] }; Returns: Json }
       profile_co_owner_flag: { Args: { _user_id: string }; Returns: boolean }
       profile_owner_flag: { Args: { _user_id: string }; Returns: boolean }
+      prune_mda_lens_access_events: { Args: never; Returns: undefined }
       record_inactive_login_attempt: {
         Args: {
           _attempted_user_id?: string
