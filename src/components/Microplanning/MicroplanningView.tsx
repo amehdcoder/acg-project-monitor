@@ -463,6 +463,10 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   // Designation-based scope (admins bypass)
   const scope = useMicroplanScope(isAdmin);
+  const { lens, lensEnabled, canOpenMicroplanTab } = useMdaLens();
+  const lensScopeLabel = lens
+    ? `Scope: ${lens.states.length ? lens.states.join(", ") : "All states"}${lens.lgas.length ? ` · ${lens.lgas.join(", ")}` : ""}`
+    : "Scope: full dataset";
   // Project-level geographic scope (State/LGA/Ward set on the project itself).
   const { scope: projectScope } = useProjectScope(selectedProjectId);
   // Shared target-population disaggregation selection (syncs with Map tab + globally)
@@ -877,8 +881,10 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     // 2) Project-level geographic scope (applies to everyone, incl. admins,
     //    since it's a boundary defined on the project itself).
     result = result.filter((e: any) => rowInScope(projectScope, e));
+    // 3) MDA Lens: admin-granted State/LGA lens narrows everything the user sees.
+    if (lens) result = result.filter((e: any) => rowInLensScope(lens, e.state, e.lga));
     return result;
-  }, [baseEntries, isAdmin, scope, projectScope]);
+  }, [baseEntries, isAdmin, scope, projectScope, lens]);
 
   // Filters (memoized — avoids re-deriving over millions of rows every render)
   const uniqueStates = useMemo(
