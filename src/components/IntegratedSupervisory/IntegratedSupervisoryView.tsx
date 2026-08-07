@@ -235,6 +235,16 @@ export default function IntegratedSupervisoryView() {
               {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Server className="h-4 w-4 mr-1" />}
               Sync Now
             </Button>
+
+            {(perms.canExport || (lensEnabled && lens?.can_export)) && (
+              <MdaLensExportButton
+                title="Integrated Supervisory Checklist — Scoped Export"
+                scopeLabel={scopeLabel}
+                sheetName="Responses"
+                columns={exportColumns}
+                rows={(scopedCache?.flatResults ?? []) as Record<string, unknown>[]}
+              />
+            )}
           </div>
         </CardContent>
       </Card>
