@@ -887,8 +887,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
   };
 
-  // Use demo data when no real entries exist
-  const isUsingDemoData = entries.length === 0 && !loading;
+  // Use demo data when no real entries exist. Never for MDA Lens users — a
+  // scoped user must only ever see real, in-scope submissions (or an empty state).
+  const isUsingDemoData = entries.length === 0 && !loading && !lensEnabled;
   const baseEntries = isUsingDemoData ? DEMO_ENTRIES : entries;
   // Designation-scope filter: admins always see all; non-admins with no
   // designation assignment also see all (legacy). Users with assignments are
