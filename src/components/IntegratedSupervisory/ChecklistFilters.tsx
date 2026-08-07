@@ -143,16 +143,36 @@ export default function ChecklistFilters({
   const monitors = useMemo(() => uniq(byDesig, "Independent_Monitor_s_Name"), [byDesig]);
   const campaigns = useMemo(() => uniq(byWard, "MDA_Campaign_Type"), [byWard]);
 
+  const lockState = !!only(lens?.states) && states.length <= 1;
+  const lockLga = !!only(lens?.lgas) && lgas.length <= 1;
+  const lockWard = !!only(lens?.wards) && wards.length <= 1;
+
+  // Pin the locked levels so the dashboards always read the granted slice.
+  useEffect(() => {
+    const patch: Partial<ChecklistFilterState> = {};
+    if (lockState && states[0] && value.state !== states[0]) patch.state = states[0];
+    if (lockLga && lgas[0] && value.lga !== lgas[0]) patch.lga = lgas[0];
+    if (lockWard && wards[0] && value.ward !== wards[0]) patch.ward = wards[0];
+    if (Object.keys(patch).length) onChange({ ...value, ...patch });
+  }, [lockState, lockLga, lockWard, states, lgas, wards, value, onChange]);
+
   const set = (patch: Partial<ChecklistFilterState>) => {
     const next = { ...value, ...patch };
     // cascade reset
     if (patch.state !== undefined) { next.lga = ""; next.ward = ""; }
     if (patch.lga !== undefined) next.ward = "";
     if (patch.designation !== undefined) next.monitor = "";
+    // never clear a level the MDA Lens locks
+    if (lockState && states[0]) next.state = states[0];
+    if (lockLga && lgas[0]) next.lga = lgas[0];
+    if (lockWard && wards[0]) next.ward = wards[0];
     onChange(next);
   };
 
+  const clearAll = () => set({ ...EMPTY_FILTERS });
+
   const active = Object.values(value).filter(Boolean).length;
+
 
   return (
     <Card className="p-3">
