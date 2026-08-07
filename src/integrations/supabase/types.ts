@@ -9382,6 +9382,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      mda_lens_geo_key: { Args: { _v: string }; Returns: string }
       microplan_distinct_geography:
         | {
             Args: { _states?: string[] }
