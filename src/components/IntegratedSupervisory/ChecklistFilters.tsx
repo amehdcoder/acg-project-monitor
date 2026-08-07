@@ -59,26 +59,30 @@ const uniq = (rows: Record<string, unknown>[], field: string) =>
   );
 
 function FilterSelect({
-  id, title, value, options, onChange, disabled,
+  id, title, value, options, onChange, disabled, locked,
 }: {
   id: string; title: string; value: string; options: string[];
-  onChange: (v: string) => void; disabled?: boolean;
+  onChange: (v: string) => void; disabled?: boolean; locked?: boolean;
 }) {
   return (
     <div className="space-y-1">
-      <Label htmlFor={id} className="text-[11px] font-semibold text-muted-foreground">{title}</Label>
-      <Select value={value || ALL} onValueChange={(v) => onChange(v === ALL ? "" : v)} disabled={disabled}>
+      <Label htmlFor={id} className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+        {title}
+        {locked && <Lock className="h-3 w-3 text-primary" aria-label="Locked to your MDA Lens scope" />}
+      </Label>
+      <Select value={value || ALL} onValueChange={(v) => onChange(v === ALL ? "" : v)} disabled={disabled || locked}>
         <SelectTrigger id={id} className="h-9 text-xs">
           <SelectValue placeholder={`All ${title}`} />
         </SelectTrigger>
         <SelectContent className="max-h-72">
-          <SelectItem value={ALL}>All {title}</SelectItem>
+          {!locked && <SelectItem value={ALL}>All {title}</SelectItem>}
           {options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
         </SelectContent>
       </Select>
     </div>
   );
 }
+
 
 /** Cascaded filter bar: date range → State → LGA → Ward, plus person filters. */
 export default function ChecklistFilters({
