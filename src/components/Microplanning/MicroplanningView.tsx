@@ -469,6 +469,14 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const lensScopeLabel = lens
     ? `Scope: ${lens.states.length ? lens.states.join(", ") : "All states"}${lens.lgas.length ? ` · ${lens.lgas.join(", ")}` : ""}`
     : "Scope: full dataset";
+  // Pre-select the geography filters when the lens grants exactly one State / LGA,
+  // so scoped users land straight on their own real-time slice.
+  useEffect(() => {
+    if (!lens) return;
+    if (lens.states.length === 1) setFilterState((c) => (c === "all" ? lens.states[0] : c));
+    if (lens.lgas.length === 1) setFilterLga((c) => (c === "all" ? lens.lgas[0] : c));
+  }, [lens]);
+
   // Project-level geographic scope (State/LGA/Ward set on the project itself).
   const { scope: projectScope } = useProjectScope(selectedProjectId);
   // Shared target-population disaggregation selection (syncs with Map tab + globally)

@@ -43,7 +43,24 @@ export const SUPERVISORY_TAB_IDS = SUPERVISORY_TABS.map((t) => t.id) as unknown 
 /** Page ids the lens unlocks in the sidebar / route guard. */
 export const LENS_PAGE_IDS = ["microplanning", "integrated-supervisory", "integrated-supervisory-raw"];
 
-const norm = (s: unknown) => String(s ?? "").trim().toLowerCase();
+/**
+ * Tolerant comparison key: Kobo/microplan rows store geography in many shapes
+ * ("Kano", "kano", "c__kano", "Kano|Dala", "state_kano_01", "Dala LGA").
+ * We compare on the last hierarchy segment, without code prefixes, spacing or
+ * punctuation, so an admin's plain "Kano" grant always matches the data.
+ */
+const norm = (s: unknown) => {
+  const value = String(s ?? "").trim();
+  const leaf = value.split("|").pop() ?? value;
+  return leaf
+    .toLowerCase()
+    .replace(/^[a-z]+__/, "")
+    .replace(/^[a-z]+_[a-z0-9]+_/, "")
+    .replace(/^(c|s)__?/i, "")
+    .replace(/\b(state|lga|ward)\b/g, "")
+    .replace(/[^a-z0-9]+/g, "");
+};
+
 
 /** True when a row (any object with state/lga-ish fields) is inside the lens scope. */
 export function rowInLensScope(
@@ -56,10 +73,16 @@ export function rowInLensScope(
   const states = (lens.states || []).map(norm).filter(Boolean);
   const lgas = (lens.lgas || []).map(norm).filter(Boolean);
   const wards = (lens.wards || []).map(norm).filter(Boolean);
-  if (states.length && !states.includes(norm(state))) return false;
-  if (lgas.length && !lgas.includes(norm(lga))) return false;
-  if (wards.length && !wards.includes(norm(ward))) return false;
+  const s = norm(state);
+  const l = norm(lga);
+  const w = norm(ward);
+  // A level is only enforced when the row actually carries a value there, so a
+  // State grant keeps every LGA/Ward inside it and rows missing a ward stay visible.
+  if (states.length && s && !states.includes(s)) return false;
+  if (lgas.length && l && !lgas.includes(l)) return false;
+  if (wards.length && w && !wards.includes(w)) return false;
   return true;
+
 }
 
 export const projectInLensScope = (lens: MdaLensGrant | null, projectId: unknown): boolean =>
@@ -83,12 +106,15 @@ export function readKoboGeo(row: Record<string, unknown>): { state: string; lga:
   let state = "";
   let lga = "";
   let ward = "";
+  const pick = (leaf: string, level: "state" | "lga" | "ward") =>
+    new RegExp(`^((mda|sel|q)_?)?${level}(_?(name|label|select|code))?$`, "i").test(leaf.replace(/\s+/g, "_"));
   for (const [k, v] of Object.entries(row || {})) {
     const leaf = k.split("/").pop() || k;
-    if (!state && /^state$/i.test(leaf)) state = String(v ?? "");
-    if (!lga && /^lga$/i.test(leaf)) lga = String(v ?? "");
-    if (!ward && /^ward$/i.test(leaf)) ward = String(v ?? "");
+    if (!state && pick(leaf, "state")) state = String(v ?? "");
+    if (!lga && pick(leaf, "lga")) lga = String(v ?? "");
+    if (!ward && pick(leaf, "ward")) ward = String(v ?? "");
     if (state && lga && ward) break;
   }
+
   return { state, lga, ward };
 }
