@@ -124,12 +124,13 @@ export default function ChecklistFilters({
     () => (value.state ? dateScoped.filter((p) => label("State", p.State) === value.state) : dateScoped),
     [dateScoped, value.state],
   );
-  const lgas = useMemo(() => uniq(byState, "LGA"), [byState]);
+  const lgas = useMemo(() => uniq(byState, "LGA").filter((l) => keep("lga", l)), [byState, lens]);
   const byLga = useMemo(
     () => (value.lga ? byState.filter((p) => label("LGA", p.LGA) === value.lga) : byState),
     [byState, value.lga],
   );
-  const wards = useMemo(() => uniq(byLga, "Ward"), [byLga]);
+  const wards = useMemo(() => uniq(byLga, "Ward").filter((w) => keep("ward", w)), [byLga, lens]);
+
   const byWard = useMemo(
     () => (value.ward ? byLga.filter((p) => label("Ward", p.Ward) === value.ward) : byLga),
     [byLga, value.ward],
