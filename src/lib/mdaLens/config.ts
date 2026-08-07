@@ -73,10 +73,16 @@ export function rowInLensScope(
   const states = (lens.states || []).map(norm).filter(Boolean);
   const lgas = (lens.lgas || []).map(norm).filter(Boolean);
   const wards = (lens.wards || []).map(norm).filter(Boolean);
-  if (states.length && !states.includes(norm(state))) return false;
-  if (lgas.length && !lgas.includes(norm(lga))) return false;
-  if (wards.length && !wards.includes(norm(ward))) return false;
+  const s = norm(state);
+  const l = norm(lga);
+  const w = norm(ward);
+  // A level is only enforced when the row actually carries a value there, so a
+  // State grant keeps every LGA/Ward inside it and rows missing a ward stay visible.
+  if (states.length && s && !states.includes(s)) return false;
+  if (lgas.length && l && !lgas.includes(l)) return false;
+  if (wards.length && w && !wards.includes(w)) return false;
   return true;
+
 }
 
 export const projectInLensScope = (lens: MdaLensGrant | null, projectId: unknown): boolean =>
