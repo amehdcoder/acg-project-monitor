@@ -5060,6 +5060,7 @@ export type Database = {
       }
       mda_lens_grants: {
         Row: {
+          campaign_types: string[]
           can_export: boolean
           created_at: string
           enabled: boolean
@@ -5067,12 +5068,15 @@ export type Database = {
           id: string
           lgas: string[]
           microplan_tabs: string[]
+          project_ids: string[]
           states: string[]
           supervisory_tabs: string[]
           updated_at: string
           user_id: string
+          wards: string[]
         }
         Insert: {
+          campaign_types?: string[]
           can_export?: boolean
           created_at?: string
           enabled?: boolean
@@ -5080,12 +5084,15 @@ export type Database = {
           id?: string
           lgas?: string[]
           microplan_tabs?: string[]
+          project_ids?: string[]
           states?: string[]
           supervisory_tabs?: string[]
           updated_at?: string
           user_id: string
+          wards?: string[]
         }
         Update: {
+          campaign_types?: string[]
           can_export?: boolean
           created_at?: string
           enabled?: boolean
@@ -5093,10 +5100,12 @@ export type Database = {
           id?: string
           lgas?: string[]
           microplan_tabs?: string[]
+          project_ids?: string[]
           states?: string[]
           supervisory_tabs?: string[]
           updated_at?: string
           user_id?: string
+          wards?: string[]
         }
         Relationships: []
       }

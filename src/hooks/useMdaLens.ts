@@ -34,13 +34,13 @@ export function useMdaLens(): MdaLensState {
       (async () =>
         await supabase
           .from("mda_lens_grants")
-          .select("user_id, enabled, microplan_tabs, supervisory_tabs, states, lgas, can_export")
+          .select("user_id, enabled, microplan_tabs, supervisory_tabs, states, lgas, wards, project_ids, campaign_types, can_export")
           .eq("user_id", user.id)
           .maybeSingle())(),
       8000,
       { data: null } as any,
     );
-    setLens((data as MdaLensGrant | null) ?? null);
+    setLens(data ? ({ wards: [], project_ids: [], campaign_types: [], ...data } as MdaLensGrant) : null);
     setLoading(false);
   }, [user, authLoading]);
 

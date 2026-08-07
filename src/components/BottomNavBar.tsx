@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { LayoutDashboard, FileText, Briefcase, BarChart3, Menu, MessageSquareText, History } from "lucide-react";
+import { LayoutDashboard, FileText, Briefcase, BarChart3, Menu, MessageSquareText, History, MapPin, ClipboardList } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useAuth } from "@/hooks/useAuth";
 import { useAudioCues } from "@/hooks/useAudioCues";
@@ -12,9 +12,10 @@ interface BottomNavBarProps {
   onMenuClick: () => void;
   isAdmin?: boolean;
   isAdhoc?: boolean;
+  lensEnabled?: boolean;
 }
 
-const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin, isAdhoc }: BottomNavBarProps) => {
+const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin, isAdhoc, lensEnabled }: BottomNavBarProps) => {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { playClick, playNavigate, playSwipe } = useAudioCues();
@@ -27,7 +28,12 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin, isAdhoc }:
   const prevCounts = useRef<Record<string, number>>({});
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
-  const navItems = isAdhoc
+  const navItems = lensEnabled && !isAdmin
+    ? [
+        { id: "microplanning", label: "Microplanning", icon: MapPin },
+        { id: "integrated-supervisory", label: "Supervisory", icon: ClipboardList },
+      ]
+    : isAdhoc
     ? [
         { id: "forms", label: t("nav.forms"), icon: FileText },
         { id: "project-chat", label: "Chat", icon: MessageSquareText },

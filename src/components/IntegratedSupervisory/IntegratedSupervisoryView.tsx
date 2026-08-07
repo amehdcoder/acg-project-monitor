@@ -22,7 +22,7 @@ import {
 import { useChecklistPermissions } from "@/hooks/useChecklistPermissions";
 import { useRealtimeKoboChecklist } from "@/hooks/useRealtimeKoboChecklist";
 import { useMdaLens } from "@/hooks/useMdaLens";
-import { readKoboGeo, rowInLensScope } from "@/lib/mdaLens/config";
+import { campaignInLensScope, readKoboCampaign, readKoboGeo, rowInLensScope } from "@/lib/mdaLens/config";
 import MdaLensExportButton from "@/components/UserManagement/MdaLensExportButton";
 
 export default function IntegratedSupervisoryView() {
@@ -48,8 +48,8 @@ export default function IntegratedSupervisoryView() {
   const scopedCache = useMemo<KoboCache | null>(() => {
     if (!cache || !lens) return cache;
     const keep = (r: Record<string, unknown>) => {
-      const { state, lga } = readKoboGeo(r);
-      return rowInLensScope(lens, state, lga);
+      const { state, lga, ward } = readKoboGeo(r);
+      return rowInLensScope(lens, state, lga, ward) && campaignInLensScope(lens, readKoboCampaign(r));
     };
     const results = (cache.results || []).filter(keep);
     const flatResults = (cache.flatResults || []).filter(keep);

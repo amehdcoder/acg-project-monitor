@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "@/hooks/useAuth";
 import { usePageAccess } from "@/hooks/usePageAccess";
+import { useMdaLens } from "@/hooks/useMdaLens";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSwipeGesture } from "@/hooks/useSwipeGesture";
@@ -101,6 +102,7 @@ const Index = () => {
 
   const { user, loading, profile, role, isAdmin, isApproved, isPendingApproval, isSuperAdmin, isOwner, isCoOwner, isAdhoc } = useAuth();
   const { canAccessPage, minimalAccess, loadingAccess } = usePageAccess();
+  const { lensEnabled, loadingLens } = useMdaLens();
   const { canEditDashboards } = useCanEditDashboards();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -186,15 +188,22 @@ const Index = () => {
     }
   }, [loading, user, isAdmin, isOwner, searchParams, activeTab]);
 
+  useEffect(() => {
+    if (loading || loadingLens || !user || isAdmin || isOwner || !lensEnabled) return;
+    if (!["microplanning", "integrated-supervisory"].includes(activeTab)) {
+      setActiveTab(canAccessPage("microplanning") ? "microplanning" : "integrated-supervisory");
+    }
+  }, [loading, loadingLens, user, isAdmin, isOwner, lensEnabled, activeTab, canAccessPage]);
+
   // Adhoc users are confined to: their assigned form, the project chat, and
   // their own submissions. Any other tab redirects them back to Forms.
   const ADHOC_TABS = ["forms", "project-chat", "my-submissions", "quizzes"];
   useEffect(() => {
-    if (loading || !user || !isAdhoc) return;
+    if (loading || !user || !isAdhoc || lensEnabled) return;
     if (!ADHOC_TABS.includes(activeTab)) {
       setActiveTab("forms");
     }
-  }, [loading, user, isAdhoc, activeTab]);
+  }, [loading, user, isAdhoc, lensEnabled, activeTab]);
 
   // Rescue Bloomberg validations stuck in this device's "Ready to send" tab
   // (collected with the old draft/finalize form) and push them to the server.
@@ -382,6 +391,7 @@ const Index = () => {
           isAdhoc={isAdhoc}
           canAccessPage={canAccessPage}
           minimalAccess={minimalAccess}
+          lensEnabled={lensEnabled}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(prev => !prev)}
         />
@@ -423,6 +433,7 @@ const Index = () => {
         onMenuClick={() => setSidebarOpen(true)}
         isAdmin={isAdmin}
         isAdhoc={isAdhoc}
+        lensEnabled={lensEnabled}
       />
 
       <ProximityHub />
