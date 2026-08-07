@@ -99,7 +99,6 @@ export default function MdaLensHarness() {
         return grant;
       };
     }
-  }
   } else {
     delete w.__MDA_LENS_TEST_LOADER__;
     w.__MDA_LENS_TEST__ = grant;
