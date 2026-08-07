@@ -25,7 +25,7 @@ import ChecklistFilters, {
 } from "@/components/IntegratedSupervisory/ChecklistFilters";
 import { usePageAccess } from "@/hooks/usePageAccess";
 import { useMdaLens } from "@/hooks/useMdaLens";
-import { rowInLensScope, type MdaLensGrant } from "@/lib/mdaLens/config";
+import { enforceLensTab, rowInLensScope, type MdaLensGrant } from "@/lib/mdaLens/config";
 
 const PAGE_IDS = [
   "microplanning",
@@ -76,7 +76,13 @@ export default function MdaLensHarness() {
   const { lens, lensEnabled } = useMdaLens();
   const { canAccessPage } = usePageAccess();
   const [filters, setFilters] = useState<ChecklistFilterState>({ ...EMPTY_FILTERS });
-  const [activeTab, setActiveTab] = useState("microplanning");
+  // Direct navigation: `?tab=` is treated exactly as Index treats a deep link,
+  // and the real lens route guard decides where the user actually lands.
+  const requestedTab = params.get("tab") || "microplanning";
+  const [activeTab, setActiveTab] = useState(requestedTab);
+  const guardedTab = lensEnabled
+    ? enforceLensTab(activeTab, canAccessPage("microplanning"))
+    : activeTab;
 
   // What the dashboards/exports are allowed to read: lens scope first, then
   // the user's own filter choices — exactly the order the real pages use.
@@ -91,7 +97,7 @@ export default function MdaLensHarness() {
       <Sidebar
         isOpen
         onClose={() => {}}
-        activeTab={activeTab}
+        activeTab={guardedTab}
         onTabChange={setActiveTab}
         profile={{ first_name: "Lens", last_name: "User", designation: "enumerator" }}
         role="user"
@@ -107,6 +113,7 @@ export default function MdaLensHarness() {
 
       <div className="space-y-4 md:pl-72">
         <span data-testid="lens-enabled">{String(lensEnabled)}</span>
+        <span data-testid="active-tab">{guardedTab}</span>
 
         <LensScopeBanner lens={lens} />
 
@@ -141,7 +148,7 @@ export default function MdaLensHarness() {
       </div>
 
       <BottomNavBar
-        activeTab={activeTab}
+        activeTab={guardedTab}
         onTabChange={setActiveTab}
         onMenuClick={() => {}}
         isAdmin={false}
