@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,8 +6,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-import { Filter, X } from "lucide-react";
+import { Filter, Lock, X } from "lucide-react";
 import { resolveChecklistValue } from "./checklistSchema";
+import { useMdaLens } from "@/hooks/useMdaLens";
+import { rowInLensScope } from "@/lib/mdaLens/config";
+
 
 export interface ChecklistFilterState {
   from: string;
