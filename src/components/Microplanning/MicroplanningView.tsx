@@ -366,6 +366,9 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, readOnly = false }:
                     )}
                   </TableCell>
                   <TableCell>
+                    {readOnly ? (
+                      <span className="text-[10px] text-muted-foreground">View only</span>
+                    ) : (
                     <div className="flex items-center gap-1">
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(entry)}>
                         <Edit className="h-3 w-3" />
@@ -374,6 +377,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, readOnly = false }:
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
