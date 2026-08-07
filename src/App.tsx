@@ -19,6 +19,8 @@ import Install from "./pages/Install";
 import DataCleaner from "./pages/DataCleaner";
 import KoboHubPage from "./components/KoboHub/KoboHubPage";
 import MdaAnalysesHarness from "./pages/MdaAnalysesHarness";
+import MdaLensHarness from "./pages/MdaLensHarness";
+
 import MicroplanKpiHarness from "./pages/MicroplanKpiHarness";
 import XlsFormCoverHarness from "./pages/XlsFormCoverHarness";
 import LearningLog from "./pages/LearningLog";
