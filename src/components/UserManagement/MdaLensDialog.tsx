@@ -55,6 +55,7 @@ export default function MdaLensDialog({ open, onOpenChange, userId, userName, us
   const [stateQuery, setStateQuery] = useState("");
   const [lgaQuery, setLgaQuery] = useState("");
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [campaignOptions, setCampaignOptions] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,7 +73,26 @@ export default function MdaLensDialog({ open, onOpenChange, userId, userName, us
     if (!open) return;
     void load();
     void supabase.from("projects").select("id,name").order("name").then(({ data }) => setProjects(data || []));
+    // Campaign types must mirror the values actually stored on submissions —
+    // a hard-coded disease list silently filters every row out of scope.
+    void supabase
+      .from("microplan_entries")
+      .select("campaign_type")
+      .not("campaign_type", "is", null)
+      .limit(5000)
+      .then(({ data }) => {
+        const found = [...new Set((data || []).map((r: any) => String(r.campaign_type || "").trim()).filter(Boolean))].sort();
+        setCampaignOptions(found);
+      });
   }, [open, load]);
+
+  const campaignChoices = useMemo(
+    () => [...new Set([...campaignOptions, ...draft.campaign_types])].sort(),
+    [campaignOptions, draft.campaign_types],
+  );
+  const prettyCampaign = (v: string) =>
+    v.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
 
   const allStates = useMemo(() => getAllStates(), []);
   const visibleStates = useMemo(
