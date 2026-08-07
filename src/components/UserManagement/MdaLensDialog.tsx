@@ -210,14 +210,23 @@ export default function MdaLensDialog({ open, onOpenChange, userId, userName, us
                 </div>
                 <div className="rounded-xl border p-4 space-y-3">
                   <p className="text-sm font-semibold">MDA campaign types</p>
-                  <p className="text-xs text-muted-foreground">Applied to Checklist, Raw Kobo Data, and Medicine Accountability.</p>
-                  {["Schistosomiasis", "Lymphatic Filariasis", "Onchocerciasis", "Soil-Transmitted Helminths"].map((campaign) => (
-                    <label key={campaign} className="flex items-center gap-2 text-xs rounded-md p-1.5 hover:bg-muted/60 cursor-pointer">
-                      <Checkbox checked={draft.campaign_types.includes(campaign)} onCheckedChange={() => toggle("campaign_types", campaign)} />
-                      {campaign}
-                    </label>
-                  ))}
+                  <p className="text-xs text-muted-foreground">
+                    Read from live submissions. Leave empty to include every campaign type.
+                  </p>
+                  <div className="max-h-44 overflow-y-auto space-y-1">
+                    {campaignChoices.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-4 text-center">
+                        No campaign types recorded yet — all campaigns will be visible.
+                      </p>
+                    ) : campaignChoices.map((campaign) => (
+                      <label key={campaign} className="flex items-center gap-2 text-xs rounded-md p-1.5 hover:bg-muted/60 cursor-pointer">
+                        <Checkbox checked={draft.campaign_types.includes(campaign)} onCheckedChange={() => toggle("campaign_types", campaign)} />
+                        {prettyCampaign(campaign)}
+                      </label>
+                    ))}
+                  </div>
                 </div>
+
               </div>
 
               {/* Tabs */}
