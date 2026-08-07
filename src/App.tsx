@@ -162,6 +162,8 @@ const App = () => (
                    <Route path="/kobo-hub/manage" element={<ProtectedRoute><KoboHubPage manage /></ProtectedRoute>} />
                    <Route path="/learning-log" element={<ProtectedRoute><LearningLog /></ProtectedRoute>} />
                     <Route path="/__test/mda-analyses" element={<MdaAnalysesHarness />} />
+                    <Route path="/__test/mda-lens" element={<MdaLensHarness />} />
+
                     <Route path="/__test/microplan-kpi" element={<MicroplanKpiHarness />} />
                     <Route path="/__test/xlsform-cover" element={<XlsFormCoverHarness />} />
                     <Route path="/shared/dashboard/:token" element={<SharedDashboard />} />
