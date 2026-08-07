@@ -163,6 +163,8 @@ const App = () => (
                    <Route path="/learning-log" element={<ProtectedRoute><LearningLog /></ProtectedRoute>} />
                     <Route path="/__test/mda-analyses" element={<MdaAnalysesHarness />} />
                     <Route path="/__test/mda-lens" element={<MdaLensHarness />} />
+                    {/* Extra path segments must not unlock anything — same guarded harness. */}
+                    <Route path="/__test/mda-lens/*" element={<MdaLensHarness />} />
 
                     <Route path="/__test/microplan-kpi" element={<MicroplanKpiHarness />} />
                     <Route path="/__test/xlsform-cover" element={<XlsFormCoverHarness />} />
