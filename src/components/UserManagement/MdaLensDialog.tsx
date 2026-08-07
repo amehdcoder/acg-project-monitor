@@ -18,6 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
+import { invalidateMdaLensCache } from "@/hooks/useMdaLens";
 import {
   Check, Compass, Database, Globe2, Layers, Loader2, MapPin, Search, Sparkles, Trash2,
 } from "lucide-react";
@@ -135,6 +136,7 @@ export default function MdaLensDialog({ open, onOpenChange, userId, userName, us
       const payload = { ...draft, user_id: userId, granted_by: user?.id ?? null };
       const { error } = await supabase.from("mda_lens_grants").upsert(payload, { onConflict: "user_id" });
       if (error) throw error;
+      invalidateMdaLensCache(userId);
       toast({ title: "MDA Lens saved", description: `Scoped access updated for ${userName}.` });
       onSaved?.();
       onOpenChange(false);
@@ -148,6 +150,7 @@ export default function MdaLensDialog({ open, onOpenChange, userId, userName, us
     try {
       const { error } = await supabase.from("mda_lens_grants").delete().eq("user_id", userId);
       if (error) throw error;
+      invalidateMdaLensCache(userId);
       toast({ title: "MDA Lens removed", description: `${userName} no longer has scoped MDA access.` });
       onSaved?.();
       onOpenChange(false);
