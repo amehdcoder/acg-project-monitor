@@ -2114,6 +2114,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             </div>
           )}
 
+          <LensScopeBanner lens={lens} />
+
           {/* Filters & View Toggle */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[180px]">
