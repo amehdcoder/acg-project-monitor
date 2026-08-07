@@ -27,6 +27,12 @@ import ChecklistFilters, {
 import { usePageAccess } from "@/hooks/usePageAccess";
 import { useMdaLens } from "@/hooks/useMdaLens";
 import { enforceLensTab, rowInLensScope, type MdaLensGrant } from "@/lib/mdaLens/config";
+import {
+  guardLensWrite,
+  isLensReadOnly,
+  LENS_READONLY_MESSAGE,
+  type LensWriteOp,
+} from "@/lib/mdaLens/writeGuard";
 
 const PAGE_IDS = [
   "microplanning",
@@ -107,6 +113,18 @@ export default function MdaLensHarness() {
   const { lens, lensEnabled, loadingLens, grantState, refetchLens } = useMdaLens();
   const { canAccessPage } = usePageAccess();
   const [filters, setFilters] = useState<ChecklistFilterState>({ ...EMPTY_FILTERS });
+  // Mirrors the microplanning screens: lens users get a view-only surface.
+  const readOnly = isLensReadOnly({ lens, lensEnabled, isAdmin: false, isOwner: false });
+  const [writeLog, setWriteLog] = useState<string[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const attempt = (op: LensWriteOp) => {
+    const d = guardLensWrite({ lens, lensEnabled, isAdmin: false, isOwner: false }, op);
+    setWriteLog((prev) => [...prev, `${op}:${d.allowed ? "allowed" : "blocked"}`]);
+    return d.allowed;
+  };
+  // Tests drive programmatic (UI-bypass) attempts through the same guard.
+  (window as unknown as { __LENS_TRY_WRITE__?: (op: LensWriteOp) => boolean }).__LENS_TRY_WRITE__ =
+    (op) => attempt(op);
   // Direct navigation: `?tab=` is treated exactly as Index treats a deep link,
   // and the real lens route guard decides where the user actually lands.
   const requestedTab = params.get("tab") || "microplanning";
@@ -193,6 +211,45 @@ export default function MdaLensHarness() {
           <span data-testid="visible-count">{visible.length}</span>
           <span data-testid="visible-ids">{visible.map((r) => r._id).join(",")}</span>
         </div>
+
+        <section data-testid="microplan-write-surface" className="space-y-2 rounded border p-3">
+          <span data-testid="write-readonly">{String(readOnly)}</span>
+          {readOnly && (
+            <p data-testid="readonly-notice" className="text-xs text-muted-foreground">
+              {LENS_READONLY_MESSAGE}
+            </p>
+          )}
+
+          {!readOnly && (
+            <div className="flex flex-wrap gap-2" data-testid="row-actions">
+              <button data-testid="entry-edit" onClick={() => attempt("edit")}>Edit</button>
+              <button data-testid="entry-delete" onClick={() => attempt("delete")}>Delete</button>
+              <button data-testid="entry-create" onClick={() => attempt("create")}>Add entry</button>
+            </div>
+          )}
+
+          {!readOnly && (
+            <div className="flex flex-wrap gap-2" data-testid="bulk-actions">
+              <button data-testid="bulk-delete" onClick={() => attempt("bulk-delete")}>Bulk delete</button>
+              <button data-testid="bulk-edit" onClick={() => attempt("bulk-edit")}>Bulk edit</button>
+              <button data-testid="delete-request" onClick={() => attempt("delete-request")}>Request deletion</button>
+              <button data-testid="bulk-import" onClick={() => attempt("import")}>Import</button>
+            </div>
+          )}
+
+          <button data-testid="open-entry-modal" onClick={() => setModalOpen(true)}>Open entry</button>
+          {modalOpen && (
+            <div role="dialog" data-testid="entry-modal" className="rounded border p-2">
+              {readOnly ? (
+                <span data-testid="modal-readonly">View only</span>
+              ) : (
+                <button data-testid="modal-save" onClick={() => attempt("submit")}>Save changes</button>
+              )}
+            </div>
+          )}
+
+          <span data-testid="write-log">{writeLog.join("|")}</span>
+        </section>
 
         {lensEnabled && lens?.can_export && (
           <button data-testid="lens-export" className="rounded border px-3 py-1 text-xs">
