@@ -284,7 +284,7 @@ const Index = () => {
       case "surveillance": return guardedPage("surveillance", <AdminSurveillanceView />);
       case "data-quality": return guardedPage("data-quality", <DataQualityView />);
       case "microplanning": return guardedPage("microplanning", <MicroplanningView />);
-      case "integrated-supervisory": return isAdmin ? <IntegratedSupervisoryView /> : guardedPage("__admin_only__", <></>);
+      case "integrated-supervisory": return guardedPage("integrated-supervisory", <IntegratedSupervisoryView />);
       case "environment": return guardedPage("environment", <ChangeEnvironmentView />);
       case "quizzes": return isAdmin ? guardedPage("quizzes", <QuizBuilder />) : <QuizBuilder />;
       case "ntd-assessment": return <NTDAssessmentView />;

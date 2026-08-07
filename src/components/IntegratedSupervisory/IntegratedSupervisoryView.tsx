@@ -21,6 +21,9 @@ import {
 } from "./koboClient";
 import { useChecklistPermissions } from "@/hooks/useChecklistPermissions";
 import { useRealtimeKoboChecklist } from "@/hooks/useRealtimeKoboChecklist";
+import { useMdaLens } from "@/hooks/useMdaLens";
+import { readKoboGeo, rowInLensScope } from "@/lib/mdaLens/config";
+import MdaLensExportButton from "@/components/UserManagement/MdaLensExportButton";
 
 export default function IntegratedSupervisoryView() {
   const perms = useChecklistPermissions();
@@ -34,10 +37,45 @@ export default function IntegratedSupervisoryView() {
   const [syncError, setSyncError] = useState<{ message: string; hint?: string } | null>(null);
   const [openAccess, setOpenAccess] = useState(false);
 
+  const { lens, lensEnabled, canOpenSupervisoryTab } = useMdaLens();
+
   const activeConnection = useMemo(
     () => connections.find((c) => c.id === activeId) ?? null,
     [connections, activeId],
   );
+
+  /** Lens users only ever see rows inside their granted State / LGA scope. */
+  const scopedCache = useMemo<KoboCache | null>(() => {
+    if (!cache || !lens) return cache;
+    const keep = (r: Record<string, unknown>) => {
+      const { state, lga } = readKoboGeo(r);
+      return rowInLensScope(lens, state, lga);
+    };
+    const results = (cache.results || []).filter(keep);
+    const flatResults = (cache.flatResults || []).filter(keep);
+    return { ...cache, results, flatResults, count: results.length };
+  }, [cache, lens]);
+
+  const showTab = useCallback((t: string) => canOpenSupervisoryTab(t), [canOpenSupervisoryTab]);
+  const defaultTab = useMemo(
+    () => ["checklist", "records", "studio", "reconciliation"].find((t) => showTab(t)) ?? "checklist",
+    [showTab],
+  );
+
+  const scopeLabel = lens
+    ? `Scope: ${lens.states.length ? lens.states.join(", ") : "All states"}${lens.lgas.length ? ` · ${lens.lgas.join(", ")}` : ""}`
+    : "Scope: full dataset";
+
+  const exportColumns = useMemo(() => {
+    const cols = (scopedCache?.columns ?? []).map((c: any) => ({
+      key: c.key ?? c.name,
+      label: c.label ?? c.key ?? c.name,
+      geo: /(^|\/)(state|lga|ward)$/i.test(String(c.key ?? c.name)),
+    }));
+    if (cols.length) return cols;
+    const first = scopedCache?.flatResults?.[0] ?? {};
+    return Object.keys(first).map((k) => ({ key: k, label: k.split("/").pop() || k }));
+  }, [scopedCache]);
 
   const reloadRegistry = useCallback(() => {
     const all = listConnections();
@@ -201,33 +239,41 @@ export default function IntegratedSupervisoryView() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="checklist" className="w-full">
+      <Tabs defaultValue={defaultTab} className="w-full">
         <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="checklist"><ClipboardList className="h-4 w-4 mr-1" /> Checklist Dashboard</TabsTrigger>
-          {perms.canViewRawData && (
+          {showTab("checklist") && (
+            <TabsTrigger value="checklist"><ClipboardList className="h-4 w-4 mr-1" /> Checklist Dashboard</TabsTrigger>
+          )}
+          {perms.canViewRawData && showTab("records") && (
             <TabsTrigger value="records"><Database className="h-4 w-4 mr-1" /> Raw Kobo Data</TabsTrigger>
           )}
-          <TabsTrigger value="studio"><LayoutDashboard className="h-4 w-4 mr-1" /> Dashboard Studio</TabsTrigger>
-          
-          {perms.canViewMedicineAccountability && (
+          {showTab("studio") && (
+            <TabsTrigger value="studio"><LayoutDashboard className="h-4 w-4 mr-1" /> Dashboard Studio</TabsTrigger>
+          )}
+
+          {perms.canViewMedicineAccountability && showTab("reconciliation") && (
             <TabsTrigger value="reconciliation"><GitCompareArrows className="h-4 w-4 mr-1" /> Medicine Accountability</TabsTrigger>
           )}
         </TabsList>
-        <TabsContent value="checklist" className="mt-4">
-          <ChecklistDashboard cache={cache} onRefresh={() => refresh(false)} syncing={syncing} />
-        </TabsContent>
-        {perms.canViewRawData && (
+        {showTab("checklist") && (
+          <TabsContent value="checklist" className="mt-4">
+            <ChecklistDashboard cache={scopedCache} onRefresh={() => refresh(false)} syncing={syncing} />
+          </TabsContent>
+        )}
+        {perms.canViewRawData && showTab("records") && (
           <TabsContent value="records" className="mt-4">
-            <RawKoboDataTabs cache={cache} onRefresh={() => refresh(false)} />
+            <RawKoboDataTabs cache={scopedCache} onRefresh={() => refresh(false)} />
           </TabsContent>
         )}
 
-        <TabsContent value="studio" className="mt-4">
-          <SupervisoryDashboardView cache={cache} onRefresh={() => refresh(false)} syncing={syncing} />
-        </TabsContent>
-        {perms.canViewMedicineAccountability && (
+        {showTab("studio") && (
+          <TabsContent value="studio" className="mt-4">
+            <SupervisoryDashboardView cache={scopedCache} onRefresh={() => refresh(false)} syncing={syncing} />
+          </TabsContent>
+        )}
+        {perms.canViewMedicineAccountability && showTab("reconciliation") && (
           <TabsContent value="reconciliation" className="mt-4">
-            <MedicineAccountabilityDashboard canExport={perms.canExport} checklistCache={cache} />
+            <MedicineAccountabilityDashboard canExport={perms.canExport} checklistCache={scopedCache} />
           </TabsContent>
         )}
       </Tabs>

@@ -5058,6 +5058,48 @@ export type Database = {
           },
         ]
       }
+      mda_lens_grants: {
+        Row: {
+          can_export: boolean
+          created_at: string
+          enabled: boolean
+          granted_by: string | null
+          id: string
+          lgas: string[]
+          microplan_tabs: string[]
+          states: string[]
+          supervisory_tabs: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_export?: boolean
+          created_at?: string
+          enabled?: boolean
+          granted_by?: string | null
+          id?: string
+          lgas?: string[]
+          microplan_tabs?: string[]
+          states?: string[]
+          supervisory_tabs?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_export?: boolean
+          created_at?: string
+          enabled?: boolean
+          granted_by?: string | null
+          id?: string
+          lgas?: string[]
+          microplan_tabs?: string[]
+          states?: string[]
+          supervisory_tabs?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       mda_sync_job_runs: {
         Row: {
           details: Json

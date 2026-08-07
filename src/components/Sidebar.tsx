@@ -170,6 +170,8 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     }
     // The adhoc-only items are hidden from admins/owner (they use full views).
     if ((item as any).adhocOnly) return false;
+    // MDA Lens users reach the two MDA pages even though they're admin-only.
+    if ((item.id === "microplanning" || item.id === "integrated-supervisory") && canAccessPage?.(item.id)) return true;
     if (item.adminOnly && !isAdmin) return false;
     if ((item as any).showForUsers && !isAdmin) return true;
     if (RESTRICTED_PAGE_IDS.includes(item.id as any)) {

@@ -28,7 +28,9 @@ import {
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
+  Compass,
 } from "lucide-react";
+import MdaLensDialog from "@/components/UserManagement/MdaLensDialog";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -184,6 +186,7 @@ const UserCard = memo(function UserCard({
     stdFormNameByCodeFn,
     formById,
     cascadeAssign,
+    mdaLensMap,
   } = ctx;
   const a = api.current;
   const roleInfo = getRoleInfo(user.role?.role);
@@ -193,6 +196,9 @@ const UserCard = memo(function UserCard({
   const userProjectIds = getUserProjectIds(user.user_id);
   const userFormIds = getUserFormIds(user.user_id);
   const userStandardCodes = getUserStandardCodes(user.user_id);
+  const lens = (mdaLensMap || {})[user.user_id] as
+    | { enabled: boolean; states: string[]; lgas: string[]; microplan_tabs: string[]; supervisory_tabs: string[] }
+    | undefined;
 
   return (
     <div
@@ -326,6 +332,22 @@ const UserCard = memo(function UserCard({
                 ))}
               </div>
             )}
+            {lens?.enabled && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">MDA Lens</span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                  <Compass className="h-3 w-3" />
+                  {lens.states.length ? lens.states.join(", ") : "All states"}
+                  {lens.lgas.length ? ` · ${lens.lgas.length} LGA${lens.lgas.length > 1 ? "s" : ""}` : ""}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                  {lens.microplan_tabs.length || "All"} microplan tabs
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700">
+                  {lens.supervisory_tabs.length || "All"} supervisory tabs
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -350,6 +372,18 @@ const UserCard = memo(function UserCard({
           >
             <MapPin className="h-4 w-4" />
             Cascade
+          </Button>
+        )}
+        {(isOwner || isCoOwner || isSuperAdmin) && (
+          <Button
+            variant={lens?.enabled ? "default" : "outline"}
+            size="sm"
+            onClick={() => a.setLensUser(user)}
+            title="MDA Lens — scoped access to Geo Microplanning & Integrated Supervisory Checklist"
+            className={lens?.enabled ? "bg-gradient-to-r from-primary to-primary/70" : ""}
+          >
+            <Compass className="h-4 w-4" />
+            MDA Lens
           </Button>
         )}
         <DropdownMenu>
@@ -551,6 +585,19 @@ const UsersView = () => {
   const [cascadeAssign, setCascadeAssign] = useState<Record<string, { form_id: string; field_key: string; value: string; value_label: string | null }[]>>({});
   const [stdFormAssign, setStdFormAssign] = useState<Record<string, string[]>>({});
   const [cascadeUser, setCascadeUser] = useState<UserProfile | null>(null);
+  const [lensUser, setLensUser] = useState<UserProfile | null>(null);
+  const [mdaLensMap, setMdaLensMap] = useState<Record<string, any>>({});
+
+  const fetchMdaLenses = useCallback(async () => {
+    const { data } = await supabase
+      .from("mda_lens_grants")
+      .select("user_id, enabled, microplan_tabs, supervisory_tabs, states, lgas, can_export");
+    const map: Record<string, any> = {};
+    (data || []).forEach((r: any) => { map[r.user_id] = r; });
+    setMdaLensMap(map);
+  }, []);
+
+  useEffect(() => { void fetchMdaLenses(); }, [fetchMdaLenses]);
 
   useEffect(() => {
     reloadAll();
@@ -1524,6 +1571,7 @@ const UsersView = () => {
     setSelectedUser,
     setShowAssignDialog,
     setCascadeUser,
+    setLensUser,
     setEditProfileData,
     setShowEditProfileDialog,
     setNewRole,
@@ -1557,6 +1605,7 @@ const UsersView = () => {
       stdFormNameByCodeFn,
       formById,
       cascadeAssign,
+      mdaLensMap,
     }),
     [
       isOwner,
@@ -1573,6 +1622,7 @@ const UsersView = () => {
       stdFormNameByCodeFn,
       formById,
       cascadeAssign,
+      mdaLensMap,
     ],
   );
 
@@ -2123,6 +2173,17 @@ const UsersView = () => {
           onClose={() => setShowDeviceDialog(false)}
           userId={selectedUser.user_id}
           userName={getUserDisplayName(selectedUser)}
+        />
+      )}
+
+      {lensUser && (
+        <MdaLensDialog
+          open={!!lensUser}
+          onOpenChange={(v) => { if (!v) setLensUser(null); }}
+          userId={lensUser.user_id}
+          userName={getUserDisplayName(lensUser)}
+          userEmail={lensUser.email}
+          onSaved={fetchMdaLenses}
         />
       )}
 

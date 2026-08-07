@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { useUserAccess } from "@/hooks/useUserAccess";
 import { withTimeoutFallback } from "@/lib/withTimeout";
+import { useMdaLens } from "@/hooks/useMdaLens";
+import { LENS_PAGE_IDS } from "@/lib/mdaLens/config";
 
 
 // Pages that are restricted to owner only (other super admins need explicit grants)
@@ -244,6 +246,7 @@ export const usePageAccess = () => {
   // Owner-granted user-level page access (with optional time window).
   // Available to ANY user — not just super admins.
   const { canAccessUserPage, loadingUserAccess } = useUserAccess();
+  const { lensEnabled } = useMdaLens();
 
   const designation = (profile?.designation || "").toLowerCase();
   const isFieldDesignation = FIELD_DESIGNATIONS.has(designation);
@@ -281,6 +284,9 @@ export const usePageAccess = () => {
       // Tier 2: a "Manage Microplanning Form Access" grant unlocks the full
       // Geo Microplanning dashboard page for any user.
       if (pageId === "microplanning" && hasMicroplanFormAccess) return true;
+      // MDA Lens: an admin-granted, geography-scoped pass to the two MDA
+      // field-operations pages (Geo Microplanning + Integrated Supervisory).
+      if (lensEnabled && LENS_PAGE_IDS.includes(pageId)) return true;
       // Restricted pages: any admin (Super Admin or Systems Admin) can be
       // granted access by the owner via admin_page_access.
       if (isRestrictedPageId(pageId)) {
@@ -293,7 +299,7 @@ export const usePageAccess = () => {
       if (pageId === "forms" || pageId === "cases" || pageId === "community-forum" || pageId === "project-chat") return true;
       return false;
     },
-    [isOwner, isOwnerLevel, isAdmin, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage, isFieldDesignation, hasMicroplanFormAccess, minimalAccess]
+    [isOwner, isOwnerLevel, isAdmin, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage, isFieldDesignation, hasMicroplanFormAccess, minimalAccess, lensEnabled]
   );
 
   const refetch = useCallback(async () => {
