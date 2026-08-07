@@ -895,6 +895,20 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     return result;
   }, [baseEntries, isAdmin, scope, projectScope, lens]);
 
+  // Columns for the MDA Lens export (questions as columns, responses as rows).
+  const lensExportColumns = useMemo(() => {
+    const hidden = new Set(["user_id", "project_id", "created_by", "idempotency_key"]);
+    const keys = new Set<string>();
+    for (const r of displayEntries.slice(0, 200)) Object.keys(r || {}).forEach((k) => keys.add(k));
+    return [...keys]
+      .filter((k) => !hidden.has(k))
+      .map((k) => ({
+        key: k,
+        label: k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        geo: ["state", "lga", "ward"].includes(k),
+      }));
+  }, [displayEntries]);
+
   // Filters (memoized — avoids re-deriving over millions of rows every render)
   const uniqueStates = useMemo(
     () => [...new Set(displayEntries.map(e => e.state))].sort(),
@@ -2128,6 +2142,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                   <span className="hidden sm:inline text-xs">Historical</span>
                 </Button>)}
               </div>
+            )}
+            {(isAdmin || (lensEnabled && lens?.can_export)) && (
+              <MdaLensExportButton
+                title="Geo Microplanning — Scoped Export"
+                scopeLabel={lensScopeLabel}
+                sheetName="Microplan"
+                columns={lensExportColumns}
+                rows={filtered as unknown as Record<string, unknown>[]}
+              />
             )}
             {canManageAccess && (
               <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setShowDesignationManager(true)}>
