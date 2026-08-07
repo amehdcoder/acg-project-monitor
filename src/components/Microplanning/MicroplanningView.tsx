@@ -142,7 +142,7 @@ const numericFields = new Set([
 ]);
 
 // Paginated entry list for entry-only users
-const EntryOnlyList = ({ entries, loading, onEdit, onDelete }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void }) => {
+const EntryOnlyList = ({ entries, loading, onEdit, onDelete, readOnly = false }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; readOnly?: boolean }) => {
   const pagination = useTablePagination(entries, 10);
 
   return (
@@ -170,6 +170,7 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete }: { entries: any[];
                 <CardContent className="p-3 space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold">{entry.community_name}</span>
+                    {!readOnly && (
                     <div className="flex items-center gap-0.5">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(entry)}>
                         <Edit className="h-3.5 w-3.5" />
@@ -178,6 +179,7 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete }: { entries: any[];
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
                     <span>State: <strong className="text-foreground">{entry.state}</strong></span>
@@ -217,6 +219,7 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete }: { entries: any[];
                     <TableCell className="text-xs">{entry.estimated_total_population?.toLocaleString() || "—"}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{new Date(entry.created_at).toLocaleDateString()}</TableCell>
                     <TableCell>
+                      {!readOnly && (
                       <div className="flex items-center gap-0.5">
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(entry)}>
                           <Edit className="h-3.5 w-3.5" />
@@ -225,6 +228,7 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete }: { entries: any[];
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -249,7 +253,7 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete }: { entries: any[];
 };
 
 // Paginated admin list view for full access users
-const AdminListView = ({ entries, loading, onEdit, onDelete }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void }) => {
+const AdminListView = ({ entries, loading, onEdit, onDelete, readOnly = false }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; readOnly?: boolean }) => {
   const pagination = useTablePagination(entries, 25);
 
   return (
@@ -266,6 +270,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete }: { entries: any[];
               <CardContent className="p-3 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold">{entry.community_name}</span>
+                  {!readOnly && (
                   <div className="flex items-center gap-0.5">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(entry)}>
                       <Edit className="h-3 w-3" />
@@ -274,6 +279,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete }: { entries: any[];
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
                   <span>{entry.state} / {entry.lga}</span>
