@@ -466,9 +466,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   // Designation-based scope (admins bypass)
   const scope = useMicroplanScope(isAdmin);
   const { lens, lensEnabled, canOpenMicroplanTab } = useMdaLens();
-  const lensScopeLabel = lens
-    ? `Scope: ${lens.states.length ? lens.states.join(", ") : "All states"}${lens.lgas.length ? ` · ${lens.lgas.join(", ")}` : ""}`
-    : "Scope: full dataset";
+  const lensScopeLabel = lensScopeSummary(lens);
   // Pre-select the geography filters when the lens grants exactly one State / LGA,
   // so scoped users land straight on their own real-time slice.
   useEffect(() => {
@@ -2109,24 +2107,24 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search communities, FLHF..." className="pl-8 h-8 text-xs" />
             </div>
-            <Select value={filterState} onValueChange={(value) => { setFilterState(value); setFilterLga("all"); setFilterWard("all"); }}>
+            <Select value={filterState} disabled={lensLockState} onValueChange={(value) => { setFilterState(value); setFilterLga("all"); setFilterWard("all"); }}>
               <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All States" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All States</SelectItem>
+                {!lensLockState && <SelectItem value="all">All States</SelectItem>}
                 {uniqueStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={filterLga} onValueChange={(value) => { setFilterLga(value); setFilterWard("all"); }}>
+            <Select value={filterLga} disabled={lensLockLga} onValueChange={(value) => { setFilterLga(value); setFilterWard("all"); }}>
               <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All LGAs" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All LGAs</SelectItem>
+                {!lensLockLga && <SelectItem value="all">All LGAs</SelectItem>}
                 {uniqueLgas.map((lga) => <SelectItem key={lga} value={lga}>{lga}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={filterWard} onValueChange={setFilterWard}>
+            <Select value={filterWard} disabled={lensLockWard} onValueChange={setFilterWard}>
               <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All Wards" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Wards</SelectItem>
+                {!lensLockWard && <SelectItem value="all">All Wards</SelectItem>}
                 {uniqueWards.map((ward) => <SelectItem key={ward} value={ward}>{ward}</SelectItem>)}
               </SelectContent>
             </Select>
