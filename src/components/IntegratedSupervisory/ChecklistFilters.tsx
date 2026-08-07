@@ -99,7 +99,27 @@ export default function ChecklistFilters({
     [parents, value.from, value.to],
   );
 
-  const states = useMemo(() => uniq(dateScoped, "State"), [dateScoped]);
+  // MDA Lens: geography selects are restricted (and locked when a single value
+  // is granted) so a scoped user can never widen past their granted scope.
+  const { lens } = useMdaLens();
+  const only = (list: string[] | undefined) => (list?.length ? list : null);
+  const keep = (level: "state" | "lga" | "ward", v: string) =>
+    rowInLensScope(
+      {
+        states: level === "state" ? lens?.states ?? [] : [],
+        lgas: level === "lga" ? lens?.lgas ?? [] : [],
+        wards: level === "ward" ? lens?.wards ?? [] : [],
+      },
+      level === "state" ? v : null,
+      level === "lga" ? v : null,
+      level === "ward" ? v : null,
+    );
+
+  const states = useMemo(
+    () => uniq(dateScoped, "State").filter((s) => keep("state", s)),
+    [dateScoped, lens],
+  );
+
   const byState = useMemo(
     () => (value.state ? dateScoped.filter((p) => label("State", p.State) === value.state) : dateScoped),
     [dateScoped, value.state],
