@@ -190,10 +190,10 @@ const Index = () => {
 
   useEffect(() => {
     if (loading || loadingLens || !user || isAdmin || isOwner || !lensEnabled) return;
-    if (!["microplanning", "integrated-supervisory"].includes(activeTab)) {
-      setActiveTab(canAccessPage("microplanning") ? "microplanning" : "integrated-supervisory");
-    }
+    const allowed = enforceLensTab(activeTab, canAccessPage("microplanning"));
+    if (allowed !== activeTab) setActiveTab(allowed);
   }, [loading, loadingLens, user, isAdmin, isOwner, lensEnabled, activeTab, canAccessPage]);
+
 
   // Adhoc users are confined to: their assigned form, the project chat, and
   // their own submissions. Any other tab redirects them back to Forms.
