@@ -479,6 +479,16 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const scope = useMicroplanScope(isAdmin);
   const { lens, lensEnabled, canOpenMicroplanTab } = useMdaLens();
   const lensScopeLabel = lensScopeSummary(lens);
+  // MDA Lens users are strictly read-only: they may view and export their scoped
+  // data but can never edit or delete a submission (also enforced by RLS).
+  const lensReadOnly = lensEnabled && !isAdmin && !isOwner;
+  const blockLensWrite = () => {
+    toast({
+      title: "View-only access",
+      description: "MDA Lens access is read-only — you cannot edit or delete submissions.",
+      variant: "destructive",
+    });
+  };
   // Pre-select the geography filters when the lens grants exactly one State / LGA,
   // so scoped users land straight on their own real-time slice.
   useEffect(() => {
@@ -725,6 +735,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   };
 
   const handleDelete = async (id: string) => {
+    if (lensReadOnly) { blockLensWrite(); return; }
     // Non-admins cannot delete directly — they must submit a delete request
     // for admin approval. Admins delete immediately (with confirmation).
     if (!isAdmin && !isOwner) {
@@ -2249,6 +2260,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             <MicroplanMap
               entries={filtered}
               onEntryClick={(id) => {
+                if (lensReadOnly) { blockLensWrite(); return; }
                 const entry = entries.find(e => e.id === id);
                 if (entry) { setEditingEntry(entry); setShowForm(true); }
               }}
@@ -2260,8 +2272,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             <AdminListView
               entries={filtered}
               loading={loading}
-              onEdit={(entry) => { setEditingEntry(entry); setShowForm(true); }}
+              onEdit={(entry) => { if (lensReadOnly) { blockLensWrite(); return; } setEditingEntry(entry); setShowForm(true); }}
               onDelete={handleDelete}
+              readOnly={lensReadOnly}
             />
           )}
 
@@ -2896,8 +2909,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         <EntryOnlyList
           entries={entries}
           loading={loading}
-          onEdit={(entry) => { setEditingEntry(entry); setShowForm(true); }}
+          onEdit={(entry) => { if (lensReadOnly) { blockLensWrite(); return; } setEditingEntry(entry); setShowForm(true); }}
           onDelete={handleDelete}
+          readOnly={lensReadOnly}
         />
       )}
 
