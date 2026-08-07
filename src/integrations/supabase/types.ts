@@ -9265,6 +9265,7 @@ export type Database = {
         Args: { p_chat_group_id: string; p_user_id: string }
         Returns: number
       }
+      has_active_mda_lens: { Args: { _user_id: string }; Returns: boolean }
       has_ces_role: {
         Args: { _project_id: string; _role: string; _user_id: string }
         Returns: boolean
@@ -9365,6 +9366,21 @@ export type Database = {
           _user_agent?: string
         }
         Returns: string
+      }
+      mda_lens_allows_project: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
+      mda_lens_allows_row: {
+        Args: {
+          _campaign_type: string
+          _lga: string
+          _project_id: string
+          _state: string
+          _user_id: string
+          _ward: string
+        }
+        Returns: boolean
       }
       microplan_distinct_geography:
         | {
