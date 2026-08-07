@@ -24,6 +24,7 @@ import { useRealtimeKoboChecklist } from "@/hooks/useRealtimeKoboChecklist";
 import { useMdaLens } from "@/hooks/useMdaLens";
 import { campaignInLensScope, readKoboCampaign, readKoboGeo, rowInLensScope } from "@/lib/mdaLens/config";
 import MdaLensExportButton from "@/components/UserManagement/MdaLensExportButton";
+import LensScopeBanner, { lensScopeSummary } from "@/components/MdaLens/LensScopeBanner";
 
 export default function IntegratedSupervisoryView() {
   const perms = useChecklistPermissions();
@@ -62,9 +63,7 @@ export default function IntegratedSupervisoryView() {
     [showTab],
   );
 
-  const scopeLabel = lens
-    ? `Scope: ${lens.states.length ? lens.states.join(", ") : "All states"}${lens.lgas.length ? ` · ${lens.lgas.join(", ")}` : ""}`
-    : "Scope: full dataset";
+  const scopeLabel = lensScopeSummary(lens);
 
   const exportColumns = useMemo(() => {
     const cols = (scopedCache?.columns ?? []).map((c: any) => ({
@@ -248,6 +247,8 @@ export default function IntegratedSupervisoryView() {
           </div>
         </CardContent>
       </Card>
+
+      <LensScopeBanner lens={lens} />
 
       <Tabs defaultValue={defaultTab} className="w-full">
         <TabsList className="flex-wrap h-auto">
