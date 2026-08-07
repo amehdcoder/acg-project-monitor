@@ -83,7 +83,7 @@ async function fetchLens(userId: string): Promise<MdaLensGrant | null> {
 }
 
 export function useMdaLens(): MdaLensState {
-  const { user, isOwner, isCoOwner, isAdmin, loading: authLoading } = useAuth();
+  const { user, session, isOwner, isCoOwner, isAdmin, loading: authLoading } = useAuth();
   const injected = testLens();
   const unrestricted = injected ? false : !!isOwner || !!isCoOwner || !!isAdmin;
   const [lens, setLens] = useState<MdaLensGrant | null>(() => user?.id ? readCachedLens(user.id) : null);
@@ -99,6 +99,14 @@ export function useMdaLens(): MdaLensState {
     const generation = ++requestGeneration.current;
     const cached = readCachedLens(userId);
     if (cached) setLens(cached);
+    // Offline-auth hydration intentionally has a user/profile but no live
+    // backend session. Querying in that state runs as anonymous; RLS correctly
+    // returns no row, but treating that empty result as a revocation made the
+    // two Lens pages disappear seconds after they first rendered.
+    if (!session) {
+      setLoading(false);
+      return;
+    }
     setLoading(!cached);
 
     try {
@@ -114,7 +122,7 @@ export function useMdaLens(): MdaLensState {
     } finally {
       if (generation === requestGeneration.current) setLoading(false);
     }
-  }, [user, authLoading, injected]);
+  }, [user, session, authLoading, injected]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -125,7 +133,7 @@ export function useMdaLens(): MdaLensState {
   }, [loading]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || (!session && !injected)) return;
     const ch = supabase.channel(`mda-lens-${user.id}-${Math.random().toString(36).slice(2, 8)}`);
     ch.on(
       "postgres_changes" as any,
@@ -142,7 +150,7 @@ export function useMdaLens(): MdaLensState {
       },
     ).subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [user, load]);
+  }, [user, session, injected, load]);
 
   const active = !unrestricted && !!lens?.enabled;
 
