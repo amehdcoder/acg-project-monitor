@@ -184,7 +184,7 @@ export default function ChecklistFilters({
         <div className="flex items-center gap-1.5">
           {presetSlot}
           {active > 0 && (
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onChange({ ...EMPTY_FILTERS })}>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={clearAll}>
               <X className="h-3.5 w-3.5 mr-1" /> Clear all
             </Button>
           )}
@@ -202,11 +202,11 @@ export default function ChecklistFilters({
             onChange={(e) => set({ to: e.target.value })} />
         </div>
         <FilterSelect id="isc-state" title="States" value={value.state} options={states}
-          onChange={(v) => set({ state: v })} />
+          locked={lockState} onChange={(v) => set({ state: v })} />
         <FilterSelect id="isc-lga" title="LGAs" value={value.lga} options={lgas}
-          onChange={(v) => set({ lga: v })} />
+          locked={lockLga} onChange={(v) => set({ lga: v })} />
         <FilterSelect id="isc-ward" title="Wards" value={value.ward} options={wards}
-          onChange={(v) => set({ ward: v })} />
+          locked={lockWard} onChange={(v) => set({ ward: v })} />
         <FilterSelect id="isc-desig" title="Designations" value={value.designation} options={designations}
           onChange={(v) => set({ designation: v })} />
         <FilterSelect id="isc-monitor" title="Monitors" value={value.monitor} options={monitors}
