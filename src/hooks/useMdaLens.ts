@@ -40,8 +40,10 @@ export function useMdaLens(): MdaLensState {
 
 
   const load = useCallback(async () => {
+    if (injected) { setLens(injected); setLoading(false); return; }
     if (authLoading) return;
     if (!user) { setLens(null); setLoading(false); return; }
+
     const { data } = await withTimeoutFallback(
       (async () =>
         await supabase
