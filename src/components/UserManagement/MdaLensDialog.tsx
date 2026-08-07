@@ -55,6 +55,7 @@ export default function MdaLensDialog({ open, onOpenChange, userId, userName, us
   const [stateQuery, setStateQuery] = useState("");
   const [lgaQuery, setLgaQuery] = useState("");
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [campaignOptions, setCampaignOptions] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,7 +73,26 @@ export default function MdaLensDialog({ open, onOpenChange, userId, userName, us
     if (!open) return;
     void load();
     void supabase.from("projects").select("id,name").order("name").then(({ data }) => setProjects(data || []));
+    // Campaign types must mirror the values actually stored on submissions —
+    // a hard-coded disease list silently filters every row out of scope.
+    void supabase
+      .from("microplan_entries")
+      .select("campaign_type")
+      .not("campaign_type", "is", null)
+      .limit(5000)
+      .then(({ data }) => {
+        const found = [...new Set((data || []).map((r: any) => String(r.campaign_type || "").trim()).filter(Boolean))].sort();
+        setCampaignOptions(found);
+      });
   }, [open, load]);
+
+  const campaignChoices = useMemo(
+    () => [...new Set([...campaignOptions, ...draft.campaign_types])].sort(),
+    [campaignOptions, draft.campaign_types],
+  );
+  const prettyCampaign = (v: string) =>
+    v.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
 
   const allStates = useMemo(() => getAllStates(), []);
   const visibleStates = useMemo(
@@ -190,64 +210,26 @@ export default function MdaLensDialog({ open, onOpenChange, userId, userName, us
                 </div>
                 <div className="rounded-xl border p-4 space-y-3">
                   <p className="text-sm font-semibold">MDA campaign types</p>
-                  <p className="text-xs text-muted-foreground">Applied to Checklist, Raw Kobo Data, and Medicine Accountability.</p>
-                  {["Schistosomiasis", "Lymphatic Filariasis", "Onchocerciasis", "Soil-Transmitted Helminths"].map((campaign) => (
-                    <label key={campaign} className="flex items-center gap-2 text-xs rounded-md p-1.5 hover:bg-muted/60 cursor-pointer">
-                      <Checkbox checked={draft.campaign_types.includes(campaign)} onCheckedChange={() => toggle("campaign_types", campaign)} />
-                      {campaign}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Tabs */}
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-xl border p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-emerald-500" /> Geo Microplanning tabs
-                    </p>
-                    <Badge variant="secondary" className="text-[10px]">
-                      {chipCount(draft.microplan_tabs.length, MICROPLAN_TABS.length)}
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {MICROPLAN_TABS.map((t) => (
-                      <label key={t.id} className="flex items-center gap-2 text-xs rounded-md p-1.5 hover:bg-muted/60 cursor-pointer">
-                        <Checkbox
-                          checked={draft.microplan_tabs.includes(t.id)}
-                          onCheckedChange={() => toggle("microplan_tabs", t.id)}
-                        />
-                        {t.label}
+                  <p className="text-xs text-muted-foreground">
+                    Read from live submissions. Leave empty to include every campaign type.
+                  </p>
+                  <div className="max-h-44 overflow-y-auto space-y-1">
+                    {campaignChoices.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-4 text-center">
+                        No campaign types recorded yet — all campaigns will be visible.
+                      </p>
+                    ) : campaignChoices.map((campaign) => (
+                      <label key={campaign} className="flex items-center gap-2 text-xs rounded-md p-1.5 hover:bg-muted/60 cursor-pointer">
+                        <Checkbox checked={draft.campaign_types.includes(campaign)} onCheckedChange={() => toggle("campaign_types", campaign)} />
+                        {prettyCampaign(campaign)}
                       </label>
                     ))}
                   </div>
                 </div>
 
-                <div className="rounded-xl border p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold flex items-center gap-2">
-                      <Layers className="h-4 w-4 text-sky-500" /> Supervisory Checklist tabs
-                    </p>
-                    <Badge variant="secondary" className="text-[10px]">
-                      {chipCount(draft.supervisory_tabs.length, SUPERVISORY_TABS.length)}
-                    </Badge>
-                  </div>
-                  <div className="grid gap-1.5">
-                    {SUPERVISORY_TABS.map((t) => (
-                      <label key={t.id} className="flex items-center gap-2 text-xs rounded-md p-1.5 hover:bg-muted/60 cursor-pointer">
-                        <Checkbox
-                          checked={draft.supervisory_tabs.includes(t.id)}
-                          onCheckedChange={() => toggle("supervisory_tabs", t.id)}
-                        />
-                        {t.label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
               </div>
 
-              {/* Geography */}
+              {/* Geography scope */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-xl border p-4 space-y-3">
                   <div className="flex items-center justify-between">
@@ -328,6 +310,54 @@ export default function MdaLensDialog({ open, onOpenChange, userId, userName, us
                   </div>
                 </div>
               )}
+
+              {/* Tabs */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl border p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-emerald-500" /> Geo Microplanning tabs
+                    </p>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {chipCount(draft.microplan_tabs.length, MICROPLAN_TABS.length)}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {MICROPLAN_TABS.map((t) => (
+                      <label key={t.id} className="flex items-center gap-2 text-xs rounded-md p-1.5 hover:bg-muted/60 cursor-pointer">
+                        <Checkbox
+                          checked={draft.microplan_tabs.includes(t.id)}
+                          onCheckedChange={() => toggle("microplan_tabs", t.id)}
+                        />
+                        {t.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-sky-500" /> Supervisory Checklist tabs
+                    </p>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {chipCount(draft.supervisory_tabs.length, SUPERVISORY_TABS.length)}
+                    </Badge>
+                  </div>
+                  <div className="grid gap-1.5">
+                    {SUPERVISORY_TABS.map((t) => (
+                      <label key={t.id} className="flex items-center gap-2 text-xs rounded-md p-1.5 hover:bg-muted/60 cursor-pointer">
+                        <Checkbox
+                          checked={draft.supervisory_tabs.includes(t.id)}
+                          onCheckedChange={() => toggle("supervisory_tabs", t.id)}
+                        />
+                        {t.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
 
               <div className="rounded-xl border p-4 flex items-center justify-between gap-4">
                 <div className="space-y-0.5">
