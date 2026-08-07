@@ -29,6 +29,7 @@ import KoboSyncStatusChip from "./KoboSyncStatusChip";
 import { TabSyncStatus } from "./TabSyncStatus";
 import useRealtimeMicroplanEntries from "@/hooks/useRealtimeMicroplanEntries";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
+import { isLensReadOnly, LENS_READONLY_MESSAGE } from "@/lib/mdaLens/writeGuard";
 import { useMdaLens } from "@/hooks/useMdaLens";
 import { campaignInLensScope, projectInLensScope, rowInLensScope, MICROPLAN_TABS } from "@/lib/mdaLens/config";
 import LensScopeBanner, { lensScopeSummary } from "@/components/MdaLens/LensScopeBanner";
@@ -481,11 +482,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const lensScopeLabel = lensScopeSummary(lens);
   // MDA Lens users are strictly read-only: they may view and export their scoped
   // data but can never edit or delete a submission (also enforced by RLS).
-  const lensReadOnly = lensEnabled && !isAdmin && !isOwner;
+  const lensReadOnly = isLensReadOnly({ lens, lensEnabled, isAdmin, isOwner });
   const blockLensWrite = () => {
     toast({
       title: "View-only access",
-      description: "MDA Lens access is read-only — you cannot edit or delete submissions.",
+      description: LENS_READONLY_MESSAGE,
       variant: "destructive",
     });
   };
