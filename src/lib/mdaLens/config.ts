@@ -43,7 +43,24 @@ export const SUPERVISORY_TAB_IDS = SUPERVISORY_TABS.map((t) => t.id) as unknown 
 /** Page ids the lens unlocks in the sidebar / route guard. */
 export const LENS_PAGE_IDS = ["microplanning", "integrated-supervisory", "integrated-supervisory-raw"];
 
-const norm = (s: unknown) => String(s ?? "").trim().toLowerCase();
+/**
+ * Tolerant comparison key: Kobo/microplan rows store geography in many shapes
+ * ("Kano", "kano", "c__kano", "Kano|Dala", "state_kano_01", "Dala LGA").
+ * We compare on the last hierarchy segment, without code prefixes, spacing or
+ * punctuation, so an admin's plain "Kano" grant always matches the data.
+ */
+const norm = (s: unknown) => {
+  const value = String(s ?? "").trim();
+  const leaf = value.split("|").pop() ?? value;
+  return leaf
+    .toLowerCase()
+    .replace(/^[a-z]+__/, "")
+    .replace(/^[a-z]+_[a-z0-9]+_/, "")
+    .replace(/^(c|s)__?/i, "")
+    .replace(/\b(state|lga|ward)\b/g, "")
+    .replace(/[^a-z0-9]+/g, "");
+};
+
 
 /** True when a row (any object with state/lga-ish fields) is inside the lens scope. */
 export function rowInLensScope(
