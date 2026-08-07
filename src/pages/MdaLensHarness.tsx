@@ -84,18 +84,22 @@ export default function MdaLensHarness() {
   const w = window as unknown as {
     __MDA_LENS_TEST__?: MdaLensGrant;
     __MDA_LENS_TEST_LOADER__?: () => Promise<MdaLensGrant | null>;
+    /** Tests flip this to simulate an outage that later recovers. */
+    __MDA_LENS_TEST_FAIL__?: boolean;
   };
   if (asyncMode) {
     delete w.__MDA_LENS_TEST__;
     if (!w.__MDA_LENS_TEST_LOADER__) {
       loaderCalls = 0;
+      if (w.__MDA_LENS_TEST_FAIL__ === undefined) w.__MDA_LENS_TEST_FAIL__ = alwaysFail;
       w.__MDA_LENS_TEST_LOADER__ = async () => {
         loaderCalls += 1;
         if (delay > 0) await sleep(delay);
-        if (alwaysFail || loaderCalls <= failFirst) throw new Error("grant_fetch_failed");
+        if (w.__MDA_LENS_TEST_FAIL__ || loaderCalls <= failFirst) throw new Error("grant_fetch_failed");
         return grant;
       };
     }
+  }
   } else {
     delete w.__MDA_LENS_TEST_LOADER__;
     w.__MDA_LENS_TEST__ = grant;
