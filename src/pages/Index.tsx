@@ -5,6 +5,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePageAccess } from "@/hooks/usePageAccess";
 import { useMdaLens } from "@/hooks/useMdaLens";
+import { enforceLensTab } from "@/lib/mdaLens/config";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSwipeGesture } from "@/hooks/useSwipeGesture";
