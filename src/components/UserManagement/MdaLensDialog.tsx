@@ -22,7 +22,7 @@ import {
   Check, Compass, Database, Globe2, Layers, Loader2, MapPin, Search, Sparkles, Trash2,
 } from "lucide-react";
 import { MICROPLAN_TABS, SUPERVISORY_TABS, type MdaLensGrant } from "@/lib/mdaLens/config";
-import { getAllStates, getLGAsForState } from "@/lib/nigeriaAdminData";
+import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 
 interface Props {
   open: boolean;
@@ -40,6 +40,9 @@ const emptyDraft = (userId: string): MdaLensGrant => ({
   supervisory_tabs: [],
   states: [],
   lgas: [],
+  wards: [],
+  project_ids: [],
+  campaign_types: [],
   can_export: true,
 });
 
@@ -51,20 +54,25 @@ export default function MdaLensDialog({ open, onOpenChange, userId, userName, us
   const [saving, setSaving] = useState(false);
   const [stateQuery, setStateQuery] = useState("");
   const [lgaQuery, setLgaQuery] = useState("");
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
       .from("mda_lens_grants")
-      .select("user_id, enabled, microplan_tabs, supervisory_tabs, states, lgas, can_export")
+      .select("user_id, enabled, microplan_tabs, supervisory_tabs, states, lgas, wards, project_ids, campaign_types, can_export")
       .eq("user_id", userId)
       .maybeSingle();
-    if (data) { setDraft(data as MdaLensGrant); setExists(true); }
+    if (data) { setDraft({ wards: [], project_ids: [], campaign_types: [], ...data } as MdaLensGrant); setExists(true); }
     else { setDraft(emptyDraft(userId)); setExists(false); }
     setLoading(false);
   }, [userId]);
 
-  useEffect(() => { if (open) void load(); }, [open, load]);
+  useEffect(() => {
+    if (!open) return;
+    void load();
+    void supabase.from("projects").select("id,name").order("name").then(({ data }) => setProjects(data || []));
+  }, [open, load]);
 
   const allStates = useMemo(() => getAllStates(), []);
   const visibleStates = useMemo(
@@ -81,15 +89,23 @@ export default function MdaLensDialog({ open, onOpenChange, userId, userName, us
     () => availableLgas.filter((l) => l.toLowerCase().includes(lgaQuery.toLowerCase())),
     [availableLgas, lgaQuery],
   );
+  const availableWards = useMemo(() => {
+    const out = new Set<string>();
+    draft.states.forEach((state) => draft.lgas.forEach((lga) =>
+      getWardsForLGA(state, lga).forEach((ward) => out.add(ward))
+    ));
+    return [...out].sort();
+  }, [draft.states, draft.lgas]);
 
-  const toggle = (key: "microplan_tabs" | "supervisory_tabs" | "states" | "lgas", value: string) =>
+  const toggle = (key: "microplan_tabs" | "supervisory_tabs" | "states" | "lgas" | "wards" | "project_ids" | "campaign_types", value: string) =>
     setDraft((d) => {
       const list = d[key];
       const next = list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
       if (key === "states") {
         const allowed = new Set(next.flatMap((s) => getLGAsForState(s)));
-        return { ...d, states: next, lgas: d.lgas.filter((l) => allowed.has(l)) };
+        return { ...d, states: next, lgas: d.lgas.filter((l) => allowed.has(l)), wards: [] };
       }
+      if (key === "lgas") return { ...d, lgas: next, wards: [] };
       return { ...d, [key]: next };
     });
 
@@ -157,6 +173,31 @@ export default function MdaLensDialog({ open, onOpenChange, userId, userName, us
                   </p>
                 </div>
                 <Switch checked={draft.enabled} onCheckedChange={(v) => setDraft((d) => ({ ...d, enabled: v }))} />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl border p-4 space-y-3">
+                  <p className="text-sm font-semibold">Geo Microplanning projects</p>
+                  <p className="text-xs text-muted-foreground">Empty includes all assigned project dashboards.</p>
+                  <div className="max-h-44 overflow-y-auto space-y-1">
+                    {projects.map((project) => (
+                      <label key={project.id} className="flex items-center gap-2 text-xs rounded-md p-1.5 hover:bg-muted/60 cursor-pointer">
+                        <Checkbox checked={draft.project_ids.includes(project.id)} onCheckedChange={() => toggle("project_ids", project.id)} />
+                        {project.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-xl border p-4 space-y-3">
+                  <p className="text-sm font-semibold">MDA campaign types</p>
+                  <p className="text-xs text-muted-foreground">Applied to Checklist, Raw Kobo Data, and Medicine Accountability.</p>
+                  {["Schistosomiasis", "Lymphatic Filariasis", "Onchocerciasis", "Soil-Transmitted Helminths"].map((campaign) => (
+                    <label key={campaign} className="flex items-center gap-2 text-xs rounded-md p-1.5 hover:bg-muted/60 cursor-pointer">
+                      <Checkbox checked={draft.campaign_types.includes(campaign)} onCheckedChange={() => toggle("campaign_types", campaign)} />
+                      {campaign}
+                    </label>
+                  ))}
+                </div>
               </div>
 
               {/* Tabs */}
@@ -272,6 +313,21 @@ export default function MdaLensDialog({ open, onOpenChange, userId, userName, us
                   )}
                 </div>
               </div>
+
+              {draft.lgas.length > 0 && (
+                <div className="rounded-xl border p-4 space-y-3">
+                  <p className="text-sm font-semibold">Wards</p>
+                  <p className="text-xs text-muted-foreground">Optional; empty includes all Wards in the selected LGAs.</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-1 max-h-44 overflow-y-auto">
+                    {availableWards.map((ward) => (
+                      <label key={ward} className="flex items-center gap-2 text-xs rounded-md p-1.5 hover:bg-muted/60 cursor-pointer">
+                        <Checkbox checked={draft.wards.includes(ward)} onCheckedChange={() => toggle("wards", ward)} />
+                        {ward}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="rounded-xl border p-4 flex items-center justify-between gap-4">
                 <div className="space-y-0.5">

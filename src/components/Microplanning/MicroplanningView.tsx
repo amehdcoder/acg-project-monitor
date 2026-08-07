@@ -30,7 +30,7 @@ import { TabSyncStatus } from "./TabSyncStatus";
 import useRealtimeMicroplanEntries from "@/hooks/useRealtimeMicroplanEntries";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useMdaLens } from "@/hooks/useMdaLens";
-import { rowInLensScope, MICROPLAN_TABS } from "@/lib/mdaLens/config";
+import { campaignInLensScope, projectInLensScope, rowInLensScope, MICROPLAN_TABS } from "@/lib/mdaLens/config";
 import MdaLensExportButton from "@/components/UserManagement/MdaLensExportButton";
 import { useProjectScope } from "@/hooks/useProjectScope";
 import { rowInScope } from "@/lib/projectScope";
@@ -408,6 +408,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [dialogFullscreen, setDialogFullscreen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterState, setFilterState] = useState<string>("all");
+  const [filterLga, setFilterLga] = useState<string>("all");
+  const [filterWard, setFilterWard] = useState<string>("all");
   const [filterAccessibility, setFilterAccessibility] = useState<string>("all");
   const [filterSecurity, setFilterSecurity] = useState<string>("all");
   const [filterTerrain, setFilterTerrain] = useState<string>("all");
@@ -497,15 +499,16 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         data = [];
       }
     }
-    setProjects(data || []);
-    if (data && data.length > 0 && !selectedProjectId) {
-      setSelectedProjectId(data[0].id);
+    const visibleProjects = lens ? (data || []).filter((project) => projectInLensScope(lens, project.id)) : (data || []);
+    setProjects(visibleProjects);
+    if (visibleProjects.length > 0 && (!selectedProjectId || !visibleProjects.some((project) => project.id === selectedProjectId))) {
+      setSelectedProjectId(visibleProjects[0].id);
       // For entry-only users, auto-open the form immediately once project is set
       if (entryOnly) {
         setShowForm(true);
       }
     }
-  }, [selectedProjectId, entryOnly, isAdmin, user?.id]);
+  }, [selectedProjectId, entryOnly, isAdmin, user?.id, lens]);
 
   const fetchEntries = useCallback(async () => {
     if (!selectedProjectId) return;
@@ -891,7 +894,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     //    since it's a boundary defined on the project itself).
     result = result.filter((e: any) => rowInScope(projectScope, e));
     // 3) MDA Lens: admin-granted State/LGA lens narrows everything the user sees.
-    if (lens) result = result.filter((e: any) => rowInLensScope(lens, e.state, e.lga));
+    if (lens) result = result.filter((e: any) =>
+      rowInLensScope(lens, e.state, e.lga, e.ward) && campaignInLensScope(lens, e.campaign_type)
+    );
     return result;
   }, [baseEntries, isAdmin, scope, projectScope, lens]);
 
@@ -914,8 +919,16 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     () => [...new Set(displayEntries.map(e => e.state))].sort(),
     [displayEntries],
   );
+  const uniqueLgas = useMemo(() => [...new Set(displayEntries
+    .filter((e) => filterState === "all" || e.state === filterState)
+    .map((e) => e.lga).filter(Boolean))].sort(), [displayEntries, filterState]);
+  const uniqueWards = useMemo(() => [...new Set(displayEntries
+    .filter((e) => (filterState === "all" || e.state === filterState) && (filterLga === "all" || e.lga === filterLga))
+    .map((e) => e.ward).filter(Boolean))].sort(), [displayEntries, filterState, filterLga]);
   const filtered = useMemo(() => displayEntries.filter(e => {
     if (filterState !== "all" && e.state !== filterState) return false;
+    if (filterLga !== "all" && e.lga !== filterLga) return false;
+    if (filterWard !== "all" && e.ward !== filterWard) return false;
     if (filterAccessibility !== "all") {
       const acc = e.accessibility || "unset";
       if (acc !== filterAccessibility) return false;
@@ -939,7 +952,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       return [e.community_name, e.settlement_name, e.flhf_name, e.lga, e.ward].some(v => v?.toLowerCase().includes(q));
     }
     return true;
-  }), [displayEntries, filterState, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, searchQuery]);
+  }), [displayEntries, filterState, filterLga, filterWard, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, searchQuery]);
 
   // ===== COMPREHENSIVE KPI ENGINE — single pass over `filtered` (memoized) =====
   // Previously ~25 separate map/filter/reduce passes ran on EVERY render. With
@@ -2088,11 +2101,25 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search communities, FLHF..." className="pl-8 h-8 text-xs" />
             </div>
-            <Select value={filterState} onValueChange={setFilterState}>
+            <Select value={filterState} onValueChange={(value) => { setFilterState(value); setFilterLga("all"); setFilterWard("all"); }}>
               <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All States" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All States</SelectItem>
                 {uniqueStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={filterLga} onValueChange={(value) => { setFilterLga(value); setFilterWard("all"); }}>
+              <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All LGAs" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All LGAs</SelectItem>
+                {uniqueLgas.map((lga) => <SelectItem key={lga} value={lga}>{lga}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={filterWard} onValueChange={setFilterWard}>
+              <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All Wards" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Wards</SelectItem>
+                {uniqueWards.map((ward) => <SelectItem key={ward} value={ward}>{ward}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={filterAccessibility} onValueChange={setFilterAccessibility}>

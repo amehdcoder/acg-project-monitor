@@ -268,6 +268,7 @@ export const usePageAccess = () => {
       // Submissions — PLUS any page explicitly granted to the user via
       // user_page_access (an explicit owner grant always overrides the lock).
       if (minimalAccess && !isAdmin) {
+        if (lensEnabled && LENS_PAGE_IDS.includes(pageId)) return true;
         return (
           pageId === "forms" ||
           pageId === "project-chat" ||

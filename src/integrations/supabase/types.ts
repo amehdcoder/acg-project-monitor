@@ -5060,6 +5060,7 @@ export type Database = {
       }
       mda_lens_grants: {
         Row: {
+          campaign_types: string[]
           can_export: boolean
           created_at: string
           enabled: boolean
@@ -5067,12 +5068,15 @@ export type Database = {
           id: string
           lgas: string[]
           microplan_tabs: string[]
+          project_ids: string[]
           states: string[]
           supervisory_tabs: string[]
           updated_at: string
           user_id: string
+          wards: string[]
         }
         Insert: {
+          campaign_types?: string[]
           can_export?: boolean
           created_at?: string
           enabled?: boolean
@@ -5080,12 +5084,15 @@ export type Database = {
           id?: string
           lgas?: string[]
           microplan_tabs?: string[]
+          project_ids?: string[]
           states?: string[]
           supervisory_tabs?: string[]
           updated_at?: string
           user_id: string
+          wards?: string[]
         }
         Update: {
+          campaign_types?: string[]
           can_export?: boolean
           created_at?: string
           enabled?: boolean
@@ -5093,10 +5100,12 @@ export type Database = {
           id?: string
           lgas?: string[]
           microplan_tabs?: string[]
+          project_ids?: string[]
           states?: string[]
           supervisory_tabs?: string[]
           updated_at?: string
           user_id?: string
+          wards?: string[]
         }
         Relationships: []
       }
@@ -9256,6 +9265,7 @@ export type Database = {
         Args: { p_chat_group_id: string; p_user_id: string }
         Returns: number
       }
+      has_active_mda_lens: { Args: { _user_id: string }; Returns: boolean }
       has_ces_role: {
         Args: { _project_id: string; _role: string; _user_id: string }
         Returns: boolean
@@ -9356,6 +9366,21 @@ export type Database = {
           _user_agent?: string
         }
         Returns: string
+      }
+      mda_lens_allows_project: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
+      mda_lens_allows_row: {
+        Args: {
+          _campaign_type: string
+          _lga: string
+          _project_id: string
+          _state: string
+          _user_id: string
+          _ward: string
+        }
+        Returns: boolean
       }
       microplan_distinct_geography:
         | {

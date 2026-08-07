@@ -38,6 +38,7 @@ interface SidebarProps {
   isAdhoc?: boolean;
   canAccessPage?: (pageId: string) => boolean;
   minimalAccess?: boolean;
+  lensEnabled?: boolean;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }
@@ -70,7 +71,7 @@ const getRoleBadge = (role?: AppRole | null) => {
   return null;
 };
 
-const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdmin, isOwner, isAdhoc, canAccessPage, minimalAccess, collapsed, onToggleCollapse }: SidebarProps) => {
+const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdmin, isOwner, isAdhoc, canAccessPage, minimalAccess, lensEnabled = false, collapsed, onToggleCollapse }: SidebarProps) => {
   const roleBadge = getRoleBadge(role);
   const { t } = useLanguage();
   const { playNavigate, playClick } = useAudioCues();
@@ -152,6 +153,8 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
   // their project(s), role and owner-granted access unlock.
   const DEFAULT_USER_PAGES = ["forms", "cases", "community-forum", "project-chat"];
   const visibleMenuItems = menuItems.filter(item => {
+    // Lens confinement outranks adhoc/minimal/default navigation for regular users.
+    if (isRegularUser && lensEnabled) return ["microplanning", "integrated-supervisory"].includes(item.id);
     // Adhoc users only ever see: their assigned form, project chat, own submissions.
     if (isAdhoc) return ADHOC_ALLOWED.includes(item.id);
     if ((item as any).ownerOnly && !isOwner) return false;
@@ -270,7 +273,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
 
             {/* Bottom nav */}
             <div className="border-t border-sidebar-border px-1.5 py-1.5">
-              {bottomItems.map((item) => (
+              {(!isRegularUser || !lensEnabled) && bottomItems.map((item) => (
                 <NavButton key={item.id} id={item.id} label={item.label} icon={item.icon} isBottom />
               ))}
             </div>
