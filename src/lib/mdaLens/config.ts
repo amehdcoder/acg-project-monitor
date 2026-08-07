@@ -43,6 +43,20 @@ export const SUPERVISORY_TAB_IDS = SUPERVISORY_TABS.map((t) => t.id) as unknown 
 /** Page ids the lens unlocks in the sidebar / route guard. */
 export const LENS_PAGE_IDS = ["microplanning", "integrated-supervisory", "integrated-supervisory-raw"];
 
+/** Tabs a lens-only (non-admin) user is allowed to land on. */
+export const LENS_ALLOWED_TABS = ["microplanning", "integrated-supervisory"];
+
+/**
+ * Route guard for lens users: returns the tab that must be shown for a
+ * requested tab. Any other destination — including one reached by direct
+ * navigation (`?tab=users`) — is redirected back into the granted pages.
+ */
+export function enforceLensTab(requestedTab: string, canOpenMicroplanning: boolean): string {
+  if (LENS_ALLOWED_TABS.includes(requestedTab)) return requestedTab;
+  return canOpenMicroplanning ? "microplanning" : "integrated-supervisory";
+}
+
+
 /**
  * Tolerant comparison key: Kobo/microplan rows store geography in many shapes
  * ("Kano", "kano", "c__kano", "Kano|Dala", "state_kano_01", "Dala LGA").

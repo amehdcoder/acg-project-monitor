@@ -19,6 +19,8 @@ import Install from "./pages/Install";
 import DataCleaner from "./pages/DataCleaner";
 import KoboHubPage from "./components/KoboHub/KoboHubPage";
 import MdaAnalysesHarness from "./pages/MdaAnalysesHarness";
+import MdaLensHarness from "./pages/MdaLensHarness";
+
 import MicroplanKpiHarness from "./pages/MicroplanKpiHarness";
 import XlsFormCoverHarness from "./pages/XlsFormCoverHarness";
 import LearningLog from "./pages/LearningLog";
@@ -160,6 +162,8 @@ const App = () => (
                    <Route path="/kobo-hub/manage" element={<ProtectedRoute><KoboHubPage manage /></ProtectedRoute>} />
                    <Route path="/learning-log" element={<ProtectedRoute><LearningLog /></ProtectedRoute>} />
                     <Route path="/__test/mda-analyses" element={<MdaAnalysesHarness />} />
+                    <Route path="/__test/mda-lens" element={<MdaLensHarness />} />
+
                     <Route path="/__test/microplan-kpi" element={<MicroplanKpiHarness />} />
                     <Route path="/__test/xlsform-cover" element={<XlsFormCoverHarness />} />
                     <Route path="/shared/dashboard/:token" element={<SharedDashboard />} />

@@ -5,6 +5,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePageAccess } from "@/hooks/usePageAccess";
 import { useMdaLens } from "@/hooks/useMdaLens";
+import { enforceLensTab } from "@/lib/mdaLens/config";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSwipeGesture } from "@/hooks/useSwipeGesture";
@@ -190,10 +192,10 @@ const Index = () => {
 
   useEffect(() => {
     if (loading || loadingLens || !user || isAdmin || isOwner || !lensEnabled) return;
-    if (!["microplanning", "integrated-supervisory"].includes(activeTab)) {
-      setActiveTab(canAccessPage("microplanning") ? "microplanning" : "integrated-supervisory");
-    }
+    const allowed = enforceLensTab(activeTab, canAccessPage("microplanning"));
+    if (allowed !== activeTab) setActiveTab(allowed);
   }, [loading, loadingLens, user, isAdmin, isOwner, lensEnabled, activeTab, canAccessPage]);
+
 
   // Adhoc users are confined to: their assigned form, the project chat, and
   // their own submissions. Any other tab redirects them back to Forms.

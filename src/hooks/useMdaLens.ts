@@ -21,15 +21,29 @@ export interface MdaLensState {
   refetchLens: () => void;
 }
 
+/**
+ * Dev-only injection point used by the `/__test/mda-lens` E2E harness so the
+ * real gating components can be driven with a deterministic grant. Never
+ * consulted in a production build.
+ */
+const testLens = (): MdaLensGrant | null => {
+  if (!import.meta.env.DEV) return null;
+  return (window as unknown as { __MDA_LENS_TEST__?: MdaLensGrant }).__MDA_LENS_TEST__ ?? null;
+};
+
 export function useMdaLens(): MdaLensState {
   const { user, isOwner, isCoOwner, isAdmin, loading: authLoading } = useAuth();
-  const unrestricted = !!isOwner || !!isCoOwner || !!isAdmin;
+  const injected = testLens();
+  const unrestricted = injected ? false : !!isOwner || !!isCoOwner || !!isAdmin;
   const [lens, setLens] = useState<MdaLensGrant | null>(null);
   const [loading, setLoading] = useState(true);
 
+
   const load = useCallback(async () => {
+    if (injected) { setLens(injected); setLoading(false); return; }
     if (authLoading) return;
     if (!user) { setLens(null); setLoading(false); return; }
+
     const { data } = await withTimeoutFallback(
       (async () =>
         await supabase
@@ -42,7 +56,7 @@ export function useMdaLens(): MdaLensState {
     );
     setLens(data ? ({ wards: [], project_ids: [], campaign_types: [], ...data } as MdaLensGrant) : null);
     setLoading(false);
-  }, [user, authLoading]);
+  }, [user, authLoading, injected]);
 
   useEffect(() => { void load(); }, [load]);
 
