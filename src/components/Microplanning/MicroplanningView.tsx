@@ -142,7 +142,7 @@ const numericFields = new Set([
 ]);
 
 // Paginated entry list for entry-only users
-const EntryOnlyList = ({ entries, loading, onEdit, onDelete }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void }) => {
+const EntryOnlyList = ({ entries, loading, onEdit, onDelete, readOnly = false }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; readOnly?: boolean }) => {
   const pagination = useTablePagination(entries, 10);
 
   return (
@@ -170,6 +170,7 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete }: { entries: any[];
                 <CardContent className="p-3 space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold">{entry.community_name}</span>
+                    {!readOnly && (
                     <div className="flex items-center gap-0.5">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(entry)}>
                         <Edit className="h-3.5 w-3.5" />
@@ -178,6 +179,7 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete }: { entries: any[];
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
                     <span>State: <strong className="text-foreground">{entry.state}</strong></span>
@@ -217,6 +219,7 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete }: { entries: any[];
                     <TableCell className="text-xs">{entry.estimated_total_population?.toLocaleString() || "—"}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{new Date(entry.created_at).toLocaleDateString()}</TableCell>
                     <TableCell>
+                      {!readOnly && (
                       <div className="flex items-center gap-0.5">
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(entry)}>
                           <Edit className="h-3.5 w-3.5" />
@@ -225,6 +228,7 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete }: { entries: any[];
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -249,7 +253,7 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete }: { entries: any[];
 };
 
 // Paginated admin list view for full access users
-const AdminListView = ({ entries, loading, onEdit, onDelete }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void }) => {
+const AdminListView = ({ entries, loading, onEdit, onDelete, readOnly = false }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; readOnly?: boolean }) => {
   const pagination = useTablePagination(entries, 25);
 
   return (
@@ -266,6 +270,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete }: { entries: any[];
               <CardContent className="p-3 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold">{entry.community_name}</span>
+                  {!readOnly && (
                   <div className="flex items-center gap-0.5">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(entry)}>
                       <Edit className="h-3 w-3" />
@@ -274,6 +279,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete }: { entries: any[];
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
                   <span>{entry.state} / {entry.lga}</span>
@@ -360,6 +366,9 @@ const AdminListView = ({ entries, loading, onEdit, onDelete }: { entries: any[];
                     )}
                   </TableCell>
                   <TableCell>
+                    {readOnly ? (
+                      <span className="text-[10px] text-muted-foreground">View only</span>
+                    ) : (
                     <div className="flex items-center gap-1">
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(entry)}>
                         <Edit className="h-3 w-3" />
@@ -368,6 +377,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete }: { entries: any[];
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -469,6 +479,16 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const scope = useMicroplanScope(isAdmin);
   const { lens, lensEnabled, canOpenMicroplanTab } = useMdaLens();
   const lensScopeLabel = lensScopeSummary(lens);
+  // MDA Lens users are strictly read-only: they may view and export their scoped
+  // data but can never edit or delete a submission (also enforced by RLS).
+  const lensReadOnly = lensEnabled && !isAdmin && !isOwner;
+  const blockLensWrite = () => {
+    toast({
+      title: "View-only access",
+      description: "MDA Lens access is read-only — you cannot edit or delete submissions.",
+      variant: "destructive",
+    });
+  };
   // Pre-select the geography filters when the lens grants exactly one State / LGA,
   // so scoped users land straight on their own real-time slice.
   useEffect(() => {
@@ -715,6 +735,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   };
 
   const handleDelete = async (id: string) => {
+    if (lensReadOnly) { blockLensWrite(); return; }
     // Non-admins cannot delete directly — they must submit a delete request
     // for admin approval. Admins delete immediately (with confirmation).
     if (!isAdmin && !isOwner) {
@@ -2239,6 +2260,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             <MicroplanMap
               entries={filtered}
               onEntryClick={(id) => {
+                if (lensReadOnly) { blockLensWrite(); return; }
                 const entry = entries.find(e => e.id === id);
                 if (entry) { setEditingEntry(entry); setShowForm(true); }
               }}
@@ -2250,8 +2272,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             <AdminListView
               entries={filtered}
               loading={loading}
-              onEdit={(entry) => { setEditingEntry(entry); setShowForm(true); }}
+              onEdit={(entry) => { if (lensReadOnly) { blockLensWrite(); return; } setEditingEntry(entry); setShowForm(true); }}
               onDelete={handleDelete}
+              readOnly={lensReadOnly}
             />
           )}
 
@@ -2886,8 +2909,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         <EntryOnlyList
           entries={entries}
           loading={loading}
-          onEdit={(entry) => { setEditingEntry(entry); setShowForm(true); }}
+          onEdit={(entry) => { if (lensReadOnly) { blockLensWrite(); return; } setEditingEntry(entry); setShowForm(true); }}
           onDelete={handleDelete}
+          readOnly={lensReadOnly}
         />
       )}
 
