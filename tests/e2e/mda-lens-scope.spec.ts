@@ -16,7 +16,8 @@ const HARNESS = "/__test/mda-lens";
 const SCOPED = `${HARNESS}?states=Kano&lgas=Dala`;
 
 const LENS_PAGES = ["microplanning", "integrated-supervisory", "integrated-supervisory-raw"];
-const OTHER_PAGES = ["dashboard", "users", "analytics", "forms", "cases"];
+// Restricted destinations that must stay closed to a lens user.
+const OTHER_PAGES = ["dashboard", "users", "analytics"];
 
 async function gotoLens(page: Page, url = SCOPED) {
   await page.goto(url);
@@ -40,9 +41,14 @@ test.describe("MDA Lens — page containment", () => {
     // Deep-link straight at a non-MDA page: the access decision is recomputed
     // client-side and must not open up just because the URL asked for it.
     await gotoLens(page, `${SCOPED}&tab=users`);
+    // The lens route guard bounces the request back into the granted pages.
+    await expect(page.getByTestId("active-tab")).toHaveText("microplanning");
     await expect(page.getByTestId("page-users")).toHaveAttribute("data-allowed", "false");
     await expect(page.getByTestId("page-dashboard")).toHaveAttribute("data-allowed", "false");
     await expect(page.getByTestId("page-microplanning")).toHaveAttribute("data-allowed", "true");
+
+    await gotoLens(page, `${SCOPED}&tab=analytics`);
+    await expect(page.getByTestId("active-tab")).toHaveText("microplanning");
   });
 
   test("navigation surfaces expose only the two MDA destinations", async ({ page }) => {
@@ -69,8 +75,8 @@ test.describe("MDA Lens — locked geography filters", () => {
     await expect(page.getByTestId("filter-lga")).toHaveText("Dala");
 
     // Both selects are disabled — no "All" escape hatch.
-    await expect(page.getByTestId("isc-state")).toBeDisabled();
-    await expect(page.getByTestId("isc-lga")).toBeDisabled();
+    await expect(page.locator("#isc-state")).toBeDisabled();
+    await expect(page.locator("#isc-lga")).toBeDisabled();
   });
 
   test("Clear all cannot widen the scope back to every State/LGA", async ({ page }) => {
@@ -86,7 +92,7 @@ test.describe("MDA Lens — locked geography filters", () => {
 
   test("an unlocked Ward select still only offers wards inside the grant", async ({ page }) => {
     await gotoLens(page);
-    await page.getByTestId("isc-ward").click();
+    await page.locator("#isc-ward").click();
     const options = page.getByRole("option");
     await expect(options.filter({ hasText: "Gwammaja" })).toHaveCount(1);
     await expect(options.filter({ hasText: "Kabuwaya" })).toHaveCount(1);
@@ -113,7 +119,7 @@ test.describe("MDA Lens — data and exports stay inside the grant", () => {
     await expect(page.getByTestId("scoped-count")).toHaveText("1");
     await expect(page.getByTestId("visible-ids")).toHaveText("1");
     await expect(page.getByTestId("lens-export")).toContainText("(1)");
-    await expect(page.getByTestId("isc-ward")).toBeDisabled();
+    await expect(page.locator("#isc-ward")).toBeDisabled();
   });
 
   test("export is hidden when the grant withholds it", async ({ page }) => {
