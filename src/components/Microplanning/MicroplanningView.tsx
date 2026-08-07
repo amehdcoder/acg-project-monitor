@@ -770,8 +770,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   // ---- EXPORT: Blank branded template or filled data ----
   const handleExportTemplate = async (filled: boolean) => {
+    // Lens/scope aware: never export rows outside what this user may see.
     const dataRows = filled
-      ? entries.map((entry) =>
+      ? displayEntries.map((entry) =>
           TEMPLATE_HEADERS.map((header) => {
             const field = HEADER_TO_FIELD[header];
             if (!field) return "";
