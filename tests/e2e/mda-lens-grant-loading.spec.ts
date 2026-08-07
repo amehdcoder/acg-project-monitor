@@ -63,16 +63,19 @@ test.describe("MDA Lens — intermittent grant fetch failures", () => {
   });
 
   test("a failure followed by a successful retry ends in granted access", async ({ page }) => {
-    await page.goto(`${HARNESS}?${SCOPE}&failFirst=1&delay=150`);
+    // Start in an outage: the grant fetch fails, so access must be restricted.
+    await page.goto(`${HARNESS}?${SCOPE}&fail=1&delay=150`);
+    await expect(page.getByTestId("access-state")).toHaveText("restricted", { timeout: 15_000 });
+    expect(await telemetry(page)).toContain("lens_fetch_failed");
 
-    // Retry (what focus/online/realtime invalidation does in the real app).
+    // Outage recovers, then retry (what focus/online/invalidation does for real).
+    await page.evaluate(() => {
+      (window as unknown as { __MDA_LENS_TEST_FAIL__?: boolean }).__MDA_LENS_TEST_FAIL__ = false;
+    });
     await page.getByTestId("refetch-lens").dispatchEvent("click");
     await expect(page.getByTestId("access-state")).toHaveText("granted", { timeout: 15_000 });
     await expect(page.getByTestId("visible-ids")).toHaveText("1,2");
-    // The transient failure was recorded, and access never flickered away.
-    const events = await telemetry(page);
-    expect(events).toContain("lens_fetch_failed");
-    expect(events).toContain("lens_resolved");
+    expect(await telemetry(page)).toContain("lens_resolved");
     assertNoFlicker(await trail(page));
   });
 
