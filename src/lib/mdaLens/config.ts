@@ -106,12 +106,15 @@ export function readKoboGeo(row: Record<string, unknown>): { state: string; lga:
   let state = "";
   let lga = "";
   let ward = "";
+  const pick = (leaf: string, level: "state" | "lga" | "ward") =>
+    new RegExp(`^((mda|sel|q)_?)?${level}(_?(name|label|select|code))?$`, "i").test(leaf.replace(/\s+/g, "_"));
   for (const [k, v] of Object.entries(row || {})) {
     const leaf = k.split("/").pop() || k;
-    if (!state && /^state$/i.test(leaf)) state = String(v ?? "");
-    if (!lga && /^lga$/i.test(leaf)) lga = String(v ?? "");
-    if (!ward && /^ward$/i.test(leaf)) ward = String(v ?? "");
+    if (!state && pick(leaf, "state")) state = String(v ?? "");
+    if (!lga && pick(leaf, "lga")) lga = String(v ?? "");
+    if (!ward && pick(leaf, "ward")) ward = String(v ?? "");
     if (state && lga && ward) break;
   }
+
   return { state, lga, ward };
 }
