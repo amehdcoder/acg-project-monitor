@@ -931,6 +931,17 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const uniqueWards = useMemo(() => [...new Set(displayEntries
     .filter((e) => (filterState === "all" || e.state === filterState) && (filterLga === "all" || e.lga === filterLga))
     .map((e) => e.ward).filter(Boolean))].sort(), [displayEntries, filterState, filterLga]);
+
+  // MDA Lens: lock any geography level the grant pins to a single value.
+  const lensLockState = !!lens?.states.length && uniqueStates.length <= 1;
+  const lensLockLga = !!lens?.lgas.length && uniqueLgas.length <= 1;
+  const lensLockWard = !!lens?.wards.length && uniqueWards.length <= 1;
+  useEffect(() => {
+    if (lensLockState && uniqueStates[0] && filterState !== uniqueStates[0]) setFilterState(uniqueStates[0] as string);
+    if (lensLockLga && uniqueLgas[0] && filterLga !== uniqueLgas[0]) setFilterLga(uniqueLgas[0] as string);
+    if (lensLockWard && uniqueWards[0] && filterWard !== uniqueWards[0]) setFilterWard(uniqueWards[0] as string);
+  }, [lensLockState, lensLockLga, lensLockWard, uniqueStates, uniqueLgas, uniqueWards, filterState, filterLga, filterWard]);
+
   const filtered = useMemo(() => displayEntries.filter(e => {
     if (filterState !== "all" && e.state !== filterState) return false;
     if (filterLga !== "all" && e.lga !== filterLga) return false;
