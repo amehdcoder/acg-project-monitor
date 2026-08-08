@@ -20,6 +20,8 @@ import ReconciliationView from "./ReconciliationView";
 import MissingCommunitiesView from "./MissingCommunitiesView";
 import TravelRouteMap from "./TravelRouteMap";
 import HistoricalDataReview from "./HistoricalDataReview";
+import MicroplanSummaryView from "./MicroplanSummaryView";
+import { DISABILITY_TYPES, pwdValue, pwdTotalFor } from "@/lib/microplanning/disabilityTypes";
 import DesignationManagerDialog from "./DesignationManagerDialog";
 import AllocationHistoryDialog from "./AllocationHistoryDialog";
 import MicroplanDeleteRequestDialog from "./MicroplanDeleteRequestDialog";
