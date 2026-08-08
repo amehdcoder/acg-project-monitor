@@ -2079,6 +2079,54 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               </CardContent>
             </Card>
 
+            {/* Disability Types — clickable population disaggregation */}
+            <Card className="border-border/40 shadow-sm">
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-2.5">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(262, 55%, 52%)" }} />
+                    Disability Types
+                  </p>
+                  {filterDisability !== "all" && (
+                    <button onClick={() => setFilterDisability("all")} className="text-[9px] text-primary hover:underline">Clear</button>
+                  )}
+                </div>
+                <div className="flex items-baseline justify-between mb-2">
+                  <span className="text-[10px] text-muted-foreground">Total persons with disability</span>
+                  <span className="text-sm font-bold tabular-nums text-foreground">{totalPwd.toLocaleString()}</span>
+                </div>
+                <div className="space-y-2">
+                  {DISABILITY_TYPES.map((d) => {
+                    const stat = disabilityStats[d.key] || { pop: 0, communities: 0 };
+                    const active = filterDisability === d.key;
+                    const share = totalPwd > 0 ? (stat.pop / totalPwd) * 100 : 0;
+                    return (
+                      <button
+                        key={d.key}
+                        onClick={() => setFilterDisability(active ? "all" : d.key)}
+                        title={`${stat.communities} communities reporting ${d.label}`}
+                        className={`w-full flex items-center gap-2 text-xs px-1.5 py-1 rounded transition-colors ${active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
+                      >
+                        <span
+                          className="flex-shrink-0 flex items-center justify-center h-6 w-6 rounded-md"
+                          style={{ background: `${d.color}1A` }}
+                        >
+                          <d.icon className="h-3.5 w-3.5" style={{ color: d.color }} />
+                        </span>
+                        <span className="flex-1 text-left text-foreground">{d.label}</span>
+                        <span className="font-bold tabular-nums text-foreground">{stat.pop.toLocaleString()}</span>
+                        <span className="text-[9px] text-muted-foreground tabular-nums w-14 text-right">{stat.communities} comm.</span>
+                        <div className="w-14 h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${share}%`, background: d.color }} />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+
             {/* CDD & Key Ratios */}
             <Card className="border-border/40 shadow-sm">
               <CardContent className="p-3">
