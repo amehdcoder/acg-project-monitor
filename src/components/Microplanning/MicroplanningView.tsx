@@ -1018,6 +1018,35 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     return true;
   }), [displayEntries, filterState, filterLga, filterWard, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, filterDisability, searchQuery]);
 
+  // Filter context used by the breadcrumb trail and the "export any level" button.
+  const exportFilterContext = useMemo(() => ({
+    project: projects.find((p) => p.id === selectedProjectId)?.name,
+    state: filterState,
+    lga: filterLga,
+    ward: filterWard,
+    accessibility: filterAccessibility,
+    security: filterSecurity,
+    terrain: filterTerrain,
+    keyRatio: filterKeyRatio,
+    disability: filterDisability === "all"
+      ? "all"
+      : DISABILITY_TYPES.find((d) => d.key === filterDisability)?.label ?? filterDisability,
+    search: searchQuery || undefined,
+  }), [projects, selectedProjectId, filterState, filterLga, filterWard, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, filterDisability, searchQuery]);
+
+  const drillCrumbs = useMemo(() => {
+    const c: { label: string; value: string; onClear?: () => void }[] = [];
+    if (filterState !== "all") c.push({ label: "State", value: filterState, onClear: lensLockState ? undefined : () => { setFilterState("all"); setFilterLga("all"); setFilterWard("all"); } });
+    if (filterLga !== "all") c.push({ label: "LGA", value: filterLga, onClear: lensLockLga ? undefined : () => { setFilterLga("all"); setFilterWard("all"); } });
+    if (filterWard !== "all") c.push({ label: "Ward", value: filterWard, onClear: lensLockWard ? undefined : () => setFilterWard("all") });
+    if (filterAccessibility !== "all") c.push({ label: "Accessibility", value: filterAccessibility.replace(/_/g, " "), onClear: () => setFilterAccessibility("all") });
+    if (filterSecurity !== "all") c.push({ label: "Security", value: filterSecurity.replace(/_/g, " "), onClear: () => setFilterSecurity("all") });
+    if (filterTerrain !== "all") c.push({ label: "Terrain", value: filterTerrain, onClear: () => setFilterTerrain("all") });
+    if (filterKeyRatio !== "all") c.push({ label: "Key Ratio", value: filterKeyRatio.replace(/_/g, " "), onClear: () => setFilterKeyRatio("all") });
+    if (filterDisability !== "all") c.push({ label: "Disability", value: DISABILITY_TYPES.find(d => d.key === filterDisability)?.label ?? filterDisability, onClear: () => setFilterDisability("all") });
+    return c;
+  }, [filterState, filterLga, filterWard, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, filterDisability, lensLockState, lensLockLga, lensLockWard]);
+
   // ===== COMPREHENSIVE KPI ENGINE — single pass over `filtered` (memoized) =====
   // Previously ~25 separate map/filter/reduce passes ran on EVERY render. With
   // millions of rows that froze the page; now it's one loop, recomputed only
