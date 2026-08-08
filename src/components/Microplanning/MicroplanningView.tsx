@@ -359,15 +359,9 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, readOnly = false }:
                     )}
                   </TableCell>
                   <TableCell>
-                    {entry.community_latitude != null && entry.community_longitude != null ? (
-                      <Badge variant="outline" className="text-[10px] border-blue-300 text-blue-700">
-                        <MapPin className="h-2.5 w-2.5 mr-0.5" />
-                        {entry.community_latitude.toFixed(2)}, {entry.community_longitude.toFixed(2)}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
+                    <GpsResolveCell entry={entry} readOnly={readOnly} onResolved={onGpsResolved} />
                   </TableCell>
+
                   <TableCell>
                     {readOnly ? (
                       <span className="text-[10px] text-muted-foreground">View only</span>
