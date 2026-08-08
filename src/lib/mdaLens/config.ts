@@ -28,6 +28,7 @@ export const MICROPLAN_TABS = [
   { id: "map", label: "Map" },
   { id: "routes", label: "Routes" },
   { id: "historical", label: "Historical" },
+  { id: "summary", label: "Summary" },
 ] as const;
 
 export const SUPERVISORY_TABS = [
