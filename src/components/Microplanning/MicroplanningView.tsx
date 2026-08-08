@@ -2910,7 +2910,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             <MicroplanSummaryView
               entries={filtered as any}
               readOnly={lensReadOnly}
-              onRefresh={() => refetch?.()}
+              onRefresh={fetchEntries}
             />
           )}
         </>
