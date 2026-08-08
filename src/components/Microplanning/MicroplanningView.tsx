@@ -993,12 +993,17 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       if (filterKeyRatio === "cdd_external" && e.cdd_from_community) return false;
       if (filterKeyRatio === "hard_to_reach" && !(e.accessibility === "hard_to_reach" || e.accessibility === "inaccessible")) return false;
     }
+    if (filterDisability !== "all") {
+      const def = DISABILITY_TYPES.find(d => d.key === filterDisability);
+      if (!def) return false;
+      if (pwdValue(e as any, def.field) <= 0) return false;
+    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return [e.community_name, e.settlement_name, e.flhf_name, e.lga, e.ward].some(v => v?.toLowerCase().includes(q));
     }
     return true;
-  }), [displayEntries, filterState, filterLga, filterWard, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, searchQuery]);
+  }), [displayEntries, filterState, filterLga, filterWard, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, filterDisability, searchQuery]);
 
   // ===== COMPREHENSIVE KPI ENGINE — single pass over `filtered` (memoized) =====
   // Previously ~25 separate map/filter/reduce passes ran on EVERY render. With
