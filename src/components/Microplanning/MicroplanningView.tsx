@@ -2215,6 +2215,10 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                   <HistoryIcon className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Historical</span>
                 </Button>)}
+                {canOpenView("summary") && (<Button variant={activeView === "summary" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("summary")}>
+                  <LayersIcon className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline text-xs">Summary</span>
+                </Button>)}
               </div>
             )}
             {(isAdmin || (lensEnabled && lens?.can_export)) && (
