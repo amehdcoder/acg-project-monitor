@@ -431,6 +431,22 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [filterKeyRatio, setFilterKeyRatio] = useState<string>("all"); // "cdd_from_community" | "cdd_external" | "hard_to_reach"
   const [filterDisability, setFilterDisability] = useState<string>("all"); // disability type key
   const [activeView, setActiveView] = useState<"list" | "medicine" | "coverage" | "reconciliation" | "gaps" | "map" | "routes" | "historical" | "summary">("list");
+  // Where the current drill-through started, so we can offer a one-click return.
+  const [drillOrigin, setDrillOrigin] = useState<"disability" | "accessibility" | "security" | "terrain" | "keyRatio" | "summary" | null>(null);
+  const backToDisaggregation = useCallback(() => {
+    if (drillOrigin === "summary") { setActiveView("summary"); setDrillOrigin(null); return; }
+    if (drillOrigin === "disability") setFilterDisability("all");
+    if (drillOrigin === "accessibility") setFilterAccessibility("all");
+    if (drillOrigin === "security") setFilterSecurity("all");
+    if (drillOrigin === "terrain") setFilterTerrain("all");
+    if (drillOrigin === "keyRatio") setFilterKeyRatio("all");
+    setActiveView("list");
+    setDrillOrigin(null);
+    requestAnimationFrame(() => {
+      document.getElementById(`disagg-${drillOrigin}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [drillOrigin]);
+
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
