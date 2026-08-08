@@ -256,7 +256,7 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete, readOnly = false }:
 };
 
 // Paginated admin list view for full access users
-const AdminListView = ({ entries, loading, onEdit, onDelete, readOnly = false }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; readOnly?: boolean }) => {
+const AdminListView = ({ entries, loading, onEdit, onDelete, readOnly = false, onGpsResolved }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; readOnly?: boolean; onGpsResolved?: (id: string, patch: Record<string, unknown>) => void }) => {
   const pagination = useTablePagination(entries, 25);
 
   return (
