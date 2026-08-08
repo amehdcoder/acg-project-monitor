@@ -20,6 +20,8 @@ import ReconciliationView from "./ReconciliationView";
 import MissingCommunitiesView from "./MissingCommunitiesView";
 import TravelRouteMap from "./TravelRouteMap";
 import HistoricalDataReview from "./HistoricalDataReview";
+import MicroplanSummaryView from "./MicroplanSummaryView";
+import { DISABILITY_TYPES, pwdValue, pwdTotalFor } from "@/lib/microplanning/disabilityTypes";
 import DesignationManagerDialog from "./DesignationManagerDialog";
 import AllocationHistoryDialog from "./AllocationHistoryDialog";
 import MicroplanDeleteRequestDialog from "./MicroplanDeleteRequestDialog";
@@ -39,7 +41,7 @@ import { useProjectScope } from "@/hooks/useProjectScope";
 import { rowInScope } from "@/lib/projectScope";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
-import { ShieldCheck, History as HistoryIcon } from "lucide-react";
+import { ShieldCheck, History as HistoryIcon, Layers as LayersIcon } from "lucide-react";
 import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -427,7 +429,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [filterSecurity, setFilterSecurity] = useState<string>("all");
   const [filterTerrain, setFilterTerrain] = useState<string>("all");
   const [filterKeyRatio, setFilterKeyRatio] = useState<string>("all"); // "cdd_from_community" | "cdd_external" | "hard_to_reach"
-  const [activeView, setActiveView] = useState<"list" | "medicine" | "coverage" | "reconciliation" | "gaps" | "map" | "routes" | "historical">("list");
+  const [filterDisability, setFilterDisability] = useState<string>("all"); // disability type key
+  const [activeView, setActiveView] = useState<"list" | "medicine" | "coverage" | "reconciliation" | "gaps" | "map" | "routes" | "historical" | "summary">("list");
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -990,12 +993,17 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       if (filterKeyRatio === "cdd_external" && e.cdd_from_community) return false;
       if (filterKeyRatio === "hard_to_reach" && !(e.accessibility === "hard_to_reach" || e.accessibility === "inaccessible")) return false;
     }
+    if (filterDisability !== "all") {
+      const def = DISABILITY_TYPES.find(d => d.key === filterDisability);
+      if (!def) return false;
+      if (pwdValue(e as any, def.field) <= 0) return false;
+    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return [e.community_name, e.settlement_name, e.flhf_name, e.lga, e.ward].some(v => v?.toLowerCase().includes(q));
     }
     return true;
-  }), [displayEntries, filterState, filterLga, filterWard, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, searchQuery]);
+  }), [displayEntries, filterState, filterLga, filterWard, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, filterDisability, searchQuery]);
 
   // ===== COMPREHENSIVE KPI ENGINE — single pass over `filtered` (memoized) =====
   // Previously ~25 separate map/filter/reduce passes ran on EVERY render. With
@@ -1009,7 +1017,16 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     const accessStats = { accessible: 0, hard_to_reach: 0, inaccessible: 0, seasonal: 0, unset: 0 };
     const securityStats = { cleared: 0, partial: 0, not_cleared: 0, unknown: 0 };
     const terrainCounts: Record<string, number> = {};
+    const disabilityStats: Record<string, { pop: number; communities: number }> = Object.fromEntries(
+      DISABILITY_TYPES.map(d => [d.key, { pop: 0, communities: 0 }]),
+    );
+    let totalPwd = 0;
     for (const e of filtered) {
+      for (const d of DISABILITY_TYPES) {
+        const v = pwdValue(e as any, d.field);
+        if (v > 0) { disabilityStats[d.key].pop += v; disabilityStats[d.key].communities += 1; }
+      }
+      totalPwd += pwdTotalFor(e as any);
       totalPop += e.estimated_total_population || 0;
       totalChildren04 += e.estimated_children_0_4 || 0;
       totalChildren514 += e.estimated_children_5_14 || 0;
@@ -1046,14 +1063,14 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       uniqueSettlements, cddFromCommunity, cddPct: count > 0 ? (cddFromCommunity / count) * 100 : 0,
       avgDistKm: distCount ? (distSum / distCount).toFixed(1) : "—",
       avgHouseholdsPerCommunity: count > 0 && totalHouseholds > 0 ? Math.round(totalHouseholds / count) : 0,
-      accessStats, securityStats, terrainCounts,
+      accessStats, securityStats, terrainCounts, disabilityStats, totalPwd,
     };
   }, [filtered, calcTargetPop]);
   const {
     totalPop, totalChildren04, totalChildren514, totalAdults15, totalHouseholds, targetPop,
     geotagged, geotaggedPct, hardToReach, uniqueStatesCount, uniqueLGAsCount, uniqueWardsCount,
     uniqueFLHFs, uniqueSettlements, cddFromCommunity, cddPct, avgDistKm, avgHouseholdsPerCommunity,
-    accessStats, securityStats, terrainCounts,
+    accessStats, securityStats, terrainCounts, disabilityStats, totalPwd,
   } = kpis;
 
   const TERRAIN_EMOJI: Record<string, string> = { flat: "🌾", hilly: "⛰️", mountainous: "🏔️", riverine: "🌊", swampy: "🏝️", desert: "🏜️", forest: "🌲" };
@@ -2062,6 +2079,54 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               </CardContent>
             </Card>
 
+            {/* Disability Types — clickable population disaggregation */}
+            <Card className="border-border/40 shadow-sm">
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-2.5">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(262, 55%, 52%)" }} />
+                    Disability Types
+                  </p>
+                  {filterDisability !== "all" && (
+                    <button onClick={() => setFilterDisability("all")} className="text-[9px] text-primary hover:underline">Clear</button>
+                  )}
+                </div>
+                <div className="flex items-baseline justify-between mb-2">
+                  <span className="text-[10px] text-muted-foreground">Total persons with disability</span>
+                  <span className="text-sm font-bold tabular-nums text-foreground">{totalPwd.toLocaleString()}</span>
+                </div>
+                <div className="space-y-2">
+                  {DISABILITY_TYPES.map((d) => {
+                    const stat = disabilityStats[d.key] || { pop: 0, communities: 0 };
+                    const active = filterDisability === d.key;
+                    const share = totalPwd > 0 ? (stat.pop / totalPwd) * 100 : 0;
+                    return (
+                      <button
+                        key={d.key}
+                        onClick={() => setFilterDisability(active ? "all" : d.key)}
+                        title={`${stat.communities} communities reporting ${d.label}`}
+                        className={`w-full flex items-center gap-2 text-xs px-1.5 py-1 rounded transition-colors ${active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
+                      >
+                        <span
+                          className="flex-shrink-0 flex items-center justify-center h-6 w-6 rounded-md"
+                          style={{ background: `${d.color}1A` }}
+                        >
+                          <d.icon className="h-3.5 w-3.5" style={{ color: d.color }} />
+                        </span>
+                        <span className="flex-1 text-left text-foreground">{d.label}</span>
+                        <span className="font-bold tabular-nums text-foreground">{stat.pop.toLocaleString()}</span>
+                        <span className="text-[9px] text-muted-foreground tabular-nums w-14 text-right">{stat.communities} comm.</span>
+                        <div className="w-14 h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${share}%`, background: d.color }} />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+
             {/* CDD & Key Ratios */}
             <Card className="border-border/40 shadow-sm">
               <CardContent className="p-3">
@@ -2115,13 +2180,14 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
 
           {/* Active indicator-filter reset bar */}
-          {(filterAccessibility !== "all" || filterSecurity !== "all" || filterTerrain !== "all" || filterKeyRatio !== "all") && (
+          {(filterAccessibility !== "all" || filterSecurity !== "all" || filterTerrain !== "all" || filterKeyRatio !== "all" || filterDisability !== "all") && (
             <div className="flex items-center gap-2 flex-wrap rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
               <span className="text-xs font-medium text-primary">Indicator filter active:</span>
               {filterAccessibility !== "all" && <span className="text-[11px] rounded bg-background px-2 py-0.5 border">Accessibility: {filterAccessibility}</span>}
               {filterSecurity !== "all" && <span className="text-[11px] rounded bg-background px-2 py-0.5 border">Security: {filterSecurity}</span>}
               {filterTerrain !== "all" && <span className="text-[11px] rounded bg-background px-2 py-0.5 border">Terrain: {filterTerrain}</span>}
               {filterKeyRatio !== "all" && <span className="text-[11px] rounded bg-background px-2 py-0.5 border">Key Ratio: {filterKeyRatio}</span>}
+              {filterDisability !== "all" && <span className="text-[11px] rounded bg-background px-2 py-0.5 border">Disability: {DISABILITY_TYPES.find(d => d.key === filterDisability)?.label ?? filterDisability}</span>}
               <Button
                 size="sm"
                 variant="outline"
@@ -2131,6 +2197,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                   setFilterSecurity("all");
                   setFilterTerrain("all");
                   setFilterKeyRatio("all");
+                  setFilterDisability("all");
                 }}
               >
                 <X className="h-3.5 w-3.5" /> Reset filters
@@ -2212,6 +2279,10 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 {canOpenView("historical") && (<Button variant={activeView === "historical" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("historical")}>
                   <HistoryIcon className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline text-xs">Historical</span>
+                </Button>)}
+                {canOpenView("summary") && (<Button variant={activeView === "summary" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("summary")}>
+                  <LayersIcon className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline text-xs">Summary</span>
                 </Button>)}
               </div>
             )}
@@ -2901,6 +2972,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
           {/* Historical Data Review — population trend vs WorldPop/GRID3 */}
           {activeView === "historical" && (
             <HistoricalDataReview entries={displayEntries as any} />
+          )}
+
+          {/* Summary — hierarchical LGA → Ward → Health Facility rollup */}
+          {activeView === "summary" && (
+            <MicroplanSummaryView
+              entries={filtered as any}
+              readOnly={lensReadOnly}
+              onRefresh={fetchEntries}
+            />
           )}
         </>
       )}
