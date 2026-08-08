@@ -1985,7 +1985,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(142, 60%, 35%)" }} />
-                    Accessibility
+                    <span id="disagg-accessibility">Accessibility</span>
                   </p>
                   {filterAccessibility !== "all" && (
                     <button onClick={() => setFilterAccessibility("all")} className="text-[9px] text-primary hover:underline">Clear</button>
@@ -2003,7 +2003,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                     return (
                       <button
                         key={item.label}
-                        onClick={() => setFilterAccessibility(active ? "all" : item.key)}
+                        onClick={() => { setFilterAccessibility(active ? "all" : item.key); setDrillOrigin(active ? null : "accessibility"); }}
                         className={`w-full flex items-center gap-2 text-xs px-1.5 py-1 rounded transition-colors ${active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
                       >
                         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: item.color }} />
@@ -2025,7 +2025,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(215, 70%, 40%)" }} />
-                    Security Clearance
+                    <span id="disagg-security">Security Clearance</span>
                   </p>
                   {filterSecurity !== "all" && (
                     <button onClick={() => setFilterSecurity("all")} className="text-[9px] text-primary hover:underline">Clear</button>
@@ -2042,7 +2042,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                     return (
                       <button
                         key={item.label}
-                        onClick={() => setFilterSecurity(active ? "all" : item.key)}
+                        onClick={() => { setFilterSecurity(active ? "all" : item.key); setDrillOrigin(active ? null : "security"); }}
                         className={`w-full flex items-center gap-2 text-xs px-1.5 py-1 rounded transition-colors ${active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
                       >
                         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: item.color }} />
@@ -2064,7 +2064,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(25, 70%, 45%)" }} />
-                    Terrain Types
+                    <span id="disagg-terrain">Terrain Types</span>
                   </p>
                   {filterTerrain !== "all" && (
                     <button onClick={() => setFilterTerrain("all")} className="text-[9px] text-primary hover:underline">Clear</button>
@@ -2076,7 +2076,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                     return (
                       <button
                         key={terrain}
-                        onClick={() => setFilterTerrain(active ? "all" : terrain)}
+                        onClick={() => { setFilterTerrain(active ? "all" : terrain); setDrillOrigin(active ? null : "terrain"); }}
                         className={`w-full flex items-center gap-2 text-xs px-1.5 py-1 rounded transition-colors ${active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
                       >
                         <span className="flex-shrink-0 text-sm">{TERRAIN_EMOJI[terrain] || "❓"}</span>
@@ -2098,7 +2098,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(262, 55%, 52%)" }} />
-                    Disability Types
+                    <span id="disagg-disability">Disability Types</span>
                   </p>
                   {filterDisability !== "all" && (
                     <button onClick={() => setFilterDisability("all")} className="text-[9px] text-primary hover:underline">Clear</button>
@@ -2116,7 +2116,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                     return (
                       <button
                         key={d.key}
-                        onClick={() => setFilterDisability(active ? "all" : d.key)}
+                        onClick={() => { setFilterDisability(active ? "all" : d.key); setDrillOrigin(active ? null : "disability"); setActiveView("list"); }}
                         title={`${stat.communities} communities reporting ${d.label}`}
                         className={`w-full flex items-center gap-2 text-xs px-1.5 py-1 rounded transition-colors ${active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
                       >
@@ -2146,7 +2146,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(262, 50%, 50%)" }} />
-                    Key Ratios
+                    <span id="disagg-keyRatio">Key Ratios</span>
                   </p>
                   {filterKeyRatio !== "all" && (
                     <button onClick={() => setFilterKeyRatio("all")} className="text-[9px] text-primary hover:underline">Clear</button>
@@ -2154,7 +2154,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 </div>
                 <div className="space-y-3">
                   <button
-                    onClick={() => setFilterKeyRatio(filterKeyRatio === "cdd_from_community" ? "all" : "cdd_from_community")}
+                    onClick={() => { const on = filterKeyRatio === "cdd_from_community"; setFilterKeyRatio(on ? "all" : "cdd_from_community"); setDrillOrigin(on ? null : "keyRatio"); }}
                     className={`w-full text-left p-1.5 rounded transition-colors ${filterKeyRatio === "cdd_from_community" ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
                   >
                     <div className="flex justify-between text-xs mb-1">
@@ -2169,7 +2169,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                     <p className="text-[9px] text-muted-foreground mt-0.5">{cddFromCommunity} of {filtered.length} communities</p>
                   </button>
                   <button
-                    onClick={() => setFilterKeyRatio(filterKeyRatio === "hard_to_reach" ? "all" : "hard_to_reach")}
+                    onClick={() => { const on = filterKeyRatio === "hard_to_reach"; setFilterKeyRatio(on ? "all" : "hard_to_reach"); setDrillOrigin(on ? null : "keyRatio"); }}
                     className={`w-full text-left p-1.5 rounded transition-colors ${filterKeyRatio === "hard_to_reach" ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
                   >
                     <div className="flex justify-between text-xs mb-1">
