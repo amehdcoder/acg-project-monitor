@@ -1063,14 +1063,14 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       uniqueSettlements, cddFromCommunity, cddPct: count > 0 ? (cddFromCommunity / count) * 100 : 0,
       avgDistKm: distCount ? (distSum / distCount).toFixed(1) : "—",
       avgHouseholdsPerCommunity: count > 0 && totalHouseholds > 0 ? Math.round(totalHouseholds / count) : 0,
-      accessStats, securityStats, terrainCounts,
+      accessStats, securityStats, terrainCounts, disabilityStats, totalPwd,
     };
   }, [filtered, calcTargetPop]);
   const {
     totalPop, totalChildren04, totalChildren514, totalAdults15, totalHouseholds, targetPop,
     geotagged, geotaggedPct, hardToReach, uniqueStatesCount, uniqueLGAsCount, uniqueWardsCount,
     uniqueFLHFs, uniqueSettlements, cddFromCommunity, cddPct, avgDistKm, avgHouseholdsPerCommunity,
-    accessStats, securityStats, terrainCounts,
+    accessStats, securityStats, terrainCounts, disabilityStats, totalPwd,
   } = kpis;
 
   const TERRAIN_EMOJI: Record<string, string> = { flat: "🌾", hilly: "⛰️", mountainous: "🏔️", riverine: "🌊", swampy: "🏝️", desert: "🏜️", forest: "🌲" };
