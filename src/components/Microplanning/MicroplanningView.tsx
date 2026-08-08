@@ -2904,6 +2904,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
           {activeView === "historical" && (
             <HistoricalDataReview entries={displayEntries as any} />
           )}
+
+          {/* Summary — hierarchical LGA → Ward → Health Facility rollup */}
+          {activeView === "summary" && (
+            <MicroplanSummaryView
+              entries={filtered as any}
+              readOnly={lensReadOnly}
+              onRefresh={() => refetch?.()}
+            />
+          )}
         </>
       )}
 
