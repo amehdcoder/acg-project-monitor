@@ -2192,6 +2192,19 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
           </div>
 
 
+          {/* Drill-through breadcrumb trail */}
+          <DrillBreadcrumb
+            crumbs={drillCrumbs}
+            origin={drillOrigin}
+            onBack={backToDisaggregation}
+            onReset={drillCrumbs.length ? () => {
+              setFilterAccessibility("all"); setFilterSecurity("all"); setFilterTerrain("all");
+              setFilterKeyRatio("all"); setFilterDisability("all");
+              if (!lensLockWard) setFilterWard("all");
+              setDrillOrigin(null);
+            } : undefined}
+          />
+
           {/* Active indicator-filter reset bar */}
           {(filterAccessibility !== "all" || filterSecurity !== "all" || filterTerrain !== "all" || filterKeyRatio !== "all" || filterDisability !== "all") && (
             <div className="flex items-center gap-2 flex-wrap rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
@@ -2328,6 +2341,20 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             <Button size="sm" variant="outline" onClick={() => handleExportTemplate(true)} disabled={entries.length === 0}>
               <Download className="h-3.5 w-3.5 mr-1" /> Export Data as Template
             </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                const { fileName, count } = exportFilteredMicroplan(filtered as Record<string, unknown>[], exportFilterContext);
+                toast({ title: `\u2705 Exported ${count.toLocaleString()} records`, description: fileName });
+              }}
+              disabled={filtered.length === 0}
+              className="gap-1"
+            >
+              <Download className="h-3.5 w-3.5" /> Export Current Filter ({filtered.length.toLocaleString()})
+            </Button>
+            <span className="text-[10px] text-muted-foreground max-w-[280px] truncate" title={filterScopeLabel(exportFilterContext)}>
+              {filterScopeLabel(exportFilterContext)}
+            </span>
             <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing || !selectedProjectId}>
               <Upload className="h-3.5 w-3.5 mr-1" /> {importing ? "Importing..." : "Import Template"}
             </Button>
@@ -2360,6 +2387,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               onEdit={(entry) => { if (lensReadOnly) { blockLensWrite(); return; } setEditingEntry(entry); setShowForm(true); }}
               onDelete={handleDelete}
               readOnly={lensReadOnly}
+              onGpsResolved={(id, patch) =>
+                setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)))
+              }
             />
           )}
 
