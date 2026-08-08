@@ -1017,7 +1017,16 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     const accessStats = { accessible: 0, hard_to_reach: 0, inaccessible: 0, seasonal: 0, unset: 0 };
     const securityStats = { cleared: 0, partial: 0, not_cleared: 0, unknown: 0 };
     const terrainCounts: Record<string, number> = {};
+    const disabilityStats: Record<string, { pop: number; communities: number }> = Object.fromEntries(
+      DISABILITY_TYPES.map(d => [d.key, { pop: 0, communities: 0 }]),
+    );
+    let totalPwd = 0;
     for (const e of filtered) {
+      for (const d of DISABILITY_TYPES) {
+        const v = pwdValue(e as any, d.field);
+        if (v > 0) { disabilityStats[d.key].pop += v; disabilityStats[d.key].communities += 1; }
+      }
+      totalPwd += pwdTotalFor(e as any);
       totalPop += e.estimated_total_population || 0;
       totalChildren04 += e.estimated_children_0_4 || 0;
       totalChildren514 += e.estimated_children_5_14 || 0;
