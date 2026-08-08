@@ -21,6 +21,9 @@ import MissingCommunitiesView from "./MissingCommunitiesView";
 import TravelRouteMap from "./TravelRouteMap";
 import HistoricalDataReview from "./HistoricalDataReview";
 import MicroplanSummaryView from "./MicroplanSummaryView";
+import GpsResolveCell from "./GpsResolveCell";
+import DrillBreadcrumb from "./DrillBreadcrumb";
+import { exportFilteredMicroplan, filterScopeLabel } from "@/lib/microplanning/filteredExport";
 import { DISABILITY_TYPES, pwdValue, pwdTotalFor } from "@/lib/microplanning/disabilityTypes";
 import DesignationManagerDialog from "./DesignationManagerDialog";
 import AllocationHistoryDialog from "./AllocationHistoryDialog";
@@ -256,7 +259,7 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete, readOnly = false }:
 };
 
 // Paginated admin list view for full access users
-const AdminListView = ({ entries, loading, onEdit, onDelete, readOnly = false }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; readOnly?: boolean }) => {
+const AdminListView = ({ entries, loading, onEdit, onDelete, readOnly = false, onGpsResolved }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; readOnly?: boolean; onGpsResolved?: (id: string, patch: Record<string, unknown>) => void }) => {
   const pagination = useTablePagination(entries, 25);
 
   return (
@@ -290,7 +293,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, readOnly = false }:
                   <span>FLHF: {entry.flhf_name}</span>
                   <span>Pop: {entry.estimated_total_population?.toLocaleString() || "—"}</span>
                   {entry.accessibility && <span className="capitalize">{entry.accessibility.replace(/_/g, " ")}</span>}
-                  {entry.community_latitude != null && entry.community_longitude != null && <span>📍 {entry.community_latitude.toFixed(2)}, {entry.community_longitude.toFixed(2)}</span>}
+                  <span className="col-span-2"><GpsResolveCell entry={entry} readOnly={readOnly} onResolved={onGpsResolved} compact /></span>
                 </div>
               </CardContent>
             </Card>
@@ -359,15 +362,9 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, readOnly = false }:
                     )}
                   </TableCell>
                   <TableCell>
-                    {entry.community_latitude != null && entry.community_longitude != null ? (
-                      <Badge variant="outline" className="text-[10px] border-blue-300 text-blue-700">
-                        <MapPin className="h-2.5 w-2.5 mr-0.5" />
-                        {entry.community_latitude.toFixed(2)}, {entry.community_longitude.toFixed(2)}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
+                    <GpsResolveCell entry={entry} readOnly={readOnly} onResolved={onGpsResolved} />
                   </TableCell>
+
                   <TableCell>
                     {readOnly ? (
                       <span className="text-[10px] text-muted-foreground">View only</span>
@@ -431,6 +428,22 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [filterKeyRatio, setFilterKeyRatio] = useState<string>("all"); // "cdd_from_community" | "cdd_external" | "hard_to_reach"
   const [filterDisability, setFilterDisability] = useState<string>("all"); // disability type key
   const [activeView, setActiveView] = useState<"list" | "medicine" | "coverage" | "reconciliation" | "gaps" | "map" | "routes" | "historical" | "summary">("list");
+  // Where the current drill-through started, so we can offer a one-click return.
+  const [drillOrigin, setDrillOrigin] = useState<"disability" | "accessibility" | "security" | "terrain" | "keyRatio" | "summary" | null>(null);
+  const backToDisaggregation = useCallback(() => {
+    if (drillOrigin === "summary") { setActiveView("summary"); setDrillOrigin(null); return; }
+    if (drillOrigin === "disability") setFilterDisability("all");
+    if (drillOrigin === "accessibility") setFilterAccessibility("all");
+    if (drillOrigin === "security") setFilterSecurity("all");
+    if (drillOrigin === "terrain") setFilterTerrain("all");
+    if (drillOrigin === "keyRatio") setFilterKeyRatio("all");
+    setActiveView("list");
+    setDrillOrigin(null);
+    requestAnimationFrame(() => {
+      document.getElementById(`disagg-${drillOrigin}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [drillOrigin]);
+
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1004,6 +1017,35 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
     return true;
   }), [displayEntries, filterState, filterLga, filterWard, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, filterDisability, searchQuery]);
+
+  // Filter context used by the breadcrumb trail and the "export any level" button.
+  const exportFilterContext = useMemo(() => ({
+    project: projects.find((p) => p.id === selectedProjectId)?.name,
+    state: filterState,
+    lga: filterLga,
+    ward: filterWard,
+    accessibility: filterAccessibility,
+    security: filterSecurity,
+    terrain: filterTerrain,
+    keyRatio: filterKeyRatio,
+    disability: filterDisability === "all"
+      ? "all"
+      : DISABILITY_TYPES.find((d) => d.key === filterDisability)?.label ?? filterDisability,
+    search: searchQuery || undefined,
+  }), [projects, selectedProjectId, filterState, filterLga, filterWard, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, filterDisability, searchQuery]);
+
+  const drillCrumbs = useMemo(() => {
+    const c: { label: string; value: string; onClear?: () => void }[] = [];
+    if (filterState !== "all") c.push({ label: "State", value: filterState, onClear: lensLockState ? undefined : () => { setFilterState("all"); setFilterLga("all"); setFilterWard("all"); } });
+    if (filterLga !== "all") c.push({ label: "LGA", value: filterLga, onClear: lensLockLga ? undefined : () => { setFilterLga("all"); setFilterWard("all"); } });
+    if (filterWard !== "all") c.push({ label: "Ward", value: filterWard, onClear: lensLockWard ? undefined : () => setFilterWard("all") });
+    if (filterAccessibility !== "all") c.push({ label: "Accessibility", value: filterAccessibility.replace(/_/g, " "), onClear: () => setFilterAccessibility("all") });
+    if (filterSecurity !== "all") c.push({ label: "Security", value: filterSecurity.replace(/_/g, " "), onClear: () => setFilterSecurity("all") });
+    if (filterTerrain !== "all") c.push({ label: "Terrain", value: filterTerrain, onClear: () => setFilterTerrain("all") });
+    if (filterKeyRatio !== "all") c.push({ label: "Key Ratio", value: filterKeyRatio.replace(/_/g, " "), onClear: () => setFilterKeyRatio("all") });
+    if (filterDisability !== "all") c.push({ label: "Disability", value: DISABILITY_TYPES.find(d => d.key === filterDisability)?.label ?? filterDisability, onClear: () => setFilterDisability("all") });
+    return c;
+  }, [filterState, filterLga, filterWard, filterAccessibility, filterSecurity, filterTerrain, filterKeyRatio, filterDisability, lensLockState, lensLockLga, lensLockWard]);
 
   // ===== COMPREHENSIVE KPI ENGINE — single pass over `filtered` (memoized) =====
   // Previously ~25 separate map/filter/reduce passes ran on EVERY render. With
@@ -1972,7 +2014,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(142, 60%, 35%)" }} />
-                    Accessibility
+                    <span id="disagg-accessibility">Accessibility</span>
                   </p>
                   {filterAccessibility !== "all" && (
                     <button onClick={() => setFilterAccessibility("all")} className="text-[9px] text-primary hover:underline">Clear</button>
@@ -1990,7 +2032,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                     return (
                       <button
                         key={item.label}
-                        onClick={() => setFilterAccessibility(active ? "all" : item.key)}
+                        onClick={() => { setFilterAccessibility(active ? "all" : item.key); setDrillOrigin(active ? null : "accessibility"); }}
                         className={`w-full flex items-center gap-2 text-xs px-1.5 py-1 rounded transition-colors ${active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
                       >
                         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: item.color }} />
@@ -2012,7 +2054,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(215, 70%, 40%)" }} />
-                    Security Clearance
+                    <span id="disagg-security">Security Clearance</span>
                   </p>
                   {filterSecurity !== "all" && (
                     <button onClick={() => setFilterSecurity("all")} className="text-[9px] text-primary hover:underline">Clear</button>
@@ -2029,7 +2071,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                     return (
                       <button
                         key={item.label}
-                        onClick={() => setFilterSecurity(active ? "all" : item.key)}
+                        onClick={() => { setFilterSecurity(active ? "all" : item.key); setDrillOrigin(active ? null : "security"); }}
                         className={`w-full flex items-center gap-2 text-xs px-1.5 py-1 rounded transition-colors ${active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
                       >
                         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: item.color }} />
@@ -2051,7 +2093,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(25, 70%, 45%)" }} />
-                    Terrain Types
+                    <span id="disagg-terrain">Terrain Types</span>
                   </p>
                   {filterTerrain !== "all" && (
                     <button onClick={() => setFilterTerrain("all")} className="text-[9px] text-primary hover:underline">Clear</button>
@@ -2063,7 +2105,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                     return (
                       <button
                         key={terrain}
-                        onClick={() => setFilterTerrain(active ? "all" : terrain)}
+                        onClick={() => { setFilterTerrain(active ? "all" : terrain); setDrillOrigin(active ? null : "terrain"); }}
                         className={`w-full flex items-center gap-2 text-xs px-1.5 py-1 rounded transition-colors ${active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
                       >
                         <span className="flex-shrink-0 text-sm">{TERRAIN_EMOJI[terrain] || "❓"}</span>
@@ -2085,7 +2127,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(262, 55%, 52%)" }} />
-                    Disability Types
+                    <span id="disagg-disability">Disability Types</span>
                   </p>
                   {filterDisability !== "all" && (
                     <button onClick={() => setFilterDisability("all")} className="text-[9px] text-primary hover:underline">Clear</button>
@@ -2103,7 +2145,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                     return (
                       <button
                         key={d.key}
-                        onClick={() => setFilterDisability(active ? "all" : d.key)}
+                        onClick={() => { setFilterDisability(active ? "all" : d.key); setDrillOrigin(active ? null : "disability"); setActiveView("list"); }}
                         title={`${stat.communities} communities reporting ${d.label}`}
                         className={`w-full flex items-center gap-2 text-xs px-1.5 py-1 rounded transition-colors ${active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
                       >
@@ -2133,7 +2175,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(262, 50%, 50%)" }} />
-                    Key Ratios
+                    <span id="disagg-keyRatio">Key Ratios</span>
                   </p>
                   {filterKeyRatio !== "all" && (
                     <button onClick={() => setFilterKeyRatio("all")} className="text-[9px] text-primary hover:underline">Clear</button>
@@ -2141,7 +2183,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 </div>
                 <div className="space-y-3">
                   <button
-                    onClick={() => setFilterKeyRatio(filterKeyRatio === "cdd_from_community" ? "all" : "cdd_from_community")}
+                    onClick={() => { const on = filterKeyRatio === "cdd_from_community"; setFilterKeyRatio(on ? "all" : "cdd_from_community"); setDrillOrigin(on ? null : "keyRatio"); }}
                     className={`w-full text-left p-1.5 rounded transition-colors ${filterKeyRatio === "cdd_from_community" ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
                   >
                     <div className="flex justify-between text-xs mb-1">
@@ -2156,7 +2198,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                     <p className="text-[9px] text-muted-foreground mt-0.5">{cddFromCommunity} of {filtered.length} communities</p>
                   </button>
                   <button
-                    onClick={() => setFilterKeyRatio(filterKeyRatio === "hard_to_reach" ? "all" : "hard_to_reach")}
+                    onClick={() => { const on = filterKeyRatio === "hard_to_reach"; setFilterKeyRatio(on ? "all" : "hard_to_reach"); setDrillOrigin(on ? null : "keyRatio"); }}
                     className={`w-full text-left p-1.5 rounded transition-colors ${filterKeyRatio === "hard_to_reach" ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
                   >
                     <div className="flex justify-between text-xs mb-1">
@@ -2178,6 +2220,19 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             </Card>
           </div>
 
+
+          {/* Drill-through breadcrumb trail */}
+          <DrillBreadcrumb
+            crumbs={drillCrumbs}
+            origin={drillOrigin}
+            onBack={backToDisaggregation}
+            onReset={drillCrumbs.length ? () => {
+              setFilterAccessibility("all"); setFilterSecurity("all"); setFilterTerrain("all");
+              setFilterKeyRatio("all"); setFilterDisability("all");
+              if (!lensLockWard) setFilterWard("all");
+              setDrillOrigin(null);
+            } : undefined}
+          />
 
           {/* Active indicator-filter reset bar */}
           {(filterAccessibility !== "all" || filterSecurity !== "all" || filterTerrain !== "all" || filterKeyRatio !== "all" || filterDisability !== "all") && (
@@ -2315,6 +2370,20 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             <Button size="sm" variant="outline" onClick={() => handleExportTemplate(true)} disabled={entries.length === 0}>
               <Download className="h-3.5 w-3.5 mr-1" /> Export Data as Template
             </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                const { fileName, count } = exportFilteredMicroplan(filtered as Record<string, unknown>[], exportFilterContext);
+                toast({ title: `\u2705 Exported ${count.toLocaleString()} records`, description: fileName });
+              }}
+              disabled={filtered.length === 0}
+              className="gap-1"
+            >
+              <Download className="h-3.5 w-3.5" /> Export Current Filter ({filtered.length.toLocaleString()})
+            </Button>
+            <span className="text-[10px] text-muted-foreground max-w-[280px] truncate" title={filterScopeLabel(exportFilterContext)}>
+              {filterScopeLabel(exportFilterContext)}
+            </span>
             <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing || !selectedProjectId}>
               <Upload className="h-3.5 w-3.5 mr-1" /> {importing ? "Importing..." : "Import Template"}
             </Button>
@@ -2347,6 +2416,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               onEdit={(entry) => { if (lensReadOnly) { blockLensWrite(); return; } setEditingEntry(entry); setShowForm(true); }}
               onDelete={handleDelete}
               readOnly={lensReadOnly}
+              onGpsResolved={(id, patch) =>
+                setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)))
+              }
             />
           )}
 
