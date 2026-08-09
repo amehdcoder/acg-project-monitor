@@ -11,6 +11,8 @@ import * as XLSX from "xlsx";
 import { downloadReconciliationXlsForm } from "@/lib/microplanning/generateReconciliationXLSForm";
 import useRealtimeReconciliationEntries from "@/hooks/useRealtimeReconciliationEntries";
 import { TabSyncStatus } from "./TabSyncStatus";
+import KoboAllocationOverridePanel from "./KoboAllocationOverridePanel";
+
 
 export interface AllocationRow {
   entryId: string;
