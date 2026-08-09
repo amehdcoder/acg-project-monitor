@@ -211,6 +211,10 @@ Deno.serve(async (req) => {
       const items = Array.isArray(payload["medicine_repeat"])
         ? (payload["medicine_repeat"] as Array<Record<string, unknown>>)
         : [{} as Record<string, unknown>];
+      const overridden = (pick(payload, ["allocation_overridden"]) ?? "").toLowerCase() === "yes";
+      const allocated = pickNum(payload, ["allocated_quantity"]);
+      const overrideQty = overridden ? pickNum(payload, ["override_quantity"]) : null;
+      const overrideReason = overridden ? pick(payload, ["override_reason"]) : null;
       const rows = items.map((item, idx) => {
         const rawMed = pick(item, ["medicine_name", "medicine"]);
         const medOther = pick(item, ["medicine_other"]);
@@ -221,6 +225,12 @@ Deno.serve(async (req) => {
           submitted_by: submitterUserId,
           kobo_form_uid: formUid,
           state, lga, ward, flhf_name: flhf,
+          community_name: pick(payload, ["community_name", "community"]),
+          settlement_name: pick(payload, ["settlement_name", "settlement"]),
+          microplan_entry_id: pick(payload, ["microplan_entry_id"]) || null,
+          allocated_quantity: allocated,
+          override_quantity: overrideQty,
+          override_reason: overrideReason,
           medicine_name: med,
           received_quantity: pickNum(item, ["received_quantity", "received"]),
           administered_quantity: pickNum(item, ["administered_quantity", "administered"]),
@@ -231,6 +241,7 @@ Deno.serve(async (req) => {
           submitted_at: submittedAt,
         };
       });
+
       const { data, error } = await supabase
         .from("microplan_reconciliation")
         .upsert(rows, { onConflict: "idempotency_key,project_id", ignoreDuplicates: false })

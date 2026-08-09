@@ -6130,6 +6130,8 @@ export type Database = {
       microplan_reconciliation: {
         Row: {
           administered_quantity: number | null
+          allocated_quantity: number | null
+          community_name: string | null
           created_at: string
           discrepancy_notes: string | null
           flhf_name: string | null
@@ -6138,10 +6140,14 @@ export type Database = {
           kobo_form_uid: string | null
           lga: string | null
           medicine_name: string | null
+          microplan_entry_id: string | null
+          override_quantity: number | null
+          override_reason: string | null
           payload: Json | null
           project_id: string | null
           received_quantity: number | null
           returned_quantity: number | null
+          settlement_name: string | null
           state: string | null
           submitted_at: string | null
           submitted_by: string | null
@@ -6151,6 +6157,8 @@ export type Database = {
         }
         Insert: {
           administered_quantity?: number | null
+          allocated_quantity?: number | null
+          community_name?: string | null
           created_at?: string
           discrepancy_notes?: string | null
           flhf_name?: string | null
@@ -6159,10 +6167,14 @@ export type Database = {
           kobo_form_uid?: string | null
           lga?: string | null
           medicine_name?: string | null
+          microplan_entry_id?: string | null
+          override_quantity?: number | null
+          override_reason?: string | null
           payload?: Json | null
           project_id?: string | null
           received_quantity?: number | null
           returned_quantity?: number | null
+          settlement_name?: string | null
           state?: string | null
           submitted_at?: string | null
           submitted_by?: string | null
@@ -6172,6 +6184,8 @@ export type Database = {
         }
         Update: {
           administered_quantity?: number | null
+          allocated_quantity?: number | null
+          community_name?: string | null
           created_at?: string
           discrepancy_notes?: string | null
           flhf_name?: string | null
@@ -6180,10 +6194,14 @@ export type Database = {
           kobo_form_uid?: string | null
           lga?: string | null
           medicine_name?: string | null
+          microplan_entry_id?: string | null
+          override_quantity?: number | null
+          override_reason?: string | null
           payload?: Json | null
           project_id?: string | null
           received_quantity?: number | null
           returned_quantity?: number | null
+          settlement_name?: string | null
           state?: string | null
           submitted_at?: string | null
           submitted_by?: string | null
