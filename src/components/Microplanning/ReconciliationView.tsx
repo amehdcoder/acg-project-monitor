@@ -198,14 +198,29 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
         <Button
           variant="outline" size="sm" className="gap-1.5"
           onClick={() => {
-            const file = downloadReconciliationXlsForm({});
-            toast({ title: "Reconciliation XLSForm ready", description: file });
+            const file = downloadReconciliationXlsForm({
+              allocations: allocationRows.map(r => ({
+                entryId: r.entryId,
+                state: r.state,
+                lga: r.lga,
+                ward: r.ward,
+                flhf: r.flhf,
+                community: r.community,
+                settlement: r.settlement,
+                medicineRequired: r.medicineRequired,
+              })),
+            });
+            toast({
+              title: "Reconciliation XLSForm ready",
+              description: `${file} — ${allocationRows.length.toLocaleString()} communities in the cascade.`,
+            });
           }}
         >
           <Download className="h-3.5 w-3.5" />
           Download Reconciliation XLSForm
         </Button>
       </div>
+
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <Card className="border-border/50 bg-gradient-to-br from-blue-50 to-background dark:from-blue-950/20">
