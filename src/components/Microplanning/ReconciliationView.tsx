@@ -281,7 +281,11 @@ const ReconciliationView = ({ entries, allocationRows, onRefresh, projectId }: R
         </Button>
       </div>
 
+      {/* Planned vs actual allocation from linked Kobo form */}
+      <KoboAllocationOverridePanel projectId={projectId} filterState={filterState} filterLga={filterLga} />
+
       {/* Reconciliation table */}
+
       <Card className="border-border/50">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
