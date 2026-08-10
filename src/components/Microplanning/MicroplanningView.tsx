@@ -2542,6 +2542,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               loading={loading}
               onEdit={(entry) => { if (lensReadOnly) { blockLensWrite(); return; } setEditingEntry(entry); setShowForm(true); }}
               onDelete={handleDelete}
+              onBulkDelete={handleBulkDelete}
+
               readOnly={lensReadOnly}
               onGpsResolved={(id, patch) =>
                 setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)))
