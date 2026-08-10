@@ -852,25 +852,48 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (lensReadOnly) { blockLensWrite(); return; }
     // Non-admins cannot delete directly — they must submit a delete request
-    // for admin approval. Admins delete immediately (with confirmation).
+    // for admin approval. Admins delete after an explicit confirmation.
     if (!isAdmin && !isOwner) {
       const entry = entries.find((e: any) => e.id === id);
       const label = entry ? [entry.community_name, entry.settlement_name].filter(Boolean).join(" / ") : undefined;
       setDeleteRequestTarget({ id, label, projectId: entry?.project_id ?? selectedProjectId ?? null });
       return;
     }
-    if (!confirm("Delete this microplan entry?")) return;
-    const { error } = await supabase.from("microplan_entries").delete().eq("id", id);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Entry deleted" });
+    setDeleteTargetIds([id]);
+  };
+
+  // Bulk delete from the Planning list selection — admins only, and always
+  // behind the typed confirmation dialog.
+  const handleBulkDelete = (ids: string[]) => {
+    if (lensReadOnly) { blockLensWrite(); return; }
+    if (!ids.length) return;
+    if (!isAdmin && !isOwner) {
+      toast({ title: "Approval required", description: "Only admins can delete records. Request deletion per record instead.", variant: "destructive" });
+      return;
+    }
+    setDeleteTargetIds(ids);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTargetIds.length) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("microplan_entries").delete().in("id", deleteTargetIds);
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+        return;
+      }
+      toast({ title: deleteTargetIds.length > 1 ? `${deleteTargetIds.length} entries deleted` : "Entry deleted" });
+      setDeleteTargetIds([]);
       fetchEntries();
+    } finally {
+      setDeleting(false);
     }
   };
+
 
   // Grant user access
   const grantAccess = async (userId: string) => {
