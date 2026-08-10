@@ -297,6 +297,41 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
   return (
     <Card className="border-border/50">
       <CardContent className="p-0">
+        {/* Selection toolbar */}
+        {!readOnly && (
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/30">
+            <Checkbox
+              checked={allPageSelected && pageIds.length > 0}
+              onCheckedChange={togglePage}
+              aria-label="Select all records on this page"
+              disabled={!pageIds.length}
+            />
+            <span className="text-[11px] text-muted-foreground">
+              {selected.size > 0 ? `${selected.size} selected` : "Select records"}
+            </span>
+            {selected.size > 0 && selected.size < entries.length && (
+              <Button variant="link" size="sm" className="h-6 px-1 text-[11px]" onClick={selectAllFiltered}>
+                Select all {entries.length} filtered
+              </Button>
+            )}
+            {selected.size > 0 && (
+              <>
+                <Button variant="link" size="sm" className="h-6 px-1 text-[11px]" onClick={clearSelection}>
+                  Clear
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="h-7 text-[11px] gap-1 ml-auto"
+                  onClick={() => onBulkDelete?.([...selected])}
+                >
+                  <Trash2 className="h-3 w-3" /> Delete {selected.size}
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Mobile card view */}
         <div className="block sm:hidden p-2 space-y-2">
           {loading ? (
