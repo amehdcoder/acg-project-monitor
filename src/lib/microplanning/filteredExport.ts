@@ -52,11 +52,14 @@ const label = (k: string) => k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUp
  * the exact scope so the workbook is self-describing in supervision meetings.
  */
 export function exportFilteredMicroplan(
-  rows: Record<string, unknown>[],
+  inputRows: Record<string, unknown>[],
   ctx: FilterContext,
   opts?: { hiddenKeys?: string[]; sheetName?: string },
 ): { fileName: string; count: number } {
+  // Recompute Haversine distances from the latest GPS (field, GRID3-resolved or centroid).
+  const rows = inputRows.map((r) => withRecomputedDistances(r));
   const hidden = new Set(opts?.hiddenKeys ?? ["user_id", "project_id", "created_by", "idempotency_key"]);
+
   const keys: string[] = [];
   const seen = new Set<string>();
   for (const r of rows.slice(0, 500)) {
