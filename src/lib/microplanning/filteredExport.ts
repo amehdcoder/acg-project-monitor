@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { withRecomputedDistances } from "./distance";
 
 export interface FilterContext {
   project?: string;
