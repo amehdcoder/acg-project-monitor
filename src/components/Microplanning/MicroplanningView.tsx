@@ -260,8 +260,39 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete, readOnly = false }:
 };
 
 // Paginated admin list view for full access users
-const AdminListView = ({ entries, loading, onEdit, onDelete, readOnly = false, onGpsResolved }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; readOnly?: boolean; onGpsResolved?: (id: string, patch: Record<string, unknown>) => void }) => {
+const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readOnly = false, onGpsResolved }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; onBulkDelete?: (ids: string[]) => void; readOnly?: boolean; onGpsResolved?: (id: string, patch: Record<string, unknown>) => void }) => {
   const pagination = useTablePagination(entries, 25);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Drop selections that are no longer part of the filtered result set.
+  useEffect(() => {
+    setSelected((prev) => {
+      if (!prev.size) return prev;
+      const ids = new Set(entries.map((e: any) => e.id));
+      const next = new Set([...prev].filter((id) => ids.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [entries]);
+
+  const toggleOne = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const pageIds = pagination.paginatedData.map((e: any) => e.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id: string) => selected.has(id));
+  const togglePage = () =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) pageIds.forEach((id: string) => next.delete(id));
+      else pageIds.forEach((id: string) => next.add(id));
+      return next;
+    });
+  const selectAllFiltered = () => setSelected(new Set(entries.map((e: any) => e.id)));
+  const clearSelection = () => setSelected(new Set());
+
 
   return (
     <Card className="border-border/50">
