@@ -24,6 +24,7 @@ import MicroplanSummaryView from "./MicroplanSummaryView";
 import GpsResolveCell from "./GpsResolveCell";
 import DrillBreadcrumb from "./DrillBreadcrumb";
 import { exportFilteredMicroplan, filterScopeLabel } from "@/lib/microplanning/filteredExport";
+import { effectiveDistanceKm, withRecomputedDistances } from "@/lib/microplanning/distance";
 import { DISABILITY_TYPES, pwdValue, pwdTotalFor } from "@/lib/microplanning/disabilityTypes";
 import DesignationManagerDialog from "./DesignationManagerDialog";
 import AllocationHistoryDialog from "./AllocationHistoryDialog";
@@ -1081,7 +1082,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       stateSet.add(e.state); lgaSet.add(e.lga); wardSet.add(e.ward); flhfSet.add(e.flhf_name);
       if (e.settlement_name) uniqueSettlements++;
       if (e.cdd_from_community) cddFromCommunity++;
-      const d = e.community_distance_to_flhf_km;
+      const d = effectiveDistanceKm(e as any);
       if (d != null && d > 0) { distSum += d; distCount++; }
       if (acc === "accessible") accessStats.accessible++;
       else if (acc === "hard_to_reach") accessStats.hard_to_reach++;
