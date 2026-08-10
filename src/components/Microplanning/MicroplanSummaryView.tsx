@@ -15,6 +15,8 @@ import {
   resolveMissingCoordinates, resolutionToUpdate, rowNeedsGeocoding,
   type RowResolution, type MicroplanGeoRow,
 } from "@/lib/microplanning/settlementResolver";
+import { effectiveDistanceKm } from "@/lib/microplanning/distance";
+import LargePopulationFlags from "./LargePopulationFlags";
 
 interface Props {
   entries: any[];
