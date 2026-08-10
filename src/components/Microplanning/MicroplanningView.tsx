@@ -384,6 +384,16 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
           <Table>
             <TableHeader>
               <TableRow>
+                {!readOnly && (
+                  <TableHead className="w-[36px]">
+                    <Checkbox
+                      checked={allPageSelected && pageIds.length > 0}
+                      onCheckedChange={togglePage}
+                      aria-label="Select all records on this page"
+                      disabled={!pageIds.length}
+                    />
+                  </TableHead>
+                )}
                 <TableHead className="text-xs">State</TableHead>
                 <TableHead className="text-xs">LGA</TableHead>
                 <TableHead className="text-xs">Ward</TableHead>
@@ -399,14 +409,15 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8">Loading...</TableCell>
+                  <TableCell colSpan={readOnly ? 10 : 11} className="text-center text-muted-foreground py-8">Loading...</TableCell>
                 </TableRow>
               ) : pagination.paginatedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={readOnly ? 10 : 11} className="text-center text-muted-foreground py-8">
                     No entries yet. Click 'Add Entry' to start microplanning.
                   </TableCell>
                 </TableRow>
+
               ) : pagination.paginatedData.map((entry: any) => (
                 <TableRow key={entry.id} className="text-xs" data-state={selected.has(entry.id) ? "selected" : undefined}>
                   {!readOnly && (
