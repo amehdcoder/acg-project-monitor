@@ -9,6 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
+import MicroplanDeleteConfirmDialog from "./MicroplanDeleteConfirmDialog";
+
 import { toast } from "@/hooks/use-toast";
 import { Plus, Map as MapIcon, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity, Navigation, Home, Target, Globe, Heart } from "lucide-react";
 import { useTablePagination } from "@/hooks/useTablePagination";
@@ -260,12 +263,78 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete, readOnly = false }:
 };
 
 // Paginated admin list view for full access users
-const AdminListView = ({ entries, loading, onEdit, onDelete, readOnly = false, onGpsResolved }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; readOnly?: boolean; onGpsResolved?: (id: string, patch: Record<string, unknown>) => void }) => {
+const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readOnly = false, onGpsResolved }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; onBulkDelete?: (ids: string[]) => void; readOnly?: boolean; onGpsResolved?: (id: string, patch: Record<string, unknown>) => void }) => {
   const pagination = useTablePagination(entries, 25);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Drop selections that are no longer part of the filtered result set.
+  useEffect(() => {
+    setSelected((prev) => {
+      if (!prev.size) return prev;
+      const ids = new Set(entries.map((e: any) => e.id));
+      const next = new Set([...prev].filter((id) => ids.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [entries]);
+
+  const toggleOne = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const pageIds = pagination.paginatedData.map((e: any) => e.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id: string) => selected.has(id));
+  const togglePage = () =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) pageIds.forEach((id: string) => next.delete(id));
+      else pageIds.forEach((id: string) => next.add(id));
+      return next;
+    });
+  const selectAllFiltered = () => setSelected(new Set(entries.map((e: any) => e.id)));
+  const clearSelection = () => setSelected(new Set());
+
 
   return (
     <Card className="border-border/50">
       <CardContent className="p-0">
+        {/* Selection toolbar */}
+        {!readOnly && (
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/30">
+            <Checkbox
+              checked={allPageSelected && pageIds.length > 0}
+              onCheckedChange={togglePage}
+              aria-label="Select all records on this page"
+              disabled={!pageIds.length}
+            />
+            <span className="text-[11px] text-muted-foreground">
+              {selected.size > 0 ? `${selected.size} selected` : "Select records"}
+            </span>
+            {selected.size > 0 && selected.size < entries.length && (
+              <Button variant="link" size="sm" className="h-6 px-1 text-[11px]" onClick={selectAllFiltered}>
+                Select all {entries.length} filtered
+              </Button>
+            )}
+            {selected.size > 0 && (
+              <>
+                <Button variant="link" size="sm" className="h-6 px-1 text-[11px]" onClick={clearSelection}>
+                  Clear
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="h-7 text-[11px] gap-1 ml-auto"
+                  onClick={() => onBulkDelete?.([...selected])}
+                >
+                  <Trash2 className="h-3 w-3" /> Delete {selected.size}
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Mobile card view */}
         <div className="block sm:hidden p-2 space-y-2">
           {loading ? (
@@ -275,8 +344,18 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, readOnly = false, o
           ) : pagination.paginatedData.map((entry: any) => (
             <Card key={entry.id} className="border-border/40">
               <CardContent className="p-3 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold">{entry.community_name}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {!readOnly && (
+                      <Checkbox
+                        checked={selected.has(entry.id)}
+                        onCheckedChange={() => toggleOne(entry.id)}
+                        aria-label={`Select ${entry.community_name ?? "record"}`}
+                      />
+                    )}
+                    <span className="text-xs font-semibold truncate">{entry.community_name}</span>
+                  </div>
+
                   {!readOnly && (
                   <div className="flex items-center gap-0.5">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(entry)}>
@@ -318,6 +397,16 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, readOnly = false, o
           <Table>
             <TableHeader>
               <TableRow>
+                {!readOnly && (
+                  <TableHead className="w-[36px]">
+                    <Checkbox
+                      checked={allPageSelected && pageIds.length > 0}
+                      onCheckedChange={togglePage}
+                      aria-label="Select all records on this page"
+                      disabled={!pageIds.length}
+                    />
+                  </TableHead>
+                )}
                 <TableHead className="text-xs">State</TableHead>
                 <TableHead className="text-xs">LGA</TableHead>
                 <TableHead className="text-xs">Ward</TableHead>
@@ -333,17 +422,28 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, readOnly = false, o
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8">Loading...</TableCell>
+                  <TableCell colSpan={readOnly ? 10 : 11} className="text-center text-muted-foreground py-8">Loading...</TableCell>
                 </TableRow>
               ) : pagination.paginatedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={readOnly ? 10 : 11} className="text-center text-muted-foreground py-8">
                     No entries yet. Click 'Add Entry' to start microplanning.
                   </TableCell>
                 </TableRow>
+
               ) : pagination.paginatedData.map((entry: any) => (
-                <TableRow key={entry.id} className="text-xs">
+                <TableRow key={entry.id} className="text-xs" data-state={selected.has(entry.id) ? "selected" : undefined}>
+                  {!readOnly && (
+                    <TableCell className="w-[36px]">
+                      <Checkbox
+                        checked={selected.has(entry.id)}
+                        onCheckedChange={() => toggleOne(entry.id)}
+                        aria-label={`Select ${entry.community_name ?? "record"}`}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>{entry.state}</TableCell>
+
                   <TableCell>{entry.lga}</TableCell>
                   <TableCell>{entry.ward}</TableCell>
                   <TableCell>{entry.flhf_name}</TableCell>
@@ -482,6 +582,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   // User access management state
   const [showAccessManager, setShowAccessManager] = useState(false);
   const [deleteRequestTarget, setDeleteRequestTarget] = useState<{ id: string; label?: string; projectId?: string | null } | null>(null);
+  const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState(false);
+
   const [showDeleteRequestsPanel, setShowDeleteRequestsPanel] = useState(false);
   const [showKoboSettings, setShowKoboSettings] = useState(false);
   const [showDesignationManager, setShowDesignationManager] = useState(false);
@@ -752,25 +855,48 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (lensReadOnly) { blockLensWrite(); return; }
     // Non-admins cannot delete directly — they must submit a delete request
-    // for admin approval. Admins delete immediately (with confirmation).
+    // for admin approval. Admins delete after an explicit confirmation.
     if (!isAdmin && !isOwner) {
       const entry = entries.find((e: any) => e.id === id);
       const label = entry ? [entry.community_name, entry.settlement_name].filter(Boolean).join(" / ") : undefined;
       setDeleteRequestTarget({ id, label, projectId: entry?.project_id ?? selectedProjectId ?? null });
       return;
     }
-    if (!confirm("Delete this microplan entry?")) return;
-    const { error } = await supabase.from("microplan_entries").delete().eq("id", id);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Entry deleted" });
+    setDeleteTargetIds([id]);
+  };
+
+  // Bulk delete from the Planning list selection — admins only, and always
+  // behind the typed confirmation dialog.
+  const handleBulkDelete = (ids: string[]) => {
+    if (lensReadOnly) { blockLensWrite(); return; }
+    if (!ids.length) return;
+    if (!isAdmin && !isOwner) {
+      toast({ title: "Approval required", description: "Only admins can delete records. Request deletion per record instead.", variant: "destructive" });
+      return;
+    }
+    setDeleteTargetIds(ids);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTargetIds.length) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("microplan_entries").delete().in("id", deleteTargetIds);
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+        return;
+      }
+      toast({ title: deleteTargetIds.length > 1 ? `${deleteTargetIds.length} entries deleted` : "Entry deleted" });
+      setDeleteTargetIds([]);
       fetchEntries();
+    } finally {
+      setDeleting(false);
     }
   };
+
 
   // Grant user access
   const grantAccess = async (userId: string) => {
@@ -2416,6 +2542,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               loading={loading}
               onEdit={(entry) => { if (lensReadOnly) { blockLensWrite(); return; } setEditingEntry(entry); setShowForm(true); }}
               onDelete={handleDelete}
+              onBulkDelete={handleBulkDelete}
+
               readOnly={lensReadOnly}
               onGpsResolved={(id, patch) =>
                 setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)))
@@ -3178,8 +3306,18 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       </Dialog>
       )}
 
+      {/* Hard delete confirmation (admins) — single and bulk */}
+      <MicroplanDeleteConfirmDialog
+        open={deleteTargetIds.length > 0}
+        onOpenChange={(v) => { if (!v) setDeleteTargetIds([]); }}
+        entries={entries.filter((e: any) => deleteTargetIds.includes(e.id))}
+        busy={deleting}
+        onConfirm={confirmDelete}
+      />
+
       {/* Deletion request dialog (for non-admin owners of their entries) */}
       <MicroplanDeleteRequestDialog
+
         open={!!deleteRequestTarget}
         onClose={() => setDeleteRequestTarget(null)}
         entryId={deleteRequestTarget?.id ?? null}

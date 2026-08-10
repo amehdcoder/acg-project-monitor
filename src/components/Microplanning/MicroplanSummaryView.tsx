@@ -83,6 +83,22 @@ const MicroplanSummaryView = ({ entries, readOnly = false, onRefresh }: Props) =
   const [resolutions, setResolutions] = useState<RowResolution[] | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Alphabetical LGA → Ward → Health Facility ordering for the resolution list.
+  const sortedResolutions = useMemo(() => {
+    if (!resolutions) return null;
+    const flhfOf = new Map<string, string>(
+      entries.map((e: any) => [e.id, String(e.flhf_name ?? "")]),
+    );
+    const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base" });
+    return [...resolutions].sort((a, b) =>
+      cmp(a.lga || "", b.lga || "") ||
+      cmp(a.ward || "", b.ward || "") ||
+      cmp(flhfOf.get(a.id ?? "") || "", flhfOf.get(b.id ?? "") || "") ||
+      cmp(String(a.id ?? ""), String(b.id ?? "")),
+    );
+  }, [resolutions, entries]);
+
+
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return entries;
@@ -252,7 +268,7 @@ const MicroplanSummaryView = ({ entries, readOnly = false, onRefresh }: Props) =
                   </tr>
                 </thead>
                 <tbody>
-                  {resolutions.flatMap((r) =>
+                  {(sortedResolutions ?? []).flatMap((r) =>
                     (["flhf", "community", "settlement"] as const)
                       .filter((slot) => r[slot])
                       .map((slot) => {
