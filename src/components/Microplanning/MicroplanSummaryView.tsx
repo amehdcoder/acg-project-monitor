@@ -268,7 +268,7 @@ const MicroplanSummaryView = ({ entries, readOnly = false, onRefresh }: Props) =
                   </tr>
                 </thead>
                 <tbody>
-                  {resolutions.flatMap((r) =>
+                  {(sortedResolutions ?? []).flatMap((r) =>
                     (["flhf", "community", "settlement"] as const)
                       .filter((slot) => r[slot])
                       .map((slot) => {
