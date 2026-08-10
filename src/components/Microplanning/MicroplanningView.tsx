@@ -408,8 +408,18 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                   </TableCell>
                 </TableRow>
               ) : pagination.paginatedData.map((entry: any) => (
-                <TableRow key={entry.id} className="text-xs">
+                <TableRow key={entry.id} className="text-xs" data-state={selected.has(entry.id) ? "selected" : undefined}>
+                  {!readOnly && (
+                    <TableCell className="w-[36px]">
+                      <Checkbox
+                        checked={selected.has(entry.id)}
+                        onCheckedChange={() => toggleOne(entry.id)}
+                        aria-label={`Select ${entry.community_name ?? "record"}`}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>{entry.state}</TableCell>
+
                   <TableCell>{entry.lga}</TableCell>
                   <TableCell>{entry.ward}</TableCell>
                   <TableCell>{entry.flhf_name}</TableCell>
