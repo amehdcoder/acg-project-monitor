@@ -3306,8 +3306,18 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       </Dialog>
       )}
 
+      {/* Hard delete confirmation (admins) — single and bulk */}
+      <MicroplanDeleteConfirmDialog
+        open={deleteTargetIds.length > 0}
+        onOpenChange={(v) => { if (!v) setDeleteTargetIds([]); }}
+        entries={entries.filter((e: any) => deleteTargetIds.includes(e.id))}
+        busy={deleting}
+        onConfirm={confirmDelete}
+      />
+
       {/* Deletion request dialog (for non-admin owners of their entries) */}
       <MicroplanDeleteRequestDialog
+
         open={!!deleteRequestTarget}
         onClose={() => setDeleteRequestTarget(null)}
         entryId={deleteRequestTarget?.id ?? null}
