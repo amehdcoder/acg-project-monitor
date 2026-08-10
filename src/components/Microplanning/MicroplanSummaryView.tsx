@@ -15,6 +15,8 @@ import {
   resolveMissingCoordinates, resolutionToUpdate, rowNeedsGeocoding,
   type RowResolution, type MicroplanGeoRow,
 } from "@/lib/microplanning/settlementResolver";
+import { effectiveDistanceKm } from "@/lib/microplanning/distance";
+import LargePopulationFlags from "./LargePopulationFlags";
 
 interface Props {
   entries: any[];
@@ -57,7 +59,7 @@ const accumulate = (a: Agg, e: any) => {
   for (const d of DISABILITY_TYPES) a.pwdByType[d.key] = (a.pwdByType[d.key] || 0) + pwdValue(e, d.field);
   if (e.community_latitude && e.community_longitude) a.geotagged += 1;
   if (e.accessibility === "hard_to_reach" || e.accessibility === "inaccessible") a.hardToReach += 1;
-  const dist = e.community_distance_to_flhf_km;
+  const dist = effectiveDistanceKm(e);
   if (typeof dist === "number" && dist > 0) { a.distSum += dist; a.distCount += 1; }
 };
 
@@ -204,6 +206,11 @@ const MicroplanSummaryView = ({ entries, readOnly = false, onRefresh }: Props) =
           </div>
         </CardContent>
       </Card>
+
+      {/* Oversized population watchlist */}
+      <LargePopulationFlags entries={rows} />
+
+
 
       {/* Missing coordinates resolver */}
       <Card className="border-amber-500/30">
