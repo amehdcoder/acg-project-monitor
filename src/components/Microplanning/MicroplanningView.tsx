@@ -341,8 +341,18 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
           ) : pagination.paginatedData.map((entry: any) => (
             <Card key={entry.id} className="border-border/40">
               <CardContent className="p-3 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold">{entry.community_name}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {!readOnly && (
+                      <Checkbox
+                        checked={selected.has(entry.id)}
+                        onCheckedChange={() => toggleOne(entry.id)}
+                        aria-label={`Select ${entry.community_name ?? "record"}`}
+                      />
+                    )}
+                    <span className="text-xs font-semibold truncate">{entry.community_name}</span>
+                  </div>
+
                   {!readOnly && (
                   <div className="flex items-center gap-0.5">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(entry)}>
