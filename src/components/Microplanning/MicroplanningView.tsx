@@ -811,7 +811,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const handleExportTemplate = async (filled: boolean) => {
     // Lens/scope aware: never export rows outside what this user may see.
     const dataRows = filled
-      ? displayEntries.map((entry) =>
+      ? displayEntries.map(withRecomputedDistances).map((entry) =>
           TEMPLATE_HEADERS.map((header) => {
             const field = HEADER_TO_FIELD[header];
             if (!field) return "";
