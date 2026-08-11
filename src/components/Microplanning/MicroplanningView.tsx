@@ -385,6 +385,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                       />
                     )}
                     <span className="text-xs font-semibold truncate">{entry.community_name}</span>
+                    {dupBadge(entry.id)}
                   </div>
 
                   {!readOnly && (
@@ -409,7 +410,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
               </CardContent>
             </Card>
           ))}
-          {entries.length > 25 && (
+          {visibleEntries.length > 25 && (
             <TablePagination
               currentPage={pagination.currentPage}
               totalPages={pagination.totalPages}
@@ -478,7 +479,12 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                   <TableCell>{entry.lga}</TableCell>
                   <TableCell>{entry.ward}</TableCell>
                   <TableCell>{entry.flhf_name}</TableCell>
-                  <TableCell className="font-medium">{entry.community_name}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate">{entry.community_name}</span>
+                      {dupBadge(entry.id)}
+                    </div>
+                  </TableCell>
                   <TableCell>{entry.settlement_name || "—"}</TableCell>
                   <TableCell className="text-right">{entry.estimated_total_population?.toLocaleString() || "—"}</TableCell>
                   <TableCell>
