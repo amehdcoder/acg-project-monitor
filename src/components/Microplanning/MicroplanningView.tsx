@@ -557,7 +557,13 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                     />
                   )}
                   <span className="text-[11px] font-semibold">Duplicate set · {groupIds.length} matching records</span>
+                  {meta.group.records.some((r) => pwdTotalFor(r as any) >= PWD_FLAG) && (
+                    <Badge variant="outline" className="border-purple-400 text-purple-700 text-[9px]">
+                      PWD ≥ {PWD_FLAG} ({meta.group.records.filter((r) => pwdTotalFor(r as any) >= PWD_FLAG).length})
+                    </Badge>
+                  )}
                   {meta.group.conflicting && (
+
                     <Badge variant="outline" className="border-red-300 text-red-700 text-[9px]">Pop conflict</Badge>
                   )}
                 </div>
