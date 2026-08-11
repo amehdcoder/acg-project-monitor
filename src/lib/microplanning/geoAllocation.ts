@@ -44,7 +44,7 @@ export interface WardNode {
   targetPop: number;
   sharePct: number;      // share of LGA target population
   allocation: number;
-  rows: GeoRow[];
+  rows: { r: GeoRow; tp: number }[];
 }
 
 export interface LgaNode {
@@ -115,7 +115,7 @@ export function buildGeoTree(rows: GeoRow[], getTargetPop: (r: GeoRow) => number
       L.wards.push(W);
     }
     const tp = Math.max(0, Math.round(Number(getTargetPop(r)) || 0));
-    W.rows.push(r);
+    W.rows.push({ r, tp });
     W.communities += 1;
     W.targetPop += tp;
     L.communities += 1;
@@ -163,7 +163,8 @@ export function computeAllocations(tree: LgaNode[], inputs: AllocationInputs): A
     const explicitSum = explicit.reduce((s, w) => s + Number(inputs.wardTotals[w.key]), 0);
     const lgaTotal = Math.max(0, Math.round(Number(inputs.lgaTotals[L.key]) || 0));
     const rest = L.wards.filter((w) => !(Number(inputs.wardTotals[w.key]) > 0));
-    const remaining = Math.max(0, lgaTotal - (lgaTotal > 0 ? 0 : 0));
+    // The LGA total tops up the wards that have no explicit ward allocation.
+    const remaining = Math.max(0, lgaTotal - explicitSum);
 
     for (const w of explicit) {
       wardAllocation[w.key] = Math.round(Number(inputs.wardTotals[w.key]));
@@ -184,9 +185,9 @@ export function computeAllocations(tree: LgaNode[], inputs: AllocationInputs): A
     // community-level split inside every ward
     for (const w of L.wards) {
       const total = wardAllocation[w.key] || 0;
-      const tps = w.rows.map((r) => Math.max(0, Math.round(Number((r as any).__tp) || 0)));
+      const tps = w.rows.map((x) => x.tp);
       const split = apportion(total, tps);
-      w.rows.forEach((r, i) => {
+      w.rows.forEach(({ r }, i) => {
         const alloc = split[i];
         const bufferUnits = Math.round(alloc * buf);
         communities.push({
