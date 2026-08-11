@@ -60,6 +60,7 @@ import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import { exportMicroplanWorkbook } from "@/lib/microplanning/microplanTemplate";
+import GeoMedicineAllocationTable from "@/components/Microplanning/GeoMedicineAllocationTable";
 import { parseMedicineUploadFile, exportMedicineUploadTemplate, parseAllocationPlanFile, exportAllocationPlanTemplate, type UploadedMedicineEntry } from "@/lib/microplanning/medicineUpload";
 
 // Exact template column headers matching the NTDs Microplan Template
@@ -2935,7 +2936,17 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
           {/* Medicine Allocation View */}
           {activeView === "medicine" && (
+            <>
+            <GeoMedicineAllocationTable
+              rows={medicineSourceEntries as any[]}
+              getTargetPop={getTargetPop}
+              scopeLabel={`${allLgasForMedicine.length} LGA(s) in view`}
+              projectName={projects.find((p) => p.id === selectedProjectId)?.name}
+              targetPopBasis={uploadedMedEntries.length > 0 ? `Uploaded total population × ${medTargetPct}%` : "Microplan target population"}
+              readOnly={lensReadOnly}
+            />
             <Card className="border-border/50">
+
               <CardContent className="p-4 space-y-4">
                 <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                   <div className="flex items-center gap-2">
@@ -3519,6 +3530,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 )}
               </CardContent>
             </Card>
+            </>
           )}
 
           {/* Coverage View */}
