@@ -326,7 +326,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
     <MicroplanDuplicatesPanel
       analysis={dupAnalysis as any}
       readOnly={readOnly}
-      onRemoveAll={(ids) => onBulkDelete?.(ids)}
+      onSelectAll={(ids) => setSelected(new Set(ids))}
       showOnlyDuplicates={showOnlyDuplicates}
       onToggleFilter={setShowOnlyDuplicates}
     />
