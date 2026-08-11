@@ -674,7 +674,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                 return (
                 <Fragment key={entry.id}>
                 {isGroupStart && meta && <GroupHeader group={meta.group} colSpan={readOnly ? 10 : 11} />}
-                <TableRow className={`text-xs ${meta ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`} data-state={selected.has(entry.id) ? "selected" : undefined}>
+                <TableRow className={`text-xs ${pwdTotalFor(entry) >= PWD_FLAG ? "bg-purple-50/60 dark:bg-purple-950/20 border-l-2 border-l-purple-500" : meta ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`} data-state={selected.has(entry.id) ? "selected" : undefined}>
 
                   {!readOnly && (
                     <TableCell className="w-[36px]">
