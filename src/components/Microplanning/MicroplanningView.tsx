@@ -307,6 +307,49 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
 
   const pagination = useTablePagination(visibleEntries, 25);
 
+  // Per-record duplicate metadata (group index, position, oldest/newest).
+  const dupMeta = useMemo(() => {
+    const m = new Map<string, { gi: number; ri: number; group: (typeof dupAnalysis.groups)[number] }>();
+    dupAnalysis.groups.forEach((g, gi) => g.records.forEach((r, ri) => m.set(r.id, { gi, ri, group: g })));
+    return m;
+  }, [dupAnalysis]);
+
+  // Ordered list of duplicate clusters as they appear in the visible table,
+  // used by the "Previous / Next duplicate group" navigation.
+  const groupSequence = useMemo(() => {
+    const seen = new Map<string, number>();
+    visibleEntries.forEach((e: any, i: number) => {
+      if (!dupAnalysis.duplicateIds.has(e.id)) return;
+      const k = duplicateKey(e);
+      if (!seen.has(k)) seen.set(k, i);
+    });
+    return [...seen.entries()].map(([key, index]) => ({ key, index }));
+  }, [visibleEntries, dupAnalysis]);
+
+  const [groupCursor, setGroupCursor] = useState(0);
+  useEffect(() => { setGroupCursor(0); }, [groupSequence.length]);
+
+  const gotoGroup = useCallback((idx: number) => {
+    if (!groupSequence.length) return;
+    const next = (idx + groupSequence.length) % groupSequence.length;
+    setGroupCursor(next);
+    const target = groupSequence[next];
+    pagination.goToPage(Math.floor(target.index / pagination.pageSize) + 1);
+    window.setTimeout(() => {
+      document
+        .querySelector(`[data-dup-group="${CSS.escape(target.key)}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+  }, [groupSequence, pagination]);
+
+  const selectGroup = (ids: string[], all: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => (all ? next.delete(id) : next.add(id)));
+      return next;
+    });
+
+
   // Drop selections that are no longer part of the filtered result set.
   useEffect(() => {
     setSelected((prev) => {
