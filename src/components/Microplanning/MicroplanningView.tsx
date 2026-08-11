@@ -607,6 +607,10 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                   <span>Ward: {entry.ward}</span>
                   <span>FLHF: {entry.flhf_name}</span>
                   <span>Pop: {entry.estimated_total_population?.toLocaleString() || "—"}</span>
+                  <span className={pwdTotalFor(entry) >= PWD_FLAG ? "font-bold text-purple-700 dark:text-purple-300" : ""}>
+                    PWD: {pwdTotalFor(entry) ? pwdTotalFor(entry).toLocaleString() : "—"}{pwdTotalFor(entry) >= PWD_FLAG ? " ⚑" : ""}
+                  </span>
+
                   {entry.accessibility && <span className="capitalize">{entry.accessibility.replace(/_/g, " ")}</span>}
                   <span className="col-span-2"><GpsResolveCell entry={entry} readOnly={readOnly} onResolved={onGpsResolved} compact /></span>
                 </div>
