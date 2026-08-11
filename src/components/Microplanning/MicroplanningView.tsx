@@ -2544,17 +2544,40 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             <Button size="sm" variant="outline" onClick={() => handleExportTemplate(true)} disabled={entries.length === 0}>
               <Download className="h-3.5 w-3.5 mr-1" /> Export Data as Template
             </Button>
-            <Button
-              size="sm"
-              onClick={() => {
-                const { fileName, count } = exportFilteredMicroplan(filtered as Record<string, unknown>[], exportFilterContext);
-                toast({ title: `\u2705 Exported ${count.toLocaleString()} records`, description: fileName });
-              }}
-              disabled={filtered.length === 0}
-              className="gap-1"
-            >
-              <Download className="h-3.5 w-3.5" /> Export Current Filter ({filtered.length.toLocaleString()})
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" disabled={filtered.length === 0} className="gap-1">
+                  <Download className="h-3.5 w-3.5" /> Export Current Filter ({filtered.length.toLocaleString()})
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-72">
+                <DropdownMenuLabel className="text-[11px]">Excel export — duplicates flagged</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    const r = exportFilteredMicroplan(filtered as Record<string, unknown>[], exportFilterContext, { duplicateMode: "all" });
+                    toast({ title: `\u2705 Exported ${r.count.toLocaleString()} records`, description: `${r.fileName} \u2022 ${r.duplicatesFlagged.toLocaleString()} duplicate rows flagged` });
+                  }}
+                >
+                  <div className="flex flex-col">
+                    <span className="text-xs font-medium">All records</span>
+                    <span className="text-[10px] text-muted-foreground">Includes duplicates, each labelled in a “Duplicates Flagged” column</span>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    const r = exportFilteredMicroplan(filtered as Record<string, unknown>[], exportFilterContext, { duplicateMode: "kept" });
+                    toast({ title: `\u2705 Exported ${r.count.toLocaleString()} records`, description: `${r.fileName} \u2022 ${r.removed.toLocaleString()} duplicate copies excluded` });
+                  }}
+                >
+                  <div className="flex flex-col">
+                    <span className="text-xs font-medium">Non-duplicate kept set only</span>
+                    <span className="text-[10px] text-muted-foreground">Removes exact-population repeats; population conflicts are kept for review</span>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <span className="text-[10px] text-muted-foreground max-w-[280px] truncate" title={filterScopeLabel(exportFilterContext)}>
               {filterScopeLabel(exportFilterContext)}
             </span>
