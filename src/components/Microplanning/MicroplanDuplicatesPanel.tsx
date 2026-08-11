@@ -2,13 +2,13 @@ import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CopyCheck, Copy, AlertTriangle, ChevronDown, ChevronRight, Trash2, ShieldCheck } from "lucide-react";
+import { CopyCheck, Copy, AlertTriangle, ChevronDown, ChevronRight, CheckSquare, ShieldCheck } from "lucide-react";
 import type { DuplicateAnalysis, DuplicateCandidate } from "@/lib/microplanning/duplicates";
 
 interface Props {
   analysis: DuplicateAnalysis<DuplicateCandidate & Record<string, unknown>>;
   readOnly?: boolean;
-  onRemoveAll: (ids: string[]) => void;
+  onSelectAll: (ids: string[]) => void;
   showOnlyDuplicates: boolean;
   onToggleFilter: (v: boolean) => void;
 }
@@ -17,12 +17,14 @@ const fmt = (n: number) => n.toLocaleString();
 
 /**
  * Duplicate intelligence banner for the Planning tab.
- * Auto-removable duplicates (identical estimated population) get a one-click
- * cleanup button; population conflicts are held back for a manual decision.
+ * Duplicates are only those records matching on ALL of State, LGA, Ward, FLHF,
+ * Community and Settlement name. Every matching record is listed in the table
+ * so the user can verify each one and remove them manually — nothing is ever
+ * deleted automatically.
  */
-const MicroplanDuplicatesPanel = ({ analysis, readOnly, onRemoveAll, showOnlyDuplicates, onToggleFilter }: Props) => {
+const MicroplanDuplicatesPanel = ({ analysis, readOnly, onSelectAll, showOnlyDuplicates, onToggleFilter }: Props) => {
   const [open, setOpen] = useState(false);
-  const { groups, safeGroups, conflictGroups, removableIds, duplicateRecordCount } = analysis;
+  const { groups, safeGroups, conflictGroups, duplicateIds, duplicateRecordCount } = analysis;
 
   const conflictRecords = useMemo(
     () => conflictGroups.reduce((s, g) => s + g.records.length, 0),
@@ -43,8 +45,8 @@ const MicroplanDuplicatesPanel = ({ analysis, readOnly, onRemoveAll, showOnlyDup
               {groups.length} duplicate group{groups.length === 1 ? "" : "s"} detected · {duplicateRecordCount} records
             </p>
             <p className="text-[11px] text-muted-foreground">
-              Matched on State → LGA → Ward → FLHF → Community / Settlement.
-              {conflictGroups.length > 0 && ` ${conflictRecords} record(s) have different estimated populations and are kept for your decision.`}
+              Matched only when State, LGA, Ward, FLHF, Community <em>and</em> Settlement name are all identical. All matching records are listed in the table below for your manual verification.
+              {conflictGroups.length > 0 && ` ${conflictRecords} record(s) also differ on estimated population.`}
             </p>
           </div>
 
@@ -61,22 +63,21 @@ const MicroplanDuplicatesPanel = ({ analysis, readOnly, onRemoveAll, showOnlyDup
           {!readOnly && (
             <Button
               size="sm"
-              disabled={removableIds.length === 0}
-              onClick={() => onRemoveAll(removableIds)}
-              className="h-7 text-[11px] gap-1 bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-700 hover:to-orange-700 disabled:opacity-50"
+              onClick={() => { onToggleFilter(true); onSelectAll([...duplicateIds]); }}
+              className="h-7 text-[11px] gap-1 bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-700 hover:to-orange-700"
             >
-              <Trash2 className="h-3 w-3" />
-              Remove {removableIds.length} duplicate{removableIds.length === 1 ? "" : "s"}
+              <CheckSquare className="h-3 w-3" />
+              Select all {duplicateIds.size} in table
             </Button>
           )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline" className="border-emerald-300 text-emerald-700 text-[10px] gap-1">
-            <ShieldCheck className="h-3 w-3" /> {safeGroups.length} safe to clean
+            <ShieldCheck className="h-3 w-3" /> {safeGroups.length} identical-population groups
           </Badge>
           <Badge variant="outline" className="border-red-300 text-red-700 text-[10px] gap-1">
-            <AlertTriangle className="h-3 w-3" /> {conflictGroups.length} need a decision
+            <AlertTriangle className="h-3 w-3" /> {conflictGroups.length} population-conflict groups
           </Badge>
           <Button variant="link" size="sm" className="h-6 px-1 text-[11px]" onClick={() => setOpen((o) => !o)}>
             {open ? <ChevronDown className="h-3 w-3 mr-1" /> : <ChevronRight className="h-3 w-3 mr-1" />}
@@ -94,12 +95,12 @@ const MicroplanDuplicatesPanel = ({ analysis, readOnly, onRemoveAll, showOnlyDup
                     <Badge variant="outline" className="border-red-300 text-red-700 text-[9px]">Population conflict</Badge>
                   ) : (
                     <Badge variant="outline" className="border-emerald-300 text-emerald-700 text-[9px]">
-                      {g.records.length - 1} removable
+                      {g.records.length} identical records
                     </Badge>
                   )}
                 </div>
                 <p className="text-muted-foreground">
-                  {[g.records[0].state, g.records[0].lga, g.records[0].ward, g.records[0].flhf_name]
+                  {[g.records[0].state, g.records[0].lga, g.records[0].ward, g.records[0].flhf_name, g.records[0].community_name, g.records[0].settlement_name]
                     .filter(Boolean)
                     .join(" → ") || "No geography recorded"}
                 </p>
