@@ -538,8 +538,43 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
             <div className="text-xs text-muted-foreground py-8 text-center">Loading...</div>
           ) : pagination.paginatedData.length === 0 ? (
             <div className="text-center text-muted-foreground py-8 text-xs">No entries yet. Click 'Add Entry' to start microplanning.</div>
-          ) : pagination.paginatedData.map((entry: any) => (
-            <Card key={entry.id} className="border-border/40">
+          ) : pagination.paginatedData.map((entry: any, idx: number) => {
+            const meta = dupMeta.get(entry.id);
+            const prevEntry: any = pagination.paginatedData[idx - 1];
+            const isGroupStart = !!meta && (!prevEntry || !dupMeta.has(prevEntry.id) || duplicateKey(prevEntry) !== duplicateKey(entry));
+            const groupIds = meta ? meta.group.records.map((r) => r.id) : [];
+            const groupAllSelected = groupIds.length > 0 && groupIds.every((id) => selected.has(id));
+            return (
+            <Fragment key={entry.id}>
+            {isGroupStart && meta && (
+              <div data-dup-group={meta.group.key} className="rounded-md border border-amber-300/70 bg-amber-50/70 dark:bg-amber-950/20 px-2 py-1.5 space-y-1">
+                <div className="flex items-center gap-2">
+                  {!readOnly && (
+                    <Checkbox
+                      checked={groupAllSelected}
+                      onCheckedChange={() => selectGroup(groupIds, groupAllSelected)}
+                      aria-label="Select all in this duplicate set"
+                    />
+                  )}
+                  <span className="text-[11px] font-semibold">Duplicate set · {groupIds.length} matching records</span>
+                  {meta.group.conflicting && (
+                    <Badge variant="outline" className="border-red-300 text-red-700 text-[9px]">Pop conflict</Badge>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {([["State", entry.state, "state"], ["LGA", entry.lga, "lga"], ["Ward", entry.ward, "ward"], ["FLHF", entry.flhf_name, "flhf_name"], ["Community", entry.community_name, "community_name"], ["Settlement", entry.settlement_name, "settlement_name"]] as [string, string, string][]).map(([label, val, key]) => {
+                    const differs = meta.group.varyingFields?.includes(key);
+                    return (
+                      <Badge key={label} variant="outline" className={`text-[9px] ${differs ? "border-amber-500 bg-amber-100/70 text-amber-800 font-semibold" : "text-muted-foreground"}`}>
+                        {label}: {val || "—"}{differs ? " ⚠" : ""}
+                      </Badge>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            <Card className="border-border/40">
+
               <CardContent className="p-3 space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
