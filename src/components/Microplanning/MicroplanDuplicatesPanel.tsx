@@ -2,8 +2,9 @@ import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CopyCheck, Copy, AlertTriangle, ChevronDown, ChevronRight, CheckSquare, ShieldCheck } from "lucide-react";
+import { CopyCheck, Copy, AlertTriangle, ChevronDown, ChevronRight, CheckSquare, ShieldCheck, Columns3, Trash2 } from "lucide-react";
 import type { DuplicateAnalysis, DuplicateCandidate } from "@/lib/microplanning/duplicates";
+import MicroplanDuplicateCompareDialog from "./MicroplanDuplicateCompareDialog";
 
 interface Props {
   analysis: DuplicateAnalysis<DuplicateCandidate & Record<string, unknown>>;
@@ -11,6 +12,13 @@ interface Props {
   onSelectAll: (ids: string[]) => void;
   showOnlyDuplicates: boolean;
   onToggleFilter: (v: boolean) => void;
+  /** when true only exact matches (same six fields AND same population) are shown */
+  exactOnly: boolean;
+  onToggleExactOnly: (v: boolean) => void;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onAddToSelection: (ids: string[]) => void;
+  onRemoveSelected: () => void;
 }
 
 const fmt = (n: number) => n.toLocaleString();
@@ -22,9 +30,28 @@ const fmt = (n: number) => n.toLocaleString();
  * so the user can verify each one and remove them manually — nothing is ever
  * deleted automatically.
  */
-const MicroplanDuplicatesPanel = ({ analysis, readOnly, onSelectAll, showOnlyDuplicates, onToggleFilter }: Props) => {
+const MicroplanDuplicatesPanel = ({
+  analysis,
+  readOnly,
+  onSelectAll,
+  showOnlyDuplicates,
+  onToggleFilter,
+  exactOnly,
+  onToggleExactOnly,
+  selectedIds,
+  onToggleSelect,
+  onAddToSelection,
+  onRemoveSelected,
+}: Props) => {
   const [open, setOpen] = useState(false);
-  const { groups, safeGroups, conflictGroups, duplicateIds, duplicateRecordCount } = analysis;
+  const [compareOpen, setCompareOpen] = useState(false);
+  const { groups, safeGroups, conflictGroups, duplicateIds, exactIds, duplicateRecordCount } = analysis;
+
+  const activeIds = exactOnly ? exactIds : duplicateIds;
+  const selectedDupCount = useMemo(
+    () => [...selectedIds].filter((id) => duplicateIds.has(id)).length,
+    [selectedIds, duplicateIds],
+  );
 
   const conflictRecords = useMemo(
     () => conflictGroups.reduce((s, g) => s + g.records.length, 0),
@@ -57,17 +84,48 @@ const MicroplanDuplicatesPanel = ({ analysis, readOnly, onSelectAll, showOnlyDup
             onClick={() => onToggleFilter(!showOnlyDuplicates)}
           >
             <CopyCheck className="h-3 w-3" />
-            {showOnlyDuplicates ? "Showing duplicates" : "Show duplicates only"}
+            {showOnlyDuplicates ? "Showing duplicates only" : "Show duplicates only"}
+          </Button>
+
+          <Button
+            variant={exactOnly ? "secondary" : "outline"}
+            size="sm"
+            className="h-7 text-[11px] gap-1"
+            onClick={() => { const next = !exactOnly; onToggleExactOnly(next); if (next) onToggleFilter(true); }}
+          >
+            <ShieldCheck className="h-3 w-3" />
+            {exactOnly ? `Exact duplicates only (${exactIds.size})` : "Exact duplicates only"}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-[11px] gap-1"
+            onClick={() => setCompareOpen(true)}
+          >
+            <Columns3 className="h-3 w-3" /> Compare fields
           </Button>
 
           {!readOnly && (
             <Button
               size="sm"
-              onClick={() => { onToggleFilter(true); onSelectAll([...duplicateIds]); }}
+              onClick={() => { onToggleFilter(true); onSelectAll([...activeIds]); }}
               className="h-7 text-[11px] gap-1 bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-700 hover:to-orange-700"
             >
               <CheckSquare className="h-3 w-3" />
-              Select all {duplicateIds.size} in table
+              Select all {activeIds.size} in table
+            </Button>
+          )}
+
+          {!readOnly && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-7 text-[11px] gap-1"
+              disabled={selectedDupCount === 0}
+              onClick={onRemoveSelected}
+            >
+              <Trash2 className="h-3 w-3" /> Remove selected duplicates ({selectedDupCount})
             </Button>
           )}
         </div>
@@ -112,6 +170,18 @@ const MicroplanDuplicatesPanel = ({ analysis, readOnly, onSelectAll, showOnlyDup
           </div>
         )}
       </CardContent>
+
+      <MicroplanDuplicateCompareDialog
+        open={compareOpen}
+        onOpenChange={setCompareOpen}
+        analysis={analysis}
+        exactOnly={exactOnly}
+        selectedIds={selectedIds}
+        onToggleSelect={onToggleSelect}
+        onSelectGroupExtras={onAddToSelection}
+        onRemoveSelected={() => { setCompareOpen(false); onRemoveSelected(); }}
+        readOnly={readOnly}
+      />
     </Card>
   );
 };
