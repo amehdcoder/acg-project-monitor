@@ -667,8 +667,15 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                   </TableCell>
                 </TableRow>
 
-              ) : pagination.paginatedData.map((entry: any) => (
-                <TableRow key={entry.id} className="text-xs" data-state={selected.has(entry.id) ? "selected" : undefined}>
+              ) : pagination.paginatedData.map((entry: any, idx: number) => {
+                const meta = dupMeta.get(entry.id);
+                const prevEntry: any = pagination.paginatedData[idx - 1];
+                const isGroupStart = !!meta && (!prevEntry || !dupMeta.has(prevEntry.id) || duplicateKey(prevEntry) !== duplicateKey(entry));
+                return (
+                <Fragment key={entry.id}>
+                {isGroupStart && meta && <GroupHeader group={meta.group} colSpan={readOnly ? 10 : 11} />}
+                <TableRow className={`text-xs ${meta ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`} data-state={selected.has(entry.id) ? "selected" : undefined}>
+
                   {!readOnly && (
                     <TableCell className="w-[36px]">
                       <Checkbox
