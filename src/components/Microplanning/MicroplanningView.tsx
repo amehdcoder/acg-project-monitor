@@ -271,15 +271,31 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
   const [exactOnly, setExactOnly] = useState(false);
+  const [pwdOnly, setPwdOnly] = useState(false);
+  const [pwdSort, setPwdSort] = useState<"asc" | "desc" | null>(null);
+
+  const pwdFlaggedCount = useMemo(
+    () => entries.filter((e: any) => pwdTotalFor(e) >= PWD_FLAG).length,
+    [entries],
+  );
 
   // Duplicate intelligence: same State/LGA/Ward/FLHF/Community/Settlement.
   const dupAnalysis = useMemo(() => analyzeDuplicates(entries as any[]), [entries]);
   const visibleEntries = useMemo(() => {
-    const base = showOnlyDuplicates
+    let base = showOnlyDuplicates
       ? entries.filter((e: any) =>
           (exactOnly ? dupAnalysis.exactIds : dupAnalysis.duplicateIds).has(e.id),
         )
       : entries;
+    if (pwdOnly) base = base.filter((e: any) => pwdTotalFor(e) >= PWD_FLAG);
+
+    // Explicit PWD sort takes precedence over duplicate clustering.
+    if (pwdSort) {
+      return [...base].sort((a: any, b: any) => {
+        const d = pwdTotalFor(a) - pwdTotalFor(b);
+        return pwdSort === "desc" ? -d : d;
+      });
+    }
 
     // Keep every duplicate group's records immediately after each other so they
     // are easy to compare side by side before deciding what to remove.
@@ -303,7 +319,8 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
       if (ra !== rb) return ra - rb;
       return (memberRank.get(a.id) ?? 0) - (memberRank.get(b.id) ?? 0);
     });
-  }, [entries, showOnlyDuplicates, exactOnly, dupAnalysis]);
+  }, [entries, showOnlyDuplicates, exactOnly, pwdOnly, pwdSort, dupAnalysis]);
+
 
   const pagination = useTablePagination(visibleEntries, 25);
 
