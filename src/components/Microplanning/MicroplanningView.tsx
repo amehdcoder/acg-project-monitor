@@ -503,7 +503,24 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
     />
     <Card className="border-border/50">
       <CardContent className="p-0">
+        {/* PWD watchlist filter */}
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50 bg-purple-50/40 dark:bg-purple-950/10">
+          <Accessibility className="h-3.5 w-3.5 text-purple-600" />
+          <span className="text-[11px] font-medium">
+            {pwdFlaggedCount} record{pwdFlaggedCount === 1 ? "" : "s"} with persons with disability ≥ {PWD_FLAG}
+          </span>
+          <Button
+            variant={pwdOnly ? "secondary" : "outline"}
+            size="sm"
+            className="h-7 text-[11px] gap-1"
+            onClick={() => setPwdOnly((v) => !v)}
+          >
+            <Accessibility className="h-3 w-3" />
+            {pwdOnly ? `Showing PWD ≥ ${PWD_FLAG} only` : `Show PWD ≥ ${PWD_FLAG} only`}
+          </Button>
+        </div>
         {/* Duplicate cluster navigation */}
+
         {groupSequence.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50 bg-amber-50/50 dark:bg-amber-950/10">
             <Layers className="h-3.5 w-3.5 text-amber-600" />
