@@ -480,7 +480,23 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
     />
     <Card className="border-border/50">
       <CardContent className="p-0">
+        {/* Duplicate cluster navigation */}
+        {groupSequence.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50 bg-amber-50/50 dark:bg-amber-950/10">
+            <Layers className="h-3.5 w-3.5 text-amber-600" />
+            <span className="text-[11px] font-medium">
+              Duplicate group {Math.min(groupCursor + 1, groupSequence.length)} of {groupSequence.length}
+            </span>
+            <Button variant="outline" size="sm" className="h-7 text-[11px] gap-1" onClick={() => gotoGroup(groupCursor - 1)}>
+              <ChevronUp className="h-3 w-3" /> Previous duplicate group
+            </Button>
+            <Button variant="outline" size="sm" className="h-7 text-[11px] gap-1" onClick={() => gotoGroup(groupCursor + 1)}>
+              <ChevronDown className="h-3 w-3" /> Next duplicate group
+            </Button>
+          </div>
+        )}
         {/* Selection toolbar */}
+
         {!readOnly && (
           <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/30">
             <Checkbox
