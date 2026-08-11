@@ -197,9 +197,11 @@ const MicroplanSummaryView = ({ entries, readOnly = false, onRefresh }: Props) =
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
             {[
-              { label: "LGAs", value: n(tree.list.length) },
-              { label: "Wards", value: n(tree.list.reduce((s, l) => s + l.wards.length, 0)) },
-              { label: "Facilities", value: n(tree.list.reduce((s, l) => s + l.wards.reduce((t, w) => t + w.flhfs.length, 0), 0)) },
+              // Placeholder buckets ("Unassigned …") are excluded so these
+              // counts match the Planning dashboard KPIs exactly.
+              { label: "LGAs", value: n(tree.list.filter((l) => l.agg.name !== "Unassigned LGA").length) },
+              { label: "Wards", value: n(tree.list.reduce((s, l) => s + l.wards.filter((w) => w.agg.name !== "Unassigned Ward").length, 0)) },
+              { label: "Facilities", value: n(tree.list.reduce((s, l) => s + l.wards.reduce((t, w) => t + w.flhfs.filter((f) => f.name !== "Unassigned Health Facility").length, 0), 0)) },
               { label: "Communities", value: n(o.communities) },
               { label: "Households", value: n(o.households) },
               { label: "Population", value: n(o.population) },

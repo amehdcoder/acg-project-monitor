@@ -11,9 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import MicroplanDeleteConfirmDialog from "./MicroplanDeleteConfirmDialog";
+import MicroplanDuplicatesPanel from "./MicroplanDuplicatesPanel";
+import { analyzeDuplicates } from "@/lib/microplanning/duplicates";
 
 import { toast } from "@/hooks/use-toast";
-import { Plus, Map as MapIcon, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity, Navigation, Home, Target, Globe, Heart } from "lucide-react";
+import { Plus, Map as MapIcon, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity, Navigation, Home, Target, Globe, Heart, Copy, AlertTriangle } from "lucide-react";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import TablePagination from "@/components/ui/table-pagination";
 import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
@@ -264,8 +266,16 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete, readOnly = false }:
 
 // Paginated admin list view for full access users
 const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readOnly = false, onGpsResolved }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; onBulkDelete?: (ids: string[]) => void; readOnly?: boolean; onGpsResolved?: (id: string, patch: Record<string, unknown>) => void }) => {
-  const pagination = useTablePagination(entries, 25);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
+
+  // Duplicate intelligence: same State/LGA/Ward/FLHF/Community/Settlement.
+  const dupAnalysis = useMemo(() => analyzeDuplicates(entries as any[]), [entries]);
+  const visibleEntries = useMemo(
+    () => (showOnlyDuplicates ? entries.filter((e: any) => dupAnalysis.duplicateIds.has(e.id)) : entries),
+    [entries, showOnlyDuplicates, dupAnalysis],
+  );
+  const pagination = useTablePagination(visibleEntries, 25);
 
   // Drop selections that are no longer part of the filtered result set.
   useEffect(() => {
@@ -293,11 +303,31 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
       else pageIds.forEach((id: string) => next.add(id));
       return next;
     });
-  const selectAllFiltered = () => setSelected(new Set(entries.map((e: any) => e.id)));
+  const selectAllFiltered = () => setSelected(new Set(visibleEntries.map((e: any) => e.id)));
   const clearSelection = () => setSelected(new Set());
 
+  const dupBadge = (id: string) =>
+    dupAnalysis.duplicateIds.has(id) ? (
+      dupAnalysis.conflictIds.has(id) ? (
+        <Badge variant="outline" className="border-red-300 text-red-700 text-[9px] gap-0.5">
+          <AlertTriangle className="h-2.5 w-2.5" /> Dup · pop conflict
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="border-amber-300 text-amber-700 text-[9px] gap-0.5">
+          <Copy className="h-2.5 w-2.5" /> Duplicate
+        </Badge>
+      )
+    ) : null;
 
   return (
+    <div className="space-y-3">
+    <MicroplanDuplicatesPanel
+      analysis={dupAnalysis as any}
+      readOnly={readOnly}
+      onRemoveAll={(ids) => onBulkDelete?.(ids)}
+      showOnlyDuplicates={showOnlyDuplicates}
+      onToggleFilter={setShowOnlyDuplicates}
+    />
     <Card className="border-border/50">
       <CardContent className="p-0">
         {/* Selection toolbar */}
@@ -312,11 +342,12 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
             <span className="text-[11px] text-muted-foreground">
               {selected.size > 0 ? `${selected.size} selected` : "Select records"}
             </span>
-            {selected.size > 0 && selected.size < entries.length && (
+            {selected.size > 0 && selected.size < visibleEntries.length && (
               <Button variant="link" size="sm" className="h-6 px-1 text-[11px]" onClick={selectAllFiltered}>
-                Select all {entries.length} filtered
+                Select all {visibleEntries.length} filtered
               </Button>
             )}
+
             {selected.size > 0 && (
               <>
                 <Button variant="link" size="sm" className="h-6 px-1 text-[11px]" onClick={clearSelection}>
@@ -354,6 +385,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                       />
                     )}
                     <span className="text-xs font-semibold truncate">{entry.community_name}</span>
+                    {dupBadge(entry.id)}
                   </div>
 
                   {!readOnly && (
@@ -378,7 +410,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
               </CardContent>
             </Card>
           ))}
-          {entries.length > 25 && (
+          {visibleEntries.length > 25 && (
             <TablePagination
               currentPage={pagination.currentPage}
               totalPages={pagination.totalPages}
@@ -447,7 +479,12 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                   <TableCell>{entry.lga}</TableCell>
                   <TableCell>{entry.ward}</TableCell>
                   <TableCell>{entry.flhf_name}</TableCell>
-                  <TableCell className="font-medium">{entry.community_name}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate">{entry.community_name}</span>
+                      {dupBadge(entry.id)}
+                    </div>
+                  </TableCell>
                   <TableCell>{entry.settlement_name || "—"}</TableCell>
                   <TableCell className="text-right">{entry.estimated_total_population?.toLocaleString() || "—"}</TableCell>
                   <TableCell>
@@ -485,7 +522,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
             </TableBody>
           </Table>
         </div>
-        {entries.length > 25 && (
+        {visibleEntries.length > 25 && (
           <div className="hidden sm:block p-2 border-t border-border">
             <TablePagination
               currentPage={pagination.currentPage}
@@ -502,7 +539,9 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
         )}
       </CardContent>
     </Card>
+    </div>
   );
+
 };
 
 interface MicroplanningViewProps {
@@ -1205,7 +1244,14 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       if (e.community_latitude && e.community_longitude) geotagged++;
       const acc = e.accessibility;
       if (acc === "hard_to_reach" || acc === "inaccessible") hardToReach++;
-      stateSet.add(e.state); lgaSet.add(e.lga); wardSet.add(e.ward); flhfSet.add(e.flhf_name);
+      // Wards (and LGAs) are counted on a composite key so identically named
+      // wards in different LGAs are never collapsed, and blanks never count —
+      // this keeps the dashboard KPI identical to the Microplan Summary rollup.
+      const gk = (v: unknown) => String(v ?? "").trim().toLowerCase();
+      if (gk(e.state)) stateSet.add(gk(e.state));
+      if (gk(e.lga)) lgaSet.add(`${gk(e.state)}||${gk(e.lga)}`);
+      if (gk(e.ward)) wardSet.add(`${gk(e.state)}||${gk(e.lga)}||${gk(e.ward)}`);
+      if (gk(e.flhf_name)) flhfSet.add(`${gk(e.state)}||${gk(e.lga)}||${gk(e.ward)}||${gk(e.flhf_name)}`);
       if (e.settlement_name) uniqueSettlements++;
       if (e.cdd_from_community) cddFromCommunity++;
       const d = effectiveDistanceKm(e as any);
