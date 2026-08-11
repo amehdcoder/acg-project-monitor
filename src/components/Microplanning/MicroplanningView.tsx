@@ -320,7 +320,14 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
     ) : null;
 
   return (
-
+    <div className="space-y-3">
+    <MicroplanDuplicatesPanel
+      analysis={dupAnalysis as any}
+      readOnly={readOnly}
+      onRemoveAll={(ids) => onBulkDelete?.(ids)}
+      showOnlyDuplicates={showOnlyDuplicates}
+      onToggleFilter={setShowOnlyDuplicates}
+    />
     <Card className="border-border/50">
       <CardContent className="p-0">
         {/* Selection toolbar */}
@@ -335,11 +342,12 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
             <span className="text-[11px] text-muted-foreground">
               {selected.size > 0 ? `${selected.size} selected` : "Select records"}
             </span>
-            {selected.size > 0 && selected.size < entries.length && (
+            {selected.size > 0 && selected.size < visibleEntries.length && (
               <Button variant="link" size="sm" className="h-6 px-1 text-[11px]" onClick={selectAllFiltered}>
-                Select all {entries.length} filtered
+                Select all {visibleEntries.length} filtered
               </Button>
             )}
+
             {selected.size > 0 && (
               <>
                 <Button variant="link" size="sm" className="h-6 px-1 text-[11px]" onClick={clearSelection}>
