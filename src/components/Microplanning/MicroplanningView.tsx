@@ -29,6 +29,8 @@ import MicroplanSummaryView from "./MicroplanSummaryView";
 import GpsResolveCell from "./GpsResolveCell";
 import DrillBreadcrumb from "./DrillBreadcrumb";
 import { exportFilteredMicroplan, filterScopeLabel } from "@/lib/microplanning/filteredExport";
+import { harmonizeFacilityNames, applyRenamesLocally, type FacilityRename } from "@/lib/microplanning/facilityHarmonizer";
+
 import { countGeography } from "@/lib/microplanning/geoCounts";
 import { effectiveDistanceKm, withRecomputedDistances } from "@/lib/microplanning/distance";
 import { DISABILITY_TYPES, pwdValue, pwdTotalFor } from "@/lib/microplanning/disabilityTypes";
