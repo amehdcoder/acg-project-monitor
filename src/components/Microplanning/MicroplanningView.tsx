@@ -1402,10 +1402,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [harmonizeKey]);
 
-  const baseEntries = useMemo(
-    () => (facilityRenames.length ? applyRenamesLocally(rawBaseEntries as any[], facilityRenames) : rawBaseEntries),
+  const baseEntries = useMemo<any[]>(
+    () => (facilityRenames.length ? applyRenamesLocally(rawBaseEntries as any[], facilityRenames) : (rawBaseEntries as any[])),
     [rawBaseEntries, facilityRenames],
   );
+
   // Designation-scope filter: admins always see all; non-admins with no
   // designation assignment also see all (legacy). Users with assignments are
   // restricted to rows that match at least one of their assignments.
