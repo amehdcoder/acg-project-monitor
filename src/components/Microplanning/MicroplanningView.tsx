@@ -1244,7 +1244,14 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       if (e.community_latitude && e.community_longitude) geotagged++;
       const acc = e.accessibility;
       if (acc === "hard_to_reach" || acc === "inaccessible") hardToReach++;
-      stateSet.add(e.state); lgaSet.add(e.lga); wardSet.add(e.ward); flhfSet.add(e.flhf_name);
+      // Wards (and LGAs) are counted on a composite key so identically named
+      // wards in different LGAs are never collapsed, and blanks never count —
+      // this keeps the dashboard KPI identical to the Microplan Summary rollup.
+      const gk = (v: unknown) => String(v ?? "").trim().toLowerCase();
+      if (gk(e.state)) stateSet.add(gk(e.state));
+      if (gk(e.lga)) lgaSet.add(`${gk(e.state)}||${gk(e.lga)}`);
+      if (gk(e.ward)) wardSet.add(`${gk(e.state)}||${gk(e.lga)}||${gk(e.ward)}`);
+      if (gk(e.flhf_name)) flhfSet.add(`${gk(e.state)}||${gk(e.lga)}||${gk(e.ward)}||${gk(e.flhf_name)}`);
       if (e.settlement_name) uniqueSettlements++;
       if (e.cdd_from_community) cddFromCommunity++;
       const d = effectiveDistanceKm(e as any);
