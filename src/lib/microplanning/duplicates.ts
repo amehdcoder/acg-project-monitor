@@ -34,7 +34,18 @@ export interface DuplicateGroup<T extends DuplicateCandidate = DuplicateCandidat
   /** ids that would be removed by "remove all duplicates" */
   removableIds: string[];
   populations: number[];
+  /** oldest (first created) record id — the "original" */
+  oldestId: string;
+  /** newest (last created) record id — the latest copy */
+  newestId: string;
+  /**
+   * Identity fields whose RAW values differ inside the group (they still match
+   * after normalisation — e.g. casing/spacing). Highlighted so the user can
+   * spot rows that may not truly be duplicates.
+   */
+  varyingFields: string[];
 }
+
 
 const norm = (v: unknown) =>
   String(v ?? "")
@@ -99,6 +110,9 @@ export function analyzeDuplicates<T extends DuplicateCandidate>(entries: T[]): D
     );
     const populations = ordered.map((r) => Number(r.estimated_total_population ?? 0) || 0);
     const conflicting = new Set(populations).size > 1;
+    const varyingFields = IDENTITY_FIELDS.filter(
+      (f) => new Set(ordered.map((r) => String(r[f] ?? "").trim())).size > 1,
+    ) as string[];
     groups.push({
       key,
       label: labelOf(ordered[0]),
@@ -107,7 +121,11 @@ export function analyzeDuplicates<T extends DuplicateCandidate>(entries: T[]): D
       keepId: conflicting ? null : ordered[0].id,
       removableIds: conflicting ? [] : ordered.slice(1).map((r) => r.id),
       populations,
+      oldestId: ordered[0].id,
+      newestId: ordered[ordered.length - 1].id,
+      varyingFields,
     });
+
   }
 
   groups.sort((a, b) => Number(b.conflicting) - Number(a.conflicting) || a.label.localeCompare(b.label));

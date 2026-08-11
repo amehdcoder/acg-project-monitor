@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import MicroplanDuplicatesPanel from "./MicroplanDuplicatesPanel";
 import { analyzeDuplicates, duplicateKey } from "@/lib/microplanning/duplicates";
 
 import { toast } from "@/hooks/use-toast";
-import { Plus, Map as MapIcon, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity, Navigation, Home, Target, Globe, Heart, Copy, AlertTriangle } from "lucide-react";
+import { Plus, Map as MapIcon, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity, Navigation, Home, Target, Globe, Heart, Copy, AlertTriangle, ChevronUp, Layers } from "lucide-react";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import TablePagination from "@/components/ui/table-pagination";
 import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
@@ -307,6 +307,49 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
 
   const pagination = useTablePagination(visibleEntries, 25);
 
+  // Per-record duplicate metadata (group index, position, oldest/newest).
+  const dupMeta = useMemo(() => {
+    const m = new Map<string, { gi: number; ri: number; group: (typeof dupAnalysis.groups)[number] }>();
+    dupAnalysis.groups.forEach((g, gi) => g.records.forEach((r, ri) => m.set(r.id, { gi, ri, group: g })));
+    return m;
+  }, [dupAnalysis]);
+
+  // Ordered list of duplicate clusters as they appear in the visible table,
+  // used by the "Previous / Next duplicate group" navigation.
+  const groupSequence = useMemo(() => {
+    const seen = new Map<string, number>();
+    visibleEntries.forEach((e: any, i: number) => {
+      if (!dupAnalysis.duplicateIds.has(e.id)) return;
+      const k = duplicateKey(e);
+      if (!seen.has(k)) seen.set(k, i);
+    });
+    return [...seen.entries()].map(([key, index]) => ({ key, index }));
+  }, [visibleEntries, dupAnalysis]);
+
+  const [groupCursor, setGroupCursor] = useState(0);
+  useEffect(() => { setGroupCursor(0); }, [groupSequence.length]);
+
+  const gotoGroup = useCallback((idx: number) => {
+    if (!groupSequence.length) return;
+    const next = (idx + groupSequence.length) % groupSequence.length;
+    setGroupCursor(next);
+    const target = groupSequence[next];
+    pagination.goToPage(Math.floor(target.index / pagination.pageSize) + 1);
+    window.setTimeout(() => {
+      document
+        .querySelector(`[data-dup-group="${CSS.escape(target.key)}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+  }, [groupSequence, pagination]);
+
+  const selectGroup = (ids: string[], all: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => (all ? next.delete(id) : next.add(id)));
+      return next;
+    });
+
+
   // Drop selections that are no longer part of the filtered result set.
   useEffect(() => {
     setSelected((prev) => {
@@ -336,18 +379,86 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
   const selectAllFiltered = () => setSelected(new Set(visibleEntries.map((e: any) => e.id)));
   const clearSelection = () => setSelected(new Set());
 
-  const dupBadge = (id: string) =>
-    dupAnalysis.duplicateIds.has(id) ? (
-      dupAnalysis.conflictIds.has(id) ? (
-        <Badge variant="outline" className="border-red-300 text-red-700 text-[9px] gap-0.5">
-          <AlertTriangle className="h-2.5 w-2.5" /> Dup · pop conflict
-        </Badge>
-      ) : (
-        <Badge variant="outline" className="border-amber-300 text-amber-700 text-[9px] gap-0.5">
-          <Copy className="h-2.5 w-2.5" /> Duplicate
-        </Badge>
-      )
-    ) : null;
+  const dupBadge = (id: string) => {
+    if (!dupAnalysis.duplicateIds.has(id)) return null;
+    const meta = dupMeta.get(id);
+    const isOldest = meta?.group.oldestId === id;
+    const isNewest = meta?.group.newestId === id;
+    return (
+      <span className="inline-flex items-center gap-1">
+        {dupAnalysis.conflictIds.has(id) ? (
+          <Badge variant="outline" className="border-red-300 text-red-700 text-[9px] gap-0.5">
+            <AlertTriangle className="h-2.5 w-2.5" /> Dup · pop conflict
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="border-amber-300 text-amber-700 text-[9px] gap-0.5">
+            <Copy className="h-2.5 w-2.5" /> Duplicate
+          </Badge>
+        )}
+        {isOldest ? (
+          <Badge variant="outline" className="border-emerald-300 text-emerald-700 text-[9px]">Old (original)</Badge>
+        ) : isNewest ? (
+          <Badge variant="outline" className="border-sky-300 text-sky-700 text-[9px]">New (latest copy)</Badge>
+        ) : (
+          <Badge variant="outline" className="text-[9px] text-muted-foreground">Copy {(meta?.ri ?? 0) + 1}</Badge>
+        )}
+      </span>
+    );
+  };
+
+  /** Group header row shown above the first record of each duplicate cluster. */
+  const GroupHeader = ({ group, colSpan }: { group: (typeof dupAnalysis.groups)[number]; colSpan: number }) => {
+    const ids = group.records.map((r) => r.id);
+    const allSelected = ids.every((id) => selected.has(id));
+    const r0: any = group.records[0];
+    const fields: [string, string][] = [
+      ["State", r0.state], ["LGA", r0.lga], ["Ward", r0.ward],
+      ["FLHF", r0.flhf_name], ["Community", r0.community_name], ["Settlement", r0.settlement_name],
+    ];
+    return (
+      <TableRow data-dup-group={group.key} className="bg-amber-50/70 dark:bg-amber-950/20 hover:bg-amber-50/70">
+        <TableCell colSpan={colSpan} className="py-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {!readOnly && (
+              <Checkbox
+                checked={allSelected}
+                onCheckedChange={() => selectGroup(ids, allSelected)}
+                aria-label="Select all in this duplicate set"
+              />
+            )}
+            <Layers className="h-3.5 w-3.5 text-amber-600" />
+            <span className="text-[11px] font-semibold">
+              Duplicate set · {group.records.length} matching records
+            </span>
+            {group.conflicting && (
+              <Badge variant="outline" className="border-red-300 text-red-700 text-[9px]">Population conflict</Badge>
+            )}
+            <span className="flex flex-wrap items-center gap-1">
+              {fields.map(([label, val]) => {
+                const key = label === "FLHF" ? "flhf_name" : label === "Community" ? "community_name" : label === "Settlement" ? "settlement_name" : label.toLowerCase();
+                const differs = group.varyingFields?.includes(key);
+                return (
+                  <Badge
+                    key={label}
+                    variant="outline"
+                    className={`text-[9px] ${differs ? "border-amber-500 bg-amber-100/70 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 font-semibold" : "text-muted-foreground"}`}
+                  >
+                    {label}: {val || "—"}{differs ? " ⚠ differs" : ""}
+                  </Badge>
+                );
+              })}
+            </span>
+            {!readOnly && (
+              <Button variant="link" size="sm" className="h-6 px-1 text-[11px] ml-auto" onClick={() => selectGroup(ids, allSelected)}>
+                {allSelected ? "Unselect this set" : `Select all ${ids.length} in this set`}
+              </Button>
+            )}
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  };
+
 
   return (
     <div className="space-y-3">
@@ -369,7 +480,23 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
     />
     <Card className="border-border/50">
       <CardContent className="p-0">
+        {/* Duplicate cluster navigation */}
+        {groupSequence.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50 bg-amber-50/50 dark:bg-amber-950/10">
+            <Layers className="h-3.5 w-3.5 text-amber-600" />
+            <span className="text-[11px] font-medium">
+              Duplicate group {Math.min(groupCursor + 1, groupSequence.length)} of {groupSequence.length}
+            </span>
+            <Button variant="outline" size="sm" className="h-7 text-[11px] gap-1" onClick={() => gotoGroup(groupCursor - 1)}>
+              <ChevronUp className="h-3 w-3" /> Previous duplicate group
+            </Button>
+            <Button variant="outline" size="sm" className="h-7 text-[11px] gap-1" onClick={() => gotoGroup(groupCursor + 1)}>
+              <ChevronDown className="h-3 w-3" /> Next duplicate group
+            </Button>
+          </div>
+        )}
         {/* Selection toolbar */}
+
         {!readOnly && (
           <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/30">
             <Checkbox
@@ -411,8 +538,43 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
             <div className="text-xs text-muted-foreground py-8 text-center">Loading...</div>
           ) : pagination.paginatedData.length === 0 ? (
             <div className="text-center text-muted-foreground py-8 text-xs">No entries yet. Click 'Add Entry' to start microplanning.</div>
-          ) : pagination.paginatedData.map((entry: any) => (
-            <Card key={entry.id} className="border-border/40">
+          ) : pagination.paginatedData.map((entry: any, idx: number) => {
+            const meta = dupMeta.get(entry.id);
+            const prevEntry: any = pagination.paginatedData[idx - 1];
+            const isGroupStart = !!meta && (!prevEntry || !dupMeta.has(prevEntry.id) || duplicateKey(prevEntry) !== duplicateKey(entry));
+            const groupIds = meta ? meta.group.records.map((r) => r.id) : [];
+            const groupAllSelected = groupIds.length > 0 && groupIds.every((id) => selected.has(id));
+            return (
+            <Fragment key={entry.id}>
+            {isGroupStart && meta && (
+              <div data-dup-group={meta.group.key} className="rounded-md border border-amber-300/70 bg-amber-50/70 dark:bg-amber-950/20 px-2 py-1.5 space-y-1">
+                <div className="flex items-center gap-2">
+                  {!readOnly && (
+                    <Checkbox
+                      checked={groupAllSelected}
+                      onCheckedChange={() => selectGroup(groupIds, groupAllSelected)}
+                      aria-label="Select all in this duplicate set"
+                    />
+                  )}
+                  <span className="text-[11px] font-semibold">Duplicate set · {groupIds.length} matching records</span>
+                  {meta.group.conflicting && (
+                    <Badge variant="outline" className="border-red-300 text-red-700 text-[9px]">Pop conflict</Badge>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {([["State", entry.state, "state"], ["LGA", entry.lga, "lga"], ["Ward", entry.ward, "ward"], ["FLHF", entry.flhf_name, "flhf_name"], ["Community", entry.community_name, "community_name"], ["Settlement", entry.settlement_name, "settlement_name"]] as [string, string, string][]).map(([label, val, key]) => {
+                    const differs = meta.group.varyingFields?.includes(key);
+                    return (
+                      <Badge key={label} variant="outline" className={`text-[9px] ${differs ? "border-amber-500 bg-amber-100/70 text-amber-800 font-semibold" : "text-muted-foreground"}`}>
+                        {label}: {val || "—"}{differs ? " ⚠" : ""}
+                      </Badge>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            <Card className="border-border/40">
+
               <CardContent className="p-3 space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
@@ -448,7 +610,10 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                 </div>
               </CardContent>
             </Card>
-          ))}
+            </Fragment>
+            );
+          })}
+
           {visibleEntries.length > 25 && (
             <TablePagination
               currentPage={pagination.currentPage}
@@ -502,8 +667,15 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                   </TableCell>
                 </TableRow>
 
-              ) : pagination.paginatedData.map((entry: any) => (
-                <TableRow key={entry.id} className="text-xs" data-state={selected.has(entry.id) ? "selected" : undefined}>
+              ) : pagination.paginatedData.map((entry: any, idx: number) => {
+                const meta = dupMeta.get(entry.id);
+                const prevEntry: any = pagination.paginatedData[idx - 1];
+                const isGroupStart = !!meta && (!prevEntry || !dupMeta.has(prevEntry.id) || duplicateKey(prevEntry) !== duplicateKey(entry));
+                return (
+                <Fragment key={entry.id}>
+                {isGroupStart && meta && <GroupHeader group={meta.group} colSpan={readOnly ? 10 : 11} />}
+                <TableRow className={`text-xs ${meta ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`} data-state={selected.has(entry.id) ? "selected" : undefined}>
+
                   {!readOnly && (
                     <TableCell className="w-[36px]">
                       <Checkbox
@@ -557,7 +729,10 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                     )}
                   </TableCell>
                 </TableRow>
-              ))}
+                </Fragment>
+                );
+              })}
+
             </TableBody>
           </Table>
         </div>
