@@ -729,7 +729,10 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                     )}
                   </TableCell>
                 </TableRow>
-              ))}
+                </Fragment>
+                );
+              })}
+
             </TableBody>
           </Table>
         </div>
