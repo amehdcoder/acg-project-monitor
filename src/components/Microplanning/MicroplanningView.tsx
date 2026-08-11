@@ -379,18 +379,86 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
   const selectAllFiltered = () => setSelected(new Set(visibleEntries.map((e: any) => e.id)));
   const clearSelection = () => setSelected(new Set());
 
-  const dupBadge = (id: string) =>
-    dupAnalysis.duplicateIds.has(id) ? (
-      dupAnalysis.conflictIds.has(id) ? (
-        <Badge variant="outline" className="border-red-300 text-red-700 text-[9px] gap-0.5">
-          <AlertTriangle className="h-2.5 w-2.5" /> Dup · pop conflict
-        </Badge>
-      ) : (
-        <Badge variant="outline" className="border-amber-300 text-amber-700 text-[9px] gap-0.5">
-          <Copy className="h-2.5 w-2.5" /> Duplicate
-        </Badge>
-      )
-    ) : null;
+  const dupBadge = (id: string) => {
+    if (!dupAnalysis.duplicateIds.has(id)) return null;
+    const meta = dupMeta.get(id);
+    const isOldest = meta?.group.oldestId === id;
+    const isNewest = meta?.group.newestId === id;
+    return (
+      <span className="inline-flex items-center gap-1">
+        {dupAnalysis.conflictIds.has(id) ? (
+          <Badge variant="outline" className="border-red-300 text-red-700 text-[9px] gap-0.5">
+            <AlertTriangle className="h-2.5 w-2.5" /> Dup · pop conflict
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="border-amber-300 text-amber-700 text-[9px] gap-0.5">
+            <Copy className="h-2.5 w-2.5" /> Duplicate
+          </Badge>
+        )}
+        {isOldest ? (
+          <Badge variant="outline" className="border-emerald-300 text-emerald-700 text-[9px]">Old (original)</Badge>
+        ) : isNewest ? (
+          <Badge variant="outline" className="border-sky-300 text-sky-700 text-[9px]">New (latest copy)</Badge>
+        ) : (
+          <Badge variant="outline" className="text-[9px] text-muted-foreground">Copy {(meta?.ri ?? 0) + 1}</Badge>
+        )}
+      </span>
+    );
+  };
+
+  /** Group header row shown above the first record of each duplicate cluster. */
+  const GroupHeader = ({ group, colSpan }: { group: (typeof dupAnalysis.groups)[number]; colSpan: number }) => {
+    const ids = group.records.map((r) => r.id);
+    const allSelected = ids.every((id) => selected.has(id));
+    const r0: any = group.records[0];
+    const fields: [string, string][] = [
+      ["State", r0.state], ["LGA", r0.lga], ["Ward", r0.ward],
+      ["FLHF", r0.flhf_name], ["Community", r0.community_name], ["Settlement", r0.settlement_name],
+    ];
+    return (
+      <TableRow data-dup-group={group.key} className="bg-amber-50/70 dark:bg-amber-950/20 hover:bg-amber-50/70">
+        <TableCell colSpan={colSpan} className="py-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {!readOnly && (
+              <Checkbox
+                checked={allSelected}
+                onCheckedChange={() => selectGroup(ids, allSelected)}
+                aria-label="Select all in this duplicate set"
+              />
+            )}
+            <Layers className="h-3.5 w-3.5 text-amber-600" />
+            <span className="text-[11px] font-semibold">
+              Duplicate set · {group.records.length} matching records
+            </span>
+            {group.conflicting && (
+              <Badge variant="outline" className="border-red-300 text-red-700 text-[9px]">Population conflict</Badge>
+            )}
+            <span className="flex flex-wrap items-center gap-1">
+              {fields.map(([label, val]) => {
+                const key = label === "FLHF" ? "flhf_name" : label === "Community" ? "community_name" : label === "Settlement" ? "settlement_name" : label.toLowerCase();
+                const differs = group.varyingFields?.includes(key);
+                return (
+                  <Badge
+                    key={label}
+                    variant="outline"
+                    className={`text-[9px] ${differs ? "border-amber-500 bg-amber-100/70 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 font-semibold" : "text-muted-foreground"}`}
+                  >
+                    {label}: {val || "—"}{differs ? " ⚠ differs" : ""}
+                  </Badge>
+                );
+              })}
+            </span>
+            {!readOnly && (
+              <Button variant="link" size="sm" className="h-6 px-1 text-[11px] ml-auto" onClick={() => selectGroup(ids, allSelected)}>
+                {allSelected ? "Unselect this set" : `Select all ${ids.length} in this set`}
+              </Button>
+            )}
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  };
+
 
   return (
     <div className="space-y-3">
