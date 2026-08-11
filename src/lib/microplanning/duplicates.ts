@@ -69,6 +69,8 @@ export interface DuplicateAnalysis<T extends DuplicateCandidate = DuplicateCandi
   duplicateIds: Set<string>;
   /** ids flagged as needing a manual population decision */
   conflictIds: Set<string>;
+  /** ids in groups where every field AND the population match exactly */
+  exactIds: Set<string>;
   /** ids safe to delete in one click */
   removableIds: string[];
   duplicateRecordCount: number;
@@ -112,6 +114,7 @@ export function analyzeDuplicates<T extends DuplicateCandidate>(entries: T[]): D
 
   const duplicateIds = new Set<string>();
   const conflictIds = new Set<string>();
+  const exactIds = new Set<string>();
   const removableIds: string[] = [];
   let duplicateRecordCount = 0;
   for (const g of groups) {
@@ -119,6 +122,7 @@ export function analyzeDuplicates<T extends DuplicateCandidate>(entries: T[]): D
     for (const r of g.records) {
       duplicateIds.add(r.id);
       if (g.conflicting) conflictIds.add(r.id);
+      else exactIds.add(r.id);
     }
     removableIds.push(...g.removableIds);
   }
@@ -129,6 +133,7 @@ export function analyzeDuplicates<T extends DuplicateCandidate>(entries: T[]): D
     conflictGroups: groups.filter((g) => g.conflicting),
     duplicateIds,
     conflictIds,
+    exactIds,
     removableIds,
     duplicateRecordCount,
   };
