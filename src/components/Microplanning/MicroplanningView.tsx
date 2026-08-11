@@ -698,6 +698,10 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                   </TableCell>
                   <TableCell>{entry.settlement_name || "—"}</TableCell>
                   <TableCell className="text-right">{entry.estimated_total_population?.toLocaleString() || "—"}</TableCell>
+                  <TableCell className={`text-right tabular-nums ${pwdTotalFor(entry) >= PWD_FLAG ? "font-bold text-purple-700 dark:text-purple-300" : "text-muted-foreground"}`}>
+                    {pwdTotalFor(entry) ? pwdTotalFor(entry).toLocaleString() : "—"}
+                  </TableCell>
+
                   <TableCell>
                     {entry.accessibility && (
                       <Badge variant="outline" className={`text-[10px] ${
