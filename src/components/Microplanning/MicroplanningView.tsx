@@ -32,6 +32,7 @@ import { exportFilteredMicroplan, filterScopeLabel } from "@/lib/microplanning/f
 import { countGeography } from "@/lib/microplanning/geoCounts";
 import { effectiveDistanceKm, withRecomputedDistances } from "@/lib/microplanning/distance";
 import { DISABILITY_TYPES, pwdValue, pwdTotalFor } from "@/lib/microplanning/disabilityTypes";
+import { PWD_FLAG } from "./LargePopulationFlags";
 import DesignationManagerDialog from "./DesignationManagerDialog";
 import AllocationHistoryDialog from "./AllocationHistoryDialog";
 import MicroplanDeleteRequestDialog from "./MicroplanDeleteRequestDialog";
@@ -51,7 +52,7 @@ import { useProjectScope } from "@/hooks/useProjectScope";
 import { rowInScope } from "@/lib/projectScope";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
-import { ShieldCheck, History as HistoryIcon, Layers as LayersIcon, ChevronDown } from "lucide-react";
+import { ShieldCheck, History as HistoryIcon, Layers as LayersIcon, ChevronDown, Accessibility, ArrowUpDown } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
