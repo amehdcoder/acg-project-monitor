@@ -129,16 +129,28 @@ const MicroplanDuplicateCompareDialog = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {IDENTITY_FIELDS.map((f) => (
-                      <tr key={f} className="border-b border-border/30">
-                        <td className="px-2 py-1.5 text-muted-foreground">{FIELD_LABELS[f] ?? f}</td>
-                        {g.records.map((r) => (
-                          <td key={r.id} className="px-2 py-1.5 text-emerald-700 dark:text-emerald-400">
-                            {String(r[f] ?? "—")}
+                    {IDENTITY_FIELDS.map((f) => {
+                      const differs = g.varyingFields?.includes(f);
+                      return (
+                        <tr key={f} className={`border-b border-border/30 ${differs ? "bg-amber-50/70 dark:bg-amber-950/20" : ""}`}>
+                          <td className="px-2 py-1.5 text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              {FIELD_LABELS[f] ?? f}
+                              {differs && <AlertTriangle className="h-2.5 w-2.5 text-amber-600" aria-label="values differ" />}
+                            </span>
                           </td>
-                        ))}
-                      </tr>
-                    ))}
+                          {g.records.map((r) => (
+                            <td
+                              key={r.id}
+                              className={`px-2 py-1.5 ${differs ? "font-semibold text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}`}
+                            >
+                              {String(r[f] ?? "—")}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+
                     <tr>
                       <td className="px-2 py-1.5 text-muted-foreground">Est. population</td>
                       {g.records.map((r) => (
