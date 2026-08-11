@@ -1222,7 +1222,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     let totalPop = 0, totalChildren04 = 0, totalChildren514 = 0, totalAdults15 = 0, totalHouseholds = 0, targetPop = 0;
     let geotagged = 0, hardToReach = 0, uniqueSettlements = 0, cddFromCommunity = 0;
     let distSum = 0, distCount = 0;
-    const stateSet = new Set<any>(), lgaSet = new Set<any>(), wardSet = new Set<any>(), flhfSet = new Set<any>();
+    // (geography counts are computed via countGeography below)
     const accessStats = { accessible: 0, hard_to_reach: 0, inaccessible: 0, seasonal: 0, unset: 0 };
     const securityStats = { cleared: 0, partial: 0, not_cleared: 0, unknown: 0 };
     const terrainCounts: Record<string, number> = {};
