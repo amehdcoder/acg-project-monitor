@@ -118,11 +118,16 @@ const MicroplanDuplicateCompareDialog = ({
                               />
                             )}
                             Copy {i + 1}
-                            {i === 0 && (
+                            {i === 0 ? (
                               <Badge variant="outline" className="text-[8px] border-emerald-300 text-emerald-700">
-                                oldest
+                                old (original)
                               </Badge>
-                            )}
+                            ) : i === g.records.length - 1 ? (
+                              <Badge variant="outline" className="text-[8px] border-sky-300 text-sky-700">
+                                new (latest)
+                              </Badge>
+                            ) : null}
+
                           </div>
                         </th>
                       ))}
