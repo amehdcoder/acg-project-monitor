@@ -15,7 +15,7 @@ import MicroplanDuplicatesPanel from "./MicroplanDuplicatesPanel";
 import { analyzeDuplicates, duplicateKey } from "@/lib/microplanning/duplicates";
 
 import { toast } from "@/hooks/use-toast";
-import { Plus, Map as MapIcon, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity, Navigation, Home, Target, Globe, Heart, Copy, AlertTriangle, ChevronUp, ChevronDown, Layers } from "lucide-react";
+import { Plus, Map as MapIcon, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity, Navigation, Home, Target, Globe, Heart, Copy, AlertTriangle, ChevronUp, Layers } from "lucide-react";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import TablePagination from "@/components/ui/table-pagination";
 import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
