@@ -17,6 +17,8 @@ import {
 } from "@/lib/microplanning/settlementResolver";
 import { effectiveDistanceKm } from "@/lib/microplanning/distance";
 import LargePopulationFlags from "./LargePopulationFlags";
+import FacilityHarmonizerPanel from "./FacilityHarmonizerPanel";
+import LgaGeoBreakdownTable from "./LgaGeoBreakdownTable";
 import { countGeography } from "@/lib/microplanning/geoCounts";
 
 interface Props {
