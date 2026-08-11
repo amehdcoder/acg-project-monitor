@@ -17,6 +17,8 @@ import {
 } from "@/lib/microplanning/settlementResolver";
 import { effectiveDistanceKm } from "@/lib/microplanning/distance";
 import LargePopulationFlags from "./LargePopulationFlags";
+import FacilityHarmonizerPanel from "./FacilityHarmonizerPanel";
+import LgaGeoBreakdownTable from "./LgaGeoBreakdownTable";
 import { countGeography } from "@/lib/microplanning/geoCounts";
 
 interface Props {
@@ -232,6 +234,12 @@ const MicroplanSummaryView = ({ entries, readOnly = false, onRefresh }: Props) =
 
       {/* Oversized population watchlist */}
       <LargePopulationFlags entries={rows} />
+
+      {/* Unique Wards / FLHF / Communities / Settlements per LGA */}
+      <LgaGeoBreakdownTable entries={rows} scopeLabel={query.trim() ? `Search: ${query.trim()}` : "All data"} />
+
+      {/* GRID3 facility-name harmonisation */}
+      <FacilityHarmonizerPanel entries={rows} readOnly={readOnly} onRefresh={onRefresh} />
 
 
 
