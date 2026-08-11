@@ -1377,13 +1377,40 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   // Use demo data when no real entries exist. Never for MDA Lens users — a
   // scoped user must only ever see real, in-scope submissions (or an empty state).
   const isUsingDemoData = entries.length === 0 && !loading && !lensEnabled;
-  const baseEntries = isUsingDemoData ? DEMO_ENTRIES : entries;
+  const rawBaseEntries = isUsingDemoData ? DEMO_ENTRIES : entries;
+
+  // Global GRID3 fuzzy harmonisation of health-facility names, applied
+  // in-memory so the Planning table, dashboards and every export show one
+  // standard spelling per ward without mutating the stored records.
+  const [facilityRenames, setFacilityRenames] = useState<FacilityRename[]>([]);
+  const harmonizeKey = useMemo(
+    () =>
+      rawBaseEntries
+        .map((e: any) => `${e?.id}|${e?.state}|${e?.lga}|${e?.ward}|${e?.flhf_name}`)
+        .join("~"),
+    [rawBaseEntries],
+  );
+  useEffect(() => {
+    let cancelled = false;
+    if (!rawBaseEntries.length) { setFacilityRenames([]); return; }
+    harmonizeFacilityNames(rawBaseEntries as any[])
+      .then((res) => { if (!cancelled) setFacilityRenames(res.renames); })
+      .catch(() => { if (!cancelled) setFacilityRenames([]); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [harmonizeKey]);
+
+  const baseEntries = useMemo(
+    () => (facilityRenames.length ? applyRenamesLocally(rawBaseEntries as any[], facilityRenames) : rawBaseEntries),
+    [rawBaseEntries, facilityRenames],
+  );
   // Designation-scope filter: admins always see all; non-admins with no
   // designation assignment also see all (legacy). Users with assignments are
   // restricted to rows that match at least one of their assignments.
   const displayEntries = useMemo(() => {
     // 1) Designation-scope filter (per-user field assignment).
     let result = baseEntries;
+
     if (!isAdmin && !scope.loading && scope.designations.length > 0 && !scope.hasNoRestriction) {
       result = result.filter((e: any) => scope.isInScope(e));
     }
