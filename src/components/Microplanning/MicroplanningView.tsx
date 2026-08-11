@@ -60,6 +60,7 @@ import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import { exportMicroplanWorkbook } from "@/lib/microplanning/microplanTemplate";
+import GeoMedicineAllocationTable from "@/components/Microplanning/GeoMedicineAllocationTable";
 import { parseMedicineUploadFile, exportMedicineUploadTemplate, parseAllocationPlanFile, exportAllocationPlanTemplate, type UploadedMedicineEntry } from "@/lib/microplanning/medicineUpload";
 
 // Exact template column headers matching the NTDs Microplan Template
@@ -2940,7 +2941,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               rows={medicineSourceEntries as any[]}
               getTargetPop={getTargetPop}
               scopeLabel={`${allLgasForMedicine.length} LGA(s) in view`}
-              projectName={selectedProject?.name}
+              projectName={projects.find((p) => p.id === selectedProjectId)?.name}
               targetPopBasis={uploadedMedEntries.length > 0 ? `Uploaded total population × ${medTargetPct}%` : "Microplan target population"}
               readOnly={lensReadOnly}
             />
