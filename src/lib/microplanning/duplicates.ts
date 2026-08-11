@@ -42,10 +42,18 @@ const norm = (v: unknown) =>
     .toLowerCase()
     .replace(/\s+/g, " ");
 
+/** Every field that must match (and be present) for a duplicate. */
+export const IDENTITY_FIELDS = [
+  "state",
+  "lga",
+  "ward",
+  "flhf_name",
+  "community_name",
+  "settlement_name",
+] as const satisfies readonly (keyof DuplicateCandidate)[];
+
 export function duplicateKey(e: DuplicateCandidate): string {
-  return [e.state, e.lga, e.ward, e.flhf_name, e.community_name, e.settlement_name]
-    .map(norm)
-    .join("||");
+  return IDENTITY_FIELDS.map((f) => norm(e[f])).join("||");
 }
 
 const labelOf = (e: DuplicateCandidate) =>
@@ -70,8 +78,11 @@ export function analyzeDuplicates<T extends DuplicateCandidate>(entries: T[]): D
   const buckets = new Map<string, T[]>();
   for (const e of entries) {
     if (!e?.id) continue;
-    // Records with no community AND no settlement carry no identity — skip.
-    if (!norm(e.community_name) && !norm(e.settlement_name)) continue;
+    // Strict identity: a duplicate must match on ALL of
+    // State, LGA, Ward, FLHF, Community and Settlement name.
+    // If any of these identity fields is missing the record cannot be
+    // confidently matched, so it is never treated as a duplicate.
+    if (!IDENTITY_FIELDS.every((f) => norm(e[f]))) continue;
     const key = duplicateKey(e);
     const list = buckets.get(key);
     if (list) list.push(e);
