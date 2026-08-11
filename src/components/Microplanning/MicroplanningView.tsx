@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import MicroplanDeleteConfirmDialog from "./MicroplanDeleteConfirmDialog";
 import MicroplanDuplicatesPanel from "./MicroplanDuplicatesPanel";
-import { analyzeDuplicates } from "@/lib/microplanning/duplicates";
+import { analyzeDuplicates, duplicateKey } from "@/lib/microplanning/duplicates";
 
 import { toast } from "@/hooks/use-toast";
 import { Plus, Map as MapIcon, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity, Navigation, Home, Target, Globe, Heart, Copy, AlertTriangle } from "lucide-react";
