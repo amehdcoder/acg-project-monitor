@@ -3529,6 +3529,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 )}
               </CardContent>
             </Card>
+            </>
           )}
 
           {/* Coverage View */}
