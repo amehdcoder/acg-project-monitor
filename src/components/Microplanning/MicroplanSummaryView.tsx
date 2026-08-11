@@ -17,6 +17,7 @@ import {
 } from "@/lib/microplanning/settlementResolver";
 import { effectiveDistanceKm } from "@/lib/microplanning/distance";
 import LargePopulationFlags from "./LargePopulationFlags";
+import { countGeography } from "@/lib/microplanning/geoCounts";
 
 interface Props {
   entries: any[];
@@ -136,6 +137,10 @@ const MicroplanSummaryView = ({ entries, readOnly = false, onRefresh }: Props) =
     return { overall, list };
   }, [rows]);
 
+  // Shared blank-excluding composite counting — identical to the Planning
+  // dashboard KPIs and the Excel export summary sheet.
+  const geoCounts = useMemo(() => countGeography(rows as any[]), [rows]);
+
   const missing = useMemo(() => rows.filter((e) => rowNeedsGeocoding(e as MicroplanGeoRow)), [rows]);
 
   const runResolve = useCallback(async () => {
@@ -197,11 +202,11 @@ const MicroplanSummaryView = ({ entries, readOnly = false, onRefresh }: Props) =
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
             {[
-              // Placeholder buckets ("Unassigned …") are excluded so these
-              // counts match the Planning dashboard KPIs exactly.
-              { label: "LGAs", value: n(tree.list.filter((l) => l.agg.name !== "Unassigned LGA").length) },
-              { label: "Wards", value: n(tree.list.reduce((s, l) => s + l.wards.filter((w) => w.agg.name !== "Unassigned Ward").length, 0)) },
-              { label: "Facilities", value: n(tree.list.reduce((s, l) => s + l.wards.reduce((t, w) => t + w.flhfs.filter((f) => f.name !== "Unassigned Health Facility").length, 0), 0)) },
+              // Counted via the shared composite key helper so these values are
+              // always identical to the Planning dashboard KPIs and exports.
+              { label: "LGAs", value: n(geoCounts.lgas) },
+              { label: "Wards", value: n(geoCounts.wards) },
+              { label: "Facilities", value: n(geoCounts.flhfs) },
               { label: "Communities", value: n(o.communities) },
               { label: "Households", value: n(o.households) },
               { label: "Population", value: n(o.population) },

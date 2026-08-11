@@ -29,6 +29,7 @@ import MicroplanSummaryView from "./MicroplanSummaryView";
 import GpsResolveCell from "./GpsResolveCell";
 import DrillBreadcrumb from "./DrillBreadcrumb";
 import { exportFilteredMicroplan, filterScopeLabel } from "@/lib/microplanning/filteredExport";
+import { countGeography } from "@/lib/microplanning/geoCounts";
 import { effectiveDistanceKm, withRecomputedDistances } from "@/lib/microplanning/distance";
 import { DISABILITY_TYPES, pwdValue, pwdTotalFor } from "@/lib/microplanning/disabilityTypes";
 import DesignationManagerDialog from "./DesignationManagerDialog";
@@ -50,7 +51,8 @@ import { useProjectScope } from "@/hooks/useProjectScope";
 import { rowInScope } from "@/lib/projectScope";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
-import { ShieldCheck, History as HistoryIcon, Layers as LayersIcon } from "lucide-react";
+import { ShieldCheck, History as HistoryIcon, Layers as LayersIcon, ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -1221,7 +1223,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     let totalPop = 0, totalChildren04 = 0, totalChildren514 = 0, totalAdults15 = 0, totalHouseholds = 0, targetPop = 0;
     let geotagged = 0, hardToReach = 0, uniqueSettlements = 0, cddFromCommunity = 0;
     let distSum = 0, distCount = 0;
-    const stateSet = new Set<any>(), lgaSet = new Set<any>(), wardSet = new Set<any>(), flhfSet = new Set<any>();
+    // (geography counts are computed via countGeography below)
     const accessStats = { accessible: 0, hard_to_reach: 0, inaccessible: 0, seasonal: 0, unset: 0 };
     const securityStats = { cleared: 0, partial: 0, not_cleared: 0, unknown: 0 };
     const terrainCounts: Record<string, number> = {};
@@ -1247,11 +1249,6 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       // Wards (and LGAs) are counted on a composite key so identically named
       // wards in different LGAs are never collapsed, and blanks never count —
       // this keeps the dashboard KPI identical to the Microplan Summary rollup.
-      const gk = (v: unknown) => String(v ?? "").trim().toLowerCase();
-      if (gk(e.state)) stateSet.add(gk(e.state));
-      if (gk(e.lga)) lgaSet.add(`${gk(e.state)}||${gk(e.lga)}`);
-      if (gk(e.ward)) wardSet.add(`${gk(e.state)}||${gk(e.lga)}||${gk(e.ward)}`);
-      if (gk(e.flhf_name)) flhfSet.add(`${gk(e.state)}||${gk(e.lga)}||${gk(e.ward)}||${gk(e.flhf_name)}`);
       if (e.settlement_name) uniqueSettlements++;
       if (e.cdd_from_community) cddFromCommunity++;
       const d = effectiveDistanceKm(e as any);
@@ -1274,7 +1271,12 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       totalPop, totalChildren04, totalChildren514, totalAdults15, totalHouseholds, targetPop,
       geotagged, geotaggedPct: count > 0 ? (geotagged / count) * 100 : 0,
       hardToReach,
-      uniqueStatesCount: stateSet.size, uniqueLGAsCount: lgaSet.size, uniqueWardsCount: wardSet.size, uniqueFLHFs: flhfSet.size,
+      ...(() => {
+        // Shared helper — same blank-excluding composite keys used by the
+        // Microplan Summary rollup and the Excel export summary sheet.
+        const g = countGeography(filtered as any[]);
+        return { uniqueStatesCount: g.states, uniqueLGAsCount: g.lgas, uniqueWardsCount: g.wards, uniqueFLHFs: g.flhfs };
+      })(),
       uniqueSettlements, cddFromCommunity, cddPct: count > 0 ? (cddFromCommunity / count) * 100 : 0,
       avgDistKm: distCount ? (distSum / distCount).toFixed(1) : "—",
       avgHouseholdsPerCommunity: count > 0 && totalHouseholds > 0 ? Math.round(totalHouseholds / count) : 0,
@@ -2543,17 +2545,40 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             <Button size="sm" variant="outline" onClick={() => handleExportTemplate(true)} disabled={entries.length === 0}>
               <Download className="h-3.5 w-3.5 mr-1" /> Export Data as Template
             </Button>
-            <Button
-              size="sm"
-              onClick={() => {
-                const { fileName, count } = exportFilteredMicroplan(filtered as Record<string, unknown>[], exportFilterContext);
-                toast({ title: `\u2705 Exported ${count.toLocaleString()} records`, description: fileName });
-              }}
-              disabled={filtered.length === 0}
-              className="gap-1"
-            >
-              <Download className="h-3.5 w-3.5" /> Export Current Filter ({filtered.length.toLocaleString()})
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" disabled={filtered.length === 0} className="gap-1">
+                  <Download className="h-3.5 w-3.5" /> Export Current Filter ({filtered.length.toLocaleString()})
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-72">
+                <DropdownMenuLabel className="text-[11px]">Excel export — duplicates flagged</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    const r = exportFilteredMicroplan(filtered as Record<string, unknown>[], exportFilterContext, { duplicateMode: "all" });
+                    toast({ title: `\u2705 Exported ${r.count.toLocaleString()} records`, description: `${r.fileName} \u2022 ${r.duplicatesFlagged.toLocaleString()} duplicate rows flagged` });
+                  }}
+                >
+                  <div className="flex flex-col">
+                    <span className="text-xs font-medium">All records</span>
+                    <span className="text-[10px] text-muted-foreground">Includes duplicates, each labelled in a “Duplicates Flagged” column</span>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    const r = exportFilteredMicroplan(filtered as Record<string, unknown>[], exportFilterContext, { duplicateMode: "kept" });
+                    toast({ title: `\u2705 Exported ${r.count.toLocaleString()} records`, description: `${r.fileName} \u2022 ${r.removed.toLocaleString()} duplicate copies excluded` });
+                  }}
+                >
+                  <div className="flex flex-col">
+                    <span className="text-xs font-medium">Non-duplicate kept set only</span>
+                    <span className="text-[10px] text-muted-foreground">Removes exact-population repeats; population conflicts are kept for review</span>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <span className="text-[10px] text-muted-foreground max-w-[280px] truncate" title={filterScopeLabel(exportFilterContext)}>
               {filterScopeLabel(exportFilterContext)}
             </span>
