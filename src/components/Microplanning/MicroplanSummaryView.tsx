@@ -233,7 +233,7 @@ const MicroplanSummaryView = ({ entries, readOnly = false, onRefresh }: Props) =
       </Card>
 
       {/* Oversized population watchlist */}
-      <LargePopulationFlags entries={rows} />
+      <LargePopulationFlags entries={rows} readOnly={readOnly} onRefresh={onRefresh} />
 
       {/* Unique Wards / FLHF / Communities / Settlements per LGA */}
       <LgaGeoBreakdownTable entries={rows} scopeLabel={query.trim() ? `Search: ${query.trim()}` : "All data"} />
