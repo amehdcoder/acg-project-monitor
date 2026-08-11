@@ -165,7 +165,7 @@ const LargePopulationFlags = ({ entries, readOnly = false, onRefresh }: Props) =
     if (!Object.keys(patch).length) return toast.info("Nothing to update");
     setSaving(r.id);
     try {
-      const { error } = await supabase.from("microplan_entries").update(patch).eq("id", r.recordId);
+      const { error } = await supabase.from("microplan_entries").update(patch as never).eq("id", r.recordId);
       if (error) throw error;
       toast.success(`Updated ${r.name}`);
       setDrafts((d) => {
