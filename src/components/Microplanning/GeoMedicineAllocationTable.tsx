@@ -6,7 +6,7 @@
  * LGA) or against a single Ward (distributed across the communities of that
  * ward only). Community-level results export to a WHO-standard workbook.
  */
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -172,8 +172,8 @@ export default function GeoMedicineAllocationTable({
                 const isOpen = open[L.key] ?? true;
                 const buffer = Math.round(L.allocation * (bufferPct / 100));
                 return (
-                  <>
-                    <tr key={L.key} className="bg-gradient-to-r from-sky-100 to-emerald-50 dark:from-sky-950/50 dark:to-emerald-950/30 border-y border-sky-200 dark:border-sky-900">
+                  <Fragment key={L.key}>
+                    <tr className="bg-gradient-to-r from-sky-100 to-emerald-50 dark:from-sky-950/50 dark:to-emerald-950/30 border-y border-sky-200 dark:border-sky-900">
                       <td className="px-3 py-2">
                         <button onClick={() => setOpen((p) => ({ ...p, [L.key]: !isOpen }))} className="flex items-center gap-1.5 font-bold text-sky-900 dark:text-sky-200">
                           {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
@@ -231,7 +231,7 @@ export default function GeoMedicineAllocationTable({
                         </tr>
                       );
                     })}
-                  </>
+                  </Fragment>
                 );
               })}
 
