@@ -610,7 +610,10 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                 </div>
               </CardContent>
             </Card>
-          ))}
+            </Fragment>
+            );
+          })}
+
           {visibleEntries.length > 25 && (
             <TablePagination
               currentPage={pagination.currentPage}
