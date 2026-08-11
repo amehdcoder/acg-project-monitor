@@ -573,7 +573,9 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                 </div>
               </div>
             )}
-            <Card className="border-border/40">
+            <Card className={pwdTotalFor(entry) >= PWD_FLAG ? "border-purple-400 bg-purple-50/50 dark:bg-purple-950/20" : "border-border/40"}>
+
+
 
               <CardContent className="p-3 space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
