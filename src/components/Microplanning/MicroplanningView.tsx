@@ -2935,7 +2935,17 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
           {/* Medicine Allocation View */}
           {activeView === "medicine" && (
+            <>
+            <GeoMedicineAllocationTable
+              rows={medicineSourceEntries as any[]}
+              getTargetPop={getTargetPop}
+              scopeLabel={`${allLgasForMedicine.length} LGA(s) in view`}
+              projectName={selectedProject?.name}
+              targetPopBasis={uploadedMedEntries.length > 0 ? `Uploaded total population × ${medTargetPct}%` : "Microplan target population"}
+              readOnly={lensReadOnly}
+            />
             <Card className="border-border/50">
+
               <CardContent className="p-4 space-y-4">
                 <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                   <div className="flex items-center gap-2">
