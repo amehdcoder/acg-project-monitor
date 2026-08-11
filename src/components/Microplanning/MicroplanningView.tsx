@@ -516,7 +516,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
             </TableBody>
           </Table>
         </div>
-        {entries.length > 25 && (
+        {visibleEntries.length > 25 && (
           <div className="hidden sm:block p-2 border-t border-border">
             <TablePagination
               currentPage={pagination.currentPage}
@@ -533,7 +533,9 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
         )}
       </CardContent>
     </Card>
+    </div>
   );
+
 };
 
 interface MicroplanningViewProps {
