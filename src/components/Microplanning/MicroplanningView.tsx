@@ -650,6 +650,17 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                 <TableHead className="text-xs">Community</TableHead>
                 <TableHead className="text-xs">Settlement</TableHead>
                 <TableHead className="text-xs text-right">Population</TableHead>
+                <TableHead className="text-xs text-right">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                    onClick={() => setPwdSort((s) => (s === "desc" ? "asc" : s === "asc" ? null : "desc"))}
+                    aria-label="Sort by persons with disability"
+                  >
+                    PWD
+                    {pwdSort === "desc" ? <ChevronDown className="h-3 w-3" /> : pwdSort === "asc" ? <ChevronUp className="h-3 w-3" /> : <ArrowUpDown className="h-3 w-3 opacity-50" />}
+                  </button>
+                </TableHead>
                 <TableHead className="text-xs">Access</TableHead>
                 <TableHead className="text-xs">GPS</TableHead>
                 <TableHead className="text-xs w-[80px]">Actions</TableHead>
@@ -658,11 +669,11 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={readOnly ? 10 : 11} className="text-center text-muted-foreground py-8">Loading...</TableCell>
+                  <TableCell colSpan={readOnly ? 11 : 12} className="text-center text-muted-foreground py-8">Loading...</TableCell>
                 </TableRow>
               ) : pagination.paginatedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={readOnly ? 10 : 11} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={readOnly ? 11 : 12} className="text-center text-muted-foreground py-8">
                     No entries yet. Click 'Add Entry' to start microplanning.
                   </TableCell>
                 </TableRow>
@@ -673,7 +684,8 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                 const isGroupStart = !!meta && (!prevEntry || !dupMeta.has(prevEntry.id) || duplicateKey(prevEntry) !== duplicateKey(entry));
                 return (
                 <Fragment key={entry.id}>
-                {isGroupStart && meta && <GroupHeader group={meta.group} colSpan={readOnly ? 10 : 11} />}
+                {isGroupStart && meta && <GroupHeader group={meta.group} colSpan={readOnly ? 11 : 12} />}
+
                 <TableRow className={`text-xs ${pwdTotalFor(entry) >= PWD_FLAG ? "bg-purple-50/60 dark:bg-purple-950/20 border-l-2 border-l-purple-500" : meta ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`} data-state={selected.has(entry.id) ? "selected" : undefined}>
 
                   {!readOnly && (
