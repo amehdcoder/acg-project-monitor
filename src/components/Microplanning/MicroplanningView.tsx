@@ -266,8 +266,16 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete, readOnly = false }:
 
 // Paginated admin list view for full access users
 const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readOnly = false, onGpsResolved }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; onBulkDelete?: (ids: string[]) => void; readOnly?: boolean; onGpsResolved?: (id: string, patch: Record<string, unknown>) => void }) => {
-  const pagination = useTablePagination(entries, 25);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
+
+  // Duplicate intelligence: same State/LGA/Ward/FLHF/Community/Settlement.
+  const dupAnalysis = useMemo(() => analyzeDuplicates(entries as any[]), [entries]);
+  const visibleEntries = useMemo(
+    () => (showOnlyDuplicates ? entries.filter((e: any) => dupAnalysis.duplicateIds.has(e.id)) : entries),
+    [entries, showOnlyDuplicates, dupAnalysis],
+  );
+  const pagination = useTablePagination(visibleEntries, 25);
 
   // Drop selections that are no longer part of the filtered result set.
   useEffect(() => {
@@ -295,11 +303,24 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
       else pageIds.forEach((id: string) => next.add(id));
       return next;
     });
-  const selectAllFiltered = () => setSelected(new Set(entries.map((e: any) => e.id)));
+  const selectAllFiltered = () => setSelected(new Set(visibleEntries.map((e: any) => e.id)));
   const clearSelection = () => setSelected(new Set());
 
+  const dupBadge = (id: string) =>
+    dupAnalysis.duplicateIds.has(id) ? (
+      dupAnalysis.conflictIds.has(id) ? (
+        <Badge variant="outline" className="border-red-300 text-red-700 text-[9px] gap-0.5">
+          <AlertTriangle className="h-2.5 w-2.5" /> Dup · pop conflict
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="border-amber-300 text-amber-700 text-[9px] gap-0.5">
+          <Copy className="h-2.5 w-2.5" /> Duplicate
+        </Badge>
+      )
+    ) : null;
 
   return (
+
     <Card className="border-border/50">
       <CardContent className="p-0">
         {/* Selection toolbar */}
