@@ -34,7 +34,18 @@ export interface DuplicateGroup<T extends DuplicateCandidate = DuplicateCandidat
   /** ids that would be removed by "remove all duplicates" */
   removableIds: string[];
   populations: number[];
+  /** oldest (first created) record id — the "original" */
+  oldestId: string;
+  /** newest (last created) record id — the latest copy */
+  newestId: string;
+  /**
+   * Identity fields whose RAW values differ inside the group (they still match
+   * after normalisation — e.g. casing/spacing). Highlighted so the user can
+   * spot rows that may not truly be duplicates.
+   */
+  varyingFields: string[];
 }
+
 
 const norm = (v: unknown) =>
   String(v ?? "")
