@@ -270,12 +270,18 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete, readOnly = false }:
 const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readOnly = false, onGpsResolved }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; onBulkDelete?: (ids: string[]) => void; readOnly?: boolean; onGpsResolved?: (id: string, patch: Record<string, unknown>) => void }) => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
+  const [exactOnly, setExactOnly] = useState(false);
 
   // Duplicate intelligence: same State/LGA/Ward/FLHF/Community/Settlement.
   const dupAnalysis = useMemo(() => analyzeDuplicates(entries as any[]), [entries]);
   const visibleEntries = useMemo(
-    () => (showOnlyDuplicates ? entries.filter((e: any) => dupAnalysis.duplicateIds.has(e.id)) : entries),
-    [entries, showOnlyDuplicates, dupAnalysis],
+    () =>
+      showOnlyDuplicates
+        ? entries.filter((e: any) =>
+            (exactOnly ? dupAnalysis.exactIds : dupAnalysis.duplicateIds).has(e.id),
+          )
+        : entries,
+    [entries, showOnlyDuplicates, exactOnly, dupAnalysis],
   );
   const pagination = useTablePagination(visibleEntries, 25);
 
@@ -329,6 +335,15 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
       onSelectAll={(ids) => setSelected(new Set(ids))}
       showOnlyDuplicates={showOnlyDuplicates}
       onToggleFilter={setShowOnlyDuplicates}
+      exactOnly={exactOnly}
+      onToggleExactOnly={setExactOnly}
+      selectedIds={selected}
+      onToggleSelect={toggleOne}
+      onAddToSelection={(ids) => setSelected((prev) => new Set([...prev, ...ids]))}
+      onRemoveSelected={() => {
+        const ids = [...selected].filter((id) => dupAnalysis.duplicateIds.has(id));
+        if (ids.length) onBulkDelete?.(ids);
+      }}
     />
     <Card className="border-border/50">
       <CardContent className="p-0">
