@@ -32,6 +32,7 @@ import { exportFilteredMicroplan, filterScopeLabel } from "@/lib/microplanning/f
 import { countGeography } from "@/lib/microplanning/geoCounts";
 import { effectiveDistanceKm, withRecomputedDistances } from "@/lib/microplanning/distance";
 import { DISABILITY_TYPES, pwdValue, pwdTotalFor } from "@/lib/microplanning/disabilityTypes";
+import { PWD_FLAG } from "./LargePopulationFlags";
 import DesignationManagerDialog from "./DesignationManagerDialog";
 import AllocationHistoryDialog from "./AllocationHistoryDialog";
 import MicroplanDeleteRequestDialog from "./MicroplanDeleteRequestDialog";
@@ -51,7 +52,7 @@ import { useProjectScope } from "@/hooks/useProjectScope";
 import { rowInScope } from "@/lib/projectScope";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { fetchAllRowsKeyset } from "@/lib/fetchAllRowsKeyset";
-import { ShieldCheck, History as HistoryIcon, Layers as LayersIcon, ChevronDown } from "lucide-react";
+import { ShieldCheck, History as HistoryIcon, Layers as LayersIcon, ChevronDown, Accessibility, ArrowUpDown } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
@@ -271,15 +272,31 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
   const [exactOnly, setExactOnly] = useState(false);
+  const [pwdOnly, setPwdOnly] = useState(false);
+  const [pwdSort, setPwdSort] = useState<"asc" | "desc" | null>(null);
+
+  const pwdFlaggedCount = useMemo(
+    () => entries.filter((e: any) => pwdTotalFor(e) >= PWD_FLAG).length,
+    [entries],
+  );
 
   // Duplicate intelligence: same State/LGA/Ward/FLHF/Community/Settlement.
   const dupAnalysis = useMemo(() => analyzeDuplicates(entries as any[]), [entries]);
   const visibleEntries = useMemo(() => {
-    const base = showOnlyDuplicates
+    let base = showOnlyDuplicates
       ? entries.filter((e: any) =>
           (exactOnly ? dupAnalysis.exactIds : dupAnalysis.duplicateIds).has(e.id),
         )
       : entries;
+    if (pwdOnly) base = base.filter((e: any) => pwdTotalFor(e) >= PWD_FLAG);
+
+    // Explicit PWD sort takes precedence over duplicate clustering.
+    if (pwdSort) {
+      return [...base].sort((a: any, b: any) => {
+        const d = pwdTotalFor(a) - pwdTotalFor(b);
+        return pwdSort === "desc" ? -d : d;
+      });
+    }
 
     // Keep every duplicate group's records immediately after each other so they
     // are easy to compare side by side before deciding what to remove.
@@ -303,7 +320,8 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
       if (ra !== rb) return ra - rb;
       return (memberRank.get(a.id) ?? 0) - (memberRank.get(b.id) ?? 0);
     });
-  }, [entries, showOnlyDuplicates, exactOnly, dupAnalysis]);
+  }, [entries, showOnlyDuplicates, exactOnly, pwdOnly, pwdSort, dupAnalysis]);
+
 
   const pagination = useTablePagination(visibleEntries, 25);
 
@@ -430,9 +448,15 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
             <span className="text-[11px] font-semibold">
               Duplicate set · {group.records.length} matching records
             </span>
+            {group.records.some((r) => pwdTotalFor(r as any) >= PWD_FLAG) && (
+              <Badge variant="outline" className="border-purple-400 bg-purple-100/60 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 text-[9px] gap-0.5 font-semibold">
+                <Accessibility className="h-2.5 w-2.5" /> PWD ≥ {PWD_FLAG} · {group.records.filter((r) => pwdTotalFor(r as any) >= PWD_FLAG).length} record(s)
+              </Badge>
+            )}
             {group.conflicting && (
               <Badge variant="outline" className="border-red-300 text-red-700 text-[9px]">Population conflict</Badge>
             )}
+
             <span className="flex flex-wrap items-center gap-1">
               {fields.map(([label, val]) => {
                 const key = label === "FLHF" ? "flhf_name" : label === "Community" ? "community_name" : label === "Settlement" ? "settlement_name" : label.toLowerCase();
@@ -480,7 +504,24 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
     />
     <Card className="border-border/50">
       <CardContent className="p-0">
+        {/* PWD watchlist filter */}
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50 bg-purple-50/40 dark:bg-purple-950/10">
+          <Accessibility className="h-3.5 w-3.5 text-purple-600" />
+          <span className="text-[11px] font-medium">
+            {pwdFlaggedCount} record{pwdFlaggedCount === 1 ? "" : "s"} with persons with disability ≥ {PWD_FLAG}
+          </span>
+          <Button
+            variant={pwdOnly ? "secondary" : "outline"}
+            size="sm"
+            className="h-7 text-[11px] gap-1"
+            onClick={() => setPwdOnly((v) => !v)}
+          >
+            <Accessibility className="h-3 w-3" />
+            {pwdOnly ? `Showing PWD ≥ ${PWD_FLAG} only` : `Show PWD ≥ ${PWD_FLAG} only`}
+          </Button>
+        </div>
         {/* Duplicate cluster navigation */}
+
         {groupSequence.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50 bg-amber-50/50 dark:bg-amber-950/10">
             <Layers className="h-3.5 w-3.5 text-amber-600" />
@@ -557,7 +598,13 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                     />
                   )}
                   <span className="text-[11px] font-semibold">Duplicate set · {groupIds.length} matching records</span>
+                  {meta.group.records.some((r) => pwdTotalFor(r as any) >= PWD_FLAG) && (
+                    <Badge variant="outline" className="border-purple-400 text-purple-700 text-[9px]">
+                      PWD ≥ {PWD_FLAG} ({meta.group.records.filter((r) => pwdTotalFor(r as any) >= PWD_FLAG).length})
+                    </Badge>
+                  )}
                   {meta.group.conflicting && (
+
                     <Badge variant="outline" className="border-red-300 text-red-700 text-[9px]">Pop conflict</Badge>
                   )}
                 </div>
@@ -573,7 +620,9 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                 </div>
               </div>
             )}
-            <Card className="border-border/40">
+            <Card className={pwdTotalFor(entry) >= PWD_FLAG ? "border-purple-400 bg-purple-50/50 dark:bg-purple-950/20" : "border-border/40"}>
+
+
 
               <CardContent className="p-3 space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
@@ -605,6 +654,10 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                   <span>Ward: {entry.ward}</span>
                   <span>FLHF: {entry.flhf_name}</span>
                   <span>Pop: {entry.estimated_total_population?.toLocaleString() || "—"}</span>
+                  <span className={pwdTotalFor(entry) >= PWD_FLAG ? "font-bold text-purple-700 dark:text-purple-300" : ""}>
+                    PWD: {pwdTotalFor(entry) ? pwdTotalFor(entry).toLocaleString() : "—"}{pwdTotalFor(entry) >= PWD_FLAG ? " ⚑" : ""}
+                  </span>
+
                   {entry.accessibility && <span className="capitalize">{entry.accessibility.replace(/_/g, " ")}</span>}
                   <span className="col-span-2"><GpsResolveCell entry={entry} readOnly={readOnly} onResolved={onGpsResolved} compact /></span>
                 </div>
@@ -650,6 +703,17 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                 <TableHead className="text-xs">Community</TableHead>
                 <TableHead className="text-xs">Settlement</TableHead>
                 <TableHead className="text-xs text-right">Population</TableHead>
+                <TableHead className="text-xs text-right">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                    onClick={() => setPwdSort((s) => (s === "desc" ? "asc" : s === "asc" ? null : "desc"))}
+                    aria-label="Sort by persons with disability"
+                  >
+                    PWD
+                    {pwdSort === "desc" ? <ChevronDown className="h-3 w-3" /> : pwdSort === "asc" ? <ChevronUp className="h-3 w-3" /> : <ArrowUpDown className="h-3 w-3 opacity-50" />}
+                  </button>
+                </TableHead>
                 <TableHead className="text-xs">Access</TableHead>
                 <TableHead className="text-xs">GPS</TableHead>
                 <TableHead className="text-xs w-[80px]">Actions</TableHead>
@@ -658,11 +722,11 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={readOnly ? 10 : 11} className="text-center text-muted-foreground py-8">Loading...</TableCell>
+                  <TableCell colSpan={readOnly ? 11 : 12} className="text-center text-muted-foreground py-8">Loading...</TableCell>
                 </TableRow>
               ) : pagination.paginatedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={readOnly ? 10 : 11} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={readOnly ? 11 : 12} className="text-center text-muted-foreground py-8">
                     No entries yet. Click 'Add Entry' to start microplanning.
                   </TableCell>
                 </TableRow>
@@ -673,8 +737,9 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                 const isGroupStart = !!meta && (!prevEntry || !dupMeta.has(prevEntry.id) || duplicateKey(prevEntry) !== duplicateKey(entry));
                 return (
                 <Fragment key={entry.id}>
-                {isGroupStart && meta && <GroupHeader group={meta.group} colSpan={readOnly ? 10 : 11} />}
-                <TableRow className={`text-xs ${meta ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`} data-state={selected.has(entry.id) ? "selected" : undefined}>
+                {isGroupStart && meta && <GroupHeader group={meta.group} colSpan={readOnly ? 11 : 12} />}
+
+                <TableRow className={`text-xs ${pwdTotalFor(entry) >= PWD_FLAG ? "bg-purple-50/60 dark:bg-purple-950/20 border-l-2 border-l-purple-500" : meta ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`} data-state={selected.has(entry.id) ? "selected" : undefined}>
 
                   {!readOnly && (
                     <TableCell className="w-[36px]">
@@ -698,6 +763,10 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
                   </TableCell>
                   <TableCell>{entry.settlement_name || "—"}</TableCell>
                   <TableCell className="text-right">{entry.estimated_total_population?.toLocaleString() || "—"}</TableCell>
+                  <TableCell className={`text-right tabular-nums ${pwdTotalFor(entry) >= PWD_FLAG ? "font-bold text-purple-700 dark:text-purple-300" : "text-muted-foreground"}`}>
+                    {pwdTotalFor(entry) ? pwdTotalFor(entry).toLocaleString() : "—"}
+                  </TableCell>
+
                   <TableCell>
                     {entry.accessibility && (
                       <Badge variant="outline" className={`text-[10px] ${
