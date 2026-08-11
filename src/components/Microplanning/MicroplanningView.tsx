@@ -430,9 +430,15 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
             <span className="text-[11px] font-semibold">
               Duplicate set · {group.records.length} matching records
             </span>
+            {group.records.some((r) => pwdTotalFor(r as any) >= PWD_FLAG) && (
+              <Badge variant="outline" className="border-purple-400 bg-purple-100/60 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 text-[9px] gap-0.5 font-semibold">
+                <Accessibility className="h-2.5 w-2.5" /> PWD ≥ {PWD_FLAG} · {group.records.filter((r) => pwdTotalFor(r as any) >= PWD_FLAG).length} record(s)
+              </Badge>
+            )}
             {group.conflicting && (
               <Badge variant="outline" className="border-red-300 text-red-700 text-[9px]">Population conflict</Badge>
             )}
+
             <span className="flex flex-wrap items-center gap-1">
               {fields.map(([label, val]) => {
                 const key = label === "FLHF" ? "flhf_name" : label === "Community" ? "community_name" : label === "Settlement" ? "settlement_name" : label.toLowerCase();
