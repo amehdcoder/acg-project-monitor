@@ -29,6 +29,7 @@ import MicroplanSummaryView from "./MicroplanSummaryView";
 import GpsResolveCell from "./GpsResolveCell";
 import DrillBreadcrumb from "./DrillBreadcrumb";
 import { exportFilteredMicroplan, filterScopeLabel } from "@/lib/microplanning/filteredExport";
+import { countGeography } from "@/lib/microplanning/geoCounts";
 import { effectiveDistanceKm, withRecomputedDistances } from "@/lib/microplanning/distance";
 import { DISABILITY_TYPES, pwdValue, pwdTotalFor } from "@/lib/microplanning/disabilityTypes";
 import DesignationManagerDialog from "./DesignationManagerDialog";
@@ -1247,11 +1248,6 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       // Wards (and LGAs) are counted on a composite key so identically named
       // wards in different LGAs are never collapsed, and blanks never count —
       // this keeps the dashboard KPI identical to the Microplan Summary rollup.
-      const gk = (v: unknown) => String(v ?? "").trim().toLowerCase();
-      if (gk(e.state)) stateSet.add(gk(e.state));
-      if (gk(e.lga)) lgaSet.add(`${gk(e.state)}||${gk(e.lga)}`);
-      if (gk(e.ward)) wardSet.add(`${gk(e.state)}||${gk(e.lga)}||${gk(e.ward)}`);
-      if (gk(e.flhf_name)) flhfSet.add(`${gk(e.state)}||${gk(e.lga)}||${gk(e.ward)}||${gk(e.flhf_name)}`);
       if (e.settlement_name) uniqueSettlements++;
       if (e.cdd_from_community) cddFromCommunity++;
       const d = effectiveDistanceKm(e as any);
@@ -1274,7 +1270,12 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       totalPop, totalChildren04, totalChildren514, totalAdults15, totalHouseholds, targetPop,
       geotagged, geotaggedPct: count > 0 ? (geotagged / count) * 100 : 0,
       hardToReach,
-      uniqueStatesCount: stateSet.size, uniqueLGAsCount: lgaSet.size, uniqueWardsCount: wardSet.size, uniqueFLHFs: flhfSet.size,
+      ...(() => {
+        // Shared helper — same blank-excluding composite keys used by the
+        // Microplan Summary rollup and the Excel export summary sheet.
+        const g = countGeography(filtered as any[]);
+        return { uniqueStatesCount: g.states, uniqueLGAsCount: g.lgas, uniqueWardsCount: g.wards, uniqueFLHFs: g.flhfs };
+      })(),
       uniqueSettlements, cddFromCommunity, cddPct: count > 0 ? (cddFromCommunity / count) * 100 : 0,
       avgDistKm: distCount ? (distSum / distCount).toFixed(1) : "—",
       avgHouseholdsPerCommunity: count > 0 && totalHouseholds > 0 ? Math.round(totalHouseholds / count) : 0,
