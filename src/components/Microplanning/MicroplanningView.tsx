@@ -274,15 +274,37 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
 
   // Duplicate intelligence: same State/LGA/Ward/FLHF/Community/Settlement.
   const dupAnalysis = useMemo(() => analyzeDuplicates(entries as any[]), [entries]);
-  const visibleEntries = useMemo(
-    () =>
-      showOnlyDuplicates
-        ? entries.filter((e: any) =>
-            (exactOnly ? dupAnalysis.exactIds : dupAnalysis.duplicateIds).has(e.id),
-          )
-        : entries,
-    [entries, showOnlyDuplicates, exactOnly, dupAnalysis],
-  );
+  const visibleEntries = useMemo(() => {
+    const base = showOnlyDuplicates
+      ? entries.filter((e: any) =>
+          (exactOnly ? dupAnalysis.exactIds : dupAnalysis.duplicateIds).has(e.id),
+        )
+      : entries;
+
+    // Keep every duplicate group's records immediately after each other so they
+    // are easy to compare side by side before deciding what to remove.
+    const groupRank = new Map<string, number>();
+    const memberRank = new Map<string, number>();
+    dupAnalysis.groups.forEach((g, gi) => {
+      groupRank.set(g.key, gi);
+      g.records.forEach((r, ri) => memberRank.set(r.id, ri));
+    });
+    const rankOf = (e: any) => {
+      const gi = groupRank.get(duplicateKey(e));
+      return gi === undefined || !dupAnalysis.duplicateIds.has(e.id) ? null : gi;
+    };
+
+    return [...base].sort((a: any, b: any) => {
+      const ra = rankOf(a);
+      const rb = rankOf(b);
+      if (ra === null && rb === null) return 0;
+      if (ra === null) return 1; // duplicates float to the top, grouped
+      if (rb === null) return -1;
+      if (ra !== rb) return ra - rb;
+      return (memberRank.get(a.id) ?? 0) - (memberRank.get(b.id) ?? 0);
+    });
+  }, [entries, showOnlyDuplicates, exactOnly, dupAnalysis]);
+
   const pagination = useTablePagination(visibleEntries, 25);
 
   // Drop selections that are no longer part of the filtered result set.
