@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Archive, ArchiveRestore, ChevronDown, ChevronRight, EyeOff, Filter, Layers, RotateCcw, Search, Undo2,
+  Archive, ArchiveRestore, ChevronDown, ChevronRight, EyeOff, Filter, Layers, Redo2, RotateCcw, Search, Undo2,
 } from "lucide-react";
 import { exKeyLga, exKeyWard, type ExcludedRef } from "@/lib/microplanning/geoExclusions";
 
@@ -28,6 +28,14 @@ interface Props {
   exclude: (refs: ExcludedRef[]) => void;
   restore: (keys: string[]) => void;
   restoreAll: () => void;
+  /** step one exclusion change back */
+  undo?: () => void;
+  /** step one exclusion change forward */
+  redo?: () => void;
+  /** clear all exclusions and history — recompute against the full scope */
+  reset?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
   title?: string;
   subtitle?: string;
   accent?: "sky" | "violet";
@@ -38,6 +46,7 @@ const n0 = (v: number) => Math.round(v || 0).toLocaleString();
 
 export default function GeoExclusionPanel({
   rows, getPop, archived, keys, exclude, restore, restoreAll,
+  undo, redo, reset, canUndo, canRedo,
   title = "Include / exclude geographies",
   subtitle = "Drop LGAs or wards from every figure on this page. Excluded geographies are archived and can be restored at any time.",
   accent = "sky",
@@ -122,8 +131,29 @@ export default function GeoExclusionPanel({
               <p className="text-[11px] text-white/85 max-w-2xl">{subtitle}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {archived.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {undo && (
+              <Button size="sm" variant="ghost" disabled={disabled || !canUndo} onClick={undo}
+                title="Undo the last exclusion change"
+                className="h-8 text-[11px] gap-1 text-white hover:bg-white/20 disabled:opacity-40">
+                <Undo2 className="h-3.5 w-3.5" /> Undo
+              </Button>
+            )}
+            {redo && (
+              <Button size="sm" variant="ghost" disabled={disabled || !canRedo} onClick={redo}
+                title="Redo the change you just undid"
+                className="h-8 text-[11px] gap-1 text-white hover:bg-white/20 disabled:opacity-40">
+                <Redo2 className="h-3.5 w-3.5" /> Redo
+              </Button>
+            )}
+            {reset && (
+              <Button size="sm" variant="ghost" disabled={disabled || archived.length === 0} onClick={reset}
+                title="Clear every exclusion and recompute against the full scope"
+                className="h-8 text-[11px] gap-1 text-white hover:bg-white/20 disabled:opacity-40">
+                <RotateCcw className="h-3.5 w-3.5" /> Reset to full scope
+              </Button>
+            )}
+            {archived.length > 0 && !reset && (
               <Button size="sm" variant="ghost" disabled={disabled} onClick={restoreAll}
                 className="h-8 text-[11px] gap-1 text-white hover:bg-white/20">
                 <RotateCcw className="h-3.5 w-3.5" /> Restore all
@@ -135,6 +165,7 @@ export default function GeoExclusionPanel({
             </Button>
           </div>
         </div>
+
 
         <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2">
           {[
