@@ -128,19 +128,24 @@ export default function GeoMedicineAllocationTable({
       toast({ title: "Nothing to export", description: "Enter a medicine quantity against at least one LGA or ward first.", variant: "destructive" });
       return;
     }
+    if (errors.length) {
+      toast({ title: "Allocation does not reconcile", description: errors[0].text, variant: "destructive" });
+      return;
+    }
     setBusy(true);
     try {
       await exportCommunityAllocationWorkbook(result, {
-        scope: scopeLabel, project: projectName, medicine,
+        scope: scopeLabel, project: projectName, medicine, program, unit,
         bufferPct: bufferPct / 100, targetPopBasis,
       });
-      toast({ title: "✅ Community allocation exported", description: `${n0(result.totals.communities)} communities · ${n0(result.totals.dispatch)} units to dispatch.` });
+      toast({ title: "✅ Community allocation exported", description: `${n0(result.totals.communities)} communities · ${n0(result.totals.dispatch)} ${unit.toLowerCase()} to dispatch.` });
     } catch (e) {
       toast({ title: "Export failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
     } finally {
       setBusy(false);
     }
   };
+
 
   const clearAll = () => { setLgaTotals({}); setWardTotals({}); };
 
