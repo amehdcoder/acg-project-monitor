@@ -247,13 +247,44 @@ export interface CddTx extends BaseTx {
   hasPhoto: boolean;
 }
 
+/**
+ * Level 4 — reverse logistics: unused, damaged, expired or recalled stock
+ * flowing back up the cascade (CDD → FLHF → LGA → State → Federal store).
+ */
+export interface ReturnTx extends BaseTx {
+  level: "level_4";
+  medicine: string;
+  batch: string;
+  expiry: string;
+  /** Reverse leg (see RETURN_LEG_LABELS); inferred when the form omits it. */
+  leg: string;
+  returnedFrom: string;
+  returnedTo: string;
+  qtyReturned: number;
+  qtyUsable: number;
+  qtyDamaged: number;
+  qtyExpired: number;
+  condition: string;
+  reason: string;
+  returnedBy: string;
+  receivedBy: string;
+  facility: string;
+  community: string;
+  waybill: string;
+  hasWaybill: boolean;
+  hasSignature: boolean;
+  hasPhoto: boolean;
+}
+
 export interface LogisticsDataset {
   dispatches: DispatchTx[];
   receipts: ReceiptTx[];
   issues: IssueTx[];
   cddIssues: CddTx[];
+  returns: ReturnTx[];
   submissions: number;
 }
+
 
 
 /* ── parsing ─────────────────────────────────────────────────────────────── */
