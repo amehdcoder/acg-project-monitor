@@ -129,73 +129,71 @@ export async function exportCommunityAllocationWorkbook(result: AllocationResult
 
   /* ── LGA / Ward summary ────────────────────────────────────────────── */
   const sum = wb.addWorksheet("LGA & Ward Summary", { properties: { tabColor: { argb: ACCENT } }, pageSetup: { orientation: "landscape", fitToPage: true } });
-  const sumHead = ["State", "LGA", "Ward", "Communities", "Target population", "% of LGA", "Allocated units", "Buffer units", "Units to dispatch", "Units per person", "Allocation source"];
-  sum.columns = [{ width: 16 }, { width: 20 }, { width: 22 }, { width: 13 }, { width: 18 }, { width: 11 }, { width: 15 }, { width: 13 }, { width: 17 }, { width: 14 }, { width: 16 }];
+  const sumHead = ["State", "LGA", "Ward", "Communities", "Target population", `Allocated (${unit})`, `Buffer (${unit})`, `To dispatch (${unit})`];
+  sum.columns = [{ width: 16 }, { width: 22 }, { width: 24 }, { width: 13 }, { width: 18 }, { width: 16 }, { width: 15 }, { width: 18 }];
   titleBlock(sum, "LGA & Ward Allocation Summary", subtitle, sumHead.length);
   headerRow(sum, 4, sumHead);
   let sr = 5;
+  const subtotalRows: number[] = [];
   for (const L of result.tree) {
     for (const w of L.wards) {
       const alloc = result.wardAllocation[w.key] || 0;
       const buffer = Math.round(alloc * meta.bufferPct);
-      sum.getRow(sr).values = [
-        L.state, L.lga, w.ward, w.communities, w.targetPop, w.sharePct,
-        alloc, buffer, alloc + buffer, w.targetPop > 0 ? alloc / w.targetPop : 0,
-        result.wardSource[w.key] ?? "—",
-      ];
+      sum.getRow(sr).values = [L.state, L.lga, w.ward, w.communities, w.targetPop, alloc, buffer, alloc + buffer];
       sr++;
     }
-    // LGA subtotal band
-    const row = sum.getRow(sr);
     const lgaBuffer = Math.round(L.allocation * meta.bufferPct);
-    row.values = [L.state, `${L.lga} — TOTAL`, "", L.communities, L.targetPop, 1, L.allocation, lgaBuffer, L.allocation + lgaBuffer, L.targetPop > 0 ? L.allocation / L.targetPop : 0, L.lgaInputUsed ? "LGA" : "Ward"];
-    for (let c = 1; c <= sumHead.length; c++) {
-      const cell = row.getCell(c);
-      cell.font = { name: "Arial", size: 9, bold: true, color: { argb: "FFFFFFFF" } };
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: WHO_DARK } };
-    }
+    sum.getRow(sr).values = [L.state, `${L.lga} — TOTAL`, "", L.communities, L.targetPop, L.allocation, lgaBuffer, L.allocation + lgaBuffer];
+    subtotalRows.push(sr);
     sr++;
   }
   styleBody(sum, 5, sr - 1, sumHead.length);
   for (let i = 5; i < sr; i++) {
     const row = sum.getRow(i);
-    [4, 5, 7, 8, 9].forEach((c) => { row.getCell(c).numFmt = money; row.getCell(c).alignment = { horizontal: "right" }; });
-    row.getCell(6).numFmt = pct;
-    row.getCell(10).numFmt = "0.00";
+    [4, 5, 6, 7, 8].forEach((c) => { row.getCell(c).numFmt = money; row.getCell(c).alignment = { horizontal: "right" }; });
+  }
+  for (const i of subtotalRows) {
+    const row = sum.getRow(i);
+    row.height = 20;
+    for (let c = 1; c <= sumHead.length; c++) {
+      const cell = row.getCell(c);
+      cell.font = { name: "Arial", size: 10, bold: true, color: { argb: "FF0000FF" } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF7CC" } };
+      cell.border = { top: { style: "thin", color: { argb: WHO_DARK } }, bottom: { style: "double", color: { argb: WHO_DARK } }, left: { style: "hair" }, right: { style: "hair" } };
+      if (c >= 4) cell.alignment = { horizontal: "right" };
+    }
   }
 
   /* ── Community register ────────────────────────────────────────────── */
   const com = wb.addWorksheet("Community Allocation", { properties: { tabColor: { argb: WHO_BLUE } }, pageSetup: { orientation: "landscape", fitToPage: true } });
-  const head = ["S/N", "State", "LGA", "Ward", "Health facility (FLHF)", "Community", "Settlement", "Target population", "% of ward", "Allocated units", `Buffer (${(meta.bufferPct * 100).toFixed(0)}%)`, "Units to dispatch", "Units per person", "Source", "Quantity received", "Signature / date"];
-  com.columns = [{ width: 6 }, { width: 15 }, { width: 18 }, { width: 20 }, { width: 24 }, { width: 22 }, { width: 22 }, { width: 16 }, { width: 10 }, { width: 14 }, { width: 12 }, { width: 15 }, { width: 12 }, { width: 10 }, { width: 16 }, { width: 20 }];
+  const head = ["S/N", "State", "LGA", "Ward", "Health facility (FLHF)", "Community", "Settlement", "Target population", `Allocated (${unit})`, `Buffer (${(meta.bufferPct * 100).toFixed(0)}%)`, `To dispatch (${unit})`, "Quantity received", "Signature / date"];
+  com.columns = [{ width: 6 }, { width: 15 }, { width: 18 }, { width: 20 }, { width: 24 }, { width: 22 }, { width: 22 }, { width: 16 }, { width: 16 }, { width: 14 }, { width: 17 }, { width: 16 }, { width: 20 }];
   titleBlock(com, "Community / Settlement Allocation Register", subtitle, head.length);
   headerRow(com, 4, head);
   let cr = 5;
   result.communities.forEach((c, i) => {
     com.getRow(cr).values = [
       i + 1, c.state, c.lga, c.ward, c.flhf, c.community, c.settlement,
-      c.targetPop, c.sharePct, c.allocation, c.buffer, c.dispatch,
-      c.targetPop > 0 ? c.allocation / c.targetPop : 0, c.source, "", "",
+      c.targetPop, c.allocation, c.buffer, c.dispatch, "", "",
     ];
     cr++;
   });
   styleBody(com, 5, cr - 1, head.length);
   for (let i = 5; i < cr; i++) {
     const row = com.getRow(i);
-    [8, 10, 11, 12].forEach((c) => { row.getCell(c).numFmt = money; row.getCell(c).alignment = { horizontal: "right" }; });
-    row.getCell(9).numFmt = pct;
-    row.getCell(13).numFmt = "0.00";
+    [8, 9, 10, 11].forEach((c) => { row.getCell(c).numFmt = money; row.getCell(c).alignment = { horizontal: "right" }; });
     row.getCell(1).alignment = { horizontal: "center" };
-    [15, 16].forEach((c) => { row.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: WARN } }; });
+    [12, 13].forEach((c) => { row.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: WARN } }; });
   }
   const totalRow = com.getRow(cr);
-  totalRow.values = ["", "TOTAL", "", "", "", "", "", result.totals.targetPop, "", result.totals.allocation, result.totals.buffer, result.totals.dispatch, "", "", "", ""];
+  totalRow.values = ["", "TOTAL", "", "", "", "", "", result.totals.targetPop, result.totals.allocation, result.totals.buffer, result.totals.dispatch, "", ""];
   for (let c = 1; c <= head.length; c++) {
     const cell = totalRow.getCell(c);
     cell.font = { name: "Arial", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ACCENT } };
-    if ([8, 10, 11, 12].includes(c)) { cell.numFmt = money; cell.alignment = { horizontal: "right" }; }
+    if ([8, 9, 10, 11].includes(c)) { cell.numFmt = money; cell.alignment = { horizontal: "right" }; }
   }
+
 
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
