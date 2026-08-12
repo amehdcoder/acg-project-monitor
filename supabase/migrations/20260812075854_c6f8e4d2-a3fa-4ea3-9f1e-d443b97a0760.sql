@@ -1,0 +1,1 @@
+DELETE FROM public.microplan_entries WHERE id = 'c205b350-3edd-449a-a19b-c3ec18ab2618';
