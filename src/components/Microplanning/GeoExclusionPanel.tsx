@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Archive, ArchiveRestore, ChevronDown, ChevronRight, EyeOff, Filter, Layers, RotateCcw, Search, Undo2,
+  Archive, ArchiveRestore, ChevronDown, ChevronRight, EyeOff, Filter, Layers, Redo2, RotateCcw, Search, Undo2,
 } from "lucide-react";
 import { exKeyLga, exKeyWard, type ExcludedRef } from "@/lib/microplanning/geoExclusions";
 
@@ -28,6 +28,14 @@ interface Props {
   exclude: (refs: ExcludedRef[]) => void;
   restore: (keys: string[]) => void;
   restoreAll: () => void;
+  /** step one exclusion change back */
+  undo?: () => void;
+  /** step one exclusion change forward */
+  redo?: () => void;
+  /** clear all exclusions and history — recompute against the full scope */
+  reset?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
   title?: string;
   subtitle?: string;
   accent?: "sky" | "violet";
