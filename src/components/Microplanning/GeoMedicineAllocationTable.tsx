@@ -380,6 +380,50 @@ export default function GeoMedicineAllocationTable({
         </div>
       </div>
 
+      {/* Live reconciliation preview — recalculates on every keystroke */}
+      <div className="px-4 py-3 border-b border-border/50 bg-gradient-to-r from-slate-50 via-sky-50 to-emerald-50 dark:from-slate-950/40 dark:via-sky-950/25 dark:to-emerald-950/20">
+        <div className="flex items-center gap-2 mb-2">
+          <Gauge className="h-4 w-4 text-sky-600" />
+          <p className="text-[11px] font-bold text-sky-900 dark:text-sky-200">Live reconciliation preview</p>
+          <Badge variant="outline" className="text-[9px]">updates as you type</Badge>
+          {preview.residualTotal === 0
+            ? <Badge className="text-[9px] bg-emerald-600 hover:bg-emerald-600">Balanced</Badge>
+            : <Badge className="text-[9px] bg-amber-600 hover:bg-amber-600">Residual {preview.residualTotal > 0 ? "+" : ""}{n0(preview.residualTotal)}</Badge>}
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+          {[
+            { l: "LGA totals entered", v: n0(preview.entered), c: "text-sky-700 dark:text-sky-300" },
+            { l: "Ward totals entered", v: n0(preview.wardEntered), c: "text-violet-700 dark:text-violet-300" },
+            { l: `Distributed (${unit.toLowerCase()})`, v: n0(preview.distributed), c: "text-emerald-700 dark:text-emerald-300" },
+            { l: "Rounding residual", v: `${preview.residualTotal > 0 ? "+" : ""}${n0(preview.residualTotal)}`, c: preview.residualTotal === 0 ? "text-muted-foreground" : "text-rose-600 dark:text-rose-400" },
+            { l: "LGAs / wards touched", v: `${n0(preview.touchedLgas)} / ${n0(preview.touchedWards)}`, c: "text-foreground" },
+            { l: `${unit} per person`, v: preview.perPerson > 0 ? preview.perPerson.toFixed(2) : "—", c: "text-foreground" },
+          ].map((k) => (
+            <div key={k.l} className="rounded-lg bg-background/80 border border-border/50 px-2.5 py-1.5">
+              <p className="text-[9px] uppercase tracking-wide text-muted-foreground">{k.l}</p>
+              <p className={`text-sm font-bold tabular-nums ${k.c}`}>{k.v}</p>
+            </div>
+          ))}
+        </div>
+        {result.residuals.length > 0 && (
+          <div className="mt-2 rounded-lg border border-amber-300 dark:border-amber-900 bg-amber-50/80 dark:bg-amber-950/25 px-2.5 py-2">
+            <p className="text-[10.5px] font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+              <Info className="h-3.5 w-3.5" /> Error summary — {result.residuals.length} geograph{result.residuals.length === 1 ? "y differs" : "ies differ"} from the entered total
+            </p>
+            <ul className="mt-1 space-y-0.5 max-h-24 overflow-y-auto">
+              {result.residuals.slice(0, 8).map((r, i) => (
+                <li key={i} className="text-[10px] leading-snug text-amber-800 dark:text-amber-300">• {explainResidual(r, unit)}</li>
+              ))}
+              {result.residuals.length > 8 && <li className="text-[10px] text-muted-foreground">…and {result.residuals.length - 8} more (all listed in the Validation Report sheet)</li>}
+            </ul>
+          </div>
+        )}
+        <p className="mt-1.5 text-[10px] text-muted-foreground">
+          Every figure above and in the exported workbook excludes the {excl.archived.length} archived geograph{excl.archived.length === 1 ? "y" : "ies"}.
+        </p>
+      </div>
+
+
       {/* Validation banner */}
       {result.totals.allocation > 0 && (
         <div className={`px-4 py-2.5 border-b ${errors.length ? "bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900" : warns.length ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900" : "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900"}`}>
