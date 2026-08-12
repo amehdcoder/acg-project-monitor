@@ -2770,6 +2770,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               exclude={dashExcl.exclude}
               restore={dashExcl.restore}
               restoreAll={dashExcl.restoreAll}
+              undo={dashExcl.undo}
+              redo={dashExcl.redo}
+              reset={dashExcl.reset}
+              canUndo={dashExcl.canUndo}
+              canRedo={dashExcl.canRedo}
               disabled={lensReadOnly}
               title="Dashboard coverage — drop LGAs or wards"
               subtitle="Archive geographies to remove them from every KPI, chart, table and export on this page. Nothing is deleted — restore them any time to bring the figures back."
