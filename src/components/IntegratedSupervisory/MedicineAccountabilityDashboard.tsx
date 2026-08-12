@@ -504,14 +504,13 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
           value={integrity.equity.rows.length ? integrity.equity.weightedCv.toFixed(2) : "—"}
           tone={integrity.equity.weightedCv <= 0.25 ? "success" : integrity.equity.weightedCv <= 0.5 ? "warn" : "danger"}
           sub={`${integrity.equity.facilities} facilities across ${integrity.equity.lgas} LGAs compared`}
+          hint="Coefficient of variation of medicine quantities issued to facilities within the same LGA. Low values mean an even spread; high values expose over-served and under-served catchment areas." />
         <Kpi icon={Undo2} label="Reverse logistics (Level 4)" docId="reverse-logistics" flags={dq.byKpi["reverse-logistics"]}
           value={fmt(summary.reverse.returned)}
           tone={summary.reverse.lossRate > 0.25 ? "danger" : summary.reverse.transactions === 0 ? "warn" : "success"}
           sub={`${summary.reverse.transactions} returns · ${pctf(summary.reverse.recoveryRate)} usable · loss ${pctf(summary.reverse.lossRate)}`}
           hint="Units flowing back up the cascade (CDD → facility → LGA → State → Federal store) after the MDA round: total returned, the share still usable and the share written off as damaged or expired." />
-        <Kpi icon={Scale} label="Facility equity index (CV)" docId="equity-cv-hidden" flags={undefined}
-          value={integrity.equity.rows.length ? integrity.equity.weightedCv.toFixed(2) : "—"}
-          hint="Coefficient of variation of medicine quantities issued to facilities within the same LGA. Low values mean an even spread; high values expose over-served and under-served catchment areas." />
+
       </div>
 
       {/* Threshold-driven alerts */}
