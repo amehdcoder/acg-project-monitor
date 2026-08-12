@@ -754,6 +754,7 @@ export function computeAccountability(
   const targetWindowDays = opts.targetWindowDays ?? 7;
   const lowThreshold = opts.lowStockThreshold ?? 0.15;
   const { receipts, issues, cddIssues } = ds;
+  const rets = ds.returns ?? [];
 
   const allocFor = (pred: (a: Allocation) => boolean) =>
     allocations.filter(pred).reduce((a, x) => a + (Number(x.quantity) || 0), 0);
@@ -763,6 +764,7 @@ export function computeAccountability(
     ...receipts.map((r) => r.medicine),
     ...issues.map((r) => r.medicine),
     ...cddIssues.map((r) => r.medicine),
+    ...rets.map((r) => r.medicine),
     ...allocations.map((a) => a.medicine),
   ])).filter(Boolean);
 
@@ -772,6 +774,7 @@ export function computeAccountability(
     issues.filter((r) => r.medicine === m),
     cddIssues.filter((r) => r.medicine === m),
     allocFor((a) => a.medicine === m),
+    rets.filter((r) => r.medicine === m),
   )).sort((a, b) => b.received - a.received);
 
   /* by LGA / State */
@@ -779,6 +782,7 @@ export function computeAccountability(
     ...receipts.map((r) => `${r.state}||${r.lga}`),
     ...issues.map((r) => `${r.state}||${r.lga}`),
     ...cddIssues.map((r) => `${r.state}||${r.lga}`),
+    ...rets.map((r) => `${r.state}||${r.lga}`),
   ])).filter((k) => k !== "||");
 
   const byLga = lgaKeys.map((k) => {
@@ -789,6 +793,7 @@ export function computeAccountability(
       issues.filter((x) => x.state === state && x.lga === lga),
       cddIssues.filter((x) => x.state === state && x.lga === lga),
       allocFor((a) => a.state === state && a.lga === lga),
+      rets.filter((x) => x.state === state && x.lga === lga),
     );
     return { ...r, state, lga };
   }).sort((a, b) => b.received - a.received);
@@ -801,6 +806,7 @@ export function computeAccountability(
       issues.filter((x) => x.state === state),
       cddIssues.filter((x) => x.state === state),
       allocFor((a) => a.state === state),
+      rets.filter((x) => x.state === state),
     );
     return { ...r, state };
   }).sort((a, b) => b.received - a.received);
@@ -921,16 +927,17 @@ export function computeAccountability(
   const podN = l1Forms.length + issues.length + cddIssues.length;
 
   /* timeline */
-  const tl = new Map<string, { date: string; received: number; toFlhf: number; toCdd: number }>();
-  const bump = (date: string, field: "received" | "toFlhf" | "toCdd", qty: number) => {
+  const tl = new Map<string, { date: string; received: number; toFlhf: number; toCdd: number; returned: number }>();
+  const bump = (date: string, field: "received" | "toFlhf" | "toCdd" | "returned", qty: number) => {
     if (!date) return;
-    const row = tl.get(date) ?? { date, received: 0, toFlhf: 0, toCdd: 0 };
+    const row = tl.get(date) ?? { date, received: 0, toFlhf: 0, toCdd: 0, returned: 0 };
     row[field] += qty;
     tl.set(date, row);
   };
   receipts.forEach((r) => bump(r.date, "received", r.qtyReceived));
   issues.forEach((i) => bump(i.date, "toFlhf", i.qtyIssued));
   cddIssues.forEach((c) => bump(c.date, "toCdd", c.qtyIssued));
+  rets.forEach((r) => bump(r.date, "returned", r.qtyReturned));
   const timeline = Array.from(tl.values()).sort((a, b) => a.date.localeCompare(b.date));
 
   const totals = {
@@ -942,9 +949,14 @@ export function computeAccountability(
     issuedToCdd: byMedicine.reduce((a, m) => a + m.issuedToCdd, 0),
     lgaBalance: 0,
     flhfBalance: 0,
+    returned: rets.reduce((a, r) => a + r.qtyReturned, 0),
+    returnedUsable: rets.reduce((a, r) => a + r.qtyUsable, 0),
+    returnedUnusable: rets.reduce((a, r) => a + r.qtyDamaged + r.qtyExpired, 0),
   };
   totals.lgaBalance = totals.netUsable - totals.issuedToFlhf;
   totals.flhfBalance = totals.issuedToFlhf - totals.issuedToCdd;
+
+  const reverse = computeReverseLogistics(rets, issues, cddIssues);
 
   const atRisk = facilities.filter((f) => f.status !== "healthy").length;
   const stockout = facilities.filter((f) => f.status === "stockout").length;
@@ -975,6 +987,122 @@ export function computeAccountability(
     facilities,
     leadTimes,
     timeline,
+    reverse,
+  };
+}
+
+/* ── Level 4 reverse logistics ───────────────────────────────────────────── */
+
+function computeReverseLogistics(
+  rets: ReturnTx[], issues: IssueTx[], cddIssues: CddTx[],
+): ReverseLogistics {
+  const sum = (xs: ReturnTx[], f: (r: ReturnTx) => number) => xs.reduce((a, r) => a + f(r), 0);
+  const returned = sum(rets, (r) => r.qtyReturned);
+  const usable = sum(rets, (r) => r.qtyUsable);
+  const damaged = sum(rets, (r) => r.qtyDamaged);
+  const expired = sum(rets, (r) => r.qtyExpired);
+  const issuedToCdd = cddIssues.reduce((a, c) => a + c.qtyIssued, 0);
+  const issuedToFlhf = issues.reduce((a, i) => a + i.qtyIssued, 0);
+  const documentedOf = (xs: ReturnTx[]) =>
+    xs.filter((r) => r.hasSignature || r.hasWaybill || r.hasPhoto).length;
+
+  // Denominator per leg: the downstream volume that could physically come back.
+  const legDenominator = (leg: string) =>
+    /cdd/i.test(leg) ? issuedToCdd : /flhf|facility|health/i.test(leg) ? issuedToFlhf : issuedToCdd || issuedToFlhf;
+
+  const legMap = new Map<string, ReturnTx[]>();
+  for (const r of rets) {
+    const k = r.leg || "unspecified";
+    legMap.set(k, [...(legMap.get(k) ?? []), r]);
+  }
+  const legs: ReverseLegRow[] = Array.from(legMap.entries()).map(([leg, xs]) => {
+    const t = sum(xs, (r) => r.qtyReturned);
+    const doc = documentedOf(xs);
+    return {
+      leg,
+      label: returnLegLabel(leg),
+      transactions: xs.length,
+      returned: t,
+      usable: sum(xs, (r) => r.qtyUsable),
+      damaged: sum(xs, (r) => r.qtyDamaged),
+      expired: sum(xs, (r) => r.qtyExpired),
+      returnRate: pct(t, legDenominator(leg)),
+      documented: doc,
+      documentationRate: pct(doc, xs.length),
+    };
+  }).sort((a, b) => b.returned - a.returned);
+
+  const medMap = new Map<string, ReturnTx[]>();
+  for (const r of rets) medMap.set(r.medicine, [...(medMap.get(r.medicine) ?? []), r]);
+  const byMedicine = Array.from(medMap.entries()).map(([medicine, xs]) => ({
+    medicine,
+    returned: sum(xs, (r) => r.qtyReturned),
+    usable: sum(xs, (r) => r.qtyUsable),
+    damaged: sum(xs, (r) => r.qtyDamaged),
+    expired: sum(xs, (r) => r.qtyExpired),
+  })).sort((a, b) => b.returned - a.returned);
+
+  const lgaMap = new Map<string, ReturnTx[]>();
+  for (const r of rets) {
+    const k = `${r.state}||${r.lga}`;
+    lgaMap.set(k, [...(lgaMap.get(k) ?? []), r]);
+  }
+  const byLga = Array.from(lgaMap.entries()).map(([k, xs]) => {
+    const [state, lga] = k.split("||");
+    const t = sum(xs, (r) => r.qtyReturned);
+    const out = cddIssues.filter((c) => c.state === state && c.lga === lga).reduce((a, c) => a + c.qtyIssued, 0);
+    return {
+      state, lga,
+      returned: t,
+      usable: sum(xs, (r) => r.qtyUsable),
+      unusable: sum(xs, (r) => r.qtyDamaged + r.qtyExpired),
+      returnRate: pct(t, out),
+    };
+  }).sort((a, b) => b.returned - a.returned);
+
+  const reasonMap = new Map<string, { count: number; units: number }>();
+  for (const r of rets) {
+    const key = (r.reason || "Not stated").trim();
+    const cur = reasonMap.get(key) ?? { count: 0, units: 0 };
+    cur.count += 1;
+    cur.units += r.qtyReturned;
+    reasonMap.set(key, cur);
+  }
+  const topReasons = Array.from(reasonMap.entries())
+    .map(([reason, v]) => ({ reason, ...v }))
+    .sort((a, b) => b.units - a.units);
+
+  const returnedFacilities = new Set(rets.map((r) => `${r.state}||${r.lga}||${r.facility}`));
+  const facMap = new Map<string, { state: string; lga: string; facility: string; issued: number; toCdd: number }>();
+  for (const i of issues) {
+    const k = `${i.state}||${i.lga}||${i.facility}`;
+    const row = facMap.get(k) ?? { state: i.state, lga: i.lga, facility: i.facility, issued: 0, toCdd: 0 };
+    row.issued += i.qtyIssued;
+    facMap.set(k, row);
+  }
+  for (const c of cddIssues) {
+    const k = `${c.state}||${c.lga}||${c.facility}`;
+    const row = facMap.get(k) ?? { state: c.state, lga: c.lga, facility: c.facility, issued: 0, toCdd: 0 };
+    row.toCdd += c.qtyIssued;
+    facMap.set(k, row);
+  }
+  const missingReturns = Array.from(facMap.entries())
+    .filter(([k, r]) => r.issued > 0 && !returnedFacilities.has(k))
+    .map(([, r]) => r)
+    .sort((a, b) => b.issued - a.issued);
+
+  return {
+    transactions: rets.length,
+    returned, usable, damaged, expired,
+    returnRate: pct(returned, issuedToCdd || issuedToFlhf),
+    recoveryRate: pct(usable, returned),
+    lossRate: pct(damaged + expired, returned),
+    documentationRate: pct(documentedOf(rets), rets.length),
+    legs,
+    byMedicine,
+    byLga,
+    topReasons,
+    missingReturns,
   };
 }
 
