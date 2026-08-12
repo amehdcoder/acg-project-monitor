@@ -47,13 +47,30 @@ export const rowExcluded = (keys: Set<string>, row: { state?: unknown; lga?: unk
 
 export function useGeoExclusions(scopeId: string) {
   const [archived, setArchived] = useState<ExcludedRef[]>(() => readExclusions(scopeId));
+  /** undo/redo stacks of full snapshots */
+  const past = useRef<ExcludedRef[][]>([]);
+  const future = useRef<ExcludedRef[][]>([]);
+  const [stamp, setStamp] = useState(0);
 
-  useEffect(() => { setArchived(readExclusions(scopeId)); }, [scopeId]);
+  useEffect(() => {
+    past.current = [];
+    future.current = [];
+    setStamp((s) => s + 1);
+    setArchived(readExclusions(scopeId));
+  }, [scopeId]);
 
-  const persist = useCallback((next: ExcludedRef[]) => {
+  const write = useCallback((next: ExcludedRef[]) => {
     setArchived(next);
     writeExclusions(scopeId, next);
+    setStamp((s) => s + 1);
   }, [scopeId]);
+
+  /** commit a new state, pushing the current one onto the undo stack */
+  const persist = useCallback((next: ExcludedRef[]) => {
+    past.current = [...past.current, readExclusions(scopeId)].slice(-50);
+    future.current = [];
+    write(next);
+  }, [write, scopeId]);
 
   const exclude = useCallback((refs: ExcludedRef[]) => {
     persist([...readExclusions(scopeId).filter((a) => !refs.some((r) => r.key === a.key)), ...refs]);
@@ -66,7 +83,39 @@ export function useGeoExclusions(scopeId: string) {
 
   const restoreAll = useCallback(() => persist([]), [persist]);
 
+  /** step one change back */
+  const undo = useCallback(() => {
+    const prev = past.current[past.current.length - 1];
+    if (!prev) return;
+    past.current = past.current.slice(0, -1);
+    future.current = [readExclusions(scopeId), ...future.current].slice(0, 50);
+    write(prev);
+  }, [write, scopeId]);
+
+  /** step one change forward */
+  const redo = useCallback(() => {
+    const next = future.current[0];
+    if (!next) return;
+    future.current = future.current.slice(1);
+    past.current = [...past.current, readExclusions(scopeId)].slice(-50);
+    write(next);
+  }, [write, scopeId]);
+
+  /** clear every exclusion AND the history — back to the full scope */
+  const reset = useCallback(() => {
+    past.current = [];
+    future.current = [];
+    write([]);
+  }, [write]);
+
   const keys = new Set(archived.map((a) => a.key));
 
-  return { archived, keys, exclude, restore, restoreAll };
+  return {
+    archived, keys, exclude, restore, restoreAll,
+    undo, redo, reset,
+    canUndo: past.current.length > 0,
+    canRedo: future.current.length > 0,
+    historyStamp: stamp,
+  };
 }
+
