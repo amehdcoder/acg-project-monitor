@@ -64,9 +64,12 @@ export interface AllocationExportMeta {
   scope: string;
   project?: string;
   medicine: string;
+  program?: string;
+  unit?: string;
   bufferPct: number;
   targetPopBasis: string;
 }
+
 
 export async function exportCommunityAllocationWorkbook(result: AllocationResult, meta: AllocationExportMeta) {
   const wb = new ExcelJS.Workbook();
