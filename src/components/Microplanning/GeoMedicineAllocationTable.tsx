@@ -84,10 +84,12 @@ export default function GeoMedicineAllocationTable({
   const issues = useMemo<Issue[]>(() => {
     const out: Issue[] = [];
     for (const L of tree) {
-      const explicit = L.wards.filter((w) => Number(wardTotals[w.key]) > 0);
+      if (excl.keys.has(L.key)) continue;
+      const active = L.wards.filter((w) => !excl.keys.has(w.key));
+      const explicit = active.filter((w) => Number(wardTotals[w.key]) > 0);
       const explicitSum = explicit.reduce((s, w) => s + Number(wardTotals[w.key] || 0), 0);
       const lgaTotal = Math.max(0, Math.round(Number(lgaTotals[L.key]) || 0));
-      const rest = L.wards.filter((w) => !(Number(wardTotals[w.key]) > 0));
+      const rest = active.filter((w) => !(Number(wardTotals[w.key]) > 0));
 
       if (lgaTotal > 0 && explicitSum > lgaTotal) {
         out.push({
@@ -112,34 +114,66 @@ export default function GeoMedicineAllocationTable({
         const per = w.targetPop > 0 ? Number(wardTotals[w.key]) / w.targetPop : 0;
         if (per > 5) out.push({ level: "warn", text: `${L.lga} → ${w.ward}: ${per.toFixed(1)} ${unit.toLowerCase()} per person is unusually high — verify the entry.` });
       }
+      if (lgaTotal > 0 && excl.keys.size > 0) {
+        const droppedWards = L.wards.filter((w) => excl.keys.has(w.key));
+        if (droppedWards.length) {
+          out.push({ level: "info", text: `${L.lga}: ${droppedWards.length} archived ward(s) excluded — the LGA total is shared across the remaining ${active.length} ward(s) only.` });
+        }
+      }
       // reconciliation check: ward sum must equal the resolved LGA allocation
       const resolved = L.wards.reduce((s, w) => s + (result.wardAllocation[w.key] || 0), 0);
       if (resolved !== L.allocation) {
         out.push({ level: "error", text: `${L.lga}: ward allocations (${n0(resolved)}) do not reconcile with the LGA total (${n0(L.allocation)}).` });
       }
     }
-    // community ↔ ward reconciliation
-    if (result.totals.allocation !== tree.reduce((s, L) => s + L.allocation, 0)) {
+    // rounding residuals — explained, never blocking
+    for (const r of result.residuals) out.push({ level: "warn", text: explainResidual(r, unit) });
+
+    // community ↔ ward reconciliation (exact mode only — pack rounding is expected to differ)
+    const entered = tree.reduce((s, L) => s + L.allocation, 0);
+    if (rounding.mode === "exact" && result.totals.allocation !== entered) {
       out.push({ level: "error", text: "Community allocations do not reconcile with ward/LGA totals. Clear entries and re-enter." });
     }
     return out;
-  }, [tree, lgaTotals, wardTotals, result, unit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tree, lgaTotals, wardTotals, result, unit, rounding, excl.archived]);
 
   const errors = issues.filter((i) => i.level === "error");
   const warns = issues.filter((i) => i.level !== "error");
 
+  /* ── Live preview totals (recomputed on every keystroke) ───────────── */
+  const preview = useMemo(() => {
+    const entered =
+      Object.entries(lgaTotals).reduce((s, [k, v]) => s + (excl.keys.has(k) ? 0 : Math.max(0, Math.round(Number(v) || 0))), 0);
+    const distributed = result.totals.allocation;
+    const wardEntered = Object.entries(wardTotals)
+      .reduce((s, [k, v]) => s + (excl.keys.has(k) ? 0 : Math.max(0, Math.round(Number(v) || 0))), 0);
+    const touchedLgas = result.tree.filter((L) => L.allocation > 0).length;
+    const touchedWards = Object.values(result.wardAllocation).filter((v) => v > 0).length;
+    const touchedCommunities = result.communities.filter((c) => c.allocation > 0).length;
+    return {
+      entered, wardEntered, distributed,
+      variance: distributed - Math.max(entered, wardEntered, entered + 0),
+      residualTotal: result.residuals.reduce((s, r) => s + r.diff, 0),
+      touchedLgas, touchedWards, touchedCommunities,
+      perPerson: result.totals.targetPop > 0 ? distributed / result.totals.targetPop : 0,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lgaTotals, wardTotals, result, excl.archived]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return tree;
-    return tree
+    const base = tree.filter((L) => !excl.keys.has(L.key));
+    if (!q) return base;
+    return base
       .map((L) => {
         const hitLga = `${L.state} ${L.lga}`.toLowerCase().includes(q);
         const wards = hitLga ? L.wards : L.wards.filter((w) => w.ward.toLowerCase().includes(q));
         return wards.length ? { ...L, wards } : null;
       })
       .filter(Boolean) as typeof tree;
-  }, [tree, search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tree, search, excl.archived]);
 
   const download = async () => {
     if (result.totals.allocation <= 0) {
@@ -155,6 +189,9 @@ export default function GeoMedicineAllocationTable({
       await exportCommunityAllocationWorkbook(result, {
         scope: scopeLabel, project: projectName, medicine, program, unit,
         bufferPct: bufferPct / 100, targetPopBasis,
+        roundingRule: describeRounding(rounding),
+        validation: issues,
+        exclusions: excl.archived.map((a) => ({ level: a.level, state: a.state, lga: a.lga, ward: a.ward })),
       });
       toast({ title: "✅ Community allocation exported", description: `${n0(result.totals.communities)} communities · ${n0(result.totals.dispatch)} ${unit.toLowerCase()} to dispatch.` });
     } catch (e) {
@@ -164,6 +201,24 @@ export default function GeoMedicineAllocationTable({
     }
   };
 
+  const importCsv = async (file: File) => {
+    try {
+      const parsed = parseAllocationCsv(await file.text(), tree);
+      if (parsed.medicine && findNtdMedicine(parsed.medicine)) pickMedicine(parsed.medicine);
+      if (parsed.unit) setUnit(parsed.unit);
+      if (Object.keys(parsed.lgaTotals).length) setLgaTotals((p) => ({ ...p, ...parsed.lgaTotals }));
+      if (Object.keys(parsed.wardTotals).length) setWardTotals((p) => ({ ...p, ...parsed.wardTotals }));
+      toast({
+        title: parsed.matched ? `✅ ${parsed.matched} allocation row(s) loaded` : "No rows matched",
+        description: parsed.errors.length ? `${parsed.errors.length} row(s) skipped — ${parsed.errors[0]}` : "Totals recalculated in the live preview.",
+        variant: parsed.matched ? "default" : "destructive",
+      });
+    } catch (e) {
+      toast({ title: "Import failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
+    } finally {
+      if (csvRef.current) csvRef.current.value = "";
+    }
+  };
 
   const clearAll = () => { setLgaTotals({}); setWardTotals({}); };
 
@@ -171,6 +226,7 @@ export default function GeoMedicineAllocationTable({
     setLgaTotals((p) => ({ ...p, [k]: Math.max(0, Number(v) || 0) }));
   const setWard = (k: string, v: string) =>
     setWardTotals((p) => ({ ...p, [k]: Math.max(0, Number(v) || 0) }));
+
 
   return (
     <Card className="border-border/60 overflow-hidden">
