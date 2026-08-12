@@ -645,6 +645,7 @@ export interface AccountabilitySummary {
   totals: {
     allocated: number; received: number; damaged: number; netUsable: number;
     issuedToFlhf: number; issuedToCdd: number; lgaBalance: number; flhfBalance: number;
+    returned: number; returnedUsable: number; returnedUnusable: number;
   };
   wastageRate: number;
   pushRate: number;
@@ -659,7 +660,45 @@ export interface AccountabilitySummary {
   batches: BatchRow[];
   facilities: FacilityRow[];
   leadTimes: LeadTimeRow[];
-  timeline: { date: string; received: number; toFlhf: number; toCdd: number }[];
+  timeline: { date: string; received: number; toFlhf: number; toCdd: number; returned: number }[];
+  /** Level 4 — reverse logistics of NTD medicines across all cascade legs. */
+  reverse: ReverseLogistics;
+}
+
+export interface ReverseLegRow {
+  leg: string;
+  label: string;
+  transactions: number;
+  returned: number;
+  usable: number;
+  damaged: number;
+  expired: number;
+  /** Share of the downstream issue volume for that leg that came back. */
+  returnRate: number;
+  /** Reverse consignments with a signed acknowledgement / waybill / photo. */
+  documented: number;
+  documentationRate: number;
+}
+
+export interface ReverseLogistics {
+  transactions: number;
+  returned: number;
+  usable: number;
+  damaged: number;
+  expired: number;
+  /** returned / issued downstream (CDD level) — the headline reverse-flow KPI. */
+  returnRate: number;
+  /** usable / returned — stock that can be redeployed instead of destroyed. */
+  recoveryRate: number;
+  /** (damaged + expired) / returned — reverse-logistics loss. */
+  lossRate: number;
+  documentationRate: number;
+  legs: ReverseLegRow[];
+  byMedicine: { medicine: string; returned: number; usable: number; damaged: number; expired: number }[];
+  byLga: { state: string; lga: string; returned: number; usable: number; unusable: number; returnRate: number }[];
+  topReasons: { reason: string; count: number; units: number }[];
+  /** Facilities / LGAs that issued stock but recorded no return at all. */
+  missingReturns: { state: string; lga: string; facility: string; issued: number; toCdd: number }[];
 }
 
 const pct = (n: number, d: number) => (d > 0 ? n / d : 0);
@@ -675,6 +714,7 @@ function median(xs: number[]) {
 function rollup(
   key: string,
   receipts: ReceiptTx[], issues: IssueTx[], cdd: CddTx[], allocated: number,
+  rets: ReturnTx[] = [],
 ): MedicineRollup {
   const received = receipts.reduce((a, r) => a + r.qtyReceived, 0);
   const damaged = receipts.reduce((a, r) => a + r.qtyDamaged, 0);
@@ -692,6 +732,9 @@ function rollup(
     lgaBalance: netUsable - issuedToFlhf,
     flhfBalance: issuedToFlhf - issuedToCdd,
     wastageRate: pct(damaged, received),
+    returned: rets.reduce((a, r) => a + r.qtyReturned, 0),
+    returnedUsable: rets.reduce((a, r) => a + r.qtyUsable, 0),
+    returnRate: pct(rets.reduce((a, r) => a + r.qtyReturned, 0), issuedToCdd || issuedToFlhf),
     pushRate: pct(issuedToFlhf, netUsable),
     cddPushRate: pct(issuedToCdd, issuedToFlhf),
     allocationFulfilment: pct(received, allocated),
