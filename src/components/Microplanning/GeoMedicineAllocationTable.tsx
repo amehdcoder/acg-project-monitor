@@ -229,7 +229,22 @@ export default function GeoMedicineAllocationTable({
 
 
   return (
+    <div className="space-y-3">
+    <GeoExclusionPanel
+      rows={rows as any[]}
+      getPop={(r) => Number(getTargetPop(r as GeoRow)) || 0}
+      archived={excl.archived}
+      keys={excl.keys}
+      exclude={excl.exclude}
+      restore={excl.restore}
+      restoreAll={excl.restoreAll}
+      disabled={readOnly}
+      accent="violet"
+      title="Allocation coverage — exclude LGAs or wards"
+      subtitle="Archive geographies that should receive no medicine this round. Excluded areas are removed from every allocation, KPI and export until restored."
+    />
     <Card className="border-border/60 overflow-hidden">
+
       {/* Header */}
       <div className="bg-gradient-to-r from-sky-700 via-cyan-600 to-emerald-600 px-4 py-3 text-white">
         <div className="flex items-start justify-between gap-3 flex-wrap">
