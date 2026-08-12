@@ -35,7 +35,35 @@ export const LEVEL_LABELS: Record<string, string> = {
   level_1: "Level 1 — State → LGA receipt",
   level_2: "Level 2 — LGA → Health Facility",
   level_3: "Level 3 — Facility → CDD",
+  level_4: "Level 4 — Reverse logistics (return of medicines)",
 };
+
+/** Reverse-logistics legs captured by the Level 4 group of the XLSForm. */
+export const RETURN_LEG_LABELS: Record<string, string> = {
+  cdd_to_flhf: "CDD → Health Facility",
+  flhf_to_lga: "Health Facility → LGA store",
+  lga_to_state: "LGA → State medical store",
+  state_to_federal: "State → Federal Medical Store",
+};
+
+export const returnLegLabel = (code: string) =>
+  RETURN_LEG_LABELS[code] ??
+  (code ? code.replace(/_+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()) : "Unspecified leg");
+
+/** Condition of returned stock (usable stock re-enters the pipeline). */
+export const RETURN_CONDITION_LABELS: Record<string, string> = {
+  good: "Good / usable",
+  usable: "Good / usable",
+  damaged: "Damaged",
+  expired: "Expired",
+  short_dated: "Short-dated",
+  opened: "Opened / broken seal",
+};
+
+export const returnConditionLabel = (code: string) =>
+  RETURN_CONDITION_LABELS[String(code).toLowerCase()] ??
+  (code ? code.replace(/_+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()) : "Unspecified");
+
 
 /** The national supply origin for all Federal allocations. */
 export const FEDERAL_SOURCE = "Federal Medical Store, Oshodi";
