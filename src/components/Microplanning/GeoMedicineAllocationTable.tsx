@@ -238,6 +238,11 @@ export default function GeoMedicineAllocationTable({
       exclude={excl.exclude}
       restore={excl.restore}
       restoreAll={excl.restoreAll}
+      undo={excl.undo}
+      redo={excl.redo}
+      reset={excl.reset}
+      canUndo={excl.canUndo}
+      canRedo={excl.canRedo}
       disabled={readOnly}
       accent="violet"
       title="Allocation coverage — exclude LGAs or wards"
