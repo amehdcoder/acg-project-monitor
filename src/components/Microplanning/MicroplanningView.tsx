@@ -2972,6 +2972,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               projectName={projects.find((p) => p.id === selectedProjectId)?.name}
               targetPopBasis={uploadedMedEntries.length > 0 ? `Uploaded total population × ${medTargetPct}%` : "Microplan target population"}
               readOnly={lensReadOnly}
+              scopeId={selectedProjectId || "all"}
+
             />
             <Card className="border-border/50">
 
