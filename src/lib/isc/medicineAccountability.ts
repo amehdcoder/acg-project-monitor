@@ -579,6 +579,8 @@ export function applyFilters(ds: LogisticsDataset, f: Filters): LogisticsDataset
     receipts: ds.receipts.filter((t) => matches(t, f)),
     issues: ds.issues.filter((t) => matches(t, f)),
     cddIssues: ds.cddIssues.filter((t) => matches(t, f)),
+    returns: ds.returns.filter((t) => matches(t, f)),
+
     submissions: ds.submissions,
   };
 }
