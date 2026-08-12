@@ -171,7 +171,7 @@ export default function GeoMedicineAllocationTable({
           </div>
           <Button
             onClick={download}
-            disabled={busy}
+            disabled={busy || errors.length > 0}
             className="h-10 gap-2 bg-white text-sky-800 hover:bg-white/90 font-bold shadow-lg shrink-0"
           >
             <Download className="h-4 w-4" />
@@ -373,7 +373,7 @@ export default function GeoMedicineAllocationTable({
             <Sparkles className="h-3 w-3 text-emerald-600" />
             Ward entries take precedence; the remaining LGA total is shared across wards without an explicit figure. Largest-remainder rounding keeps community totals reconciled exactly.
           </p>
-          <Button onClick={download} disabled={busy} size="sm" className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white">
+          <Button onClick={download} disabled={busy || errors.length > 0} size="sm" className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white">
             <Download className="h-3.5 w-3.5" /> Download community allocation
           </Button>
         </div>
