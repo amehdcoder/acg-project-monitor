@@ -2760,6 +2760,23 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
           <LensScopeBanner lens={lens} />
 
+          {/* Dashboard-wide geography archive */}
+          {(isAdmin || lensEnabled) && (
+            <GeoExclusionPanel
+              rows={baseEntries as any[]}
+              getPop={(r: any) => Number(r?.estimated_total_population) || 0}
+              archived={dashExcl.archived}
+              keys={dashExcl.keys}
+              exclude={dashExcl.exclude}
+              restore={dashExcl.restore}
+              restoreAll={dashExcl.restoreAll}
+              disabled={lensReadOnly}
+              title="Dashboard coverage — drop LGAs or wards"
+              subtitle="Archive geographies to remove them from every KPI, chart, table and export on this page. Nothing is deleted — restore them any time to bring the figures back."
+            />
+          )}
+
+
           {/* Filters & View Toggle */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[180px]">
