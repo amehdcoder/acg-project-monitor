@@ -234,7 +234,7 @@ export default function GeoMedicineAllocationTable({
             { l: "Wards", v: n0(result.totals.wards) },
             { l: "Communities", v: n0(result.totals.communities) },
             { l: "Target population", v: n0(result.totals.targetPop) },
-            { l: "Units to dispatch", v: n0(result.totals.dispatch) },
+            { l: `${unit} to dispatch`, v: n0(result.totals.dispatch) },
           ].map((k) => (
             <div key={k.l} className="rounded-lg bg-white/15 px-2.5 py-1.5">
               <p className="text-[9px] uppercase tracking-wide text-white/80">{k.l}</p>
@@ -243,6 +243,35 @@ export default function GeoMedicineAllocationTable({
           ))}
         </div>
       </div>
+
+      {/* Validation banner */}
+      {result.totals.allocation > 0 && (
+        <div className={`px-4 py-2.5 border-b ${errors.length ? "bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900" : warns.length ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900" : "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900"}`}>
+          <div className="flex items-start gap-2">
+            {errors.length ? <AlertTriangle className="h-4 w-4 text-rose-600 mt-0.5 shrink-0" />
+              : warns.length ? <Info className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              : <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />}
+            <div className="min-w-0">
+              <p className={`text-[11px] font-bold ${errors.length ? "text-rose-800 dark:text-rose-300" : warns.length ? "text-amber-800 dark:text-amber-300" : "text-emerald-800 dark:text-emerald-300"}`}>
+                {errors.length
+                  ? `${errors.length} allocation error${errors.length > 1 ? "s" : ""} — export blocked until totals reconcile`
+                  : warns.length
+                    ? `${warns.length} allocation warning${warns.length > 1 ? "s" : ""} — review before dispatch`
+                    : `Reconciled — ${n0(result.totals.allocation)} ${unit.toLowerCase()} distributed exactly across ${n0(result.totals.communities)} communities`}
+              </p>
+              <ul className="mt-1 space-y-0.5 max-h-32 overflow-y-auto">
+                {issues.slice(0, 12).map((i, idx) => (
+                  <li key={idx} className={`text-[10.5px] leading-snug ${i.level === "error" ? "text-rose-700 dark:text-rose-300" : "text-amber-800 dark:text-amber-300"}`}>
+                    • {i.text}
+                  </li>
+                ))}
+                {issues.length > 12 && <li className="text-[10px] text-muted-foreground">…and {issues.length - 12} more</li>}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       <CardContent className="p-0">
         <div className="overflow-x-auto">
