@@ -61,6 +61,9 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import { exportMicroplanWorkbook } from "@/lib/microplanning/microplanTemplate";
 import GeoMedicineAllocationTable from "@/components/Microplanning/GeoMedicineAllocationTable";
+import GeoExclusionPanel from "@/components/Microplanning/GeoExclusionPanel";
+import { useGeoExclusions, rowExcluded } from "@/lib/microplanning/geoExclusions";
+
 import { parseMedicineUploadFile, exportMedicineUploadTemplate, parseAllocationPlanFile, exportAllocationPlanTemplate, type UploadedMedicineEntry } from "@/lib/microplanning/medicineUpload";
 
 // Exact template column headers matching the NTDs Microplan Template
@@ -1411,6 +1414,10 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   // Designation-scope filter: admins always see all; non-admins with no
   // designation assignment also see all (legacy). Users with assignments are
   // restricted to rows that match at least one of their assignments.
+  // Project-scoped geography archive: LGAs/wards the manager has dropped from
+  // every KPI, chart, table and export until they are restored.
+  const dashExcl = useGeoExclusions(`dashboard.${selectedProjectId || "all"}`);
+
   const displayEntries = useMemo(() => {
     // 1) Designation-scope filter (per-user field assignment).
     let result = baseEntries;
@@ -1425,8 +1432,12 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     if (lens) result = result.filter((e: any) =>
       rowInLensScope(lens, e.state, e.lga, e.ward) && campaignInLensScope(lens, e.campaign_type)
     );
+    // 4) Archived geographies — excluded from every downstream computation.
+    if (dashExcl.keys.size > 0) result = result.filter((e: any) => !rowExcluded(dashExcl.keys, e));
     return result;
-  }, [baseEntries, isAdmin, scope, projectScope, lens]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseEntries, isAdmin, scope, projectScope, lens, dashExcl.archived]);
+
 
   // Columns for the MDA Lens export (questions as columns, responses as rows).
   const lensExportColumns = useMemo(() => {
@@ -2749,6 +2760,23 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
           <LensScopeBanner lens={lens} />
 
+          {/* Dashboard-wide geography archive */}
+          {(isAdmin || lensEnabled) && (
+            <GeoExclusionPanel
+              rows={baseEntries as any[]}
+              getPop={(r: any) => Number(r?.estimated_total_population) || 0}
+              archived={dashExcl.archived}
+              keys={dashExcl.keys}
+              exclude={dashExcl.exclude}
+              restore={dashExcl.restore}
+              restoreAll={dashExcl.restoreAll}
+              disabled={lensReadOnly}
+              title="Dashboard coverage — drop LGAs or wards"
+              subtitle="Archive geographies to remove them from every KPI, chart, table and export on this page. Nothing is deleted — restore them any time to bring the figures back."
+            />
+          )}
+
+
           {/* Filters & View Toggle */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[180px]">
@@ -2944,6 +2972,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               projectName={projects.find((p) => p.id === selectedProjectId)?.name}
               targetPopBasis={uploadedMedEntries.length > 0 ? `Uploaded total population × ${medTargetPct}%` : "Microplan target population"}
               readOnly={lensReadOnly}
+              scopeId={selectedProjectId || "all"}
+
             />
             <Card className="border-border/50">
 

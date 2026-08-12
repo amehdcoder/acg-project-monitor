@@ -5,6 +5,8 @@
  */
 import ExcelJS from "exceljs";
 import type { AllocationResult } from "./geoAllocation";
+import { explainResidual } from "./allocationRounding";
+
 
 const WHO_BLUE = "FF0093D5";
 const WHO_DARK = "FF002E5D";
@@ -68,7 +70,14 @@ export interface AllocationExportMeta {
   unit?: string;
   bufferPct: number;
   targetPopBasis: string;
+  /** Human description of the rounding rule in force */
+  roundingRule?: string;
+  /** Reconciliation warnings/errors shown in the UI at export time */
+  validation?: { level: "error" | "warn" | "info"; text: string }[];
+  /** Geographies archived out of this allocation */
+  exclusions?: { level: "LGA" | "Ward"; state: string; lga: string; ward?: string }[];
 }
+
 
 
 export async function exportCommunityAllocationWorkbook(result: AllocationResult, meta: AllocationExportMeta) {
@@ -193,6 +202,116 @@ export async function exportCommunityAllocationWorkbook(result: AllocationResult
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ACCENT } };
     if ([8, 9, 10, 11].includes(c)) { cell.numFmt = money; cell.alignment = { horizontal: "right" }; }
   }
+
+  /* ── Validation report ─────────────────────────────────────────────── */
+  const vr = wb.addWorksheet("Validation Report", { properties: { tabColor: { argb: "FFB00020" } }, pageSetup: { orientation: "landscape", fitToPage: true } });
+  vr.columns = [{ width: 14 }, { width: 46 }, { width: 16 }, { width: 16 }, { width: 14 }, { width: 60 }];
+  titleBlock(vr, "Validation Report — Reconciliation & Approved Totals", subtitle, 6);
+
+  let vrow = 4;
+  const sectionHeader = (text: string) => {
+    vr.mergeCells(vrow, 1, vrow, 6);
+    const c = vr.getCell(vrow, 1);
+    c.value = text;
+    c.font = { name: "Arial", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: WHO_DARK } };
+    c.alignment = { vertical: "middle", indent: 1 };
+    vr.getRow(vrow).height = 20;
+    vrow++;
+  };
+
+  sectionHeader("1. Final approved totals used for this allocation");
+  const approved: [string, string | number][] = [
+    ["Medicine / commodity", meta.medicine],
+    ["Programme", meta.program || "—"],
+    ["Dispensing unit", unit],
+    ["Rounding rule", meta.roundingRule || "Exact largest-remainder apportionment"],
+    ["Wastage / contingency buffer", `${(meta.bufferPct * 100).toFixed(1)}%`],
+    ["LGAs included", result.totals.lgas],
+    ["Wards included", result.totals.wards],
+    ["Communities / settlements", result.totals.communities],
+    ["Total target population", result.totals.targetPop],
+    ["Total allocated units", result.totals.allocation],
+    ["Buffer units", result.totals.buffer],
+    ["Total units to dispatch", result.totals.dispatch],
+    ["Approved on", stampedOn],
+  ];
+  for (const [k, v] of approved) {
+    const a = vr.getCell(vrow, 1); vr.mergeCells(vrow, 2, vrow, 3);
+    const b = vr.getCell(vrow, 2);
+    a.value = k; a.font = { name: "Arial", size: 9, bold: true, color: { argb: WHO_DARK } };
+    a.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BAND } };
+    b.value = v as any; b.font = { name: "Arial", size: 9 };
+    if (typeof v === "number") { b.numFmt = money; b.alignment = { horizontal: "left" }; }
+    [a, b].forEach((c) => { c.border = { top: { style: "hair" }, bottom: { style: "hair" }, left: { style: "hair" }, right: { style: "hair" } }; c.alignment = { ...(c.alignment || {}), vertical: "middle", wrapText: true }; });
+    vrow++;
+  }
+  vrow++;
+
+  sectionHeader("2. Rounding residuals (difference between entered and distributed totals)");
+  headerRow(vr, vrow, ["Level", "Geography", `Entered (${unit})`, `Distributed (${unit})`, "Difference", "Explanation"]);
+  const resStart = vrow + 1;
+  vrow++;
+  if (result.residuals.length === 0) {
+    vr.getRow(vrow).values = ["—", "All geographies", result.totals.allocation, result.totals.allocation, 0, "Every ward and LGA reconciles exactly — no residual."];
+    vrow++;
+  } else {
+    for (const r of result.residuals) {
+      vr.getRow(vrow).values = [r.level, r.scope, r.input, r.distributed, r.diff, explainResidual(r, unit)];
+      vrow++;
+    }
+  }
+  styleBody(vr, resStart, vrow - 1, 6);
+  for (let i = resStart; i < vrow; i++) {
+    const row = vr.getRow(i);
+    [3, 4, 5].forEach((c) => { row.getCell(c).numFmt = money; row.getCell(c).alignment = { horizontal: "right" }; });
+    const d = Number(row.getCell(5).value) || 0;
+    if (d !== 0) row.getCell(5).font = { name: "Arial", size: 9, bold: true, color: { argb: "FFC00000" } };
+  }
+  vrow++;
+
+  sectionHeader("3. Reconciliation warnings raised before approval");
+  headerRow(vr, vrow, ["Severity", "Message", "", "", "", ""]);
+  const wStart = vrow + 1;
+  vrow++;
+  const notes = meta.validation ?? [];
+  if (notes.length === 0) {
+    vr.getRow(vrow).values = ["OK", "No reconciliation warnings — the allocation was approved clean."];
+    vr.mergeCells(vrow, 2, vrow, 6);
+    vrow++;
+  } else {
+    for (const nte of notes) {
+      vr.getRow(vrow).values = [nte.level === "error" ? "ERROR" : nte.level === "warn" ? "WARNING" : "INFO", nte.text];
+      vr.mergeCells(vrow, 2, vrow, 6);
+      vrow++;
+    }
+  }
+  styleBody(vr, wStart, vrow - 1, 6);
+  for (let i = wStart; i < vrow; i++) {
+    const sev = String(vr.getCell(i, 1).value || "");
+    vr.getCell(i, 1).font = {
+      name: "Arial", size: 9, bold: true,
+      color: { argb: sev === "ERROR" ? "FFC00000" : sev === "WARNING" ? "FFB45309" : "FF008000" },
+    };
+    vr.getCell(i, 2).alignment = { wrapText: true, vertical: "top" };
+  }
+  vrow++;
+
+  sectionHeader("4. Geographies excluded / archived from this allocation");
+  headerRow(vr, vrow, ["Level", "State", "LGA", "Ward", "", ""]);
+  const xStart = vrow + 1;
+  vrow++;
+  const ex = meta.exclusions ?? [];
+  if (ex.length === 0) {
+    vr.getRow(vrow).values = ["—", "None", "All geographies in scope were included in this allocation."];
+    vr.mergeCells(vrow, 3, vrow, 6);
+    vrow++;
+  } else {
+    for (const e of ex) { vr.getRow(vrow).values = [e.level, e.state, e.lga, e.ward || "—", "", ""]; vrow++; }
+  }
+  styleBody(vr, xStart, vrow - 1, 6);
+  vr.views = [{ state: "normal" }];
+  vr.autoFilter = undefined as any;
 
 
   const buf = await wb.xlsx.writeBuffer();
