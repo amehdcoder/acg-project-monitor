@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, FileSpreadsheet, ScanLine, Search } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { parseLogistics, medicineLabel } from "@/lib/isc/medicineAccountability";
+import { parseLogistics, medicineLabel, returnLegLabel, returnConditionLabel } from "@/lib/isc/medicineAccountability";
 import { exportCsv, exportXlsx } from "./exportKoboData";
 import type { KoboCache } from "./koboClient";
 
@@ -23,7 +23,7 @@ const COMMON: Col[] = [
   { key: "ward", label: "Ward" },
 ];
 
-const LEVELS: { id: string; label: string; source: "dispatches" | "receipts" | "issues" | "cddIssues"; cols: Col[] }[] = [
+const LEVELS: { id: string; label: string; source: "dispatches" | "receipts" | "issues" | "cddIssues" | "returns"; cols: Col[] }[] = [
   {
     id: "l0", label: "Level 0 · State → LGA", source: "dispatches",
     cols: [...COMMON,
@@ -71,6 +71,30 @@ const LEVELS: { id: string; label: string; source: "dispatches" | "receipts" | "
       { key: "qtyIssued", label: "Qty issued to CDD" },
     ],
   },
+  {
+    id: "l4", label: "Level 4 · Return / reverse logistics", source: "returns",
+    cols: [...COMMON,
+      { key: "legLabel", label: "Return leg" },
+      { key: "returnedFrom", label: "Returned from" },
+      { key: "returnedTo", label: "Returned to" },
+      { key: "facility", label: "Health facility" },
+      { key: "community", label: "Community / settlement" },
+      { key: "medicineLabel", label: "Medicine" },
+      { key: "batch", label: "Batch / Lot" },
+      { key: "expiry", label: "Expiry" },
+      { key: "qtyReturned", label: "Qty returned" },
+      { key: "qtyUsable", label: "Usable" },
+      { key: "qtyDamaged", label: "Damaged" },
+      { key: "qtyExpired", label: "Expired" },
+      { key: "conditionLabel", label: "Condition" },
+      { key: "reason", label: "Reason for return" },
+      { key: "returnedBy", label: "Returned by" },
+      { key: "receivedBy", label: "Received by" },
+      { key: "waybill", label: "Return waybill" },
+      { key: "proof", label: "Proof of return" },
+      { key: "barcode", label: "Barcode / QR" },
+    ],
+  },
 ];
 
 const cell = (v: unknown) => (v === undefined || v === null || v === "" ? "—" : String(v));
@@ -82,7 +106,16 @@ export default function MedicineRawLevelTables({ cache }: { cache: KoboCache | n
   const ds = useMemo(() => parseLogistics(cache?.results ?? []), [cache]);
 
   const enrich = (rows: any[]) =>
-    rows.map((r) => ({ ...r, medicineLabel: r.medicine ? medicineLabel(r.medicine) : "—" }));
+    rows.map((r) => ({
+      ...r,
+      medicineLabel: r.medicine ? medicineLabel(r.medicine) : "—",
+      legLabel: r.leg ? returnLegLabel(r.leg) : undefined,
+      conditionLabel: r.condition ? returnConditionLabel(r.condition) : undefined,
+      proof: r.level === "level_4"
+        ? [r.hasSignature && "Signature", r.hasWaybill && "Waybill", r.hasPhoto && "Photo"]
+            .filter(Boolean).join(" · ") || "None"
+        : undefined,
+    }));
 
   const stamp = new Date().toISOString().slice(0, 10);
 

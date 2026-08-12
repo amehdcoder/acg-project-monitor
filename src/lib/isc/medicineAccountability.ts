@@ -35,7 +35,35 @@ export const LEVEL_LABELS: Record<string, string> = {
   level_1: "Level 1 — State → LGA receipt",
   level_2: "Level 2 — LGA → Health Facility",
   level_3: "Level 3 — Facility → CDD",
+  level_4: "Level 4 — Reverse logistics (return of medicines)",
 };
+
+/** Reverse-logistics legs captured by the Level 4 group of the XLSForm. */
+export const RETURN_LEG_LABELS: Record<string, string> = {
+  cdd_to_flhf: "CDD → Health Facility",
+  flhf_to_lga: "Health Facility → LGA store",
+  lga_to_state: "LGA → State medical store",
+  state_to_federal: "State → Federal Medical Store",
+};
+
+export const returnLegLabel = (code: string) =>
+  RETURN_LEG_LABELS[code] ??
+  (code ? code.replace(/_+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()) : "Unspecified leg");
+
+/** Condition of returned stock (usable stock re-enters the pipeline). */
+export const RETURN_CONDITION_LABELS: Record<string, string> = {
+  good: "Good / usable",
+  usable: "Good / usable",
+  damaged: "Damaged",
+  expired: "Expired",
+  short_dated: "Short-dated",
+  opened: "Opened / broken seal",
+};
+
+export const returnConditionLabel = (code: string) =>
+  RETURN_CONDITION_LABELS[String(code).toLowerCase()] ??
+  (code ? code.replace(/_+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()) : "Unspecified");
+
 
 /** The national supply origin for all Federal allocations. */
 export const FEDERAL_SOURCE = "Federal Medical Store, Oshodi";
@@ -161,7 +189,7 @@ export interface BaseTx {
   state: string;
   lga: string;
   ward: string;
-  level: "level_0" | "level_1" | "level_2" | "level_3";
+  level: "level_0" | "level_1" | "level_2" | "level_3" | "level_4";
   submittedBy: string;
   /** Barcode / QR code captured by the scanner question (empty when not scanned). */
   barcode: string;
@@ -219,13 +247,44 @@ export interface CddTx extends BaseTx {
   hasPhoto: boolean;
 }
 
+/**
+ * Level 4 — reverse logistics: unused, damaged, expired or recalled stock
+ * flowing back up the cascade (CDD → FLHF → LGA → State → Federal store).
+ */
+export interface ReturnTx extends BaseTx {
+  level: "level_4";
+  medicine: string;
+  batch: string;
+  expiry: string;
+  /** Reverse leg (see RETURN_LEG_LABELS); inferred when the form omits it. */
+  leg: string;
+  returnedFrom: string;
+  returnedTo: string;
+  qtyReturned: number;
+  qtyUsable: number;
+  qtyDamaged: number;
+  qtyExpired: number;
+  condition: string;
+  reason: string;
+  returnedBy: string;
+  receivedBy: string;
+  facility: string;
+  community: string;
+  waybill: string;
+  hasWaybill: boolean;
+  hasSignature: boolean;
+  hasPhoto: boolean;
+}
+
 export interface LogisticsDataset {
   dispatches: DispatchTx[];
   receipts: ReceiptTx[];
   issues: IssueTx[];
   cddIssues: CddTx[];
+  returns: ReturnTx[];
   submissions: number;
 }
+
 
 
 /* ── parsing ─────────────────────────────────────────────────────────────── */
@@ -235,6 +294,8 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
   const receipts: ReceiptTx[] = [];
   const issues: IssueTx[] = [];
   const cddIssues: CddTx[] = [];
+  const returns: ReturnTx[] = [];
+
 
   for (const raw of raws ?? []) {
     const submissionCode = scanCode(raw);
@@ -372,10 +433,102 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
       }
     }
 
+    /* Level 4 — reverse logistics / return of medicines.
+     * The Kobo group id is opaque and may change between form revisions, so
+     * items are discovered by: explicit group names, `l4_` leaf prefix, or any
+     * repeat item that carries a "return"-flavoured quantity. Flat (non-repeat)
+     * Level 4 groups are handled by falling back to the submission itself. */
+    const isReturnItem = (i: any) =>
+      hasLeafPrefix(i, "l4_") ||
+      Object.keys(i ?? {}).some((k) => /(return|reverse|retriev|recall)/i.test(leaf(k)));
+    const l4Items = [
+      ...repeats(raw, "group_l4"),
+      ...repeats(raw, "group_return"),
+      ...repeats(raw, "Return_of_Medicines"),
+      ...repeats(raw, "medicine_return_repeat"),
+      ...repeatsWhere(raw, isReturnItem),
+    ];
+    const l4Sources: any[] = l4Items.length ? l4Items : (isReturnItem(raw) ? [raw] : []);
+    const seenL4 = new Set<any>();
+    for (const item of l4Sources) {
+      if (seenL4.has(item)) continue;
+      seenL4.add(item);
+
+      const medicine = str(getAny(item, [
+        "l4_medicine", "Medicine_Returned", "Medicine_Return", "Medicine_Returned_by_CDD",
+        "Medicine_Retrieved", "Returned_Medicine", "Medicine_Reversed",
+      ]));
+      const qtyUsable = num(getAny(item, [
+        "l4_qty_usable", "Quantity_Returned_Usable", "Usable_Quantity_Returned",
+        "Quantity_Good_Condition", "l4_qty_good",
+      ]));
+      const qtyDamaged = num(getAny(item, [
+        "l4_qty_damaged", "Quantity_Returned_Damaged", "Damaged_Quantity_Returned", "l4_damaged",
+      ]));
+      const qtyExpired = num(getAny(item, [
+        "l4_qty_expired", "Quantity_Returned_Expired", "Expired_Quantity_Returned", "l4_expired",
+      ]));
+      const qtyReturned = num(getAny(item, [
+        "l4_qty_returned", "Quantity_Returned", "Quantity_of_medicine_s_Returned",
+        "Total_Quantity_Returned", "Qty_Returned", "Quantity_Retrieved", "l4_qty",
+      ])) || (qtyUsable + qtyDamaged + qtyExpired);
+      if (!medicine && !qtyReturned) continue;
+
+      const returnedFrom = str(getAny(item, [
+        "l4_returned_from", "Returned_From", "Return_Source", "Returning_Level", "Source_Level",
+      ]));
+      const returnedTo = str(getAny(item, [
+        "l4_returned_to", "Returned_To", "Return_Destination", "Receiving_Level", "Destination_Level",
+      ]));
+      const legRaw = str(getAny(item, [
+        "l4_leg", "Return_Level", "Reverse_Logistics_Level", "Level_of_Return", "Return_Type",
+      ]));
+      const leg = legRaw ||
+        (returnedFrom && returnedTo
+          ? `${returnedFrom.toLowerCase().replace(/\s+/g, "_")}_to_${returnedTo.toLowerCase().replace(/\s+/g, "_")}`
+          : "unspecified");
+
+      returns.push({
+        ...base,
+        level: "level_4",
+        medicine: medicine || "unspecified",
+        batch: str(getAny(item, ["l4_batch_lot_number", "Batch_Lot_Number_003", "Batch_Lot_Number_Returned", "Batch_Lot_Number"])) || "—",
+        expiry: str(getAny(item, ["l4_expiry_date", "Expiry_Date_Returned", "Expiry_Date_003", "Expiry_Date"])),
+        leg,
+        returnedFrom: returnedFrom || "—",
+        returnedTo: returnedTo || "—",
+        qtyReturned,
+        qtyUsable,
+        qtyDamaged,
+        qtyExpired,
+        condition: str(getAny(item, ["l4_condition", "Condition_of_Returned_Medicine", "Stock_Condition", "Condition"])),
+        reason: str(getAny(item, [
+          "l4_reason", "Reason_for_Return", "Reason_for_Returning_Medicine", "Return_Reason", "Reason",
+        ])),
+        returnedBy: str(getAny(item, [
+          "l4_returned_by", "Name_of_Person_Returning", "Returning_Officer_Name", "Returned_By",
+        ])) || str(getAny(raw, ["CDD_Name", "Health_Facility_In_Charge_Name"])) || "—",
+        receivedBy: str(getAny(item, [
+          "l4_received_by", "Name_of_Officer_Receiving_Return", "Receiving_Officer_Name", "Received_By",
+        ])) || "—",
+        facility: str(getAny(item, ["Health_Facility_Name_002", "Health_Facility_Name_001"])) ||
+          str(get(raw, "Health_Facility_Name")) || "—",
+        community: str(getAny(item, ["Target_Community_Settlement", "Community_Settlement", "l4_community"])) || "—",
+        waybill: str(getAny(item, ["l4_waybill_number", "Return_Waybill_Number", "Waybill_Number"])) || "—",
+        hasWaybill: hasMedia(getAny(item, ["l4_waybill_photo", "Return_Waybill_Photo", "Proof_of_Return_Waybill_Photo"])),
+        hasSignature: hasMedia(getAny(item, [
+          "l4_signature", "Return_Acknowledgment_Signature", "Receiving_Officer_Signature",
+        ])) || hasSignature,
+        hasPhoto: hasMedia(getAny(item, ["l4_photo", "Return_Photo_Confirmation", "Photo_of_Returned_Medicines"])),
+        barcode: findCode(item, raw),
+      });
+    }
+
     if (!roleRaw) continue; // role is only used for context; parsing is data-driven
   }
 
-  return { dispatches, receipts, issues, cddIssues, submissions: (raws ?? []).length };
+  return { dispatches, receipts, issues, cddIssues, returns, submissions: (raws ?? []).length };
+
 }
 
 
@@ -426,6 +579,8 @@ export function applyFilters(ds: LogisticsDataset, f: Filters): LogisticsDataset
     receipts: ds.receipts.filter((t) => matches(t, f)),
     issues: ds.issues.filter((t) => matches(t, f)),
     cddIssues: ds.cddIssues.filter((t) => matches(t, f)),
+    returns: (ds.returns ?? []).filter((t) => matches(t, f)),
+
     submissions: ds.submissions,
   };
 }
@@ -441,6 +596,10 @@ export interface MedicineRollup {
   lgaBalance: number;
   flhfBalance: number;
   wastageRate: number;   // damaged / received
+  /** Level 4 — units returned back up the cascade for this key. */
+  returned: number;
+  returnedUsable: number;
+  returnRate: number;    // returned / issued downstream
   pushRate: number;      // issuedToFlhf / netUsable
   cddPushRate: number;   // issuedToCdd / issuedToFlhf
   allocationFulfilment: number; // received / allocated
@@ -486,6 +645,7 @@ export interface AccountabilitySummary {
   totals: {
     allocated: number; received: number; damaged: number; netUsable: number;
     issuedToFlhf: number; issuedToCdd: number; lgaBalance: number; flhfBalance: number;
+    returned: number; returnedUsable: number; returnedUnusable: number;
   };
   wastageRate: number;
   pushRate: number;
@@ -500,7 +660,45 @@ export interface AccountabilitySummary {
   batches: BatchRow[];
   facilities: FacilityRow[];
   leadTimes: LeadTimeRow[];
-  timeline: { date: string; received: number; toFlhf: number; toCdd: number }[];
+  timeline: { date: string; received: number; toFlhf: number; toCdd: number; returned: number }[];
+  /** Level 4 — reverse logistics of NTD medicines across all cascade legs. */
+  reverse: ReverseLogistics;
+}
+
+export interface ReverseLegRow {
+  leg: string;
+  label: string;
+  transactions: number;
+  returned: number;
+  usable: number;
+  damaged: number;
+  expired: number;
+  /** Share of the downstream issue volume for that leg that came back. */
+  returnRate: number;
+  /** Reverse consignments with a signed acknowledgement / waybill / photo. */
+  documented: number;
+  documentationRate: number;
+}
+
+export interface ReverseLogistics {
+  transactions: number;
+  returned: number;
+  usable: number;
+  damaged: number;
+  expired: number;
+  /** returned / issued downstream (CDD level) — the headline reverse-flow KPI. */
+  returnRate: number;
+  /** usable / returned — stock that can be redeployed instead of destroyed. */
+  recoveryRate: number;
+  /** (damaged + expired) / returned — reverse-logistics loss. */
+  lossRate: number;
+  documentationRate: number;
+  legs: ReverseLegRow[];
+  byMedicine: { medicine: string; returned: number; usable: number; damaged: number; expired: number }[];
+  byLga: { state: string; lga: string; returned: number; usable: number; unusable: number; returnRate: number }[];
+  topReasons: { reason: string; count: number; units: number }[];
+  /** Facilities / LGAs that issued stock but recorded no return at all. */
+  missingReturns: { state: string; lga: string; facility: string; issued: number; toCdd: number }[];
 }
 
 const pct = (n: number, d: number) => (d > 0 ? n / d : 0);
@@ -516,6 +714,7 @@ function median(xs: number[]) {
 function rollup(
   key: string,
   receipts: ReceiptTx[], issues: IssueTx[], cdd: CddTx[], allocated: number,
+  rets: ReturnTx[] = [],
 ): MedicineRollup {
   const received = receipts.reduce((a, r) => a + r.qtyReceived, 0);
   const damaged = receipts.reduce((a, r) => a + r.qtyDamaged, 0);
@@ -533,6 +732,9 @@ function rollup(
     lgaBalance: netUsable - issuedToFlhf,
     flhfBalance: issuedToFlhf - issuedToCdd,
     wastageRate: pct(damaged, received),
+    returned: rets.reduce((a, r) => a + r.qtyReturned, 0),
+    returnedUsable: rets.reduce((a, r) => a + r.qtyUsable, 0),
+    returnRate: pct(rets.reduce((a, r) => a + r.qtyReturned, 0), issuedToCdd || issuedToFlhf),
     pushRate: pct(issuedToFlhf, netUsable),
     cddPushRate: pct(issuedToCdd, issuedToFlhf),
     allocationFulfilment: pct(received, allocated),
@@ -552,6 +754,7 @@ export function computeAccountability(
   const targetWindowDays = opts.targetWindowDays ?? 7;
   const lowThreshold = opts.lowStockThreshold ?? 0.15;
   const { receipts, issues, cddIssues } = ds;
+  const rets = ds.returns ?? [];
 
   const allocFor = (pred: (a: Allocation) => boolean) =>
     allocations.filter(pred).reduce((a, x) => a + (Number(x.quantity) || 0), 0);
@@ -561,6 +764,7 @@ export function computeAccountability(
     ...receipts.map((r) => r.medicine),
     ...issues.map((r) => r.medicine),
     ...cddIssues.map((r) => r.medicine),
+    ...rets.map((r) => r.medicine),
     ...allocations.map((a) => a.medicine),
   ])).filter(Boolean);
 
@@ -570,6 +774,7 @@ export function computeAccountability(
     issues.filter((r) => r.medicine === m),
     cddIssues.filter((r) => r.medicine === m),
     allocFor((a) => a.medicine === m),
+    rets.filter((r) => r.medicine === m),
   )).sort((a, b) => b.received - a.received);
 
   /* by LGA / State */
@@ -577,6 +782,7 @@ export function computeAccountability(
     ...receipts.map((r) => `${r.state}||${r.lga}`),
     ...issues.map((r) => `${r.state}||${r.lga}`),
     ...cddIssues.map((r) => `${r.state}||${r.lga}`),
+    ...rets.map((r) => `${r.state}||${r.lga}`),
   ])).filter((k) => k !== "||");
 
   const byLga = lgaKeys.map((k) => {
@@ -587,6 +793,7 @@ export function computeAccountability(
       issues.filter((x) => x.state === state && x.lga === lga),
       cddIssues.filter((x) => x.state === state && x.lga === lga),
       allocFor((a) => a.state === state && a.lga === lga),
+      rets.filter((x) => x.state === state && x.lga === lga),
     );
     return { ...r, state, lga };
   }).sort((a, b) => b.received - a.received);
@@ -599,6 +806,7 @@ export function computeAccountability(
       issues.filter((x) => x.state === state),
       cddIssues.filter((x) => x.state === state),
       allocFor((a) => a.state === state),
+      rets.filter((x) => x.state === state),
     );
     return { ...r, state };
   }).sort((a, b) => b.received - a.received);
@@ -719,16 +927,17 @@ export function computeAccountability(
   const podN = l1Forms.length + issues.length + cddIssues.length;
 
   /* timeline */
-  const tl = new Map<string, { date: string; received: number; toFlhf: number; toCdd: number }>();
-  const bump = (date: string, field: "received" | "toFlhf" | "toCdd", qty: number) => {
+  const tl = new Map<string, { date: string; received: number; toFlhf: number; toCdd: number; returned: number }>();
+  const bump = (date: string, field: "received" | "toFlhf" | "toCdd" | "returned", qty: number) => {
     if (!date) return;
-    const row = tl.get(date) ?? { date, received: 0, toFlhf: 0, toCdd: 0 };
+    const row = tl.get(date) ?? { date, received: 0, toFlhf: 0, toCdd: 0, returned: 0 };
     row[field] += qty;
     tl.set(date, row);
   };
   receipts.forEach((r) => bump(r.date, "received", r.qtyReceived));
   issues.forEach((i) => bump(i.date, "toFlhf", i.qtyIssued));
   cddIssues.forEach((c) => bump(c.date, "toCdd", c.qtyIssued));
+  rets.forEach((r) => bump(r.date, "returned", r.qtyReturned));
   const timeline = Array.from(tl.values()).sort((a, b) => a.date.localeCompare(b.date));
 
   const totals = {
@@ -740,9 +949,14 @@ export function computeAccountability(
     issuedToCdd: byMedicine.reduce((a, m) => a + m.issuedToCdd, 0),
     lgaBalance: 0,
     flhfBalance: 0,
+    returned: rets.reduce((a, r) => a + r.qtyReturned, 0),
+    returnedUsable: rets.reduce((a, r) => a + r.qtyUsable, 0),
+    returnedUnusable: rets.reduce((a, r) => a + r.qtyDamaged + r.qtyExpired, 0),
   };
   totals.lgaBalance = totals.netUsable - totals.issuedToFlhf;
   totals.flhfBalance = totals.issuedToFlhf - totals.issuedToCdd;
+
+  const reverse = computeReverseLogistics(rets, issues, cddIssues);
 
   const atRisk = facilities.filter((f) => f.status !== "healthy").length;
   const stockout = facilities.filter((f) => f.status === "stockout").length;
@@ -773,6 +987,122 @@ export function computeAccountability(
     facilities,
     leadTimes,
     timeline,
+    reverse,
+  };
+}
+
+/* ── Level 4 reverse logistics ───────────────────────────────────────────── */
+
+function computeReverseLogistics(
+  rets: ReturnTx[], issues: IssueTx[], cddIssues: CddTx[],
+): ReverseLogistics {
+  const sum = (xs: ReturnTx[], f: (r: ReturnTx) => number) => xs.reduce((a, r) => a + f(r), 0);
+  const returned = sum(rets, (r) => r.qtyReturned);
+  const usable = sum(rets, (r) => r.qtyUsable);
+  const damaged = sum(rets, (r) => r.qtyDamaged);
+  const expired = sum(rets, (r) => r.qtyExpired);
+  const issuedToCdd = cddIssues.reduce((a, c) => a + c.qtyIssued, 0);
+  const issuedToFlhf = issues.reduce((a, i) => a + i.qtyIssued, 0);
+  const documentedOf = (xs: ReturnTx[]) =>
+    xs.filter((r) => r.hasSignature || r.hasWaybill || r.hasPhoto).length;
+
+  // Denominator per leg: the downstream volume that could physically come back.
+  const legDenominator = (leg: string) =>
+    /cdd/i.test(leg) ? issuedToCdd : /flhf|facility|health/i.test(leg) ? issuedToFlhf : issuedToCdd || issuedToFlhf;
+
+  const legMap = new Map<string, ReturnTx[]>();
+  for (const r of rets) {
+    const k = r.leg || "unspecified";
+    legMap.set(k, [...(legMap.get(k) ?? []), r]);
+  }
+  const legs: ReverseLegRow[] = Array.from(legMap.entries()).map(([leg, xs]) => {
+    const t = sum(xs, (r) => r.qtyReturned);
+    const doc = documentedOf(xs);
+    return {
+      leg,
+      label: returnLegLabel(leg),
+      transactions: xs.length,
+      returned: t,
+      usable: sum(xs, (r) => r.qtyUsable),
+      damaged: sum(xs, (r) => r.qtyDamaged),
+      expired: sum(xs, (r) => r.qtyExpired),
+      returnRate: pct(t, legDenominator(leg)),
+      documented: doc,
+      documentationRate: pct(doc, xs.length),
+    };
+  }).sort((a, b) => b.returned - a.returned);
+
+  const medMap = new Map<string, ReturnTx[]>();
+  for (const r of rets) medMap.set(r.medicine, [...(medMap.get(r.medicine) ?? []), r]);
+  const byMedicine = Array.from(medMap.entries()).map(([medicine, xs]) => ({
+    medicine,
+    returned: sum(xs, (r) => r.qtyReturned),
+    usable: sum(xs, (r) => r.qtyUsable),
+    damaged: sum(xs, (r) => r.qtyDamaged),
+    expired: sum(xs, (r) => r.qtyExpired),
+  })).sort((a, b) => b.returned - a.returned);
+
+  const lgaMap = new Map<string, ReturnTx[]>();
+  for (const r of rets) {
+    const k = `${r.state}||${r.lga}`;
+    lgaMap.set(k, [...(lgaMap.get(k) ?? []), r]);
+  }
+  const byLga = Array.from(lgaMap.entries()).map(([k, xs]) => {
+    const [state, lga] = k.split("||");
+    const t = sum(xs, (r) => r.qtyReturned);
+    const out = cddIssues.filter((c) => c.state === state && c.lga === lga).reduce((a, c) => a + c.qtyIssued, 0);
+    return {
+      state, lga,
+      returned: t,
+      usable: sum(xs, (r) => r.qtyUsable),
+      unusable: sum(xs, (r) => r.qtyDamaged + r.qtyExpired),
+      returnRate: pct(t, out),
+    };
+  }).sort((a, b) => b.returned - a.returned);
+
+  const reasonMap = new Map<string, { count: number; units: number }>();
+  for (const r of rets) {
+    const key = (r.reason || "Not stated").trim();
+    const cur = reasonMap.get(key) ?? { count: 0, units: 0 };
+    cur.count += 1;
+    cur.units += r.qtyReturned;
+    reasonMap.set(key, cur);
+  }
+  const topReasons = Array.from(reasonMap.entries())
+    .map(([reason, v]) => ({ reason, ...v }))
+    .sort((a, b) => b.units - a.units);
+
+  const returnedFacilities = new Set(rets.map((r) => `${r.state}||${r.lga}||${r.facility}`));
+  const facMap = new Map<string, { state: string; lga: string; facility: string; issued: number; toCdd: number }>();
+  for (const i of issues) {
+    const k = `${i.state}||${i.lga}||${i.facility}`;
+    const row = facMap.get(k) ?? { state: i.state, lga: i.lga, facility: i.facility, issued: 0, toCdd: 0 };
+    row.issued += i.qtyIssued;
+    facMap.set(k, row);
+  }
+  for (const c of cddIssues) {
+    const k = `${c.state}||${c.lga}||${c.facility}`;
+    const row = facMap.get(k) ?? { state: c.state, lga: c.lga, facility: c.facility, issued: 0, toCdd: 0 };
+    row.toCdd += c.qtyIssued;
+    facMap.set(k, row);
+  }
+  const missingReturns = Array.from(facMap.entries())
+    .filter(([k, r]) => r.issued > 0 && !returnedFacilities.has(k))
+    .map(([, r]) => r)
+    .sort((a, b) => b.issued - a.issued);
+
+  return {
+    transactions: rets.length,
+    returned, usable, damaged, expired,
+    returnRate: pct(returned, issuedToCdd || issuedToFlhf),
+    recoveryRate: pct(usable, returned),
+    lossRate: pct(damaged + expired, returned),
+    documentationRate: pct(documentedOf(rets), rets.length),
+    legs,
+    byMedicine,
+    byLga,
+    topReasons,
+    missingReturns,
   };
 }
 

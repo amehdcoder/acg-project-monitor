@@ -124,6 +124,8 @@ function dashboardSections(b: ExportBundle): Section[] {
       ["Transit shrinkage rate", p1(integrity.shrinkage.overall.rate), `${r0(integrity.shrinkage.overall.variance).toLocaleString()} units unaccounted`],
       [`Expiry risk index (${integrity.expiryRisk.windowDays}d)`, p1(integrity.expiryRisk.index), `${r0(integrity.expiryRisk.stockAtRisk).toLocaleString()} of ${r0(integrity.expiryRisk.totalStock).toLocaleString()} units short-dated`],
       ["Buffer retention ratio", integrity.buffer.ratio === null ? "—" : `${integrity.buffer.ratio.toFixed(2)} : 1`, `${p1(integrity.buffer.retainedShare)} retained · ${integrity.buffer.band}`],
+      ["Reverse logistics — units returned", r0(summary.reverse.returned).toLocaleString(), `${summary.reverse.transactions} return transactions · ${p1(summary.reverse.returnRate)} of stock issued to CDDs`],
+      ["Reverse logistics — recovery rate", p1(summary.reverse.recoveryRate), `${r0(summary.reverse.usable).toLocaleString()} usable · ${r0(summary.reverse.damaged + summary.reverse.expired).toLocaleString()} damaged/expired (loss ${p1(summary.reverse.lossRate)})`],
       ["Facility equity index (CV)", integrity.equity.rows.length ? integrity.equity.weightedCv.toFixed(2) : "—", `${integrity.equity.facilities} facilities · ${integrity.equity.lgas} LGAs`],
     ],
   });
@@ -154,6 +156,45 @@ function dashboardSections(b: ExportBundle): Section[] {
       r0(r.issuedToFlhf), r0(r.issuedToCdd), p1(r.wastageRate), p1(r.pushRate),
     ]),
   });
+
+  if (summary.reverse.transactions) {
+    s.push({
+      title: "Level 4 — reverse logistics by leg",
+      head: ["Return leg", "Transactions", "Returned", "Usable", "Damaged", "Expired", "Return rate", "Documented"],
+      rows: summary.reverse.legs.map((r) => [
+        r.label, r.transactions, r0(r.returned), r0(r.usable), r0(r.damaged), r0(r.expired),
+        p1(r.returnRate), p1(r.documentationRate),
+      ]),
+    });
+    s.push({
+      title: "Level 4 — returns by medicine",
+      head: ["Medicine", "Returned", "Usable", "Damaged", "Expired"],
+      rows: summary.reverse.byMedicine.map((r) => [
+        medicineLabel(r.medicine), r0(r.returned), r0(r.usable), r0(r.damaged), r0(r.expired),
+      ]),
+    });
+    s.push({
+      title: "Level 4 — returns by LGA",
+      head: ["State", "LGA", "Returned", "Usable", "Unusable", "Return rate"],
+      rows: summary.reverse.byLga.map((r) => [
+        r.state, r.lga, r0(r.returned), r0(r.usable), r0(r.unusable), p1(r.returnRate),
+      ]),
+    });
+    if (summary.reverse.topReasons.length) {
+      s.push({
+        title: "Level 4 — reasons for return",
+        head: ["Reason", "Transactions", "Units"],
+        rows: summary.reverse.topReasons.map((r) => [r.reason, r.count, r0(r.units)]),
+      });
+    }
+    if (summary.reverse.missingReturns.length) {
+      s.push({
+        title: "Level 4 — sites with no return recorded",
+        head: ["State", "LGA", "Health facility", "Issued to facility", "Issued to CDDs"],
+        rows: summary.reverse.missingReturns.map((r) => [r.state, r.lga, r.facility, r0(r.issued), r0(r.toCdd)]),
+      });
+    }
+  }
 
   if (alerts.length) {
     s.push({

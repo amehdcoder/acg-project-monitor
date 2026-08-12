@@ -21,7 +21,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import {
   Activity, AlertTriangle, BookOpen, Boxes, CalendarClock, CheckCircle2, ClipboardCheck, Download, FileSpreadsheet,
   FileText, Filter, Gauge, Loader2, Maximize2, PackageCheck, PackageX, PlugZap, QrCode, RefreshCw, Route, Scale,
-  ShieldAlert, Timer, TrendingDown, Truck, Warehouse,
+  ShieldAlert, Timer, TrendingDown, Truck, Undo2, Warehouse,
 } from "lucide-react";
 
 
@@ -505,6 +505,12 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
           tone={integrity.equity.weightedCv <= 0.25 ? "success" : integrity.equity.weightedCv <= 0.5 ? "warn" : "danger"}
           sub={`${integrity.equity.facilities} facilities across ${integrity.equity.lgas} LGAs compared`}
           hint="Coefficient of variation of medicine quantities issued to facilities within the same LGA. Low values mean an even spread; high values expose over-served and under-served catchment areas." />
+        <Kpi icon={Undo2} label="Reverse logistics (Level 4)" docId="reverse-logistics" flags={dq.byKpi["reverse-logistics"]}
+          value={fmt(summary.reverse.returned)}
+          tone={summary.reverse.lossRate > 0.25 ? "danger" : summary.reverse.transactions === 0 ? "warn" : "success"}
+          sub={`${summary.reverse.transactions} returns · ${pctf(summary.reverse.recoveryRate)} usable · loss ${pctf(summary.reverse.lossRate)}`}
+          hint="Units flowing back up the cascade (CDD → facility → LGA → State → Federal store) after the MDA round: total returned, the share still usable and the share written off as damaged or expired." />
+
       </div>
 
       {/* Threshold-driven alerts */}
@@ -528,6 +534,87 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
 
 
 
+
+      {/* Level 4 — reverse logistics of NTD medicines */}
+      <Card>
+        <CardHeader className="py-3 px-4 border-b bg-muted/40">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Undo2 className="h-4 w-4 text-primary" /> Level 4 — reverse logistics (return of medicines)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 space-y-4">
+          {summary.reverse.transactions === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No return transactions captured yet. Once the Level 4 group of the Medicine Allocation &amp; Accountability
+              form is submitted on KoboToolbox, returns from CDDs, facilities, LGAs and States appear here automatically.
+            </p>
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Units returned</p>
+                  <p className="font-display text-xl font-bold">{fmt(summary.reverse.returned)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Usable (redeployable)</p>
+                  <p className="font-display text-xl font-bold text-emerald-600">{fmt(summary.reverse.usable)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Damaged / expired</p>
+                  <p className="font-display text-xl font-bold text-destructive">{fmt(summary.reverse.damaged + summary.reverse.expired)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Return documentation</p>
+                  <p className="font-display text-xl font-bold">{pctf(summary.reverse.documentationRate)}</p>
+                </div>
+              </div>
+
+              <div className="overflow-auto rounded-lg border">
+                <table className="w-full border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-muted/60">
+                      {["Return leg", "Transactions", "Returned", "Usable", "Damaged", "Expired", "Return rate", "Documented"].map((h) => (
+                        <th key={h} className="whitespace-nowrap px-3 py-2 text-left font-semibold">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summary.reverse.legs.map((r) => (
+                      <tr key={r.leg} className="border-t">
+                        <td className="px-3 py-1.5">{r.label}</td>
+                        <td className="px-3 py-1.5">{r.transactions}</td>
+                        <td className="px-3 py-1.5 font-medium">{fmt(r.returned)}</td>
+                        <td className="px-3 py-1.5 text-emerald-600">{fmt(r.usable)}</td>
+                        <td className="px-3 py-1.5 text-destructive">{fmt(r.damaged)}</td>
+                        <td className="px-3 py-1.5 text-destructive">{fmt(r.expired)}</td>
+                        <td className="px-3 py-1.5">{pctf(r.returnRate)}</td>
+                        <td className="px-3 py-1.5">{pctf(r.documentationRate)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {summary.reverse.topReasons.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {summary.reverse.topReasons.slice(0, 6).map((r) => (
+                    <Badge key={r.reason} variant="outline" className="text-[11px]">
+                      {r.reason} · {fmt(r.units)} units ({r.count})
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {summary.reverse.missingReturns.length > 0 && (
+                <p className="text-[11px] text-muted-foreground">
+                  {summary.reverse.missingReturns.length} site(s) issued stock but recorded no return — see the
+                  “Sites with no return recorded” sheet in the export for the accountability follow-up list.
+                </p>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Allocation fulfilment */}
       {summary.totals.allocated > 0 && (
