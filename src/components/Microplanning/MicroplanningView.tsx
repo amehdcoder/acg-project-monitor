@@ -1411,6 +1411,10 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   // Designation-scope filter: admins always see all; non-admins with no
   // designation assignment also see all (legacy). Users with assignments are
   // restricted to rows that match at least one of their assignments.
+  // Project-scoped geography archive: LGAs/wards the manager has dropped from
+  // every KPI, chart, table and export until they are restored.
+  const dashExcl = useGeoExclusions(`dashboard.${selectedProjectId || "all"}`);
+
   const displayEntries = useMemo(() => {
     // 1) Designation-scope filter (per-user field assignment).
     let result = baseEntries;
@@ -1425,8 +1429,12 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     if (lens) result = result.filter((e: any) =>
       rowInLensScope(lens, e.state, e.lga, e.ward) && campaignInLensScope(lens, e.campaign_type)
     );
+    // 4) Archived geographies — excluded from every downstream computation.
+    if (dashExcl.keys.size > 0) result = result.filter((e: any) => !rowExcluded(dashExcl.keys, e));
     return result;
-  }, [baseEntries, isAdmin, scope, projectScope, lens]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseEntries, isAdmin, scope, projectScope, lens, dashExcl.archived]);
+
 
   // Columns for the MDA Lens export (questions as columns, responses as rows).
   const lensExportColumns = useMemo(() => {
