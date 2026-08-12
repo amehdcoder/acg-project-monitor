@@ -46,6 +46,7 @@ const n0 = (v: number) => Math.round(v || 0).toLocaleString();
 
 export default function GeoExclusionPanel({
   rows, getPop, archived, keys, exclude, restore, restoreAll,
+  undo, redo, reset, canUndo, canRedo,
   title = "Include / exclude geographies",
   subtitle = "Drop LGAs or wards from every figure on this page. Excluded geographies are archived and can be restored at any time.",
   accent = "sky",
