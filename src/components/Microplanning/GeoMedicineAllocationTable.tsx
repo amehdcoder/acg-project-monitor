@@ -460,7 +460,7 @@ export default function GeoMedicineAllocationTable({
         <div className="flex items-center justify-between gap-2 flex-wrap px-3 py-2 border-t border-border/50 bg-muted/30">
           <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
             <Sparkles className="h-3 w-3 text-emerald-600" />
-            Ward entries take precedence; the remaining LGA total is shared across wards without an explicit figure. Largest-remainder rounding keeps community totals reconciled exactly.
+            {describeRounding(rounding)} Ward entries take precedence; the remaining LGA total is shared across wards without an explicit figure.
           </p>
           <Button onClick={download} disabled={busy || errors.length > 0} size="sm" className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white">
             <Download className="h-3.5 w-3.5" /> Download community allocation
@@ -468,5 +468,7 @@ export default function GeoMedicineAllocationTable({
         </div>
       </CardContent>
     </Card>
+    </div>
   );
+
 }
