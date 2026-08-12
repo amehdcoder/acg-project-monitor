@@ -189,7 +189,7 @@ export interface BaseTx {
   state: string;
   lga: string;
   ward: string;
-  level: "level_0" | "level_1" | "level_2" | "level_3";
+  level: "level_0" | "level_1" | "level_2" | "level_3" | "level_4";
   submittedBy: string;
   /** Barcode / QR code captured by the scanner question (empty when not scanned). */
   barcode: string;
