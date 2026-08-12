@@ -294,6 +294,8 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
   const receipts: ReceiptTx[] = [];
   const issues: IssueTx[] = [];
   const cddIssues: CddTx[] = [];
+  const returns: ReturnTx[] = [];
+
 
   for (const raw of raws ?? []) {
     const submissionCode = scanCode(raw);
