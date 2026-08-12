@@ -2767,7 +2767,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
           {/* Dashboard-wide geography archive */}
           {(isAdmin || lensEnabled) && (
             <GeoExclusionPanel
-              rows={baseEntries as any[]}
+              rows={scopedEntries as any[]}
               getPop={(r: any) => Number(r?.estimated_total_population) || 0}
               archived={dashExcl.archived}
               keys={dashExcl.keys}
