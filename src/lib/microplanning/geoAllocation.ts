@@ -9,6 +9,7 @@
  *  - A programmatic wastage / contingency buffer (default 10%) is reported
  *    separately so the dispatch quantity is auditable.
  */
+import { applyRounding, DEFAULT_ROUNDING, type Residual, type RoundingRule } from "./allocationRounding";
 
 export interface GeoRow {
   state?: string | null;
@@ -137,6 +138,10 @@ export interface AllocationInputs {
   wardTotals: Record<string, number>;
   /** Wastage / contingency buffer, e.g. 0.1 for 10% */
   bufferPct: number;
+  /** Optional pack-rounding rule applied at community level */
+  rounding?: RoundingRule;
+  /** Keys (LGA or Ward) excluded/archived from the allocation */
+  excluded?: Set<string>;
 }
 
 export interface AllocationResult {
@@ -144,8 +149,10 @@ export interface AllocationResult {
   wardAllocation: Record<string, number>;
   wardSource: Record<string, "LGA" | "Ward" | "—">;
   communities: CommunityAllocation[];
+  residuals: Residual[];
   totals: { targetPop: number; allocation: number; buffer: number; dispatch: number; lgas: number; wards: number; communities: number };
 }
+
 
 /**
  * Resolve allocations top-down.
@@ -156,16 +163,28 @@ export function computeAllocations(tree: LgaNode[], inputs: AllocationInputs): A
   const wardAllocation: Record<string, number> = {};
   const wardSource: Record<string, "LGA" | "Ward" | "—"> = {};
   const communities: CommunityAllocation[] = [];
+  const residuals: Residual[] = [];
   const buf = Math.max(0, inputs.bufferPct || 0);
+  const rule = inputs.rounding ?? DEFAULT_ROUNDING;
+  const excluded = inputs.excluded ?? new Set<string>();
 
   for (const L of tree) {
-    const explicit = L.wards.filter((w) => Number(inputs.wardTotals[w.key]) > 0);
+    const wards = L.wards.filter((w) => !excluded.has(w.key));
+    if (excluded.has(L.key)) {
+      for (const w of L.wards) { wardAllocation[w.key] = 0; wardSource[w.key] = "—"; w.allocation = 0; }
+      L.allocation = 0; L.lgaInputUsed = false;
+      continue;
+    }
+    const explicit = wards.filter((w) => Number(inputs.wardTotals[w.key]) > 0);
     const explicitSum = explicit.reduce((s, w) => s + Number(inputs.wardTotals[w.key]), 0);
     const lgaTotal = Math.max(0, Math.round(Number(inputs.lgaTotals[L.key]) || 0));
-    const rest = L.wards.filter((w) => !(Number(inputs.wardTotals[w.key]) > 0));
+    const rest = wards.filter((w) => !(Number(inputs.wardTotals[w.key]) > 0));
     // The LGA total tops up the wards that have no explicit ward allocation.
     const remaining = Math.max(0, lgaTotal - explicitSum);
 
+    for (const w of L.wards) {
+      if (excluded.has(w.key)) { wardAllocation[w.key] = 0; wardSource[w.key] = "—"; }
+    }
     for (const w of explicit) {
       wardAllocation[w.key] = Math.round(Number(inputs.wardTotals[w.key]));
       wardSource[w.key] = "Ward";
@@ -183,10 +202,19 @@ export function computeAllocations(tree: LgaNode[], inputs: AllocationInputs): A
     for (const w of L.wards) w.allocation = wardAllocation[w.key] || 0;
 
     // community-level split inside every ward
+    let lgaDistributed = 0;
     for (const w of L.wards) {
       const total = wardAllocation[w.key] || 0;
       const tps = w.rows.map((x) => x.tp);
-      const split = apportion(total, tps);
+      const split = apportion(total, tps).map((v) => applyRounding(v, rule));
+      const wardDistributed = split.reduce((a, b) => a + b, 0);
+      lgaDistributed += wardDistributed;
+      if (total > 0 && wardDistributed !== total) {
+        residuals.push({
+          scope: `${L.state} → ${L.lga} → ${w.ward}`, level: "Ward",
+          input: total, distributed: wardDistributed, diff: wardDistributed - total,
+        });
+      }
       w.rows.forEach(({ r }, i) => {
         const alloc = split[i];
         const bufferUnits = Math.round(alloc * buf);
@@ -203,17 +231,25 @@ export function computeAllocations(tree: LgaNode[], inputs: AllocationInputs): A
         });
       });
     }
+    if (L.allocation > 0 && lgaDistributed !== L.allocation) {
+      residuals.push({
+        scope: `${L.state} → ${L.lga}`, level: "LGA",
+        input: L.allocation, distributed: lgaDistributed, diff: lgaDistributed - L.allocation,
+      });
+    }
   }
 
+  const activeLgas = tree.filter((L) => !excluded.has(L.key));
   const totals = communities.reduce(
     (acc, c) => {
       acc.targetPop += c.targetPop; acc.allocation += c.allocation;
       acc.buffer += c.buffer; acc.dispatch += c.dispatch;
       return acc;
     },
-    { targetPop: 0, allocation: 0, buffer: 0, dispatch: 0, lgas: tree.length, wards: 0, communities: communities.length },
+    { targetPop: 0, allocation: 0, buffer: 0, dispatch: 0, lgas: activeLgas.length, wards: 0, communities: communities.length },
   );
-  totals.wards = tree.reduce((s, l) => s + l.wards.length, 0);
+  totals.wards = activeLgas.reduce((s, l) => s + l.wards.filter((w) => !excluded.has(w.key)).length, 0);
 
-  return { tree, wardAllocation, wardSource, communities, totals };
+  return { tree, wardAllocation, wardSource, communities, residuals, totals };
+
 }

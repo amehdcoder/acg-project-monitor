@@ -6,12 +6,13 @@
  * LGA) or against a single Ward (distributed across the communities of that
  * ward only). Community-level results export to a WHO-standard workbook.
  */
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
 import {
   buildGeoTree, computeAllocations, type GeoRow,
@@ -19,7 +20,15 @@ import {
 import { NTD_MEDICINES, NTD_UNITS, findNtdMedicine } from "@/lib/microplanning/ntdMedicines";
 import { exportCommunityAllocationWorkbook } from "@/lib/microplanning/communityAllocationExcel";
 import {
-  AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Download, Eraser, Info, MapPin, Pill, Search, Sparkles,
+  DEFAULT_ROUNDING, ROUNDING_LABELS, describeRounding, explainResidual,
+  type RoundingMode, type RoundingRule,
+} from "@/lib/microplanning/allocationRounding";
+import { parseAllocationCsv, downloadAllocationCsvTemplate } from "@/lib/microplanning/allocationCsv";
+import GeoExclusionPanel from "@/components/Microplanning/GeoExclusionPanel";
+import { useGeoExclusions } from "@/lib/microplanning/geoExclusions";
+import {
+  AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Download, Eraser, FileUp, Gauge, Info,
+  MapPin, Pill, Search, Sliders, Sparkles, Upload,
 } from "lucide-react";
 
 interface Props {
@@ -29,6 +38,8 @@ interface Props {
   projectName?: string;
   targetPopBasis?: string;
   readOnly?: boolean;
+  /** stable id used to persist the allocation exclusion archive */
+  scopeId?: string;
 }
 
 const n0 = (v: number) => Math.round(v).toLocaleString();
@@ -37,6 +48,7 @@ type Issue = { level: "error" | "warn" | "info"; text: string };
 
 export default function GeoMedicineAllocationTable({
   rows, getTargetPop, scopeLabel = "All selected geographies", projectName, targetPopBasis = "Microplan target population", readOnly,
+  scopeId = "medicine-allocation",
 }: Props) {
   const [medicine, setMedicine] = useState("Ivermectin + Albendazole (IA)");
   const [unit, setUnit] = useState(findNtdMedicine("Ivermectin + Albendazole (IA)")?.unit ?? "Doses");
@@ -46,6 +58,10 @@ export default function GeoMedicineAllocationTable({
   const [wardTotals, setWardTotals] = useState<Record<string, number>>({});
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
+  const [rounding, setRounding] = useState<RoundingRule>(DEFAULT_ROUNDING);
+  const csvRef = useRef<HTMLInputElement>(null);
+
+  const excl = useGeoExclusions(`medicine.${scopeId}`);
 
   const program = findNtdMedicine(medicine)?.program ?? "—";
 
@@ -58,9 +74,11 @@ export default function GeoMedicineAllocationTable({
   const tree = useMemo(() => buildGeoTree(rows, getTargetPop), [rows, getTargetPop]);
 
   const result = useMemo(
-    () => computeAllocations(tree, { lgaTotals, wardTotals, bufferPct: bufferPct / 100 }),
-    [tree, lgaTotals, wardTotals, bufferPct],
+    () => computeAllocations(tree, { lgaTotals, wardTotals, bufferPct: bufferPct / 100, rounding, excluded: excl.keys }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tree, lgaTotals, wardTotals, bufferPct, rounding, excl.archived],
   );
+
 
   /* ── Reconciliation validation ─────────────────────────────────────── */
   const issues = useMemo<Issue[]>(() => {
