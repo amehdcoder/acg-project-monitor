@@ -11,13 +11,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import {
   buildGeoTree, computeAllocations, type GeoRow,
 } from "@/lib/microplanning/geoAllocation";
+import { NTD_MEDICINES, NTD_UNITS, findNtdMedicine } from "@/lib/microplanning/ntdMedicines";
 import { exportCommunityAllocationWorkbook } from "@/lib/microplanning/communityAllocationExcel";
 import {
-  ChevronDown, ChevronRight, Download, Eraser, MapPin, Pill, Search, Sparkles,
+  AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Download, Eraser, Info, MapPin, Pill, Search, Sparkles,
 } from "lucide-react";
 
 interface Props {
@@ -31,10 +33,13 @@ interface Props {
 
 const n0 = (v: number) => Math.round(v).toLocaleString();
 
+type Issue = { level: "error" | "warn" | "info"; text: string };
+
 export default function GeoMedicineAllocationTable({
   rows, getTargetPop, scopeLabel = "All selected geographies", projectName, targetPopBasis = "Microplan target population", readOnly,
 }: Props) {
-  const [medicine, setMedicine] = useState("Ivermectin + Albendazole");
+  const [medicine, setMedicine] = useState("Ivermectin + Albendazole (IA)");
+  const [unit, setUnit] = useState(findNtdMedicine("Ivermectin + Albendazole (IA)")?.unit ?? "Doses");
   const [bufferPct, setBufferPct] = useState(10);
   const [search, setSearch] = useState("");
   const [lgaTotals, setLgaTotals] = useState<Record<string, number>>({});
@@ -42,12 +47,69 @@ export default function GeoMedicineAllocationTable({
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
 
+  const program = findNtdMedicine(medicine)?.program ?? "—";
+
+  const pickMedicine = (name: string) => {
+    setMedicine(name);
+    const m = findNtdMedicine(name);
+    if (m) setUnit(m.unit);
+  };
+
   const tree = useMemo(() => buildGeoTree(rows, getTargetPop), [rows, getTargetPop]);
 
   const result = useMemo(
     () => computeAllocations(tree, { lgaTotals, wardTotals, bufferPct: bufferPct / 100 }),
     [tree, lgaTotals, wardTotals, bufferPct],
   );
+
+  /* ── Reconciliation validation ─────────────────────────────────────── */
+  const issues = useMemo<Issue[]>(() => {
+    const out: Issue[] = [];
+    for (const L of tree) {
+      const explicit = L.wards.filter((w) => Number(wardTotals[w.key]) > 0);
+      const explicitSum = explicit.reduce((s, w) => s + Number(wardTotals[w.key] || 0), 0);
+      const lgaTotal = Math.max(0, Math.round(Number(lgaTotals[L.key]) || 0));
+      const rest = L.wards.filter((w) => !(Number(wardTotals[w.key]) > 0));
+
+      if (lgaTotal > 0 && explicitSum > lgaTotal) {
+        out.push({
+          level: "error",
+          text: `${L.lga}: ward entries total ${n0(explicitSum)} ${unit.toLowerCase()} but the LGA total is only ${n0(lgaTotal)}. Wards over-allocate the LGA by ${n0(explicitSum - lgaTotal)} — the remaining wards will receive nothing.`,
+        });
+      } else if (lgaTotal > 0 && explicit.length && rest.length === 0 && explicitSum < lgaTotal) {
+        out.push({
+          level: "warn",
+          text: `${L.lga}: every ward has an explicit entry (${n0(explicitSum)}), so ${n0(lgaTotal - explicitSum)} ${unit.toLowerCase()} of the LGA total will not be distributed.`,
+        });
+      }
+      if (lgaTotal > 0 && rest.length > 0 && L.targetPop <= 0) {
+        out.push({ level: "error", text: `${L.lga}: no target population recorded — allocation cannot be apportioned proportionally.` });
+      }
+      const restPop = rest.reduce((s, w) => s + w.targetPop, 0);
+      if (lgaTotal > 0 && rest.length > 0 && restPop <= 0) {
+        out.push({ level: "warn", text: `${L.lga}: wards without an explicit entry have zero target population — the remainder is being split evenly instead of proportionally.` });
+      }
+      for (const w of explicit) {
+        if (w.targetPop <= 0) out.push({ level: "warn", text: `${L.lga} → ${w.ward}: ward has zero target population; units will be split evenly across its communities.` });
+        const per = w.targetPop > 0 ? Number(wardTotals[w.key]) / w.targetPop : 0;
+        if (per > 5) out.push({ level: "warn", text: `${L.lga} → ${w.ward}: ${per.toFixed(1)} ${unit.toLowerCase()} per person is unusually high — verify the entry.` });
+      }
+      // reconciliation check: ward sum must equal the resolved LGA allocation
+      const resolved = L.wards.reduce((s, w) => s + (result.wardAllocation[w.key] || 0), 0);
+      if (resolved !== L.allocation) {
+        out.push({ level: "error", text: `${L.lga}: ward allocations (${n0(resolved)}) do not reconcile with the LGA total (${n0(L.allocation)}).` });
+      }
+    }
+    // community ↔ ward reconciliation
+    if (result.totals.allocation !== tree.reduce((s, L) => s + L.allocation, 0)) {
+      out.push({ level: "error", text: "Community allocations do not reconcile with ward/LGA totals. Clear entries and re-enter." });
+    }
+    return out;
+  }, [tree, lgaTotals, wardTotals, result, unit]);
+
+  const errors = issues.filter((i) => i.level === "error");
+  const warns = issues.filter((i) => i.level !== "error");
+
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -66,19 +128,24 @@ export default function GeoMedicineAllocationTable({
       toast({ title: "Nothing to export", description: "Enter a medicine quantity against at least one LGA or ward first.", variant: "destructive" });
       return;
     }
+    if (errors.length) {
+      toast({ title: "Allocation does not reconcile", description: errors[0].text, variant: "destructive" });
+      return;
+    }
     setBusy(true);
     try {
       await exportCommunityAllocationWorkbook(result, {
-        scope: scopeLabel, project: projectName, medicine,
+        scope: scopeLabel, project: projectName, medicine, program, unit,
         bufferPct: bufferPct / 100, targetPopBasis,
       });
-      toast({ title: "✅ Community allocation exported", description: `${n0(result.totals.communities)} communities · ${n0(result.totals.dispatch)} units to dispatch.` });
+      toast({ title: "✅ Community allocation exported", description: `${n0(result.totals.communities)} communities · ${n0(result.totals.dispatch)} ${unit.toLowerCase()} to dispatch.` });
     } catch (e) {
       toast({ title: "Export failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
     } finally {
       setBusy(false);
     }
   };
+
 
   const clearAll = () => { setLgaTotals({}); setWardTotals({}); };
 
@@ -104,7 +171,7 @@ export default function GeoMedicineAllocationTable({
           </div>
           <Button
             onClick={download}
-            disabled={busy}
+            disabled={busy || errors.length > 0}
             className="h-10 gap-2 bg-white text-sky-800 hover:bg-white/90 font-bold shadow-lg shrink-0"
           >
             <Download className="h-4 w-4" />
@@ -116,8 +183,33 @@ export default function GeoMedicineAllocationTable({
         <div className="mt-3 flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 rounded-md bg-white/15 px-2 py-1">
             <span className="text-[10px] font-semibold uppercase tracking-wide">Medicine</span>
-            <Input value={medicine} onChange={(e) => setMedicine(e.target.value)} className="h-7 w-56 text-xs bg-white/90 text-foreground border-0" />
+            <Select value={medicine} onValueChange={pickMedicine} disabled={readOnly}>
+              <SelectTrigger className="h-7 w-[320px] text-xs bg-white/95 text-foreground border-0">
+                <SelectValue placeholder="Select NTD medicine" />
+              </SelectTrigger>
+              <SelectContent className="max-h-80">
+                {NTD_MEDICINES.map((m) => (
+                  <SelectItem key={m.name} value={m.name} className="text-xs">
+                    {m.name} <span className="text-muted-foreground">· {m.program}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+          <div className="flex items-center gap-1.5 rounded-md bg-white/15 px-2 py-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wide">Unit</span>
+            <Select value={unit} onValueChange={setUnit} disabled={readOnly}>
+              <SelectTrigger className="h-7 w-28 text-xs bg-white/95 text-foreground border-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[...new Set([...NTD_UNITS, unit, "Tubes", "Capsules"])].map((u) => (
+                  <SelectItem key={u} value={u} className="text-xs">{u}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Badge className="bg-white/20 hover:bg-white/20 text-white text-[10px] border-0">Programme: {program}</Badge>
           <div className="flex items-center gap-1.5 rounded-md bg-white/15 px-2 py-1">
             <span className="text-[10px] font-semibold uppercase tracking-wide">Buffer %</span>
             <Input type="number" min={0} max={100} value={bufferPct}
@@ -134,6 +226,7 @@ export default function GeoMedicineAllocationTable({
           </Button>
         </div>
 
+
         {/* Totals */}
         <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-2">
           {[
@@ -141,7 +234,7 @@ export default function GeoMedicineAllocationTable({
             { l: "Wards", v: n0(result.totals.wards) },
             { l: "Communities", v: n0(result.totals.communities) },
             { l: "Target population", v: n0(result.totals.targetPop) },
-            { l: "Units to dispatch", v: n0(result.totals.dispatch) },
+            { l: `${unit} to dispatch`, v: n0(result.totals.dispatch) },
           ].map((k) => (
             <div key={k.l} className="rounded-lg bg-white/15 px-2.5 py-1.5">
               <p className="text-[9px] uppercase tracking-wide text-white/80">{k.l}</p>
@@ -150,6 +243,35 @@ export default function GeoMedicineAllocationTable({
           ))}
         </div>
       </div>
+
+      {/* Validation banner */}
+      {result.totals.allocation > 0 && (
+        <div className={`px-4 py-2.5 border-b ${errors.length ? "bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900" : warns.length ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900" : "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900"}`}>
+          <div className="flex items-start gap-2">
+            {errors.length ? <AlertTriangle className="h-4 w-4 text-rose-600 mt-0.5 shrink-0" />
+              : warns.length ? <Info className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              : <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />}
+            <div className="min-w-0">
+              <p className={`text-[11px] font-bold ${errors.length ? "text-rose-800 dark:text-rose-300" : warns.length ? "text-amber-800 dark:text-amber-300" : "text-emerald-800 dark:text-emerald-300"}`}>
+                {errors.length
+                  ? `${errors.length} allocation error${errors.length > 1 ? "s" : ""} — export blocked until totals reconcile`
+                  : warns.length
+                    ? `${warns.length} allocation warning${warns.length > 1 ? "s" : ""} — review before dispatch`
+                    : `Reconciled — ${n0(result.totals.allocation)} ${unit.toLowerCase()} distributed exactly across ${n0(result.totals.communities)} communities`}
+              </p>
+              <ul className="mt-1 space-y-0.5 max-h-32 overflow-y-auto">
+                {issues.slice(0, 12).map((i, idx) => (
+                  <li key={idx} className={`text-[10.5px] leading-snug ${i.level === "error" ? "text-rose-700 dark:text-rose-300" : "text-amber-800 dark:text-amber-300"}`}>
+                    • {i.text}
+                  </li>
+                ))}
+                {issues.length > 12 && <li className="text-[10px] text-muted-foreground">…and {issues.length - 12} more</li>}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       <CardContent className="p-0">
         <div className="overflow-x-auto">
@@ -251,7 +373,7 @@ export default function GeoMedicineAllocationTable({
             <Sparkles className="h-3 w-3 text-emerald-600" />
             Ward entries take precedence; the remaining LGA total is shared across wards without an explicit figure. Largest-remainder rounding keeps community totals reconciled exactly.
           </p>
-          <Button onClick={download} disabled={busy} size="sm" className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white">
+          <Button onClick={download} disabled={busy || errors.length > 0} size="sm" className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white">
             <Download className="h-3.5 w-3.5" /> Download community allocation
           </Button>
         </div>
