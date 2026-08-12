@@ -579,7 +579,7 @@ export function applyFilters(ds: LogisticsDataset, f: Filters): LogisticsDataset
     receipts: ds.receipts.filter((t) => matches(t, f)),
     issues: ds.issues.filter((t) => matches(t, f)),
     cddIssues: ds.cddIssues.filter((t) => matches(t, f)),
-    returns: ds.returns.filter((t) => matches(t, f)),
+    returns: (ds.returns ?? []).filter((t) => matches(t, f)),
 
     submissions: ds.submissions,
   };
@@ -596,6 +596,10 @@ export interface MedicineRollup {
   lgaBalance: number;
   flhfBalance: number;
   wastageRate: number;   // damaged / received
+  /** Level 4 — units returned back up the cascade for this key. */
+  returned: number;
+  returnedUsable: number;
+  returnRate: number;    // returned / issued downstream
   pushRate: number;      // issuedToFlhf / netUsable
   cddPushRate: number;   // issuedToCdd / issuedToFlhf
   allocationFulfilment: number; // received / allocated
