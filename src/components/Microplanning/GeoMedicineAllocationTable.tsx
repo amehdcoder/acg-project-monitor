@@ -310,10 +310,57 @@ export default function GeoMedicineAllocationTable({
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search LGA or ward…"
               className="h-8 w-52 pl-7 text-xs bg-white/90 text-foreground border-0" />
           </div>
+          {/* Rounding rules */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 text-[11px] gap-1 text-white hover:bg-white/20">
+                <Sliders className="h-3.5 w-3.5" /> Rounding: {rounding.mode === "exact" ? "Exact" : `${ROUNDING_LABELS[rounding.mode].replace("Round ", "")} ×${rounding.step}`}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80 space-y-3">
+              <div>
+                <p className="text-xs font-bold flex items-center gap-1.5"><Gauge className="h-3.5 w-3.5 text-sky-600" /> Rounding rule</p>
+                <p className="text-[10.5px] text-muted-foreground mt-0.5">{describeRounding(rounding)}</p>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Mode</label>
+                <Select value={rounding.mode} onValueChange={(v) => setRounding((p) => ({ ...p, mode: v as RoundingMode }))} disabled={readOnly}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(ROUNDING_LABELS) as RoundingMode[]).map((m) => (
+                      <SelectItem key={m} value={m} className="text-xs">{ROUNDING_LABELS[m]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Pack size ({unit.toLowerCase()} per pack)</label>
+                <Input type="number" min={1} value={rounding.step} disabled={readOnly || rounding.mode === "exact"}
+                  onChange={(e) => setRounding((p) => ({ ...p, step: Math.max(1, Math.round(Number(e.target.value) || 1)) }))}
+                  className="h-8 text-xs" />
+              </div>
+              <Button size="sm" variant="outline" className="w-full h-8 text-[11px]" onClick={() => setRounding(DEFAULT_ROUNDING)}>
+                Reset to exact apportionment
+              </Button>
+            </PopoverContent>
+          </Popover>
+
+          {/* Bulk CSV */}
+          <input ref={csvRef} type="file" accept=".csv,text/csv" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) importCsv(f); }} />
+          <Button variant="ghost" size="sm" disabled={readOnly} onClick={() => csvRef.current?.click()}
+            className="h-8 text-[11px] gap-1 text-white hover:bg-white/20">
+            <Upload className="h-3.5 w-3.5" /> Import CSV
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => downloadAllocationCsvTemplate(tree, medicine, unit)}
+            className="h-8 text-[11px] gap-1 text-white hover:bg-white/20">
+            <FileUp className="h-3.5 w-3.5" /> CSV template
+          </Button>
           <Button variant="ghost" size="sm" onClick={clearAll} className="h-8 text-[11px] gap-1 text-white hover:bg-white/20">
             <Eraser className="h-3.5 w-3.5" /> Clear entries
           </Button>
         </div>
+
 
 
         {/* Totals */}
