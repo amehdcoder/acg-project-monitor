@@ -1418,25 +1418,29 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   // every KPI, chart, table and export until they are restored.
   const dashExcl = useGeoExclusions(`dashboard.${selectedProjectId || "all"}`);
 
-  const displayEntries = useMemo(() => {
-    // 1) Designation-scope filter (per-user field assignment).
+  /** Everything the user is allowed to see (designation + project scope + lens),
+   *  BEFORE archiving. This is the universe the exclusion panel may offer, so it
+   *  can never surface geographies that are not part of the project. */
+  const scopedEntries = useMemo(() => {
     let result = baseEntries;
-
     if (!isAdmin && !scope.loading && scope.designations.length > 0 && !scope.hasNoRestriction) {
       result = result.filter((e: any) => scope.isInScope(e));
     }
-    // 2) Project-level geographic scope (applies to everyone, incl. admins,
-    //    since it's a boundary defined on the project itself).
     result = result.filter((e: any) => rowInScope(projectScope, e));
-    // 3) MDA Lens: admin-granted State/LGA lens narrows everything the user sees.
     if (lens) result = result.filter((e: any) =>
       rowInLensScope(lens, e.state, e.lga, e.ward) && campaignInLensScope(lens, e.campaign_type)
     );
-    // 4) Archived geographies — excluded from every downstream computation.
-    if (dashExcl.keys.size > 0) result = result.filter((e: any) => !rowExcluded(dashExcl.keys, e));
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseEntries, isAdmin, scope, projectScope, lens, dashExcl.archived]);
+  }, [baseEntries, isAdmin, scope, projectScope, lens]);
+
+  const displayEntries = useMemo(() => {
+    // Archived geographies — excluded from every downstream computation.
+    if (dashExcl.keys.size > 0) return scopedEntries.filter((e: any) => !rowExcluded(dashExcl.keys, e));
+    return scopedEntries;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopedEntries, dashExcl.archived]);
+
 
 
   // Columns for the MDA Lens export (questions as columns, responses as rows).
