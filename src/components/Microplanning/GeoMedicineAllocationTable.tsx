@@ -183,8 +183,33 @@ export default function GeoMedicineAllocationTable({
         <div className="mt-3 flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 rounded-md bg-white/15 px-2 py-1">
             <span className="text-[10px] font-semibold uppercase tracking-wide">Medicine</span>
-            <Input value={medicine} onChange={(e) => setMedicine(e.target.value)} className="h-7 w-56 text-xs bg-white/90 text-foreground border-0" />
+            <Select value={medicine} onValueChange={pickMedicine} disabled={readOnly}>
+              <SelectTrigger className="h-7 w-[320px] text-xs bg-white/95 text-foreground border-0">
+                <SelectValue placeholder="Select NTD medicine" />
+              </SelectTrigger>
+              <SelectContent className="max-h-80">
+                {NTD_MEDICINES.map((m) => (
+                  <SelectItem key={m.name} value={m.name} className="text-xs">
+                    {m.name} <span className="text-muted-foreground">· {m.program}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+          <div className="flex items-center gap-1.5 rounded-md bg-white/15 px-2 py-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wide">Unit</span>
+            <Select value={unit} onValueChange={setUnit} disabled={readOnly}>
+              <SelectTrigger className="h-7 w-28 text-xs bg-white/95 text-foreground border-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[...new Set([...NTD_UNITS, unit, "Tubes", "Capsules"])].map((u) => (
+                  <SelectItem key={u} value={u} className="text-xs">{u}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Badge className="bg-white/20 hover:bg-white/20 text-white text-[10px] border-0">Programme: {program}</Badge>
           <div className="flex items-center gap-1.5 rounded-md bg-white/15 px-2 py-1">
             <span className="text-[10px] font-semibold uppercase tracking-wide">Buffer %</span>
             <Input type="number" min={0} max={100} value={bufferPct}
@@ -200,6 +225,7 @@ export default function GeoMedicineAllocationTable({
             <Eraser className="h-3.5 w-3.5" /> Clear entries
           </Button>
         </div>
+
 
         {/* Totals */}
         <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-2">
