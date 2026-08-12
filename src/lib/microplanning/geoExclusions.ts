@@ -7,7 +7,7 @@
  * undone. Persisted per project + surface in localStorage so the choice
  * survives reloads and works fully offline.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export const exKeyLga = (state: unknown, lga: unknown) =>
   `L:${String(state ?? "").trim().toLowerCase()}|${String(lga ?? "").trim().toLowerCase()}`;
