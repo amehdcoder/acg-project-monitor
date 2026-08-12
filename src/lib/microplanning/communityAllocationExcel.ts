@@ -77,7 +77,8 @@ export async function exportCommunityAllocationWorkbook(result: AllocationResult
   wb.created = new Date();
 
   const stampedOn = new Date().toLocaleString();
-  const subtitle = `${meta.medicine} · ${meta.scope}${meta.project ? ` · ${meta.project}` : ""} · Generated ${stampedOn}`;
+  const unit = meta.unit || "Units";
+  const subtitle = `${meta.medicine}${meta.program ? ` · ${meta.program}` : ""} · ${unit} · ${meta.scope}${meta.project ? ` · ${meta.project}` : ""} · Generated ${stampedOn}`;
 
   /* ── Cover ─────────────────────────────────────────────────────────── */
   const cover = wb.addWorksheet("Cover & Method", { properties: { tabColor: { argb: WHO_DARK } } });
@@ -85,11 +86,14 @@ export async function exportCommunityAllocationWorkbook(result: AllocationResult
   titleBlock(cover, "Community Medicine Allocation — NTD Mass Drug Administration", subtitle, 2);
   const facts: [string, string | number][] = [
     ["Medicine / commodity", meta.medicine],
+    ["Programme", meta.program || "—"],
+    ["Dispensing unit", unit],
     ["Geographic scope", meta.scope],
     ["Target population basis", meta.targetPopBasis],
     ["Apportionment method", "Proportional to target population (largest-remainder integer rounding)"],
     ["Programme standard", "WHO PC-NTD guidance & Nigeria NTD Programme MDA microplanning norms"],
     ["Wastage / contingency buffer", `${(meta.bufferPct * 100).toFixed(1)}%`],
+
     ["LGAs covered", result.totals.lgas],
     ["Wards covered", result.totals.wards],
     ["Communities / settlements", result.totals.communities],
