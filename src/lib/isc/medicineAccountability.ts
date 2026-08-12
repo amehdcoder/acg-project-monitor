@@ -433,10 +433,102 @@ export function parseLogistics(raws: any[]): LogisticsDataset {
       }
     }
 
+    /* Level 4 — reverse logistics / return of medicines.
+     * The Kobo group id is opaque and may change between form revisions, so
+     * items are discovered by: explicit group names, `l4_` leaf prefix, or any
+     * repeat item that carries a "return"-flavoured quantity. Flat (non-repeat)
+     * Level 4 groups are handled by falling back to the submission itself. */
+    const isReturnItem = (i: any) =>
+      hasLeafPrefix(i, "l4_") ||
+      Object.keys(i ?? {}).some((k) => /(return|reverse|retriev|recall)/i.test(leaf(k)));
+    const l4Items = [
+      ...repeats(raw, "group_l4"),
+      ...repeats(raw, "group_return"),
+      ...repeats(raw, "Return_of_Medicines"),
+      ...repeats(raw, "medicine_return_repeat"),
+      ...repeatsWhere(raw, isReturnItem),
+    ];
+    const l4Sources: any[] = l4Items.length ? l4Items : (isReturnItem(raw) ? [raw] : []);
+    const seenL4 = new Set<any>();
+    for (const item of l4Sources) {
+      if (seenL4.has(item)) continue;
+      seenL4.add(item);
+
+      const medicine = str(getAny(item, [
+        "l4_medicine", "Medicine_Returned", "Medicine_Return", "Medicine_Returned_by_CDD",
+        "Medicine_Retrieved", "Returned_Medicine", "Medicine_Reversed",
+      ]));
+      const qtyUsable = num(getAny(item, [
+        "l4_qty_usable", "Quantity_Returned_Usable", "Usable_Quantity_Returned",
+        "Quantity_Good_Condition", "l4_qty_good",
+      ]));
+      const qtyDamaged = num(getAny(item, [
+        "l4_qty_damaged", "Quantity_Returned_Damaged", "Damaged_Quantity_Returned", "l4_damaged",
+      ]));
+      const qtyExpired = num(getAny(item, [
+        "l4_qty_expired", "Quantity_Returned_Expired", "Expired_Quantity_Returned", "l4_expired",
+      ]));
+      const qtyReturned = num(getAny(item, [
+        "l4_qty_returned", "Quantity_Returned", "Quantity_of_medicine_s_Returned",
+        "Total_Quantity_Returned", "Qty_Returned", "Quantity_Retrieved", "l4_qty",
+      ])) || (qtyUsable + qtyDamaged + qtyExpired);
+      if (!medicine && !qtyReturned) continue;
+
+      const returnedFrom = str(getAny(item, [
+        "l4_returned_from", "Returned_From", "Return_Source", "Returning_Level", "Source_Level",
+      ]));
+      const returnedTo = str(getAny(item, [
+        "l4_returned_to", "Returned_To", "Return_Destination", "Receiving_Level", "Destination_Level",
+      ]));
+      const legRaw = str(getAny(item, [
+        "l4_leg", "Return_Level", "Reverse_Logistics_Level", "Level_of_Return", "Return_Type",
+      ]));
+      const leg = legRaw ||
+        (returnedFrom && returnedTo
+          ? `${returnedFrom.toLowerCase().replace(/\s+/g, "_")}_to_${returnedTo.toLowerCase().replace(/\s+/g, "_")}`
+          : "unspecified");
+
+      returns.push({
+        ...base,
+        level: "level_4",
+        medicine: medicine || "unspecified",
+        batch: str(getAny(item, ["l4_batch_lot_number", "Batch_Lot_Number_003", "Batch_Lot_Number_Returned", "Batch_Lot_Number"])) || "—",
+        expiry: str(getAny(item, ["l4_expiry_date", "Expiry_Date_Returned", "Expiry_Date_003", "Expiry_Date"])),
+        leg,
+        returnedFrom: returnedFrom || "—",
+        returnedTo: returnedTo || "—",
+        qtyReturned,
+        qtyUsable,
+        qtyDamaged,
+        qtyExpired,
+        condition: str(getAny(item, ["l4_condition", "Condition_of_Returned_Medicine", "Stock_Condition", "Condition"])),
+        reason: str(getAny(item, [
+          "l4_reason", "Reason_for_Return", "Reason_for_Returning_Medicine", "Return_Reason", "Reason",
+        ])),
+        returnedBy: str(getAny(item, [
+          "l4_returned_by", "Name_of_Person_Returning", "Returning_Officer_Name", "Returned_By",
+        ])) || str(getAny(raw, ["CDD_Name", "Health_Facility_In_Charge_Name"])) || "—",
+        receivedBy: str(getAny(item, [
+          "l4_received_by", "Name_of_Officer_Receiving_Return", "Receiving_Officer_Name", "Received_By",
+        ])) || "—",
+        facility: str(getAny(item, ["Health_Facility_Name_002", "Health_Facility_Name_001"])) ||
+          str(get(raw, "Health_Facility_Name")) || "—",
+        community: str(getAny(item, ["Target_Community_Settlement", "Community_Settlement", "l4_community"])) || "—",
+        waybill: str(getAny(item, ["l4_waybill_number", "Return_Waybill_Number", "Waybill_Number"])) || "—",
+        hasWaybill: hasMedia(getAny(item, ["l4_waybill_photo", "Return_Waybill_Photo", "Proof_of_Return_Waybill_Photo"])),
+        hasSignature: hasMedia(getAny(item, [
+          "l4_signature", "Return_Acknowledgment_Signature", "Receiving_Officer_Signature",
+        ])) || hasSignature,
+        hasPhoto: hasMedia(getAny(item, ["l4_photo", "Return_Photo_Confirmation", "Photo_of_Returned_Medicines"])),
+        barcode: findCode(item, raw),
+      });
+    }
+
     if (!roleRaw) continue; // role is only used for context; parsing is data-driven
   }
 
-  return { dispatches, receipts, issues, cddIssues, submissions: (raws ?? []).length };
+  return { dispatches, receipts, issues, cddIssues, returns, submissions: (raws ?? []).length };
+
 }
 
 
