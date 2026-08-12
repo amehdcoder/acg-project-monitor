@@ -131,8 +131,29 @@ export default function GeoExclusionPanel({
               <p className="text-[11px] text-white/85 max-w-2xl">{subtitle}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {archived.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {undo && (
+              <Button size="sm" variant="ghost" disabled={disabled || !canUndo} onClick={undo}
+                title="Undo the last exclusion change"
+                className="h-8 text-[11px] gap-1 text-white hover:bg-white/20 disabled:opacity-40">
+                <Undo2 className="h-3.5 w-3.5" /> Undo
+              </Button>
+            )}
+            {redo && (
+              <Button size="sm" variant="ghost" disabled={disabled || !canRedo} onClick={redo}
+                title="Redo the change you just undid"
+                className="h-8 text-[11px] gap-1 text-white hover:bg-white/20 disabled:opacity-40">
+                <Redo2 className="h-3.5 w-3.5" /> Redo
+              </Button>
+            )}
+            {reset && (
+              <Button size="sm" variant="ghost" disabled={disabled || archived.length === 0} onClick={reset}
+                title="Clear every exclusion and recompute against the full scope"
+                className="h-8 text-[11px] gap-1 text-white hover:bg-white/20 disabled:opacity-40">
+                <RotateCcw className="h-3.5 w-3.5" /> Reset to full scope
+              </Button>
+            )}
+            {archived.length > 0 && !reset && (
               <Button size="sm" variant="ghost" disabled={disabled} onClick={restoreAll}
                 className="h-8 text-[11px] gap-1 text-white hover:bg-white/20">
                 <RotateCcw className="h-3.5 w-3.5" /> Restore all
@@ -144,6 +165,7 @@ export default function GeoExclusionPanel({
             </Button>
           </div>
         </div>
+
 
         <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2">
           {[
