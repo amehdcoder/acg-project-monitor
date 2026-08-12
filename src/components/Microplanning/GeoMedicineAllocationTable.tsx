@@ -11,13 +11,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import {
   buildGeoTree, computeAllocations, type GeoRow,
 } from "@/lib/microplanning/geoAllocation";
+import { NTD_MEDICINES, NTD_UNITS, findNtdMedicine } from "@/lib/microplanning/ntdMedicines";
 import { exportCommunityAllocationWorkbook } from "@/lib/microplanning/communityAllocationExcel";
 import {
-  ChevronDown, ChevronRight, Download, Eraser, MapPin, Pill, Search, Sparkles,
+  AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Download, Eraser, Info, MapPin, Pill, Search, Sparkles,
 } from "lucide-react";
 
 interface Props {
@@ -31,10 +33,13 @@ interface Props {
 
 const n0 = (v: number) => Math.round(v).toLocaleString();
 
+type Issue = { level: "error" | "warn" | "info"; text: string };
+
 export default function GeoMedicineAllocationTable({
   rows, getTargetPop, scopeLabel = "All selected geographies", projectName, targetPopBasis = "Microplan target population", readOnly,
 }: Props) {
-  const [medicine, setMedicine] = useState("Ivermectin + Albendazole");
+  const [medicine, setMedicine] = useState("Ivermectin + Albendazole (IA)");
+  const [unit, setUnit] = useState(findNtdMedicine("Ivermectin + Albendazole (IA)")?.unit ?? "Doses");
   const [bufferPct, setBufferPct] = useState(10);
   const [search, setSearch] = useState("");
   const [lgaTotals, setLgaTotals] = useState<Record<string, number>>({});
@@ -42,12 +47,69 @@ export default function GeoMedicineAllocationTable({
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
 
+  const program = findNtdMedicine(medicine)?.program ?? "—";
+
+  const pickMedicine = (name: string) => {
+    setMedicine(name);
+    const m = findNtdMedicine(name);
+    if (m) setUnit(m.unit);
+  };
+
   const tree = useMemo(() => buildGeoTree(rows, getTargetPop), [rows, getTargetPop]);
 
   const result = useMemo(
     () => computeAllocations(tree, { lgaTotals, wardTotals, bufferPct: bufferPct / 100 }),
     [tree, lgaTotals, wardTotals, bufferPct],
   );
+
+  /* ── Reconciliation validation ─────────────────────────────────────── */
+  const issues = useMemo<Issue[]>(() => {
+    const out: Issue[] = [];
+    for (const L of tree) {
+      const explicit = L.wards.filter((w) => Number(wardTotals[w.key]) > 0);
+      const explicitSum = explicit.reduce((s, w) => s + Number(wardTotals[w.key] || 0), 0);
+      const lgaTotal = Math.max(0, Math.round(Number(lgaTotals[L.key]) || 0));
+      const rest = L.wards.filter((w) => !(Number(wardTotals[w.key]) > 0));
+
+      if (lgaTotal > 0 && explicitSum > lgaTotal) {
+        out.push({
+          level: "error",
+          text: `${L.lga}: ward entries total ${n0(explicitSum)} ${unit.toLowerCase()} but the LGA total is only ${n0(lgaTotal)}. Wards over-allocate the LGA by ${n0(explicitSum - lgaTotal)} — the remaining wards will receive nothing.`,
+        });
+      } else if (lgaTotal > 0 && explicit.length && rest.length === 0 && explicitSum < lgaTotal) {
+        out.push({
+          level: "warn",
+          text: `${L.lga}: every ward has an explicit entry (${n0(explicitSum)}), so ${n0(lgaTotal - explicitSum)} ${unit.toLowerCase()} of the LGA total will not be distributed.`,
+        });
+      }
+      if (lgaTotal > 0 && rest.length > 0 && L.targetPop <= 0) {
+        out.push({ level: "error", text: `${L.lga}: no target population recorded — allocation cannot be apportioned proportionally.` });
+      }
+      const restPop = rest.reduce((s, w) => s + w.targetPop, 0);
+      if (lgaTotal > 0 && rest.length > 0 && restPop <= 0) {
+        out.push({ level: "warn", text: `${L.lga}: wards without an explicit entry have zero target population — the remainder is being split evenly instead of proportionally.` });
+      }
+      for (const w of explicit) {
+        if (w.targetPop <= 0) out.push({ level: "warn", text: `${L.lga} → ${w.ward}: ward has zero target population; units will be split evenly across its communities.` });
+        const per = w.targetPop > 0 ? Number(wardTotals[w.key]) / w.targetPop : 0;
+        if (per > 5) out.push({ level: "warn", text: `${L.lga} → ${w.ward}: ${per.toFixed(1)} ${unit.toLowerCase()} per person is unusually high — verify the entry.` });
+      }
+      // reconciliation check: ward sum must equal the resolved LGA allocation
+      const resolved = L.wards.reduce((s, w) => s + (result.wardAllocation[w.key] || 0), 0);
+      if (resolved !== L.allocation) {
+        out.push({ level: "error", text: `${L.lga}: ward allocations (${n0(resolved)}) do not reconcile with the LGA total (${n0(L.allocation)}).` });
+      }
+    }
+    // community ↔ ward reconciliation
+    if (result.totals.allocation !== tree.reduce((s, L) => s + L.allocation, 0)) {
+      out.push({ level: "error", text: "Community allocations do not reconcile with ward/LGA totals. Clear entries and re-enter." });
+    }
+    return out;
+  }, [tree, lgaTotals, wardTotals, result, unit]);
+
+  const errors = issues.filter((i) => i.level === "error");
+  const warns = issues.filter((i) => i.level !== "error");
+
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
