@@ -61,6 +61,9 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import { exportMicroplanWorkbook } from "@/lib/microplanning/microplanTemplate";
 import GeoMedicineAllocationTable from "@/components/Microplanning/GeoMedicineAllocationTable";
+import GeoExclusionPanel from "@/components/Microplanning/GeoExclusionPanel";
+import { useGeoExclusions, rowExcluded } from "@/lib/microplanning/geoExclusions";
+
 import { parseMedicineUploadFile, exportMedicineUploadTemplate, parseAllocationPlanFile, exportAllocationPlanTemplate, type UploadedMedicineEntry } from "@/lib/microplanning/medicineUpload";
 
 // Exact template column headers matching the NTDs Microplan Template
