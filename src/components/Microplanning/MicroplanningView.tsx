@@ -2785,6 +2785,17 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             />
           )}
 
+          {/* Complete project data — WHO / Nigeria NTD standard table + export */}
+          <ProjectDataTable
+            entries={displayEntries as any[]}
+            projectName={projects.find((p) => p.id === selectedProjectId)?.name || "All projects"}
+            scopeLabel={filterScopeLabel(filterContext)}
+            campaignLabel={filterContext.campaign}
+            exclusions={dashExcl.archived.map((a) => ({ level: a.level, state: a.state, lga: a.lga, ward: a.ward }))}
+          />
+
+
+
 
           {/* Filters & View Toggle */}
           <div className="flex items-center gap-2 flex-wrap">
