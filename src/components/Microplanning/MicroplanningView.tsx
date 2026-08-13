@@ -29,6 +29,7 @@ import MicroplanSummaryView from "./MicroplanSummaryView";
 import GpsResolveCell from "./GpsResolveCell";
 import DrillBreadcrumb from "./DrillBreadcrumb";
 import { exportFilteredMicroplan, filterScopeLabel } from "@/lib/microplanning/filteredExport";
+import ProjectDataTable from "@/components/Microplanning/ProjectDataTable";
 import { harmonizeFacilityNames, applyRenamesLocally, type FacilityRename } from "@/lib/microplanning/facilityHarmonizer";
 
 import { countGeography } from "@/lib/microplanning/geoCounts";
@@ -2784,6 +2785,17 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               subtitle="Archive geographies to remove them from every KPI, chart, table and export on this page. Nothing is deleted — restore them any time to bring the figures back."
             />
           )}
+
+          {/* Complete project data — WHO / Nigeria NTD standard table + export */}
+          <ProjectDataTable
+            entries={displayEntries as any[]}
+            projectName={projects.find((p) => p.id === selectedProjectId)?.name || "All projects"}
+            scopeLabel={filterScopeLabel(exportFilterContext)}
+            campaignLabel={(exportFilterContext as any).campaign}
+            exclusions={dashExcl.archived.map((a) => ({ level: a.level, state: a.state, lga: a.lga, ward: a.ward }))}
+          />
+
+
 
 
           {/* Filters & View Toggle */}
