@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -133,8 +133,8 @@ const ProjectDataTable = ({ entries, projectName = "All projects", scopeLabel = 
                 const isOpen = !!open[r.key];
                 const kids = isOpen ? wardsOf(r) : [];
                 return (
-                  <>
-                    <tr key={r.key} className="border-t border-border/50 bg-sky-50/60 dark:bg-sky-950/20 hover:bg-sky-100/70 dark:hover:bg-sky-900/30 cursor-pointer"
+                  <Fragment key={r.key}>
+                    <tr className="border-t border-border/50 bg-sky-50/60 dark:bg-sky-950/20 hover:bg-sky-100/70 dark:hover:bg-sky-900/30 cursor-pointer"
                       onClick={() => setOpen((s) => ({ ...s, [r.key]: !s[r.key] }))}>
                       <td className="px-2.5 py-1.5">
                         <span className="inline-flex items-center gap-1 font-semibold text-foreground">
@@ -189,7 +189,7 @@ const ProjectDataTable = ({ entries, projectName = "All projects", scopeLabel = 
                         </td>
                       </tr>
                     ))}
-                  </>
+                  </Fragment>
                 );
               })}
               {!filtered.length && (
