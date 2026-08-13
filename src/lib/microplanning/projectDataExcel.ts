@@ -6,7 +6,7 @@
  */
 import ExcelJS from "exceljs";
 import { DISABILITY_TYPES, pwdTotalFor } from "./disabilityTypes";
-import { bestDistanceKm, withRecomputedDistances } from "./distance";
+import { effectiveDistanceKm, withRecomputedDistances } from "./distance";
 import { geoKey } from "./geoCounts";
 
 const WHO_DARK = "FF002E5D";
@@ -184,7 +184,7 @@ export function buildProjectAggregates(entries: ProjectDataRow[]) {
       b.age5_14 += n((e as any).estimated_children_5_14);
       b.age15p += n((e as any).estimated_adults_15_plus);
       b.pwd += pwdTotalFor(e as any);
-      const d = bestDistanceKm(e as any);
+      const d = effectiveDistanceKm(e as any);
       if (typeof d === "number" && Number.isFinite(d)) b.dist.push(d);
     };
 
@@ -399,7 +399,7 @@ export async function exportProjectDataWorkbook(entries: ProjectDataRow[], meta:
       return tot > 0 && sum > 0 && Math.abs(sum - tot) > 1;
     })],
     ["No GPS coordinates for community or settlement", missing((e) => !e.community_latitude && !e.settlement_latitude)],
-    ["No computable distance to health facility", missing((e) => bestDistanceKm(e) == null)],
+    ["No computable distance to health facility", missing((e) => effectiveDistanceKm(e) == null)],
   ];
   checks.forEach(([label, count], i) => {
     const row = dq.getRow(5 + i);
