@@ -2971,8 +2971,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             />
           )}
 
-          {/* List View */}
-          {activeView === "list" && (
+          {/* List View — Planning table is admin (or lens-granted) only */}
+          {activeView === "list" && canOpenView("list") && (
             <AdminListView
               entries={filtered}
               loading={loading}
