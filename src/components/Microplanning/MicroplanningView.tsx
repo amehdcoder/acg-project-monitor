@@ -1049,15 +1049,19 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   // Real-time: refresh entries whenever the Kobo webhook (or any other client)
   // inserts / updates / deletes a row on the active project.
   useRealtimeMicroplanEntries(selectedProjectId || null, fetchEntries);
-  // Non-admin project members only get the Planning list + form. Force-reset
-  // the view so analytics/dashboard tabs can never render for them.
+  // The Planning table is admin-only. Every other user still sees the Complete
+  // Project Data table (and its export) which renders above the tab strip.
+  // MDA Lens users get exactly the tabs their grant lists.
   const canOpenView = useCallback(
-    (v: string) => (isAdmin ? true : lensEnabled ? canOpenMicroplanTab(v) : v === "list"),
+    (v: string) => {
+      if (v === "list") return isAdmin || (lensEnabled && canOpenMicroplanTab("list"));
+      return isAdmin ? true : lensEnabled ? canOpenMicroplanTab(v) : false;
+    },
     [isAdmin, lensEnabled, canOpenMicroplanTab],
   );
   useEffect(() => {
     if (!canOpenView(activeView)) {
-      const next = MICROPLAN_TABS.find((t) => canOpenView(t.id))?.id ?? "list";
+      const next = MICROPLAN_TABS.find((t) => canOpenView(t.id))?.id ?? "none";
       setActiveView(next as any);
     }
   }, [canOpenView, activeView]);
@@ -2967,8 +2971,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             />
           )}
 
-          {/* List View */}
-          {activeView === "list" && (
+          {/* List View — Planning table is admin (or lens-granted) only */}
+          {activeView === "list" && canOpenView("list") && (
             <AdminListView
               entries={filtered}
               loading={loading}
@@ -2992,7 +2996,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               scopeLabel={`${allLgasForMedicine.length} LGA(s) in view`}
               projectName={projects.find((p) => p.id === selectedProjectId)?.name}
               targetPopBasis={uploadedMedEntries.length > 0 ? `Uploaded total population × ${medTargetPct}%` : "Microplan target population"}
-              readOnly={lensReadOnly}
+              readOnly={false}
               scopeId={selectedProjectId || "all"}
 
             />

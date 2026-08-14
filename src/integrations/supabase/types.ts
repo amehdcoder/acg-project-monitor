@@ -5955,6 +5955,57 @@ export type Database = {
         }
         Relationships: []
       }
+      microplan_geo_exclusions: {
+        Row: {
+          archived_at: string
+          created_at: string
+          created_by: string | null
+          ex_key: string
+          id: string
+          level: string
+          lga: string | null
+          population: number
+          project_id: string | null
+          records: number
+          scope_id: string
+          state: string | null
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          archived_at?: string
+          created_at?: string
+          created_by?: string | null
+          ex_key: string
+          id?: string
+          level: string
+          lga?: string | null
+          population?: number
+          project_id?: string | null
+          records?: number
+          scope_id: string
+          state?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          archived_at?: string
+          created_at?: string
+          created_by?: string | null
+          ex_key?: string
+          id?: string
+          level?: string
+          lga?: string | null
+          population?: number
+          project_id?: string | null
+          records?: number
+          scope_id?: string
+          state?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: []
+      }
       microplan_medicine_allocations: {
         Row: {
           amount: number
