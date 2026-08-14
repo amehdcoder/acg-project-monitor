@@ -2996,9 +2996,6 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               scopeLabel={`${allLgasForMedicine.length} LGA(s) in view`}
               projectName={projects.find((p) => p.id === selectedProjectId)?.name}
               targetPopBasis={uploadedMedEntries.length > 0 ? `Uploaded total population × ${medTargetPct}%` : "Microplan target population"}
-              {/* Anyone granted the Medicine tab (incl. MDA Lens) may enter
-                  allocations, pick medicine / unit / buffer and download the
-                  community allocation — these are local computations + export. */}
               readOnly={false}
               scopeId={selectedProjectId || "all"}
 
