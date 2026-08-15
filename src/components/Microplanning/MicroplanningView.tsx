@@ -1066,7 +1066,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   // MDA Lens users get exactly the tabs their grant lists.
   const canOpenView = useCallback(
     (v: string) => {
-      if (v === "list") return isAdmin || (lensEnabled && canOpenMicroplanTab("list"));
+      if (v === "list") return isAdmin; // Planning table is strictly admin-only
       return isAdmin ? true : lensEnabled ? canOpenMicroplanTab(v) : false;
     },
     [isAdmin, lensEnabled, canOpenMicroplanTab],
