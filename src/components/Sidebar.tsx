@@ -186,12 +186,12 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
 
   const sidebarWidth = collapsed ? "w-[52px]" : "w-[240px]";
 
-  const NavButton = ({ id, label, icon: Icon, isBottom }: { id: string; label: string; icon: any; isBottom?: boolean }) => {
+  const NavButton = ({ id, label, icon: Icon, isBottom, route }: { id: string; label: string; icon: any; isBottom?: boolean; route?: string }) => {
     const isActive = activeTab === id;
     const btn = (
       <button
         data-active={isActive ? "true" : undefined}
-        onClick={() => { playNavigate(); if (id === "data-cleaner") { navigate("/data-cleaner"); } else if (id === "learning-log") { navigate("/learning-log"); } else { onTabChange(id); } onClose(); }}
+        onClick={() => { playNavigate(); if (route) { navigate(route); } else { onTabChange(id); } onClose(); }}
         className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13px] font-medium transition-all duration-100 ${
           isActive
             ? "bg-sidebar-primary text-sidebar-primary-foreground"
