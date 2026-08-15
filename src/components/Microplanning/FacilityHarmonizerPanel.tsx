@@ -165,6 +165,87 @@ const FacilityHarmonizerPanel = ({ entries, readOnly = false, onRefresh }: Props
             </table>
           </div>
         )}
+
+        {!!result?.unmatched.length && (
+          <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <p className="text-xs font-bold text-foreground">
+                {result.unmatched.length} facility name{result.unmatched.length === 1 ? "" : "s"} not found in the GRID3 ward registry
+              </p>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              These were left exactly as captured. Pick the correct GRID3 facility for the ward (or type the
+              official name) and save — the change is applied to every affected record immediately.
+            </p>
+            <div className="max-h-[320px] overflow-auto rounded-md border border-border/50 bg-background/70">
+              <table className="w-full text-[11px]">
+                <thead className="sticky top-0 bg-muted/70 backdrop-blur">
+                  <tr className="text-left">
+                    {["LGA", "Ward", "Captured name", "Closest GRID3", "Correct to", "Records", ""].map((h, i) => (
+                      <th key={i} className="px-2 py-1.5 font-semibold text-muted-foreground">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.unmatched.map((u) => {
+                    const key = `${u.lga}||${u.ward}||${u.name}`;
+                    return (
+                      <tr key={key} className="border-t border-border/40 align-middle">
+                        <td className="px-2 py-1">{u.lga}</td>
+                        <td className="px-2 py-1">{u.ward}</td>
+                        <td className="px-2 py-1 font-medium text-foreground">{u.name}</td>
+                        <td className="px-2 py-1 text-muted-foreground">
+                          {u.nearest ? `${u.nearest} (${Math.round(u.nearestScore * 100)}%)` : "—"}
+                        </td>
+                        <td className="px-2 py-1">
+                          <div className="flex flex-col gap-1 min-w-[190px]">
+                            {!!u.grid3Options.length && (
+                              <select
+                                className="h-7 rounded-md border border-border bg-background px-1.5 text-[11px]"
+                                value={u.grid3Options.includes(fixes[key] ?? "") ? fixes[key] : ""}
+                                onChange={(e) => setFixes((f) => ({ ...f, [key]: e.target.value }))}
+                              >
+                                <option value="">Select GRID3 facility…</option>
+                                {u.grid3Options.map((o) => (
+                                  <option key={o} value={o}>{o}</option>
+                                ))}
+                              </select>
+                            )}
+                            <Input
+                              className="h-7 text-[11px]"
+                              placeholder="or type official name"
+                              value={fixes[key] ?? ""}
+                              onChange={(e) => setFixes((f) => ({ ...f, [key]: e.target.value }))}
+                            />
+                          </div>
+                        </td>
+                        <td className="px-2 py-1 tabular-nums">{u.recordCount}</td>
+                        <td className="px-2 py-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-[11px]"
+                            disabled={
+                              fixing === key ||
+                              readOnly ||
+                              !(fixes[key] || "").trim() ||
+                              (fixes[key] || "").trim() === u.name
+                            }
+                            onClick={() => applyFix(u, (fixes[key] || "").trim(), key)}
+                          >
+                            {fixing === key ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
       </CardContent>
     </Card>
   );
