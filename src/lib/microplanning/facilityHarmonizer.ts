@@ -121,6 +121,7 @@ export async function harmonizeFacilityNames(
   }
 
   const renames: FacilityRename[] = [];
+  const notInGrid3: UnmatchedFacility[] = [];
   let inspected = 0;
   let alreadyStandard = 0;
   let recordsAffected = 0;
@@ -132,6 +133,11 @@ export async function harmonizeFacilityNames(
       getGrid3FacilitiesWithCoords(w.state, w.lga, w.ward).catch(() => []),
       getGrid3FacilitiesWithCoords(w.state, w.lga).catch(() => []),
     ]);
+    const wardOptions = Array.from(
+      new Set((facWard.length ? facWard : facLga).map((f) => titleCase(String(f?.name ?? ""))).filter(Boolean)),
+    ).sort((a, b) => a.localeCompare(b));
+
+
 
     // Pass 1 — GRID3 canon.
     const unmatched: Array<{ name: string; ids: string[] }> = [];
