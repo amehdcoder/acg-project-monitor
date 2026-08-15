@@ -109,7 +109,9 @@ function WidgetChart({
           </thead>
           <tbody>
             {res.data.map((d) => (
-              <tr key={d.name} className="border-t border-slate-800 text-slate-200">
+              <tr key={d.name}
+                onClick={() => pick(d.name)}
+                className={`border-t border-slate-800 text-slate-200 ${onDrill ? "cursor-pointer hover:bg-slate-800/50" : ""} ${activeValue === d.name ? "bg-cyan-500/10 text-cyan-200" : ""}`}>
                 <td className="p-2">{d.name}</td>
                 <td className="p-2 text-right font-medium">{fmt(d.value)}</td>
                 <td className="p-2 text-right text-slate-400">{d.pct.toFixed(1)}%</td>
@@ -126,15 +128,22 @@ function WidgetChart({
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie data={res.data} dataKey="value" nameKey="name" innerRadius={w.kind === "donut" ? "52%" : 0}
-            outerRadius="80%" paddingAngle={1}
+            outerRadius="80%" paddingAngle={1} onClick={(d: any) => pick(d?.name ?? d?.payload?.name)}
+            className={onDrill ? "cursor-pointer" : undefined}
             label={w.showValues ? (d: any) => `${d.name}: ${fmt(d.value)}` : false} labelLine={false}>
-            {res.data.map((_, i) => <Cell key={i} fill={WHO_PALETTE[(i + w.colorIndex) % WHO_PALETTE.length]} />)}
+            {res.data.map((d, i) => (
+              <Cell key={i} fill={WHO_PALETTE[(i + w.colorIndex) % WHO_PALETTE.length]}
+                stroke={activeValue === d.name ? "#e2e8f0" : "#0f172a"}
+                strokeWidth={activeValue === d.name ? 2 : 1}
+                opacity={activeValue && activeValue !== d.name ? 0.45 : 1} />
+            ))}
           </Pie>
           {tooltip}
         </PieChart>
       </ResponsiveContainer>
     );
   }
+
 
   if (w.kind === "treemap") {
     return (
