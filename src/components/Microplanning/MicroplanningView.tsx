@@ -275,6 +275,12 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete, readOnly = false }:
 };
 
 // Paginated admin list view for full access users
+/** True when a record has no usable household count captured. */
+const missingHouseholds = (e: any): boolean => {
+  const v = Number(e?.number_of_households);
+  return !Number.isFinite(v) || v <= 0;
+};
+
 const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readOnly = false, onGpsResolved }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; onBulkDelete?: (ids: string[]) => void; readOnly?: boolean; onGpsResolved?: (id: string, patch: Record<string, unknown>) => void }) => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
@@ -319,6 +325,12 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
     };
 
     return [...base].sort((a: any, b: any) => {
+      // Records with a missing / zero household count always come first so the
+      // data gap is impossible to miss.
+      const ma = missingHouseholds(a) ? 0 : 1;
+      const mb = missingHouseholds(b) ? 0 : 1;
+      if (ma !== mb) return ma - mb;
+
       const ra = rankOf(a);
       const rb = rankOf(b);
       if (ra === null && rb === null) return 0;
@@ -1054,7 +1066,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   // MDA Lens users get exactly the tabs their grant lists.
   const canOpenView = useCallback(
     (v: string) => {
-      if (v === "list") return isAdmin || (lensEnabled && canOpenMicroplanTab("list"));
+      if (v === "list") return isAdmin; // Planning table is strictly admin-only
       return isAdmin ? true : lensEnabled ? canOpenMicroplanTab(v) : false;
     },
     [isAdmin, lensEnabled, canOpenMicroplanTab],
