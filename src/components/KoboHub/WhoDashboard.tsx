@@ -296,6 +296,9 @@ export default function WhoDashboard({
           <Button size="sm" variant="outline" className="border-slate-700 text-slate-200" onClick={exportCsv}>
             <Download className="mr-1.5 h-3.5 w-3.5" /> Export
           </Button>
+          <Button size="sm" variant="outline" className="border-slate-700 text-slate-200" onClick={() => setGalleryOpen(true)}>
+            <Sparkles className="mr-1.5 h-3.5 w-3.5 text-cyan-400" /> Template gallery
+          </Button>
           {editing && (
             <>
               <Button size="sm" variant="outline" className="border-slate-700 text-slate-200"
@@ -315,13 +318,34 @@ export default function WhoDashboard({
         </div>
       </div>
 
+      {sliceEntries.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-2 text-xs text-cyan-100">
+          <Filter className="h-3.5 w-3.5" />
+          <span className="font-medium">Drill-down active — every widget and the Raw Kobo data explorer are filtered:</span>
+          {sliceEntries.map(([k, v]) => (
+            <button key={k} type="button" onClick={() => onDrill?.(k, v)}
+              className="inline-flex items-center gap-1 rounded-full border border-cyan-400/40 bg-slate-950/50 px-2 py-0.5 hover:bg-slate-950">
+              {(fieldOf(schema, k)?.label ?? k)}: <strong>{v}</strong> <X className="h-3 w-3" />
+            </button>
+          ))}
+          {onClearDrill && (
+            <Button size="sm" variant="ghost" className="h-6 text-cyan-200" onClick={onClearDrill}>Clear all</Button>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-        {dash.widgets.map((w) => (
+        {dash.widgets.map((w) => {
+          const df = drillField(w);
+          return (
           <div key={w.id} className={`${spanClass[Math.min(12, Math.max(3, w.span))] ?? "lg:col-span-4"} rounded-lg border border-slate-800 bg-slate-900/60 p-3`}>
             <div className="mb-2 flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <h3 className="truncate text-sm font-semibold text-slate-100">{w.title}</h3>
                 {w.subtitle && <p className="truncate text-[11px] text-slate-500">{w.subtitle}</p>}
+                {df && !editing && onDrill && (
+                  <p className="text-[10px] uppercase tracking-wide text-cyan-500/70">Click a segment to drill down</p>
+                )}
               </div>
               {editing && (
                 <div className="flex shrink-0 items-center gap-0.5">
@@ -334,10 +358,13 @@ export default function WhoDashboard({
               )}
             </div>
             <div style={{ height: w.height }}>
-              <WidgetChart w={w} schema={schema} rows={rows} />
+              <WidgetChart w={w} schema={schema} rows={rows}
+                activeValue={df ? slices[df] : undefined}
+                onDrill={df && onDrill && !editing ? (value) => onDrill(df, value) : undefined} />
             </div>
           </div>
-        ))}
+          );
+        })}
         {!dash.widgets.length && (
           <div className="lg:col-span-12 rounded-lg border border-dashed border-slate-800 p-10 text-center text-sm text-slate-500">
             No widgets yet — switch to edit mode and add your first panel.
@@ -346,6 +373,14 @@ export default function WhoDashboard({
       </div>
 
       <WidgetEditorDialog open={open} onOpenChange={setOpen} schema={schema} widget={target} onSave={upsert} />
+      <WidgetTemplateGallery
+        open={galleryOpen} onOpenChange={setGalleryOpen} schema={schema}
+        onInsert={(widgets, name) => {
+          patch([...dash.widgets, ...widgets]);
+          toast({ title: "Template inserted", description: `${name} — ${widgets.length} panel(s) added.` });
+        }}
+      />
     </div>
+
   );
 }
