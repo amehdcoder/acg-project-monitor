@@ -419,8 +419,24 @@ export default function KoboHubPage({ manage = false }: { manage?: boolean }) {
                 </TabsList>
 
                 <TabsContent value="who">
-                  <WhoDashboard connectionId={connection.id} schema={schema} rows={rows as any} formTitle={cache?.formTitle ?? connection.name} />
+                  <WhoDashboard
+                    connectionId={connection.id} schema={schema} rows={rows as any}
+                    formTitle={cache?.formTitle ?? connection.name}
+                    activeSlices={filters.slices}
+                    onDrill={(field, value) => {
+                      const applied = filters.slices[field] === value;
+                      onSlice(field, value);
+                      if (!applied) {
+                        toast({
+                          title: "Drill-down applied",
+                          description: `${value} — Raw Kobo data and every widget are now filtered.`,
+                        });
+                      }
+                    }}
+                    onClearDrill={() => setFilters(emptyFilters())}
+                  />
                 </TabsContent>
+
 
                 <TabsContent value="fields">
                   <FieldWidgets rows={rows} schema={schema} filters={filters} onSlice={onSlice} fields={widgetFields} />
