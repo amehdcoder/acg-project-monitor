@@ -19,7 +19,13 @@ export const FACILITY_LEVELS = [
 export const OWNERSHIP_TYPES = [
   { value: "government", label: "Government" },
   { value: "private", label: "Private" },
+  { value: "faith_based", label: "Faith-based / Missionary" },
+  { value: "other", label: "Other" },
 ];
+
+/** Human label for an ownership value (falls back to the raw value). */
+export const ownershipLabel = (value?: string | null) =>
+  OWNERSHIP_TYPES.find((o) => o.value === value)?.label || (value || "—");
 
 export const FUNCTIONAL_STATUS = [
   { value: "fully", label: "Fully Functional" },
