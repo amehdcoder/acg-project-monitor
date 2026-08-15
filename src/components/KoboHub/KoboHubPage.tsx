@@ -22,7 +22,7 @@ import { exportSnapshotPNG, exportSnapshotPDF } from "@/lib/isc/snapshotExport";
 import {
   deleteConnection, deletePreset, getActiveId, listConnections, listPresets,
   loadCache, savePreset, setActiveId, syncConnection,
-  type HubCache, type HubConnection, type HubPreset,
+  type HubCache, type HubConnection, type HubPreset, type SyncStage,
 } from "@/lib/koboHub/client";
 import {
   applyFilters, downloadCsv, emptyFilters, integrityScan,
