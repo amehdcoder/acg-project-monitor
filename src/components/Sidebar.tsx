@@ -266,7 +266,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
               )}
               <div className="space-y-0.5">
                 {visibleMenuItems.map((item) => (
-                  <NavButton key={item.id} id={item.id} label={item.label} icon={item.icon} />
+                  <NavButton key={item.id} id={item.id} label={item.label} icon={item.icon} route={(item as any).route} />
                 ))}
               </div>
             </nav>
