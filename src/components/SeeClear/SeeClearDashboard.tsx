@@ -131,6 +131,14 @@ export default function SeeClearDashboard({ onClose }: Props) {
                 <DropdownMenuItem onClick={exportPDF}><FileText className="mr-2 h-4 w-4" /> Export as PDF</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => exportImage("png")}><FileImage className="mr-2 h-4 w-4" /> Export as PNG</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => exportImage("jpeg")}><FileImage className="mr-2 h-4 w-4" /> Export as JPEG</DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    try { const f = downloadSeeClearXlsForm(); toast.success(`XLSForm downloaded — ${f}`); }
+                    catch (e: any) { toast.error(e?.message || "Could not build XLSForm"); }
+                  }}
+                >
+                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Download Kobo XLSForm
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             {canSim && (
