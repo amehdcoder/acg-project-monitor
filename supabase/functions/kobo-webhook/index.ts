@@ -312,7 +312,7 @@ Deno.serve(async (req) => {
         readiness_score: readiness,
         overall_score: readiness,
         evidence,
-        challenges: splitMulti("challenges"),
+        challenges: splitMulti("key_challenges"),
         recommendations: splitMulti("recommendations"),
         remarks: pick(payload, ["remarks"]),
         critical_gap: pick(payload, ["critical_gap"]),

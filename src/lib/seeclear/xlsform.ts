@@ -326,10 +326,10 @@ export function buildSeeClearXlsForm(options: SeeClearXlsFormOptions = {}): XLSX
   survey.push(q({ type: "begin_group", name: "learning_section", label: "10. Learning, Challenges & Sign-off", appearance: "field-list" }));
   survey.push(banner("s10_banner", "📝", "Learning, Challenges & Sign-off", "Document what was learned and agree next steps with the facility."));
   survey.push(q({
-    type: "select_multiple challenges", name: "challenges", label: "Key challenges observed",
+    type: "select_multiple challenges", name: "key_challenges", label: "Key challenges observed",
     required: "yes", hint: "Select all that apply.",
   }));
-  survey.push(q({ type: "text", name: "challenges_other", label: "Other challenge (specify)", relevant: "selected(${challenges}, 'other')", required: "yes" }));
+  survey.push(q({ type: "text", name: "key_challenges_other", label: "Other challenge (specify)", relevant: "selected(${key_challenges}, 'other')", required: "yes" }));
   survey.push(q({
     type: "select_multiple recommendations", name: "recommendations", label: "Recommendations / agreed actions",
     required: "yes", hint: "Select all that apply.",
