@@ -57,11 +57,25 @@ export default function KoboHubPage({ manage = false }: { manage?: boolean }) {
   const [editing, setEditing] = useState<HubConnection | null>(null);
   const [presets, setPresets] = useState<HubPreset[]>([]);
   const [lastSyncLabel, setLastSyncLabel] = useState("");
+  const [tab, setTab] = useState("who");
+
+  /* --------------------------------------------------- sync status state */
+  const [stage, setStage] = useState<SyncStage | null>(null);
+  const [stageDetail, setStageDetail] = useState("");
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [retryIn, setRetryIn] = useState<number | null>(null);
+  const [autoRetry, setAutoRetry] = useState(true);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const retryTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const connection = useMemo(() => connections.find((c) => c.id === activeId) ?? null, [connections, activeId]);
 
   useEffect(() => { if (manage) setDialogOpen(true); }, [manage]);
   useEffect(() => { setPresets(activeId ? listPresets(activeId) : []); }, [activeId, dialogOpen]);
+  useEffect(() => {
+    setLastSyncAt(cache?.fetchedAt ?? null);
+  }, [cache?.fetchedAt]);
 
   const reload = useCallback((id?: string) => {
     const all = listConnections();
@@ -69,20 +83,54 @@ export default function KoboHubPage({ manage = false }: { manage?: boolean }) {
     const next = id ?? getActiveId();
     setActive(next);
     setCache(next ? loadCache(next) : null);
+    setSyncError(null);
+    setAttempt(0);
+  }, []);
+
+  const clearRetryTimer = useCallback(() => {
+    if (retryTimer.current) { clearInterval(retryTimer.current); retryTimer.current = null; }
+    setRetryIn(null);
   }, []);
 
   const refresh = useCallback(async (silent = false) => {
     if (!connection) return;
+    clearRetryTimer();
     setSyncing(true);
+    setSyncError(null);
+    setStage("schema");
+    setStageDetail("");
     try {
-      const c = await syncConnection(connection);
+      const c = await syncConnection(connection, (st, detail) => { setStage(st); setStageDetail(detail ?? ""); });
       setCache(c);
       setLastSyncLabel(new Date().toLocaleTimeString());
+      setLastSyncAt(c.fetchedAt);
+      setAttempt(0);
       if (!silent) toast({ title: "Live KoboSync", description: `${c.count} records synced.` });
     } catch (e: any) {
-      if (!silent) toast({ title: "Sync failed", description: e?.message ?? "Unable to reach KoboToolbox.", variant: "destructive" });
-    } finally { setSyncing(false); }
-  }, [connection]);
+      const msg = e?.message ?? "Unable to reach KoboToolbox.";
+      setSyncError(msg);
+      setAttempt((a) => a + 1);
+      if (!silent) toast({ title: "Sync failed", description: msg, variant: "destructive" });
+    } finally { setSyncing(false); setStage(null); }
+  }, [connection, clearRetryTimer]);
+
+  // Automatic retry with exponential backoff (15s → 30s → 60s → 120s, max 4 tries)
+  useEffect(() => {
+    if (!autoRetry || !syncError || syncing || attempt === 0 || attempt > 4) return;
+    const wait = Math.min(120, 15 * 2 ** (attempt - 1));
+    setRetryIn(wait);
+    const t = setInterval(() => {
+      setRetryIn((s) => {
+        if (s === null) return null;
+        if (s <= 1) { clearInterval(t); retryTimer.current = null; refresh(true); return null; }
+        return s - 1;
+      });
+    }, 1000);
+    retryTimer.current = t;
+    return () => { clearInterval(t); };
+  }, [autoRetry, syncError, syncing, attempt, refresh]);
+
+  useEffect(() => () => { if (retryTimer.current) clearInterval(retryTimer.current); }, []);
 
   // Configurable auto-refresh cadence
   useEffect(() => {
@@ -90,6 +138,7 @@ export default function KoboHubPage({ manage = false }: { manage?: boolean }) {
     const t = setInterval(() => { refresh(true); }, Math.max(30, connection.autoRefreshSeconds) * 1000);
     return () => clearInterval(t);
   }, [connection, refresh]);
+
 
   /* ------------------------------------------------------------- derived */
 
