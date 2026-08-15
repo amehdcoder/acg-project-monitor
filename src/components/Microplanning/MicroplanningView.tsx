@@ -319,6 +319,12 @@ const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readO
     };
 
     return [...base].sort((a: any, b: any) => {
+      // Records with a missing / zero household count always come first so the
+      // data gap is impossible to miss.
+      const ma = missingHouseholds(a) ? 0 : 1;
+      const mb = missingHouseholds(b) ? 0 : 1;
+      if (ma !== mb) return ma - mb;
+
       const ra = rankOf(a);
       const rb = rankOf(b);
       if (ra === null && rb === null) return 0;
