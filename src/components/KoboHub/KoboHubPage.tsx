@@ -332,8 +332,7 @@ export default function KoboHubPage({ manage = false }: { manage?: boolean }) {
             </div>
 
             <div ref={boardRef} className="space-y-5">
-              <Tabs defaultValue="fields" className="space-y-4">
-            <div ref={boardRef} className="space-y-5">
+
               {cache?.drift?.changed && (
                 <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
                   <span className="font-semibold">Kobo schema updated — dashboard adapted automatically.</span>{" "}
