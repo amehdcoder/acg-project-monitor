@@ -1554,6 +1554,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     isOwner ||
     (!!currentProjectId && bmzProjectIds.has(currentProjectId)) ||
     projects.some((p) => bmzProjectIds.has(p.id));
+
+  // See Clear access is granted SEPARATELY for the checklist and the dashboard
+  // via `user_standard_form_assignments` (codes: seeclear_form / seeclear_dash).
+  const canUseSeeClearForm = isOwner || assignedStandardCodes.has("seeclear_form");
+  const canUseSeeClearDash = isOwner || assignedStandardCodes.has("seeclear_dash");
+  const seeclearFolderVisible = canUseSeeClearForm || canUseSeeClearDash;
   useEffect(() => {
     console.log("[BMZ] visibility eval", {
       bmzFolderVisible,
@@ -1838,11 +1844,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     return <BloombergDashboard onClose={() => setShowBloombergDash(false)} />;
   }
 
-  if (showSeeClearForm) {
+  if (showSeeClearForm && canUseSeeClearForm) {
     return <SeeClearFormFiller onClose={() => setShowSeeClearForm(false)} />;
   }
 
-  if (showSeeClearDash) {
+  if (showSeeClearDash && canUseSeeClearDash) {
     return <SeeClearDashboard onClose={() => setShowSeeClearDash(false)} />;
   }
 
@@ -4123,14 +4129,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     },
                   ],
                 }] : []),
-                ...(isOwner ? [{
+                ...(seeclearFolderVisible ? [{
                   id: "seeclear_folder",
                   title: "See Clear — Plateau Eye Health Project",
                   subtitle: "Facility monitoring & supervision — checklist & dashboard",
                   bg: "bg-[#DCF3F0]", fg: "text-[#0f766e]", chipBg: "bg-[#DCF3F0]", chipFg: "text-[#0f766e]",
                   items: [
-                    { kind: "seeclear_form" as const, icon: ClipboardCheck, bg: "bg-[#DCF3F0]", fg: "text-[#14b8a6]", label: "Facility Monitoring Checklist", desc: "Profile, readiness, equipment, evidence & sign-off (Owner only)." },
-                    { kind: "seeclear_dash" as const, icon: BarChart3, bg: "bg-[#DCF3F0]", fg: "text-[#0f766e]", label: "Monitoring Dashboard", desc: "Readiness, equipment, referrals, data quality & map (Owner only)." },
+                    ...(canUseSeeClearForm ? [{ kind: "seeclear_form" as const, icon: ClipboardCheck, bg: "bg-[#DCF3F0]", fg: "text-[#14b8a6]", label: "Facility Monitoring Checklist", desc: "Profile, readiness, equipment, evidence, XLSForm export & sign-off." }] : []),
+                    ...(canUseSeeClearDash ? [{ kind: "seeclear_dash" as const, icon: BarChart3, bg: "bg-[#DCF3F0]", fg: "text-[#0f766e]", label: "Monitoring Dashboard", desc: "Readiness, equipment, referrals, data quality & map." }] : []),
                   ],
                 }] : []),
                 ...(bmzFolderVisible ? [{

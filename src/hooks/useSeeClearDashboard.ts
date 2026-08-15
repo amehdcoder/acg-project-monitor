@@ -3,7 +3,7 @@ import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-quer
 import { DASHBOARD_QUERY_OPTIONS } from "@/lib/queryConfig";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  EQUIPMENT_ITEMS, EQUIP_STATUS_META, readinessBand, type EquipStatus,
+  EQUIPMENT_ITEMS, EQUIP_STATUS_META, OWNERSHIP_TYPES, readinessBand, type EquipStatus,
 } from "@/lib/seeclear/definition";
 import { generateSeeClearSimulation } from "@/lib/seeclear/simulation";
 import { buildAccountability, type ProfileLite } from "@/lib/accountability";
@@ -162,13 +162,19 @@ export const useSeeClearDashboard = () => {
     }));
   }, [facilities]);
 
-  const byOwnership = useMemo(
-    () => [
-      { name: "Government", value: stats.government, color: "#2563eb" },
-      { name: "Private", value: stats.private, color: "#14b8a6" },
-    ],
-    [stats],
-  );
+  const byOwnership = useMemo(() => {
+    const colors: Record<string, string> = {
+      government: "#2563eb",
+      private: "#14b8a6",
+      faith_based: "#9b72cf",
+      other: "#f59e0b",
+    };
+    return OWNERSHIP_TYPES.map((o) => ({
+      name: o.label,
+      value: facilities.filter((f) => (f.ownership || "") === o.value).length,
+      color: colors[o.value] || "#94a3b8",
+    })).filter((d) => d.value > 0 || d.name === "Government" || d.name === "Private");
+  }, [facilities]);
 
   const readinessByLevel = useMemo(() => {
     const order = ["primary", "secondary", "tertiary"];
