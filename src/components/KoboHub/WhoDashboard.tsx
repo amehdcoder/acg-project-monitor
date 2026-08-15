@@ -219,12 +219,18 @@ function WidgetChart({
 }
 
 
-export default function WhoDashboard({ connectionId, schema, rows, formTitle }: Props) {
+export default function WhoDashboard({
+  connectionId, schema, rows, formTitle, onDrill, activeSlices, onClearDrill,
+}: Props) {
   const [dash, setDash] = useState<HubDashboard>(() =>
     loadDashboard(connectionId) ?? autoDashboard(schema, connectionId, rows));
   const [editing, setEditing] = useState(false);
   const [target, setTarget] = useState<HubWidget | null>(null);
   const [open, setOpen] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const slices = activeSlices ?? {};
+  const sliceEntries = Object.entries(slices);
+
 
   const persist = (next: HubDashboard) => { setDash(next); saveDashboard(next); };
   const patch = (widgets: HubWidget[]) => persist({ ...dash, widgets });
