@@ -31,6 +31,11 @@ interface Props {
   schema: HubSchema;
   rows: Row[];
   formTitle: string;
+  /** Click-through drill-down: applies a slice to the whole hub (incl. Raw data). */
+  onDrill?: (field: string, value: string) => void;
+  /** Currently applied slices, so widgets can highlight the active segment. */
+  activeSlices?: Record<string, string>;
+  onClearDrill?: () => void;
 }
 
 const fmt = (n: number) =>
@@ -42,8 +47,23 @@ const spanClass: Record<number, string> = {
   11: "lg:col-span-11", 12: "lg:col-span-12",
 };
 
-function WidgetChart({ w, schema, rows }: { w: HubWidget; schema: HubSchema; rows: Row[] }) {
+/** A widget can drill down when it is bound to a real (non-virtual) parent field. */
+const drillField = (w: HubWidget): string | null => {
+  if (!w.dimension || w.source !== "parent") return null;
+  if (w.dimension === "__date" || w.dimension === "__month") return null;
+  if (w.kind === "kpi" || w.kind === "text") return null;
+  return w.dimension;
+};
+
+function WidgetChart({
+  w, schema, rows, onDrill, activeValue,
+}: {
+  w: HubWidget; schema: HubSchema; rows: Row[];
+  onDrill?: (value: string) => void; activeValue?: string;
+}) {
   const res = useMemo(() => computeWidget(rows, schema, w), [rows, schema, w]);
+  const pick = (name: unknown) => { if (onDrill && name != null) onDrill(String(name)); };
+
   const color = WHO_PALETTE[w.colorIndex % WHO_PALETTE.length];
 
   if (w.kind === "text") {
