@@ -381,17 +381,21 @@ export default function KoboHubPage({ manage = false }: { manage?: boolean }) {
             </div>
 
             <div ref={boardRef} className="space-y-5">
+              <SyncStatusPanel
+                state={{
+                  syncing, stage, detail: stageDetail, error: syncError, attempt,
+                  retryInSeconds: retryIn, lastSyncAt,
+                  cadenceSeconds: Math.max(30, connection.autoRefreshSeconds || 60),
+                  recordCount: cache?.count ?? 0,
+                }}
+                drift={cache?.drift}
+                autoRetry={autoRetry}
+                onAutoRetryChange={(v) => { setAutoRetry(v); if (!v) clearRetryTimer(); }}
+                onRetryNow={() => refresh(false)}
+                onCancelRetry={clearRetryTimer}
+              />
+              <Tabs value={tab} onValueChange={setTab} className="space-y-4">
 
-              {cache?.drift?.changed && (
-                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
-                  <span className="font-semibold">Kobo schema updated — dashboard adapted automatically.</span>{" "}
-                  {cache.drift.added.length > 0 && <>{cache.drift.added.length} new field(s){cache.drift.added.slice(0, 4).length ? `: ${cache.drift.added.slice(0, 4).map((f) => f.label).join(", ")}` : ""}. </>}
-                  {cache.drift.removed.length > 0 && <>{cache.drift.removed.length} field(s) removed. </>}
-                  {cache.drift.retyped.length > 0 && <>{cache.drift.retyped.length} field(s) changed type. </>}
-                  {cache.drift.addedRepeats.length > 0 && <>{cache.drift.addedRepeats.length} new repeat group(s). </>}
-                </div>
-              )}
-              <Tabs defaultValue="who" className="space-y-4">
                 <TabsList className="bg-slate-900 border border-slate-800 flex-wrap h-auto">
                   <TabsTrigger value="who" className="text-slate-300 data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-200">
                     <Activity className="h-4 w-4 mr-1" /> WHO dashboard
