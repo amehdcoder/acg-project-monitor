@@ -14,23 +14,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, Copy, Download, LayoutDashboard,
-  Pencil, Plus, RotateCcw, Save, Trash2, X,
+  AlertTriangle, ArrowLeft, ArrowRight, Copy, Download, Filter, LayoutDashboard,
+  Pencil, Plus, RotateCcw, Save, Sparkles, Trash2, X,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import type { HubSchema } from "@/lib/koboHub/schema";
 import {
-  WHO_PALETTE, autoDashboard, blankWidget, clearDashboard, computeWidget,
+  WHO_PALETTE, autoDashboard, blankWidget, clearDashboard, computeWidget, fieldOf,
   loadDashboard, newWidgetId, saveDashboard,
   type HubDashboard, type HubWidget, type Row,
 } from "@/lib/koboHub/dashboard";
 import WidgetEditorDialog from "./WidgetEditorDialog";
+import WidgetTemplateGallery from "./WidgetTemplateGallery";
+
 
 interface Props {
   connectionId: string;
   schema: HubSchema;
   rows: Row[];
   formTitle: string;
+  /** Click-through drill-down: applies a slice to the whole hub (incl. Raw data). */
+  onDrill?: (field: string, value: string) => void;
+  /** Currently applied slices, so widgets can highlight the active segment. */
+  activeSlices?: Record<string, string>;
+  onClearDrill?: () => void;
 }
 
 const fmt = (n: number) =>
@@ -42,8 +49,23 @@ const spanClass: Record<number, string> = {
   11: "lg:col-span-11", 12: "lg:col-span-12",
 };
 
-function WidgetChart({ w, schema, rows }: { w: HubWidget; schema: HubSchema; rows: Row[] }) {
+/** A widget can drill down when it is bound to a real (non-virtual) parent field. */
+const drillField = (w: HubWidget): string | null => {
+  if (!w.dimension || w.source !== "parent") return null;
+  if (w.dimension === "__date" || w.dimension === "__month") return null;
+  if (w.kind === "kpi" || w.kind === "text") return null;
+  return w.dimension;
+};
+
+function WidgetChart({
+  w, schema, rows, onDrill, activeValue,
+}: {
+  w: HubWidget; schema: HubSchema; rows: Row[];
+  onDrill?: (value: string) => void; activeValue?: string;
+}) {
   const res = useMemo(() => computeWidget(rows, schema, w), [rows, schema, w]);
+  const pick = (name: unknown) => { if (onDrill && name != null) onDrill(String(name)); };
+
   const color = WHO_PALETTE[w.colorIndex % WHO_PALETTE.length];
 
   if (w.kind === "text") {
@@ -89,7 +111,9 @@ function WidgetChart({ w, schema, rows }: { w: HubWidget; schema: HubSchema; row
           </thead>
           <tbody>
             {res.data.map((d) => (
-              <tr key={d.name} className="border-t border-slate-800 text-slate-200">
+              <tr key={d.name}
+                onClick={() => pick(d.name)}
+                className={`border-t border-slate-800 text-slate-200 ${onDrill ? "cursor-pointer hover:bg-slate-800/50" : ""} ${activeValue === d.name ? "bg-cyan-500/10 text-cyan-200" : ""}`}>
                 <td className="p-2">{d.name}</td>
                 <td className="p-2 text-right font-medium">{fmt(d.value)}</td>
                 <td className="p-2 text-right text-slate-400">{d.pct.toFixed(1)}%</td>
@@ -106,9 +130,15 @@ function WidgetChart({ w, schema, rows }: { w: HubWidget; schema: HubSchema; row
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie data={res.data} dataKey="value" nameKey="name" innerRadius={w.kind === "donut" ? "52%" : 0}
-            outerRadius="80%" paddingAngle={1}
+            outerRadius="80%" paddingAngle={1} onClick={(d: any) => pick(d?.name ?? d?.payload?.name)}
+            className={onDrill ? "cursor-pointer" : undefined}
             label={w.showValues ? (d: any) => `${d.name}: ${fmt(d.value)}` : false} labelLine={false}>
-            {res.data.map((_, i) => <Cell key={i} fill={WHO_PALETTE[(i + w.colorIndex) % WHO_PALETTE.length]} />)}
+            {res.data.map((d, i) => (
+              <Cell key={i} fill={WHO_PALETTE[(i + w.colorIndex) % WHO_PALETTE.length]}
+                stroke={activeValue === d.name ? "#e2e8f0" : "#0f172a"}
+                strokeWidth={activeValue === d.name ? 2 : 1}
+                opacity={activeValue && activeValue !== d.name ? 0.45 : 1} />
+            ))}
           </Pie>
           {tooltip}
         </PieChart>
@@ -116,10 +146,13 @@ function WidgetChart({ w, schema, rows }: { w: HubWidget; schema: HubSchema; row
     );
   }
 
+
   if (w.kind === "treemap") {
     return (
       <ResponsiveContainer width="100%" height="100%">
         <Treemap data={res.data} dataKey="value" nameKey="name" stroke="#0f172a"
+          onClick={(d: any) => pick(d?.name ?? d?.payload?.name)}
+          className={onDrill ? "cursor-pointer" : undefined}
           content={undefined as any} fill={color}>
           {tooltip}
         </Treemap>
@@ -131,7 +164,8 @@ function WidgetChart({ w, schema, rows }: { w: HubWidget; schema: HubSchema; row
     const Chart = w.kind === "line" ? LineChart : AreaChart;
     return (
       <ResponsiveContainer width="100%" height="100%">
-        <Chart data={res.data} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+        <Chart data={res.data} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}
+          onClick={(st: any) => pick(st?.activeLabel)}>
           {grid}
           <XAxis dataKey="name" {...axisProps} minTickGap={20} />
           <YAxis {...axisProps} />
@@ -147,7 +181,9 @@ function WidgetChart({ w, schema, rows }: { w: HubWidget; schema: HubSchema; row
   if (w.kind === "stacked" && res.seriesKeys.length) {
     return (
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={res.stacked} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+        <BarChart data={res.stacked} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}
+          onClick={(st: any) => pick(st?.activeLabel)}
+          className={onDrill ? "cursor-pointer" : undefined}>
           {grid}
           <XAxis dataKey="name" {...axisProps} interval={0} angle={-20} textAnchor="end" height={62} />
           <YAxis {...axisProps} />
@@ -165,12 +201,18 @@ function WidgetChart({ w, schema, rows }: { w: HubWidget; schema: HubSchema; row
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={res.data} layout={horizontal ? "vertical" : "horizontal"}
-        margin={{ top: 8, right: 24, left: horizontal ? 8 : 0, bottom: 4 }}>
+        margin={{ top: 8, right: 24, left: horizontal ? 8 : 0, bottom: 4 }}
+        className={onDrill ? "cursor-pointer" : undefined}>
         {grid}
         {horizontal ? <XAxis type="number" {...axisProps} /> : <XAxis dataKey="name" {...axisProps} interval={0} angle={-20} textAnchor="end" height={62} />}
         {horizontal ? <YAxis type="category" dataKey="name" width={130} {...axisProps} /> : <YAxis {...axisProps} />}
         {tooltip}
-        <Bar dataKey="value" fill={color} radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]}>
+        <Bar dataKey="value" fill={color} radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]}
+          onClick={(d: any) => pick(d?.name ?? d?.payload?.name)}>
+          {res.data.map((d, i) => (
+            <Cell key={i} fill={color} opacity={activeValue && activeValue !== d.name ? 0.4 : 1}
+              stroke={activeValue === d.name ? "#e2e8f0" : undefined} strokeWidth={activeValue === d.name ? 1.5 : 0} />
+          ))}
           {w.showValues && <LabelList dataKey="value" position={horizontal ? "right" : "top"} fill="#cbd5e1" fontSize={10} formatter={(v: any) => fmt(Number(v))} />}
         </Bar>
       </BarChart>
@@ -178,12 +220,19 @@ function WidgetChart({ w, schema, rows }: { w: HubWidget; schema: HubSchema; row
   );
 }
 
-export default function WhoDashboard({ connectionId, schema, rows, formTitle }: Props) {
+
+export default function WhoDashboard({
+  connectionId, schema, rows, formTitle, onDrill, activeSlices, onClearDrill,
+}: Props) {
   const [dash, setDash] = useState<HubDashboard>(() =>
     loadDashboard(connectionId) ?? autoDashboard(schema, connectionId, rows));
   const [editing, setEditing] = useState(false);
   const [target, setTarget] = useState<HubWidget | null>(null);
   const [open, setOpen] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const slices = activeSlices ?? {};
+  const sliceEntries = Object.entries(slices);
+
 
   const persist = (next: HubDashboard) => { setDash(next); saveDashboard(next); };
   const patch = (widgets: HubWidget[]) => persist({ ...dash, widgets });
@@ -249,6 +298,9 @@ export default function WhoDashboard({ connectionId, schema, rows, formTitle }: 
           <Button size="sm" variant="outline" className="border-slate-700 text-slate-200" onClick={exportCsv}>
             <Download className="mr-1.5 h-3.5 w-3.5" /> Export
           </Button>
+          <Button size="sm" variant="outline" className="border-slate-700 text-slate-200" onClick={() => setGalleryOpen(true)}>
+            <Sparkles className="mr-1.5 h-3.5 w-3.5 text-cyan-400" /> Template gallery
+          </Button>
           {editing && (
             <>
               <Button size="sm" variant="outline" className="border-slate-700 text-slate-200"
@@ -268,13 +320,34 @@ export default function WhoDashboard({ connectionId, schema, rows, formTitle }: 
         </div>
       </div>
 
+      {sliceEntries.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-2 text-xs text-cyan-100">
+          <Filter className="h-3.5 w-3.5" />
+          <span className="font-medium">Drill-down active — every widget and the Raw Kobo data explorer are filtered:</span>
+          {sliceEntries.map(([k, v]) => (
+            <button key={k} type="button" onClick={() => onDrill?.(k, v)}
+              className="inline-flex items-center gap-1 rounded-full border border-cyan-400/40 bg-slate-950/50 px-2 py-0.5 hover:bg-slate-950">
+              {(fieldOf(schema, k)?.label ?? k)}: <strong>{v}</strong> <X className="h-3 w-3" />
+            </button>
+          ))}
+          {onClearDrill && (
+            <Button size="sm" variant="ghost" className="h-6 text-cyan-200" onClick={onClearDrill}>Clear all</Button>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-        {dash.widgets.map((w) => (
+        {dash.widgets.map((w) => {
+          const df = drillField(w);
+          return (
           <div key={w.id} className={`${spanClass[Math.min(12, Math.max(3, w.span))] ?? "lg:col-span-4"} rounded-lg border border-slate-800 bg-slate-900/60 p-3`}>
             <div className="mb-2 flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <h3 className="truncate text-sm font-semibold text-slate-100">{w.title}</h3>
                 {w.subtitle && <p className="truncate text-[11px] text-slate-500">{w.subtitle}</p>}
+                {df && !editing && onDrill && (
+                  <p className="text-[10px] uppercase tracking-wide text-cyan-500/70">Click a segment to drill down</p>
+                )}
               </div>
               {editing && (
                 <div className="flex shrink-0 items-center gap-0.5">
@@ -287,10 +360,13 @@ export default function WhoDashboard({ connectionId, schema, rows, formTitle }: 
               )}
             </div>
             <div style={{ height: w.height }}>
-              <WidgetChart w={w} schema={schema} rows={rows} />
+              <WidgetChart w={w} schema={schema} rows={rows}
+                activeValue={df ? slices[df] : undefined}
+                onDrill={df && onDrill && !editing ? (value) => onDrill(df, value) : undefined} />
             </div>
           </div>
-        ))}
+          );
+        })}
         {!dash.widgets.length && (
           <div className="lg:col-span-12 rounded-lg border border-dashed border-slate-800 p-10 text-center text-sm text-slate-500">
             No widgets yet — switch to edit mode and add your first panel.
@@ -299,6 +375,14 @@ export default function WhoDashboard({ connectionId, schema, rows, formTitle }: 
       </div>
 
       <WidgetEditorDialog open={open} onOpenChange={setOpen} schema={schema} widget={target} onSave={upsert} />
+      <WidgetTemplateGallery
+        open={galleryOpen} onOpenChange={setGalleryOpen} schema={schema}
+        onInsert={(widgets, name) => {
+          patch([...dash.widgets, ...widgets]);
+          toast({ title: "Template inserted", description: `${name} — ${widgets.length} panel(s) added.` });
+        }}
+      />
     </div>
+
   );
 }

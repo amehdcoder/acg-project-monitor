@@ -22,7 +22,7 @@ import { exportSnapshotPNG, exportSnapshotPDF } from "@/lib/isc/snapshotExport";
 import {
   deleteConnection, deletePreset, getActiveId, listConnections, listPresets,
   loadCache, savePreset, setActiveId, syncConnection,
-  type HubCache, type HubConnection, type HubPreset,
+  type HubCache, type HubConnection, type HubPreset, type SyncStage,
 } from "@/lib/koboHub/client";
 import {
   applyFilters, downloadCsv, emptyFilters, integrityScan,
@@ -34,6 +34,7 @@ import HubMap from "./HubMap";
 import HubRepeats from "./HubRepeats";
 import HubReconciliation from "./HubReconciliation";
 import HubRawData from "./HubRawData";
+import SyncStatusPanel from "./SyncStatusPanel";
 import WhoDashboard from "./WhoDashboard";
 import IntegrationManagerDialog from "./IntegrationManagerDialog";
 
@@ -57,11 +58,25 @@ export default function KoboHubPage({ manage = false }: { manage?: boolean }) {
   const [editing, setEditing] = useState<HubConnection | null>(null);
   const [presets, setPresets] = useState<HubPreset[]>([]);
   const [lastSyncLabel, setLastSyncLabel] = useState("");
+  const [tab, setTab] = useState("who");
+
+  /* --------------------------------------------------- sync status state */
+  const [stage, setStage] = useState<SyncStage | null>(null);
+  const [stageDetail, setStageDetail] = useState("");
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [retryIn, setRetryIn] = useState<number | null>(null);
+  const [autoRetry, setAutoRetry] = useState(true);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const retryTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const connection = useMemo(() => connections.find((c) => c.id === activeId) ?? null, [connections, activeId]);
 
   useEffect(() => { if (manage) setDialogOpen(true); }, [manage]);
   useEffect(() => { setPresets(activeId ? listPresets(activeId) : []); }, [activeId, dialogOpen]);
+  useEffect(() => {
+    setLastSyncAt(cache?.fetchedAt ?? null);
+  }, [cache?.fetchedAt]);
 
   const reload = useCallback((id?: string) => {
     const all = listConnections();
@@ -69,20 +84,54 @@ export default function KoboHubPage({ manage = false }: { manage?: boolean }) {
     const next = id ?? getActiveId();
     setActive(next);
     setCache(next ? loadCache(next) : null);
+    setSyncError(null);
+    setAttempt(0);
+  }, []);
+
+  const clearRetryTimer = useCallback(() => {
+    if (retryTimer.current) { clearInterval(retryTimer.current); retryTimer.current = null; }
+    setRetryIn(null);
   }, []);
 
   const refresh = useCallback(async (silent = false) => {
     if (!connection) return;
+    clearRetryTimer();
     setSyncing(true);
+    setSyncError(null);
+    setStage("schema");
+    setStageDetail("");
     try {
-      const c = await syncConnection(connection);
+      const c = await syncConnection(connection, (st, detail) => { setStage(st); setStageDetail(detail ?? ""); });
       setCache(c);
       setLastSyncLabel(new Date().toLocaleTimeString());
+      setLastSyncAt(c.fetchedAt);
+      setAttempt(0);
       if (!silent) toast({ title: "Live KoboSync", description: `${c.count} records synced.` });
     } catch (e: any) {
-      if (!silent) toast({ title: "Sync failed", description: e?.message ?? "Unable to reach KoboToolbox.", variant: "destructive" });
-    } finally { setSyncing(false); }
-  }, [connection]);
+      const msg = e?.message ?? "Unable to reach KoboToolbox.";
+      setSyncError(msg);
+      setAttempt((a) => a + 1);
+      if (!silent) toast({ title: "Sync failed", description: msg, variant: "destructive" });
+    } finally { setSyncing(false); setStage(null); }
+  }, [connection, clearRetryTimer]);
+
+  // Automatic retry with exponential backoff (15s → 30s → 60s → 120s, max 4 tries)
+  useEffect(() => {
+    if (!autoRetry || !syncError || syncing || attempt === 0 || attempt > 4) return;
+    const wait = Math.min(120, 15 * 2 ** (attempt - 1));
+    setRetryIn(wait);
+    const t = setInterval(() => {
+      setRetryIn((s) => {
+        if (s === null) return null;
+        if (s <= 1) { clearInterval(t); retryTimer.current = null; refresh(true); return null; }
+        return s - 1;
+      });
+    }, 1000);
+    retryTimer.current = t;
+    return () => { clearInterval(t); };
+  }, [autoRetry, syncError, syncing, attempt, refresh]);
+
+  useEffect(() => () => { if (retryTimer.current) clearInterval(retryTimer.current); }, []);
 
   // Configurable auto-refresh cadence
   useEffect(() => {
@@ -90,6 +139,7 @@ export default function KoboHubPage({ manage = false }: { manage?: boolean }) {
     const t = setInterval(() => { refresh(true); }, Math.max(30, connection.autoRefreshSeconds) * 1000);
     return () => clearInterval(t);
   }, [connection, refresh]);
+
 
   /* ------------------------------------------------------------- derived */
 
@@ -332,17 +382,21 @@ export default function KoboHubPage({ manage = false }: { manage?: boolean }) {
             </div>
 
             <div ref={boardRef} className="space-y-5">
+              <SyncStatusPanel
+                state={{
+                  syncing, stage, detail: stageDetail, error: syncError, attempt,
+                  retryInSeconds: retryIn, lastSyncAt,
+                  cadenceSeconds: Math.max(30, connection.autoRefreshSeconds || 60),
+                  recordCount: cache?.count ?? 0,
+                }}
+                drift={cache?.drift}
+                autoRetry={autoRetry}
+                onAutoRetryChange={(v) => { setAutoRetry(v); if (!v) clearRetryTimer(); }}
+                onRetryNow={() => refresh(false)}
+                onCancelRetry={clearRetryTimer}
+              />
+              <Tabs value={tab} onValueChange={setTab} className="space-y-4">
 
-              {cache?.drift?.changed && (
-                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
-                  <span className="font-semibold">Kobo schema updated — dashboard adapted automatically.</span>{" "}
-                  {cache.drift.added.length > 0 && <>{cache.drift.added.length} new field(s){cache.drift.added.slice(0, 4).length ? `: ${cache.drift.added.slice(0, 4).map((f) => f.label).join(", ")}` : ""}. </>}
-                  {cache.drift.removed.length > 0 && <>{cache.drift.removed.length} field(s) removed. </>}
-                  {cache.drift.retyped.length > 0 && <>{cache.drift.retyped.length} field(s) changed type. </>}
-                  {cache.drift.addedRepeats.length > 0 && <>{cache.drift.addedRepeats.length} new repeat group(s). </>}
-                </div>
-              )}
-              <Tabs defaultValue="who" className="space-y-4">
                 <TabsList className="bg-slate-900 border border-slate-800 flex-wrap h-auto">
                   <TabsTrigger value="who" className="text-slate-300 data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-200">
                     <Activity className="h-4 w-4 mr-1" /> WHO dashboard
@@ -365,8 +419,24 @@ export default function KoboHubPage({ manage = false }: { manage?: boolean }) {
                 </TabsList>
 
                 <TabsContent value="who">
-                  <WhoDashboard connectionId={connection.id} schema={schema} rows={rows as any} formTitle={cache?.formTitle ?? connection.name} />
+                  <WhoDashboard
+                    connectionId={connection.id} schema={schema} rows={rows as any}
+                    formTitle={cache?.formTitle ?? connection.name}
+                    activeSlices={filters.slices}
+                    onDrill={(field, value) => {
+                      const applied = filters.slices[field] === value;
+                      onSlice(field, value);
+                      if (!applied) {
+                        toast({
+                          title: "Drill-down applied",
+                          description: `${value} — Raw Kobo data and every widget are now filtered.`,
+                        });
+                      }
+                    }}
+                    onClearDrill={() => setFilters(emptyFilters())}
+                  />
                 </TabsContent>
+
 
                 <TabsContent value="fields">
                   <FieldWidgets rows={rows} schema={schema} filters={filters} onSlice={onSlice} fields={widgetFields} />
