@@ -14,17 +14,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, Copy, Download, LayoutDashboard,
-  Pencil, Plus, RotateCcw, Save, Trash2, X,
+  AlertTriangle, ArrowLeft, ArrowRight, Copy, Download, Filter, LayoutDashboard,
+  Pencil, Plus, RotateCcw, Save, Sparkles, Trash2, X,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import type { HubSchema } from "@/lib/koboHub/schema";
 import {
-  WHO_PALETTE, autoDashboard, blankWidget, clearDashboard, computeWidget,
+  WHO_PALETTE, autoDashboard, blankWidget, clearDashboard, computeWidget, fieldOf,
   loadDashboard, newWidgetId, saveDashboard,
   type HubDashboard, type HubWidget, type Row,
 } from "@/lib/koboHub/dashboard";
 import WidgetEditorDialog from "./WidgetEditorDialog";
+import WidgetTemplateGallery from "./WidgetTemplateGallery";
+
 
 interface Props {
   connectionId: string;
