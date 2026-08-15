@@ -1554,6 +1554,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     isOwner ||
     (!!currentProjectId && bmzProjectIds.has(currentProjectId)) ||
     projects.some((p) => bmzProjectIds.has(p.id));
+
+  // See Clear access is granted SEPARATELY for the checklist and the dashboard
+  // via `user_standard_form_assignments` (codes: seeclear_form / seeclear_dash).
+  const canUseSeeClearForm = isOwner || assignedStandardCodes.has("seeclear_form");
+  const canUseSeeClearDash = isOwner || assignedStandardCodes.has("seeclear_dash");
+  const seeclearFolderVisible = canUseSeeClearForm || canUseSeeClearDash;
   useEffect(() => {
     console.log("[BMZ] visibility eval", {
       bmzFolderVisible,
