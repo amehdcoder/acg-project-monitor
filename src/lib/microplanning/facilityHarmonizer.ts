@@ -41,6 +41,22 @@ export interface FacilityRename {
   recordCount: number;
 }
 
+/** A ward-scoped facility spelling GRID3 has no record of. */
+export interface UnmatchedFacility {
+  state: string;
+  lga: string;
+  ward: string;
+  /** The name as it will stand after harmonisation (cluster winner). */
+  name: string;
+  ids: string[];
+  recordCount: number;
+  /** Closest GRID3 facility in the ward and how close it was (below threshold). */
+  nearest: string | null;
+  nearestScore: number;
+  /** Every GRID3 facility registered in this ward, for manual assignment. */
+  grid3Options: string[];
+}
+
 export interface HarmonizeResult {
   renames: FacilityRename[];
   /** Distinct ward-scoped facility spellings inspected. */
@@ -48,7 +64,10 @@ export interface HarmonizeResult {
   /** Spellings already standard (exact GRID3 match or already canonical). */
   alreadyStandard: number;
   recordsAffected: number;
+  /** Facilities captured in the field that GRID3 does not know — need a decision. */
+  unmatched: UnmatchedFacility[];
 }
+
 
 export interface HarmonizeRow {
   id?: string;
