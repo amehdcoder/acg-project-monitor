@@ -7662,8 +7662,10 @@ export type Database = {
           infra_max: number | null
           infra_score: number | null
           is_functional: boolean | null
+          kobo_form_uid: string | null
+          kobo_payload: Json | null
           lga: string | null
-          monitor_id: string
+          monitor_id: string | null
           officer_signature: string | null
           overall_score: number | null
           ownership: string | null
@@ -7673,6 +7675,7 @@ export type Database = {
           referrals_completed: number | null
           referrals_made: number | null
           remarks: string | null
+          source: string
           staff_on_duty: number | null
           state: string | null
           status: string
@@ -7711,8 +7714,10 @@ export type Database = {
           infra_max?: number | null
           infra_score?: number | null
           is_functional?: boolean | null
+          kobo_form_uid?: string | null
+          kobo_payload?: Json | null
           lga?: string | null
-          monitor_id?: string
+          monitor_id?: string | null
           officer_signature?: string | null
           overall_score?: number | null
           ownership?: string | null
@@ -7722,6 +7727,7 @@ export type Database = {
           referrals_completed?: number | null
           referrals_made?: number | null
           remarks?: string | null
+          source?: string
           staff_on_duty?: number | null
           state?: string | null
           status?: string
@@ -7760,8 +7766,10 @@ export type Database = {
           infra_max?: number | null
           infra_score?: number | null
           is_functional?: boolean | null
+          kobo_form_uid?: string | null
+          kobo_payload?: Json | null
           lga?: string | null
-          monitor_id?: string
+          monitor_id?: string | null
           officer_signature?: string | null
           overall_score?: number | null
           ownership?: string | null
@@ -7771,6 +7779,7 @@ export type Database = {
           referrals_completed?: number | null
           referrals_made?: number | null
           remarks?: string | null
+          source?: string
           staff_on_duty?: number | null
           state?: string | null
           status?: string
