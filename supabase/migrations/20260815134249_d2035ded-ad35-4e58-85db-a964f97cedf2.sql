@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Owner cannot have is_owner changed" ON public.profiles;
