@@ -10,7 +10,8 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import {
-  inferSchema, inferSchemaFromRows, type HubSchema,
+  augmentSchemaFromRows, diffSchemas, inferSchema, inferSchemaFromRows,
+  type HubSchema, type SchemaDrift,
 } from "./schema";
 
 const REGISTRY_KEY = "amehnities.koboHub.connections";
@@ -34,7 +35,10 @@ export interface HubCache {
   count: number;
   results: any[];
   schema: HubSchema;
+  /** What changed in the Kobo form definition since the previous sync. */
+  drift?: SchemaDrift;
 }
+
 
 const read = <T,>(k: string): T | null => {
   try { const r = localStorage.getItem(k); return r ? (JSON.parse(r) as T) : null; } catch { return null; }
@@ -159,9 +163,14 @@ export async function syncConnection(
   const survey: any[] = Array.isArray(first?.survey) ? first.survey : [];
   const choices: any[] = Array.isArray(first?.choices) ? first.choices : [];
   const title = first?.form_title || conn.name || conn.formUid;
-  const schema = survey.length
+  const base = survey.length
     ? inferSchema(survey, choices, title)
     : inferSchemaFromRows(results, title);
+  // Union the published definition with everything present in the payload so a
+  // form edited in Kobo (new questions, renamed groups, new repeats) adapts here
+  // automatically on the next sync.
+  const schema = augmentSchemaFromRows(base, results);
+  const drift = diffSchemas(loadCache(conn.id)?.schema ?? null, schema);
 
   onStage?.("widgets", "Building dashboard widgets…");
   const cache: HubCache = {
@@ -170,8 +179,10 @@ export async function syncConnection(
     count: results.length,
     results,
     schema,
+    drift,
   };
   saveCache(conn.id, cache);
   onStage?.("ready", `${results.length} submissions synced.`);
   return cache;
 }
+

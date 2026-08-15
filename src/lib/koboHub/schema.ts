@@ -306,3 +306,126 @@ export function repeatCounts(rows: any[], repeats: HubRepeatBlock[]): Record<str
 }
 
 export { findRepeatArray };
+
+/* ------------------------------------------- dynamic schema adaptation --- */
+
+/** Guess a field type from a raw submission value. */
+export function guessType(v: unknown): HubFieldType {
+  const str = s(v);
+  if (typeof v === "number") return Number.isInteger(v) ? "integer" : "decimal";
+  if (typeof v === "boolean") return "boolean";
+  if (/^-?\d+$/.test(str)) return "integer";
+  if (/^-?\d+\.\d+$/.test(str)) return "decimal";
+  if (/^-?\d+(\.\d+)?\s-?\d+(\.\d+)?(\s|$)/.test(str)) return "geopoint";
+  if (/^\d{4}-\d{2}-\d{2}T/.test(str)) return "datetime";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return "date";
+  if (str && str.length <= 48) return "select_one";
+  return "text";
+}
+
+const IGNORED = (k: string) =>
+  k.startsWith("_") || k.startsWith("formhub") || k.startsWith("meta") ||
+  k.endsWith("/instanceID") || k === "__version__" || k === "start" || k === "end";
+
+const prettify = (leaf: string) =>
+  leaf.replace(/[_\-.]+/g, " ").replace(/\s+/g, " ").trim()
+    .replace(/^\w/, (c) => c.toUpperCase());
+
+/**
+ * Union the survey-derived schema with everything actually present in the
+ * submissions. This is what makes the integration schema-agnostic: when the
+ * Kobo form is edited (questions added, groups renamed, new repeat blocks),
+ * the extra keys appear here on the very next sync without any reconfiguration.
+ */
+export function augmentSchemaFromRows(schema: HubSchema, rows: any[]): HubSchema {
+  const known = new Set<string>();
+  const knownLeaf = new Set<string>();
+  const register = (f: HubField) => { known.add(f.name); knownLeaf.add(f.leaf); };
+  schema.fields.forEach(register);
+  schema.repeats.forEach((r) => { known.add(r.name); knownLeaf.add(r.leaf); r.fields.forEach(register); });
+
+  const fields = [...schema.fields];
+  const repeats = schema.repeats.map((r) => ({ ...r, fields: [...r.fields] }));
+
+  const addChildren = (block: HubRepeatBlock, child: any) => {
+    for (const [ck, cv] of Object.entries(child ?? {})) {
+      if (IGNORED(ck)) continue;
+      const leaf = ck.split("/").pop() as string;
+      if (block.fields.some((f) => f.name === ck || f.leaf === leaf)) continue;
+      block.fields.push({
+        name: ck, leaf, label: prettify(leaf), type: guessType(cv), repeat: block.name,
+      });
+    }
+  };
+
+  for (const row of (rows ?? []).slice(0, 800)) {
+    for (const [k, v] of Object.entries(row ?? {})) {
+      if (IGNORED(k)) continue;
+      const leaf = k.split("/").pop() as string;
+
+      if (Array.isArray(v) && v.some((x) => x && typeof x === "object")) {
+        let block = repeats.find((r) => r.name === k || r.leaf === leaf);
+        if (!block) {
+          block = { name: k, leaf, label: prettify(leaf), fields: [] };
+          repeats.push(block);
+          known.add(k); knownLeaf.add(leaf);
+        }
+        v.forEach((child) => addChildren(block!, child));
+        continue;
+      }
+      if (v && typeof v === "object") continue;
+      if (known.has(k) || knownLeaf.has(leaf)) continue;
+      known.add(k); knownLeaf.add(leaf);
+      fields.push({ name: k, leaf, label: prettify(leaf), type: guessType(v) });
+    }
+  }
+
+  const geo = { ...detectGeo(fields), ...schema.geo };
+  return {
+    ...schema,
+    fields,
+    repeats,
+    geo,
+    personName: schema.personName ?? detect(fields, NAME_PATTERNS),
+    designation: schema.designation ?? detect(fields, DESIGNATION_PATTERNS),
+  };
+}
+
+export interface SchemaDrift {
+  changed: boolean;
+  added: { name: string; label: string; type: HubFieldType }[];
+  removed: { name: string; label: string }[];
+  retyped: { name: string; label: string; from: HubFieldType; to: HubFieldType }[];
+  addedRepeats: string[];
+  removedRepeats: string[];
+}
+
+const allFields = (sc: HubSchema): HubField[] =>
+  [...sc.fields, ...sc.repeats.flatMap((r) => r.fields)];
+
+/** Compare two inferred schemas so the UI can surface a live drift report. */
+export function diffSchemas(prev: HubSchema | null | undefined, next: HubSchema): SchemaDrift {
+  const empty: SchemaDrift = {
+    changed: false, added: [], removed: [], retyped: [], addedRepeats: [], removedRepeats: [],
+  };
+  if (!prev) return empty;
+  const a = new Map(allFields(prev).map((f) => [f.name, f]));
+  const b = new Map(allFields(next).map((f) => [f.name, f]));
+  const drift: SchemaDrift = { ...empty, added: [], removed: [], retyped: [], addedRepeats: [], removedRepeats: [] };
+
+  for (const [name, f] of b) {
+    const old = a.get(name);
+    if (!old) drift.added.push({ name, label: f.label, type: f.type });
+    else if (old.type !== f.type) drift.retyped.push({ name, label: f.label, from: old.type, to: f.type });
+  }
+  for (const [name, f] of a) if (!b.has(name)) drift.removed.push({ name, label: f.label });
+
+  const pr = new Set(prev.repeats.map((r) => r.name));
+  const nr = new Set(next.repeats.map((r) => r.name));
+  drift.addedRepeats = [...nr].filter((n) => !pr.has(n));
+  drift.removedRepeats = [...pr].filter((n) => !nr.has(n));
+
+  drift.changed = !!(drift.added.length || drift.removed.length || drift.retyped.length ||
+    drift.addedRepeats.length || drift.removedRepeats.length);
+  return drift;
+}
