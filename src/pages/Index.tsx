@@ -324,6 +324,13 @@ const Index = () => {
           </Suspense>
         </ErrorBoundary>
       );
+      case "kobo-hub": return isAdmin ? (
+        <ErrorBoundary name="KoboHub">
+          <Suspense fallback={<div className="flex h-96 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            <KoboHubPage />
+          </Suspense>
+        </ErrorBoundary>
+      ) : guardedPage("__admin_only__", <></>);
       default:
         return (
           <div className="flex h-96 items-center justify-center">
