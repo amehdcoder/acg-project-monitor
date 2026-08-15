@@ -34,6 +34,7 @@ import HubMap from "./HubMap";
 import HubRepeats from "./HubRepeats";
 import HubReconciliation from "./HubReconciliation";
 import HubRawData from "./HubRawData";
+import SyncStatusPanel from "./SyncStatusPanel";
 import WhoDashboard from "./WhoDashboard";
 import IntegrationManagerDialog from "./IntegrationManagerDialog";
 
