@@ -33,7 +33,10 @@ import FieldWidgets from "./FieldWidgets";
 import HubMap from "./HubMap";
 import HubRepeats from "./HubRepeats";
 import HubReconciliation from "./HubReconciliation";
+import HubRawData from "./HubRawData";
+import WhoDashboard from "./WhoDashboard";
 import IntegrationManagerDialog from "./IntegrationManagerDialog";
+
 
 const fmt = (n: number) => n.toLocaleString();
 
