@@ -1844,11 +1844,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     return <BloombergDashboard onClose={() => setShowBloombergDash(false)} />;
   }
 
-  if (showSeeClearForm) {
+  if (showSeeClearForm && canUseSeeClearForm) {
     return <SeeClearFormFiller onClose={() => setShowSeeClearForm(false)} />;
   }
 
-  if (showSeeClearDash) {
+  if (showSeeClearDash && canUseSeeClearDash) {
     return <SeeClearDashboard onClose={() => setShowSeeClearDash(false)} />;
   }
 
