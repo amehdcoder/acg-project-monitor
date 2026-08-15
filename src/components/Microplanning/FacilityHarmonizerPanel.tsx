@@ -150,12 +150,13 @@ const FacilityHarmonizerPanel = ({ entries, readOnly = false, onRefresh }: Props
         {running && <Progress value={progress} className="h-1.5" />}
 
         {result && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {[
               { label: "Spellings inspected", value: result.inspected },
               { label: "Already standard", value: result.alreadyStandard },
               { label: "To standardise", value: result.renames.length },
               { label: "Records affected", value: result.recordsAffected },
+              { label: "Not in GRID3", value: result.unmatched.length },
             ].map((k) => (
               <div key={k.label} className="rounded-lg border border-border/50 bg-background/60 p-2">
                 <p className="text-[9px] uppercase tracking-wide text-muted-foreground">{k.label}</p>
