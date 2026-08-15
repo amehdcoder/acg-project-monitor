@@ -33,7 +33,10 @@ import FieldWidgets from "./FieldWidgets";
 import HubMap from "./HubMap";
 import HubRepeats from "./HubRepeats";
 import HubReconciliation from "./HubReconciliation";
+import HubRawData from "./HubRawData";
+import WhoDashboard from "./WhoDashboard";
 import IntegrationManagerDialog from "./IntegrationManagerDialog";
+
 
 const fmt = (n: number) => n.toLocaleString();
 
@@ -329,8 +332,21 @@ export default function KoboHubPage({ manage = false }: { manage?: boolean }) {
             </div>
 
             <div ref={boardRef} className="space-y-5">
-              <Tabs defaultValue="fields" className="space-y-4">
+
+              {cache?.drift?.changed && (
+                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
+                  <span className="font-semibold">Kobo schema updated — dashboard adapted automatically.</span>{" "}
+                  {cache.drift.added.length > 0 && <>{cache.drift.added.length} new field(s){cache.drift.added.slice(0, 4).length ? `: ${cache.drift.added.slice(0, 4).map((f) => f.label).join(", ")}` : ""}. </>}
+                  {cache.drift.removed.length > 0 && <>{cache.drift.removed.length} field(s) removed. </>}
+                  {cache.drift.retyped.length > 0 && <>{cache.drift.retyped.length} field(s) changed type. </>}
+                  {cache.drift.addedRepeats.length > 0 && <>{cache.drift.addedRepeats.length} new repeat group(s). </>}
+                </div>
+              )}
+              <Tabs defaultValue="who" className="space-y-4">
                 <TabsList className="bg-slate-900 border border-slate-800 flex-wrap h-auto">
+                  <TabsTrigger value="who" className="text-slate-300 data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-200">
+                    <Activity className="h-4 w-4 mr-1" /> WHO dashboard
+                  </TabsTrigger>
                   <TabsTrigger value="fields" className="text-slate-300 data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-200">
                     <Layers className="h-4 w-4 mr-1" /> Field dashboards
                   </TabsTrigger>
@@ -340,17 +356,29 @@ export default function KoboHubPage({ manage = false }: { manage?: boolean }) {
                   <TabsTrigger value="repeats" className="text-slate-300 data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-200">
                     <Database className="h-4 w-4 mr-1" /> Repeat groups
                   </TabsTrigger>
+                  <TabsTrigger value="raw" className="text-slate-300 data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-200">
+                    <Database className="h-4 w-4 mr-1" /> Raw Kobo data
+                  </TabsTrigger>
                   <TabsTrigger value="recon" className="text-slate-300 data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-200">
                     <GitCompareArrows className="h-4 w-4 mr-1" /> Reconciliation
                   </TabsTrigger>
                 </TabsList>
 
+                <TabsContent value="who">
+                  <WhoDashboard connectionId={connection.id} schema={schema} rows={rows as any} formTitle={cache?.formTitle ?? connection.name} />
+                </TabsContent>
+
                 <TabsContent value="fields">
                   <FieldWidgets rows={rows} schema={schema} filters={filters} onSlice={onSlice} fields={widgetFields} />
                 </TabsContent>
 
+                <TabsContent value="raw">
+                  <HubRawData rows={rows as any} schema={schema} />
+                </TabsContent>
+
                 <TabsContent value="maps" className="space-y-4">
                   {geoFields.length === 0 ? (
+
                     <Card className="bg-slate-900/70 border-slate-800">
                       <CardContent className="p-8 text-center text-sm text-slate-400">
                         This form has no geopoint question, so no spatial layer could be generated.
