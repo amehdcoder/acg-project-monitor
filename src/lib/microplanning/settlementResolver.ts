@@ -75,8 +75,11 @@ export interface RowResolution {
 
 const STOP = new Set([
   "ward", "village", "settlement", "community", "town", "hamlet",
-  "phc", "hp", "health", "post", "clinic", "centre", "center", "dispensary",
-  "primary", "care", "facility", "the", "of", "and",
+  "phc", "hp", "ho", "hc", "chc", "bhc", "phcc", "chc", "mch", "disp",
+  "health", "post", "clinic", "centre", "center", "center", "dispensary",
+  "hospital", "general", "cottage", "comprehensive", "comp", "model",
+  "medical", "maternity", "basic", "primary", "care", "facility",
+  "the", "of", "and",
 ]);
 
 export const normName = (s: unknown): string =>
@@ -89,6 +92,30 @@ export const normName = (s: unknown): string =>
 
 const tokens = (s: string): string[] =>
   normName(s).split(" ").filter((t) => t && !STOP.has(t));
+
+/**
+ * Facility "core" = the distinguishing part of a health-facility name with
+ * every facility-type word/abbreviation removed ("Biskin HP", "Biskin Ho" and
+ * "Biskin Health Post" all reduce to "biskin").
+ */
+export const facilityCore = (s: unknown): string => tokens(String(s ?? "")).sort().join(" ");
+
+/**
+ * Similarity tuned for health-facility names: identical cores mean the same
+ * facility regardless of how the facility type was abbreviated.
+ */
+export function facilitySimilarity(a: string, b: string): number {
+  const ca = facilityCore(a);
+  const cb = facilityCore(b);
+  if (ca && cb && ca === cb) return 1;
+  const base = similarity(a, b);
+  if (ca && cb) {
+    const coreScore = similarity(ca, cb);
+    return Math.max(base, coreScore * 0.97);
+  }
+  return base;
+}
+
 
 function levenshtein(a: string, b: string): number {
   if (a === b) return 0;

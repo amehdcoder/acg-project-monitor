@@ -22,7 +22,7 @@ import {
   getGrid3FacilitiesWithCoords,
   type FacilityWithCoords,
 } from "@/lib/grid3NigeriaData";
-import { normName, similarity } from "./settlementResolver";
+import { normName, similarity, facilitySimilarity, facilityCore } from "./settlementResolver";
 
 export type HarmonizeSource = "grid3_ward" | "grid3_lga" | "local_consensus";
 
@@ -41,6 +41,22 @@ export interface FacilityRename {
   recordCount: number;
 }
 
+/** A ward-scoped facility spelling GRID3 has no record of. */
+export interface UnmatchedFacility {
+  state: string;
+  lga: string;
+  ward: string;
+  /** The name as it will stand after harmonisation (cluster winner). */
+  name: string;
+  ids: string[];
+  recordCount: number;
+  /** Closest GRID3 facility in the ward and how close it was (below threshold). */
+  nearest: string | null;
+  nearestScore: number;
+  /** Every GRID3 facility registered in this ward, for manual assignment. */
+  grid3Options: string[];
+}
+
 export interface HarmonizeResult {
   renames: FacilityRename[];
   /** Distinct ward-scoped facility spellings inspected. */
@@ -48,7 +64,10 @@ export interface HarmonizeResult {
   /** Spellings already standard (exact GRID3 match or already canonical). */
   alreadyStandard: number;
   recordsAffected: number;
+  /** Facilities captured in the field that GRID3 does not know — need a decision. */
+  unmatched: UnmatchedFacility[];
 }
+
 
 export interface HarmonizeRow {
   id?: string;
@@ -70,7 +89,7 @@ function bestFacility(name: string, pool: FacilityWithCoords[]) {
   let best: { rec: FacilityWithCoords; score: number } | null = null;
   for (const rec of pool) {
     if (!rec?.name) continue;
-    const score = similarity(name, rec.name);
+    const score = facilitySimilarity(name, rec.name);
     if (!best || score > best.score) best = { rec, score };
   }
   return best;
@@ -102,6 +121,7 @@ export async function harmonizeFacilityNames(
   }
 
   const renames: FacilityRename[] = [];
+  const notInGrid3: UnmatchedFacility[] = [];
   let inspected = 0;
   let alreadyStandard = 0;
   let recordsAffected = 0;
@@ -113,6 +133,11 @@ export async function harmonizeFacilityNames(
       getGrid3FacilitiesWithCoords(w.state, w.lga, w.ward).catch(() => []),
       getGrid3FacilitiesWithCoords(w.state, w.lga).catch(() => []),
     ]);
+    const wardOptions = Array.from(
+      new Set((facWard.length ? facWard : facLga).map((f) => titleCase(String(f?.name ?? ""))).filter(Boolean)),
+    ).sort((a, b) => a.localeCompare(b));
+
+
 
     // Pass 1 — GRID3 canon.
     const unmatched: Array<{ name: string; ids: string[] }> = [];
@@ -156,12 +181,12 @@ export async function harmonizeFacilityNames(
       // another record already standardised in this ward).
       let folded = false;
       for (const canon of canonical.values()) {
-        if (similarity(item.name, canon) >= LOCAL_NAME_THRESHOLD) {
+        if (facilitySimilarity(item.name, canon) >= LOCAL_NAME_THRESHOLD) {
           if (canon !== item.name) {
             renames.push({
               state: w.state, lga: w.lga, ward: w.ward,
               from: item.name, to: canon,
-              confidence: Math.round(similarity(item.name, canon) * 100) / 100,
+              confidence: Math.round(facilitySimilarity(item.name, canon) * 100) / 100,
               source: "grid3_ward", ids: item.ids, recordCount: item.ids.length,
             });
             recordsAffected += item.ids.length;
@@ -175,32 +200,43 @@ export async function harmonizeFacilityNames(
       if (folded) continue;
 
       const hit = clusters.find((c) =>
-        c.variants.some((v) => similarity(v.name, item.name) >= LOCAL_NAME_THRESHOLD),
+        c.variants.some((v) => facilitySimilarity(v.name, item.name) >= LOCAL_NAME_THRESHOLD),
       );
       if (hit) hit.variants.push(item);
       else clusters.push({ variants: [item] });
     }
 
     for (const c of clusters) {
-      if (c.variants.length < 2) {
-        alreadyStandard++;
-        continue;
-      }
       // Winner = most records, tie-break on the longest (most descriptive) name.
       const winner = [...c.variants].sort(
         (a, b) => b.ids.length - a.ids.length || b.name.length - a.name.length || a.name.localeCompare(b.name),
       )[0];
+      if (c.variants.length < 2) alreadyStandard++;
       for (const v of c.variants) {
         if (v.name === winner.name) continue;
         renames.push({
           state: w.state, lga: w.lga, ward: w.ward,
           from: v.name, to: winner.name,
-          confidence: Math.round(similarity(v.name, winner.name) * 100) / 100,
+          confidence: Math.round(facilitySimilarity(v.name, winner.name) * 100) / 100,
           source: "local_consensus",
           ids: v.ids, recordCount: v.ids.length,
         });
         recordsAffected += v.ids.length;
       }
+
+      // GRID3 has no record of this facility in the ward — surface it so a
+      // supervisor can map it manually.
+      const allIds = c.variants.flatMap((v) => v.ids);
+      const near = bestFacility(winner.name, facWard.length ? facWard : facLga);
+      notInGrid3.push({
+        state: w.state, lga: w.lga, ward: w.ward,
+        name: winner.name,
+        ids: allIds,
+        recordCount: allIds.length,
+        nearest: near?.rec?.name ? titleCase(near.rec.name) : null,
+        nearestScore: near ? Math.round(near.score * 100) / 100 : 0,
+        grid3Options: wardOptions,
+      });
     }
 
     onProgress?.(i + 1, list.length);
@@ -212,9 +248,13 @@ export async function harmonizeFacilityNames(
       a.ward.localeCompare(b.ward) ||
       a.from.localeCompare(b.from),
   );
+  notInGrid3.sort(
+    (a, b) => a.lga.localeCompare(b.lga) || a.ward.localeCompare(b.ward) || a.name.localeCompare(b.name),
+  );
 
-  return { renames, inspected, alreadyStandard, recordsAffected };
+  return { renames, inspected, alreadyStandard, recordsAffected, unmatched: notInGrid3 };
 }
+
 
 /** Apply the renames in-memory (used for previews and exports). */
 export function applyRenamesLocally<T extends HarmonizeRow>(rows: T[], renames: FacilityRename[]): T[] {
