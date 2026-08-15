@@ -3,7 +3,7 @@ import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-quer
 import { DASHBOARD_QUERY_OPTIONS } from "@/lib/queryConfig";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  EQUIPMENT_ITEMS, EQUIP_STATUS_META, readinessBand, type EquipStatus,
+  EQUIPMENT_ITEMS, EQUIP_STATUS_META, OWNERSHIP_TYPES, readinessBand, type EquipStatus,
 } from "@/lib/seeclear/definition";
 import { generateSeeClearSimulation } from "@/lib/seeclear/simulation";
 import { buildAccountability, type ProfileLite } from "@/lib/accountability";
