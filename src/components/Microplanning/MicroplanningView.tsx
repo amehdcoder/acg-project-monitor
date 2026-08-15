@@ -275,6 +275,12 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete, readOnly = false }:
 };
 
 // Paginated admin list view for full access users
+/** True when a record has no usable household count captured. */
+const missingHouseholds = (e: any): boolean => {
+  const v = Number(e?.number_of_households);
+  return !Number.isFinite(v) || v <= 0;
+};
+
 const AdminListView = ({ entries, loading, onEdit, onDelete, onBulkDelete, readOnly = false, onGpsResolved }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void; onBulkDelete?: (ids: string[]) => void; readOnly?: boolean; onGpsResolved?: (id: string, patch: Record<string, unknown>) => void }) => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
