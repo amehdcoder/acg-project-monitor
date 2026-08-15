@@ -22,7 +22,7 @@ import {
   getGrid3FacilitiesWithCoords,
   type FacilityWithCoords,
 } from "@/lib/grid3NigeriaData";
-import { normName, similarity } from "./settlementResolver";
+import { normName, similarity, facilitySimilarity, facilityCore } from "./settlementResolver";
 
 export type HarmonizeSource = "grid3_ward" | "grid3_lga" | "local_consensus";
 
@@ -70,7 +70,7 @@ function bestFacility(name: string, pool: FacilityWithCoords[]) {
   let best: { rec: FacilityWithCoords; score: number } | null = null;
   for (const rec of pool) {
     if (!rec?.name) continue;
-    const score = similarity(name, rec.name);
+    const score = facilitySimilarity(name, rec.name);
     if (!best || score > best.score) best = { rec, score };
   }
   return best;
@@ -156,12 +156,12 @@ export async function harmonizeFacilityNames(
       // another record already standardised in this ward).
       let folded = false;
       for (const canon of canonical.values()) {
-        if (similarity(item.name, canon) >= LOCAL_NAME_THRESHOLD) {
+        if (facilitySimilarity(item.name, canon) >= LOCAL_NAME_THRESHOLD) {
           if (canon !== item.name) {
             renames.push({
               state: w.state, lga: w.lga, ward: w.ward,
               from: item.name, to: canon,
-              confidence: Math.round(similarity(item.name, canon) * 100) / 100,
+              confidence: Math.round(facilitySimilarity(item.name, canon) * 100) / 100,
               source: "grid3_ward", ids: item.ids, recordCount: item.ids.length,
             });
             recordsAffected += item.ids.length;
@@ -175,7 +175,7 @@ export async function harmonizeFacilityNames(
       if (folded) continue;
 
       const hit = clusters.find((c) =>
-        c.variants.some((v) => similarity(v.name, item.name) >= LOCAL_NAME_THRESHOLD),
+        c.variants.some((v) => facilitySimilarity(v.name, item.name) >= LOCAL_NAME_THRESHOLD),
       );
       if (hit) hit.variants.push(item);
       else clusters.push({ variants: [item] });
@@ -195,7 +195,7 @@ export async function harmonizeFacilityNames(
         renames.push({
           state: w.state, lga: w.lga, ward: w.ward,
           from: v.name, to: winner.name,
-          confidence: Math.round(similarity(v.name, winner.name) * 100) / 100,
+          confidence: Math.round(facilitySimilarity(v.name, winner.name) * 100) / 100,
           source: "local_consensus",
           ids: v.ids, recordCount: v.ids.length,
         });
