@@ -201,14 +201,11 @@ export async function harmonizeFacilityNames(
     }
 
     for (const c of clusters) {
-      if (c.variants.length < 2) {
-        alreadyStandard++;
-        continue;
-      }
       // Winner = most records, tie-break on the longest (most descriptive) name.
       const winner = [...c.variants].sort(
         (a, b) => b.ids.length - a.ids.length || b.name.length - a.name.length || a.name.localeCompare(b.name),
       )[0];
+      if (c.variants.length < 2) alreadyStandard++;
       for (const v of c.variants) {
         if (v.name === winner.name) continue;
         renames.push({
@@ -220,6 +217,20 @@ export async function harmonizeFacilityNames(
         });
         recordsAffected += v.ids.length;
       }
+
+      // GRID3 has no record of this facility in the ward — surface it so a
+      // supervisor can map it manually.
+      const allIds = c.variants.flatMap((v) => v.ids);
+      const near = bestFacility(winner.name, facWard.length ? facWard : facLga);
+      notInGrid3.push({
+        state: w.state, lga: w.lga, ward: w.ward,
+        name: winner.name,
+        ids: allIds,
+        recordCount: allIds.length,
+        nearest: near?.rec?.name ? titleCase(near.rec.name) : null,
+        nearestScore: near ? Math.round(near.score * 100) / 100 : 0,
+        grid3Options: wardOptions,
+      });
     }
 
     onProgress?.(i + 1, list.length);
@@ -231,9 +242,13 @@ export async function harmonizeFacilityNames(
       a.ward.localeCompare(b.ward) ||
       a.from.localeCompare(b.from),
   );
+  notInGrid3.sort(
+    (a, b) => a.lga.localeCompare(b.lga) || a.ward.localeCompare(b.ward) || a.name.localeCompare(b.name),
+  );
 
-  return { renames, inspected, alreadyStandard, recordsAffected };
+  return { renames, inspected, alreadyStandard, recordsAffected, unmatched: notInGrid3 };
 }
+
 
 /** Apply the renames in-memory (used for previews and exports). */
 export function applyRenamesLocally<T extends HarmonizeRow>(rows: T[], renames: FacilityRename[]): T[] {
