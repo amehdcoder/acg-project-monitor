@@ -56,7 +56,7 @@ const banner = (name: string, emoji: string, title: string, subtitle: string): R
     label: `### ${emoji} ${title}\n_${subtitle}_`,
   });
 
-function yesNoBlock(prefix: string, qs: YesNoQ[]): Row[] {
+function yesNoBlock(qs: YesNoQ[]): Row[] {
   return qs.map((item) =>
     q({
       type: `select_one yes_no`,
@@ -190,7 +190,7 @@ export function buildSeeClearXlsForm(options: SeeClearXlsFormOptions = {}): XLSX
   // ── Section 2 — General assessment ────────────────────────────────────
   survey.push(q({ type: "begin_group", name: "general_section", label: "3. General Facility Assessment", appearance: "field-list" }));
   survey.push(banner("s3_banner", "✅", "General Facility Assessment", `Six observation items — maximum score ${GENERAL_QUESTIONS.length}.`));
-  yesNoBlock("general", GENERAL_QUESTIONS).forEach((r) => survey.push(r));
+  yesNoBlock(GENERAL_QUESTIONS).forEach((r) => survey.push(r));
   survey.push(q({ type: "calculate", name: "general_score", calculation: yesNoScoreExpr(GENERAL_QUESTIONS) }));
   survey.push(q({
     type: "note", name: "general_score_note",
@@ -205,7 +205,7 @@ export function buildSeeClearXlsForm(options: SeeClearXlsFormOptions = {}): XLSX
     type: "integer", name: "staff_on_duty", label: "Number of staff on duty today", required: "yes",
     constraint: ". >= 0 and . <= 500", constraint_message: "Enter a number between 0 and 500.",
   }));
-  yesNoBlock("hr", HR_QUESTIONS).forEach((r) => survey.push(r));
+  yesNoBlock(HR_QUESTIONS).forEach((r) => survey.push(r));
   survey.push(q({ type: "calculate", name: "hr_score", calculation: yesNoScoreExpr(HR_QUESTIONS) }));
   survey.push(q({ type: "calculate", name: "hr_max", calculation: String(HR_QUESTIONS.length) }));
   survey.push(q({
@@ -217,7 +217,7 @@ export function buildSeeClearXlsForm(options: SeeClearXlsFormOptions = {}): XLSX
   // ── Section 4 — Infrastructure ────────────────────────────────────────
   survey.push(q({ type: "begin_group", name: "infra_section", label: "5. Infrastructure & Utilities", appearance: "field-list" }));
   survey.push(banner("s5_banner", "🏗️", "Infrastructure & Utilities", `Space, power, water and accessibility — maximum score ${INFRA_QUESTIONS.length}.`));
-  yesNoBlock("infra", INFRA_QUESTIONS).forEach((r) => survey.push(r));
+  yesNoBlock(INFRA_QUESTIONS).forEach((r) => survey.push(r));
   survey.push(q({ type: "calculate", name: "infra_score", calculation: yesNoScoreExpr(INFRA_QUESTIONS) }));
   survey.push(q({ type: "calculate", name: "infra_max", calculation: String(INFRA_QUESTIONS.length) }));
   survey.push(q({
@@ -351,7 +351,6 @@ export function buildSeeClearXlsForm(options: SeeClearXlsFormOptions = {}): XLSX
   survey.push(q({ type: "end_group", name: "learning_section_end" }));
 
   // ── Choices ───────────────────────────────────────────────────────────
-  ch("", "", "");
   choices.push(ch("yes_no", "yes", "Yes"));
   choices.push(ch("yes_no", "no", "No"));
 
