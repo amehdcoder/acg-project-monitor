@@ -27,7 +27,7 @@ import { getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 const SURVEY_HEADER = [
   "type", "name", "label", "hint", "required", "required_message",
   "constraint", "constraint_message", "relevant", "calculation",
-  "choice_filter", "appearance", "default", "read_only",
+  "choice_filter", "appearance", "default", "read_only", "parameters",
 ] as const;
 
 const CHOICES_HEADER = ["list_name", "name", "label", "state", "lga"] as const;
@@ -317,7 +317,7 @@ export function buildSeeClearXlsForm(options: SeeClearXlsFormOptions = {}): XLSX
       type: "image", name: `evidence_${slot.slot}`, label: slot.label,
       required: slot.required ? "yes" : "",
       required_message: "This photograph is required as evidence of the visit.",
-      appearance: "annotate",
+      appearance: "annotate", parameters: "max-pixels=1600",
     }));
   });
   survey.push(q({ type: "end_group", name: "evidence_section_end" }));
@@ -342,8 +342,8 @@ export function buildSeeClearXlsForm(options: SeeClearXlsFormOptions = {}): XLSX
     constraint: "string-length(.) >= 10",
     constraint_message: "Please write at least 10 characters.",
   }));
-  survey.push(q({ type: "image", name: "officer_signature", label: "Monitoring officer signature", required: "yes", appearance: "signature" }));
-  survey.push(q({ type: "image", name: "incharge_signature", label: "Officer-in-charge signature", required: "yes", appearance: "signature" }));
+  survey.push(q({ type: "image", name: "officer_signature", label: "Monitoring officer signature", required: "yes", appearance: "signature", parameters: "max-pixels=1200" }));
+  survey.push(q({ type: "image", name: "incharge_signature", label: "Officer-in-charge signature", required: "yes", appearance: "signature", parameters: "max-pixels=1200" }));
   survey.push(q({
     type: "note", name: "closing_note",
     label: "### ✅ Thank you\nReview your answers, then tap **Submit**. Data syncs automatically to the See Clear Monitoring Dashboard.",
@@ -388,7 +388,7 @@ export function buildSeeClearXlsForm(options: SeeClearXlsFormOptions = {}): XLSX
   surveySheet["!cols"] = [
     { wch: 26 }, { wch: 24 }, { wch: 56 }, { wch: 40 }, { wch: 10 },
     { wch: 30 }, { wch: 34 }, { wch: 34 }, { wch: 30 }, { wch: 46 },
-    { wch: 20 }, { wch: 24 }, { wch: 16 }, { wch: 10 },
+    { wch: 20 }, { wch: 24 }, { wch: 16 }, { wch: 10 }, { wch: 20 },
   ];
   const choicesSheet = XLSX.utils.aoa_to_sheet(choices);
   choicesSheet["!cols"] = [{ wch: 22 }, { wch: 34 }, { wch: 40 }, { wch: 16 }, { wch: 22 }];
