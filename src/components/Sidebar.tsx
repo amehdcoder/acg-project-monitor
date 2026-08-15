@@ -274,7 +274,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
             {/* Bottom nav */}
             <div className="border-t border-sidebar-border px-1.5 py-1.5">
               {(!isRegularUser || !lensEnabled) && bottomItems.map((item) => (
-                <NavButton key={item.id} id={item.id} label={item.label} icon={item.icon} isBottom />
+                <NavButton key={item.id} id={item.id} label={item.label} icon={item.icon} route={(item as any).route} isBottom />
               ))}
             </div>
 
