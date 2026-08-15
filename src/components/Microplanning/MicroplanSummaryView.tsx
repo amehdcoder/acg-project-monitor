@@ -241,6 +241,10 @@ const MicroplanSummaryView = ({ entries, readOnly = false, onRefresh }: Props) =
       {/* GRID3 facility-name harmonisation */}
       <FacilityHarmonizerPanel entries={rows} readOnly={readOnly} onRefresh={onRefresh} />
 
+      {/* Implausible age structure (5–14 yrs exceeding 15+ yrs) */}
+      <AgeStructureFixPanel entries={rows} readOnly={readOnly} onRefresh={onRefresh} />
+
+
 
 
       {/* Missing coordinates resolver */}
