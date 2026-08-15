@@ -149,6 +149,8 @@ function WidgetChart({
     return (
       <ResponsiveContainer width="100%" height="100%">
         <Treemap data={res.data} dataKey="value" nameKey="name" stroke="#0f172a"
+          onClick={(d: any) => pick(d?.name ?? d?.payload?.name)}
+          className={onDrill ? "cursor-pointer" : undefined}
           content={undefined as any} fill={color}>
           {tooltip}
         </Treemap>
@@ -160,7 +162,8 @@ function WidgetChart({
     const Chart = w.kind === "line" ? LineChart : AreaChart;
     return (
       <ResponsiveContainer width="100%" height="100%">
-        <Chart data={res.data} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+        <Chart data={res.data} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}
+          onClick={(st: any) => pick(st?.activeLabel)}>
           {grid}
           <XAxis dataKey="name" {...axisProps} minTickGap={20} />
           <YAxis {...axisProps} />
@@ -176,7 +179,9 @@ function WidgetChart({
   if (w.kind === "stacked" && res.seriesKeys.length) {
     return (
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={res.stacked} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+        <BarChart data={res.stacked} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}
+          onClick={(st: any) => pick(st?.activeLabel)}
+          className={onDrill ? "cursor-pointer" : undefined}>
           {grid}
           <XAxis dataKey="name" {...axisProps} interval={0} angle={-20} textAnchor="end" height={62} />
           <YAxis {...axisProps} />
@@ -194,18 +199,25 @@ function WidgetChart({
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={res.data} layout={horizontal ? "vertical" : "horizontal"}
-        margin={{ top: 8, right: 24, left: horizontal ? 8 : 0, bottom: 4 }}>
+        margin={{ top: 8, right: 24, left: horizontal ? 8 : 0, bottom: 4 }}
+        className={onDrill ? "cursor-pointer" : undefined}>
         {grid}
         {horizontal ? <XAxis type="number" {...axisProps} /> : <XAxis dataKey="name" {...axisProps} interval={0} angle={-20} textAnchor="end" height={62} />}
         {horizontal ? <YAxis type="category" dataKey="name" width={130} {...axisProps} /> : <YAxis {...axisProps} />}
         {tooltip}
-        <Bar dataKey="value" fill={color} radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]}>
+        <Bar dataKey="value" fill={color} radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]}
+          onClick={(d: any) => pick(d?.name ?? d?.payload?.name)}>
+          {res.data.map((d, i) => (
+            <Cell key={i} fill={color} opacity={activeValue && activeValue !== d.name ? 0.4 : 1}
+              stroke={activeValue === d.name ? "#e2e8f0" : undefined} strokeWidth={activeValue === d.name ? 1.5 : 0} />
+          ))}
           {w.showValues && <LabelList dataKey="value" position={horizontal ? "right" : "top"} fill="#cbd5e1" fontSize={10} formatter={(v: any) => fmt(Number(v))} />}
         </Bar>
       </BarChart>
     </ResponsiveContainer>
   );
 }
+
 
 export default function WhoDashboard({ connectionId, schema, rows, formTitle }: Props) {
   const [dash, setDash] = useState<HubDashboard>(() =>
