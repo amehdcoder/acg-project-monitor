@@ -3,13 +3,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Wand2, Loader2, CheckCircle2, ArrowRight, Building2 } from "lucide-react";
+import { Wand2, Loader2, CheckCircle2, ArrowRight, Building2, AlertTriangle } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   harmonizeFacilityNames,
   type HarmonizeResult,
   type FacilityRename,
+  type UnmatchedFacility,
 } from "@/lib/microplanning/facilityHarmonizer";
 
 interface Props {
@@ -33,6 +35,35 @@ const FacilityHarmonizerPanel = ({ entries, readOnly = false, onRefresh }: Props
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<HarmonizeResult | null>(null);
   const [saving, setSaving] = useState(false);
+  const [fixes, setFixes] = useState<Record<string, string>>({});
+  const [fixing, setFixing] = useState<string | null>(null);
+
+  /** Manually map a facility GRID3 does not know onto an official name. */
+  const applyFix = async (u: UnmatchedFacility, to: string, key: string) => {
+    if (!to || !u.ids.length) return;
+    setFixing(key);
+    try {
+      const { error } = await supabase
+        .from("microplan_entries")
+        .update({ flhf_name: to } as any)
+        .in("id", u.ids);
+      if (error) throw error;
+      setResult((prev) =>
+        prev ? { ...prev, unmatched: prev.unmatched.filter((x) => x !== u) } : prev,
+      );
+      setFixes((f) => {
+        const next = { ...f };
+        delete next[key];
+        return next;
+      });
+      toast.success(`"${u.name}" renamed to "${to}" on ${u.ids.length} record${u.ids.length === 1 ? "" : "s"}`);
+      onRefresh?.();
+    } catch (err) {
+      toast.error("Update failed: " + (err as Error).message);
+    } finally {
+      setFixing(null);
+    }
+  };
 
   const distinctFacilities = useMemo(() => {
     const s = new Set<string>();
