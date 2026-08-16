@@ -135,7 +135,22 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
             ({sites.length.toLocaleString()} sites) are fuzzy-matched on LGA / Ward / Facility / Community so
             behavioural evidence explains logistics failures.
           </p>
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <Badge variant="outline" className="text-[10px] font-normal">
+              Identity resolution: {network.actors.length} unique people
+            </Badge>
+            {identityMerges.length > 0 && (
+              <Badge
+                variant="outline"
+                className="border-emerald-300 bg-emerald-50 text-[10px] font-normal text-emerald-700"
+                title={identityMerges.slice(0, 25).map((m) => `${m.name} ← ${m.variants.join(" | ")}`).join("\n")}
+              >
+                {identityMerges.length} name{identityMerges.length === 1 ? "" : "s"} auto-merged from spelling variants
+              </Badge>
+            )}
+          </div>
         </CardHeader>
+
         <CardContent className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <p className="text-[11px] text-muted-foreground">Late-start threshold (days)</p>
