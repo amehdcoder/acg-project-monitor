@@ -11,6 +11,7 @@
  * Everything is computed locally, offline, from already-cached submissions.
  */
 import type { LogisticsDataset } from "./medicineAccountability";
+import { buildIdentityIndex, type IdentityIndex } from "./actorIdentity";
 
 /* ──────────────────────────────────────────────── fuzzy string utilities ── */
 
