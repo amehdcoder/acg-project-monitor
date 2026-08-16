@@ -363,6 +363,12 @@ export interface ChecklistSite {
   community: string;
   matchKey: string;
   flags: { id: string; label: string; cause: string; field: string }[];
+  /** People named on the submission (supervisor, monitor, CDD, in-charge…). */
+  people: { name: string; role: ActorRole }[];
+  /** Submission / visit timestamp, used for work-rhythm analysis. */
+  date: string;
+  /** True when the submission carries a signature or photo proof. */
+  signed: boolean;
 }
 
 const pick = (row: Record<string, unknown>, re: RegExp): string => {
@@ -370,6 +376,34 @@ const pick = (row: Record<string, unknown>, re: RegExp): string => {
     if (re.test(k) && v != null && String(v).trim() && typeof v !== "object") return String(v).trim();
   }
   return "";
+};
+
+const GEO_KEY = /state|lga|local_gov|ward|facility|flhf|health_?fac|hf_name|community|settlement|village/i;
+const PERSON_RULES: { keys: RegExp; role: ActorRole }[] = [
+  { keys: /cdd|distributor|drug_?distributor/i, role: "cdd" },
+  { keys: /in_?charge|officer_?in_?charge|oic|facility_?(staff|focal)/i, role: "facility" },
+  { keys: /edo|logistic|store_?keeper|slo/i, role: "lga" },
+  { keys: /supervisor|monitor|assessor|enumerator|interviewer|submitted_?by|username|data_?collector|name_?of_?(the_)?(officer|supervisor|monitor)/i, role: "state" },
+];
+const BAD_NAME = /^(n\/?a|none|unknown|nil|-|yes|no|true|false|\d+(\.\d+)?)$/i;
+
+/** Names of people mentioned on a flattened checklist row, with their role. */
+const pickPeople = (row: Record<string, unknown>): { name: string; role: ActorRole }[] => {
+  const seen = new Map<string, ActorRole>();
+  for (const [k, v] of Object.entries(row)) {
+    if (v == null || typeof v === "object") continue;
+    const val = String(v).trim();
+    if (!val || val.length < 3 || val.length > 60 || BAD_NAME.test(val)) continue;
+    if (GEO_KEY.test(k)) continue;
+    if (!/name|_by|username|cdd|supervisor|monitor|officer|enumerator|in_?charge/i.test(k)) continue;
+    if (!/[a-z]/i.test(val) || /^https?:/i.test(val)) continue;
+    const rule = PERSON_RULES.find((r) => r.keys.test(k));
+    if (!rule) continue;
+    const id = norm(val);
+    if (!id || seen.has(id)) continue;
+    seen.set(id, rule.role);
+  }
+  return Array.from(seen, ([id, role]) => ({ name: id.replace(/\b\w/g, (c) => c.toUpperCase()), role }));
 };
 
 /** Extract geography + behavioural flags from flattened checklist rows. */
@@ -395,10 +429,34 @@ export function extractChecklistSites(flatRows: Record<string, unknown>[]): Chec
       state, lga, ward, facility, community,
       matchKey: norm([lga, ward, facility, community].filter(Boolean).join(" ")),
       flags,
+      people: pickPeople(row),
+      date: pick(row, /^_?submission_?time$|^end$|^start$|^today$|date/i),
+      signed: Object.entries(row).some(([k, v]) =>
+        /signature|photo|image|proof/i.test(k) && v != null && String(v).trim() !== ""),
     });
   }
   return sites;
 }
+
+/**
+ * Checklist submissions read as handovers: everyone named on the same
+ * visit (same facility/community, same day) is treated as co-working, so the
+ * social network can be computed even before the logistics ledger is synced.
+ */
+export function collectChecklistHandlings(sites: ChecklistSite[]): Handling[] {
+  const out: Handling[] = [];
+  for (const s of sites) {
+    const context = `checklist|${norm(`${s.lga} ${s.facility} ${s.community || s.ward}`)}`;
+    for (const p of s.people) {
+      out.push({
+        person: p.name, role: p.role, qty: 0, date: s.date, lga: s.lga,
+        facility: s.facility, community: s.community, context, signed: s.signed,
+      });
+    }
+  }
+  return out;
+}
+
 
 /* ──────────────────────────────────────────── community failure diagnosis ── */
 
