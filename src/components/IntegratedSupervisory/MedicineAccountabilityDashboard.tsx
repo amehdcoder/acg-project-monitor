@@ -6,6 +6,7 @@
  * FLHF → CDD) plus manually entered State/LGA allocations, and renders the
  * full accountability indicator suite with live tiered balances.
  */
+import { getAllStates, getLGAsForState } from "@/lib/nigeriaAdminData";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
