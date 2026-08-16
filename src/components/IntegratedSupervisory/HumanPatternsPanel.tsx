@@ -55,11 +55,30 @@ const TONE: Record<string, string> = {
 
 const csvCell = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
+const PROJECT_BINDING_KEY = "isc-human-patterns-microplan-project";
+
 export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel, canExport = true }: Props) {
   const [lateStartDays, setLateStartDays] = useState(3);
   const [coverageFloor, setCoverageFloor] = useState(70);
   const [kindFilter, setKindFilter] = useState<"all" | FailureKind>("all");
   const [q, setQ] = useState("");
+
+  /* Bound microplanning project — saved once, restored on every visit. */
+  const [projectId, setProjectId] = useState<string>(() => {
+    try { return localStorage.getItem(PROJECT_BINDING_KEY) ?? ""; } catch { return ""; }
+  });
+  const bindProject = (id: string) => {
+    setProjectId(id);
+    try { localStorage.setItem(PROJECT_BINDING_KEY, id); } catch { /* private mode */ }
+  };
+  const { projects, loading: projectsLoading } = useMicroplanProjects();
+  const { entries, loading: planLoading, fromCache, syncedAt, refresh } = useMicroplanProjectEntries(projectId || null);
+  const { fields, setFields, calcTargetPop, label: targetLabel, options } = useTargetPopFields();
+
+  const plan = useMemo(
+    () => normalizePlanRows(entries, (e) => calcTargetPop(e as Record<string, any>)),
+    [entries, calcTargetPop],
+  );
 
   const { profile } = useAuth();
   const excludePeople = useMemo(() => {
@@ -72,11 +91,14 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
       lateStartDays,
       coverageFloor: coverageFloor / 100,
       excludePeople,
+      plan,
     }),
-    [dataset, checklistRows, lateStartDays, coverageFloor, excludePeople],
+    [dataset, checklistRows, lateStartDays, coverageFloor, excludePeople, plan],
   );
 
   const { network, diagnoses, rhythms, answers, sites, identityMerges } = result;
+
+
 
 
   const diag = useMemo(() => {
