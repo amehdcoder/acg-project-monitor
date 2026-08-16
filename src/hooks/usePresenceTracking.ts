@@ -1,10 +1,15 @@
 /**
  * Collaborator Presence — Google-Workspace-style live presence.
  *
- * EVERY authenticated user silently "tracks" themselves on a shared Realtime
- * presence channel while the app is open. The list of active collaborators is
- * only ever *read* (and rendered) for the Owner / Super Admins via the
- * `<CollaboratorPresence />` component, so regular users never see each other.
+ * Presence is PROJECT-SCOPED for privacy: every authenticated user silently
+ * "tracks" themselves on the presence channel of each project they are
+ * assigned to (or on a dedicated `presence:project:none` channel when they
+ * have no active assignment). A user can therefore only ever observe the
+ * collaborators of their own projects — admins subscribe to every project
+ * channel and keep the full organisation-wide roster.
+ *
+ * The list of active collaborators is only ever *rendered* for the Owner /
+ * Super Admins via `<CollaboratorPresence />`.
  *
  * Presence is fully ephemeral (no DB writes) — when a tab closes or the network
  * drops, Supabase Realtime removes the user automatically.
@@ -24,12 +29,17 @@ export interface ActiveCollaborator {
   online_at: string;
 }
 
-const PRESENCE_CHANNEL = "app-collaborator-presence";
+const UNASSIGNED_TOPIC = "presence:project:none";
+const topicFor = (projectId: string) => `presence:project:${projectId}`;
+/** Safety cap so a user assigned to everything never opens dozens of sockets. */
+const MAX_CHANNELS = 24;
 
 export function usePresenceTracking(enabled: boolean) {
-  const { user, profile } = useAuth();
+  const { user, profile, isOwner, isSuperAdmin } = useAuth();
+  const isAdminViewer = !!(isOwner || isSuperAdmin);
   const [collaborators, setCollaborators] = useState<ActiveCollaborator[]>([]);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const channelsRef = useRef<ReturnType<typeof supabase.channel>[]>([]);
+  const rosterRef = useRef<Map<string, Map<string, ActiveCollaborator>>>(new Map());
 
   const buildSelf = useCallback((): ActiveCollaborator | null => {
     if (!user) return null;
@@ -52,81 +62,129 @@ export function usePresenceTracking(enabled: boolean) {
   useEffect(() => {
     if (!enabled || !user) {
       setCollaborators([]);
+      rosterRef.current.clear();
       return;
     }
 
     const initialSelf = buildSelf();
     if (initialSelf) setCollaborators([initialSelf]);
 
-    let channel: ReturnType<typeof supabase.channel> | null = null;
     let cancelled = false;
+    rosterRef.current = new Map();
 
-    authorizeRealtimeSubscription(PRESENCE_CHANNEL).then(({ allowed, reason }) => {
-      if (cancelled || !allowed) {
-        if (!allowed) console.warn(`[presence] subscription denied: ${reason}`);
-        return;
+    const flush = () => {
+      const merged = new Map<string, ActiveCollaborator>();
+      for (const perTopic of rosterRef.current.values()) {
+        for (const [uid, c] of perTopic) {
+          const prev = merged.get(uid);
+          if (!prev || prev.online_at < c.online_at) merged.set(uid, c);
+        }
       }
-      const ch = supabase.channel(PRESENCE_CHANNEL, {
-        config: { presence: { key: user.id }, private: true },
-      });
-      channel = ch;
-      channelRef.current = ch;
+      const self = buildSelf();
+      if (self && !merged.has(self.user_id)) merged.set(self.user_id, self);
+      setCollaborators(Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name)));
+    };
 
-      const syncState = () => {
-        const state = ch.presenceState<ActiveCollaborator>();
-        const flat: ActiveCollaborator[] = [];
-        const seen = new Set<string>();
-        Object.values(state).forEach((entries) => {
-          // Most recent entry per user wins (a user may have multiple tabs).
-          const latest = (entries as ActiveCollaborator[])
-            .slice()
-            .sort((a, b) => (a.online_at < b.online_at ? 1 : -1))[0];
-          if (latest && !seen.has(latest.user_id)) {
-            seen.add(latest.user_id);
-            flat.push(latest);
-          }
-        });
-        const self = buildSelf();
-        if (self && !seen.has(self.user_id)) flat.push(self);
-        flat.sort((a, b) => a.name.localeCompare(b.name));
-        setCollaborators(flat);
-      };
+    /** Topics this user is authorised to observe. */
+    const resolveTopics = async (): Promise<{ subscribe: string[]; track: string[] }> => {
+      const nowIso = new Date().toISOString();
+      const { data: mine } = await supabase
+        .from("user_project_assignments")
+        .select("project_id, starts_at, expires_at")
+        .eq("user_id", user.id);
 
-      ch
-        .on("presence", { event: "sync" }, syncState)
-        .on("presence", { event: "join" }, syncState)
-        .on("presence", { event: "leave" }, syncState)
-        .subscribe(async (status) => {
-          if (status === "SUBSCRIBED") {
-            const self = buildSelf();
-            if (self) void ch.track(self).catch((err) => console.warn("[presence] track failed", err));
-          }
+      const myProjects = (mine ?? [])
+        .filter((a) => (!a.starts_at || a.starts_at <= nowIso) && (!a.expires_at || a.expires_at > nowIso))
+        .map((a) => a.project_id)
+        .filter(Boolean) as string[];
+
+      const track = myProjects.length ? myProjects.map(topicFor) : [UNASSIGNED_TOPIC];
+
+      if (!isAdminViewer) return { subscribe: track.slice(0, MAX_CHANNELS), track };
+
+      // Admins keep the organisation-wide roster: every project + unassigned.
+      const { data: projects } = await supabase.from("projects").select("id");
+      const all = new Set<string>([UNASSIGNED_TOPIC, ...track]);
+      for (const p of projects ?? []) if (p?.id) all.add(topicFor(p.id as string));
+      return { subscribe: Array.from(all).slice(0, MAX_CHANNELS), track };
+    };
+
+    void (async () => {
+      let topics: { subscribe: string[]; track: string[] };
+      try {
+        topics = await resolveTopics();
+      } catch (e) {
+        console.warn("[presence] could not resolve presence scope", e);
+        topics = { subscribe: [UNASSIGNED_TOPIC], track: [UNASSIGNED_TOPIC] };
+      }
+      if (cancelled) return;
+
+      for (const topic of topics.subscribe) {
+        const { allowed, reason } = await authorizeRealtimeSubscription(topic);
+        if (cancelled) return;
+        if (!allowed) {
+          console.warn(`[presence] subscription denied for ${topic}: ${reason}`);
+          continue;
+        }
+
+        const ch = supabase.channel(topic, {
+          config: { presence: { key: user.id }, private: true },
         });
-    });
+        channelsRef.current.push(ch);
+
+        const syncState = () => {
+          const state = ch.presenceState<ActiveCollaborator>();
+          const perTopic = new Map<string, ActiveCollaborator>();
+          Object.values(state).forEach((entries) => {
+            const latest = (entries as ActiveCollaborator[])
+              .slice()
+              .sort((a, b) => (a.online_at < b.online_at ? 1 : -1))[0];
+            if (latest?.user_id) perTopic.set(latest.user_id, latest);
+          });
+          rosterRef.current.set(topic, perTopic);
+          flush();
+        };
+
+        ch
+          .on("presence", { event: "sync" }, syncState)
+          .on("presence", { event: "join" }, syncState)
+          .on("presence", { event: "leave" }, syncState)
+          .subscribe(async (status) => {
+            if (status === "SUBSCRIBED" && topics.track.includes(topic)) {
+              const self = buildSelf();
+              if (self) void ch.track(self).catch((err) => console.warn("[presence] track failed", err));
+            }
+          });
+      }
+    })();
 
     return () => {
       cancelled = true;
-      if (channel) {
-        channel.untrack();
-        supabase.removeChannel(channel);
+      for (const ch of channelsRef.current) {
+        ch.untrack();
+        supabase.removeChannel(ch);
       }
-      channelRef.current = null;
+      channelsRef.current = [];
+      rosterRef.current.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, user?.id]);
+  }, [enabled, user?.id, isAdminViewer]);
 
   // Keep our own presence payload fresh (route changes / profile updates).
   useEffect(() => {
-    if (!enabled || !channelRef.current) return;
+    if (!enabled || channelsRef.current.length === 0) return;
     const self = buildSelf();
-    if (self) {
-      setCollaborators((prev) => {
-        const rest = prev.filter((c) => c.user_id !== self.user_id);
-        return [...rest, self].sort((a, b) => a.name.localeCompare(b.name));
-      });
-      void channelRef.current.track(self).catch((err) => console.warn("[presence] refresh failed", err));
+    if (!self) return;
+    setCollaborators((prev) => {
+      const rest = prev.filter((c) => c.user_id !== self.user_id);
+      return [...rest, self].sort((a, b) => a.name.localeCompare(b.name));
+    });
+    for (const ch of channelsRef.current) {
+      if (ch.state !== "joined") continue;
+      void ch.track(self).catch(() => { /* transient */ });
     }
   }, [enabled, buildSelf]);
 
   return { collaborators };
 }
+
