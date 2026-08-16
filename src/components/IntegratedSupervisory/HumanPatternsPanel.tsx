@@ -165,15 +165,24 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
         </CardContent>
       </Card>
 
-      {empty && (
-        <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
-          <Info className="mx-auto mb-2 h-5 w-5" />
-          No logistics transactions cached yet — link and sync the medicine logistics Kobo form to unlock network intelligence.
-        </CardContent></Card>
-      )}
+      {/* data-source transparency — always visible so an empty section is explainable */}
+      <Card className={noSources ? "border-amber-300 bg-amber-50/60" : "border-muted"}>
+        <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-1 py-3 text-xs">
+          <span className="flex items-center gap-1.5 font-medium"><Info className="h-3.5 w-3.5" /> Data sources</span>
+          <span>Logistics ledger: <strong>{ledgerTx.toLocaleString()}</strong> transactions</span>
+          <span>Supervisory checklist: <strong>{checklistCount.toLocaleString()}</strong> submissions · <strong>{sites.length.toLocaleString()}</strong> with usable geography</span>
+          <span>Actors: <strong>{network.actors.length.toLocaleString()}</strong> · Communities diagnosed: <strong>{diagnoses.length.toLocaleString()}</strong></span>
+          {noSources && (
+            <span className="text-amber-800">
+              Nothing cached on this device yet — sync the medicine logistics Kobo form and the supervisory checklist, then reopen this tab.
+            </span>
+          )}
+        </CardContent>
+      </Card>
 
-      {!empty && (
+      {(
         <>
+
           {/* network KPIs */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
