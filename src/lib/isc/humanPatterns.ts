@@ -811,22 +811,44 @@ export interface HumanPatternsResult {
   diagnoses: CommunityDiagnosis[];
   rhythms: Rhythms;
   answers: IntelligenceAnswer[];
+  /** Spelling variants folded into a single person by the fuzzy resolver. */
+  identityMerges: { name: string; variants: string[] }[];
+}
+
+export interface HumanPatternsOptions extends DiagnosisOptions {
+  /** People to omit from the analysis entirely (e.g. the signed-in user). */
+  excludePeople?: string[];
 }
 
 export function computeHumanPatterns(
   ds: LogisticsDataset,
   checklistRows: Record<string, unknown>[] | null | undefined,
-  opts: DiagnosisOptions = {},
+  opts: HumanPatternsOptions = {},
 ): HumanPatternsResult {
   const sites = extractChecklistSites(checklistRows ?? []);
   // The supervisory checklist is a second social source: when the logistics
   // ledger is thin (or not yet synced) the network, rhythms and diagnoses are
   // still computed from checklist visits, so the panel is never blank.
   const checklistHandlings = collectChecklistHandlings(sites);
-  const network = buildNetwork(ds, checklistHandlings);
-  const diagnoses = diagnoseCommunities(ds, sites, opts);
+
+  // One identity index for the whole analysis so ledger + checklist aggregates
+  // resolve to the same canonical person regardless of spelling.
+  const allNames = [
+    ...collectHandlings(ds).map((h) => h.person),
+    ...checklistHandlings.map((h) => h.person),
+    ...ds.cddIssues.map((c) => c.cddName),
+  ];
+  const identity = buildIdentityIndex(allNames, opts.excludePeople ?? []);
+
+  const network = buildNetwork(ds, checklistHandlings, identity);
+  const diagnoses = diagnoseCommunities(ds, sites, { ...opts, identity });
   const rhythms = computeRhythms(ds, sites.map((s) => s.date).filter(Boolean));
   const answers = answerIntelligenceQuestions(network, diagnoses, rhythms, sites);
-  return { network, sites, diagnoses, rhythms, answers };
+  const identityMerges = identity.clusters
+    .filter((c) => c.variants.length > 1)
+    .map((c) => ({ name: c.name, variants: c.variants }))
+    .sort((a, b) => b.variants.length - a.variants.length);
+  return { network, sites, diagnoses, rhythms, answers, identityMerges };
 }
+
 
