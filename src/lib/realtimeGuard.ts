@@ -15,7 +15,10 @@ export interface RealtimeAuthResult {
  */
 export function isWellFormedTopic(topic: string): boolean {
   if (!topic || topic.length === 0 || topic.length > 200) return false;
-  if (topic === "app-collaborator-presence") return true;
+  if (topic === "presence:project:none") return true;
+  if (topic.startsWith("presence:project:")) {
+    return UUID_RE.test(topic.slice("presence:project:".length));
+  }
   if (topic.startsWith("proximity-inbox-")) {
     return UUID_RE.test(topic.slice("proximity-inbox-".length));
   }
@@ -38,13 +41,14 @@ export async function authorizeRealtimeSubscription(
   if (!isWellFormedTopic(topic)) {
     return { allowed: false, reason: "malformed_topic_client" };
   }
-  // The global collaborator-presence channel is ephemeral and intentionally
-  // mounted for every signed-in user so admins can see who is currently using
-  // the app. Do not put a database RPC in front of this hot path: under load or
-  // weak connectivity that single RPC failure made everyone appear offline.
-  if (topic === "app-collaborator-presence") {
-    return { allowed: true, reason: "global_presence" };
+  // Presence channels are project-scoped and ephemeral, and the authoritative
+  // check runs in the realtime.messages RLS policy on every subscribe/track.
+  // Do not put a database RPC in front of this hot path: under load or weak
+  // connectivity that single RPC failure made everyone appear offline.
+  if (topic.startsWith("presence:project:")) {
+    return { allowed: true, reason: "project_presence" };
   }
+
   try {
     const { data, error } = await supabase.rpc("authorize_realtime_subscription", {
       _topic: topic,
