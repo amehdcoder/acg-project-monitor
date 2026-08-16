@@ -24,6 +24,10 @@ import { computeHumanPatterns, type FailureKind } from "@/lib/isc/humanPatterns"
 import type { LogisticsDataset } from "@/lib/isc/medicineAccountability";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useMicroplanProjectEntries, useMicroplanProjects } from "@/hooks/useMicroplanProjectData";
+import { useTargetPopFields } from "@/hooks/useTargetPopFields";
+import { normalizePlanRows } from "@/lib/isc/planningLinkage";
+import MicroplanBindingCard from "./MicroplanBindingCard";
 import PlanningLinkagePanel from "./PlanningLinkagePanel";
 
 interface Props {
