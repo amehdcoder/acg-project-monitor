@@ -103,7 +103,12 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
     toast({ title: "Diagnosis exported", description: `${diagnoses.length} community rows.` });
   };
 
-  const empty = network.actors.length === 0 && diagnoses.length === 0;
+  const ledgerTx =
+    (dataset?.dispatches?.length ?? 0) + (dataset?.receipts?.length ?? 0) +
+    (dataset?.issues?.length ?? 0) + (dataset?.cddIssues?.length ?? 0) + (dataset?.returns?.length ?? 0);
+  const checklistCount = checklistRows?.length ?? 0;
+  const noSources = ledgerTx === 0 && checklistCount === 0;
+
 
   return (
     <div className="space-y-4">
