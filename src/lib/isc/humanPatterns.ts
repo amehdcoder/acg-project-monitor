@@ -502,6 +502,7 @@ export interface CommunityDiagnosis {
 export interface DiagnosisOptions {
   lateStartDays?: number;   // lag beyond which commencement is "late"
   coverageFloor?: number;   // coverage below which it is "poor"
+  identity?: IdentityIndex; // fuzzy actor-name resolver (spelling variants)
 }
 
 export function diagnoseCommunities(
