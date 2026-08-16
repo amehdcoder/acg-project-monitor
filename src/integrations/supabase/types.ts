@@ -9647,6 +9647,10 @@ export type Database = {
         Args: { _action: string; _conversation_id: string }
         Returns: undefined
       }
+      shares_project_with: {
+        Args: { _a: string; _b: string }
+        Returns: boolean
+      }
       start_proximity_conversation: {
         Args: { _other: string }
         Returns: string
