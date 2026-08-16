@@ -59,15 +59,23 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
   const [kindFilter, setKindFilter] = useState<"all" | FailureKind>("all");
   const [q, setQ] = useState("");
 
+  const { profile } = useAuth();
+  const excludePeople = useMemo(() => {
+    const me = `${profile?.first_name ?? ""} ${profile?.last_name ?? ""}`.trim();
+    return [me, "Ameh Joseph", "Joseph Ameh"].filter(Boolean);
+  }, [profile?.first_name, profile?.last_name]);
+
   const result = useMemo(
     () => computeHumanPatterns(dataset, checklistRows ?? [], {
       lateStartDays,
       coverageFloor: coverageFloor / 100,
+      excludePeople,
     }),
-    [dataset, checklistRows, lateStartDays, coverageFloor],
+    [dataset, checklistRows, lateStartDays, coverageFloor, excludePeople],
   );
 
-  const { network, diagnoses, rhythms, answers, sites } = result;
+  const { network, diagnoses, rhythms, answers, sites, identityMerges } = result;
+
 
   const diag = useMemo(() => {
     const needle = q.trim().toLowerCase();
