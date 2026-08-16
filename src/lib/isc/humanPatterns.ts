@@ -533,7 +533,8 @@ export function diagnoseCommunities(
     e.qty += Number(c.qtyIssued) || 0;
     const d = dayOf(c.date);
     if (d && (!e.first || d < e.first)) e.first = d;
-    if (clean(c.cddName)) e.cdds.add(clean(c.cddName));
+    const cddName = opts.identity ? (opts.identity.resolve(c.cddName)?.name ?? "") : clean(c.cddName);
+    if (cddName) e.cdds.add(cddName);
     comm.set(k, e);
   }
 
