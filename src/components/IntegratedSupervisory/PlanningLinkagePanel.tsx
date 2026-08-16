@@ -19,14 +19,13 @@ import {
   Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import {
-  Activity, CloudOff, Download, Layers, Loader2, MapPinned, Radar, RefreshCw, Route, Target, TrendingUp, Users2,
+  Activity, Download, Layers, MapPinned, Radar, Scale, Target, TrendingUp, Users2,
 } from "lucide-react";
-import { useMicroplanProjectEntries, useMicroplanProjects } from "@/hooks/useMicroplanProjectData";
-import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import {
-  answerLinkedQuestions, computePlanningLinkage, normalizePlanRows,
-  type CoverageStatus, type GeoLevel,
+  answerLinkedQuestions, computePlanningLinkage,
+  type CoverageMethod, type CoverageStatus, type GeoLevel, type PlanRow,
 } from "@/lib/isc/planningLinkage";
+
 import type { LogisticsDataset } from "@/lib/isc/medicineAccountability";
 import type { ChecklistSite, CommunityDiagnosis, NetworkStats } from "@/lib/isc/humanPatterns";
 import { toast } from "@/hooks/use-toast";
