@@ -19,14 +19,13 @@ import {
   Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import {
-  Activity, CloudOff, Download, Layers, Loader2, MapPinned, Radar, RefreshCw, Route, Target, TrendingUp, Users2,
+  Activity, Download, Layers, MapPinned, Radar, Scale, Target, TrendingUp, Users2,
 } from "lucide-react";
-import { useMicroplanProjectEntries, useMicroplanProjects } from "@/hooks/useMicroplanProjectData";
-import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import {
-  answerLinkedQuestions, computePlanningLinkage, normalizePlanRows,
-  type CoverageStatus, type GeoLevel,
+  answerLinkedQuestions, computePlanningLinkage,
+  type CoverageMethod, type CoverageStatus, type GeoLevel, type PlanRow,
 } from "@/lib/isc/planningLinkage";
+
 import type { LogisticsDataset } from "@/lib/isc/medicineAccountability";
 import type { ChecklistSite, CommunityDiagnosis, NetworkStats } from "@/lib/isc/humanPatterns";
 import { toast } from "@/hooks/use-toast";
@@ -36,8 +35,15 @@ interface Props {
   sites: ChecklistSite[];
   network: NetworkStats;
   diagnoses: CommunityDiagnosis[];
+  /** Planned denominators from the bound Geo-enabled Microplanning project. */
+  plan: PlanRow[];
+  projectId: string;
+  projectName: string;
+  /** Human label of the saved target-population definition. */
+  targetLabel: string;
   canExport?: boolean;
 }
+
 
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 const int = (n: number) => Math.round(n).toLocaleString();
@@ -61,22 +67,21 @@ const PRIORITY: Record<string, string> = {
   watch: "border-sky-300 bg-sky-50 text-sky-800",
 };
 
+const METHOD: Record<CoverageMethod, { label: string; cls: string }> = {
+  triangulated: { label: "Survey × allocation", cls: "border-primary/40 bg-primary/10 text-primary" },
+  survey: { label: "Household survey", cls: "border-sky-300 bg-sky-50 text-sky-700" },
+  administrative: { label: "Allocation-based", cls: "border-amber-300 bg-amber-50 text-amber-700" },
+  none: { label: "No evidence", cls: "border-muted-foreground/30 bg-muted text-muted-foreground" },
+};
+
 const csvCell = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
-export default function PlanningLinkagePanel({ dataset, sites, network, diagnoses, canExport = true }: Props) {
-  const { projects, loading: projectsLoading } = useMicroplanProjects();
-  const [projectId, setProjectId] = useState<string>("");
-  const { entries, loading, fromCache, syncedAt, refresh } = useMicroplanProjectEntries(projectId || null);
-  const { calcTargetPop, label: targetLabel } = useTargetPopFields();
-
+export default function PlanningLinkagePanel({
+  dataset, sites, network, diagnoses, plan, projectId, projectName, targetLabel, canExport = true,
+}: Props) {
   const [unitsPerPerson, setUnitsPerPerson] = useState(1);
   const [popPerDistributor, setPopPerDistributor] = useState(500);
   const [level, setLevel] = useState<GeoLevel>("LGA");
-
-  const plan = useMemo(
-    () => normalizePlanRows(entries, (e) => calcTargetPop(e as Record<string, any>)),
-    [entries, calcTargetPop],
-  );
 
   const link = useMemo(
     () => computePlanningLinkage(plan, dataset, sites, { unitsPerPerson, popPerDistributor }),
@@ -96,22 +101,26 @@ export default function PlanningLinkagePanel({ dataset, sites, network, diagnose
     [link, level],
   );
 
-  const projectName = projects.find((p) => p.id === projectId)?.name ?? "";
-
   const exportCsv = () => {
-    const head = ["Level", "Name", "Parent", "Planned communities", "Served", "Supervised", "Target population",
-      "Units issued", "Units returned", "Estimated treated", "Coverage %", "CI low %", "CI high %", "Untreated", "Status"];
+    const head = ["Level", "State", "LGA", "Ward", "Community", "Planned communities", "Served", "Supervised",
+      "Target population", "Units issued", "Units returned", "Estimated treated", "Coverage %", "CI low %",
+      "CI high %", "Basis", "Household survey coverage %", "Allocation coverage %", "Untreated", "Status"];
     const lines = [head.map(csvCell).join(",")];
     (["State", "LGA", "Ward", "Community"] as GeoLevel[]).forEach((lv) => {
       for (const n of link.nodes[lv]) {
         lines.push([
-          lv, n.name, n.parent, n.plannedCommunities, n.servedCommunities, n.visitedCommunities,
+          lv, n.state, n.lga, n.ward, n.community,
+          n.plannedCommunities, n.servedCommunities, n.visitedCommunities,
           Math.round(n.targetPop), Math.round(n.issuedUnits), Math.round(n.returnedUnits), Math.round(n.treated),
           (n.coverage * 100).toFixed(1), (n.ciLow * 100).toFixed(1), (n.ciHigh * 100).toFixed(1),
+          METHOD[n.method].label,
+          n.surveyCoverage != null ? (n.surveyCoverage * 100).toFixed(1) : "",
+          n.adminCoverage != null ? (n.adminCoverage * 100).toFixed(1) : "",
           Math.round(n.untreated), STATUS_STYLE[n.status].label,
         ].map(csvCell).join(","));
       }
     });
+
     const blob = new Blob([`\uFEFF${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -123,39 +132,21 @@ export default function PlanningLinkagePanel({ dataset, sites, network, diagnose
 
   return (
     <div className="space-y-4">
-      {/* ── project binding ─────────────────────────────────────────────── */}
-      <Card className="overflow-hidden border-primary/30">
-        <div className="h-1 w-full bg-gradient-to-r from-primary via-emerald-500 to-sky-500" />
+      {/* ── estimation assumptions ──────────────────────────────────────── */}
+      <Card className="overflow-hidden border-primary/20">
         <CardHeader className="pb-3">
           <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-            <Route className="h-4 w-4 text-primary" />
-            Plan-to-household linkage
-            <Badge variant="outline" className="text-[10px] font-normal">Microplan × Checklist × Ledger</Badge>
+            <Scale className="h-4 w-4 text-primary" />
+            Plan-to-household linkage{projectName ? ` — ${projectName}` : ""}
+            <Badge variant="outline" className="text-[10px] font-normal">Triangulated estimate</Badge>
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Bind a Geo-enabled Microplanning project to bring the planned eligible population into this analysis. The
-            microplan supplies the denominator, the checklist supplies process evidence and the logistics ledger
-            supplies the treatments — together they answer the human-pattern questions across the whole cycle.
+            Coverage is estimated by pooling the household coverage observed in the Supervisory Checklist with the
+            allocation-based coverage from the Medicine Accountability ledger, each weighted by its precision, against
+            the planned eligible population from the bound microplan ({targetLabel}).
           </p>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="space-y-1 md:col-span-2">
-            <p className="text-[11px] font-medium text-muted-foreground">Microplanning project</p>
-            <Select value={projectId} onValueChange={setProjectId}>
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder={projectsLoading ? "Loading projects…" : "Select a project to link"} />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                {!projects.length && !projectsLoading && (
-                  <div className="px-2 py-3 text-xs text-muted-foreground">No microplanning project available to you.</div>
-                )}
-              </SelectContent>
-            </Select>
-            <p className="text-[10px] text-muted-foreground">
-              Target population definition: <span className="font-medium">{targetLabel}</span>
-            </p>
-          </div>
           <div className="space-y-1">
             <p className="text-[11px] font-medium text-muted-foreground">Units per person treated</p>
             <Input type="number" min={0.1} step={0.1} className="h-9" value={unitsPerPerson}
@@ -166,28 +157,16 @@ export default function PlanningLinkagePanel({ dataset, sites, network, diagnose
             <Input type="number" min={50} step={50} className="h-9" value={popPerDistributor}
               onChange={(e) => setPopPerDistributor(Math.max(50, Number(e.target.value) || 500))} />
           </div>
-          <div className="md:col-span-2 xl:col-span-4 flex flex-wrap items-center gap-2 pt-1">
-            {loading && <Badge variant="outline" className="text-[10px] font-normal gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Loading microplan…</Badge>}
-            {!!projectId && !loading && (
-              <Badge variant="outline" className="text-[10px] font-normal">
-                {entries.length.toLocaleString()} microplan entries · {link.plan.length.toLocaleString()} planned communities
-              </Badge>
-            )}
-            {fromCache && <Badge variant="outline" className="gap-1 border-amber-300 bg-amber-50 text-[10px] font-normal text-amber-700"><CloudOff className="h-3 w-3" /> Offline copy</Badge>}
-            {syncedAt && <span className="text-[10px] text-muted-foreground">Synced {new Date(syncedAt).toLocaleTimeString()}</span>}
-            {!!projectId && (
-              <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={() => void refresh()}>
-                <RefreshCw className="h-3.5 w-3.5" /> Refresh
-              </Button>
-            )}
+          <div className="flex items-end md:col-span-2">
             {canExport && !!projectId && (
-              <Button size="sm" variant="outline" className="h-7 gap-1 text-xs ml-auto" onClick={exportCsv} disabled={!link.plan.length}>
+              <Button size="sm" variant="outline" className="h-9 gap-1 text-xs ml-auto" onClick={exportCsv} disabled={!link.plan.length}>
                 <Download className="h-3.5 w-3.5" /> Export coverage cascade
               </Button>
             )}
           </div>
         </CardContent>
       </Card>
+
 
       {!projectId ? (
         <Card className="border-dashed">
@@ -205,10 +184,13 @@ export default function PlanningLinkagePanel({ dataset, sites, network, diagnose
           {/* ── headline coverage ──────────────────────────────────────── */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { icon: Target, label: "Planned eligible population", value: int(link.totals.targetPop), sub: `${int(link.totals.plannedCommunities)} planned communities` },
-              { icon: TrendingUp, label: "Estimated treatment coverage", value: pct(link.totals.coverage), sub: `95% CI ${pct(link.totals.ciLow)} – ${pct(link.totals.ciHigh)}` },
+              { icon: Target, label: "Planned eligible population", value: int(link.totals.targetPop), sub: `${int(link.totals.plannedCommunities)} planned communities · ${targetLabel}` },
+              { icon: TrendingUp, label: "Estimated treatment coverage", value: pct(link.totals.coverage), sub: `95% CI ${pct(link.totals.ciLow)} – ${pct(link.totals.ciHigh)} · ${METHOD[link.totals.method].label}` },
+              { icon: Scale, label: "Triangulation inputs", value: link.totals.surveyCoverage != null ? pct(link.totals.surveyCoverage) : "—",
+                sub: `Household survey ${link.totals.surveyEligible.toLocaleString()} eligible · allocation-based ${link.totals.adminCoverage != null ? pct(link.totals.adminCoverage) : "—"}` },
               { icon: Users2, label: "Still untreated", value: int(link.totals.untreated), sub: `${int(link.totals.treated)} people estimated treated` },
               { icon: Radar, label: "Geography match rate", value: pct(link.totals.matchRate), sub: `${link.unplanned.length.toLocaleString()} served communities absent from the plan` },
+
             ].map((k) => (
               <Card key={k.label}>
                 <CardContent className="p-4">
@@ -328,12 +310,15 @@ export default function PlanningLinkagePanel({ dataset, sites, network, diagnose
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader><TableRow>
-                    <TableHead className="text-xs">{level}</TableHead>
-                    <TableHead className="text-xs">Within</TableHead>
+                    <TableHead className="text-xs">State</TableHead>
+                    <TableHead className="text-xs">LGA</TableHead>
+                    <TableHead className="text-xs">Ward</TableHead>
+                    <TableHead className="text-xs">Community</TableHead>
                     <TableHead className="text-xs text-right">Eligible</TableHead>
                     <TableHead className="text-xs text-right">Treated (est.)</TableHead>
                     <TableHead className="text-xs text-right">Coverage</TableHead>
                     <TableHead className="text-xs text-right">95% CI</TableHead>
+                    <TableHead className="text-xs">Basis</TableHead>
                     <TableHead className="text-xs text-right">Reach</TableHead>
                     <TableHead className="text-xs text-right">Untreated</TableHead>
                     <TableHead className="text-xs">Status</TableHead>
@@ -341,18 +326,24 @@ export default function PlanningLinkagePanel({ dataset, sites, network, diagnose
                   <TableBody>
                     {rows.map((n) => (
                       <TableRow key={`${n.level}-${n.id}`}>
-                        <TableCell className="text-xs font-medium">{n.name}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{n.parent || "—"}</TableCell>
+                        <TableCell className="text-xs font-medium">{n.state || "—"}</TableCell>
+                        <TableCell className="text-xs">{n.lga || "—"}</TableCell>
+                        <TableCell className="text-xs">{n.ward || "—"}</TableCell>
+                        <TableCell className="text-xs">{n.community || "—"}</TableCell>
                         <TableCell className="text-xs text-right">{int(n.targetPop)}</TableCell>
                         <TableCell className="text-xs text-right">{int(n.treated)}</TableCell>
                         <TableCell className="text-xs text-right font-semibold">{pct(n.coverage)}</TableCell>
                         <TableCell className="text-xs text-right text-muted-foreground">{pct(n.ciLow)}–{pct(n.ciHigh)}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={`text-[10px] ${METHOD[n.method].cls}`}>{METHOD[n.method].label}</Badge>
+                        </TableCell>
                         <TableCell className="text-xs text-right">{n.servedCommunities}/{n.plannedCommunities}</TableCell>
                         <TableCell className="text-xs text-right">{int(n.untreated)}</TableCell>
                         <TableCell><Badge variant="outline" className={`text-[10px] ${STATUS_STYLE[n.status].cls}`}>{STATUS_STYLE[n.status].label}</Badge></TableCell>
                       </TableRow>
                     ))}
-                    {!rows.length && <TableRow><TableCell colSpan={9} className="py-6 text-center text-xs text-muted-foreground">This project's microplan has no entries at this level yet.</TableCell></TableRow>}
+                    {!rows.length && <TableRow><TableCell colSpan={12} className="py-6 text-center text-xs text-muted-foreground">This project's microplan has no entries at this level yet.</TableCell></TableRow>}
+
                   </TableBody>
                 </Table>
                 {link.nodes[level].length > rows.length && (

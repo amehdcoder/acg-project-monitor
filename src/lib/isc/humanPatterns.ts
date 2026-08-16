@@ -12,6 +12,8 @@
  */
 import type { LogisticsDataset } from "./medicineAccountability";
 import { buildIdentityIndex, type IdentityIndex } from "./actorIdentity";
+import { isHumanName, isPlaceName } from "./nameQuality";
+
 
 /* ──────────────────────────────────────────────── fuzzy string utilities ── */
 
@@ -385,6 +387,8 @@ export interface ChecklistSite {
   date: string;
   /** True when the submission carries a signature or photo proof. */
   signed: boolean;
+  /** Household-level coverage observed by the supervisor on this visit. */
+  survey: { households: number; eligible: number; treated: number };
 }
 
 const pick = (row: Record<string, unknown>, re: RegExp): string => {
@@ -394,6 +398,39 @@ const pick = (row: Record<string, unknown>, re: RegExp): string => {
   return "";
 };
 
+/**
+ * Geography pick: only accepts values that can actually be a place name, so
+ * numeric answers ("800") and questionnaire responses ("Yes", "No") can never
+ * be presented as a State / LGA / Ward / Community. Keys that name the place
+ * explicitly (`..._name`) are preferred over generic matches.
+ */
+const pickPlace = (row: Record<string, unknown>, re: RegExp): string => {
+  let fallback = "";
+  for (const [k, v] of Object.entries(row)) {
+    if (v == null || typeof v === "object") continue;
+    if (!re.test(k)) continue;
+    if (/code|id$|_id|uuid|count|number|num_|total|qty|quantity|score|percent|distance|lat|lon|gps/i.test(k)) continue;
+    const val = String(v).trim();
+    if (!isPlaceName(val)) continue;
+    if (/name|label/i.test(k)) return val;
+    if (!fallback) fallback = val;
+  }
+  return fallback;
+};
+
+/** Sum of every numeric answer whose key matches — used for household counts. */
+const sumNumeric = (row: Record<string, unknown>, re: RegExp, skip?: RegExp): number => {
+  let total = 0;
+  for (const [k, v] of Object.entries(row)) {
+    if (v == null || typeof v === "object") continue;
+    if (!re.test(k) || (skip && skip.test(k))) continue;
+    const n = Number(String(v).trim());
+    if (Number.isFinite(n) && n >= 0 && n < 1_000_000) total += n;
+  }
+  return total;
+};
+
+
 const GEO_KEY = /state|lga|local_gov|ward|facility|flhf|health_?fac|hf_name|community|settlement|village/i;
 const PERSON_RULES: { keys: RegExp; role: ActorRole }[] = [
   { keys: /cdd|distributor|drug_?distributor/i, role: "cdd" },
@@ -401,20 +438,17 @@ const PERSON_RULES: { keys: RegExp; role: ActorRole }[] = [
   { keys: /edo|logistic|store_?keeper|slo/i, role: "lga" },
   { keys: /supervisor|monitor|assessor|enumerator|interviewer|submitted_?by|username|data_?collector|name_?of_?(the_)?(officer|supervisor|monitor)/i, role: "state" },
 ];
-const BAD_NAME = /^(n\/?a|none|unknown|nil|-|yes|no|true|false|\d+(\.\d+)?)$/i;
-
 /** Names of people mentioned on a flattened checklist row, with their role. */
 const pickPeople = (row: Record<string, unknown>): { name: string; role: ActorRole }[] => {
   const seen = new Map<string, ActorRole>();
   for (const [k, v] of Object.entries(row)) {
     if (v == null || typeof v === "object") continue;
     const val = String(v).trim();
-    if (!val || val.length < 3 || val.length > 60 || BAD_NAME.test(val)) continue;
     if (GEO_KEY.test(k)) continue;
-    if (/signature|photo|image|picture|attachment|gps|geopoint|uuid|_id$|url|file/i.test(k)) continue;
+    if (/signature|photo|image|picture|attachment|gps|geopoint|uuid|_id$|url|file|comment|remark|observ|reason|explain|describ|note/i.test(k)) continue;
     if (!/name|_by|username|cdd|supervisor|monitor|officer|enumerator|in_?charge/i.test(k)) continue;
-    if (!/[a-z]/i.test(val) || /^https?:/i.test(val)) continue;
-    if (/\.(png|jpe?g|webp|gif|pdf|mp3|mp4|3gp|amr)$/i.test(val)) continue;
+    // Only real human names — never an answer such as "Yes All Are Sufficient".
+    if (!isHumanName(val)) continue;
 
     const rule = PERSON_RULES.find((r) => r.keys.test(k));
     if (!rule) continue;
@@ -425,15 +459,20 @@ const pickPeople = (row: Record<string, unknown>): { name: string; role: ActorRo
   return Array.from(seen, ([id, role]) => ({ name: id.replace(/\b\w/g, (c) => c.toUpperCase()), role }));
 };
 
+const SURVEY_TREATED = /(treated|swallow|took|ingest).*(person|people|child|children|member|individual|number|count|total)?|number_?(treated|swallowed)|persons?_?treated|total_?treated/i;
+const SURVEY_ELIGIBLE = /eligible|census_?population|target_?population|present_?(person|people|member)|enumerated|household_?member|total_?(persons|people)_?(in|found)/i;
+const SURVEY_HOUSEHOLDS = /household(s)?_?(visited|surveyed|count|number)?$|hh_?(visited|count)|houses_?visited/i;
+const SURVEY_SKIP = /_id|uuid|index|version|code|percent|rate|gps|lat|lon/i;
+
 /** Extract geography + behavioural flags from flattened checklist rows. */
 export function extractChecklistSites(flatRows: Record<string, unknown>[]): ChecklistSite[] {
   const sites: ChecklistSite[] = [];
   for (const row of flatRows ?? []) {
-    const state = pick(row, /(^|_)state$|state_name/i);
-    const lga = pick(row, /lga|local_gov/i);
-    const ward = pick(row, /ward/i);
-    const facility = pick(row, /facility|flhf|health_?fac|hf_name/i);
-    const community = pick(row, /community|settlement|village/i);
+    const state = pickPlace(row, /(^|_)state$|state_name/i);
+    const lga = pickPlace(row, /lga|local_gov/i);
+    const ward = pickPlace(row, /ward/i);
+    const facility = pickPlace(row, /facility|flhf|health_?fac|hf_name/i);
+    const community = pickPlace(row, /community|settlement|village/i);
     if (!lga && !ward && !facility && !community) continue;
 
     const flags: ChecklistSite["flags"] = [];
@@ -444,6 +483,8 @@ export function extractChecklistSites(flatRows: Record<string, unknown>[]): Chec
         if (rule.bad(v)) { flags.push({ id: rule.id, label: rule.label, cause: rule.cause, field: k }); break; }
       }
     }
+    const treated = sumNumeric(row, SURVEY_TREATED, SURVEY_SKIP);
+    const eligible = sumNumeric(row, SURVEY_ELIGIBLE, SURVEY_SKIP);
     sites.push({
       state, lga, ward, facility, community,
       matchKey: norm([lga, ward, facility, community].filter(Boolean).join(" ")),
@@ -452,10 +493,17 @@ export function extractChecklistSites(flatRows: Record<string, unknown>[]): Chec
       date: pick(row, /^_?submission_?time$|^end$|^start$|^today$|date/i),
       signed: Object.entries(row).some(([k, v]) =>
         /signature|photo|image|proof/i.test(k) && v != null && String(v).trim() !== ""),
+      survey: {
+        households: sumNumeric(row, SURVEY_HOUSEHOLDS, SURVEY_SKIP),
+        eligible,
+        // A treated count above the eligible count is a data error, not coverage.
+        treated: eligible > 0 ? Math.min(treated, eligible) : treated,
+      },
     });
   }
   return sites;
 }
+
 
 /**
  * Checklist submissions read as handovers: everyone named on the same
@@ -483,7 +531,9 @@ export type FailureKind = "not_distributed" | "poor_coverage" | "late_start" | "
 
 export interface CommunityDiagnosis {
   key: string;
+  state: string;
   lga: string;
+  ward: string;
   facility: string;
   community: string;
   cdds: string[];
@@ -495,14 +545,67 @@ export interface CommunityDiagnosis {
   lagDays: number;          // days from first facility supply to first CDD issue
   kind: FailureKind;
   severity: number;         // 0..100
-  causes: { label: string; cause: string; source: "ledger" | "checklist"; confidence: number }[];
+  causes: { label: string; cause: string; source: "ledger" | "checklist" | "microplan"; confidence: number }[];
   matchScore: number;       // fuzzy join confidence to the checklist
+  /** Planned eligible population when the community exists in the microplan. */
+  targetPop: number;
+  /** Fuzzy-join confidence to the Geo-enabled Microplanning project. */
+  planScore: number;
+}
+
+/** Minimal shape of a Geo-Microplanning community used for canonical naming. */
+export interface PlanContextRow {
+  state?: string;
+  lga: string;
+  ward?: string;
+  flhf?: string;
+  community: string;
+  targetPop?: number;
+  distanceKm?: number;
+  accessibility?: string;
+  terrain?: string;
 }
 
 export interface DiagnosisOptions {
   lateStartDays?: number;   // lag beyond which commencement is "late"
   coverageFloor?: number;   // coverage below which it is "poor"
   identity?: IdentityIndex; // fuzzy actor-name resolver (spelling variants)
+  /** Bound microplan — canonicalises community names and adds planning causes. */
+  plan?: PlanContextRow[];
+}
+
+/** Fuzzy resolver from a raw (lga, community) pair onto the bound microplan. */
+function planResolver(plan: PlanContextRow[] | undefined, floor = 0.62) {
+  if (!plan?.length) return () => null as { row: PlanContextRow; score: number } | null;
+  const byLga = new Map<string, PlanContextRow[]>();
+  const exact = new Map<string, PlanContextRow>();
+  for (const p of plan) {
+    const l = norm(p.lga);
+    (byLga.get(l) ?? byLga.set(l, []).get(l)!).push(p);
+    const k = norm(`${p.lga} ${p.community}`);
+    if (k && !exact.has(k)) exact.set(k, p);
+  }
+  const cache = new Map<string, { row: PlanContextRow; score: number } | null>();
+  return (lga: string, community: string, ward = "") => {
+    const k = norm(`${lga} ${community} ${ward}`);
+    if (!k || !norm(community)) return null;
+    if (cache.has(k)) return cache.get(k)!;
+    let hit: { row: PlanContextRow; score: number } | null = null;
+    const e = exact.get(norm(`${lga} ${community}`));
+    if (e) hit = { row: e, score: 1 };
+    else {
+      const pool = byLga.get(norm(lga)) ?? plan;
+      for (const p of pool) {
+        // ward/facility agreement raises the score so identically named
+        // communities in different wards never collapse onto each other.
+        let s = dice(community, p.community);
+        if (ward && p.ward && dice(ward, p.ward) > 0.8) s = Math.min(1, s + 0.08);
+        if (s >= floor && (!hit || s > hit.score)) hit = { row: p, score: s };
+      }
+    }
+    cache.set(k, hit);
+    return hit;
+  };
 }
 
 export function diagnoseCommunities(
@@ -512,6 +615,8 @@ export function diagnoseCommunities(
 ): CommunityDiagnosis[] {
   const lateStartDays = opts.lateStartDays ?? 3;
   const coverageFloor = opts.coverageFloor ?? 0.7;
+  const toPlan = planResolver(opts.plan);
+
 
   /* facility supply timeline from Level 2 */
   const facSupply = new Map<string, { qty: number; first: string }>();
@@ -524,26 +629,49 @@ export function diagnoseCommunities(
     facSupply.set(k, e);
   }
 
-  /* community delivery from Level 3 */
-  type Agg = { lga: string; facility: string; community: string; qty: number; first: string; cdds: Set<string> };
+  /* community delivery from Level 3.
+     Only rows whose community can actually be a place name are diagnosed, so
+     numeric answers ("800", "114") and questionnaire responses ("Yes", "No")
+     never appear in the Community column. */
+  type Agg = {
+    state: string; lga: string; ward: string; facility: string; community: string;
+    qty: number; first: string; cdds: Set<string>;
+  };
   const comm = new Map<string, Agg>();
+  const blank = (state: string, lga: string, ward: string, facility: string, community: string): Agg =>
+    ({ state, lga, ward, facility, community, qty: 0, first: "", cdds: new Set<string>() });
+
   for (const c of ds.cddIssues) {
+    if (!isPlaceName(c.community)) continue;
     const k = norm(`${c.lga} ${c.facility} ${c.community}`);
-    const e = comm.get(k) ?? { lga: c.lga, facility: c.facility, community: c.community, qty: 0, first: "", cdds: new Set<string>() };
+    const e = comm.get(k) ?? blank("", c.lga, "", c.facility, c.community);
     e.qty += Number(c.qtyIssued) || 0;
     const d = dayOf(c.date);
     if (d && (!e.first || d < e.first)) e.first = d;
     const cddName = opts.identity ? (opts.identity.resolve(c.cddName)?.name ?? "") : clean(c.cddName);
-    if (cddName) e.cdds.add(cddName);
+    if (cddName && isHumanName(cddName)) e.cdds.add(cddName);
     comm.set(k, e);
   }
 
   /* communities named in the checklist but never reached in the ledger */
   for (const s of sites) {
-    if (!s.community) continue;
+    if (!s.community || !isPlaceName(s.community)) continue;
     const k = norm(`${s.lga} ${s.facility} ${s.community}`);
-    if (!comm.has(k)) {
-      comm.set(k, { lga: s.lga, facility: s.facility, community: s.community, qty: 0, first: "", cdds: new Set<string>() });
+    const e = comm.get(k);
+    if (!e) comm.set(k, blank(s.state, s.lga, s.ward, s.facility, s.community));
+    else {
+      if (!e.ward) e.ward = s.ward;
+      if (!e.state) e.state = s.state;
+    }
+  }
+
+  /* planned communities that neither source has touched — these are the true
+     zero-distribution pockets and must be diagnosed as well. */
+  for (const p of opts.plan ?? []) {
+    if (!isPlaceName(p.community)) continue;
+    const k = norm(`${p.lga} ${p.flhf ?? ""} ${p.community}`);
+    if (!comm.has(k) && !Array.from(comm.values()).some((e) => norm(`${e.lga} ${e.community}`) === norm(`${p.lga} ${p.community}`))) {
+      comm.set(k, blank(p.state ?? "", p.lga, p.ward ?? "", p.flhf ?? "", p.community));
     }
   }
 
@@ -581,13 +709,48 @@ export function diagnoseCommunities(
         causes.push({ label: `Commencement lagged facility supply by ${lagDays} days`, cause: "Timeliness", source: "ledger", confidence: 0.75 });
     }
 
+    /* fuzzy join to the Geo-enabled Microplanning project (same ward/facility
+       preferred) — canonical geography names and planning-side causes. */
+    const ph = toPlan(e.lga, e.community, e.ward);
+    let targetPop = 0;
+    if (ph) {
+      const p = ph.row;
+      targetPop = Math.max(0, Math.round(p.targetPop ?? 0));
+      // canonical names from the plan, so the table always shows real places
+      e.community = p.community || e.community;
+      e.ward = e.ward || p.ward || "";
+      e.state = e.state || p.state || "";
+      e.facility = e.facility || p.flhf || "";
+      if (kind !== "healthy") {
+        if ((p.distanceKm ?? 0) >= 15)
+          causes.push({ label: `${(p.distanceKm ?? 0).toFixed(1)} km from its health facility — outreach distance`, cause: "Access", source: "microplan", confidence: 0.8 });
+        if (/hard|difficult|inaccess|boat|riverine|seasonal/i.test(p.accessibility ?? ""))
+          causes.push({ label: `Planned as hard-to-reach (${p.accessibility})`, cause: "Access", source: "microplan", confidence: 0.75 });
+        if (/hill|mountain|riverine|swamp|forest|island/i.test(p.terrain ?? ""))
+          causes.push({ label: `Difficult terrain recorded in the microplan (${p.terrain})`, cause: "Access", source: "microplan", confidence: 0.6 });
+        if (targetPop > 0 && e.qty > 0 && e.qty < targetPop * 0.5)
+          causes.push({ label: `Only ${Math.round(e.qty).toLocaleString()} units issued against ${targetPop.toLocaleString()} planned eligible people`, cause: "Supply", source: "microplan", confidence: 0.85 });
+        if (targetPop > 0 && e.cdds.size > 0 && targetPop / e.cdds.size > 1000)
+          causes.push({ label: `${Math.round(targetPop / e.cdds.size).toLocaleString()} eligible people per distributor — over the workable norm`, cause: "Capacity", source: "microplan", confidence: 0.7 });
+      }
+    }
+
     /* fuzzy join to the supervisory checklist */
     const needle = norm(`${e.lga} ${e.facility} ${e.community}`);
     const m = bestMatch(needle, sites, (s) => s.matchKey, 0.55)
       ?? bestMatch(norm(`${e.lga} ${e.community}`), sites, (s) => s.matchKey, 0.5);
     if (m) {
+      if (!e.ward) e.ward = m.row.ward;
+      if (!e.state) e.state = m.row.state;
       for (const f of m.row.flags) {
         causes.push({ label: f.label, cause: f.cause, source: "checklist", confidence: Math.round(m.score * 100) / 100 });
+      }
+      const sv = m.row.survey;
+      if (kind !== "healthy" && sv.eligible > 0 && sv.treated / sv.eligible < coverageFloor) {
+        causes.push({
+          label: `Household survey found ${Math.round((sv.treated / sv.eligible) * 100)}% of eligible people treated`,
+          cause: "Verified coverage", source: "checklist", confidence: Math.round(m.score * 100) / 100,
+        });
       }
     }
 
@@ -597,17 +760,31 @@ export function diagnoseCommunities(
     ));
 
     out.push({
-      key, lga: e.lga, facility: e.facility, community: e.community,
+      key, state: e.state, lga: e.lga, ward: e.ward, facility: e.facility, community: e.community,
       cdds: Array.from(e.cdds).sort(),
       received: e.qty, facilityIssued, returned, coverage,
       firstIssue: e.first, lagDays, kind, severity,
-      causes: causes.sort((a, b) => b.confidence - a.confidence),
+      causes: dedupeCauses(causes),
       matchScore: m?.score ?? 0,
+      targetPop,
+      planScore: ph?.score ?? 0,
     });
   }
 
+
   return out.sort((a, b) => b.severity - a.severity || b.facilityIssued - a.facilityIssued);
 }
+
+/** Keep the highest-confidence instance of each attributed cause. */
+function dedupeCauses(causes: CommunityDiagnosis["causes"]): CommunityDiagnosis["causes"] {
+  const best = new Map<string, CommunityDiagnosis["causes"][number]>();
+  for (const c of causes) {
+    const prev = best.get(c.label);
+    if (!prev || c.confidence > prev.confidence) best.set(c.label, c);
+  }
+  return Array.from(best.values()).sort((a, b) => b.confidence - a.confidence);
+}
+
 
 /* ─────────────────────────────────────────────── rhythms & intelligence Q&A ── */
 

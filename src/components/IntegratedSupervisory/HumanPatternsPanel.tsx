@@ -24,6 +24,10 @@ import { computeHumanPatterns, type FailureKind } from "@/lib/isc/humanPatterns"
 import type { LogisticsDataset } from "@/lib/isc/medicineAccountability";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useMicroplanProjectEntries, useMicroplanProjects } from "@/hooks/useMicroplanProjectData";
+import { useTargetPopFields } from "@/hooks/useTargetPopFields";
+import { normalizePlanRows } from "@/lib/isc/planningLinkage";
+import MicroplanBindingCard from "./MicroplanBindingCard";
 import PlanningLinkagePanel from "./PlanningLinkagePanel";
 
 interface Props {
@@ -55,11 +59,30 @@ const TONE: Record<string, string> = {
 
 const csvCell = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
+const PROJECT_BINDING_KEY = "isc-human-patterns-microplan-project";
+
 export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel, canExport = true }: Props) {
   const [lateStartDays, setLateStartDays] = useState(3);
   const [coverageFloor, setCoverageFloor] = useState(70);
   const [kindFilter, setKindFilter] = useState<"all" | FailureKind>("all");
   const [q, setQ] = useState("");
+
+  /* Bound microplanning project — saved once, restored on every visit. */
+  const [projectId, setProjectId] = useState<string>(() => {
+    try { return localStorage.getItem(PROJECT_BINDING_KEY) ?? ""; } catch { return ""; }
+  });
+  const bindProject = (id: string) => {
+    setProjectId(id);
+    try { localStorage.setItem(PROJECT_BINDING_KEY, id); } catch { /* private mode */ }
+  };
+  const { projects, loading: projectsLoading } = useMicroplanProjects();
+  const { entries, loading: planLoading, fromCache, syncedAt, refresh } = useMicroplanProjectEntries(projectId || null);
+  const { fields, setFields, calcTargetPop, label: targetLabel, options } = useTargetPopFields();
+
+  const plan = useMemo(
+    () => normalizePlanRows(entries, (e) => calcTargetPop(e as Record<string, any>)),
+    [entries, calcTargetPop],
+  );
 
   const { profile } = useAuth();
   const excludePeople = useMemo(() => {
@@ -72,11 +95,14 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
       lateStartDays,
       coverageFloor: coverageFloor / 100,
       excludePeople,
+      plan,
     }),
-    [dataset, checklistRows, lateStartDays, coverageFloor, excludePeople],
+    [dataset, checklistRows, lateStartDays, coverageFloor, excludePeople, plan],
   );
 
   const { network, diagnoses, rhythms, answers, sites, identityMerges } = result;
+
+
 
 
   const diag = useMemo(() => {
@@ -205,14 +231,45 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
         </CardContent>
       </Card>
 
-      {/* plan → checklist → ledger linkage (project-bound) */}
-      <PlanningLinkagePanel
-        dataset={dataset}
-        sites={sites}
-        network={network}
-        diagnoses={diagnoses}
-        canExport={canExport}
+      {/* plan → checklist → ledger linkage (project-bound, saved) */}
+      <MicroplanBindingCard
+        projects={projects}
+        projectsLoading={projectsLoading}
+        projectId={projectId}
+        onProjectId={bindProject}
+        entryCount={entries.length}
+        plannedCommunities={plan.length}
+        loading={planLoading}
+        fromCache={fromCache}
+        syncedAt={syncedAt}
+        onRefresh={() => void refresh()}
+        fields={fields}
+        onFields={setFields}
+        options={options}
+        targetLabel={targetLabel}
       />
+
+      {projectId ? (
+        <PlanningLinkagePanel
+          dataset={dataset}
+          sites={sites}
+          network={network}
+          diagnoses={diagnoses}
+          plan={plan}
+          projectId={projectId}
+          projectName={projects.find((p) => p.id === projectId)?.name ?? ""}
+          targetLabel={targetLabel}
+          canExport={canExport}
+        />
+      ) : (
+        <Card className="border-dashed">
+          <CardContent className="py-8 text-center text-xs text-muted-foreground">
+            Bind a microplanning project above to bring the planned eligible population into this analysis — coverage is
+            then estimated by Community, Ward, LGA and State from the microplan, the checklist and the ledger together.
+          </CardContent>
+        </Card>
+      )}
+
 
 
       {(

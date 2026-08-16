@@ -84,6 +84,7 @@ export interface CoverageNode {
   state: string;
   lga: string;
   ward: string;
+  community: string;
   plannedCommunities: number;
   servedCommunities: number;
   visitedCommunities: number;
@@ -91,14 +92,26 @@ export interface CoverageNode {
   issuedUnits: number;    // units issued to distributors (Level 3)
   returnedUnits: number;
   facilityUnits: number;  // units pushed to facilities (Level 2)
-  treated: number;        // estimated persons treated
-  coverage: number;       // treated / targetPop
+  treated: number;        // estimated persons treated (triangulated)
+  coverage: number;       // triangulated coverage proportion
   ciLow: number;
   ciHigh: number;
+  /** Variance of the triangulated proportion (inverse-variance pooled). */
+  variance: number;
+  /** Allocation-based (administrative) coverage from the medicine ledger. */
+  adminCoverage: number | null;
+  /** Household coverage observed by the Supervisory Checklist. */
+  surveyCoverage: number | null;
+  surveyEligible: number;
+  surveyTreated: number;
+  /** Which sources the estimate rests on. */
+  method: CoverageMethod;
   reachRate: number;      // served communities / planned communities
   status: CoverageStatus;
   untreated: number;
 }
+
+export type CoverageMethod = "triangulated" | "administrative" | "survey" | "none";
 
 export type CoverageStatus = "on_target" | "acceptable" | "sub_optimal" | "critical" | "no_data";
 
@@ -122,6 +135,57 @@ export function wilson(x: number, n: number, z = 1.96): [number, number] {
   const s = z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n));
   return [Math.max(0, (c - s) / d), Math.min(1, (c + s) / d)];
 }
+
+/**
+ * Effective sample size credited to the administrative (allocation-based)
+ * estimate. Administrative coverage is a census of what was issued, but it
+ * carries non-sampling error (mis-keyed geography, unreported returns,
+ * tablets-per-person assumptions), so its precision is capped rather than
+ * treated as if every planned person had been observed.
+ */
+const ADMIN_EFFECTIVE_N = 100;
+
+const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+
+export interface Triangulated {
+  p: number;
+  variance: number;
+  ciLow: number;
+  ciHigh: number;
+  method: CoverageMethod;
+}
+
+/**
+ * Inverse-variance (precision-weighted) triangulation of the administrative
+ * estimate from the Medicine Accountability ledger against the household
+ * coverage observed by the Supervisory Checklist. This is the standard way to
+ * pool two independent estimators of the same proportion: each contributes in
+ * proportion to its precision, and the pooled variance is smaller than either.
+ */
+export function triangulateCoverage(
+  adminP: number | null,
+  adminN: number,
+  surveyP: number | null,
+  surveyN: number,
+): Triangulated {
+  const varOf = (p: number, n: number) => Math.max(1e-9, Math.max(p * (1 - p), 0.05) / Math.max(1, n));
+  const parts: { p: number; v: number }[] = [];
+  if (adminP != null && adminN > 0) parts.push({ p: clamp01(adminP), v: varOf(clamp01(adminP), adminN) });
+  if (surveyP != null && surveyN > 0) parts.push({ p: clamp01(surveyP), v: varOf(clamp01(surveyP), surveyN) });
+  if (!parts.length) return { p: 0, variance: 0, ciLow: 0, ciHigh: 0, method: "none" };
+  const wsum = parts.reduce((s, x) => s + 1 / x.v, 0);
+  const p = parts.reduce((s, x) => s + x.p / x.v, 0) / wsum;
+  const variance = 1 / wsum;
+  const se = Math.sqrt(variance);
+  return {
+    p,
+    variance,
+    ciLow: clamp01(p - 1.96 * se),
+    ciHigh: clamp01(p + 1.96 * se),
+    method: parts.length === 2 ? "triangulated" : adminP != null && adminN > 0 ? "administrative" : "survey",
+  };
+}
+
 
 interface Served {
   issued: number;
@@ -196,7 +260,15 @@ export interface PlanningLinkage {
     untreated: number;
     matchRate: number;
     unitsPerPerson: number;
+    /** Allocation-based coverage alone (Medicine Accountability ledger). */
+    adminCoverage: number | null;
+    /** Household coverage alone (Supervisory Checklist). */
+    surveyCoverage: number | null;
+    surveyEligible: number;
+    surveyTreated: number;
+    method: CoverageMethod;
   };
+
 }
 
 export interface EquityBand {
@@ -308,25 +380,45 @@ export function computePlanningLinkage(
     }
   }
 
+  /* Household coverage observed by the Supervisory Checklist, resolved onto
+     the planned community (fuzzy on LGA + community, ward as tie-breaker). */
+  const survey = new Map<string, { eligible: number; treated: number }>();
   for (const s of sites ?? []) {
     const hit = resolve(s.lga, s.community || s.ward);
-    if (hit) visited.add(hit.row.key);
+    if (!hit) continue;
+    visited.add(hit.row.key);
+    const obs = s.survey;
+    if (!obs || obs.eligible <= 0) continue;
+    const e = survey.get(hit.row.key) ?? { eligible: 0, treated: 0 };
+    e.eligible += obs.eligible;
+    e.treated += Math.min(obs.treated, obs.eligible);
+    survey.set(hit.row.key, e);
   }
 
-  /* 2 ── per-community coverage */
+  /* 2 ── per-community coverage, triangulated across the three sources */
   const communityNodes: CoverageNode[] = plan.map((p) => {
     const s = served.get(p.key) ?? blankServed();
     const netUnits = Math.max(0, s.issued - s.returned);
-    const treated = Math.min(p.targetPop || Infinity, netUnits / unitsPerPerson);
-    const hasData = s.issued > 0 || s.facility > 0;
-    const coverage = p.targetPop > 0 ? treated / p.targetPop : 0;
-    const [lo, hi] = wilson(Math.round(treated), Math.max(1, p.targetPop));
+    const adminTreated = Math.min(p.targetPop || Infinity, netUnits / unitsPerPerson);
+    const hasLedger = s.issued > 0 || s.facility > 0;
+    const adminCoverage = hasLedger && p.targetPop > 0 ? clamp01(adminTreated / p.targetPop) : null;
+
+    const obs = survey.get(p.key);
+    const surveyCoverage = obs && obs.eligible > 0 ? clamp01(obs.treated / obs.eligible) : null;
+
+    const tri = triangulateCoverage(
+      adminCoverage,
+      hasLedger ? Math.min(p.targetPop || ADMIN_EFFECTIVE_N, ADMIN_EFFECTIVE_N) : 0,
+      surveyCoverage,
+      obs?.eligible ?? 0,
+    );
+    const treated = tri.method === "none" ? 0 : tri.p * p.targetPop;
     return {
       level: "Community" as GeoLevel,
       id: p.key,
       name: p.community || "—",
       parent: [p.flhf, p.ward, p.lga].filter(Boolean).join(" · "),
-      state: p.state, lga: p.lga, ward: p.ward,
+      state: p.state, lga: p.lga, ward: p.ward, community: p.community,
       plannedCommunities: 1,
       servedCommunities: s.issued > 0 ? 1 : 0,
       visitedCommunities: visited.has(p.key) ? 1 : 0,
@@ -335,31 +427,46 @@ export function computePlanningLinkage(
       returnedUnits: s.returned,
       facilityUnits: s.facility,
       treated,
-      coverage,
-      ciLow: lo, ciHigh: hi,
+      coverage: tri.p,
+      ciLow: tri.ciLow, ciHigh: tri.ciHigh,
+      variance: tri.variance,
+      adminCoverage,
+      surveyCoverage,
+      surveyEligible: obs?.eligible ?? 0,
+      surveyTreated: obs?.treated ?? 0,
+      method: tri.method,
       reachRate: s.issued > 0 ? 1 : 0,
-      status: bandOf(coverage, hasData),
+      status: bandOf(tri.p, tri.method !== "none"),
       untreated: Math.max(0, p.targetPop - treated),
     };
   });
 
-  const rollup = (level: GeoLevel, keyOf: (n: CoverageNode) => string, nameOf: (n: CoverageNode) => string,
-                  parentOf: (n: CoverageNode) => string): CoverageNode[] => {
+  const rollup = (
+    level: GeoLevel,
+    keyOf: (n: CoverageNode) => string,
+    nameOf: (n: CoverageNode) => string,
+    parentOf: (n: CoverageNode) => string,
+    geoOf: (n: CoverageNode) => { state: string; lga: string; ward: string; community: string },
+  ): CoverageNode[] => {
     const m = new Map<string, CoverageNode>();
+    const acc = new Map<string, { wv: number; w: number }>();
     for (const n of communityNodes) {
       const k = keyOf(n);
       if (!k) continue;
       let e = m.get(k);
       if (!e) {
         e = {
-          ...n, level, id: k, name: nameOf(n), parent: parentOf(n),
+          ...n, level, id: k, name: nameOf(n), parent: parentOf(n), ...geoOf(n),
           plannedCommunities: 0, servedCommunities: 0, visitedCommunities: 0,
           targetPop: 0, issuedUnits: 0, returnedUnits: 0, facilityUnits: 0,
-          treated: 0, coverage: 0, ciLow: 0, ciHigh: 0, reachRate: 0,
-          status: "no_data", untreated: 0,
+          treated: 0, coverage: 0, ciLow: 0, ciHigh: 0, variance: 0,
+          adminCoverage: null, surveyCoverage: null, surveyEligible: 0, surveyTreated: 0,
+          method: "none", reachRate: 0, status: "no_data", untreated: 0,
         };
         m.set(k, e);
+        acc.set(k, { wv: 0, w: 0 });
       }
+      const a = acc.get(k)!;
       e.plannedCommunities += 1;
       e.servedCommunities += n.servedCommunities;
       e.visitedCommunities += n.visitedCommunities;
@@ -368,25 +475,44 @@ export function computePlanningLinkage(
       e.returnedUnits += n.returnedUnits;
       e.facilityUnits += n.facilityUnits;
       e.treated += n.treated;
+      e.surveyEligible += n.surveyEligible;
+      e.surveyTreated += n.surveyTreated;
+      if (n.method !== "none" && n.targetPop > 0) {
+        // population-weighted pooling of the community-level variances
+        a.w += n.targetPop;
+        a.wv += n.targetPop * n.targetPop * n.variance;
+        e.method = e.method === "none" ? n.method
+          : e.method === n.method ? n.method : "triangulated";
+      }
     }
-    for (const e of m.values()) {
-      e.coverage = e.targetPop > 0 ? e.treated / e.targetPop : 0;
-      const [lo, hi] = wilson(Math.round(e.treated), Math.max(1, e.targetPop));
-      e.ciLow = lo; e.ciHigh = hi;
+    for (const [k, e] of m) {
+      const a = acc.get(k)!;
+      e.coverage = e.targetPop > 0 ? clamp01(e.treated / e.targetPop) : 0;
+      e.variance = a.w > 0 ? a.wv / (a.w * a.w) : 0;
+      const se = Math.sqrt(e.variance);
+      e.ciLow = clamp01(e.coverage - 1.96 * se);
+      e.ciHigh = clamp01(e.coverage + 1.96 * se);
+      e.adminCoverage = e.targetPop > 0 && (e.issuedUnits > 0 || e.facilityUnits > 0)
+        ? clamp01(Math.max(0, e.issuedUnits - e.returnedUnits) / unitsPerPerson / e.targetPop) : null;
+      e.surveyCoverage = e.surveyEligible > 0 ? clamp01(e.surveyTreated / e.surveyEligible) : null;
       e.reachRate = e.plannedCommunities > 0 ? e.servedCommunities / e.plannedCommunities : 0;
       e.untreated = Math.max(0, e.targetPop - e.treated);
-      e.status = bandOf(e.coverage, e.issuedUnits > 0 || e.facilityUnits > 0);
+      e.status = bandOf(e.coverage, e.method !== "none");
     }
     return Array.from(m.values()).sort((a, b) => b.untreated - a.untreated);
   };
 
   const nodes: Record<GeoLevel, CoverageNode[]> = {
-    State: rollup("State", (n) => norm(n.state), (n) => n.state || "—", () => "National"),
-    LGA: rollup("LGA", (n) => norm(`${n.state}|${n.lga}`), (n) => n.lga || "—", (n) => n.state || "—"),
+    State: rollup("State", (n) => norm(n.state), (n) => n.state || "—", () => "National",
+      (n) => ({ state: n.state, lga: "", ward: "", community: "" })),
+    LGA: rollup("LGA", (n) => norm(`${n.state}|${n.lga}`), (n) => n.lga || "—", (n) => n.state || "—",
+      (n) => ({ state: n.state, lga: n.lga, ward: "", community: "" })),
     Ward: rollup("Ward", (n) => norm(`${n.state}|${n.lga}|${n.ward}`), (n) => n.ward || "—",
-      (n) => [n.lga, n.state].filter(Boolean).join(" · ")),
+      (n) => [n.lga, n.state].filter(Boolean).join(" · "),
+      (n) => ({ state: n.state, lga: n.lga, ward: n.ward, community: "" })),
     Community: communityNodes.slice().sort((a, b) => b.untreated - a.untreated),
   };
+
 
   /* 3 ── end-to-end funnel */
   const plannedPop = plan.reduce((s, p) => s + p.targetPop, 0);
@@ -532,7 +658,25 @@ export function computePlanningLinkage(
     });
   }
 
-  const [lo, hi] = wilson(Math.round(treatedPop), Math.max(1, plannedPop));
+  /* National totals: population-weighted pooling of the community-level
+     triangulated estimates (never a naive re-computation of the ratio). */
+  let wv = 0, w = 0, surveyEligible = 0, surveyTreated = 0;
+  let issuedNet = 0, anyLedger = false, anySurvey = false;
+  for (const n of communityNodes) {
+    surveyEligible += n.surveyEligible;
+    surveyTreated += n.surveyTreated;
+    issuedNet += Math.max(0, n.issuedUnits - n.returnedUnits);
+    if (n.adminCoverage != null) anyLedger = true;
+    if (n.surveyCoverage != null) anySurvey = true;
+    if (n.method !== "none" && n.targetPop > 0) {
+      w += n.targetPop;
+      wv += n.targetPop * n.targetPop * n.variance;
+    }
+  }
+  const coverage = plannedPop > 0 ? Math.min(1, Math.max(0, treatedPop / plannedPop)) : 0;
+  const se = w > 0 ? Math.sqrt(wv / (w * w)) : 0;
+  const lo = Math.max(0, coverage - 1.96 * se);
+  const hi = Math.min(1, coverage + 1.96 * se);
   return {
     plan,
     nodes,
@@ -548,13 +692,20 @@ export function computePlanningLinkage(
       plannedCommunities: plan.length,
       targetPop: plannedPop,
       treated: treatedPop,
-      coverage: plannedPop > 0 ? treatedPop / plannedPop : 0,
+      coverage,
       ciLow: lo, ciHigh: hi,
       untreated: Math.max(0, plannedPop - treatedPop),
       matchRate: attempts > 0 ? matched / attempts : 0,
       unitsPerPerson,
+      adminCoverage: anyLedger && plannedPop > 0
+        ? Math.min(1, issuedNet / unitsPerPerson / plannedPop) : null,
+      surveyCoverage: surveyEligible > 0 ? surveyTreated / surveyEligible : null,
+      surveyEligible,
+      surveyTreated,
+      method: anyLedger && anySurvey ? "triangulated" : anyLedger ? "administrative" : anySurvey ? "survey" : "none",
     },
   };
+
 }
 
 /* ───────────────────────────────────────── planning-aware intelligence Q&A ── */
