@@ -122,39 +122,21 @@ export default function PlanningLinkagePanel({ dataset, sites, network, diagnose
 
   return (
     <div className="space-y-4">
-      {/* ── project binding ─────────────────────────────────────────────── */}
-      <Card className="overflow-hidden border-primary/30">
-        <div className="h-1 w-full bg-gradient-to-r from-primary via-emerald-500 to-sky-500" />
+      {/* ── estimation assumptions ──────────────────────────────────────── */}
+      <Card className="overflow-hidden border-primary/20">
         <CardHeader className="pb-3">
           <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-            <Route className="h-4 w-4 text-primary" />
-            Plan-to-household linkage
-            <Badge variant="outline" className="text-[10px] font-normal">Microplan × Checklist × Ledger</Badge>
+            <Scale className="h-4 w-4 text-primary" />
+            Plan-to-household linkage{projectName ? ` — ${projectName}` : ""}
+            <Badge variant="outline" className="text-[10px] font-normal">Triangulated estimate</Badge>
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Bind a Geo-enabled Microplanning project to bring the planned eligible population into this analysis. The
-            microplan supplies the denominator, the checklist supplies process evidence and the logistics ledger
-            supplies the treatments — together they answer the human-pattern questions across the whole cycle.
+            Coverage is estimated by pooling the household coverage observed in the Supervisory Checklist with the
+            allocation-based coverage from the Medicine Accountability ledger, each weighted by its precision, against
+            the planned eligible population from the bound microplan ({targetLabel}).
           </p>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="space-y-1 md:col-span-2">
-            <p className="text-[11px] font-medium text-muted-foreground">Microplanning project</p>
-            <Select value={projectId} onValueChange={setProjectId}>
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder={projectsLoading ? "Loading projects…" : "Select a project to link"} />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                {!projects.length && !projectsLoading && (
-                  <div className="px-2 py-3 text-xs text-muted-foreground">No microplanning project available to you.</div>
-                )}
-              </SelectContent>
-            </Select>
-            <p className="text-[10px] text-muted-foreground">
-              Target population definition: <span className="font-medium">{targetLabel}</span>
-            </p>
-          </div>
           <div className="space-y-1">
             <p className="text-[11px] font-medium text-muted-foreground">Units per person treated</p>
             <Input type="number" min={0.1} step={0.1} className="h-9" value={unitsPerPerson}
@@ -165,28 +147,16 @@ export default function PlanningLinkagePanel({ dataset, sites, network, diagnose
             <Input type="number" min={50} step={50} className="h-9" value={popPerDistributor}
               onChange={(e) => setPopPerDistributor(Math.max(50, Number(e.target.value) || 500))} />
           </div>
-          <div className="md:col-span-2 xl:col-span-4 flex flex-wrap items-center gap-2 pt-1">
-            {loading && <Badge variant="outline" className="text-[10px] font-normal gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Loading microplan…</Badge>}
-            {!!projectId && !loading && (
-              <Badge variant="outline" className="text-[10px] font-normal">
-                {entries.length.toLocaleString()} microplan entries · {link.plan.length.toLocaleString()} planned communities
-              </Badge>
-            )}
-            {fromCache && <Badge variant="outline" className="gap-1 border-amber-300 bg-amber-50 text-[10px] font-normal text-amber-700"><CloudOff className="h-3 w-3" /> Offline copy</Badge>}
-            {syncedAt && <span className="text-[10px] text-muted-foreground">Synced {new Date(syncedAt).toLocaleTimeString()}</span>}
-            {!!projectId && (
-              <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={() => void refresh()}>
-                <RefreshCw className="h-3.5 w-3.5" /> Refresh
-              </Button>
-            )}
+          <div className="flex items-end md:col-span-2">
             {canExport && !!projectId && (
-              <Button size="sm" variant="outline" className="h-7 gap-1 text-xs ml-auto" onClick={exportCsv} disabled={!link.plan.length}>
+              <Button size="sm" variant="outline" className="h-9 gap-1 text-xs ml-auto" onClick={exportCsv} disabled={!link.plan.length}>
                 <Download className="h-3.5 w-3.5" /> Export coverage cascade
               </Button>
             )}
           </div>
         </CardContent>
       </Card>
+
 
       {!projectId ? (
         <Card className="border-dashed">
