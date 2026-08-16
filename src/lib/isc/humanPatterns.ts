@@ -475,9 +475,9 @@ const sumNumeric = (row: Record<string, unknown>, re: RegExp, skip?: RegExp): nu
 const GEO_KEY = /state|lga|local_gov|ward|facility|flhf|health_?fac|hf_name|community|settlement|village/i;
 const PERSON_RULES: { keys: RegExp; role: ActorRole }[] = [
   { keys: /cdd|distributor|drug_?distributor/i, role: "cdd" },
-  { keys: /in_?charge|officer_?in_?charge|oic|facility_?(staff|focal)/i, role: "facility" },
-  { keys: /edo|logistic|store_?keeper|slo/i, role: "lga" },
-  { keys: /supervisor|monitor|assessor|enumerator|interviewer|submitted_?by|username|data_?collector|name_?of_?(the_)?(officer|supervisor|monitor)/i, role: "state" },
+  { keys: /in_?charge|officer_?in_?charge|oic|facility_?(staff|focal)/i, role: "incharge" },
+  { keys: /edo|logistic|store_?keeper/i, role: "edo" },
+  { keys: /slo|state_?logistic/i, role: "slo" },
 ];
 /** Names of people mentioned on a flattened checklist row, with their role. */
 const pickPeople = (row: Record<string, unknown>): { name: string; role: ActorRole }[] => {
@@ -559,6 +559,7 @@ export function collectChecklistHandlings(sites: ChecklistSite[]): Handling[] {
       out.push({
         person: p.name, role: p.role, qty: 0, date: s.date, lga: s.lga,
         facility: s.facility, community: s.community, context, signed: s.signed,
+        cadre: false,
       });
     }
   }
