@@ -24,6 +24,8 @@ import { pickTransport, estimateBytes, Transport, NetworkState } from "@/lib/mes
 import { WebRTCLan } from "@/lib/meshSync/webrtcLan";
 import { pushViaRelay } from "@/lib/meshSync/serverRelay";
 import { bleSupported, scanForPeers } from "@/lib/meshSync/bleBeacon";
+import { supabase } from "@/integrations/supabase/client";
+
 
 interface QueueItem {
   id: string;
@@ -69,12 +71,36 @@ export default function MeshSyncManagerView() {
     };
   }, []);
 
-  // Start LAN room
+  // Start LAN room.
+  // Rooms are scoped to a project the signed-in user is assigned to
+  // (`<projectId>:<suffix>`), so signalling can never be injected into a
+  // stranger's session — the backend enforces the same rule.
   const startLan = async () => {
     if (lanRef.current) return;
+
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) {
+      toast({ title: "Sign in required", description: "Sign in to start a LAN mesh room.", variant: "destructive" });
+      return;
+    }
+    const { data: assignments } = await supabase
+      .from("user_project_assignments")
+      .select("project_id")
+      .eq("user_id", auth.user.id)
+      .limit(1);
+    const projectId = assignments?.[0]?.project_id;
+    if (!projectId) {
+      toast({
+        title: "No project assigned",
+        description: "LAN mesh rooms are scoped to a project. Ask an admin to assign you to one.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     let room = localStorage.getItem(LS_ROOM);
-    if (!room) {
-      room = (crypto.randomUUID().slice(0, 8));
+    if (!room || !room.startsWith(`${projectId}:`)) {
+      room = `${projectId}:${crypto.randomUUID().slice(0, 8)}`;
       localStorage.setItem(LS_ROOM, room);
     }
     const lan = new WebRTCLan(room);
@@ -87,6 +113,7 @@ export default function MeshSyncManagerView() {
     const tick = setInterval(() => setLanPeers(lan.peerCount()), 1500);
     (lan as any)._tick = tick;
   };
+
 
   const stopLan = async () => {
     const lan = lanRef.current;
