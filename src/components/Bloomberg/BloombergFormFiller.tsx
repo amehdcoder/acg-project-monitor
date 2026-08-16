@@ -32,6 +32,7 @@ import { reportBloombergLocalAudit } from "@/lib/bloomberg/localAuditReporter";
 import { captureAndUploadDeviceAuditSnapshots } from "@/lib/bloomberg/deviceAuditSnapshot";
 import { queueOrInsert } from "@/lib/offlineSubmissions";
 import bloombergLogo from "@/assets/bloomberg-eye-logo.png";
+import KoboSyncButton from "@/components/Kobo/KoboSyncButton";
 
 const NAVY = "#0c2340";
 const STEPS = ["School", "Verify", "Enrolment", "Evidence"];
@@ -438,7 +439,7 @@ export default function BloombergFormFiller({ onClose, projectId = null, savedEn
             <img src={bloombergLogo} alt="Bloomberg School Eye Health" className="h-7 w-7 rounded" />
             <span className="text-sm font-semibold leading-tight">Bloomberg School<br />Eye Health Project</span>
           </div>
-          <div className="w-9" />
+          <KoboSyncButton formType="bloomberg" formTitle="Bloomberg School Eye Health Validation Checklist" />
         </div>
         <h1 className="mt-4 text-2xl font-bold">New Validation</h1>
         <p className="text-sm text-white/70">School Enrolment Validation</p>

@@ -24,6 +24,7 @@ import { mirrorSpecialForm, BMZ_FORM_ID } from "@/lib/specialFormBridge";
 import { newEntryId } from "@/lib/savedForms";
 import { queueOrInsert } from "@/lib/offlineSubmissions";
 import handsLogo from "@/assets/logo-amehnities.png";
+import KoboSyncButton from "@/components/Kobo/KoboSyncButton";
 
 const STEPS = ["Identification", "Service Delivery", "Challenges & Output", "Sign-off & Review"];
 
@@ -252,7 +253,10 @@ export default function BmzFormFiller({ onClose }: Props) {
               <p className="text-[10px]" style={{ color: BMZ_TEAL }}>Monitoring Checklist — Ambassadors, TBAs & CHEWs</p>
             </div>
           </div>
-          <img src={handsLogo} alt="HANDS" className="h-8 w-8 rounded" loading="lazy" />
+          <div className="flex items-center gap-2">
+            <KoboSyncButton formType="bmz_monitoring" formTitle="Jigawa State Inclusive Eye Health BMZ Monitoring Checklist" />
+            <img src={handsLogo} alt="HANDS" className="h-8 w-8 rounded" loading="lazy" />
+          </div>
         </div>
         {/* Stepper */}
         <div className="mt-4 flex items-center">

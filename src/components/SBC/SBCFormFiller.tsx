@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import { mirrorSpecialForm } from "@/lib/specialFormBridge";
 import {
+import KoboSyncButton from "@/components/Kobo/KoboSyncButton";
   SBC_CATEGORIES, REPORTING_LEVELS, INDICATOR_LEVELS, UNITS_OF_MEASURE,
   STAKEHOLDER_TYPES, ENGAGEMENT_TYPES, COMMUNICATION_CHANNELS, REACH_TYPES,
   DATA_SOURCES, SBC_INDICATORS, findIndicator, computeAchievement,
@@ -236,6 +237,9 @@ export default function SBCFormFiller({ projectId, onClose }: Props) {
               <h1 className="text-xl sm:text-2xl font-bold leading-tight">SBC Indicator Reporting Form</h1>
               <p className="text-[13px]" style={{ color: C.sub }}>Report data for Social & Behaviour Change indicators</p>
             </div>
+          </div>
+          <div className="ml-auto">
+            <KoboSyncButton formType="sbc" formTitle="SBC Indicator Reporting Checklist" />
           </div>
           <div className="ml-auto hidden sm:flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px]" style={{ border: `1px solid ${C.border}`, color: C.sub }}>
             <HelpCircle className="h-4 w-4" /> Help
