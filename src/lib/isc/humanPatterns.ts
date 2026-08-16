@@ -158,8 +158,9 @@ function collectHandlings(ds: LogisticsDataset): Handling[] {
   return out;
 }
 
-export function buildNetwork(ds: LogisticsDataset): NetworkStats {
-  const handlings = collectHandlings(ds);
+export function buildNetwork(ds: LogisticsDataset, extra: Handling[] = []): NetworkStats {
+  const handlings = [...collectHandlings(ds), ...extra];
+
 
   /* actors */
   const map = new Map<string, {
