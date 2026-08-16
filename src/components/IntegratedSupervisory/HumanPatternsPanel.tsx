@@ -24,6 +24,7 @@ import { computeHumanPatterns, type FailureKind } from "@/lib/isc/humanPatterns"
 import type { LogisticsDataset } from "@/lib/isc/medicineAccountability";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import PlanningLinkagePanel from "./PlanningLinkagePanel";
 
 interface Props {
   dataset: LogisticsDataset;
@@ -203,6 +204,16 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
           )}
         </CardContent>
       </Card>
+
+      {/* plan → checklist → ledger linkage (project-bound) */}
+      <PlanningLinkagePanel
+        dataset={dataset}
+        sites={sites}
+        network={network}
+        diagnoses={diagnoses}
+        canExport={canExport}
+      />
+
 
       {(
         <>
