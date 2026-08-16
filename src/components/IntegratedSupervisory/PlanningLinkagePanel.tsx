@@ -35,8 +35,15 @@ interface Props {
   sites: ChecklistSite[];
   network: NetworkStats;
   diagnoses: CommunityDiagnosis[];
+  /** Planned denominators from the bound Geo-enabled Microplanning project. */
+  plan: PlanRow[];
+  projectId: string;
+  projectName: string;
+  /** Human label of the saved target-population definition. */
+  targetLabel: string;
   canExport?: boolean;
 }
+
 
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 const int = (n: number) => Math.round(n).toLocaleString();
