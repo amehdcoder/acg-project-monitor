@@ -5,6 +5,7 @@ import {
   User as UserIcon, Building2, ClipboardCheck, ChevronDown, Phone, X, Download,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import KoboSyncButton from "@/components/Kobo/KoboSyncButton";
 import { useAuth } from "@/hooks/useAuth";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { toast } from "sonner";

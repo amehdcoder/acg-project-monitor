@@ -64,6 +64,7 @@ import { syncFinalizedSavedForms } from "@/lib/savedFormAutoSync";
 import useGeolocation, { GeolocationPosition } from "@/hooks/useGeolocation";
 import useGeofenceValidation from "@/hooks/useGeofenceValidation";
 import { supabase } from "@/integrations/supabase/client";
+import KoboSyncButton from "@/components/Kobo/KoboSyncButton";
 import useCaseManagement, { CaseManagementSettings } from "@/hooks/useCaseManagement";
 import GPSCapture from "./GPSCapture";
 import DateInput from "./DateInput";
