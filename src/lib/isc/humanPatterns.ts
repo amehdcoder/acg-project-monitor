@@ -395,8 +395,11 @@ const pickPeople = (row: Record<string, unknown>): { name: string; role: ActorRo
     const val = String(v).trim();
     if (!val || val.length < 3 || val.length > 60 || BAD_NAME.test(val)) continue;
     if (GEO_KEY.test(k)) continue;
+    if (/signature|photo|image|picture|attachment|gps|geopoint|uuid|_id$|url|file/i.test(k)) continue;
     if (!/name|_by|username|cdd|supervisor|monitor|officer|enumerator|in_?charge/i.test(k)) continue;
     if (!/[a-z]/i.test(val) || /^https?:/i.test(val)) continue;
+    if (/\.(png|jpe?g|webp|gif|pdf|mp3|mp4|3gp|amr)$/i.test(val)) continue;
+
     const rule = PERSON_RULES.find((r) => r.keys.test(k));
     if (!rule) continue;
     const id = norm(val);
