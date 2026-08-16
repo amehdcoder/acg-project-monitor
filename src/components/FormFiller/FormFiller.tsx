@@ -3147,6 +3147,14 @@ const FormFiller = ({
         />
       )}
 
+      {isMdaChecklist && (
+        <div className="pointer-events-auto fixed right-3 top-3 z-40">
+          <KoboSyncButton formType={formId || "form"} formTitle={formName || "Checklist"} tone="light" />
+        </div>
+      )}
+
+
+
       {!isMdaChecklist && (
         <div
           className="flex items-center justify-between border-b border-border bg-card px-4 py-3"
