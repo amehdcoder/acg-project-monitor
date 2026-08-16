@@ -227,14 +227,45 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
         </CardContent>
       </Card>
 
-      {/* plan → checklist → ledger linkage (project-bound) */}
-      <PlanningLinkagePanel
-        dataset={dataset}
-        sites={sites}
-        network={network}
-        diagnoses={diagnoses}
-        canExport={canExport}
+      {/* plan → checklist → ledger linkage (project-bound, saved) */}
+      <MicroplanBindingCard
+        projects={projects}
+        projectsLoading={projectsLoading}
+        projectId={projectId}
+        onProjectId={bindProject}
+        entryCount={entries.length}
+        plannedCommunities={plan.length}
+        loading={planLoading}
+        fromCache={fromCache}
+        syncedAt={syncedAt}
+        onRefresh={() => void refresh()}
+        fields={fields}
+        onFields={setFields}
+        options={options}
+        targetLabel={targetLabel}
       />
+
+      {projectId ? (
+        <PlanningLinkagePanel
+          dataset={dataset}
+          sites={sites}
+          network={network}
+          diagnoses={diagnoses}
+          plan={plan}
+          projectId={projectId}
+          projectName={projects.find((p) => p.id === projectId)?.name ?? ""}
+          targetLabel={targetLabel}
+          canExport={canExport}
+        />
+      ) : (
+        <Card className="border-dashed">
+          <CardContent className="py-8 text-center text-xs text-muted-foreground">
+            Bind a microplanning project above to bring the planned eligible population into this analysis — coverage is
+            then estimated by Community, Ward, LGA and State from the microplan, the checklist and the ledger together.
+          </CardContent>
+        </Card>
+      )}
+
 
 
       {(
