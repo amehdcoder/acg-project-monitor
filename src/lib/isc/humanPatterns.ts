@@ -159,8 +159,23 @@ function collectHandlings(ds: LogisticsDataset): Handling[] {
   return out;
 }
 
-export function buildNetwork(ds: LogisticsDataset, extra: Handling[] = []): NetworkStats {
-  const handlings = [...collectHandlings(ds), ...extra];
+export function buildNetwork(
+  ds: LogisticsDataset,
+  extra: Handling[] = [],
+  identity?: IdentityIndex,
+): NetworkStats {
+  const raw = [...collectHandlings(ds), ...extra];
+  // Fuzzy identity resolution: every spelling variant of the same person is
+  // folded into one canonical actor before ANY aggregate is computed, and
+  // excluded people (e.g. the signed-in user) are dropped entirely.
+  const idx = identity ?? buildIdentityIndex(raw.map((h) => h.person));
+  const handlings: Handling[] = [];
+  for (const h of raw) {
+    const person = idx.resolve(h.person);
+    if (!person) continue;
+    handlings.push({ ...h, person: person.name });
+  }
+
 
 
   /* actors */
