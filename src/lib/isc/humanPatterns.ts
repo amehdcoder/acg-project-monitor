@@ -797,10 +797,15 @@ export function computeHumanPatterns(
   checklistRows: Record<string, unknown>[] | null | undefined,
   opts: DiagnosisOptions = {},
 ): HumanPatternsResult {
-  const network = buildNetwork(ds);
   const sites = extractChecklistSites(checklistRows ?? []);
+  // The supervisory checklist is a second social source: when the logistics
+  // ledger is thin (or not yet synced) the network, rhythms and diagnoses are
+  // still computed from checklist visits, so the panel is never blank.
+  const checklistHandlings = collectChecklistHandlings(sites);
+  const network = buildNetwork(ds, checklistHandlings);
   const diagnoses = diagnoseCommunities(ds, sites, opts);
-  const rhythms = computeRhythms(ds);
+  const rhythms = computeRhythms(ds, sites.map((s) => s.date).filter(Boolean));
   const answers = answerIntelligenceQuestions(network, diagnoses, rhythms, sites);
   return { network, sites, diagnoses, rhythms, answers };
 }
+
