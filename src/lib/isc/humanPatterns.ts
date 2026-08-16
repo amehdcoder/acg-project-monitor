@@ -539,12 +539,14 @@ export interface Rhythms {
   weekendRate: number;
 }
 
-export function computeRhythms(ds: LogisticsDataset): Rhythms {
+export function computeRhythms(ds: LogisticsDataset, extraDates: string[] = []): Rhythms {
   const hours = Array.from({ length: 24 }, (_, h) => ({ name: `${String(h).padStart(2, "0")}h`, value: 0 }));
   const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const weekdays = WD.map((name) => ({ name, value: 0 }));
   let total = 0, night = 0, weekend = 0;
-  const all = [...ds.dispatches, ...ds.receipts, ...ds.issues, ...ds.cddIssues, ...ds.returns];
+  const all = [...ds.dispatches, ...ds.receipts, ...ds.issues, ...ds.cddIssues, ...ds.returns,
+    ...extraDates.map((date) => ({ date }))];
+
   for (const t of all) {
     const d = new Date(t.date);
     if (isNaN(d.getTime())) continue;
