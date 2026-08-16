@@ -24,6 +24,8 @@ import { pickTransport, estimateBytes, Transport, NetworkState } from "@/lib/mes
 import { WebRTCLan } from "@/lib/meshSync/webrtcLan";
 import { pushViaRelay } from "@/lib/meshSync/serverRelay";
 import { bleSupported, scanForPeers } from "@/lib/meshSync/bleBeacon";
+import { supabase } from "@/integrations/supabase/client";
+
 
 interface QueueItem {
   id: string;
