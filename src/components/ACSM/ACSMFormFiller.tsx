@@ -10,6 +10,7 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import { toast } from "sonner";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import { mirrorSpecialForm } from "@/lib/specialFormBridge";
+import KoboSyncButton from "@/components/Kobo/KoboSyncButton";
 import {
   ACSM_CATEGORIES, REPORTING_LEVELS, INDICATOR_LEVELS, UNITS_OF_MEASURE,
   DATA_SOURCES, ACSM_INDICATORS, DISAGG_DIMENSIONS, findIndicator, computeAchievement,
@@ -287,6 +288,9 @@ export default function ACSMFormFiller({ projectId, onClose }: Props) {
               <h1 className="text-lg sm:text-2xl font-bold leading-tight">ACSM Indicator Reporting Form</h1>
               <p className="text-[12px] sm:text-[13px]" style={{ color: C.sub }}>Advocacy, Communication & Social Mobilization</p>
             </div>
+          </div>
+          <div className="ml-auto">
+            <KoboSyncButton formType="acsm" formTitle="ACSM Indicator Reporting Checklist" />
           </div>
         </div>
       </div>

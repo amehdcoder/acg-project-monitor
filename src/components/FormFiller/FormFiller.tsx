@@ -64,6 +64,7 @@ import { syncFinalizedSavedForms } from "@/lib/savedFormAutoSync";
 import useGeolocation, { GeolocationPosition } from "@/hooks/useGeolocation";
 import useGeofenceValidation from "@/hooks/useGeofenceValidation";
 import { supabase } from "@/integrations/supabase/client";
+import KoboSyncButton from "@/components/Kobo/KoboSyncButton";
 import useCaseManagement, { CaseManagementSettings } from "@/hooks/useCaseManagement";
 import GPSCapture from "./GPSCapture";
 import DateInput from "./DateInput";
@@ -3146,6 +3147,14 @@ const FormFiller = ({
         />
       )}
 
+      {isMdaChecklist && (
+        <div className="pointer-events-auto fixed right-3 top-3 z-40">
+          <KoboSyncButton formType={formId || "form"} formTitle={formName || "Checklist"} tone="light" />
+        </div>
+      )}
+
+
+
       {!isMdaChecklist && (
         <div
           className="flex items-center justify-between border-b border-border bg-card px-4 py-3"
@@ -3195,6 +3204,12 @@ const FormFiller = ({
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <KoboSyncButton
+                formType={formId || "form"}
+                formTitle={formName || "Checklist"}
+                tone="light"
+              />
+
               <Button
                 variant={inclusiveMode ? "default" : "outline"}
                 size="sm"

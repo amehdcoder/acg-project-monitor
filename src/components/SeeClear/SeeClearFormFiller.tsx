@@ -5,6 +5,7 @@ import {
   User as UserIcon, Building2, ClipboardCheck, ChevronDown, Phone, X, Download,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import KoboSyncButton from "@/components/Kobo/KoboSyncButton";
 import { useAuth } from "@/hooks/useAuth";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { toast } from "sonner";
@@ -274,17 +275,28 @@ export default function SeeClearFormFiller({ onClose }: Props) {
             </div>
             <img src={handsLogo} alt="HANDS" className="h-8 w-8 rounded" loading="lazy" />
           </div>
-          <button
-            type="button"
-            title="Download KoboToolbox XLSForm"
-            onClick={() => {
-              try { const f = downloadSeeClearXlsForm(); toast.success(`XLSForm downloaded — ${f}`); }
-              catch (e: any) { toast.error(e?.message || "Could not build XLSForm"); }
-            }}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
-          >
-            <Download className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <KoboSyncButton
+              formType="seeclear"
+              formTitle="Plateau Comprehensive and Inclusive Eye Health Project MEL Checklist"
+              onDownloadXlsForm={() => {
+                try { const f = downloadSeeClearXlsForm(); toast.success(`XLSForm downloaded — ${f}`); }
+                catch (e: any) { toast.error(e?.message || "Could not build XLSForm"); }
+              }}
+            />
+            <button
+              type="button"
+              title="Download KoboToolbox XLSForm"
+              onClick={() => {
+                try { const f = downloadSeeClearXlsForm(); toast.success(`XLSForm downloaded — ${f}`); }
+                catch (e: any) { toast.error(e?.message || "Could not build XLSForm"); }
+              }}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
+            >
+              <Download className="h-5 w-5" />
+            </button>
+          </div>
+
         </div>
         {/* Stepper */}
         <div className="mt-4 flex items-center">
