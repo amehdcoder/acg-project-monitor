@@ -11,6 +11,7 @@
  * Everything is computed locally, offline, from already-cached submissions.
  */
 import type { LogisticsDataset } from "./medicineAccountability";
+import { buildIdentityIndex, type IdentityIndex } from "./actorIdentity";
 
 /* ──────────────────────────────────────────────── fuzzy string utilities ── */
 
@@ -158,8 +159,23 @@ function collectHandlings(ds: LogisticsDataset): Handling[] {
   return out;
 }
 
-export function buildNetwork(ds: LogisticsDataset, extra: Handling[] = []): NetworkStats {
-  const handlings = [...collectHandlings(ds), ...extra];
+export function buildNetwork(
+  ds: LogisticsDataset,
+  extra: Handling[] = [],
+  identity?: IdentityIndex,
+): NetworkStats {
+  const raw = [...collectHandlings(ds), ...extra];
+  // Fuzzy identity resolution: every spelling variant of the same person is
+  // folded into one canonical actor before ANY aggregate is computed, and
+  // excluded people (e.g. the signed-in user) are dropped entirely.
+  const idx = identity ?? buildIdentityIndex(raw.map((h) => h.person));
+  const handlings: Handling[] = [];
+  for (const h of raw) {
+    const person = idx.resolve(h.person);
+    if (!person) continue;
+    handlings.push({ ...h, person: person.name });
+  }
+
 
 
   /* actors */
@@ -486,6 +502,7 @@ export interface CommunityDiagnosis {
 export interface DiagnosisOptions {
   lateStartDays?: number;   // lag beyond which commencement is "late"
   coverageFloor?: number;   // coverage below which it is "poor"
+  identity?: IdentityIndex; // fuzzy actor-name resolver (spelling variants)
 }
 
 export function diagnoseCommunities(
@@ -516,7 +533,8 @@ export function diagnoseCommunities(
     e.qty += Number(c.qtyIssued) || 0;
     const d = dayOf(c.date);
     if (d && (!e.first || d < e.first)) e.first = d;
-    if (clean(c.cddName)) e.cdds.add(clean(c.cddName));
+    const cddName = opts.identity ? (opts.identity.resolve(c.cddName)?.name ?? "") : clean(c.cddName);
+    if (cddName) e.cdds.add(cddName);
     comm.set(k, e);
   }
 
@@ -793,22 +811,44 @@ export interface HumanPatternsResult {
   diagnoses: CommunityDiagnosis[];
   rhythms: Rhythms;
   answers: IntelligenceAnswer[];
+  /** Spelling variants folded into a single person by the fuzzy resolver. */
+  identityMerges: { name: string; variants: string[] }[];
+}
+
+export interface HumanPatternsOptions extends DiagnosisOptions {
+  /** People to omit from the analysis entirely (e.g. the signed-in user). */
+  excludePeople?: string[];
 }
 
 export function computeHumanPatterns(
   ds: LogisticsDataset,
   checklistRows: Record<string, unknown>[] | null | undefined,
-  opts: DiagnosisOptions = {},
+  opts: HumanPatternsOptions = {},
 ): HumanPatternsResult {
   const sites = extractChecklistSites(checklistRows ?? []);
   // The supervisory checklist is a second social source: when the logistics
   // ledger is thin (or not yet synced) the network, rhythms and diagnoses are
   // still computed from checklist visits, so the panel is never blank.
   const checklistHandlings = collectChecklistHandlings(sites);
-  const network = buildNetwork(ds, checklistHandlings);
-  const diagnoses = diagnoseCommunities(ds, sites, opts);
+
+  // One identity index for the whole analysis so ledger + checklist aggregates
+  // resolve to the same canonical person regardless of spelling.
+  const allNames = [
+    ...collectHandlings(ds).map((h) => h.person),
+    ...checklistHandlings.map((h) => h.person),
+    ...ds.cddIssues.map((c) => c.cddName),
+  ];
+  const identity = buildIdentityIndex(allNames, opts.excludePeople ?? []);
+
+  const network = buildNetwork(ds, checklistHandlings, identity);
+  const diagnoses = diagnoseCommunities(ds, sites, { ...opts, identity });
   const rhythms = computeRhythms(ds, sites.map((s) => s.date).filter(Boolean));
   const answers = answerIntelligenceQuestions(network, diagnoses, rhythms, sites);
-  return { network, sites, diagnoses, rhythms, answers };
+  const identityMerges = identity.clusters
+    .filter((c) => c.variants.length > 1)
+    .map((c) => ({ name: c.name, variants: c.variants }))
+    .sort((a, b) => b.variants.length - a.variants.length);
+  return { network, sites, diagnoses, rhythms, answers, identityMerges };
 }
+
 

@@ -6,6 +6,7 @@
  * FLHF → CDD) plus manually entered State/LGA allocations, and renders the
  * full accountability indicator suite with live tiered balances.
  */
+import { getAllStates, getLGAsForState } from "@/lib/nigeriaAdminData";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -297,12 +298,25 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
   });
 
   const allRows = [...dataset.receipts, ...dataset.issues, ...dataset.cddIssues];
-  const states = useMemo(() => Array.from(new Set(allRows.map((r) => r.state).filter(Boolean))).sort(), [dataset]);
-  const lgas = useMemo(
-    () => Array.from(new Set(allRows.filter((r) => !filters.state || r.state === filters.state).map((r) => r.lga).filter(Boolean))).sort(),
-    [dataset, filters.state],
-  );
+  // Filters must offer the full national registry (37 states / 774 LGAs), not
+  // only the geographies that happen to exist in the synced ledger — otherwise
+  // Federal allocations can never be recorded for a state before its first
+  // submission arrives.
+  const states = useMemo(() => {
+    const s = new Set<string>(getAllStates());
+    for (const r of allRows) if (r.state) s.add(r.state);
+    for (const a of allocations) if (a.state) s.add(a.state);
+    return Array.from(s).sort();
+  }, [dataset, allocations]);
+  const lgas = useMemo(() => {
+    const s = new Set<string>(filters.state ? getLGAsForState(filters.state) : []);
+    if (!filters.state) for (const st of getAllStates()) for (const l of getLGAsForState(st)) s.add(l);
+    for (const r of allRows) if (r.lga && (!filters.state || r.state === filters.state)) s.add(r.lga);
+    for (const a of allocations) if (a.lga && (!filters.state || a.state === filters.state)) s.add(a.lga);
+    return Array.from(s).sort();
+  }, [dataset, allocations, filters.state]);
   const medicines = useMemo(() => Array.from(new Set(allRows.map((r) => r.medicine).filter(Boolean))).sort(), [dataset]);
+
 
   const persistAllocations = (rows: Allocation[]) => { setAllocations(rows); saveAllocations(rows); };
 

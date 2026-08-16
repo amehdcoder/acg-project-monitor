@@ -23,6 +23,7 @@ import {
 import { computeHumanPatterns, type FailureKind } from "@/lib/isc/humanPatterns";
 import type { LogisticsDataset } from "@/lib/isc/medicineAccountability";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Props {
   dataset: LogisticsDataset;
@@ -59,15 +60,23 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
   const [kindFilter, setKindFilter] = useState<"all" | FailureKind>("all");
   const [q, setQ] = useState("");
 
+  const { profile } = useAuth();
+  const excludePeople = useMemo(() => {
+    const me = `${profile?.first_name ?? ""} ${profile?.last_name ?? ""}`.trim();
+    return [me, "Ameh Joseph", "Joseph Ameh"].filter(Boolean);
+  }, [profile?.first_name, profile?.last_name]);
+
   const result = useMemo(
     () => computeHumanPatterns(dataset, checklistRows ?? [], {
       lateStartDays,
       coverageFloor: coverageFloor / 100,
+      excludePeople,
     }),
-    [dataset, checklistRows, lateStartDays, coverageFloor],
+    [dataset, checklistRows, lateStartDays, coverageFloor, excludePeople],
   );
 
-  const { network, diagnoses, rhythms, answers, sites } = result;
+  const { network, diagnoses, rhythms, answers, sites, identityMerges } = result;
+
 
   const diag = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -126,7 +135,22 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
             ({sites.length.toLocaleString()} sites) are fuzzy-matched on LGA / Ward / Facility / Community so
             behavioural evidence explains logistics failures.
           </p>
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <Badge variant="outline" className="text-[10px] font-normal">
+              Identity resolution: {network.actors.length} unique people
+            </Badge>
+            {identityMerges.length > 0 && (
+              <Badge
+                variant="outline"
+                className="border-emerald-300 bg-emerald-50 text-[10px] font-normal text-emerald-700"
+                title={identityMerges.slice(0, 25).map((m) => `${m.name} ← ${m.variants.join(" | ")}`).join("\n")}
+              >
+                {identityMerges.length} name{identityMerges.length === 1 ? "" : "s"} auto-merged from spelling variants
+              </Badge>
+            )}
+          </div>
         </CardHeader>
+
         <CardContent className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <p className="text-[11px] text-muted-foreground">Late-start threshold (days)</p>
