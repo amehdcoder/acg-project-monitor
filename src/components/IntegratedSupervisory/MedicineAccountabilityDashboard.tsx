@@ -21,7 +21,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import {
   Activity, AlertTriangle, BookOpen, Boxes, CalendarClock, CheckCircle2, ClipboardCheck, Download, FileSpreadsheet,
   FileText, Filter, Gauge, Loader2, Maximize2, PackageCheck, PackageX, PlugZap, QrCode, RefreshCw, Route, Scale,
-  ShieldAlert, Timer, TrendingDown, Truck, Undo2, Warehouse,
+  Brain, ShieldAlert, Timer, TrendingDown, Truck, Undo2, Warehouse,
 } from "lucide-react";
 
 
@@ -53,6 +53,7 @@ import SupplyIntegrityPanel from "./SupplyIntegrityPanel";
 import ChecklistReconciliation from "./ChecklistReconciliation";
 import CascadeVerificationPanel from "./CascadeVerificationPanel";
 import BarcodeTraceabilityPanel from "./BarcodeTraceabilityPanel";
+import HumanPatternsPanel from "./HumanPatternsPanel";
 import { computeBarcodeTrace, computeCascade, computeLevelBalances, stateLedger } from "@/lib/isc/medicineCascade";
 
 
@@ -660,6 +661,7 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
           <TabsTrigger value="leadtime"><Timer className="h-4 w-4 mr-1" /> Lead time & POD</TabsTrigger>
           <TabsTrigger value="supply"><Scale className="h-4 w-4 mr-1" /> Integrity, loss & equity</TabsTrigger>
 
+          <TabsTrigger value="patterns"><Brain className="h-4 w-4 mr-1" /> Human patterns & networks</TabsTrigger>
           <TabsTrigger value="integrity"><ShieldAlert className="h-4 w-4 mr-1" /> Data integrity</TabsTrigger>
         </TabsList>
 
@@ -993,6 +995,15 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
             onExpiryWindow={setExpiryWindow}
             kickoff={kickoff}
             onKickoff={setKickoff}
+          />
+        </TabsContent>
+
+        <TabsContent value="patterns" className="mt-4">
+          <HumanPatternsPanel
+            dataset={filtered}
+            checklistRows={checklistCache?.flatResults ?? []}
+            scopeLabel={scopeLabel}
+            canExport={canExport}
           />
         </TabsContent>
 
