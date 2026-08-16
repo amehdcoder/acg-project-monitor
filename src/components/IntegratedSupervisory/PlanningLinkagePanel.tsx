@@ -204,10 +204,13 @@ export default function PlanningLinkagePanel({ dataset, sites, network, diagnose
           {/* ── headline coverage ──────────────────────────────────────── */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { icon: Target, label: "Planned eligible population", value: int(link.totals.targetPop), sub: `${int(link.totals.plannedCommunities)} planned communities` },
-              { icon: TrendingUp, label: "Estimated treatment coverage", value: pct(link.totals.coverage), sub: `95% CI ${pct(link.totals.ciLow)} – ${pct(link.totals.ciHigh)}` },
+              { icon: Target, label: "Planned eligible population", value: int(link.totals.targetPop), sub: `${int(link.totals.plannedCommunities)} planned communities · ${targetLabel}` },
+              { icon: TrendingUp, label: "Estimated treatment coverage", value: pct(link.totals.coverage), sub: `95% CI ${pct(link.totals.ciLow)} – ${pct(link.totals.ciHigh)} · ${METHOD[link.totals.method].label}` },
+              { icon: Scale, label: "Triangulation inputs", value: link.totals.surveyCoverage != null ? pct(link.totals.surveyCoverage) : "—",
+                sub: `Household survey ${link.totals.surveyEligible.toLocaleString()} eligible · allocation-based ${link.totals.adminCoverage != null ? pct(link.totals.adminCoverage) : "—"}` },
               { icon: Users2, label: "Still untreated", value: int(link.totals.untreated), sub: `${int(link.totals.treated)} people estimated treated` },
               { icon: Radar, label: "Geography match rate", value: pct(link.totals.matchRate), sub: `${link.unplanned.length.toLocaleString()} served communities absent from the plan` },
+
             ].map((k) => (
               <Card key={k.label}>
                 <CardContent className="p-4">
