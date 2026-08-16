@@ -205,6 +205,16 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
         </CardContent>
       </Card>
 
+      {/* plan → checklist → ledger linkage (project-bound) */}
+      <PlanningLinkagePanel
+        dataset={dataset}
+        sites={sites}
+        network={network}
+        diagnoses={diagnoses}
+        canExport={canExport}
+      />
+
+
       {(
         <>
 
