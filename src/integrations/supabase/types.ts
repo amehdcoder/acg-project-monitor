@@ -9252,6 +9252,7 @@ export type Database = {
       }
       can_edit_dashboard: { Args: { _user_id: string }; Returns: boolean }
       can_edit_dashboards: { Args: { _user_id: string }; Returns: boolean }
+      can_join_mesh_room: { Args: { _room_id: string }; Returns: boolean }
       can_locate_community: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
@@ -9263,6 +9264,10 @@ export type Database = {
       }
       can_peer_validate_survey: {
         Args: { _survey_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_read_case_note: {
+        Args: { _author_id: string; _case_id: string; _visibility: string }
         Returns: boolean
       }
       can_read_mesh_signal: {
@@ -9293,6 +9298,15 @@ export type Database = {
       can_view_all_locations: { Args: { _user_id: string }; Returns: boolean }
       can_view_form_submissions: {
         Args: { _form_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_write_mesh_signal: {
+        Args: {
+          _from_peer: string
+          _kind: string
+          _room_id: string
+          _to_peer: string
+        }
         Returns: boolean
       }
       current_user_can_build_mda_followups: { Args: never; Returns: boolean }
@@ -9415,6 +9429,10 @@ export type Database = {
         Args: { _expires_at: string; _starts_at: string }
         Returns: boolean
       }
+      is_case_team_member: {
+        Args: { _case_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_chat_group_admin: {
         Args: { _chat_group_id: string; _user_id: string }
         Returns: boolean
@@ -9501,6 +9519,7 @@ export type Database = {
       }
       mda_lens_geo_key: { Args: { _v: string }; Returns: string }
       mda_lens_write_allowed: { Args: { _user_id: string }; Returns: boolean }
+      mesh_room_project: { Args: { _room_id: string }; Returns: string }
       microplan_distinct_geography:
         | {
             Args: { _states?: string[] }
