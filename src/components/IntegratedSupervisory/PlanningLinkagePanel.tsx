@@ -67,22 +67,21 @@ const PRIORITY: Record<string, string> = {
   watch: "border-sky-300 bg-sky-50 text-sky-800",
 };
 
+const METHOD: Record<CoverageMethod, { label: string; cls: string }> = {
+  triangulated: { label: "Survey × allocation", cls: "border-primary/40 bg-primary/10 text-primary" },
+  survey: { label: "Household survey", cls: "border-sky-300 bg-sky-50 text-sky-700" },
+  administrative: { label: "Allocation-based", cls: "border-amber-300 bg-amber-50 text-amber-700" },
+  none: { label: "No evidence", cls: "border-muted-foreground/30 bg-muted text-muted-foreground" },
+};
+
 const csvCell = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
-export default function PlanningLinkagePanel({ dataset, sites, network, diagnoses, canExport = true }: Props) {
-  const { projects, loading: projectsLoading } = useMicroplanProjects();
-  const [projectId, setProjectId] = useState<string>("");
-  const { entries, loading, fromCache, syncedAt, refresh } = useMicroplanProjectEntries(projectId || null);
-  const { calcTargetPop, label: targetLabel } = useTargetPopFields();
-
+export default function PlanningLinkagePanel({
+  dataset, sites, network, diagnoses, plan, projectId, projectName, targetLabel, canExport = true,
+}: Props) {
   const [unitsPerPerson, setUnitsPerPerson] = useState(1);
   const [popPerDistributor, setPopPerDistributor] = useState(500);
   const [level, setLevel] = useState<GeoLevel>("LGA");
-
-  const plan = useMemo(
-    () => normalizePlanRows(entries, (e) => calcTargetPop(e as Record<string, any>)),
-    [entries, calcTargetPop],
-  );
 
   const link = useMemo(
     () => computePlanningLinkage(plan, dataset, sites, { unitsPerPerson, popPerDistributor }),
@@ -102,22 +101,26 @@ export default function PlanningLinkagePanel({ dataset, sites, network, diagnose
     [link, level],
   );
 
-  const projectName = projects.find((p) => p.id === projectId)?.name ?? "";
-
   const exportCsv = () => {
-    const head = ["Level", "Name", "Parent", "Planned communities", "Served", "Supervised", "Target population",
-      "Units issued", "Units returned", "Estimated treated", "Coverage %", "CI low %", "CI high %", "Untreated", "Status"];
+    const head = ["Level", "State", "LGA", "Ward", "Community", "Planned communities", "Served", "Supervised",
+      "Target population", "Units issued", "Units returned", "Estimated treated", "Coverage %", "CI low %",
+      "CI high %", "Basis", "Household survey coverage %", "Allocation coverage %", "Untreated", "Status"];
     const lines = [head.map(csvCell).join(",")];
     (["State", "LGA", "Ward", "Community"] as GeoLevel[]).forEach((lv) => {
       for (const n of link.nodes[lv]) {
         lines.push([
-          lv, n.name, n.parent, n.plannedCommunities, n.servedCommunities, n.visitedCommunities,
+          lv, n.state, n.lga, n.ward, n.community,
+          n.plannedCommunities, n.servedCommunities, n.visitedCommunities,
           Math.round(n.targetPop), Math.round(n.issuedUnits), Math.round(n.returnedUnits), Math.round(n.treated),
           (n.coverage * 100).toFixed(1), (n.ciLow * 100).toFixed(1), (n.ciHigh * 100).toFixed(1),
+          METHOD[n.method].label,
+          n.surveyCoverage != null ? (n.surveyCoverage * 100).toFixed(1) : "",
+          n.adminCoverage != null ? (n.adminCoverage * 100).toFixed(1) : "",
           Math.round(n.untreated), STATUS_STYLE[n.status].label,
         ].map(csvCell).join(","));
       }
     });
+
     const blob = new Blob([`\uFEFF${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
