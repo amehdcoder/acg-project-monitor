@@ -62,7 +62,26 @@ export function bestMatch<T>(needle: string, rows: T[], key: (r: T) => string, f
 
 /* ───────────────────────────────────────────────────── actors & network ── */
 
-export type ActorRole = "state" | "lga" | "facility" | "cdd" | "returns";
+/**
+ * Cadres recognised as actors. Only the four named human cadres captured on
+ * the Medicine Accountability ledger are treated as actors:
+ *  slo      — State Logistic Officer (Level 0/1)
+ *  edo      — LGA EDO / Logistic Officer (Level 0/1/2)
+ *  incharge — FLHF In-charge (Level 2/3)
+ *  cdd      — Community Directed Distributor (Level 3/4)
+ */
+export type ActorRole = "slo" | "edo" | "incharge" | "cdd";
+
+export const ROLE_LABEL: Record<ActorRole, string> = {
+  slo: "State Logistic Officer",
+  edo: "LGA EDO / Logistic Officer",
+  incharge: "FLHF In-charge",
+  cdd: "CDD",
+};
+
+export const ROLE_SHORT: Record<ActorRole, string> = {
+  slo: "SLO", edo: "EDO", incharge: "In-charge", cdd: "CDD",
+};
 
 export interface Actor {
   id: string;
