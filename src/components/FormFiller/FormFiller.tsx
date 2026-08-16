@@ -3195,6 +3195,12 @@ const FormFiller = ({
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <KoboSyncButton
+                formType={formId || "form"}
+                formTitle={formName || "Checklist"}
+                tone="light"
+              />
+
               <Button
                 variant={inclusiveMode ? "default" : "outline"}
                 size="sm"
