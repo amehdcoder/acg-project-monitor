@@ -123,7 +123,7 @@ export interface NetworkStats {
   cliques: { members: string[]; weight: number; signatureRate: number }[];
 }
 
-interface Handling {
+export interface Handling {
   person: string;
   role: ActorRole;
   qty: number;
@@ -133,6 +133,8 @@ interface Handling {
   community: string;
   context: string;         // batch / waybill / facility key
   signed: boolean;
+  /** True when the name came from a named cadre field on the ledger. */
+  cadre: boolean;
 }
 
 const dayOf = (d: string) => (d ? String(d).slice(0, 10) : "");
@@ -142,40 +144,47 @@ const hourOf = (d: string) => {
 };
 const clean = (s: unknown) => String(s ?? "").trim();
 
-function collectHandlings(ds: LogisticsDataset): Handling[] {
+/**
+ * Named-cadre handovers from the Medicine Accountability ledger.
+ * Only SLO, LGA EDO / Logistic Officer, FLHF In-charge and CDD name fields
+ * become actors — anonymous `submitted_by` usernames and free-text answers
+ * are never treated as people.
+ */
+export function collectHandlings(ds: LogisticsDataset): Handling[] {
   const out: Handling[] = [];
   const push = (h: Partial<Handling> & { person: string; role: ActorRole }) => {
     if (!h.person || /^(n\/?a|none|unknown|nil|-)$/i.test(h.person)) return;
+    if (!isHumanName(h.person)) return;
     out.push({
-      qty: 0, date: "", lga: "", facility: "", community: "", context: "", signed: false,
+      qty: 0, date: "", lga: "", facility: "", community: "", context: "", signed: false, cadre: true,
       ...h,
     } as Handling);
   };
 
   for (const d of ds.dispatches) {
     const ctx = clean(d.batch) || clean(d.waybill) || `${d.state}|${d.destinationLga}`;
-    push({ person: clean(d.sloName), role: "state", qty: d.qtyDispatched, date: d.date, lga: d.destinationLga || d.lga, context: ctx, signed: d.hasSignature });
-    push({ person: clean(d.receivingOfficer), role: "lga", qty: d.qtyDispatched, date: d.date, lga: d.destinationLga || d.lga, context: ctx, signed: d.hasSignature });
+    push({ person: clean(d.sloName), role: "slo", qty: d.qtyDispatched, date: d.date, lga: d.destinationLga || d.lga, context: ctx, signed: d.hasSignature });
+    push({ person: clean(d.receivingOfficer), role: "edo", qty: d.qtyDispatched, date: d.date, lga: d.destinationLga || d.lga, context: ctx, signed: d.hasSignature });
   }
   for (const r of ds.receipts) {
     const ctx = clean(r.batch) || `${r.state}|${r.lga}`;
-    push({ person: clean(r.sloName), role: "state", qty: r.qtyReceived, date: r.date, lga: r.lga, context: ctx, signed: r.hasSignature });
-    push({ person: clean(r.edoName), role: "lga", qty: r.qtyReceived, date: r.date, lga: r.lga, context: ctx, signed: r.hasSignature });
+    push({ person: clean(r.sloName), role: "slo", qty: r.qtyReceived, date: r.date, lga: r.lga, context: ctx, signed: r.hasSignature });
+    push({ person: clean(r.edoName), role: "edo", qty: r.qtyReceived, date: r.date, lga: r.lga, context: ctx, signed: r.hasSignature });
   }
   for (const i of ds.issues) {
     const ctx = clean(i.batch) || `${i.lga}|${i.facility}`;
-    push({ person: clean(i.submittedBy), role: "lga", qty: i.qtyIssued, date: i.date, lga: i.lga, facility: i.facility, context: ctx, signed: i.hasSignature });
-    push({ person: clean(i.inCharge), role: "facility", qty: i.qtyIssued, date: i.date, lga: i.lga, facility: i.facility, context: ctx, signed: i.hasSignature });
+    push({ person: clean(i.inCharge), role: "incharge", qty: i.qtyIssued, date: i.date, lga: i.lga, facility: i.facility, context: ctx, signed: i.hasSignature });
   }
   for (const c of ds.cddIssues) {
     const ctx = `${c.lga}|${c.facility}`;
-    push({ person: clean(c.submittedBy), role: "facility", qty: c.qtyIssued, date: c.date, lga: c.lga, facility: c.facility, community: c.community, context: ctx, signed: c.hasPhoto });
     push({ person: clean(c.cddName), role: "cdd", qty: c.qtyIssued, date: c.date, lga: c.lga, facility: c.facility, community: c.community, context: ctx, signed: c.hasPhoto });
   }
   for (const r of ds.returns) {
     const ctx = clean(r.batch) || `${r.returnedFrom}|${r.returnedTo}`;
-    push({ person: clean(r.returnedBy), role: "returns", qty: r.qtyReturned, date: r.date, lga: r.lga, facility: r.facility, community: r.community, context: ctx, signed: r.hasSignature });
-    push({ person: clean(r.receivedBy), role: "returns", qty: r.qtyReturned, date: r.date, lga: r.lga, facility: r.facility, community: r.community, context: ctx, signed: r.hasSignature });
+    // Reverse legs re-use the same cadres: the community end is a CDD, the
+    // receiving end a facility in-charge / LGA logistics officer.
+    push({ person: clean(r.returnedBy), role: r.community ? "cdd" : "incharge", qty: r.qtyReturned, date: r.date, lga: r.lga, facility: r.facility, community: r.community, context: ctx, signed: r.hasSignature, cadre: false });
+    push({ person: clean(r.receivedBy), role: r.facility ? "incharge" : "edo", qty: r.qtyReturned, date: r.date, lga: r.lga, facility: r.facility, community: r.community, context: ctx, signed: r.hasSignature, cadre: false });
   }
   return out;
 }
@@ -190,12 +199,25 @@ export function buildNetwork(
   // folded into one canonical actor before ANY aggregate is computed, and
   // excluded people (e.g. the signed-in user) are dropped entirely.
   const idx = identity ?? buildIdentityIndex(raw.map((h) => h.person));
+
+  // The actor roster is defined ONLY by named cadre fields on the ledger.
+  // Everything else (reverse-logistics counterparties, checklist mentions) can
+  // add ties and evidence, but can never introduce a new person.
+  const roster = new Set<string>();
+  for (const h of raw) {
+    if (!h.cadre) continue;
+    const p = idx.resolve(h.person);
+    if (p) roster.add(norm(p.name));
+  }
+
   const handlings: Handling[] = [];
   for (const h of raw) {
     const person = idx.resolve(h.person);
     if (!person) continue;
+    if (roster.size && !roster.has(norm(person.name))) continue;
     handlings.push({ ...h, person: person.name });
   }
+
 
 
 
