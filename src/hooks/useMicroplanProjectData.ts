@@ -101,7 +101,7 @@ export function useMicroplanProjectEntries(projectId: string | null | undefined)
           .range(from, from + PAGE_SIZE - 1);
         if (error) throw error;
         if (!data?.length) break;
-        all.push(...(data as MicroplanEntry[]));
+        all.push(...((data as unknown) as MicroplanEntry[]));
         if (data.length < PAGE_SIZE) break;
       }
       if (req !== reqRef.current) return;
