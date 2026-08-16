@@ -327,12 +327,15 @@ export default function PlanningLinkagePanel({ dataset, sites, network, diagnose
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader><TableRow>
-                    <TableHead className="text-xs">{level}</TableHead>
-                    <TableHead className="text-xs">Within</TableHead>
+                    <TableHead className="text-xs">State</TableHead>
+                    <TableHead className="text-xs">LGA</TableHead>
+                    <TableHead className="text-xs">Ward</TableHead>
+                    <TableHead className="text-xs">Community</TableHead>
                     <TableHead className="text-xs text-right">Eligible</TableHead>
                     <TableHead className="text-xs text-right">Treated (est.)</TableHead>
                     <TableHead className="text-xs text-right">Coverage</TableHead>
                     <TableHead className="text-xs text-right">95% CI</TableHead>
+                    <TableHead className="text-xs">Basis</TableHead>
                     <TableHead className="text-xs text-right">Reach</TableHead>
                     <TableHead className="text-xs text-right">Untreated</TableHead>
                     <TableHead className="text-xs">Status</TableHead>
@@ -340,18 +343,24 @@ export default function PlanningLinkagePanel({ dataset, sites, network, diagnose
                   <TableBody>
                     {rows.map((n) => (
                       <TableRow key={`${n.level}-${n.id}`}>
-                        <TableCell className="text-xs font-medium">{n.name}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{n.parent || "—"}</TableCell>
+                        <TableCell className="text-xs font-medium">{n.state || "—"}</TableCell>
+                        <TableCell className="text-xs">{n.lga || "—"}</TableCell>
+                        <TableCell className="text-xs">{n.ward || "—"}</TableCell>
+                        <TableCell className="text-xs">{n.community || "—"}</TableCell>
                         <TableCell className="text-xs text-right">{int(n.targetPop)}</TableCell>
                         <TableCell className="text-xs text-right">{int(n.treated)}</TableCell>
                         <TableCell className="text-xs text-right font-semibold">{pct(n.coverage)}</TableCell>
                         <TableCell className="text-xs text-right text-muted-foreground">{pct(n.ciLow)}–{pct(n.ciHigh)}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={`text-[10px] ${METHOD[n.method].cls}`}>{METHOD[n.method].label}</Badge>
+                        </TableCell>
                         <TableCell className="text-xs text-right">{n.servedCommunities}/{n.plannedCommunities}</TableCell>
                         <TableCell className="text-xs text-right">{int(n.untreated)}</TableCell>
                         <TableCell><Badge variant="outline" className={`text-[10px] ${STATUS_STYLE[n.status].cls}`}>{STATUS_STYLE[n.status].label}</Badge></TableCell>
                       </TableRow>
                     ))}
-                    {!rows.length && <TableRow><TableCell colSpan={9} className="py-6 text-center text-xs text-muted-foreground">This project's microplan has no entries at this level yet.</TableCell></TableRow>}
+                    {!rows.length && <TableRow><TableCell colSpan={12} className="py-6 text-center text-xs text-muted-foreground">This project's microplan has no entries at this level yet.</TableCell></TableRow>}
+
                   </TableBody>
                 </Table>
                 {link.nodes[level].length > rows.length && (
