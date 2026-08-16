@@ -9246,6 +9246,7 @@ export type Database = {
         Returns: boolean
       }
       can_access_microplanning: { Args: { _user_id: string }; Returns: boolean }
+      can_access_presence_topic: { Args: { _topic: string }; Returns: boolean }
       can_bulk_data: {
         Args: { _action: string; _user_id: string }
         Returns: boolean
@@ -9608,6 +9609,7 @@ export type Database = {
         Returns: Json
       }
       owner_restore_records: { Args: { _record_ids: string[] }; Returns: Json }
+      presence_topic_project: { Args: { _topic: string }; Returns: string }
       profile_co_owner_flag: { Args: { _user_id: string }; Returns: boolean }
       profile_owner_flag: { Args: { _user_id: string }; Returns: boolean }
       prune_mda_lens_access_events: { Args: never; Returns: undefined }
