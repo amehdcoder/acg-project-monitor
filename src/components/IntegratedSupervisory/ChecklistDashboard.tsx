@@ -33,6 +33,7 @@ import ChecklistMaps from "./ChecklistMaps";
 import HouseholdCoverageAnalysis from "./HouseholdCoverageAnalysis";
 import MlIntelligenceHub from "./MlIntelligenceHub";
 import ChecklistPresetBar from "./ChecklistPresetBar";
+import CommunityVisitedTable, { buildCommunityVisits } from "./CommunityVisitedTable";
 
 
 
