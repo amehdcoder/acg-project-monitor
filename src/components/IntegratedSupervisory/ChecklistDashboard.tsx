@@ -388,15 +388,19 @@ function CoverageTargetDialog({
           </div>
         )}
         <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="ghost" onClick={() => { onSave(null); setOpen(false); }}>Clear</Button>
+          <Button variant="ghost" onClick={() => { onSave({}); setOpen(false); }}>Clear all</Button>
           <Button
             onClick={() => {
-              const n = Number(draft);
-              onSave(draft.trim() === "" || !Number.isFinite(n) || n <= 0 ? null : Math.round(n));
+              const next: Record<string, number> = {};
+              for (const s of states) {
+                const n = Number(draft[s]);
+                if (Number.isFinite(n) && n > 0) next[s] = Math.round(n);
+              }
+              onSave(next);
               setOpen(false);
             }}
           >
-            Save target
+            Save targets
           </Button>
         </DialogFooter>
       </DialogContent>
