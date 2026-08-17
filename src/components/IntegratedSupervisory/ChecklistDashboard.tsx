@@ -425,6 +425,18 @@ export default function ChecklistDashboard({
     [parents],
   );
 
+  /* Community Visited register — filtered instantly by the monitor/supervisor
+     selected in either performance table. */
+  const [visitPerson, setVisitPerson] = useState<string | null>(null);
+  const communityVisits = useMemo(() => {
+    const monitorName = makeNameResolver(parents, "Independent_Monitor_s_Name", true);
+    const supervisorName = makeNameResolver(parents, "Name_of_Supervisor", true);
+    return buildCommunityVisits(parents, (p) => monitorName(p) || supervisorName(p) || "");
+  }, [parents]);
+  const toggleVisitPerson = (name: string) =>
+    setVisitPerson((cur) => (cur === name ? null : name));
+
+
 
 
   const kpi = useMemo(() => {
