@@ -53,7 +53,7 @@ const MDA_STATUS_COLORS: { match: RegExp; color: string }[] = [
 const mdaStatusColor = (name: string) =>
   MDA_STATUS_COLORS.find((c) => c.match.test(name))?.color ?? "hsl(215,15%,55%)";
 
-const GEO_DENOM_KEY = "isc.geoCoverageDenominator";
+const GEO_TARGETS_KEY = "isc.geoCoverageTargetsByState";
 
 const yes = (v: unknown) => String(v ?? "").trim().toLowerCase() === "yes";
 
