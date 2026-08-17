@@ -299,7 +299,7 @@ export function whyCoverageLow(diag: CommunityDiagnosis[]): CoverageRegression |
       pValue: pv,
       significant: pv < 0.05,
       mean: mean(col),
-      direction: coef >= 0 ? "increases" : "reduces",
+      direction: (coef >= 0 ? "increases" : "reduces") as RegressionTerm["direction"],
     };
   }).sort((a, b) => Math.abs(b.standardized) - Math.abs(a.standardized));
 

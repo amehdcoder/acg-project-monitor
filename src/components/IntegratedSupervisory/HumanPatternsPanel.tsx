@@ -20,13 +20,14 @@ import {
 import {
   AlertTriangle, Brain, Clock, Download, GitBranch, Info, Lightbulb, Network, Search, Users,
 } from "lucide-react";
-import { computeHumanPatterns, type FailureKind } from "@/lib/isc/humanPatterns";
+import { computeHumanPatterns, ROLE_SHORT, ROLE_LABEL, type FailureKind } from "@/lib/isc/humanPatterns";
 import type { LogisticsDataset } from "@/lib/isc/medicineAccountability";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useMicroplanProjectEntries, useMicroplanProjects } from "@/hooks/useMicroplanProjectData";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { normalizePlanRows } from "@/lib/isc/planningLinkage";
+import DecisionIntelligencePanel from "./DecisionIntelligencePanel";
 import MicroplanBindingCard from "./MicroplanBindingCard";
 import PlanningLinkagePanel from "./PlanningLinkagePanel";
 
@@ -336,7 +337,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
                     {network.brokers.slice(0, 8).map((b) => (
                       <TableRow key={b.actor.id}>
                         <TableCell className="text-xs font-medium">{b.actor.name}
-                          <span className="ml-1 text-[10px] text-muted-foreground">{b.actor.roles.join("/")}</span></TableCell>
+                          <span className="ml-1 text-[10px] text-muted-foreground">{b.actor.roles.map((r) => ROLE_SHORT[r] ?? r).join(" / ")}</span></TableCell>
                         <TableCell className="text-xs text-right">{b.brokerage.toFixed(2)}</TableCell>
                         <TableCell className="text-xs text-right">{b.bridges}</TableCell>
                         <TableCell className="text-xs text-right">{b.actor.communities.length}</TableCell>
@@ -440,7 +441,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
                   {topActors.map((a) => (
                     <TableRow key={a.id}>
                       <TableCell className="text-xs font-medium">{a.name}</TableCell>
-                      <TableCell className="text-xs capitalize">{a.roles.join(", ")}</TableCell>
+                      <TableCell className="text-xs">{a.roles.map((r) => ROLE_LABEL[r] ?? r).join(", ")}</TableCell>
                       <TableCell className="text-xs text-right">{a.transactions.toLocaleString()}</TableCell>
                       <TableCell className="text-xs text-right">{Math.round(a.quantity).toLocaleString()}</TableCell>
                       <TableCell className="text-xs text-right">{a.communities.length}</TableCell>
@@ -454,6 +455,16 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
               </Table>
             </CardContent>
           </Card>
+
+          {/* decision intelligence */}
+          <DecisionIntelligencePanel
+            dataset={dataset}
+            network={network}
+            diagnoses={diagnoses}
+            sites={sites}
+            coverageFloor={coverageFloor}
+            lateStartDays={lateStartDays}
+          />
 
           {/* diagnosis table */}
           <Card>
