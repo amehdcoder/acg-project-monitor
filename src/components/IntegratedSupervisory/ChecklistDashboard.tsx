@@ -23,6 +23,8 @@ import {
 import ChecklistFilters, {
   applyChecklistFilters, EMPTY_FILTERS, type ChecklistFilterState,
 } from "./ChecklistFilters";
+import { buildIdentityIndex } from "@/lib/isc/actorIdentity";
+import { isHumanName } from "@/lib/isc/nameQuality";
 import {
   StatusCommunityTables, StatusDrilldownDialog, useStatusDrilldown,
 } from "./ChecklistStatusTables";
