@@ -55,6 +55,7 @@ import ChecklistReconciliation from "./ChecklistReconciliation";
 import CascadeVerificationPanel from "./CascadeVerificationPanel";
 import BarcodeTraceabilityPanel from "./BarcodeTraceabilityPanel";
 import HumanPatternsPanel from "./HumanPatternsPanel";
+import PersonnelAccountabilityPanel from "./PersonnelAccountabilityPanel";
 import { computeBarcodeTrace, computeCascade, computeLevelBalances, stateLedger } from "@/lib/isc/medicineCascade";
 
 
