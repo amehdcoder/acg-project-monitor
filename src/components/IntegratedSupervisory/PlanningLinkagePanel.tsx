@@ -21,23 +21,24 @@ import {
 import {
   Activity, Download, Layers, MapPinned, Radar, Scale, Target, TrendingUp, Users2,
 } from "lucide-react";
-import {
+import type {
   answerLinkedQuestions, computePlanningLinkage,
-  type CoverageMethod, type CoverageStatus, type GeoLevel, type PlanRow,
+  CoverageMethod, CoverageStatus, GeoLevel,
 } from "@/lib/isc/planningLinkage";
 
-import type { LogisticsDataset } from "@/lib/isc/medicineAccountability";
-import type { ChecklistSite, CommunityDiagnosis, NetworkStats } from "@/lib/isc/humanPatterns";
+type PlanningLinkageResult = ReturnType<typeof computePlanningLinkage>;
+type LinkedAnswer = ReturnType<typeof answerLinkedQuestions>[number];
 import { toast } from "@/hooks/use-toast";
 
 interface Props {
-  dataset: LogisticsDataset;
-  sites: ChecklistSite[];
-  network: NetworkStats;
-  diagnoses: CommunityDiagnosis[];
-  /** Planned denominators from the bound Geo-enabled Microplanning project. */
-  plan: PlanRow[];
-  projectId: string;
+  /** Coverage linkage computed off the main thread (null while it runs). */
+  link: PlanningLinkageResult | null;
+  answers: LinkedAnswer[];
+  computing: boolean;
+  unitsPerPerson: number;
+  onUnitsPerPerson: (n: number) => void;
+  popPerDistributor: number;
+  onPopPerDistributor: (n: number) => void;
   projectName: string;
   /** Human label of the saved target-population definition. */
   targetLabel: string;
@@ -77,31 +78,21 @@ const METHOD: Record<CoverageMethod, { label: string; cls: string }> = {
 const csvCell = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
 export default function PlanningLinkagePanel({
-  dataset, sites, network, diagnoses, plan, projectId, projectName, targetLabel, canExport = true,
+  link, answers, computing, unitsPerPerson, onUnitsPerPerson, popPerDistributor, onPopPerDistributor,
+  projectName, targetLabel, canExport = true,
 }: Props) {
-  const [unitsPerPerson, setUnitsPerPerson] = useState(1);
-  const [popPerDistributor, setPopPerDistributor] = useState(500);
   const [level, setLevel] = useState<GeoLevel>("LGA");
 
-  const link = useMemo(
-    () => computePlanningLinkage(plan, dataset, sites, { unitsPerPerson, popPerDistributor }),
-    [plan, dataset, sites, unitsPerPerson, popPerDistributor],
-  );
-
-  const answers = useMemo(
-    () => answerLinkedQuestions(link, network, diagnoses, sites),
-    [link, network, diagnoses, sites],
-  );
-
-  const rows = useMemo(() => link.nodes[level].slice(0, 300), [link, level]);
+  const rows = useMemo(() => (link ? link.nodes[level].slice(0, 300) : []), [link, level]);
   const chartData = useMemo(
-    () => link.nodes[level].slice(0, 15).map((n) => ({
+    () => (link ? link.nodes[level].slice(0, 15).map((n) => ({
       name: n.name, coverage: Number((n.coverage * 100).toFixed(1)), status: n.status,
-    })),
+    })) : []),
     [link, level],
   );
 
   const exportCsv = () => {
+    if (!link) return;
     const head = ["Level", "State", "LGA", "Ward", "Community", "Planned communities", "Served", "Supervised",
       "Target population", "Units issued", "Units returned", "Estimated treated", "Coverage %", "CI low %",
       "CI high %", "Basis", "Household survey coverage %", "Allocation coverage %", "Untreated", "Status"];
@@ -130,6 +121,17 @@ export default function PlanningLinkagePanel({
     toast({ title: "Coverage cascade exported", description: `${link.plan.length.toLocaleString()} planned communities across four geographic levels.` });
   };
 
+  if (!link) {
+    return (
+      <Card className="border-primary/20">
+        <CardContent className="flex items-center justify-center gap-2 py-12 text-xs text-muted-foreground">
+          <Activity className="h-4 w-4 animate-pulse text-primary" />
+          {computing ? "Linking the microplan to the checklist and the ledger…" : "No linkage available yet."}
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* ── estimation assumptions ──────────────────────────────────────── */}
@@ -150,15 +152,15 @@ export default function PlanningLinkagePanel({
           <div className="space-y-1">
             <p className="text-[11px] font-medium text-muted-foreground">Units per person treated</p>
             <Input type="number" min={0.1} step={0.1} className="h-9" value={unitsPerPerson}
-              onChange={(e) => setUnitsPerPerson(Math.max(0.1, Number(e.target.value) || 1))} />
+              onChange={(e) => onUnitsPerPerson(Math.max(0.1, Number(e.target.value) || 1))} />
           </div>
           <div className="space-y-1">
             <p className="text-[11px] font-medium text-muted-foreground">Population per distributor (norm)</p>
             <Input type="number" min={50} step={50} className="h-9" value={popPerDistributor}
-              onChange={(e) => setPopPerDistributor(Math.max(50, Number(e.target.value) || 500))} />
+              onChange={(e) => onPopPerDistributor(Math.max(50, Number(e.target.value) || 500))} />
           </div>
           <div className="flex items-end md:col-span-2">
-            {canExport && !!projectId && (
+            {canExport &&  (
               <Button size="sm" variant="outline" className="h-9 gap-1 text-xs ml-auto" onClick={exportCsv} disabled={!link.plan.length}>
                 <Download className="h-3.5 w-3.5" /> Export coverage cascade
               </Button>
@@ -168,7 +170,7 @@ export default function PlanningLinkagePanel({
       </Card>
 
 
-      {!projectId ? (
+      {false ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
             <MapPinned className="h-6 w-6 text-muted-foreground" />
