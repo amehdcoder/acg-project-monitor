@@ -22,7 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import {
   Activity, AlertTriangle, BookOpen, Boxes, CalendarClock, CheckCircle2, ClipboardCheck, Download, FileSpreadsheet,
   FileText, Filter, Gauge, Loader2, Maximize2, PackageCheck, PackageX, PlugZap, QrCode, RefreshCw, Route, Scale,
-  Brain, ShieldAlert, Timer, TrendingDown, Truck, Undo2, Warehouse,
+  Brain, ShieldAlert, Timer, TrendingDown, Truck, Undo2, Users, Warehouse,
 } from "lucide-react";
 
 
@@ -55,6 +55,7 @@ import ChecklistReconciliation from "./ChecklistReconciliation";
 import CascadeVerificationPanel from "./CascadeVerificationPanel";
 import BarcodeTraceabilityPanel from "./BarcodeTraceabilityPanel";
 import HumanPatternsPanel from "./HumanPatternsPanel";
+import PersonnelAccountabilityPanel from "./PersonnelAccountabilityPanel";
 import { computeBarcodeTrace, computeCascade, computeLevelBalances, stateLedger } from "@/lib/isc/medicineCascade";
 
 
@@ -676,6 +677,7 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
           <TabsTrigger value="supply"><Scale className="h-4 w-4 mr-1" /> Integrity, loss & equity</TabsTrigger>
 
           <TabsTrigger value="patterns"><Brain className="h-4 w-4 mr-1" /> Human patterns & networks</TabsTrigger>
+          <TabsTrigger value="personnel"><Users className="h-4 w-4 mr-1" /> Personnel accountability</TabsTrigger>
           <TabsTrigger value="integrity"><ShieldAlert className="h-4 w-4 mr-1" /> Data integrity</TabsTrigger>
         </TabsList>
 
@@ -1019,6 +1021,10 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
             scopeLabel={scopeLabel}
             canExport={canExport}
           />
+        </TabsContent>
+
+        <TabsContent value="personnel" className="mt-4">
+          <PersonnelAccountabilityPanel dataset={filtered} />
         </TabsContent>
 
         <TabsContent value="integrity" className="mt-4">

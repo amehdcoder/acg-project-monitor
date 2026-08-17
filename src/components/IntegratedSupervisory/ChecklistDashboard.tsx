@@ -53,7 +53,7 @@ const MDA_STATUS_COLORS: { match: RegExp; color: string }[] = [
 const mdaStatusColor = (name: string) =>
   MDA_STATUS_COLORS.find((c) => c.match.test(name))?.color ?? "hsl(215,15%,55%)";
 
-const GEO_DENOM_KEY = "isc.geoCoverageDenominator";
+const GEO_TARGETS_KEY = "isc.geoCoverageTargetsByState";
 
 const yes = (v: unknown) => String(v ?? "").trim().toLowerCase() === "yes";
 
@@ -319,54 +319,88 @@ function performanceBy(
 }
 
 
-/** Editable denominator control for the Geographic Coverage KPI. */
+/** Editable per-State denominator control for the Geographic Coverage KPI. */
 function CoverageTargetDialog({
-  value, onSave,
-}: { value: number | null; onSave: (v: number | null) => void }) {
+  states, visitedByState, value, onSave,
+}: {
+  states: string[];
+  visitedByState: Record<string, number>;
+  value: Record<string, number>;
+  onSave: (v: Record<string, number>) => void;
+}) {
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(value != null ? String(value) : "");
-  useEffect(() => { if (open) setDraft(value != null ? String(value) : ""); }, [open, value]);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!open) return;
+    const d: Record<string, string> = {};
+    for (const s of states) d[s] = value[s] != null ? String(value[s]) : "";
+    setDraft(d);
+  }, [open, states, value]);
+
+  const draftTotal = states.reduce((t, s) => t + (Number(draft[s]) || 0), 0);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <button
           type="button"
           className="absolute top-2 right-2 rounded-md bg-white/20 p-1 text-white hover:bg-white/30 transition-colors"
-          aria-label="Set total communities targeted"
+          aria-label="Set communities targeted per State"
         >
           <Settings2 className="h-3.5 w-3.5" />
         </button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Geographic coverage target</DialogTitle>
+          <DialogTitle>Geographic coverage target by State</DialogTitle>
           <DialogDescription>
-            Enter the total number of communities targeted for this campaign. Coverage is
-            computed as communities visited ÷ communities targeted.
+            Enter the number of communities targeted in each State present in the synced data.
+            Coverage is computed as communities visited ÷ communities targeted, summed across
+            the States you configure.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="geo-denominator">Total communities targeted</Label>
-          <Input
-            id="geo-denominator"
-            type="number"
-            min={0}
-            inputMode="numeric"
-            placeholder="e.g. 1200"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-        </div>
+        {states.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No States found in the synced data yet.</p>
+        ) : (
+          <div className="max-h-[320px] space-y-2 overflow-auto pr-1">
+            {states.map((s) => (
+              <div key={s} className="grid grid-cols-[1fr_120px] items-center gap-3">
+                <Label htmlFor={`geo-t-${s}`} className="text-sm">
+                  {s}
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    {(visitedByState[s] ?? 0).toLocaleString()} visited
+                  </span>
+                </Label>
+                <Input
+                  id={`geo-t-${s}`}
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  placeholder="target"
+                  value={draft[s] ?? ""}
+                  onChange={(e) => setDraft((d) => ({ ...d, [s]: e.target.value }))}
+                />
+              </div>
+            ))}
+            <p className="pt-1 text-xs text-muted-foreground">
+              Total target: <strong>{draftTotal.toLocaleString()}</strong> communities
+            </p>
+          </div>
+        )}
         <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="ghost" onClick={() => { onSave(null); setOpen(false); }}>Clear</Button>
+          <Button variant="ghost" onClick={() => { onSave({}); setOpen(false); }}>Clear all</Button>
           <Button
             onClick={() => {
-              const n = Number(draft);
-              onSave(draft.trim() === "" || !Number.isFinite(n) || n <= 0 ? null : Math.round(n));
+              const next: Record<string, number> = {};
+              for (const s of states) {
+                const n = Number(draft[s]);
+                if (Number.isFinite(n) && n > 0) next[s] = Math.round(n);
+              }
+              onSave(next);
               setOpen(false);
             }}
           >
-            Save target
+            Save targets
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -403,18 +437,33 @@ export default function ChecklistDashboard({
     [parents, drill.status],
   );
 
-  const [geoTarget, setGeoTarget] = useState<number | null>(() => {
-    const raw = typeof window !== "undefined" ? window.localStorage.getItem(GEO_DENOM_KEY) : null;
-    const n = raw ? Number(raw) : NaN;
-    return Number.isFinite(n) && n > 0 ? n : null;
-  });
-  const saveGeoTarget = (v: number | null) => {
-    setGeoTarget(v);
+  /* Geographic coverage target, configured per State from the synced data. */
+  const [geoTargets, setGeoTargets] = useState<Record<string, number>>(() => {
     try {
-      if (v == null) window.localStorage.removeItem(GEO_DENOM_KEY);
-      else window.localStorage.setItem(GEO_DENOM_KEY, String(v));
+      const raw = typeof window !== "undefined" ? window.localStorage.getItem(GEO_TARGETS_KEY) : null;
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && typeof parsed === "object") {
+        const out: Record<string, number> = {};
+        for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+          const n = Number(v);
+          if (Number.isFinite(n) && n > 0) out[k] = n;
+        }
+        return out;
+      }
+    } catch { /* corrupt storage */ }
+    return {};
+  });
+  const saveGeoTargets = (v: Record<string, number>) => {
+    setGeoTargets(v);
+    try {
+      if (!Object.keys(v).length) window.localStorage.removeItem(GEO_TARGETS_KEY);
+      else window.localStorage.setItem(GEO_TARGETS_KEY, JSON.stringify(v));
     } catch { /* storage unavailable */ }
   };
+  const syncedStates = useMemo(
+    () => [...new Set(allParents.map((p) => String(p.State ?? "").trim()).filter(Boolean))].sort(),
+    [allParents],
+  );
 
   const monitorPerf = useMemo(
     () => performanceBy(parents, "Independent_Monitor_s_Name", true),
@@ -442,27 +491,60 @@ export default function ChecklistDashboard({
 
   const kpi = useMemo(() => {
     const states = new Set<string>(), lgas = new Set<string>(), communities = new Set<string>(), wards = new Set<string>();
+    const perState = new Map<string, Set<string>>();
     let started = 0, notStarted = 0, sae = 0;
     for (const p of parents) {
-      if (p.State) states.add(String(p.State));
+      const stateName = String(p.State ?? "").trim();
+      if (stateName) states.add(stateName);
       if (p.LGA) lgas.add(`${p.State}|${p.LGA}`);
       if (p.Ward) wards.add(`${p.LGA}|${p.Ward}`);
       if (p.COMMUNITIES) {
         // deduplicate community names within the same State|LGA|Ward
-        communities.add(
-          `${String(p.State ?? "").trim().toLowerCase()}|${String(p.LGA ?? "").trim().toLowerCase()}|${String(p.Ward ?? "").trim().toLowerCase()}|${String(p.COMMUNITIES).trim().toLowerCase()}`,
-        );
+        const key = `${stateName.toLowerCase()}|${String(p.LGA ?? "").trim().toLowerCase()}|${String(p.Ward ?? "").trim().toLowerCase()}|${String(p.COMMUNITIES).trim().toLowerCase()}`;
+        communities.add(key);
+        if (stateName) {
+          if (!perState.has(stateName)) perState.set(stateName, new Set());
+          perState.get(stateName)!.add(key);
+        }
       }
       if (String(p.has_treatment_commenced ?? "").toLowerCase() === "yes") started++;
       else if (String(p.has_treatment_commenced ?? "").toLowerCase() === "no") notStarted++;
       if (yes(p.Any_SAE_Complain)) sae++;
     }
+    const communitiesByState: Record<string, number> = {};
+    for (const [s, set] of perState) communitiesByState[s] = set.size;
     return {
       total: parents.length,
       states: states.size, lgas: lgas.size, wards: wards.size, communities: communities.size,
+      communitiesByState,
       respondents: respondents.length, started, notStarted, sae,
     };
   }, [parents, respondents]);
+
+  /* Geographic coverage rolled up from the per-State targets. */
+  const geoCoverage = useMemo(() => {
+    const configured = Object.entries(geoTargets).filter(([, n]) => n > 0);
+    if (!configured.length) return null;
+    const target = configured.reduce((t, [, n]) => t + n, 0);
+    const visited = configured.reduce((t, [s]) => t + (kpi.communitiesByState[s] ?? 0), 0);
+    return { target, visited, states: configured.length, pct: target ? (visited / target) * 100 : 0 };
+  }, [geoTargets, kpi.communitiesByState]);
+
+  /* Household medicine uptake — share of respondents who confirmed being
+     offered the medicine(s) and those who confirmed swallowing them. */
+  const uptake = useMemo(() => {
+    let offeredAnswered = 0, offeredYes = 0, swallowAnswered = 0, swallowYes = 0;
+    for (const r of respondents) {
+      const o = resolveChecklistValue("Were_you_OFFERED_the_medicine_s", r.Were_you_OFFERED_the_medicine_s).toLowerCase();
+      if (o) { offeredAnswered++; if (o.startsWith("offered")) offeredYes++; }
+      const s = resolveChecklistValue("swallow", r.swallow).toLowerCase();
+      if (s) { swallowAnswered++; if (s.startsWith("swallowed")) swallowYes++; }
+    }
+    return {
+      offeredPct: offeredAnswered ? (offeredYes / offeredAnswered) * 100 : null,
+      swallowPct: swallowAnswered ? (swallowYes / swallowAnswered) * 100 : null,
+    };
+  }, [respondents]);
 
   const campaign = useMemo(() => tally(parents.map((p) => p.MDA_Campaign_Type), "MDA_Campaign_Type"), [parents]);
   const inventory = useMemo(() => tally(parents.map((p) => p.Is_Medicine_Inventory_Availabl), "Is_Medicine_Inventory_Availabl"), [parents]);
@@ -543,17 +625,34 @@ export default function ChecklistDashboard({
         <Kpi
           icon={MapPin}
           label="Geographic Coverage"
-          value={geoTarget ? `${((kpi.communities / geoTarget) * 100).toFixed(1)}%` : "—"}
+          value={geoCoverage ? `${geoCoverage.pct.toFixed(1)}%` : "—"}
           sub={
-            geoTarget
-              ? `${kpi.communities.toLocaleString()} of ${geoTarget.toLocaleString()} communities · ${kpi.lgas} LGAs`
-              : `${kpi.communities.toLocaleString()} communities visited · set target →`
+            geoCoverage
+              ? `${geoCoverage.visited.toLocaleString()} of ${geoCoverage.target.toLocaleString()} communities · ${geoCoverage.states} state${geoCoverage.states === 1 ? "" : "s"} targeted`
+              : `${kpi.communities.toLocaleString()} communities visited · set targets by State →`
           }
           tone="bg-[hsl(160,55%,35%)]"
-          action={<CoverageTargetDialog value={geoTarget} onSave={saveGeoTarget} />}
+          action={
+            <CoverageTargetDialog
+              states={syncedStates}
+              visitedByState={kpi.communitiesByState}
+              value={geoTargets}
+              onSave={saveGeoTargets}
+            />
+          }
         />
 
-        <Kpi icon={Users} label="Respondents Reached" value={kpi.respondents.toLocaleString()} sub={`${cddTotal.toLocaleString()} CDDs counted`} tone="bg-[hsl(265,50%,48%)]" />
+        <Kpi
+          icon={Users}
+          label="Respondents Reached"
+          value={kpi.respondents.toLocaleString()}
+          sub={
+            uptake.offeredPct == null && uptake.swallowPct == null
+              ? "No medicine responses yet"
+              : `${uptake.offeredPct == null ? "—" : `${uptake.offeredPct.toFixed(1)}%`} offered medicine · ${uptake.swallowPct == null ? "—" : `${uptake.swallowPct.toFixed(1)}%`} swallowed`
+          }
+          tone="bg-[hsl(265,50%,48%)]"
+        />
         <Kpi icon={PlayCircle} label="Treatment Commenced" value={kpi.started.toLocaleString()} sub={`${kpi.notStarted.toLocaleString()} not started`} tone="bg-[hsl(35,85%,45%)]" />
         <Kpi icon={ShieldAlert} label="SAE Alerts" value={kpi.sae.toLocaleString()} sub={kpi.sae > 0 ? "Requires review" : "None reported"} tone={kpi.sae > 0 ? "bg-[hsl(350,70%,45%)] animate-pulse" : "bg-[hsl(215,15%,45%)]"} />
       </div>
@@ -655,7 +754,7 @@ export default function ChecklistDashboard({
 
 
       {/* Predictive modelling: completion timeline */}
-      <ChecklistPredictive parents={parents} respondents={respondents} geoTarget={geoTarget} />
+      <ChecklistPredictive parents={parents} respondents={respondents} geoTarget={geoCoverage?.target ?? null} />
 
 
 
