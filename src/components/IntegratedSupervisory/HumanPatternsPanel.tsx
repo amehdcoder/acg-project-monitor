@@ -6,7 +6,7 @@
  * community failure diagnosis (non-distribution, poor coverage, late start)
  * and an answer bank of "rare intelligence" questions.
  */
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,18 +18,19 @@ import {
   Bar, BarChart, CartesianGrid, Cell, Line, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import {
-  AlertTriangle, Brain, Clock, Download, GitBranch, Info, Lightbulb, Network, Search, Users,
+  AlertTriangle, Brain, Clock, Download, GitBranch, Info, Lightbulb, Loader2, Network, Search, Users,
 } from "lucide-react";
-import { computeHumanPatterns, ROLE_SHORT, ROLE_LABEL, type FailureKind } from "@/lib/isc/humanPatterns";
+import { ROLE_SHORT, ROLE_LABEL, type FailureKind, type HumanPatternsResult } from "@/lib/isc/humanPatterns";
 import type { LogisticsDataset } from "@/lib/isc/medicineAccountability";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useMicroplanProjectEntries, useMicroplanProjects } from "@/hooks/useMicroplanProjectData";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
-import { normalizePlanRows } from "@/lib/isc/planningLinkage";
+import useHumanPatternsEngine from "@/hooks/useHumanPatternsEngine";
 import DecisionIntelligencePanel from "./DecisionIntelligencePanel";
 import MicroplanBindingCard from "./MicroplanBindingCard";
 import PlanningLinkagePanel from "./PlanningLinkagePanel";
+
 
 interface Props {
   dataset: LogisticsDataset;
