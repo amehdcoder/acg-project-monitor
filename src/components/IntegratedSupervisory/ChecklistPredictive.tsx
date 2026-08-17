@@ -16,7 +16,7 @@ import { resolveChecklistValue } from "./checklistSchema";
 import {
   forecastCompletion, pct, type CoveragePoint,
 } from "@/lib/isc/predictiveModels";
-import ChecklistScenarioBuilder from "./ChecklistScenarioBuilder";
+
 
 const norm = (v: unknown) => String(v ?? "").trim();
 const lower = (v: unknown) => norm(v).toLowerCase();
@@ -227,12 +227,6 @@ export default function ChecklistPredictive({
         </CardContent>
       </Card>
 
-      {/* ── Scenario builder ── */}
-      <ChecklistScenarioBuilder
-        points={coveragePoints}
-        target={geoTarget}
-        baseline={{ offeredRate, haltedShare: statusShares.halted, completedShare: statusShares.completed }}
-      />
     </div>
   );
 }

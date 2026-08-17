@@ -12,7 +12,7 @@
  */
 import type { LogisticsDataset } from "./medicineAccountability";
 import { buildIdentityIndex, type IdentityIndex } from "./actorIdentity";
-import { isHumanName, isPlaceName } from "./nameQuality";
+import { isHumanName, isPlaceName, isCommunityName } from "./nameQuality";
 
 
 /* ──────────────────────────────────────────────── fuzzy string utilities ── */
@@ -659,6 +659,46 @@ export function diagnoseCommunities(
   const coverageFloor = opts.coverageFloor ?? 0.7;
   const toPlan = planResolver(opts.plan);
 
+  /* ── canonical community registry ────────────────────────────────────────
+     The Community column must only ever show a real settlement name. We build
+     a registry from the Geo-Microplanning "Community Name" and the Integrated
+     MDA Supervisory Checklist "Community", then fuzzy-resolve every raw
+     "Target Community/Settlement" from the Medicine Allocation & Accountability
+     form onto it (scoped by LGA, ward-aware). Values that are numbers or
+     questionnaire answers are dropped instead of being displayed. */
+  const registry: { lga: string; ward: string; name: string }[] = [];
+  const seenReg = new Set<string>();
+  const addReg = (lga: string, ward: string, name: string) => {
+    if (!isCommunityName(name)) return;
+    const k = norm(`${lga} ${ward} ${name}`);
+    if (seenReg.has(k)) return;
+    seenReg.add(k);
+    registry.push({ lga: String(lga ?? ""), ward: String(ward ?? ""), name: String(name).replace(/\s+/g, " ").trim() });
+  };
+  for (const p of opts.plan ?? []) addReg(p.lga, p.ward ?? "", p.community);
+  for (const s of sites) addReg(s.lga, s.ward, s.community);
+
+  const canonCache = new Map<string, string | null>();
+  /** Resolve a raw community label to a canonical registry name (or null). */
+  const canonCommunity = (lga: string, ward: string, raw: string): string | null => {
+    const cleaned = String(raw ?? "").replace(/\s+/g, " ").trim();
+    if (!isCommunityName(cleaned)) return null;
+    const ck = norm(`${lga} ${ward} ${cleaned}`);
+    if (canonCache.has(ck)) return canonCache.get(ck)!;
+    let best: { name: string; score: number } | null = null;
+    for (const r of registry) {
+      if (norm(r.lga) && norm(lga) && norm(r.lga) !== norm(lga)) continue;
+      let s = dice(cleaned, r.name);
+      if (ward && r.ward && dice(ward, r.ward) > 0.8) s = Math.min(1, s + 0.08);
+      if (s >= 0.72 && (!best || s > best.score)) best = { name: r.name, score: s };
+    }
+    // Not in the registry but still a plausible settlement name — keep as-is.
+    const value = best?.name ?? cleaned;
+    canonCache.set(ck, value);
+    return value;
+  };
+
+
 
   /* facility supply timeline from Level 2 */
   const facSupply = new Map<string, { qty: number; first: string }>();
@@ -684,9 +724,10 @@ export function diagnoseCommunities(
     ({ state, lga, ward, facility, community, qty: 0, first: "", cdds: new Set<string>() });
 
   for (const c of ds.cddIssues) {
-    if (!isPlaceName(c.community)) continue;
-    const k = norm(`${c.lga} ${c.facility} ${c.community}`);
-    const e = comm.get(k) ?? blank("", c.lga, "", c.facility, c.community);
+    const name = canonCommunity(c.lga, "", c.community);
+    if (!name) continue;
+    const k = norm(`${c.lga} ${c.facility} ${name}`);
+    const e = comm.get(k) ?? blank("", c.lga, "", c.facility, name);
     e.qty += Number(c.qtyIssued) || 0;
     const d = dayOf(c.date);
     if (d && (!e.first || d < e.first)) e.first = d;
@@ -697,10 +738,11 @@ export function diagnoseCommunities(
 
   /* communities named in the checklist but never reached in the ledger */
   for (const s of sites) {
-    if (!s.community || !isPlaceName(s.community)) continue;
-    const k = norm(`${s.lga} ${s.facility} ${s.community}`);
+    const name = canonCommunity(s.lga, s.ward, s.community);
+    if (!name) continue;
+    const k = norm(`${s.lga} ${s.facility} ${name}`);
     const e = comm.get(k);
-    if (!e) comm.set(k, blank(s.state, s.lga, s.ward, s.facility, s.community));
+    if (!e) comm.set(k, blank(s.state, s.lga, s.ward, s.facility, name));
     else {
       if (!e.ward) e.ward = s.ward;
       if (!e.state) e.state = s.state;
@@ -710,17 +752,20 @@ export function diagnoseCommunities(
   /* planned communities that neither source has touched — these are the true
      zero-distribution pockets and must be diagnosed as well. */
   for (const p of opts.plan ?? []) {
-    if (!isPlaceName(p.community)) continue;
-    const k = norm(`${p.lga} ${p.flhf ?? ""} ${p.community}`);
-    if (!comm.has(k) && !Array.from(comm.values()).some((e) => norm(`${e.lga} ${e.community}`) === norm(`${p.lga} ${p.community}`))) {
-      comm.set(k, blank(p.state ?? "", p.lga, p.ward ?? "", p.flhf ?? "", p.community));
+    const name = canonCommunity(p.lga, p.ward ?? "", p.community);
+    if (!name) continue;
+    const k = norm(`${p.lga} ${p.flhf ?? ""} ${name}`);
+    if (!comm.has(k) && !Array.from(comm.values()).some((e) => norm(`${e.lga} ${e.community}`) === norm(`${p.lga} ${name}`))) {
+      comm.set(k, blank(p.state ?? "", p.lga, p.ward ?? "", p.flhf ?? "", name));
     }
   }
 
+
   const returnsByComm = new Map<string, number>();
   for (const r of ds.returns) {
-    if (!r.community) continue;
-    const k = norm(`${r.lga} ${r.facility} ${r.community}`);
+    const name = canonCommunity(r.lga, "", r.community);
+    if (!name) continue;
+    const k = norm(`${r.lga} ${r.facility} ${name}`);
     returnsByComm.set(k, (returnsByComm.get(k) ?? 0) + (Number(r.qtyReturned) || 0));
   }
 
@@ -759,7 +804,7 @@ export function diagnoseCommunities(
       const p = ph.row;
       targetPop = Math.max(0, Math.round(p.targetPop ?? 0));
       // canonical names from the plan, so the table always shows real places
-      e.community = p.community || e.community;
+      if (isCommunityName(p.community)) e.community = p.community;
       e.ward = e.ward || p.ward || "";
       e.state = e.state || p.state || "";
       e.facility = e.facility || p.flhf || "";
@@ -814,7 +859,9 @@ export function diagnoseCommunities(
   }
 
 
-  return out.sort((a, b) => b.severity - a.severity || b.facilityIssued - a.facilityIssued);
+  return out
+    .filter((d) => isCommunityName(d.community))
+    .sort((a, b) => b.severity - a.severity || b.facilityIssued - a.facilityIssued);
 }
 
 /** Keep the highest-confidence instance of each attributed cause. */

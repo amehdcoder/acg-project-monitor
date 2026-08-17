@@ -77,4 +77,24 @@ export function isPlaceName(value: unknown): boolean {
   return true;
 }
 
+/**
+ * Stricter guard used for the Community column of cross-source tables.
+ *
+ * A community label must be purely alphabetic words (no digits at all, so
+ * "800" / "114" / "3 Nos" are rejected), 1–5 tokens long, and must not contain
+ * any questionnaire response word ("Yes", "No", "All Are Sufficient", …).
+ */
+export function isCommunityName(value: unknown): boolean {
+  const s = clean(value);
+  if (!s || s.length < 3 || s.length > 60) return false;
+  if (/\d/.test(s)) return false;
+  if (!isPlaceName(s)) return false;
+  const t = tokensOf(s);
+  if (!t.length || t.length > 5) return false;
+  if (t.some((x) => SENTENCE_WORDS.has(x))) return false;
+  if (!t.some((x) => x.length >= 3)) return false;
+  return true;
+}
+
 export default isHumanName;
+
