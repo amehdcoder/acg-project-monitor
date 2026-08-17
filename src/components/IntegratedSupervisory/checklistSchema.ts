@@ -355,7 +355,7 @@ function findRepeatArray(row: any): any[] {
 export const PARENT_CONTEXT_KEYS = [
   "_id", "_uuid", "_submission_time", "_submitted_by",
   "State", "LGA", "Ward", "FLHF", "COMMUNITIES",
-  "Designation", "Independent_Monitor_s_Name", "MDA_Campaign_Type",
+  "Designation", "Independent_Monitor_s_Name", "Name_of_Supervisor", "MDA_Campaign_Type",
   "has_treatment_commenced", "Status_of_MDA", "Any_SAE_Complain",
 ] as const;
 
@@ -429,7 +429,7 @@ export const FLAT_COLUMNS: GridColumn[] = [
   { key: "_submission_time", label: "Submission Date", section: "Parent Metadata" },
   { key: "_submitted_by", label: "Submitted By", section: "Parent Metadata" },
   { key: "respondent_label", label: "Respondent Index", section: "Parent Metadata" },
-  ...(["State", "LGA", "Ward", "FLHF", "COMMUNITIES", "Designation", "Independent_Monitor_s_Name", "MDA_Campaign_Type", "has_treatment_commenced", "Status_of_MDA", "Any_SAE_Complain"] as const)
+  ...(["State", "LGA", "Ward", "FLHF", "COMMUNITIES", "Designation", "Independent_Monitor_s_Name", "Name_of_Supervisor", "MDA_Campaign_Type", "has_treatment_commenced", "Status_of_MDA", "Any_SAE_Complain"] as const)
     .map((n) => {
       const f = FIELD_BY_NAME.get(n)!;
       return { key: n, label: f.label, section: "Parent Context", field: f };
