@@ -6,7 +6,7 @@
  * community failure diagnosis (non-distribution, poor coverage, late start)
  * and an answer bank of "rare intelligence" questions.
  */
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,18 +18,19 @@ import {
   Bar, BarChart, CartesianGrid, Cell, Line, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import {
-  AlertTriangle, Brain, Clock, Download, GitBranch, Info, Lightbulb, Network, Search, Users,
+  AlertTriangle, Brain, Clock, Download, GitBranch, Info, Lightbulb, Loader2, Network, Search, Users,
 } from "lucide-react";
-import { computeHumanPatterns, ROLE_SHORT, ROLE_LABEL, type FailureKind } from "@/lib/isc/humanPatterns";
+import { ROLE_SHORT, ROLE_LABEL, type FailureKind, type HumanPatternsResult } from "@/lib/isc/humanPatterns";
 import type { LogisticsDataset } from "@/lib/isc/medicineAccountability";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useMicroplanProjectEntries, useMicroplanProjects } from "@/hooks/useMicroplanProjectData";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
-import { normalizePlanRows } from "@/lib/isc/planningLinkage";
+import useHumanPatternsEngine from "@/hooks/useHumanPatternsEngine";
 import DecisionIntelligencePanel from "./DecisionIntelligencePanel";
 import MicroplanBindingCard from "./MicroplanBindingCard";
 import PlanningLinkagePanel from "./PlanningLinkagePanel";
+
 
 interface Props {
   dataset: LogisticsDataset;
@@ -62,11 +63,28 @@ const csvCell = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
 const PROJECT_BINDING_KEY = "isc-human-patterns-microplan-project";
 
+const EMPTY_PATTERNS = {
+  network: { actors: [], ties: [], density: 0, components: 0, largestComponent: 0, isolates: [], brokers: [], cliques: [] },
+  sites: [],
+  diagnoses: [],
+  rhythms: {
+    hours: Array.from({ length: 24 }, (_, h) => ({ name: `${String(h).padStart(2, "0")}h`, value: 0 })),
+    weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((name) => ({ name, value: 0 })),
+    nightRate: 0,
+    weekendRate: 0,
+  },
+  answers: [],
+  identityMerges: [],
+} as unknown as HumanPatternsResult;
+
 export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel, canExport = true }: Props) {
   const [lateStartDays, setLateStartDays] = useState(3);
   const [coverageFloor, setCoverageFloor] = useState(70);
   const [kindFilter, setKindFilter] = useState<"all" | FailureKind>("all");
   const [q, setQ] = useState("");
+  /* linkage assumptions live here so the worker can fold them into one pass */
+  const [unitsPerPerson, setUnitsPerPerson] = useState(1);
+  const [popPerDistributor, setPopPerDistributor] = useState(500);
 
   /* Bound microplanning project — saved once, restored on every visit. */
   const [projectId, setProjectId] = useState<string>(() => {
@@ -78,11 +96,11 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
   };
   const { projects, loading: projectsLoading } = useMicroplanProjects();
   const { entries, loading: planLoading, fromCache, syncedAt, refresh } = useMicroplanProjectEntries(projectId || null);
-  const { fields, setFields, calcTargetPop, label: targetLabel, options } = useTargetPopFields();
+  const { fields, setFields, label: targetLabel, options } = useTargetPopFields();
 
-  const plan = useMemo(
-    () => normalizePlanRows(entries, (e) => calcTargetPop(e as Record<string, any>)),
-    [entries, calcTargetPop],
+  const targetColumns = useMemo(
+    () => fields.map((k) => options.find((o) => o.key === k)?.field).filter((f): f is string => !!f),
+    [fields, options],
   );
 
   const { profile } = useAuth();
@@ -91,27 +109,35 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
     return [me, "Ameh Joseph", "Joseph Ameh"].filter(Boolean);
   }, [profile?.first_name, profile?.last_name]);
 
-  const result = useMemo(
-    () => computeHumanPatterns(dataset, checklistRows ?? [], {
-      lateStartDays,
-      coverageFloor: coverageFloor / 100,
-      excludePeople,
-      plan,
-    }),
-    [dataset, checklistRows, lateStartDays, coverageFloor, excludePeople, plan],
-  );
+  const rows = useMemo(() => checklistRows ?? [], [checklistRows]);
 
+  /* Everything heavy runs in a worker — the tab never blocks. */
+  const engine = useHumanPatternsEngine({
+    dataset,
+    checklistRows: rows,
+    entries,
+    targetColumns,
+    hasProject: !!projectId,
+    lateStartDays,
+    coverageFloor,
+    excludePeople,
+    unitsPerPerson,
+    popPerDistributor,
+  });
+
+  const result = engine.patterns ?? EMPTY_PATTERNS;
   const { network, diagnoses, rhythms, answers, sites, identityMerges } = result;
+  const busy = engine.computing && !engine.patterns;
 
-
-
+  /* the search box types freely; filtering follows at low priority */
+  const deferredQ = useDeferredValue(q);
 
   const diag = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+    const needle = deferredQ.trim().toLowerCase();
     return diagnoses.filter((d) =>
       (kindFilter === "all" || d.kind === kindFilter) &&
       (!needle || `${d.lga} ${d.facility} ${d.community} ${d.cdds.join(" ")}`.toLowerCase().includes(needle)));
-  }, [diagnoses, kindFilter, q]);
+  }, [diagnoses, kindFilter, deferredQ]);
 
   const causeRanking = useMemo(() => {
     const m = new Map<string, number>();
@@ -120,6 +146,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
   }, [diagnoses]);
 
   const topActors = useMemo(() => network.actors.slice(0, 12), [network.actors]);
+
 
   const exportCsv = () => {
     const head = ["LGA", "Facility", "Community", "Diagnosis", "Severity", "Coverage %", "Lag days", "Units to CDDs", "Facility supplied", "Returned", "CDDs", "Match score", "Causes"];
@@ -155,6 +182,11 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
           <CardTitle className="flex flex-wrap items-center gap-2 text-base">
             <Brain className="h-4 w-4 text-primary" /> Human patterns & social networks
             <Badge variant="outline" className="text-[10px] font-normal">Fuzzy join · Sørensen–Dice</Badge>
+            {engine.computing && !busy && (
+              <Badge variant="outline" className="gap-1 text-[10px] font-normal">
+                <Loader2 className="h-3 w-3 animate-spin" /> Recomputing
+              </Badge>
+            )}
             {scopeLabel && <span className="text-xs font-normal text-muted-foreground">{scopeLabel}</span>}
           </CardTitle>
           <p className="text-xs text-muted-foreground">
@@ -239,7 +271,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
         projectId={projectId}
         onProjectId={bindProject}
         entryCount={entries.length}
-        plannedCommunities={plan.length}
+        plannedCommunities={engine.planCount}
         loading={planLoading}
         fromCache={fromCache}
         syncedAt={syncedAt}
@@ -252,16 +284,18 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
 
       {projectId ? (
         <PlanningLinkagePanel
-          dataset={dataset}
-          sites={sites}
-          network={network}
-          diagnoses={diagnoses}
-          plan={plan}
-          projectId={projectId}
+          link={engine.link}
+          answers={engine.linkAnswers}
+          computing={engine.computing}
+          unitsPerPerson={unitsPerPerson}
+          onUnitsPerPerson={setUnitsPerPerson}
+          popPerDistributor={popPerDistributor}
+          onPopPerDistributor={setPopPerDistributor}
           projectName={projects.find((p) => p.id === projectId)?.name ?? ""}
           targetLabel={targetLabel}
           canExport={canExport}
         />
+
       ) : (
         <Card className="border-dashed">
           <CardContent className="py-8 text-center text-xs text-muted-foreground">
@@ -273,7 +307,18 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
 
 
 
-      {(
+      {busy ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-2 py-16 text-center">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <p className="text-sm font-medium">Analysing patterns in the background…</p>
+            <p className="max-w-md text-xs text-muted-foreground">
+              Identity resolution, the handover network and community diagnosis run off the main thread, so this page
+              stays responsive no matter how large the bound microplan is.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
         <>
 
           {/* network KPIs */}
@@ -457,14 +502,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
           </Card>
 
           {/* decision intelligence */}
-          <DecisionIntelligencePanel
-            dataset={dataset}
-            network={network}
-            diagnoses={diagnoses}
-            sites={sites}
-            coverageFloor={coverageFloor}
-            lateStartDays={lateStartDays}
-          />
+          <DecisionIntelligencePanel di={engine.di} />
 
           {/* diagnosis table */}
           <Card>
