@@ -322,6 +322,12 @@ const pick = (idx: Map<string, unknown>, name: string): unknown => {
   return idx.get(`~${normToken(name)}`) ?? null;
 };
 
+/** Kobo may name the new supervisor question in a few ways — accept them all. */
+export const SUPERVISOR_ALIASES = [
+  "Name_of_Supervisor", "Name_of_the_Supervisor", "Supervisor_Name",
+  "Supervisors_Name", "Supervisor_s_Name", "Name_of_Supervisors", "Supervisor",
+];
+
 /** Locate the respondent repeat array on a submission, whatever it is named. */
 function findRepeatArray(row: any): any[] {
   const target = normToken(REPEAT_GROUP);
