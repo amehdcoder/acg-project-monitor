@@ -677,6 +677,7 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
           <TabsTrigger value="supply"><Scale className="h-4 w-4 mr-1" /> Integrity, loss & equity</TabsTrigger>
 
           <TabsTrigger value="patterns"><Brain className="h-4 w-4 mr-1" /> Human patterns & networks</TabsTrigger>
+          <TabsTrigger value="personnel"><Users className="h-4 w-4 mr-1" /> Personnel accountability</TabsTrigger>
           <TabsTrigger value="integrity"><ShieldAlert className="h-4 w-4 mr-1" /> Data integrity</TabsTrigger>
         </TabsList>
 
