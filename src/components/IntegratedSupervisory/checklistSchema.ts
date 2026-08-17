@@ -378,6 +378,9 @@ export function buildChecklistDataset(rawResults: any[] | null | undefined): Che
     parent._geolocation = raw?._geolocation ?? null;
     parent._attachments = raw?._attachments ?? null;
     parent._validation_status = raw?._validation_status ?? null;
+    // Kobo device metadata: form open ("start") and form save ("end") stamps.
+    parent._start = raw?.start ?? raw?.["meta/start"] ?? pick(idx, "start") ?? null;
+    parent._end = raw?.end ?? raw?.["meta/end"] ?? pick(idx, "end") ?? null;
     for (const f of PARENT_FIELDS) parent[f.name] = pick(idx, f.name);
     if (parent.Name_of_Supervisor == null || parent.Name_of_Supervisor === "") {
       for (const alias of SUPERVISOR_ALIASES) {

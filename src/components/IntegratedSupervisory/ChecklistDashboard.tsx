@@ -176,7 +176,14 @@ export interface PerfRow {
 }
 
 /** Submissions / respondents / average / days-worked table. */
-function PerformanceTable({ rows, headLabel }: { rows: PerfRow[]; headLabel: string }) {
+function PerformanceTable({
+  rows, headLabel, onSelect, selected,
+}: {
+  rows: PerfRow[];
+  headLabel: string;
+  onSelect?: (name: string) => void;
+  selected?: string | null;
+}) {
   if (rows.length === 0) return <Empty />;
   const totals = rows.reduce(
     (a, r) => ({ s: a.s + r.submissions, r: a.r + r.respondents, d: a.d + r.days }),
@@ -195,16 +202,24 @@ function PerformanceTable({ rows, headLabel }: { rows: PerfRow[]; headLabel: str
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.name} className="border-t hover:bg-muted/30">
-              <td className="px-2 py-1.5 font-medium align-top whitespace-normal break-words">{r.name}</td>
-              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap align-top">{r.submissions.toLocaleString()}</td>
-              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap align-top">{r.respondents.toLocaleString()}</td>
-              <td className="px-2 py-1.5 text-right tabular-nums font-semibold whitespace-nowrap align-top">{r.avgRespondents.toFixed(1)}</td>
-              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap align-top">{r.days.toLocaleString()}</td>
-            </tr>
-          ))}
+          {rows.map((r) => {
+            const active = !!selected && selected === r.name;
+            return (
+              <tr
+                key={r.name}
+                onClick={onSelect ? () => onSelect(r.name) : undefined}
+                className={`border-t hover:bg-muted/30 ${onSelect ? "cursor-pointer" : ""} ${active ? "bg-primary/10" : ""}`}
+              >
+                <td className={`px-2 py-1.5 font-medium align-top whitespace-normal break-words ${active ? "text-primary" : onSelect ? "hover:underline" : ""}`}>{r.name}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap align-top">{r.submissions.toLocaleString()}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap align-top">{r.respondents.toLocaleString()}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums font-semibold whitespace-nowrap align-top">{r.avgRespondents.toFixed(1)}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap align-top">{r.days.toLocaleString()}</td>
+              </tr>
+            );
+          })}
         </tbody>
+
         <tfoot className="bg-muted/50 sticky bottom-0">
           <tr className="border-t font-semibold">
             <td className="px-2 py-1.5">Total</td>
@@ -231,44 +246,54 @@ function PerformanceTable({ rows, headLabel }: { rows: PerfRow[]; headLabel: str
  * Designation | LGA | Ward bucket so two different people in different places
  * never collapse together; canonical labels are then aggregated across buckets.
  */
+/**
+ * Build the canonical-name resolver used by both the performance tables and
+ * the Community Visited register, so clicking a name filters exactly the
+ * records aggregated under that row (spelling variants included).
+ */
+function makeNameResolver(
+  parents: Record<string, unknown>[],
+  field: string,
+  personNames = false,
+): (p: Record<string, unknown>) => string {
+  const raw = (p: Record<string, unknown>) =>
+    String(resolveChecklistValue(field, p[field]) || "").trim();
+
+  if (!personNames) return (p) => raw(p) || "Unspecified";
+
+  const scopeKey = (p: Record<string, unknown>) =>
+    [
+      resolveChecklistValue("Designation", p.Designation) || "",
+      resolveChecklistValue("LGA", p.LGA) || "",
+      resolveChecklistValue("Ward", p.Ward) || "",
+    ].join("|").toLowerCase();
+
+  const buckets = new Map<string, string[]>();
+  for (const p of parents) {
+    const v = raw(p);
+    if (!isHumanName(v)) continue;
+    const k = scopeKey(p);
+    const list = buckets.get(k) ?? [];
+    list.push(v);
+    buckets.set(k, list);
+  }
+  const indexes = new Map<string, ReturnType<typeof buildIdentityIndex>>();
+  for (const [k, names] of buckets) indexes.set(k, buildIdentityIndex(names));
+
+  return (p) => {
+    const v = raw(p);
+    if (!isHumanName(v)) return "";
+    return indexes.get(scopeKey(p))?.resolve(v)?.name || v;
+  };
+}
+
 function performanceBy(
   parents: Record<string, unknown>[],
   field: string,
   personNames = false,
 ): PerfRow[] {
-  const raw = (p: Record<string, unknown>) =>
-    String(resolveChecklistValue(field, p[field]) || "").trim();
+  const nameOf = makeNameResolver(parents, field, personNames);
 
-  let nameOf: (p: Record<string, unknown>) => string;
-
-  if (personNames) {
-    const scopeKey = (p: Record<string, unknown>) =>
-      [
-        resolveChecklistValue("Designation", p.Designation) || "",
-        resolveChecklistValue("LGA", p.LGA) || "",
-        resolveChecklistValue("Ward", p.Ward) || "",
-      ].join("|").toLowerCase();
-
-    const buckets = new Map<string, string[]>();
-    for (const p of parents) {
-      const v = raw(p);
-      if (!isHumanName(v)) continue;
-      const k = scopeKey(p);
-      const list = buckets.get(k) ?? [];
-      list.push(v);
-      buckets.set(k, list);
-    }
-    const indexes = new Map<string, ReturnType<typeof buildIdentityIndex>>();
-    for (const [k, names] of buckets) indexes.set(k, buildIdentityIndex(names));
-
-    nameOf = (p) => {
-      const v = raw(p);
-      if (!isHumanName(v)) return "";
-      return indexes.get(scopeKey(p))?.resolve(v)?.name || v;
-    };
-  } else {
-    nameOf = (p) => raw(p) || "Unspecified";
-  }
 
   const m = new Map<string, { subs: number; resp: number; days: Set<string> }>();
   for (const p of parents) {
