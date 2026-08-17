@@ -319,44 +319,74 @@ function performanceBy(
 }
 
 
-/** Editable denominator control for the Geographic Coverage KPI. */
+/** Editable per-State denominator control for the Geographic Coverage KPI. */
 function CoverageTargetDialog({
-  value, onSave,
-}: { value: number | null; onSave: (v: number | null) => void }) {
+  states, visitedByState, value, onSave,
+}: {
+  states: string[];
+  visitedByState: Record<string, number>;
+  value: Record<string, number>;
+  onSave: (v: Record<string, number>) => void;
+}) {
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(value != null ? String(value) : "");
-  useEffect(() => { if (open) setDraft(value != null ? String(value) : ""); }, [open, value]);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!open) return;
+    const d: Record<string, string> = {};
+    for (const s of states) d[s] = value[s] != null ? String(value[s]) : "";
+    setDraft(d);
+  }, [open, states, value]);
+
+  const draftTotal = states.reduce((t, s) => t + (Number(draft[s]) || 0), 0);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <button
           type="button"
           className="absolute top-2 right-2 rounded-md bg-white/20 p-1 text-white hover:bg-white/30 transition-colors"
-          aria-label="Set total communities targeted"
+          aria-label="Set communities targeted per State"
         >
           <Settings2 className="h-3.5 w-3.5" />
         </button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Geographic coverage target</DialogTitle>
+          <DialogTitle>Geographic coverage target by State</DialogTitle>
           <DialogDescription>
-            Enter the total number of communities targeted for this campaign. Coverage is
-            computed as communities visited ÷ communities targeted.
+            Enter the number of communities targeted in each State present in the synced data.
+            Coverage is computed as communities visited ÷ communities targeted, summed across
+            the States you configure.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="geo-denominator">Total communities targeted</Label>
-          <Input
-            id="geo-denominator"
-            type="number"
-            min={0}
-            inputMode="numeric"
-            placeholder="e.g. 1200"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-        </div>
+        {states.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No States found in the synced data yet.</p>
+        ) : (
+          <div className="max-h-[320px] space-y-2 overflow-auto pr-1">
+            {states.map((s) => (
+              <div key={s} className="grid grid-cols-[1fr_120px] items-center gap-3">
+                <Label htmlFor={`geo-t-${s}`} className="text-sm">
+                  {s}
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    {(visitedByState[s] ?? 0).toLocaleString()} visited
+                  </span>
+                </Label>
+                <Input
+                  id={`geo-t-${s}`}
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  placeholder="target"
+                  value={draft[s] ?? ""}
+                  onChange={(e) => setDraft((d) => ({ ...d, [s]: e.target.value }))}
+                />
+              </div>
+            ))}
+            <p className="pt-1 text-xs text-muted-foreground">
+              Total target: <strong>{draftTotal.toLocaleString()}</strong> communities
+            </p>
+          </div>
+        )}
         <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="ghost" onClick={() => { onSave(null); setOpen(false); }}>Clear</Button>
           <Button
