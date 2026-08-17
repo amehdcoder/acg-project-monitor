@@ -754,7 +754,7 @@ export default function ChecklistDashboard({
 
 
       {/* Predictive modelling: completion timeline */}
-      <ChecklistPredictive parents={parents} respondents={respondents} geoTarget={geoTarget} />
+      <ChecklistPredictive parents={parents} respondents={respondents} geoTarget={geoCoverage?.target ?? null} />
 
 
 
