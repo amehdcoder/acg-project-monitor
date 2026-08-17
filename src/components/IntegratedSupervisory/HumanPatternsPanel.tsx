@@ -182,6 +182,11 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
           <CardTitle className="flex flex-wrap items-center gap-2 text-base">
             <Brain className="h-4 w-4 text-primary" /> Human patterns & social networks
             <Badge variant="outline" className="text-[10px] font-normal">Fuzzy join · Sørensen–Dice</Badge>
+            {engine.computing && !busy && (
+              <Badge variant="outline" className="gap-1 text-[10px] font-normal">
+                <Loader2 className="h-3 w-3 animate-spin" /> Recomputing
+              </Badge>
+            )}
             {scopeLabel && <span className="text-xs font-normal text-muted-foreground">{scopeLabel}</span>}
           </CardTitle>
           <p className="text-xs text-muted-foreground">
@@ -302,7 +307,18 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
 
 
 
-      {(
+      {busy ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-2 py-16 text-center">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <p className="text-sm font-medium">Analysing patterns in the background…</p>
+            <p className="max-w-md text-xs text-muted-foreground">
+              Identity resolution, the handover network and community diagnosis run off the main thread, so this page
+              stays responsive no matter how large the bound microplan is.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
         <>
 
           {/* network KPIs */}
