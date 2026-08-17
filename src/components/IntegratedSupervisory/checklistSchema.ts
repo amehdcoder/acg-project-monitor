@@ -54,6 +54,7 @@ export const CHECKLIST_FIELDS: ChecklistField[] = [
   // Supervisor / Monitor
   { name: "Designation", label: "Designation", type: "select_one", list: "rz5qe06", section: "Supervisor / Monitor" },
   { name: "Independent_Monitor_s_Name", label: "Independent Monitor's Name", type: "select_one", list: "im", section: "Supervisor / Monitor" },
+  { name: "Name_of_Supervisor", label: "Name of Supervisor", type: "text", section: "Supervisor / Monitor" },
 
   // Campaign
   { name: "MDA_Campaign_Type", label: "MDA Campaign Type", type: "select_one", list: "av9ct84", section: "MDA Campaign" },
