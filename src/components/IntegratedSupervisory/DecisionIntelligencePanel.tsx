@@ -8,23 +8,17 @@
  *   Is this diversion?— Z-score + unaccounted foil %
  *   Will we fail?     — naive Bayes P(Fail | Delay, NoSupervision)
  */
-import { useMemo } from "react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertTriangle, Activity, Gauge, ShieldAlert, TrendingDown } from "lucide-react";
-import computeDecisionIntelligence from "@/lib/isc/decisionIntelligence";
-import type { CommunityDiagnosis, NetworkStats, ChecklistSite } from "@/lib/isc/humanPatterns";
-import type { LogisticsDataset } from "@/lib/isc/medicineAccountability";
+import type { DecisionIntelligenceResult } from "@/lib/isc/decisionIntelligence";
 
 interface Props {
-  dataset: LogisticsDataset;
-  network: NetworkStats;
-  diagnoses: CommunityDiagnosis[];
-  sites: ChecklistSite[];
-  coverageFloor: number;   // percent (e.g. 70)
-  lateStartDays: number;
+  /** Computed off the main thread by the Human Patterns worker. */
+  di: DecisionIntelligenceResult | null;
 }
 
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
@@ -36,16 +30,8 @@ const VERDICT_TONE: Record<string, string> = {
   investigate: "border-destructive/40 bg-destructive/10 text-destructive",
 };
 
-export default function DecisionIntelligencePanel({
-  dataset, network, diagnoses, sites, coverageFloor, lateStartDays,
-}: Props) {
-  const di = useMemo(
-    () => computeDecisionIntelligence(dataset, network, diagnoses, sites, {
-      coverageFloor: coverageFloor / 100,
-      lateStartDays,
-    }),
-    [dataset, network, diagnoses, sites, coverageFloor, lateStartDays],
-  );
+export default function DecisionIntelligencePanel({ di }: Props) {
+  if (!di) return null;
 
   const { delayBrokers, regression, diversion, risk } = di;
 

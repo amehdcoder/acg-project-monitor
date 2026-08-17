@@ -486,14 +486,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
           </Card>
 
           {/* decision intelligence */}
-          <DecisionIntelligencePanel
-            dataset={dataset}
-            network={network}
-            diagnoses={diagnoses}
-            sites={sites}
-            coverageFloor={coverageFloor}
-            lateStartDays={lateStartDays}
-          />
+          <DecisionIntelligencePanel di={engine.di} />
 
           {/* diagnosis table */}
           <Card>
