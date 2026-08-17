@@ -437,18 +437,33 @@ export default function ChecklistDashboard({
     [parents, drill.status],
   );
 
-  const [geoTarget, setGeoTarget] = useState<number | null>(() => {
-    const raw = typeof window !== "undefined" ? window.localStorage.getItem(GEO_DENOM_KEY) : null;
-    const n = raw ? Number(raw) : NaN;
-    return Number.isFinite(n) && n > 0 ? n : null;
-  });
-  const saveGeoTarget = (v: number | null) => {
-    setGeoTarget(v);
+  /* Geographic coverage target, configured per State from the synced data. */
+  const [geoTargets, setGeoTargets] = useState<Record<string, number>>(() => {
     try {
-      if (v == null) window.localStorage.removeItem(GEO_DENOM_KEY);
-      else window.localStorage.setItem(GEO_DENOM_KEY, String(v));
+      const raw = typeof window !== "undefined" ? window.localStorage.getItem(GEO_TARGETS_KEY) : null;
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && typeof parsed === "object") {
+        const out: Record<string, number> = {};
+        for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+          const n = Number(v);
+          if (Number.isFinite(n) && n > 0) out[k] = n;
+        }
+        return out;
+      }
+    } catch { /* corrupt storage */ }
+    return {};
+  });
+  const saveGeoTargets = (v: Record<string, number>) => {
+    setGeoTargets(v);
+    try {
+      if (!Object.keys(v).length) window.localStorage.removeItem(GEO_TARGETS_KEY);
+      else window.localStorage.setItem(GEO_TARGETS_KEY, JSON.stringify(v));
     } catch { /* storage unavailable */ }
   };
+  const syncedStates = useMemo(
+    () => [...new Set(allParents.map((p) => String(p.State ?? "").trim()).filter(Boolean))].sort(),
+    [allParents],
+  );
 
   const monitorPerf = useMemo(
     () => performanceBy(parents, "Independent_Monitor_s_Name", true),
