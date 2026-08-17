@@ -625,17 +625,34 @@ export default function ChecklistDashboard({
         <Kpi
           icon={MapPin}
           label="Geographic Coverage"
-          value={geoTarget ? `${((kpi.communities / geoTarget) * 100).toFixed(1)}%` : "—"}
+          value={geoCoverage ? `${geoCoverage.pct.toFixed(1)}%` : "—"}
           sub={
-            geoTarget
-              ? `${kpi.communities.toLocaleString()} of ${geoTarget.toLocaleString()} communities · ${kpi.lgas} LGAs`
-              : `${kpi.communities.toLocaleString()} communities visited · set target →`
+            geoCoverage
+              ? `${geoCoverage.visited.toLocaleString()} of ${geoCoverage.target.toLocaleString()} communities · ${geoCoverage.states} state${geoCoverage.states === 1 ? "" : "s"} targeted`
+              : `${kpi.communities.toLocaleString()} communities visited · set targets by State →`
           }
           tone="bg-[hsl(160,55%,35%)]"
-          action={<CoverageTargetDialog value={geoTarget} onSave={saveGeoTarget} />}
+          action={
+            <CoverageTargetDialog
+              states={syncedStates}
+              visitedByState={kpi.communitiesByState}
+              value={geoTargets}
+              onSave={saveGeoTargets}
+            />
+          }
         />
 
-        <Kpi icon={Users} label="Respondents Reached" value={kpi.respondents.toLocaleString()} sub={`${cddTotal.toLocaleString()} CDDs counted`} tone="bg-[hsl(265,50%,48%)]" />
+        <Kpi
+          icon={Users}
+          label="Respondents Reached"
+          value={kpi.respondents.toLocaleString()}
+          sub={
+            uptake.offeredPct == null && uptake.swallowPct == null
+              ? "No medicine responses yet"
+              : `${uptake.offeredPct == null ? "—" : `${uptake.offeredPct.toFixed(1)}%`} offered medicine · ${uptake.swallowPct == null ? "—" : `${uptake.swallowPct.toFixed(1)}%`} swallowed`
+          }
+          tone="bg-[hsl(265,50%,48%)]"
+        />
         <Kpi icon={PlayCircle} label="Treatment Commenced" value={kpi.started.toLocaleString()} sub={`${kpi.notStarted.toLocaleString()} not started`} tone="bg-[hsl(35,85%,45%)]" />
         <Kpi icon={ShieldAlert} label="SAE Alerts" value={kpi.sae.toLocaleString()} sub={kpi.sae > 0 ? "Requires review" : "None reported"} tone={kpi.sae > 0 ? "bg-[hsl(350,70%,45%)] animate-pulse" : "bg-[hsl(215,15%,45%)]"} />
       </div>
