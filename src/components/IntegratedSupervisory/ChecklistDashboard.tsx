@@ -348,6 +348,13 @@ export default function ChecklistDashboard({
     [parents],
   );
   const designationPerf = useMemo(() => performanceBy(parents, "Designation"), [parents]);
+  const supervisorPerf = useMemo(
+    () => performanceBy(
+      parents.filter((p) => String(p.Name_of_Supervisor ?? "").trim() !== ""),
+      "Name_of_Supervisor",
+    ),
+    [parents],
+  );
 
 
 
@@ -577,6 +584,9 @@ export default function ChecklistDashboard({
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel title="Independent Monitor Performance" icon={UserCheck}>
           <PerformanceTable rows={monitorPerf} headLabel="Independent Monitor's Name" />
+        </Panel>
+        <Panel title="Other Supervisors Performance" icon={UserCheck}>
+          <PerformanceTable rows={supervisorPerf} headLabel="Name of Supervisor" />
         </Panel>
         <Panel title="Performance by Designation" icon={Users}>
           <PerformanceTable rows={designationPerf} headLabel="Designation" />

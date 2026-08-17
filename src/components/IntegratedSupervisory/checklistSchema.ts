@@ -54,6 +54,7 @@ export const CHECKLIST_FIELDS: ChecklistField[] = [
   // Supervisor / Monitor
   { name: "Designation", label: "Designation", type: "select_one", list: "rz5qe06", section: "Supervisor / Monitor" },
   { name: "Independent_Monitor_s_Name", label: "Independent Monitor's Name", type: "select_one", list: "im", section: "Supervisor / Monitor" },
+  { name: "Name_of_Supervisor", label: "Name of Supervisor", type: "text", section: "Supervisor / Monitor" },
 
   // Campaign
   { name: "MDA_Campaign_Type", label: "MDA Campaign Type", type: "select_one", list: "av9ct84", section: "MDA Campaign" },
@@ -321,6 +322,12 @@ const pick = (idx: Map<string, unknown>, name: string): unknown => {
   return idx.get(`~${normToken(name)}`) ?? null;
 };
 
+/** Kobo may name the new supervisor question in a few ways — accept them all. */
+export const SUPERVISOR_ALIASES = [
+  "Name_of_Supervisor", "Name_of_the_Supervisor", "Supervisor_Name",
+  "Supervisors_Name", "Supervisor_s_Name", "Name_of_Supervisors", "Supervisor",
+];
+
 /** Locate the respondent repeat array on a submission, whatever it is named. */
 function findRepeatArray(row: any): any[] {
   const target = normToken(REPEAT_GROUP);
@@ -348,7 +355,7 @@ function findRepeatArray(row: any): any[] {
 export const PARENT_CONTEXT_KEYS = [
   "_id", "_uuid", "_submission_time", "_submitted_by",
   "State", "LGA", "Ward", "FLHF", "COMMUNITIES",
-  "Designation", "Independent_Monitor_s_Name", "MDA_Campaign_Type",
+  "Designation", "Independent_Monitor_s_Name", "Name_of_Supervisor", "MDA_Campaign_Type",
   "has_treatment_commenced", "Status_of_MDA", "Any_SAE_Complain",
 ] as const;
 
@@ -372,6 +379,12 @@ export function buildChecklistDataset(rawResults: any[] | null | undefined): Che
     parent._attachments = raw?._attachments ?? null;
     parent._validation_status = raw?._validation_status ?? null;
     for (const f of PARENT_FIELDS) parent[f.name] = pick(idx, f.name);
+    if (parent.Name_of_Supervisor == null || parent.Name_of_Supervisor === "") {
+      for (const alias of SUPERVISOR_ALIASES) {
+        const v = pick(idx, alias);
+        if (v != null && v !== "") { parent.Name_of_Supervisor = v; break; }
+      }
+    }
     parents.push(parent);
 
     repeat.forEach((item, i) => {
@@ -416,7 +429,7 @@ export const FLAT_COLUMNS: GridColumn[] = [
   { key: "_submission_time", label: "Submission Date", section: "Parent Metadata" },
   { key: "_submitted_by", label: "Submitted By", section: "Parent Metadata" },
   { key: "respondent_label", label: "Respondent Index", section: "Parent Metadata" },
-  ...(["State", "LGA", "Ward", "FLHF", "COMMUNITIES", "Designation", "Independent_Monitor_s_Name", "MDA_Campaign_Type", "has_treatment_commenced", "Status_of_MDA", "Any_SAE_Complain"] as const)
+  ...(["State", "LGA", "Ward", "FLHF", "COMMUNITIES", "Designation", "Independent_Monitor_s_Name", "Name_of_Supervisor", "MDA_Campaign_Type", "has_treatment_commenced", "Status_of_MDA", "Any_SAE_Complain"] as const)
     .map((n) => {
       const f = FIELD_BY_NAME.get(n)!;
       return { key: n, label: f.label, section: "Parent Context", field: f };

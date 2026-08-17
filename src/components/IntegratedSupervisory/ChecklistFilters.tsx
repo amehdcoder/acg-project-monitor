@@ -47,7 +47,9 @@ export function applyChecklistFilters<T extends Record<string, unknown>>(
     if (f.lga && label("LGA", p.LGA) !== f.lga) return false;
     if (f.ward && label("Ward", p.Ward) !== f.ward) return false;
     if (f.designation && label("Designation", p.Designation) !== f.designation) return false;
-    if (f.monitor && label("Independent_Monitor_s_Name", p.Independent_Monitor_s_Name) !== f.monitor) return false;
+    if (f.monitor
+      && label("Independent_Monitor_s_Name", p.Independent_Monitor_s_Name) !== f.monitor
+      && label("Name_of_Supervisor", p.Name_of_Supervisor) !== f.monitor) return false;
     if (f.campaign && label("MDA_Campaign_Type", p.MDA_Campaign_Type) !== f.campaign) return false;
     return true;
   });
@@ -140,7 +142,13 @@ export default function ChecklistFilters({
     () => (value.designation ? byWard.filter((p) => label("Designation", p.Designation) === value.designation) : byWard),
     [byWard, value.designation],
   );
-  const monitors = useMemo(() => uniq(byDesig, "Independent_Monitor_s_Name"), [byDesig]);
+  const monitors = useMemo(
+    () => [...new Set([
+      ...uniq(byDesig, "Independent_Monitor_s_Name"),
+      ...uniq(byDesig, "Name_of_Supervisor"),
+    ])].sort((a, b) => a.localeCompare(b)),
+    [byDesig],
+  );
   const campaigns = useMemo(() => uniq(byWard, "MDA_Campaign_Type"), [byWard]);
 
   const lockState = !!only(lens?.states) && states.length <= 1;
@@ -209,7 +217,7 @@ export default function ChecklistFilters({
           locked={lockWard} onChange={(v) => set({ ward: v })} />
         <FilterSelect id="isc-desig" title="Designations" value={value.designation} options={designations}
           onChange={(v) => set({ designation: v })} />
-        <FilterSelect id="isc-monitor" title="Monitors" value={value.monitor} options={monitors}
+        <FilterSelect id="isc-monitor" title="Monitors / Supervisors" value={value.monitor} options={monitors}
           onChange={(v) => set({ monitor: v })} />
         <FilterSelect id="isc-campaign" title="MDA Campaign Types" value={value.campaign} options={campaigns}
           onChange={(v) => set({ campaign: v })} />
