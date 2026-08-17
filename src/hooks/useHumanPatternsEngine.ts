@@ -33,6 +33,7 @@ export interface EngineOutput {
   di: DecisionIntelligenceResult | null;
   link: LinkageResult | null;
   linkAnswers: LinkageAnswers;
+  planCount: number;
   computing: boolean;
   failed: boolean;
 }
@@ -50,7 +51,7 @@ export function useHumanPatternsEngine(input: EngineInputs): EngineOutput {
   const dataReadyRef = useRef(false);
 
   const [out, setOut] = useState<Omit<EngineOutput, "computing" | "failed">>({
-    patterns: null, di: null, link: null, linkAnswers: [],
+    patterns: null, di: null, link: null, linkAnswers: [], planCount: 0,
   });
   const [computing, setComputing] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -70,7 +71,7 @@ export function useHumanPatternsEngine(input: EngineInputs): EngineOutput {
       const m = ev.data as {
         type: string; id: number;
         patterns?: HumanPatternsResult; di?: DecisionIntelligenceResult;
-        link?: LinkageResult | null; linkAnswers?: LinkageAnswers;
+        link?: LinkageResult | null; linkAnswers?: LinkageAnswers; planCount?: number;
       };
       if (m.id !== reqRef.current) return;             // stale run — ignore
       if (m.type === "result") {
@@ -79,6 +80,7 @@ export function useHumanPatternsEngine(input: EngineInputs): EngineOutput {
           di: m.di ?? null,
           link: m.link ?? null,
           linkAnswers: m.linkAnswers ?? [],
+          planCount: m.planCount ?? 0,
         });
         setFailed(false);
       } else {
