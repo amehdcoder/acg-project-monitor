@@ -62,11 +62,28 @@ const csvCell = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
 const PROJECT_BINDING_KEY = "isc-human-patterns-microplan-project";
 
+const EMPTY_PATTERNS = {
+  network: { actors: [], ties: [], density: 0, components: 0, largestComponent: 0, isolates: [], brokers: [], cliques: [] },
+  sites: [],
+  diagnoses: [],
+  rhythms: {
+    hours: Array.from({ length: 24 }, (_, h) => ({ name: `${String(h).padStart(2, "0")}h`, value: 0 })),
+    weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((name) => ({ name, value: 0 })),
+    nightRate: 0,
+    weekendRate: 0,
+  },
+  answers: [],
+  identityMerges: [],
+} as unknown as HumanPatternsResult;
+
 export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel, canExport = true }: Props) {
   const [lateStartDays, setLateStartDays] = useState(3);
   const [coverageFloor, setCoverageFloor] = useState(70);
   const [kindFilter, setKindFilter] = useState<"all" | FailureKind>("all");
   const [q, setQ] = useState("");
+  /* linkage assumptions live here so the worker can fold them into one pass */
+  const [unitsPerPerson, setUnitsPerPerson] = useState(1);
+  const [popPerDistributor, setPopPerDistributor] = useState(500);
 
   /* Bound microplanning project — saved once, restored on every visit. */
   const [projectId, setProjectId] = useState<string>(() => {
@@ -78,11 +95,11 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
   };
   const { projects, loading: projectsLoading } = useMicroplanProjects();
   const { entries, loading: planLoading, fromCache, syncedAt, refresh } = useMicroplanProjectEntries(projectId || null);
-  const { fields, setFields, calcTargetPop, label: targetLabel, options } = useTargetPopFields();
+  const { fields, setFields, label: targetLabel, options } = useTargetPopFields();
 
-  const plan = useMemo(
-    () => normalizePlanRows(entries, (e) => calcTargetPop(e as Record<string, any>)),
-    [entries, calcTargetPop],
+  const targetColumns = useMemo(
+    () => fields.map((k) => options.find((o) => o.key === k)?.field).filter((f): f is string => !!f),
+    [fields, options],
   );
 
   const { profile } = useAuth();
@@ -91,27 +108,35 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
     return [me, "Ameh Joseph", "Joseph Ameh"].filter(Boolean);
   }, [profile?.first_name, profile?.last_name]);
 
-  const result = useMemo(
-    () => computeHumanPatterns(dataset, checklistRows ?? [], {
-      lateStartDays,
-      coverageFloor: coverageFloor / 100,
-      excludePeople,
-      plan,
-    }),
-    [dataset, checklistRows, lateStartDays, coverageFloor, excludePeople, plan],
-  );
+  const rows = useMemo(() => checklistRows ?? [], [checklistRows]);
 
+  /* Everything heavy runs in a worker — the tab never blocks. */
+  const engine = useHumanPatternsEngine({
+    dataset,
+    checklistRows: rows,
+    entries,
+    targetColumns,
+    hasProject: !!projectId,
+    lateStartDays,
+    coverageFloor,
+    excludePeople,
+    unitsPerPerson,
+    popPerDistributor,
+  });
+
+  const result = engine.patterns ?? EMPTY_PATTERNS;
   const { network, diagnoses, rhythms, answers, sites, identityMerges } = result;
+  const busy = engine.computing && !engine.patterns;
 
-
-
+  /* the search box types freely; filtering follows at low priority */
+  const deferredQ = useDeferredValue(q);
 
   const diag = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+    const needle = deferredQ.trim().toLowerCase();
     return diagnoses.filter((d) =>
       (kindFilter === "all" || d.kind === kindFilter) &&
       (!needle || `${d.lga} ${d.facility} ${d.community} ${d.cdds.join(" ")}`.toLowerCase().includes(needle)));
-  }, [diagnoses, kindFilter, q]);
+  }, [diagnoses, kindFilter, deferredQ]);
 
   const causeRanking = useMemo(() => {
     const m = new Map<string, number>();
@@ -120,6 +145,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
   }, [diagnoses]);
 
   const topActors = useMemo(() => network.actors.slice(0, 12), [network.actors]);
+
 
   const exportCsv = () => {
     const head = ["LGA", "Facility", "Community", "Diagnosis", "Severity", "Coverage %", "Lag days", "Units to CDDs", "Facility supplied", "Returned", "CDDs", "Match score", "Causes"];
