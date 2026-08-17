@@ -391,15 +391,12 @@ export default function ChecklistDashboard({
   };
 
   const monitorPerf = useMemo(
-    () => performanceBy(parents, "Independent_Monitor_s_Name"),
+    () => performanceBy(parents, "Independent_Monitor_s_Name", true),
     [parents],
   );
   const designationPerf = useMemo(() => performanceBy(parents, "Designation"), [parents]);
   const supervisorPerf = useMemo(
-    () => performanceBy(
-      parents.filter((p) => String(p.Name_of_Supervisor ?? "").trim() !== ""),
-      "Name_of_Supervisor",
-    ),
+    () => performanceBy(parents, "Name_of_Supervisor", true),
     [parents],
   );
 
