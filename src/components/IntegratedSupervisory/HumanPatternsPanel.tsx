@@ -266,7 +266,7 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
         projectId={projectId}
         onProjectId={bindProject}
         entryCount={entries.length}
-        plannedCommunities={plan.length}
+        plannedCommunities={engine.planCount}
         loading={planLoading}
         fromCache={fromCache}
         syncedAt={syncedAt}
@@ -279,16 +279,18 @@ export default function HumanPatternsPanel({ dataset, checklistRows, scopeLabel,
 
       {projectId ? (
         <PlanningLinkagePanel
-          dataset={dataset}
-          sites={sites}
-          network={network}
-          diagnoses={diagnoses}
-          plan={plan}
-          projectId={projectId}
+          link={engine.link}
+          answers={engine.linkAnswers}
+          computing={engine.computing}
+          unitsPerPerson={unitsPerPerson}
+          onUnitsPerPerson={setUnitsPerPerson}
+          popPerDistributor={popPerDistributor}
+          onPopPerDistributor={setPopPerDistributor}
           projectName={projects.find((p) => p.id === projectId)?.name ?? ""}
           targetLabel={targetLabel}
           canExport={canExport}
         />
+
       ) : (
         <Card className="border-dashed">
           <CardContent className="py-8 text-center text-xs text-muted-foreground">
