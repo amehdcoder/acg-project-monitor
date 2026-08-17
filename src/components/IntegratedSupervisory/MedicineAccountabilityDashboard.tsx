@@ -22,7 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import {
   Activity, AlertTriangle, BookOpen, Boxes, CalendarClock, CheckCircle2, ClipboardCheck, Download, FileSpreadsheet,
   FileText, Filter, Gauge, Loader2, Maximize2, PackageCheck, PackageX, PlugZap, QrCode, RefreshCw, Route, Scale,
-  Brain, ShieldAlert, Timer, TrendingDown, Truck, Undo2, Warehouse,
+  Brain, ShieldAlert, Timer, TrendingDown, Truck, Undo2, Users, Warehouse,
 } from "lucide-react";
 
 
