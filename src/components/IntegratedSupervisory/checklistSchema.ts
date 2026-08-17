@@ -373,6 +373,12 @@ export function buildChecklistDataset(rawResults: any[] | null | undefined): Che
     parent._attachments = raw?._attachments ?? null;
     parent._validation_status = raw?._validation_status ?? null;
     for (const f of PARENT_FIELDS) parent[f.name] = pick(idx, f.name);
+    if (parent.Name_of_Supervisor == null || parent.Name_of_Supervisor === "") {
+      for (const alias of SUPERVISOR_ALIASES) {
+        const v = pick(idx, alias);
+        if (v != null && v !== "") { parent.Name_of_Supervisor = v; break; }
+      }
+    }
     parents.push(parent);
 
     repeat.forEach((item, i) => {
