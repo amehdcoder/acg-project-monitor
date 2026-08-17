@@ -665,15 +665,33 @@ export default function ChecklistDashboard({
       {/* Field-worker accountability */}
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel title="Independent Monitor Performance" icon={UserCheck}>
-          <PerformanceTable rows={monitorPerf} headLabel="Independent Monitor's Name" />
+          <PerformanceTable
+            rows={monitorPerf}
+            headLabel="Independent Monitor's Name"
+            onSelect={toggleVisitPerson}
+            selected={visitPerson}
+          />
         </Panel>
         <Panel title="Other Supervisors Performance" icon={UserCheck}>
-          <PerformanceTable rows={supervisorPerf} headLabel="Name of Supervisor" />
+          <PerformanceTable
+            rows={supervisorPerf}
+            headLabel="Name of Supervisor"
+            onSelect={toggleVisitPerson}
+            selected={visitPerson}
+          />
         </Panel>
         <Panel title="Performance by Designation" icon={Users}>
           <PerformanceTable rows={designationPerf} headLabel="Designation" />
         </Panel>
+        <Panel title="Community Visited" icon={MapPin}>
+          <CommunityVisitedTable
+            rows={communityVisits}
+            selected={visitPerson}
+            onClearSelection={() => setVisitPerson(null)}
+          />
+        </Panel>
       </div>
+
 
 
 
