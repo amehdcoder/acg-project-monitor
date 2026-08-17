@@ -220,14 +220,58 @@ function PerformanceTable({ rows, headLabel }: { rows: PerfRow[]; headLabel: str
   );
 }
 
-/** Group parents by a field and compute performance metrics. */
+/**
+ * Group parents by a field and compute performance metrics.
+ *
+ * When `personNames` is set, only plausible human names are kept (blank /
+ * "Unspecified" / questionnaire answers are dropped) and spelling variants are
+ * fuzzy-resolved to one canonical actor. Fuzzy clustering runs *within* each
+ * Designation | LGA | Ward bucket so two different people in different places
+ * never collapse together; canonical labels are then aggregated across buckets.
+ */
 function performanceBy(
   parents: Record<string, unknown>[],
   field: string,
+  personNames = false,
 ): PerfRow[] {
+  const raw = (p: Record<string, unknown>) =>
+    String(resolveChecklistValue(field, p[field]) || "").trim();
+
+  let nameOf: (p: Record<string, unknown>) => string;
+
+  if (personNames) {
+    const scopeKey = (p: Record<string, unknown>) =>
+      [
+        resolveChecklistValue("Designation", p.Designation) || "",
+        resolveChecklistValue("LGA", p.LGA) || "",
+        resolveChecklistValue("Ward", p.Ward) || "",
+      ].join("|").toLowerCase();
+
+    const buckets = new Map<string, string[]>();
+    for (const p of parents) {
+      const v = raw(p);
+      if (!isHumanName(v)) continue;
+      const k = scopeKey(p);
+      const list = buckets.get(k) ?? [];
+      list.push(v);
+      buckets.set(k, list);
+    }
+    const indexes = new Map<string, ReturnType<typeof buildIdentityIndex>>();
+    for (const [k, names] of buckets) indexes.set(k, buildIdentityIndex(names));
+
+    nameOf = (p) => {
+      const v = raw(p);
+      if (!isHumanName(v)) return "";
+      return indexes.get(scopeKey(p))?.resolve(v)?.name || v;
+    };
+  } else {
+    nameOf = (p) => raw(p) || "Unspecified";
+  }
+
   const m = new Map<string, { subs: number; resp: number; days: Set<string> }>();
   for (const p of parents) {
-    const name = resolveChecklistValue(field, p[field]) || "Unspecified";
+    const name = nameOf(p);
+    if (!name) continue;
     const rec = m.get(name) ?? { subs: 0, resp: 0, days: new Set<string>() };
     rec.subs += 1;
     rec.resp += Number(p.respondent_count) || 0;
@@ -245,6 +289,7 @@ function performanceBy(
     }))
     .sort((a, b) => b.submissions - a.submissions);
 }
+
 
 /** Editable denominator control for the Geographic Coverage KPI. */
 function CoverageTargetDialog({
