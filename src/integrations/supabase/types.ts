@@ -714,7 +714,7 @@ export type Database = {
           phone: string | null
           photo_url: string | null
           project_id: string | null
-          registered_by: string | null
+          registered_by: string
           role: string | null
           sex: string | null
           state: string | null
@@ -734,7 +734,7 @@ export type Database = {
           phone?: string | null
           photo_url?: string | null
           project_id?: string | null
-          registered_by?: string | null
+          registered_by?: string
           role?: string | null
           sex?: string | null
           state?: string | null
@@ -754,7 +754,7 @@ export type Database = {
           phone?: string | null
           photo_url?: string | null
           project_id?: string | null
-          registered_by?: string | null
+          registered_by?: string
           role?: string | null
           sex?: string | null
           state?: string | null
@@ -9224,6 +9224,14 @@ export type Database = {
       approve_after_hours_request: {
         Args: { p_id: string }
         Returns: undefined
+      }
+      audit_realtime_rls_coverage: {
+        Args: never
+        Returns: {
+          has_select_policy: boolean
+          rls_enabled: boolean
+          table_name: string
+        }[]
       }
       authorize_realtime_subscription: {
         Args: { _topic: string }
