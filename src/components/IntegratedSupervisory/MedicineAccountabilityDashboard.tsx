@@ -1021,6 +1021,10 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
           />
         </TabsContent>
 
+        <TabsContent value="personnel" className="mt-4">
+          <PersonnelAccountabilityPanel dataset={filtered} />
+        </TabsContent>
+
         <TabsContent value="integrity" className="mt-4">
 
           <ChecklistReconciliation cache={checklistCache} canExport={canExport} />
