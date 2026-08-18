@@ -326,9 +326,10 @@ export default function ChecklistMaps({
         <CardContent className="space-y-2 p-4">
           <GeoMap points={householdPoints} filters={filters} />
           <Legend items={[
-            { color: "#16a34a", label: "Offered the medicine(s)", glyph: "✓" },
-            { color: "#dc2626", label: "Not offered", glyph: "✕" },
+            { color: OFFERED_COLOR, label: "Offered the medicine(s)", glyph: "✓" },
+            { color: NOT_OFFERED_COLOR, label: "Not offered", glyph: "✕" },
           ]} />
+
         </CardContent>
       </Card>
     </div>
