@@ -112,20 +112,97 @@ const Empty = () => (
   <div className="h-[220px] flex items-center justify-center text-xs text-muted-foreground">No data yet</div>
 );
 
+/** Vivid, professional donut palette (distinct hues, good contrast on light + dark). */
+const DONUT_PALETTE = [
+  "#2563eb", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
+  "#06b6d4", "#84cc16", "#f97316", "#ec4899", "#14b8a6",
+  "#6366f1", "#eab308",
+];
+
+/** Outside data label: "Name 42 (35%)" with a leader line. */
+const donutLabel = (props: any) => {
+  const { cx, cy, midAngle, outerRadius, percent, value, name } = props;
+  if (!percent || percent < 0.03) return null;
+  const RAD = Math.PI / 180;
+  const r = outerRadius + 14;
+  const x = cx + r * Math.cos(-midAngle * RAD);
+  const y = cy + r * Math.sin(-midAngle * RAD);
+  const anchor = x > cx ? "start" : "end";
+  const label = String(name ?? "");
+  const short = label.length > 16 ? `${label.slice(0, 15)}…` : label;
+  return (
+    <text x={x} y={y} textAnchor={anchor} dominantBaseline="central" className="fill-foreground" fontSize={10} fontWeight={600}>
+      <tspan>{short}</tspan>
+      <tspan x={x} dy={11} className="fill-muted-foreground" fontWeight={500}>
+        {value.toLocaleString()} · {(percent * 100).toFixed(0)}%
+      </tspan>
+    </text>
+  );
+};
+
 function DonutChart({ data }: { data: { name: string; value: number }[] }) {
   if (data.length === 0) return <Empty />;
+  const total = data.reduce((s, d) => s + (Number(d.value) || 0), 0);
   return (
-    <ResponsiveContainer width="100%" height={240}>
-      <PieChart>
-        <Pie data={data} dataKey="value" nameKey="name" innerRadius={52} outerRadius={86} paddingAngle={2}>
-          {data.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
-        </Pie>
-        <Tooltip />
-        <Legend wrapperStyle={{ fontSize: 11 }} />
-      </PieChart>
-    </ResponsiveContainer>
+    <div className="relative">
+      <ResponsiveContainer width="100%" height={300}>
+        <PieChart margin={{ top: 12, right: 60, bottom: 8, left: 60 }}>
+          <defs>
+            {DONUT_PALETTE.map((c, i) => (
+              <linearGradient key={i} id={`donutGrad${i}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={c} stopOpacity={0.98} />
+                <stop offset="100%" stopColor={c} stopOpacity={0.72} />
+              </linearGradient>
+            ))}
+          </defs>
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            innerRadius={58}
+            outerRadius={92}
+            paddingAngle={2}
+            cornerRadius={5}
+            stroke="hsl(var(--background))"
+            strokeWidth={2}
+            labelLine={{ stroke: "hsl(var(--border))", strokeWidth: 1 }}
+            label={donutLabel}
+            isAnimationActive
+            animationDuration={650}
+          >
+            {data.map((_, i) => (
+              <Cell key={i} fill={`url(#donutGrad${i % DONUT_PALETTE.length})`} />
+            ))}
+          </Pie>
+          <Tooltip
+            formatter={(v: any, n: any) => [
+              `${Number(v).toLocaleString()} (${total ? ((Number(v) / total) * 100).toFixed(1) : 0}%)`,
+              n,
+            ]}
+            contentStyle={{
+              background: "hsl(var(--card))",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: 10,
+              fontSize: 11,
+              boxShadow: "0 8px 24px -12px rgba(0,0,0,.35)",
+            }}
+          />
+          <Legend
+            wrapperStyle={{ fontSize: 11 }}
+            iconType="circle"
+            iconSize={8}
+            formatter={(v: string) => <span className="text-muted-foreground">{v}</span>}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center -mt-6">
+        <span className="font-display text-xl font-bold text-foreground tabular-nums">{total.toLocaleString()}</span>
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</span>
+      </div>
+    </div>
   );
 }
+
 
 function HBarChart({ data, color = PALETTE[0] }: { data: { name: string; value: number }[]; color?: string }) {
   if (data.length === 0) return <Empty />;
