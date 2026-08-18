@@ -12,12 +12,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Users } from "lucide-react";
 import { loadNigeriaGeo, lgaKey } from "@/components/Dashboard/ops/lgaGeo";
 import { resolveChecklistValue } from "./checklistSchema";
 import type { ChecklistFilterState } from "./ChecklistFilters";
+
 
 type Row = Record<string, unknown>;
 
@@ -67,12 +70,58 @@ function collector(row: Row): { label: string; value: string } {
 
 /* ------------------------------------------------------------------ marker */
 
+export const OFFERED_COLOR = "#16a34a";
+export const NOT_OFFERED_COLOR = "#dc2626";
+
+/**
+ * True when the respondent was offered the medicine(s).
+ * Kobo answers arrive either as choice codes (`Offered_all_required_1`,
+ * `Offered_(but_not_all_required)`, `Not_offered_any_required_1`), as resolved
+ * labels, or as plain yes/no/1/0 — all three shapes are handled here.
+ */
+function isOffered(raw: unknown, label: string): boolean {
+  const t = `${s(raw)} ${label}`.toLowerCase();
+  if (!t.trim()) return false;
+  if (/\bnot[\s_-]*offered|\bno\b|\bnone\b|\bnot[\s_-]*given|refus/.test(t)) return false;
+  if (/offer/.test(t)) return true;
+  return /^(yes|y|true|1)\b/.test(s(raw).toLowerCase()) || /^yes/.test(label.toLowerCase());
+}
+
 interface Pt {
   lat: number; lng: number;
   color: string;
   kind: "dot" | "tick" | "cross";
   popup: string;
 }
+
+/** Cluster badge coloured by the dominant marker colour it aggregates. */
+function clusterIcon(cluster: any): L.DivIcon {
+  const kids = cluster.getAllChildMarkers() as any[];
+  const counts = new Map<string, number>();
+  let dominantKind = "dot";
+  for (const m of kids) {
+    const c = (m.options?.ptColor as string) || "#64748b";
+    counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  let color = "#64748b", best = -1;
+  counts.forEach((n, c) => { if (n > best) { best = n; color = c; } });
+  const dom = kids.find((m) => m.options?.ptColor === color);
+  dominantKind = dom?.options?.ptKind ?? "dot";
+  const total = kids.length;
+  const share = total ? Math.round((best / total) * 100) : 0;
+  const size = total >= 500 ? 52 : total >= 100 ? 46 : total >= 25 ? 40 : 34;
+  const mark = dominantKind === "tick" ? "✓" : dominantKind === "cross" ? "✕" : "";
+  return L.divIcon({
+    className: "",
+    html: `<div title="${total} point(s) · ${share}% ${mark === "✓" ? "offered" : mark === "✕" ? "not offered" : "dominant"}"
+      style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:9999px;background:${color};color:#fff;border:3px solid rgba(255,255,255,.9);box-shadow:0 2px 8px rgba(15,23,42,.35);font-weight:700;font-size:${size >= 46 ? 13 : 12}px;line-height:1">
+      <span>${total}</span>${mark ? `<span style="font-size:10px;opacity:.9">${mark}</span>` : ""}
+    </div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
 
 function markerIcon(p: Pt): L.DivIcon {
   if (p.kind === "dot") {
@@ -193,17 +242,33 @@ function GeoMap({
     });
   }, [geo, ready, filters.state, filters.lga, filters.ward, points]);
 
-  // Data markers
+  // Data markers — clustered so thousands of points stay smooth.
   useEffect(() => {
+    const map = mapRef.current;
     const group = markerRef.current;
-    if (!group) return;
+    if (!map || !group) return;
     group.clearLayers();
-    for (const p of points) {
-      L.marker([p.lat, p.lng], { icon: markerIcon(p) })
-        .bindPopup(p.popup, { maxWidth: 300 })
-        .addTo(group);
-    }
+    if (!points.length) return;
+
+    const cluster = (L as any).markerClusterGroup
+      ? (L as any).markerClusterGroup({
+          chunkedLoading: true,
+          showCoverageOnHover: false,
+          maxClusterRadius: 48,
+          iconCreateFunction: clusterIcon,
+        })
+      : L.layerGroup();
+
+    const markers = points.map((p) =>
+      L.marker([p.lat, p.lng], { icon: markerIcon(p), ptKind: p.kind, ptColor: p.color } as any)
+        .bindPopup(p.popup, { maxWidth: 300 }),
+    );
+    if ((cluster as any).addLayers) (cluster as any).addLayers(markers);
+    else markers.forEach((m) => m.addTo(cluster as L.LayerGroup));
+
+    group.addLayer(cluster as L.Layer);
   }, [points, ready]);
+
 
   useEffect(() => {
     const fix = () => { try { mapRef.current?.invalidateSize(); } catch { /* noop */ } };
@@ -276,13 +341,15 @@ export default function ChecklistMaps({
     for (const r of respondents) {
       const g = parsePoint(r.GPS_of_Household);
       if (!g) continue;
-      const offeredLabel = lbl("Were_you_OFFERED_the_medicine_s", r.Were_you_OFFERED_the_medicine_s);
-      const offered = /^yes/i.test(offeredLabel);
+      const raw = r.Were_you_OFFERED_the_medicine_s;
+      const offeredLabel = lbl("Were_you_OFFERED_the_medicine_s", raw);
+      const offered = isOffered(raw, offeredLabel);
       const who = collector(r);
       out.push({
         lat: g.lat, lng: g.lng,
         kind: offered ? "tick" : "cross",
-        color: offered ? "#16a34a" : "#dc2626",
+        color: offered ? OFFERED_COLOR : NOT_OFFERED_COLOR,
+
         popup: `<div style="font-size:12px;line-height:1.5">
           <strong>${esc(r.COMMUNITIES) || "Household"}</strong><br/>
           Offered medicine(s): <strong style="color:${offered ? "#16a34a" : "#dc2626"}">${esc(offeredLabel) || "—"}</strong><br/>
@@ -323,9 +390,10 @@ export default function ChecklistMaps({
         <CardContent className="space-y-2 p-4">
           <GeoMap points={householdPoints} filters={filters} />
           <Legend items={[
-            { color: "#16a34a", label: "Offered the medicine(s)", glyph: "✓" },
-            { color: "#dc2626", label: "Not offered", glyph: "✕" },
+            { color: OFFERED_COLOR, label: "Offered the medicine(s)", glyph: "✓" },
+            { color: NOT_OFFERED_COLOR, label: "Not offered", glyph: "✕" },
           ]} />
+
         </CardContent>
       </Card>
     </div>
