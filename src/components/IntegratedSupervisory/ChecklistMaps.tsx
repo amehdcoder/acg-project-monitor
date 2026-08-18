@@ -196,17 +196,33 @@ function GeoMap({
     });
   }, [geo, ready, filters.state, filters.lga, filters.ward, points]);
 
-  // Data markers
+  // Data markers — clustered so thousands of points stay smooth.
   useEffect(() => {
+    const map = mapRef.current;
     const group = markerRef.current;
-    if (!group) return;
+    if (!map || !group) return;
     group.clearLayers();
-    for (const p of points) {
-      L.marker([p.lat, p.lng], { icon: markerIcon(p) })
-        .bindPopup(p.popup, { maxWidth: 300 })
-        .addTo(group);
-    }
+    if (!points.length) return;
+
+    const cluster = (L as any).markerClusterGroup
+      ? (L as any).markerClusterGroup({
+          chunkedLoading: true,
+          showCoverageOnHover: false,
+          maxClusterRadius: 48,
+          iconCreateFunction: clusterIcon,
+        })
+      : L.layerGroup();
+
+    const markers = points.map((p) =>
+      L.marker([p.lat, p.lng], { icon: markerIcon(p), ptKind: p.kind, ptColor: p.color } as any)
+        .bindPopup(p.popup, { maxWidth: 300 }),
+    );
+    if ((cluster as any).addLayers) (cluster as any).addLayers(markers);
+    else markers.forEach((m) => m.addTo(cluster as L.LayerGroup));
+
+    group.addLayer(cluster as L.Layer);
   }, [points, ready]);
+
 
   useEffect(() => {
     const fix = () => { try { mapRef.current?.invalidateSize(); } catch { /* noop */ } };
