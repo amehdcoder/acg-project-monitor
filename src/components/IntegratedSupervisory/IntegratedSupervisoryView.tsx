@@ -279,25 +279,34 @@ export default function IntegratedSupervisoryView() {
         </TabsList>
         {showTab("checklist") && (
           <TabsContent value="checklist" className="mt-4">
-            <ChecklistDashboard cache={scopedCache} onRefresh={() => refresh(false)} syncing={syncing} />
+            <Suspense fallback={<TabFallback />}>
+              <ChecklistDashboard cache={scopedCache} onRefresh={() => refresh(false)} syncing={syncing} />
+            </Suspense>
           </TabsContent>
         )}
         {perms.canViewRawData && showTab("records") && (
           <TabsContent value="records" className="mt-4">
-            <RawKoboDataTabs cache={scopedCache} onRefresh={() => refresh(false)} />
+            <Suspense fallback={<TabFallback />}>
+              <RawKoboDataTabs cache={scopedCache} onRefresh={() => refresh(false)} />
+            </Suspense>
           </TabsContent>
         )}
 
         {showTab("studio") && (
           <TabsContent value="studio" className="mt-4">
-            <SupervisoryDashboardView cache={scopedCache} onRefresh={() => refresh(false)} syncing={syncing} />
+            <Suspense fallback={<TabFallback />}>
+              <SupervisoryDashboardView cache={scopedCache} onRefresh={() => refresh(false)} syncing={syncing} />
+            </Suspense>
           </TabsContent>
         )}
         {perms.canViewMedicineAccountability && showTab("reconciliation") && (
           <TabsContent value="reconciliation" className="mt-4">
-            <MedicineAccountabilityDashboard canExport={perms.canExport} checklistCache={scopedCache} />
+            <Suspense fallback={<TabFallback />}>
+              <MedicineAccountabilityDashboard canExport={perms.canExport} checklistCache={scopedCache} />
+            </Suspense>
           </TabsContent>
         )}
+
       </Tabs>
 
       {perms.canManageAccess && (
