@@ -12,12 +12,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Users } from "lucide-react";
 import { loadNigeriaGeo, lgaKey } from "@/components/Dashboard/ops/lgaGeo";
 import { resolveChecklistValue } from "./checklistSchema";
 import type { ChecklistFilterState } from "./ChecklistFilters";
+
 
 type Row = Record<string, unknown>;
 
