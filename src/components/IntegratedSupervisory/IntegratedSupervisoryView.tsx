@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -8,13 +8,24 @@ import {
   ClipboardList, Database, GitCompareArrows, LayoutDashboard, Loader2, Lock, Plus, Radio, Server, Settings2, ShieldCheck, Trash2,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import KoboSyncDialog from "./KoboSyncDialog";
 import KoboSyncStatus from "./KoboSyncStatus";
-import SupervisoryDashboardView from "./SupervisoryDashboardView";
-import ChecklistDashboard from "./ChecklistDashboard";
-import RawKoboDataTabs from "./RawKoboDataTabs";
-import MedicineAccountabilityDashboard from "./MedicineAccountabilityDashboard";
 import ChecklistAccessManager from "./ChecklistAccessManager";
+
+/* Heavy dashboards are code-split so the page shell paints immediately and each
+   tab only downloads/executes its own bundle when it is first opened. */
+const SupervisoryDashboardView = lazyWithRetry(() => import("./SupervisoryDashboardView"));
+const ChecklistDashboard = lazyWithRetry(() => import("./ChecklistDashboard"));
+const RawKoboDataTabs = lazyWithRetry(() => import("./RawKoboDataTabs"));
+const MedicineAccountabilityDashboard = lazyWithRetry(() => import("./MedicineAccountabilityDashboard"));
+
+const TabFallback = () => (
+  <div className="flex items-center justify-center gap-2 rounded-lg border bg-muted/30 py-16 text-sm text-muted-foreground">
+    <Loader2 className="h-4 w-4 animate-spin" /> Loading dashboard…
+  </div>
+);
+
 import {
   deleteConnection, fetchSubmissions, getActiveConnectionId, listConnections, loadKoboCache,
   loadKoboConfig, setActiveConnectionId, type KoboCache, type KoboConnection,
