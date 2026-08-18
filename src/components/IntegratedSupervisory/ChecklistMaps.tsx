@@ -279,13 +279,15 @@ export default function ChecklistMaps({
     for (const r of respondents) {
       const g = parsePoint(r.GPS_of_Household);
       if (!g) continue;
-      const offeredLabel = lbl("Were_you_OFFERED_the_medicine_s", r.Were_you_OFFERED_the_medicine_s);
-      const offered = /^yes/i.test(offeredLabel);
+      const raw = r.Were_you_OFFERED_the_medicine_s;
+      const offeredLabel = lbl("Were_you_OFFERED_the_medicine_s", raw);
+      const offered = isOffered(raw, offeredLabel);
       const who = collector(r);
       out.push({
         lat: g.lat, lng: g.lng,
         kind: offered ? "tick" : "cross",
-        color: offered ? "#16a34a" : "#dc2626",
+        color: offered ? OFFERED_COLOR : NOT_OFFERED_COLOR,
+
         popup: `<div style="font-size:12px;line-height:1.5">
           <strong>${esc(r.COMMUNITIES) || "Household"}</strong><br/>
           Offered medicine(s): <strong style="color:${offered ? "#16a34a" : "#dc2626"}">${esc(offeredLabel) || "—"}</strong><br/>
