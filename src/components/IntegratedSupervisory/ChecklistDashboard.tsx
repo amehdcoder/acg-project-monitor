@@ -96,21 +96,47 @@ const Kpi = ({
 
 const Panel = ({
   title, icon: Icon, children, right,
-}: { title: string; icon: React.ElementType; children: React.ReactNode; right?: React.ReactNode }) => (
-  <Card className="overflow-hidden">
-    <CardHeader className="py-3 px-4 border-b bg-muted/40 flex-row items-center justify-between space-y-0">
-      <CardTitle className="text-sm font-semibold flex items-center gap-2">
-        <Icon className="h-4 w-4 text-primary" /> {title}
-      </CardTitle>
-      {right}
-    </CardHeader>
-    <CardContent className="p-4">{children}</CardContent>
-  </Card>
-);
+}: { title: string; icon: React.ElementType; children: React.ReactNode; right?: React.ReactNode }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Card className="flex flex-col overflow-hidden">
+        <CardHeader className="py-3 px-4 border-b bg-muted/40 flex-row items-center justify-between gap-2 space-y-0">
+          <CardTitle className="text-sm font-semibold flex min-w-0 items-center gap-2">
+            <Icon className="h-4 w-4 shrink-0 text-primary" />
+            <span className="truncate">{title}</span>
+          </CardTitle>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {right}
+            <Button
+              variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={() => setOpen(true)} aria-label={`Expand ${title}`} title="Expand"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="min-w-0 flex-1 overflow-hidden p-4">{children}</CardContent>
+      </Card>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-[96vw] sm:max-w-[92vw] lg:max-w-[1100px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Icon className="h-4 w-4 text-primary" /> {title}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[78vh] min-w-0 overflow-auto pr-1">{children}</div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
 
 const Empty = () => (
   <div className="h-[220px] flex items-center justify-center text-xs text-muted-foreground">No data yet</div>
 );
+
 
 /** Vivid, professional donut palette (distinct hues, good contrast on light + dark). */
 const DONUT_PALETTE = [
