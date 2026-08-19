@@ -9,9 +9,10 @@ import {
   DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Activity, AlertTriangle, ClipboardCheck, Droplets, Home, Loader2, MapPin,
+  Activity, AlertTriangle, ClipboardCheck, Droplets, Home, Loader2, MapPin, Maximize2,
   PlayCircle, RefreshCw, Settings2, ShieldAlert, UserCheck, Users,
 } from "lucide-react";
+
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
