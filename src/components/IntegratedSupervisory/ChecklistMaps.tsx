@@ -145,9 +145,18 @@ function markerIcon(p: Pt): L.DivIcon {
 
 /* --------------------------------------------------------------------- map */
 
+/** Loose state-name equivalence (handles Nasarawa/Nassarawa, FCT variants, …). */
+const sameState = (a: string, b: string) => {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (a.startsWith(b) || b.startsWith(a)) return true;
+  const strip = (v: string) => v.replace(/state$/, "").replace(/s{2,}/g, "s");
+  return strip(a) === strip(b);
+};
+
 function GeoMap({
-  points, filters, height = 460,
-}: { points: Pt[]; filters: ChecklistFilterState; height?: number }) {
+  points, filters, dataStates, height = 460,
+}: { points: Pt[]; filters: ChecklistFilterState; dataStates: string[]; height?: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const boundaryRef = useRef<L.GeoJSON | null>(null);
@@ -171,6 +180,16 @@ function GeoMap({
         subdomains: "abcd", maxZoom: 19, opacity: 0.95,
       }).addTo(map);
       map.setView([9.082, 8.6753], 6);
+      L.control.scale({ imperial: false, position: "bottomleft" }).addTo(map);
+      // Simple north arrow — standard cartographic furniture for field maps.
+      const north = new (L.Control.extend({
+        onAdd: () => {
+          const d = L.DomUtil.create("div", "");
+          d.innerHTML = `<div style="background:rgba(255,255,255,.92);border:1px solid #cbd5e1;border-radius:6px;padding:3px 6px;font:700 11px/1.1 system-ui;color:#0f172a;text-align:center;box-shadow:0 1px 4px rgba(15,23,42,.2)">▲<br/>N</div>`;
+          return d;
+        },
+      }))({ position: "topright" });
+      north.addTo(map);
       mapRef.current = map;
       markerRef.current = L.layerGroup().addTo(map);
       setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 0);
@@ -188,7 +207,9 @@ function GeoMap({
 
   useEffect(() => () => { mapRef.current?.remove(); mapRef.current = null; }, []);
 
-  // Administrative boundaries — restricted to the filtered admin unit.
+  const statesKey = dataStates.join("|");
+
+  // Administrative boundaries — only the State(s) that actually have synced data.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !geo) return;
@@ -196,31 +217,37 @@ function GeoMap({
 
     const wantState = clean(filters.state);
     const wantLga = clean(filters.lga);
-    const scoped = !!wantState;
+    const syncStates = dataStates.map(clean).filter(Boolean);
 
     const inScope = (f: any) => {
-      if (!wantState) return true;
-      const k = lgaKey(f?.properties?.state, f?.properties?.lga);
-      const [st, lg] = k.split("|");
-      const stateWanted = lgaKey(filters.state, "").split("|")[0];
-      if (st !== stateWanted) return false;
-      if (wantLga && !(lg === wantLga || lg.startsWith(wantLga) || wantLga.startsWith(lg))) return false;
-      return true;
+      const st = clean(f?.properties?.state);
+      const lg = clean(f?.properties?.lga);
+      if (wantState) {
+        if (!sameState(st, wantState)) return false;
+        if (wantLga && !(lg === wantLga || lg.startsWith(wantLga) || wantLga.startsWith(lg))) return false;
+        return true;
+      }
+      // No explicit filter → restrict the canvas to States with synced data.
+      if (!syncStates.length) return false;
+      return syncStates.some((x) => sameState(st, x));
     };
 
     const bounds = L.latLngBounds([]);
+    const scoped = !!wantState;
     const layer = L.geoJSON(geo, {
-      filter: (f: any) => (scoped ? inScope(f) : true),
-      style: (f: any) => ({
-        fillColor: "#e2e8f0",
-        fillOpacity: scoped ? 0.25 : 0.1,
-        color: scoped ? "#0f172a" : "#94a3b8",
-        weight: scoped ? 1.6 : 0.5,
-        opacity: 1,
+      filter: inScope,
+      style: () => ({
+        fillColor: "#eff6ff",
+        fillOpacity: scoped ? 0.55 : 0.45,
+        color: "#1e3a8a",
+        weight: scoped ? 1.4 : 0.9,
+        opacity: 0.85,
       }) as L.PathOptions,
       onEachFeature: (f: any, lyr: L.Layer) => {
         const st = s(f?.properties?.state), lg = s(f?.properties?.lga);
         (lyr as L.Path).bindTooltip(`${lg}${st ? `, ${st}` : ""}`, { sticky: true, direction: "top" });
+        (lyr as L.Path).on("mouseover", () => (lyr as L.Path).setStyle({ fillOpacity: 0.75, weight: 2 }));
+        (lyr as L.Path).on("mouseout", () => (lyr as L.Path).setStyle({ fillOpacity: scoped ? 0.55 : 0.45, weight: scoped ? 1.4 : 0.9 }));
         try { bounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
       },
     });
@@ -240,7 +267,8 @@ function GeoMap({
         else map.setView([9.082, 8.6753], 6);
       } catch { /* noop */ }
     });
-  }, [geo, ready, filters.state, filters.lga, filters.ward, points]);
+  }, [geo, ready, filters.state, filters.lga, filters.ward, points, statesKey, dataStates]);
+
 
   // Data markers — clustered so thousands of points stay smooth.
   useEffect(() => {
@@ -363,39 +391,64 @@ export default function ChecklistMaps({
     return out;
   }, [respondents]);
 
-  const scope = [filters.ward, filters.lga, filters.state].filter(Boolean)[0] || "Nigeria";
+  // Only the State(s) that actually carry synced records are drawn.
+  const dataStates = useMemo(() => {
+    const set = new Map<string, string>();
+    for (const r of [...parents, ...respondents]) {
+      const st = s((r as Row).State);
+      if (st && !set.has(clean(st))) set.set(clean(st), st);
+    }
+    return [...set.values()].sort((a, b) => a.localeCompare(b));
+  }, [parents, respondents]);
+
+  const scope = [filters.ward, filters.lga, filters.state].filter(Boolean)[0]
+    || (dataStates.length ? `${dataStates.length} State(s) with data` : "No synced State");
+  const asOf = new Date().toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+
+  const caption = (unit: string, n: number) => (
+    <p className="text-[10px] leading-relaxed text-muted-foreground">
+      <span className="font-semibold text-foreground">Coverage:</span>{" "}
+      {dataStates.length ? dataStates.join(", ") : "—"} · {n.toLocaleString()} {unit}
+      {" · "}<span className="font-semibold text-foreground">Source:</span> Integrated MDA Supervisory Checklist (field-synced), as of {asOf}.
+      {" "}Administrative boundaries are indicative only.
+    </p>
+  );
 
   return (
     <div className="grid gap-4 xl:grid-cols-2">
-      <Card className="overflow-hidden">
-        <CardHeader className="flex-row items-center justify-between space-y-0 border-b bg-muted/40 px-4 py-3">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-            <MapPin className="h-4 w-4 text-primary" /> Communities Visited · Status of MDA
+      <Card className="flex flex-col overflow-hidden">
+        <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 border-b bg-muted/40 px-4 py-3">
+          <CardTitle className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+            <MapPin className="h-4 w-4 shrink-0 text-primary" />
+            <span className="truncate">Communities Visited · Status of MDA</span>
           </CardTitle>
-          <Badge variant="outline" className="text-[10px]">{communityPoints.length} community point(s) · {scope}</Badge>
+          <Badge variant="outline" className="shrink-0 text-[10px]">{communityPoints.length} point(s) · {scope}</Badge>
         </CardHeader>
-        <CardContent className="space-y-2 p-4">
-          <GeoMap points={communityPoints} filters={filters} />
+        <CardContent className="min-w-0 space-y-2 p-4">
+          <GeoMap points={communityPoints} filters={filters} dataStates={dataStates} />
           <Legend items={STATUS_COLORS.map((c) => ({ color: c.color, label: c.label }))} />
+          {caption("communities mapped", communityPoints.length)}
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden">
-        <CardHeader className="flex-row items-center justify-between space-y-0 border-b bg-muted/40 px-4 py-3">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-            <Users className="h-4 w-4 text-primary" /> Households / Classes · Medicine Offered
+      <Card className="flex flex-col overflow-hidden">
+        <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 border-b bg-muted/40 px-4 py-3">
+          <CardTitle className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+            <Users className="h-4 w-4 shrink-0 text-primary" />
+            <span className="truncate">Households / Classes · Medicine Offered</span>
           </CardTitle>
-          <Badge variant="outline" className="text-[10px]">{householdPoints.length} household point(s) · {scope}</Badge>
+          <Badge variant="outline" className="shrink-0 text-[10px]">{householdPoints.length} point(s) · {scope}</Badge>
         </CardHeader>
-        <CardContent className="space-y-2 p-4">
-          <GeoMap points={householdPoints} filters={filters} />
+        <CardContent className="min-w-0 space-y-2 p-4">
+          <GeoMap points={householdPoints} filters={filters} dataStates={dataStates} />
           <Legend items={[
             { color: OFFERED_COLOR, label: "Offered the medicine(s)", glyph: "✓" },
             { color: NOT_OFFERED_COLOR, label: "Not offered", glyph: "✕" },
           ]} />
-
+          {caption("households / classes surveyed", householdPoints.length)}
         </CardContent>
       </Card>
     </div>
   );
 }
+

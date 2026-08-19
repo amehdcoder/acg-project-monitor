@@ -9,9 +9,10 @@ import {
   DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Activity, AlertTriangle, ClipboardCheck, Droplets, Home, Loader2, MapPin,
+  Activity, AlertTriangle, ClipboardCheck, Droplets, Home, Loader2, MapPin, Maximize2,
   PlayCircle, RefreshCw, Settings2, ShieldAlert, UserCheck, Users,
 } from "lucide-react";
+
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -96,21 +97,47 @@ const Kpi = ({
 
 const Panel = ({
   title, icon: Icon, children, right,
-}: { title: string; icon: React.ElementType; children: React.ReactNode; right?: React.ReactNode }) => (
-  <Card className="overflow-hidden">
-    <CardHeader className="py-3 px-4 border-b bg-muted/40 flex-row items-center justify-between space-y-0">
-      <CardTitle className="text-sm font-semibold flex items-center gap-2">
-        <Icon className="h-4 w-4 text-primary" /> {title}
-      </CardTitle>
-      {right}
-    </CardHeader>
-    <CardContent className="p-4">{children}</CardContent>
-  </Card>
-);
+}: { title: string; icon: React.ElementType; children: React.ReactNode; right?: React.ReactNode }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Card className="flex flex-col overflow-hidden">
+        <CardHeader className="py-3 px-4 border-b bg-muted/40 flex-row items-center justify-between gap-2 space-y-0">
+          <CardTitle className="text-sm font-semibold flex min-w-0 items-center gap-2">
+            <Icon className="h-4 w-4 shrink-0 text-primary" />
+            <span className="truncate">{title}</span>
+          </CardTitle>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {right}
+            <Button
+              variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={() => setOpen(true)} aria-label={`Expand ${title}`} title="Expand"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="min-w-0 flex-1 overflow-hidden p-4">{children}</CardContent>
+      </Card>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-[96vw] sm:max-w-[92vw] lg:max-w-[1100px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Icon className="h-4 w-4 text-primary" /> {title}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[78vh] min-w-0 overflow-auto pr-1">{children}</div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
 
 const Empty = () => (
   <div className="h-[220px] flex items-center justify-center text-xs text-muted-foreground">No data yet</div>
 );
+
 
 /** Vivid, professional donut palette (distinct hues, good contrast on light + dark). */
 const DONUT_PALETTE = [
@@ -119,17 +146,22 @@ const DONUT_PALETTE = [
   "#6366f1", "#eab308",
 ];
 
-/** Outside data label: "Name 42 (35%)" with a leader line. */
+/** Outside data label: "Name 42 (35%)" with a leader line, clamped inside the chart box. */
 const donutLabel = (props: any) => {
   const { cx, cy, midAngle, outerRadius, percent, value, name } = props;
   if (!percent || percent < 0.03) return null;
   const RAD = Math.PI / 180;
-  const r = outerRadius + 14;
-  const x = cx + r * Math.cos(-midAngle * RAD);
+  const r = outerRadius + 12;
+  const rawX = cx + r * Math.cos(-midAngle * RAD);
   const y = cy + r * Math.sin(-midAngle * RAD);
-  const anchor = x > cx ? "start" : "end";
+  const right = rawX > cx;
+  const maxX = cx * 2;
+  const x = Math.max(6, Math.min(maxX - 6, rawX));
+  const anchor = right ? "start" : "end";
+  const room = right ? maxX - x : x;
+  const chars = Math.max(6, Math.floor(room / 5.4));
   const label = String(name ?? "");
-  const short = label.length > 16 ? `${label.slice(0, 15)}…` : label;
+  const short = label.length > chars ? `${label.slice(0, chars - 1)}…` : label;
   return (
     <text x={x} y={y} textAnchor={anchor} dominantBaseline="central" className="fill-foreground" fontSize={10} fontWeight={600}>
       <tspan>{short}</tspan>
@@ -140,13 +172,13 @@ const donutLabel = (props: any) => {
   );
 };
 
-function DonutChart({ data }: { data: { name: string; value: number }[] }) {
+function DonutChart({ data, height = 300 }: { data: { name: string; value: number }[]; height?: number }) {
   if (data.length === 0) return <Empty />;
   const total = data.reduce((s, d) => s + (Number(d.value) || 0), 0);
   return (
-    <div className="relative">
-      <ResponsiveContainer width="100%" height={300}>
-        <PieChart margin={{ top: 12, right: 60, bottom: 8, left: 60 }}>
+    <div className="relative w-full min-w-0" style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart margin={{ top: 10, right: 8, bottom: 4, left: 8 }}>
           <defs>
             {DONUT_PALETTE.map((c, i) => (
               <linearGradient key={i} id={`donutGrad${i}`} x1="0" y1="0" x2="0" y2="1">
@@ -159,8 +191,10 @@ function DonutChart({ data }: { data: { name: string; value: number }[] }) {
             data={data}
             dataKey="value"
             nameKey="name"
-            innerRadius={58}
-            outerRadius={92}
+            cx="50%"
+            cy="46%"
+            innerRadius="38%"
+            outerRadius="58%"
             paddingAngle={2}
             cornerRadius={5}
             stroke="hsl(var(--background))"
@@ -188,14 +222,16 @@ function DonutChart({ data }: { data: { name: string; value: number }[] }) {
             }}
           />
           <Legend
-            wrapperStyle={{ fontSize: 11 }}
+            verticalAlign="bottom"
+            height={34}
+            wrapperStyle={{ fontSize: 11, lineHeight: "16px" }}
             iconType="circle"
             iconSize={8}
             formatter={(v: string) => <span className="text-muted-foreground">{v}</span>}
           />
         </PieChart>
       </ResponsiveContainer>
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center -mt-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-col items-center justify-center" style={{ height: height * 0.92 - 34 }}>
         <span className="font-display text-xl font-bold text-foreground tabular-nums">{total.toLocaleString()}</span>
         <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</span>
       </div>
@@ -207,17 +243,31 @@ function DonutChart({ data }: { data: { name: string; value: number }[] }) {
 function HBarChart({ data, color = PALETTE[0] }: { data: { name: string; value: number }[]; color?: string }) {
   if (data.length === 0) return <Empty />;
   return (
-    <ResponsiveContainer width="100%" height={Math.max(220, data.length * 34)}>
-      <BarChart data={data} layout="vertical" margin={{ left: 8, right: 24 }}>
-        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-        <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 10 }} />
-        <Tooltip />
-        <Bar dataKey="value" fill={color} radius={[0, 4, 4, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="w-full min-w-0">
+      <ResponsiveContainer width="100%" height={Math.max(220, data.length * 34)}>
+        <BarChart data={data} layout="vertical" margin={{ left: 4, right: 28, top: 4, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+          <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={140}
+            tick={{ fontSize: 10 }}
+            tickFormatter={(v: string) => (String(v).length > 22 ? `${String(v).slice(0, 21)}…` : String(v))}
+          />
+          <Tooltip
+            contentStyle={{
+              background: "hsl(var(--card))", border: "1px solid hsl(var(--border))",
+              borderRadius: 10, fontSize: 11,
+            }}
+          />
+          <Bar dataKey="value" fill={color} radius={[0, 4, 4, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
+
 
 /** Vertical bar chart with semantic per-status colours. */
 function StatusBarChart({
