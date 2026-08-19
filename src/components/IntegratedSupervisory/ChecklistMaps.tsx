@@ -391,39 +391,64 @@ export default function ChecklistMaps({
     return out;
   }, [respondents]);
 
-  const scope = [filters.ward, filters.lga, filters.state].filter(Boolean)[0] || "Nigeria";
+  // Only the State(s) that actually carry synced records are drawn.
+  const dataStates = useMemo(() => {
+    const set = new Map<string, string>();
+    for (const r of [...parents, ...respondents]) {
+      const st = s((r as Row).State);
+      if (st && !set.has(clean(st))) set.set(clean(st), st);
+    }
+    return [...set.values()].sort((a, b) => a.localeCompare(b));
+  }, [parents, respondents]);
+
+  const scope = [filters.ward, filters.lga, filters.state].filter(Boolean)[0]
+    || (dataStates.length ? `${dataStates.length} State(s) with data` : "No synced State");
+  const asOf = new Date().toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+
+  const caption = (unit: string, n: number) => (
+    <p className="text-[10px] leading-relaxed text-muted-foreground">
+      <span className="font-semibold text-foreground">Coverage:</span>{" "}
+      {dataStates.length ? dataStates.join(", ") : "—"} · {n.toLocaleString()} {unit}
+      {" · "}<span className="font-semibold text-foreground">Source:</span> Integrated MDA Supervisory Checklist (field-synced), as of {asOf}.
+      {" "}Administrative boundaries are indicative only.
+    </p>
+  );
 
   return (
     <div className="grid gap-4 xl:grid-cols-2">
-      <Card className="overflow-hidden">
-        <CardHeader className="flex-row items-center justify-between space-y-0 border-b bg-muted/40 px-4 py-3">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-            <MapPin className="h-4 w-4 text-primary" /> Communities Visited · Status of MDA
+      <Card className="flex flex-col overflow-hidden">
+        <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 border-b bg-muted/40 px-4 py-3">
+          <CardTitle className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+            <MapPin className="h-4 w-4 shrink-0 text-primary" />
+            <span className="truncate">Communities Visited · Status of MDA</span>
           </CardTitle>
-          <Badge variant="outline" className="text-[10px]">{communityPoints.length} community point(s) · {scope}</Badge>
+          <Badge variant="outline" className="shrink-0 text-[10px]">{communityPoints.length} point(s) · {scope}</Badge>
         </CardHeader>
-        <CardContent className="space-y-2 p-4">
-          <GeoMap points={communityPoints} filters={filters} />
+        <CardContent className="min-w-0 space-y-2 p-4">
+          <GeoMap points={communityPoints} filters={filters} dataStates={dataStates} />
           <Legend items={STATUS_COLORS.map((c) => ({ color: c.color, label: c.label }))} />
+          {caption("communities mapped", communityPoints.length)}
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden">
-        <CardHeader className="flex-row items-center justify-between space-y-0 border-b bg-muted/40 px-4 py-3">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-            <Users className="h-4 w-4 text-primary" /> Households / Classes · Medicine Offered
+      <Card className="flex flex-col overflow-hidden">
+        <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 border-b bg-muted/40 px-4 py-3">
+          <CardTitle className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+            <Users className="h-4 w-4 shrink-0 text-primary" />
+            <span className="truncate">Households / Classes · Medicine Offered</span>
           </CardTitle>
-          <Badge variant="outline" className="text-[10px]">{householdPoints.length} household point(s) · {scope}</Badge>
+          <Badge variant="outline" className="shrink-0 text-[10px]">{householdPoints.length} point(s) · {scope}</Badge>
         </CardHeader>
-        <CardContent className="space-y-2 p-4">
-          <GeoMap points={householdPoints} filters={filters} />
+        <CardContent className="min-w-0 space-y-2 p-4">
+          <GeoMap points={householdPoints} filters={filters} dataStates={dataStates} />
           <Legend items={[
             { color: OFFERED_COLOR, label: "Offered the medicine(s)", glyph: "✓" },
             { color: NOT_OFFERED_COLOR, label: "Not offered", glyph: "✕" },
           ]} />
-
+          {caption("households / classes surveyed", householdPoints.length)}
         </CardContent>
       </Card>
     </div>
   );
 }
+
