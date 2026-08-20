@@ -5,6 +5,21 @@
 import { tTestPValue } from "@/lib/statisticalInference";
 import { BAND_LABELS, scoreBand, type ScoreBand } from "./scoring";
 import type { QuizKoboSubmissionRow } from "@/hooks/useQuizKobo";
+import type { QuizKoboIdentityFields } from "./scoring";
+
+/**
+ * Display name for a synced submission. Falls back to the configured choice
+ * list so stored XML codes ("option_2") never surface as "Option 2".
+ */
+export function displayParticipantName(
+  row: QuizKoboSubmissionRow,
+  identity?: QuizKoboIdentityFields | null,
+): string {
+  const field = identity?.nameField;
+  const raw = field ? String((row.answers ?? {})[field] ?? "") : "";
+  const label = raw ? identity?.nameChoices?.find((c) => String(c.name) === raw)?.label : "";
+  return label || row.participant_name || "Unknown";
+}
 
 export interface PairedParticipant {
   key: string;
@@ -43,20 +58,27 @@ export function filterByGroup(rows: QuizKoboSubmissionRow[], group: string): Qui
  * Pair Pre-Test with Post-Test records by participant (Name of Independent
  * Monitor). The most recent submission of each type wins.
  */
-export function pairParticipants(rows: QuizKoboSubmissionRow[]): PairedParticipant[] {
+export function pairParticipants(
+  rows: QuizKoboSubmissionRow[],
+  identity?: QuizKoboIdentityFields | null,
+): PairedParticipant[] {
   const map = new Map<string, PairedParticipant>();
   const sorted = [...rows].sort((a, b) => +new Date(a.submitted_at) - +new Date(b.submitted_at));
 
   for (const r of sorted) {
     const key = r.participant_key || "unknown";
     const entry = map.get(key) ?? {
-      key, name: r.participant_name, pre: null, post: null, preScore: null, postScore: null,
+      key, name: displayParticipantName(r, identity), pre: null, post: null, preScore: null, postScore: null,
       maxScore: 0, delta: null, trend: "incomplete" as const, group: r.intervention_group,
     };
-    if (r.assessment_type === "post") { entry.post = Number(r.percentage); entry.postScore = Number(r.score); }
-    else { entry.pre = Number(r.percentage); entry.preScore = Number(r.score); }
+    // Only the FIRST Pre-Test and FIRST Post-Test of each participant count.
+    if (r.assessment_type === "post") {
+      if (entry.post == null) { entry.post = Number(r.percentage); entry.postScore = Number(r.score); }
+    } else if (entry.pre == null) {
+      entry.pre = Number(r.percentage); entry.preScore = Number(r.score);
+    }
     entry.maxScore = Math.max(entry.maxScore, Number(r.max_score) || 0);
-    entry.name = r.participant_name || entry.name;
+    entry.name = displayParticipantName(r, identity) || entry.name;
     entry.group = r.intervention_group ?? entry.group;
     map.set(key, entry);
   }
