@@ -1003,6 +1003,7 @@ export default function ChecklistDashboard({
             headLabel="Independent Monitor's Name"
             onSelect={toggleVisitPerson}
             selected={visitPerson}
+            rosterNote
           />
         </Panel>
         <Panel title="Other Supervisors Performance" icon={UserCheck}>
