@@ -9409,6 +9409,10 @@ export type Database = {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
       }
+      can_manage_case: {
+        Args: { _case_id: string; _user_id: string }
+        Returns: boolean
+      }
       can_manage_dashboards: { Args: { _user_id: string }; Returns: boolean }
       can_manage_form: {
         Args: { _form_id: string; _user_id: string }
@@ -9450,6 +9454,10 @@ export type Database = {
       can_view_all_locations: { Args: { _user_id: string }; Returns: boolean }
       can_view_form_submissions: {
         Args: { _form_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_write_case: {
+        Args: { _case_id: string; _user_id: string }
         Returns: boolean
       }
       can_write_mesh_signal: {
