@@ -171,9 +171,47 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
   const [loading, setLoading] = useState(true);
 
   // ───── KoboToolbox realtime ingestion (embedded across every tab) ─────
-  const { config: koboConfig, submissions: koboSubmissions, live: koboLive, lastEventAt: koboLastEvent, loading: koboLoading } =
+  const { config: koboConfig, submissions: koboSubmissions, live: koboLive, lastEventAt: koboLastEvent, loading: koboLoading, reload: koboReload } =
     useQuizKobo(quiz.id);
   const [koboGroup, setKoboGroup] = useState("all");
+  const [repairing, setRepairing] = useState(false);
+  const [repairTried, setRepairTried] = useState(false);
+
+  // Self-heal legacy configurations that never stored the participant-name
+  // field, so synced rows stop showing raw codes ("Option 2") as names.
+  useEffect(() => {
+    if (!koboConfig || repairTried || !needsIdentityRepair(koboConfig)) return;
+    setRepairTried(true);
+    setRepairing(true);
+    repairKoboIdentity(koboConfig)
+      .then((res) => {
+        if (res.repaired) {
+          toast({
+            title: "Kobo identity mapping repaired",
+            description: `Participant names resolved from “${res.nameField}”. ${res.rescored} submission(s) re-scored.`,
+          });
+          void koboReload();
+        }
+      })
+      .catch((e) => console.warn("Kobo identity repair failed:", (e as Error).message))
+      .finally(() => setRepairing(false));
+  }, [koboConfig, repairTried, koboReload]);
+
+  const forceResync = async () => {
+    if (!koboConfig) return;
+    setRepairing(true);
+    try {
+      const repair = await repairKoboIdentity(koboConfig).catch(() => null);
+      const rescored = repair?.repaired ? repair.rescored : await rescoreStoredSubmissions(koboConfig);
+      toast({ title: "Re-scored from Kobo", description: `${rescored} submission(s) refreshed with the current configuration.` });
+      void koboReload();
+    } catch (e) {
+      toast({ title: "Re-score failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setRepairing(false);
+    }
+  };
+
 
   const koboGroups = useMemo(() => {
     const fromConfig = groupsOf(koboConfig?.question_config ?? []);
