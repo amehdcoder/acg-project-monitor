@@ -9639,6 +9639,10 @@ export type Database = {
         Args: { _user_id: string }
         Returns: boolean
       }
+      is_within_proximity_radius: {
+        Args: { _target: string; _viewer: string }
+        Returns: boolean
+      }
       jsonb_replace_local_reference_ids: {
         Args: { _value: Json }
         Returns: Json
@@ -9812,6 +9816,10 @@ export type Database = {
       }
       shares_project_with: {
         Args: { _a: string; _b: string }
+        Returns: boolean
+      }
+      shares_proximity_conversation: {
+        Args: { _target: string; _viewer: string }
         Returns: boolean
       }
       start_proximity_conversation: {
