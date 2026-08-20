@@ -1,0 +1,94 @@
+/**
+ * Quiz ⇄ KoboToolbox live data hook.
+ *
+ * Loads the per-quiz Kobo configuration + all scored submissions, then keeps
+ * them live through a Supabase Realtime subscription on
+ * `public.quiz_kobo_submissions`, so the analytics dashboard updates the
+ * instant the `kobo-quiz-webhook` edge function ingests a submission — no
+ * manual refresh needed.
+ */
+import { useCallback, useEffect, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type {
+  QuizKoboIdentityFields, QuizKoboQuestion, ScoreBand,
+} from "@/lib/quizKobo/scoring";
+
+export interface QuizKoboConfig {
+  id: string;
+  quiz_id: string;
+  server_url: string;
+  form_uid: string;
+  form_title: string | null;
+  api_token: string;
+  sync_mode: string;
+  webhook_secret: string;
+  question_config: QuizKoboQuestion[];
+  identity_fields: QuizKoboIdentityFields;
+  last_sync_at: string | null;
+  last_event_at: string | null;
+}
+
+export interface QuizKoboSubmissionRow {
+  id: string;
+  quiz_id: string;
+  kobo_submission_id: string;
+  participant_name: string;
+  participant_key: string;
+  assessment_type: "pre" | "post";
+  intervention_group: string | null;
+  answers: Record<string, string>;
+  per_question: { name: string; label: string; group: string; isCorrect: boolean; earned: number; points: number }[];
+  score: number;
+  max_score: number;
+  percentage: number;
+  band: ScoreBand;
+  submitted_at: string;
+}
+
+export function useQuizKobo(quizId: string | null | undefined) {
+  const [config, setConfig] = useState<QuizKoboConfig | null>(null);
+  const [submissions, setSubmissions] = useState<QuizKoboSubmissionRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [live, setLive] = useState(false);
+  const [lastEventAt, setLastEventAt] = useState<Date | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const load = useCallback(async () => {
+    if (!quizId) { setConfig(null); setSubmissions([]); setLoading(false); return; }
+    setLoading(true);
+    const [{ data: cfg }, { data: subs }] = await Promise.all([
+      supabase.from("quiz_kobo_configs").select("*").eq("quiz_id", quizId).maybeSingle(),
+      supabase.from("quiz_kobo_submissions").select("*").eq("quiz_id", quizId)
+        .order("submitted_at", { ascending: false }).limit(5000),
+    ]);
+    setConfig((cfg as unknown as QuizKoboConfig) ?? null);
+    setSubmissions(((subs ?? []) as unknown as QuizKoboSubmissionRow[]));
+    setLoading(false);
+  }, [quizId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (!quizId) return;
+    const channel = supabase.channel(`quiz-kobo-${quizId}-${Math.random().toString(36).slice(2, 8)}`);
+    channel
+      .on(
+        "postgres_changes" as any,
+        { event: "*", schema: "public", table: "quiz_kobo_submissions", filter: `quiz_id=eq.${quizId}` },
+        () => {
+          setLastEventAt(new Date());
+          if (timer.current) clearTimeout(timer.current);
+          timer.current = setTimeout(() => { void load(); }, 600);
+        },
+      )
+      .subscribe((status) => setLive(status === "SUBSCRIBED"));
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+      supabase.removeChannel(channel);
+    };
+  }, [quizId, load]);
+
+  return { config, submissions, loading, live, lastEventAt, reload: load, setConfig };
+}
+
+export default useQuizKobo;
