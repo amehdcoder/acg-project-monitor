@@ -1,4 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import {
+  Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
+} from "@/components/ui/sheet";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,9 +27,10 @@ import {
   pairedTTest as koboPairedTTest, pairParticipants,
 } from "@/lib/quizKobo/analytics";
 import { groupsOf } from "@/lib/quizKobo/scoring";
-import { koboItemStats } from "@/lib/quizKobo/itemAnalysis";
+import { koboItemStats, uniqueParticipantCount } from "@/lib/quizKobo/itemAnalysis";
+import { fullSyncKobo } from "@/lib/quizKobo/fullSync";
 import { pairingConsistency } from "@/lib/quizKobo/pairingCheck";
-import { needsIdentityRepair, repairKoboIdentity, rescoreStoredSubmissions } from "@/lib/quizKobo/identityRepair";
+import { needsIdentityRepair, repairKoboIdentity } from "@/lib/quizKobo/identityRepair";
 import { exportKoboCSV, exportKoboPDF, fmtP } from "@/lib/quizKobo/exports";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -201,16 +205,48 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
     if (!koboConfig) return;
     setRepairing(true);
     try {
-      const repair = await repairKoboIdentity(koboConfig).catch(() => null);
-      const rescored = repair?.repaired ? repair.rescored : await rescoreStoredSubmissions(koboConfig);
-      toast({ title: "Re-scored from Kobo", description: `${rescored} submission(s) refreshed with the current configuration.` });
+      await repairKoboIdentity(koboConfig).catch(() => null);
+      const res = await fullSyncKobo(koboConfig);
+      toast({
+        title: "Synced with KoboToolbox",
+        description: `${res.saved} of ${res.fetched} submission(s) re-scored${res.deleted ? `, ${res.deleted} removed (deleted on Kobo)` : ""}.`,
+      });
       void koboReload();
     } catch (e) {
-      toast({ title: "Re-score failed", description: (e as Error).message, variant: "destructive" });
+      toast({ title: "Sync failed", description: (e as Error).message, variant: "destructive" });
     } finally {
       setRepairing(false);
     }
   };
+
+  /**
+   * Continuous reconciliation with KoboToolbox: re-scores edited submissions
+   * and removes rows deleted on Kobo. Realtime pushes both to the UI.
+   */
+  const syncing = useRef(false);
+  const runReconcile = useCallback(async () => {
+    if (!koboConfig || syncing.current) return;
+    syncing.current = true;
+    try {
+      await fullSyncKobo(koboConfig);
+    } catch (e) {
+      console.warn("Kobo reconcile failed:", (e as Error).message);
+    } finally {
+      syncing.current = false;
+    }
+  }, [koboConfig]);
+
+  useEffect(() => {
+    if (!koboConfig) return;
+    void runReconcile();
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") void runReconcile();
+    }, 60_000);
+    const onFocus = () => { if (document.visibilityState === "visible") void runReconcile(); };
+    document.addEventListener("visibilitychange", onFocus);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", onFocus); };
+  }, [koboConfig, runReconcile]);
+
 
 
   const koboGroups = useMemo(() => {
@@ -538,6 +574,35 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
   }, [analysis, koboPre, koboPost, kpi]);
 
 
+  // ───── Monitor drill-down ─────
+  const [drillKey, setDrillKey] = useState<string | null>(null);
+  const drill = useMemo(() => {
+    if (!drillKey) return null;
+    const pair = unifiedPairs.find((p) => p.key === drillKey) ?? null;
+    const rows = koboRows
+      .filter((r) => (r.participant_key || "unknown") === drillKey)
+      .sort((a, b) => +new Date(a.submitted_at) - +new Date(b.submitted_at));
+    const first = (type: "pre" | "post") => rows.find((r) => r.assessment_type === type) ?? null;
+    const build = (row: typeof rows[number] | null) => {
+      if (!row) return null;
+      const items = (row.per_question ?? []).filter((q) => !!q.name);
+      return {
+        row,
+        submittedAt: new Date(row.submitted_at),
+        missed: items.filter((q) => !q.isCorrect),
+        unanswered: items.filter((q) => !String((q as { answer?: string }).answer ?? "").trim()),
+        answered: items.length,
+      };
+    };
+    return {
+      pair,
+      name: pair?.name ?? rows[0]?.participant_name ?? "Unknown",
+      pre: build(first("pre")),
+      post: build(first("post")),
+      duplicates: rows.length - (first("pre") ? 1 : 0) - (first("post") ? 1 : 0),
+      submissions: rows,
+    };
+  }, [drillKey, unifiedPairs, koboRows]);
 
   // Pagination for individual results (Kobo + in-app)
   const pagination = useTablePagination(unifiedPairs, 10);
@@ -1100,7 +1165,11 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
                       const declined = complete && (p.diff ?? 0) < 0;
                       const initials = p.name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase()).join("") || "?";
                       return (
-                        <TableRow key={p.key} className={i % 2 === 0 ? "bg-muted/20" : ""}>
+                        <TableRow
+                          key={p.key}
+                          onClick={() => setDrillKey(p.key)}
+                          className={`cursor-pointer hover:bg-primary/5 ${i % 2 === 0 ? "bg-muted/20" : ""}`}
+                        >
                           <TableCell className="font-mono text-xs text-muted-foreground">{pagination.startIndex + i + 1}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -1156,7 +1225,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
           ) : (
             <>
               <p className="text-[11px] text-muted-foreground -mb-1">
-                Based on <span className="font-semibold text-foreground">{questionSource}</span> responses across {questionStats[0]?.answered ?? 0} participants.
+                Based on <span className="font-semibold text-foreground">{questionSource}</span> responses across {koboRows.length ? uniqueParticipantCount(koboRows) : (questionStats[0]?.answered ?? 0)} unique participants.
               </p>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1311,6 +1380,96 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* ───── Monitor drill-down drawer ───── */}
+      <Sheet open={!!drillKey} onOpenChange={(o) => !o && setDrillKey(null)}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          {drill && (
+            <>
+              <SheetHeader className="text-left">
+                <SheetTitle className="text-base">{drill.name}</SheetTitle>
+                <SheetDescription className="text-xs">
+                  {drill.pair?.group ? `${drill.pair.group} · ` : ""}
+                  {drill.submissions.length} KoboToolbox submission(s) on record
+                  {drill.duplicates > 0 ? ` (${drill.duplicates} later duplicate(s) ignored)` : ""}
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="mt-4 space-y-4">
+                {(["pre", "post"] as const).map((type) => {
+                  const d = type === "pre" ? drill.pre : drill.post;
+                  const title = type === "pre" ? "Pre-Test" : "Post-Test";
+                  return (
+                    <Card key={type} className="form-card">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center justify-between">
+                          <span>{title}</span>
+                          {d ? (
+                            <Badge variant="secondary" className="font-mono text-[10px]">
+                              {Math.round(Number(d.row.percentage))}% · {d.row.score}/{d.row.max_score}
+                            </Badge>
+                          ) : (
+                            <Badge variant="destructive" className="text-[10px]">Missing</Badge>
+                          )}
+                        </CardTitle>
+                        <CardDescription className="text-[11px]">
+                          {d ? `Submitted ${d.submittedAt.toLocaleString()}` : "No submission received from KoboToolbox yet."}
+                        </CardDescription>
+                      </CardHeader>
+                      {d && (
+                        <CardContent className="space-y-2 pt-0">
+                          <div className="text-[11px] text-muted-foreground">
+                            {d.missed.length} incorrect · {d.unanswered.length} unanswered · {d.answered} items
+                          </div>
+                          {d.missed.length > 0 && (
+                            <ul className="space-y-1">
+                              {d.missed.slice(0, 20).map((q) => (
+                                <li key={q.name} className="flex items-start gap-2 rounded-md bg-destructive/5 px-2 py-1.5">
+                                  <XCircle className="h-3.5 w-3.5 text-destructive shrink-0 mt-0.5" />
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-medium leading-snug">{q.label || q.name}</p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                      Answered: {String((q as { answer?: string }).answer ?? "") || "—"} · Correct: {String((q as { correct?: string }).correct ?? "") || "—"}
+                                    </p>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {d.missed.length === 0 && (
+                            <p className="flex items-center gap-1.5 text-xs text-emerald-600">
+                              <CheckCircle className="h-3.5 w-3.5" /> All items correct.
+                            </p>
+                          )}
+                        </CardContent>
+                      )}
+                    </Card>
+                  );
+                })}
+
+                <Card className="form-card">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Submission timeline</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-1.5 pt-0">
+                    {drill.submissions.map((s) => (
+                      <div key={s.id} className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1.5">
+                        <span className="text-[11px] font-medium capitalize">{s.assessment_type}-Test</span>
+                        <span className="text-[11px] font-mono text-muted-foreground">
+                          {new Date(s.submitted_at).toLocaleString()} · {Math.round(Number(s.percentage))}%
+                        </span>
+                      </div>
+                    ))}
+                    {drill.submissions.length === 0 && (
+                      <p className="text-xs text-muted-foreground">No KoboToolbox submissions for this participant.</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

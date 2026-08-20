@@ -133,18 +133,22 @@ export function parseKoboForm(survey: any[], choices: any[]): ParsedKoboForm {
     }
 
     // Identity / classification fields (kept out of the scored set).
+    // Match on the field name AND its label — some forms ship identity rows
+    // with an empty/auto-generated name.
     const nk = normalizeKey(name);
-    if (kind === "select_one" && /assessment.?type/.test(nk)) { identity.assessmentField = name; continue; }
-    if (/independent.?monitor|participant.?name|monitor.?name/.test(nk)) {
-      identity.nameField = name;
+    const nl = normalizeKey(`${name} ${label}`);
+    if (/assessment.?type/.test(nl)) { identity.assessmentField = name || identity.assessmentField; continue; }
+    if (NAME_FIELD_RE.test(nl)) {
+      identity.nameField = name || identity.nameField;
       identity.nameChoices =
         choiceMap.get(String(row?.select_from_list_name ?? row?.["select from list name"] ?? listName ?? "")) ?? null;
       continue;
     }
-    if (kind === "select_one" && /^intervention$|mda.?intervention/.test(nk)) { identity.interventionField = name; continue; }
+    if (/^intervention$|mda.?intervention/.test(nl)) { identity.interventionField = name || identity.interventionField; continue; }
 
     if (META_TYPES.has(kind) || KOBO_META_FIELDS.has(name)) continue;
     if (!SUPPORTED_TYPES.has(kind)) continue;
+    if (!name.trim()) continue;
     if (/_score$/.test(name)) continue;
 
     const group = groupStack[groupStack.length - 1] ?? null;
@@ -249,6 +253,31 @@ const humanizeName = (raw: string): string =>
 
 const NAME_FIELD_RE = /independent.?monitor|monitor.?name|participant.?name|respondent.?name|interviewer.?name|full.?name|^name$|name of/;
 
+/** Identity / classification fields that must never be scored as questions. */
+export const IDENTITY_FIELD_RE =
+  /independent.?monitor|monitor.?name|participant.?name|respondent.?name|interviewer.?name|full.?name|^name$|name of|assessment.?type|^intervention$|mda.?intervention/;
+
+/**
+ * True when a configured "question" is really a participant identifier or a
+ * classification field (name, assessment type, MDA intervention) — or a blank
+ * row. These must never contribute points, otherwise a perfect participant
+ * scores 100/101 = 99%.
+ */
+export function isIdentityQuestion(
+  q: { name?: string | null; label?: string | null },
+  identity?: QuizKoboIdentityFields | null,
+): boolean {
+  const name = String(q?.name ?? "").trim();
+  if (!name) return true;
+  const leaf = leafName(name);
+  if (identity) {
+    for (const f of [identity.nameField, identity.assessmentField, identity.interventionField]) {
+      if (f && leafName(String(f)) === leaf) return true;
+    }
+  }
+  return IDENTITY_FIELD_RE.test(normalizeKey(`${leaf} ${q?.label ?? ""}`));
+}
+
 /**
  * Resolve the participant's actual name from the Kobo submission.
  * Order: configured name field (choice label first) → any name-like field in
@@ -305,7 +334,7 @@ export function scoreSubmission(
   const assessmentType = detectAssessmentType(readField(payload, identity.assessmentField));
   const interventionRaw = asAnswerString(readField(payload, identity.interventionField)) || null;
 
-  const enabled = questions.filter((q) => q.enabled !== false);
+  const enabled = questions.filter((q) => q.enabled !== false && !isIdentityQuestion(q, identity));
   const relevant = enabled.filter((q) => {
     const key = questionGroupKey(q);
     if (key === "general") return true;
