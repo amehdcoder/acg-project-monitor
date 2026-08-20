@@ -574,6 +574,35 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
   }, [analysis, koboPre, koboPost, kpi]);
 
 
+  // ───── Monitor drill-down ─────
+  const [drillKey, setDrillKey] = useState<string | null>(null);
+  const drill = useMemo(() => {
+    if (!drillKey) return null;
+    const pair = unifiedPairs.find((p) => p.key === drillKey) ?? null;
+    const rows = koboRows
+      .filter((r) => (r.participant_key || "unknown") === drillKey)
+      .sort((a, b) => +new Date(a.submitted_at) - +new Date(b.submitted_at));
+    const first = (type: "pre" | "post") => rows.find((r) => r.assessment_type === type) ?? null;
+    const build = (row: typeof rows[number] | null) => {
+      if (!row) return null;
+      const items = (row.per_question ?? []).filter((q) => !!q.name);
+      return {
+        row,
+        submittedAt: new Date(row.submitted_at),
+        missed: items.filter((q) => !q.isCorrect),
+        unanswered: items.filter((q) => !String((q as { answer?: string }).answer ?? "").trim()),
+        answered: items.length,
+      };
+    };
+    return {
+      pair,
+      name: pair?.name ?? rows[0]?.participant_name ?? "Unknown",
+      pre: build(first("pre")),
+      post: build(first("post")),
+      duplicates: rows.length - (first("pre") ? 1 : 0) - (first("post") ? 1 : 0),
+      submissions: rows,
+    };
+  }, [drillKey, unifiedPairs, koboRows]);
 
   // Pagination for individual results (Kobo + in-app)
   const pagination = useTablePagination(unifiedPairs, 10);
