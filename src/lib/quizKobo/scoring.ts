@@ -244,11 +244,8 @@ export function scoreSubmission(
   identity: QuizKoboIdentityFields,
   choiceLabelFor?: (field: string, value: string) => string,
 ): ScoredSubmission {
-  const rawName = asAnswerString(readField(payload, identity.nameField));
-  const nameLabel = choiceLabelFor && identity.nameField
-    ? choiceLabelFor(identity.nameField, rawName) || rawName
-    : rawName;
-  const participantName = nameLabel.replace(/[_]+/g, " ").trim() || "Unknown";
+  const participantName = resolveParticipantName(payload, identity, choiceLabelFor);
+
 
   const assessmentType = detectAssessmentType(readField(payload, identity.assessmentField));
   const interventionRaw = asAnswerString(readField(payload, identity.interventionField)) || null;
