@@ -26,6 +26,7 @@ import ChecklistFilters, {
 } from "./ChecklistFilters";
 import { buildIdentityIndex } from "@/lib/isc/actorIdentity";
 import { isHumanName } from "@/lib/isc/nameQuality";
+import { rosterFromSchema, mergeRoster } from "@/lib/isc/monitorRoster";
 import {
   StatusCommunityTables, StatusDrilldownDialog, useStatusDrilldown,
 } from "./ChecklistStatusTables";
