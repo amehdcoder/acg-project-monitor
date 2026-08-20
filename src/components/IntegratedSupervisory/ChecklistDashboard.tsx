@@ -435,7 +435,9 @@ function PerformanceTable({
         </tfoot>
 
       </table>
+      </div>
     </div>
+
   );
 }
 
