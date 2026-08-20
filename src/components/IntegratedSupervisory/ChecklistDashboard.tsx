@@ -360,20 +360,30 @@ export interface PerfRow {
 
 /** Submissions / respondents / average / days-worked table. */
 function PerformanceTable({
-  rows, headLabel, onSelect, selected,
+  rows, headLabel, onSelect, selected, rosterNote,
 }: {
   rows: PerfRow[];
   headLabel: string;
   onSelect?: (name: string) => void;
   selected?: string | null;
+  /** Show the "configured on the form but silent" caption + counter. */
+  rosterNote?: boolean;
 }) {
   if (rows.length === 0) return <Empty />;
   const totals = rows.reduce(
     (a, r) => ({ s: a.s + r.submissions, r: a.r + r.respondents, d: a.d + r.days }),
     { s: 0, r: 0, d: 0 },
   );
+  const silent = rows.filter((r) => r.noSubmissions).length;
   return (
-    <div className="max-h-[340px] overflow-auto rounded-md border">
+    <div className="space-y-2">
+      {rosterNote && silent > 0 && (
+        <p className="text-[11px] text-muted-foreground">
+          <span className="font-semibold text-amber-600">{silent}</span> of {rows.length} monitors on the
+          KoboToolbox form have <strong>not submitted any checklist yet</strong> — listed below with zero values.
+        </p>
+      )}
+      <div className="max-h-[340px] overflow-auto rounded-md border">
       <table className="w-full min-w-[620px] text-xs">
         <thead className="bg-muted/60 sticky top-0 z-10">
           <tr>
@@ -387,13 +397,21 @@ function PerformanceTable({
         <tbody>
           {rows.map((r) => {
             const active = !!selected && selected === r.name;
+            const idle = !!r.noSubmissions;
             return (
               <tr
                 key={r.name}
-                onClick={onSelect ? () => onSelect(r.name) : undefined}
-                className={`border-t hover:bg-muted/30 ${onSelect ? "cursor-pointer" : ""} ${active ? "bg-primary/10" : ""}`}
+                onClick={onSelect && !idle ? () => onSelect(r.name) : undefined}
+                className={`border-t hover:bg-muted/30 ${onSelect && !idle ? "cursor-pointer" : ""} ${active ? "bg-primary/10" : ""} ${idle ? "bg-amber-50/60 dark:bg-amber-950/20" : ""}`}
               >
-                <td className={`px-2 py-1.5 font-medium align-top whitespace-normal break-words ${active ? "text-primary" : onSelect ? "hover:underline" : ""}`}>{r.name}</td>
+                <td className={`px-2 py-1.5 font-medium align-top whitespace-normal break-words ${active ? "text-primary" : onSelect && !idle ? "hover:underline" : ""}`}>
+                  {r.name}
+                  {idle && (
+                    <Badge variant="outline" className="ml-2 border-amber-500 text-amber-600 text-[9px] px-1 py-0 align-middle">
+                      No submission yet
+                    </Badge>
+                  )}
+                </td>
                 <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap align-top">{r.submissions.toLocaleString()}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap align-top">{r.respondents.toLocaleString()}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums font-semibold whitespace-nowrap align-top">{r.avgRespondents.toFixed(1)}</td>
@@ -402,6 +420,7 @@ function PerformanceTable({
             );
           })}
         </tbody>
+
 
         <tfoot className="bg-muted/50 sticky bottom-0">
           <tr className="border-t font-semibold">
