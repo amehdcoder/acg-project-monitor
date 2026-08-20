@@ -7226,6 +7226,149 @@ export type Database = {
         }
         Relationships: []
       }
+      quiz_kobo_configs: {
+        Row: {
+          api_token: string
+          created_at: string
+          created_by: string | null
+          form_title: string | null
+          form_uid: string
+          id: string
+          identity_fields: Json
+          last_event_at: string | null
+          last_sync_at: string | null
+          question_config: Json
+          quiz_id: string
+          server_url: string
+          sync_mode: string
+          updated_at: string
+          webhook_secret: string
+        }
+        Insert: {
+          api_token: string
+          created_at?: string
+          created_by?: string | null
+          form_title?: string | null
+          form_uid: string
+          id?: string
+          identity_fields?: Json
+          last_event_at?: string | null
+          last_sync_at?: string | null
+          question_config?: Json
+          quiz_id: string
+          server_url?: string
+          sync_mode?: string
+          updated_at?: string
+          webhook_secret?: string
+        }
+        Update: {
+          api_token?: string
+          created_at?: string
+          created_by?: string | null
+          form_title?: string | null
+          form_uid?: string
+          id?: string
+          identity_fields?: Json
+          last_event_at?: string | null
+          last_sync_at?: string | null
+          question_config?: Json
+          quiz_id?: string
+          server_url?: string
+          sync_mode?: string
+          updated_at?: string
+          webhook_secret?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_kobo_configs_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: true
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_kobo_submissions: {
+        Row: {
+          answers: Json
+          assessment_type: string
+          band: string
+          config_id: string | null
+          created_at: string
+          id: string
+          intervention_group: string | null
+          kobo_submission_id: string
+          kobo_uuid: string | null
+          max_score: number
+          participant_key: string
+          participant_name: string
+          per_question: Json
+          percentage: number
+          quiz_id: string
+          raw: Json
+          score: number
+          submitted_at: string
+          updated_at: string
+        }
+        Insert: {
+          answers?: Json
+          assessment_type?: string
+          band?: string
+          config_id?: string | null
+          created_at?: string
+          id?: string
+          intervention_group?: string | null
+          kobo_submission_id: string
+          kobo_uuid?: string | null
+          max_score?: number
+          participant_key?: string
+          participant_name?: string
+          per_question?: Json
+          percentage?: number
+          quiz_id: string
+          raw?: Json
+          score?: number
+          submitted_at?: string
+          updated_at?: string
+        }
+        Update: {
+          answers?: Json
+          assessment_type?: string
+          band?: string
+          config_id?: string | null
+          created_at?: string
+          id?: string
+          intervention_group?: string | null
+          kobo_submission_id?: string
+          kobo_uuid?: string | null
+          max_score?: number
+          participant_key?: string
+          participant_name?: string
+          per_question?: Json
+          percentage?: number
+          quiz_id?: string
+          raw?: Json
+          score?: number
+          submitted_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_kobo_submissions_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_kobo_configs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_kobo_submissions_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quiz_questions: {
         Row: {
           correct_answer: string
