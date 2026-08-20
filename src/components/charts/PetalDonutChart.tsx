@@ -6,12 +6,10 @@
 import {
   Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip,
 } from "recharts";
+import { BRIGHT_CHART_PALETTE } from "@/lib/charts/brightPalette";
 
-export const PETAL_PALETTE = [
-  "#2563eb", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#06b6d4", "#84cc16", "#f97316", "#ec4899", "#14b8a6",
-  "#6366f1", "#eab308",
-];
+export const PETAL_PALETTE = BRIGHT_CHART_PALETTE;
+
 
 const petalLabel = (props: any) => {
   const { cx, cy, midAngle, innerRadius, outerRadius, percent, value, name, fill } = props;
