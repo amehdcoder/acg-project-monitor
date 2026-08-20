@@ -226,6 +226,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
   const koboRows = useMemo(() => filterByGroup(koboSubmissions, koboGroup), [koboSubmissions, koboGroup]);
   const koboIdentity = koboConfig?.identity_fields ?? null;
   const koboPairs = useMemo(() => pairParticipants(koboRows, koboIdentity), [koboRows, koboIdentity]);
+  const koboPairing = useMemo(() => pairingConsistency(koboPairs), [koboPairs]);
   const koboStats = useMemo(() => koboPairedTTest(koboPairs), [koboPairs]);
   const koboSummary = useMemo(
     () => improvementSummary(koboPairs, koboRows, quiz.passing_score),
