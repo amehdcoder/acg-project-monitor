@@ -309,7 +309,7 @@ export function scoreSubmission(
   const assessmentType = detectAssessmentType(readField(payload, identity.assessmentField));
   const interventionRaw = asAnswerString(readField(payload, identity.interventionField)) || null;
 
-  const enabled = questions.filter((q) => q.enabled !== false);
+  const enabled = questions.filter((q) => q.enabled !== false && !isIdentityQuestion(q, identity));
   const relevant = enabled.filter((q) => {
     const key = questionGroupKey(q);
     if (key === "general") return true;
