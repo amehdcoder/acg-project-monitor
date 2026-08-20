@@ -146,14 +146,26 @@ const DONUT_PALETTE = [
   "#6366f1", "#eab308",
 ];
 
-/** Outside data label: "Name 42 (35%)" with a leader line, clamped inside the chart box. */
-const donutLabel = (props: any) => {
-  const { cx, cy, midAngle, outerRadius, percent, value, name } = props;
-  if (!percent || percent < 0.03) return null;
+/**
+ * Infographic-style label: bold coloured percentage inside the outer petal,
+ * with the category name + count on a leader line outside the ring.
+ */
+const petalLabel = (props: any) => {
+  const { cx, cy, midAngle, innerRadius, outerRadius, percent, value, name, fill } = props;
+  if (!percent || percent < 0.02) return null;
   const RAD = Math.PI / 180;
-  const r = outerRadius + 12;
-  const rawX = cx + r * Math.cos(-midAngle * RAD);
-  const y = cy + r * Math.sin(-midAngle * RAD);
+  const cos = Math.cos(-midAngle * RAD);
+  const sin = Math.sin(-midAngle * RAD);
+
+  // Big % sits in the middle of the petal band.
+  const mid = (Number(innerRadius) + Number(outerRadius)) / 2;
+  const px = cx + mid * cos;
+  const py = cy + mid * sin;
+
+  // Category name outside the ring, clamped inside the box.
+  const r = Number(outerRadius) + 14;
+  const rawX = cx + r * cos;
+  const y = cy + r * sin;
   const right = rawX > cx;
   const maxX = cx * 2;
   const x = Math.max(6, Math.min(maxX - 6, rawX));
@@ -162,31 +174,72 @@ const donutLabel = (props: any) => {
   const chars = Math.max(6, Math.floor(room / 5.4));
   const label = String(name ?? "");
   const short = label.length > chars ? `${label.slice(0, chars - 1)}…` : label;
+
   return (
-    <text x={x} y={y} textAnchor={anchor} dominantBaseline="central" className="fill-foreground" fontSize={10} fontWeight={600}>
-      <tspan>{short}</tspan>
-      <tspan x={x} dy={11} className="fill-muted-foreground" fontWeight={500}>
-        {value.toLocaleString()} · {(percent * 100).toFixed(0)}%
-      </tspan>
-    </text>
+    <g>
+      <text
+        x={px} y={py} textAnchor="middle" dominantBaseline="central"
+        fontSize={15} fontWeight={800} fill={fill}
+        style={{ paintOrder: "stroke", stroke: "hsl(var(--card))", strokeWidth: 3, strokeLinejoin: "round" }}
+      >
+        {(percent * 100).toFixed(0)}%
+      </text>
+      <text x={x} y={y} textAnchor={anchor} dominantBaseline="central" className="fill-foreground" fontSize={10} fontWeight={700}>
+        <tspan>{short}</tspan>
+        <tspan x={x} dy={11} className="fill-muted-foreground" fontWeight={500}>
+          {Number(value).toLocaleString()}
+        </tspan>
+      </text>
+    </g>
   );
 };
 
+/**
+ * Freepik-infographic styled chart: a small solid colour core, a gap, then
+ * exploded "petal" segments — near-white fills with a thick coloured outline
+ * and a bold coloured percentage inside each petal.
+ */
 function DonutChart({ data, height = 300 }: { data: { name: string; value: number }[]; height?: number }) {
   if (data.length === 0) return <Empty />;
   const total = data.reduce((s, d) => s + (Number(d.value) || 0), 0);
+  const colorAt = (i: number) => DONUT_PALETTE[i % DONUT_PALETTE.length];
   return (
     <div className="relative w-full min-w-0" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <PieChart margin={{ top: 10, right: 8, bottom: 4, left: 8 }}>
+        <PieChart margin={{ top: 12, right: 10, bottom: 4, left: 10 }}>
           <defs>
             {DONUT_PALETTE.map((c, i) => (
-              <linearGradient key={i} id={`donutGrad${i}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={c} stopOpacity={0.98} />
-                <stop offset="100%" stopColor={c} stopOpacity={0.72} />
+              <linearGradient key={i} id={`petalGrad${i}`} x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor={c} stopOpacity={0.16} />
+                <stop offset="100%" stopColor={c} stopOpacity={0.04} />
+              </linearGradient>
+            ))}
+            {DONUT_PALETTE.map((c, i) => (
+              <linearGradient key={`core${i}`} id={`coreGrad${i}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={c} stopOpacity={1} />
+                <stop offset="100%" stopColor={c} stopOpacity={0.78} />
               </linearGradient>
             ))}
           </defs>
+
+          {/* Solid colour core — the "key" ring of the infographic */}
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy="46%"
+            innerRadius="12%"
+            outerRadius="26%"
+            paddingAngle={1}
+            stroke="hsl(var(--card))"
+            strokeWidth={2}
+            isAnimationActive={false}
+          >
+            {data.map((_, i) => <Cell key={i} fill={`url(#coreGrad${i % DONUT_PALETTE.length})`} />)}
+          </Pie>
+
+          {/* Exploded outer petals */}
           <Pie
             data={data}
             dataKey="value"
@@ -194,20 +247,20 @@ function DonutChart({ data, height = 300 }: { data: { name: string; value: numbe
             cx="50%"
             cy="46%"
             innerRadius="38%"
-            outerRadius="58%"
-            paddingAngle={2}
-            cornerRadius={5}
-            stroke="hsl(var(--background))"
-            strokeWidth={2}
+            outerRadius="62%"
+            paddingAngle={5}
+            cornerRadius={8}
+            strokeWidth={2.5}
             labelLine={{ stroke: "hsl(var(--border))", strokeWidth: 1 }}
-            label={donutLabel}
+            label={petalLabel}
             isAnimationActive
-            animationDuration={650}
+            animationDuration={700}
           >
             {data.map((_, i) => (
-              <Cell key={i} fill={`url(#donutGrad${i % DONUT_PALETTE.length})`} />
+              <Cell key={i} fill={`url(#petalGrad${i % DONUT_PALETTE.length})`} stroke={colorAt(i)} />
             ))}
           </Pie>
+
           <Tooltip
             formatter={(v: any, n: any) => [
               `${Number(v).toLocaleString()} (${total ? ((Number(v) / total) * 100).toFixed(1) : 0}%)`,
@@ -232,12 +285,13 @@ function DonutChart({ data, height = 300 }: { data: { name: string; value: numbe
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-col items-center justify-center" style={{ height: height * 0.92 - 34 }}>
-        <span className="font-display text-xl font-bold text-foreground tabular-nums">{total.toLocaleString()}</span>
-        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</span>
+        <span className="font-display text-[13px] font-bold text-foreground tabular-nums">{total.toLocaleString()}</span>
+        <span className="text-[9px] uppercase tracking-wide text-muted-foreground">Total</span>
       </div>
     </div>
   );
 }
+
 
 
 function HBarChart({ data, color = PALETTE[0] }: { data: { name: string; value: number }[]; color?: string }) {
