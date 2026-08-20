@@ -843,7 +843,30 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
 
         {/* Distribution Tab */}
         <TabsContent value="distribution" className="mt-4 space-y-4">
+          {koboRows.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {[
+                { title: "All submissions", data: koboBands },
+                { title: "Pre-tests", data: koboPreBands },
+                { title: "Post-tests", data: koboPostBands },
+              ].map((b) => (
+                <Card key={b.title} className="form-card">
+                  <CardHeader className="pb-1">
+                    <CardTitle className="text-sm">{b.title}</CardTitle>
+                    <CardDescription className="text-[11px]">
+                      Excellent ≥80% · Good ≥70% · Moderate ≥60% · below 60% needs additional training
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <PetalDonutChart data={b.data} height={260} unitLabel="submissions" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
           <Card className="form-card">
+
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Activity className="h-4 w-4 text-primary" />
