@@ -37,7 +37,7 @@ export interface QuizKoboSubmissionRow {
   assessment_type: "pre" | "post";
   intervention_group: string | null;
   answers: Record<string, string>;
-  per_question: { name: string; label: string; group: string; isCorrect: boolean; earned: number; points: number }[];
+  per_question: { name: string; label: string; group: string; answer?: string; correct?: string; isCorrect: boolean; earned: number; points: number }[];
   score: number;
   max_score: number;
   percentage: number;

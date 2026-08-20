@@ -184,7 +184,8 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
   }, [koboConfig, koboSubmissions]);
 
   const koboRows = useMemo(() => filterByGroup(koboSubmissions, koboGroup), [koboSubmissions, koboGroup]);
-  const koboPairs = useMemo(() => pairParticipants(koboRows), [koboRows]);
+  const koboIdentity = koboConfig?.identity_fields ?? null;
+  const koboPairs = useMemo(() => pairParticipants(koboRows, koboIdentity), [koboRows, koboIdentity]);
   const koboStats = useMemo(() => koboPairedTTest(koboPairs), [koboPairs]);
   const koboSummary = useMemo(
     () => improvementSummary(koboPairs, koboRows, quiz.passing_score),
@@ -193,7 +194,10 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
   const koboBands = useMemo(() => bandBreakdown(koboRows), [koboRows]);
   const koboPreBands = useMemo(() => bandBreakdown(koboRows.filter((r) => r.assessment_type === "pre")), [koboRows]);
   const koboPostBands = useMemo(() => bandBreakdown(koboRows.filter((r) => r.assessment_type === "post")), [koboRows]);
-  const koboItems = useMemo(() => koboItemStats(koboRows), [koboRows]);
+  const koboItems = useMemo(
+    () => koboItemStats(koboRows, koboConfig?.question_config ?? null, koboIdentity),
+    [koboRows, koboConfig, koboIdentity],
+  );
   const koboMaxScore = useMemo(
     () => koboRows.reduce((m, r) => Math.max(m, Number(r.max_score) || 0), 0),
     [koboRows],
@@ -437,7 +441,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
       id: `kobo-${it.name}`,
       number: offset + i + 1,
       text: it.label,
-      correctLabel: it.group === "general" ? "—" : it.group,
+      correctLabel: it.correctLabel || "—",
       answered: it.answered,
       correct: it.correct,
       incorrect: it.incorrect,
