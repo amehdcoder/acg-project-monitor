@@ -1534,6 +1534,18 @@ const QuizBuilder = () => {
         </DialogContent>
       </Dialog>
 
+      {/* KoboToolbox sync settings */}
+      {selectedQuiz && (
+        <QuizKoboSyncDialog
+          open={showKoboSync}
+          onClose={() => setShowKoboSync(false)}
+          quizId={selectedQuiz.id}
+          quizTitle={selectedQuiz.title}
+          config={koboConfig}
+          onSaved={() => { void reloadKobo(); }}
+        />
+      )}
+
       {/* Quiz Settings Dialog (pass mark + custom messages) */}
       <Dialog open={showSettings} onOpenChange={setShowSettings}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">

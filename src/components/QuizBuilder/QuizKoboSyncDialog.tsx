@@ -177,12 +177,6 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
         export_type: "json",
         settings: { custom_headers: { "x-kobo-secret": config.webhook_secret } },
       };
-      const existing = await callManager({
-        action: "kobo_proxy_hooks", server_url: serverUrl, form_uid: formUid, api_token: apiToken,
-      }).catch(() => null);
-      void existing;
-      // Kobo REST Service creation happens through the browser-visible URL when
-      // the proxy action is unavailable — surface manual instructions instead.
       await navigator.clipboard.writeText(JSON.stringify(body, null, 2)).catch(() => {});
       toast({
         title: "REST Service details copied",
