@@ -587,8 +587,8 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
           <Badge variant="outline" className="text-[10px]">{koboSubmissions.length} submissions</Badge>
           {koboMaxScore > 0 && <Badge variant="outline" className="text-[10px]">Max score: {koboMaxScore} pts</Badge>}
           <Badge variant="outline" className="text-[10px]">Pass mark: {quiz.passing_score}%</Badge>
-          {koboLastEventAt && (
-            <span className="text-[10px] text-muted-foreground">Last event {koboLastEventAt.toLocaleTimeString()}</span>
+          {koboLastEvent && (
+            <span className="text-[10px] text-muted-foreground">Last event {koboLastEvent.toLocaleTimeString()}</span>
           )}
           {koboGroups.length > 0 && (
             <select
