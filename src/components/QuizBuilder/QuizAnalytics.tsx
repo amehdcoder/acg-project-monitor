@@ -30,7 +30,7 @@ import { groupsOf } from "@/lib/quizKobo/scoring";
 import { koboItemStats, uniqueParticipantCount } from "@/lib/quizKobo/itemAnalysis";
 import { fullSyncKobo } from "@/lib/quizKobo/fullSync";
 import { pairingConsistency } from "@/lib/quizKobo/pairingCheck";
-import { needsIdentityRepair, repairKoboIdentity, rescoreStoredSubmissions } from "@/lib/quizKobo/identityRepair";
+import { needsIdentityRepair, repairKoboIdentity } from "@/lib/quizKobo/identityRepair";
 import { exportKoboCSV, exportKoboPDF, fmtP } from "@/lib/quizKobo/exports";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
