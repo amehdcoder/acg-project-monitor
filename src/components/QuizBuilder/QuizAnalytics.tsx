@@ -719,14 +719,9 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
           <TabsTrigger value="individual" className="gap-1"><Users className="h-3 w-3" /> Individual</TabsTrigger>
           <TabsTrigger value="questions" className="gap-1"><BookOpen className="h-3 w-3" /> Questions</TabsTrigger>
           <TabsTrigger value="insights" className="gap-1"><Lightbulb className="h-3 w-3" /> Insights</TabsTrigger>
-          <TabsTrigger value="kobo" className="gap-1"><Radio className="h-3 w-3" /> Kobo Realtime</TabsTrigger>
-
         </TabsList>
 
-        {/* KoboToolbox realtime Pre/Post analytics */}
-        <TabsContent value="kobo" className="mt-4">
-          <QuizKoboAnalytics quizId={quiz.id} passingScore={quiz.passing_score} />
-        </TabsContent>
+
 
         {/* Comparison Tab */}
         <TabsContent value="comparison" className="mt-4 space-y-4">
