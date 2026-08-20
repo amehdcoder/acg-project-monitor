@@ -691,10 +691,17 @@ export default function ChecklistDashboard({
     [allParents],
   );
 
-  const monitorPerf = useMemo(
-    () => performanceBy(parents, "Independent_Monitor_s_Name", true),
-    [parents],
+  /* Full monitor roster straight from the synced Kobo form schema, so monitors
+     who have never submitted still appear (with zero values). */
+  const monitorRoster = useMemo(
+    () => rosterFromSchema(cache?.survey ?? [], cache?.choices ?? [], "Independent_Monitor_s_Name"),
+    [cache],
   );
+  const monitorPerf = useMemo(
+    () => mergeRoster(performanceBy(parents, "Independent_Monitor_s_Name", true), monitorRoster) as PerfRow[],
+    [parents, monitorRoster],
+  );
+
   const designationPerf = useMemo(() => performanceBy(parents, "Designation"), [parents]);
   const supervisorPerf = useMemo(
     () => performanceBy(parents, "Name_of_Supervisor", true),
