@@ -139,12 +139,9 @@ const Empty = () => (
 );
 
 
-/** Vivid, professional donut palette (distinct hues, good contrast on light + dark). */
-const DONUT_PALETTE = [
-  "#2563eb", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#06b6d4", "#84cc16", "#f97316", "#ec4899", "#14b8a6",
-  "#6366f1", "#eab308",
-];
+/** Vivid, professional donut palette (shared app-wide). */
+const DONUT_PALETTE = BRIGHT_CHART_PALETTE;
+
 
 /**
  * Infographic-style label: bold coloured percentage inside the outer petal,
