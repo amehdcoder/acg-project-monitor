@@ -501,43 +501,53 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
 
   // Generate interpretation text
   const interpretation = useMemo(() => {
-    const t = analysis.testResult;
-    if (!t) return null;
     const lines: string[] = [];
+    const t = analysis.testResult;
 
-    // Test selection rationale
-    lines.push(`📊 **Test Used:** ${t.method.toUpperCase()} — ${t.n >= 30 ? "Selected because sample size n ≥ 30 satisfies the Central Limit Theorem for normal approximation." : `Selected because sample size n = ${t.n} < 30, requiring the t-distribution for accurate p-value estimation.`}`);
-
-    // Hypothesis
-    lines.push(`\n🔬 **Hypotheses:**\n• H₀: There is no significant difference between Pre-test and Post-test scores (μ_diff = 0)\n• H₁: There is a significant difference between Pre-test and Post-test scores (μ_diff ≠ 0)`);
-
-    // Results
-    const statLabel = t.method === "z-test" ? `z = ${t.z}` : `t(${t.df}) = ${t.t}`;
-    lines.push(`\n📈 **Results:** ${statLabel}, p = ${t.p < 0.0001 ? "< 0.0001" : t.p} (two-tailed, α = 0.05)`);
-
-    // Decision
-    if (t.significant) {
-      lines.push(`\n✅ **Decision:** REJECT H₀. The improvement from Pre-test (M = ${t.preMean}%) to Post-test (M = ${t.postMean}%) is statistically significant.`);
-    } else {
-      lines.push(`\n⚠️ **Decision:** FAIL TO REJECT H₀. The difference between Pre-test and Post-test scores is not statistically significant at α = 0.05.`);
+    if (t) {
+      lines.push(`📊 **Test Used:** ${t.method.toUpperCase()} — ${t.n >= 30 ? "Selected because sample size n ≥ 30 satisfies the Central Limit Theorem for normal approximation." : `Selected because sample size n = ${t.n} < 30, requiring the t-distribution for accurate p-value estimation.`}`);
+      lines.push(`\n🔬 **Hypotheses:**\n• H₀: There is no significant difference between Pre-test and Post-test scores (μ_diff = 0)\n• H₁: There is a significant difference between Pre-test and Post-test scores (μ_diff ≠ 0)`);
+      const statLabel = t.method === "z-test" ? `z = ${t.z}` : `t(${t.df}) = ${t.t}`;
+      lines.push(`\n📈 **Results:** ${statLabel}, p = ${t.p < 0.0001 ? "< 0.0001" : t.p} (two-tailed, α = 0.05)`);
+      if (t.significant) {
+        lines.push(`\n✅ **Decision:** REJECT H₀. The improvement from Pre-test (M = ${t.preMean}%) to Post-test (M = ${t.postMean}%) is statistically significant.`);
+      } else {
+        lines.push(`\n⚠️ **Decision:** FAIL TO REJECT H₀. The difference between Pre-test and Post-test scores is not statistically significant at α = 0.05.`);
+      }
+      const absD = Math.abs(t.effectSize);
+      const effectLabel = absD < 0.2 ? "negligible" : absD < 0.5 ? "small" : absD < 0.8 ? "medium" : "large";
+      lines.push(`\n📐 **Effect Size:** Cohen's d = ${t.effectSize} (${effectLabel}). ${absD >= 0.8 ? "This indicates a practically meaningful difference — the intervention had a strong impact." : absD >= 0.5 ? "This suggests a moderate practical significance." : absD >= 0.2 ? "While statistically detectable, the practical impact is small." : "The difference, even if significant, may not be practically meaningful."}`);
+      if (t.preCI && t.postCI) {
+        lines.push(`\n📏 **95% Confidence Intervals:**\n• Pre-test: [${t.preCI.lower}%, ${t.preCI.upper}%]\n• Post-test: [${t.postCI.lower}%, ${t.postCI.upper}%]`);
+      }
     }
 
-    // Effect size
-    const absD = Math.abs(t.effectSize);
-    const effectLabel = absD < 0.2 ? "negligible" : absD < 0.5 ? "small" : absD < 0.8 ? "medium" : "large";
-    lines.push(`\n📐 **Effect Size:** Cohen's d = ${t.effectSize} (${effectLabel}). ${absD >= 0.8 ? "This indicates a practically meaningful difference — the intervention had a strong impact." : absD >= 0.5 ? "This suggests a moderate practical significance." : absD >= 0.2 ? "While statistically detectable, the practical impact is small." : "The difference, even if significant, may not be practically meaningful."}`);
-
-    // Confidence intervals
-    if (t.preCI && t.postCI) {
-      lines.push(`\n📏 **95% Confidence Intervals:**\n• Pre-test: [${t.preCI.lower}%, ${t.preCI.upper}%]\n• Post-test: [${t.postCI.lower}%, ${t.postCI.upper}%]`);
+    // ───── KoboToolbox ingested submissions ─────
+    if (koboRows.length) {
+      lines.push(`\n📡 **KoboToolbox ingestion (${koboGroupLabel}):** ${koboRows.length} submissions scored — ${koboSummary.preCount} Pre-test, ${koboSummary.postCount} Post-test, ${koboStats?.n ?? 0} matched participant pairs.`);
+      if (koboStats) {
+        lines.push(`\n🧮 **Paired t-test on Kobo data:** t = ${koboStats.t.toFixed(3)}, df = ${koboStats.df}, ${fmtP(koboStats.p)}, Cohen's d = ${koboStats.cohensD.toFixed(3)}. Mean score moved ${koboStats.meanPre.toFixed(1)}% → ${koboStats.meanPost.toFixed(1)}% (${koboStats.meanGain > 0 ? "+" : ""}${koboStats.meanGain.toFixed(1)} pp). ${koboStats.significant ? "This change is statistically significant." : "This change is not statistically significant at α = 0.05."}`);
+      }
+      lines.push(`\n🎯 **Pass rate (≥ ${quiz.passing_score}%):** pre ${koboSummary.prePassRate.toFixed(1)}% → post ${koboSummary.postPassRate.toFixed(1)}%. Improved: ${koboSummary.improved}, declined: ${koboSummary.declined}, unchanged: ${koboSummary.unchanged}, awaiting a pair: ${koboSummary.incomplete}.`);
+      const weakest = [...koboItems].sort((a, b) => a.correctRate - b.correctRate).slice(0, 3);
+      if (weakest.length) {
+        lines.push(`\n🧠 **Retraining priorities:** ${weakest.map(w => `“${w.label}” (${w.correctRate}% correct)`).join("; ")}.`);
+      }
+      const needTraining = koboBands.find(b => b.key === "needs_training")?.value ?? 0;
+      if (needTraining) {
+        lines.push(`\n⚠️ **Score bands:** ${needTraining} submission(s) fall below 60% and require additional training.`);
+      }
     }
 
-    // Practical conclusion
-    const pctImproved = analysis.pairedCount > 0 ? Math.round((analysis.improvedCount / analysis.pairedCount) * 100) : 0;
-    lines.push(`\n💡 **Practical Conclusion:** ${pctImproved}% of participants improved their scores. Mean improvement was ${t.improvement > 0 ? "+" : ""}${t.improvement} percentage points. ${t.significant && t.improvement > 0 ? "The training/intervention appears to be effective." : t.significant && t.improvement < 0 ? "Scores declined significantly — consider reviewing the intervention." : "More data may be needed to draw a definitive conclusion."}`);
+    if (!lines.length) return null;
+
+    const pairedTotal = kpi.paired;
+    const pctImproved = pairedTotal > 0 ? Math.round((kpi.improved / pairedTotal) * 100) : 0;
+    lines.push(`\n💡 **Practical Conclusion:** ${pctImproved}% of paired participants improved. Overall mean moved ${kpi.preMean}% → ${kpi.postMean}% across ${kpi.participants} participants. ${kpi.postMean > kpi.preMean ? "The training appears to be working; sustain and target the weakest items." : "No overall gain yet — review facilitation and re-test."}`);
 
     return lines.join("\n");
-  }, [analysis]);
+  }, [analysis, koboRows, koboStats, koboSummary, koboItems, koboBands, koboGroupLabel, kpi, quiz.passing_score]);
+
 
   if (loading) {
     return <div className="flex justify-center py-20"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
