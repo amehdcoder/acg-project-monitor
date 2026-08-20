@@ -133,18 +133,22 @@ export function parseKoboForm(survey: any[], choices: any[]): ParsedKoboForm {
     }
 
     // Identity / classification fields (kept out of the scored set).
+    // Match on the field name AND its label — some forms ship identity rows
+    // with an empty/auto-generated name.
     const nk = normalizeKey(name);
-    if (kind === "select_one" && /assessment.?type/.test(nk)) { identity.assessmentField = name; continue; }
-    if (/independent.?monitor|participant.?name|monitor.?name/.test(nk)) {
-      identity.nameField = name;
+    const nl = normalizeKey(`${name} ${label}`);
+    if (/assessment.?type/.test(nl)) { identity.assessmentField = name || identity.assessmentField; continue; }
+    if (NAME_FIELD_RE.test(nl)) {
+      identity.nameField = name || identity.nameField;
       identity.nameChoices =
         choiceMap.get(String(row?.select_from_list_name ?? row?.["select from list name"] ?? listName ?? "")) ?? null;
       continue;
     }
-    if (kind === "select_one" && /^intervention$|mda.?intervention/.test(nk)) { identity.interventionField = name; continue; }
+    if (/^intervention$|mda.?intervention/.test(nl)) { identity.interventionField = name || identity.interventionField; continue; }
 
     if (META_TYPES.has(kind) || KOBO_META_FIELDS.has(name)) continue;
     if (!SUPPORTED_TYPES.has(kind)) continue;
+    if (!name.trim()) continue;
     if (/_score$/.test(name)) continue;
 
     const group = groupStack[groupStack.length - 1] ?? null;
