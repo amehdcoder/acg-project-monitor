@@ -25,6 +25,8 @@ import {
 } from "@/lib/quizKobo/analytics";
 import { groupsOf } from "@/lib/quizKobo/scoring";
 import { koboItemStats } from "@/lib/quizKobo/itemAnalysis";
+import { pairingConsistency } from "@/lib/quizKobo/pairingCheck";
+import { needsIdentityRepair, repairKoboIdentity, rescoreStoredSubmissions } from "@/lib/quizKobo/identityRepair";
 import { exportKoboCSV, exportKoboPDF, fmtP } from "@/lib/quizKobo/exports";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
