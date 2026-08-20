@@ -284,10 +284,10 @@ function DonutChart({ data, height = 300 }: { data: { name: string; value: numbe
           />
         </PieChart>
       </ResponsiveContainer>
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-col items-center justify-center" style={{ height: height * 0.92 - 34 }}>
-        <span className="font-display text-[13px] font-bold text-foreground tabular-nums">{total.toLocaleString()}</span>
-        <span className="text-[9px] uppercase tracking-wide text-muted-foreground">Total</span>
+      <div className="pointer-events-none absolute right-1 top-0 rounded-full border bg-card/80 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground tabular-nums backdrop-blur-sm">
+        n = {total.toLocaleString()}
       </div>
+
     </div>
   );
 }
