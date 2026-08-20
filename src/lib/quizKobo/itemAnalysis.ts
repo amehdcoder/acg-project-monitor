@@ -40,10 +40,12 @@ export function koboItemStats(
   };
 
   const map = new Map<string, KoboItemStat>();
+  const seen = new Map<string, Set<string>>();
   for (const r of rows) {
     for (const q of r.per_question ?? []) {
-      if (isIdentityField(q.name, identity)) continue;
-      const entry = map.get(q.name) ?? {
+      if (isIdentityQuestion({ name: q.name, label: q.label }, identity)) continue;
+      const key = leafName(q.name);
+      const entry = map.get(key) ?? {
         name: q.name,
         label: q.label || q.name,
         group: q.group || "general",
@@ -52,18 +54,33 @@ export function koboItemStats(
         incorrect: 0,
         correctRate: 0,
         failRate: 0,
+        participants: 0,
         points: Number(q.points) || 0,
         correctLabel: correctLabelOf(q.name, String((q as { correct?: string }).correct ?? "")),
       };
       entry.answered += 1;
       if (q.isCorrect) entry.correct += 1;
-      map.set(q.name, entry);
+      const set = seen.get(key) ?? new Set<string>();
+      set.add(r.participant_key || r.id);
+      seen.set(key, set);
+      map.set(key, entry);
     }
   }
   return [...map.values()]
     .map((e) => {
       const rate = e.answered ? Math.round((e.correct / e.answered) * 100) : 0;
-      return { ...e, incorrect: e.answered - e.correct, correctRate: rate, failRate: 100 - rate };
+      return {
+        ...e,
+        incorrect: e.answered - e.correct,
+        correctRate: rate,
+        failRate: 100 - rate,
+        participants: seen.get(leafName(e.name))?.size ?? 0,
+      };
     })
     .sort((a, b) => b.correctRate - a.correctRate);
+}
+
+/** Unique participants represented in an item-analysis dataset. */
+export function uniqueParticipantCount(rows: QuizKoboSubmissionRow[]): number {
+  return new Set(rows.map((r) => r.participant_key || r.id)).size;
 }
