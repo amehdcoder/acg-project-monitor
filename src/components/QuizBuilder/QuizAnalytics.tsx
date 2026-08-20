@@ -553,6 +553,15 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
     return <div className="flex justify-center py-20"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
   }
 
+  const exportCtx = {
+    formTitle: koboConfig?.form_title || quiz.title,
+    groupLabel: koboGroupLabel,
+    passingScore: quiz.passing_score,
+    pairs: koboPairs,
+    stats: koboStats,
+    summary: koboSummary,
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-3">
@@ -565,28 +574,70 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* Persistent Kobo ingestion / export header */}
+      <Card className="form-card border-0 shadow-sm">
+        <CardContent className="py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="flex items-center gap-1.5 text-xs font-semibold">
+            <Radio className={`h-3.5 w-3.5 ${koboLive ? "text-emerald-500 animate-pulse" : "text-muted-foreground"}`} />
+            {koboConfig ? (koboLive ? "Live — Kobo sync active" : "Kobo connected") : "Kobo not connected"}
+          </span>
+          {koboConfig?.form_title && (
+            <Badge variant="secondary" className="text-[10px]">{koboConfig.form_title}</Badge>
+          )}
+          <Badge variant="outline" className="text-[10px]">{koboSubmissions.length} submissions</Badge>
+          {koboMaxScore > 0 && <Badge variant="outline" className="text-[10px]">Max score: {koboMaxScore} pts</Badge>}
+          <Badge variant="outline" className="text-[10px]">Pass mark: {quiz.passing_score}%</Badge>
+          {koboLastEventAt && (
+            <span className="text-[10px] text-muted-foreground">Last event {koboLastEventAt.toLocaleTimeString()}</span>
+          )}
+          {koboGroups.length > 0 && (
+            <select
+              value={koboGroup}
+              onChange={(e) => setKoboGroup(e.target.value)}
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+              aria-label="MDA intervention filter"
+            >
+              <option value="all">All MDA interventions</option>
+              {koboGroups.map((g) => (
+                <option key={g.code} value={g.code}>{g.label}</option>
+              ))}
+            </select>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-1 h-8" disabled={!koboRows.length}
+              onClick={() => exportKoboCSV(exportCtx)}>
+              <Download className="h-3.5 w-3.5" /> CSV
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1 h-8" disabled={!koboRows.length}
+              onClick={() => exportKoboPDF(exportCtx)}>
+              <FileText className="h-3.5 w-3.5" /> PDF Report
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* KPI Cards — computed across all ingested Kobo records + in-app attempts */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { icon: Users, label: "Participants", value: analysis.totalParticipants, color: "text-primary", bg: "bg-primary/10" },
-          { icon: BarChart3, label: "Pre-test Mean", value: `${analysis.preMean}%`, color: "text-blue-600", bg: "bg-blue-100 dark:bg-blue-900/30" },
-          { icon: TrendingUp, label: "Post-test Mean", value: analysis.hasPost ? `${analysis.postMean}%` : "—", color: "text-emerald-600", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
-          { icon: Target, label: "Paired Tests", value: analysis.pairedCount, color: "text-amber-600", bg: "bg-amber-100 dark:bg-amber-900/30" },
-          { icon: Percent, label: "Pre Pass Rate", value: analysis.hasPre ? `${analysis.prePassRate}%` : "—", color: "text-violet-600", bg: "bg-violet-100 dark:bg-violet-900/30" },
-          { icon: Award, label: "Post Pass Rate", value: analysis.hasPost ? `${analysis.postPassRate}%` : "—", color: "text-rose-600", bg: "bg-rose-100 dark:bg-rose-900/30" },
-
-        ].map((kpi, i) => (
+          { icon: Users, label: "Participants", value: kpi.participants, color: "text-primary", bg: "bg-primary/10" },
+          { icon: BarChart3, label: "Pre-test Mean", value: kpi.hasPre ? `${kpi.preMean}%` : "—", color: "text-blue-600", bg: "bg-blue-100 dark:bg-blue-900/30" },
+          { icon: TrendingUp, label: "Post-test Mean", value: kpi.hasPost ? `${kpi.postMean}%` : "—", color: "text-emerald-600", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
+          { icon: Target, label: "Paired Tests", value: kpi.paired, color: "text-amber-600", bg: "bg-amber-100 dark:bg-amber-900/30" },
+          { icon: Percent, label: "Pre Pass Rate", value: kpi.hasPre ? `${kpi.prePassRate}%` : "—", color: "text-violet-600", bg: "bg-violet-100 dark:bg-violet-900/30" },
+          { icon: Award, label: "Post Pass Rate", value: kpi.hasPost ? `${kpi.postPassRate}%` : "—", color: "text-rose-600", bg: "bg-rose-100 dark:bg-rose-900/30" },
+        ].map((card, i) => (
           <Card key={i} className="form-card border-0 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="py-4 text-center">
-              <div className={`mx-auto flex h-10 w-10 items-center justify-center rounded-xl ${kpi.bg} mb-2`}>
-                <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
+              <div className={`mx-auto flex h-10 w-10 items-center justify-center rounded-xl ${card.bg} mb-2`}>
+                <card.icon className={`h-5 w-5 ${card.color}`} />
               </div>
-              <div className="text-2xl font-bold text-foreground">{kpi.value}</div>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{kpi.label}</p>
+              <div className="text-2xl font-bold text-foreground">{card.value}</div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{card.label}</p>
             </CardContent>
           </Card>
         ))}
       </div>
+
 
       {/* Statistical Test Result */}
       {analysis.testResult && (
