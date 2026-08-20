@@ -81,3 +81,6 @@ verify_jwt = false
 
 [functions.kobo-webhook]
 verify_jwt = false
+
+[functions.kobo-quiz-webhook]
+verify_jwt = false
