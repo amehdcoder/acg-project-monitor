@@ -1380,6 +1380,96 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* ───── Monitor drill-down drawer ───── */}
+      <Sheet open={!!drillKey} onOpenChange={(o) => !o && setDrillKey(null)}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          {drill && (
+            <>
+              <SheetHeader className="text-left">
+                <SheetTitle className="text-base">{drill.name}</SheetTitle>
+                <SheetDescription className="text-xs">
+                  {drill.pair?.group ? `${drill.pair.group} · ` : ""}
+                  {drill.submissions.length} KoboToolbox submission(s) on record
+                  {drill.duplicates > 0 ? ` (${drill.duplicates} later duplicate(s) ignored)` : ""}
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="mt-4 space-y-4">
+                {(["pre", "post"] as const).map((type) => {
+                  const d = type === "pre" ? drill.pre : drill.post;
+                  const title = type === "pre" ? "Pre-Test" : "Post-Test";
+                  return (
+                    <Card key={type} className="form-card">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center justify-between">
+                          <span>{title}</span>
+                          {d ? (
+                            <Badge variant="secondary" className="font-mono text-[10px]">
+                              {Math.round(Number(d.row.percentage))}% · {d.row.score}/{d.row.max_score}
+                            </Badge>
+                          ) : (
+                            <Badge variant="destructive" className="text-[10px]">Missing</Badge>
+                          )}
+                        </CardTitle>
+                        <CardDescription className="text-[11px]">
+                          {d ? `Submitted ${d.submittedAt.toLocaleString()}` : "No submission received from KoboToolbox yet."}
+                        </CardDescription>
+                      </CardHeader>
+                      {d && (
+                        <CardContent className="space-y-2 pt-0">
+                          <div className="text-[11px] text-muted-foreground">
+                            {d.missed.length} incorrect · {d.unanswered.length} unanswered · {d.answered} items
+                          </div>
+                          {d.missed.length > 0 && (
+                            <ul className="space-y-1">
+                              {d.missed.slice(0, 20).map((q) => (
+                                <li key={q.name} className="flex items-start gap-2 rounded-md bg-destructive/5 px-2 py-1.5">
+                                  <XCircle className="h-3.5 w-3.5 text-destructive shrink-0 mt-0.5" />
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-medium leading-snug">{q.label || q.name}</p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                      Answered: {String((q as { answer?: string }).answer ?? "") || "—"} · Correct: {String((q as { correct?: string }).correct ?? "") || "—"}
+                                    </p>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {d.missed.length === 0 && (
+                            <p className="flex items-center gap-1.5 text-xs text-emerald-600">
+                              <CheckCircle className="h-3.5 w-3.5" /> All items correct.
+                            </p>
+                          )}
+                        </CardContent>
+                      )}
+                    </Card>
+                  );
+                })}
+
+                <Card className="form-card">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Submission timeline</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-1.5 pt-0">
+                    {drill.submissions.map((s) => (
+                      <div key={s.id} className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1.5">
+                        <span className="text-[11px] font-medium capitalize">{s.assessment_type}-Test</span>
+                        <span className="text-[11px] font-mono text-muted-foreground">
+                          {new Date(s.submitted_at).toLocaleString()} · {Math.round(Number(s.percentage))}%
+                        </span>
+                      </div>
+                    ))}
+                    {drill.submissions.length === 0 && (
+                      <p className="text-xs text-muted-foreground">No KoboToolbox submissions for this participant.</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
