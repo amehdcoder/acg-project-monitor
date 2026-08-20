@@ -25,6 +25,8 @@ import {
 } from "@/lib/quizKobo/analytics";
 import { groupsOf } from "@/lib/quizKobo/scoring";
 import { koboItemStats } from "@/lib/quizKobo/itemAnalysis";
+import { pairingConsistency } from "@/lib/quizKobo/pairingCheck";
+import { needsIdentityRepair, repairKoboIdentity, rescoreStoredSubmissions } from "@/lib/quizKobo/identityRepair";
 import { exportKoboCSV, exportKoboPDF, fmtP } from "@/lib/quizKobo/exports";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -169,9 +171,47 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
   const [loading, setLoading] = useState(true);
 
   // ───── KoboToolbox realtime ingestion (embedded across every tab) ─────
-  const { config: koboConfig, submissions: koboSubmissions, live: koboLive, lastEventAt: koboLastEvent, loading: koboLoading } =
+  const { config: koboConfig, submissions: koboSubmissions, live: koboLive, lastEventAt: koboLastEvent, loading: koboLoading, reload: koboReload } =
     useQuizKobo(quiz.id);
   const [koboGroup, setKoboGroup] = useState("all");
+  const [repairing, setRepairing] = useState(false);
+  const [repairTried, setRepairTried] = useState(false);
+
+  // Self-heal legacy configurations that never stored the participant-name
+  // field, so synced rows stop showing raw codes ("Option 2") as names.
+  useEffect(() => {
+    if (!koboConfig || repairTried || !needsIdentityRepair(koboConfig)) return;
+    setRepairTried(true);
+    setRepairing(true);
+    repairKoboIdentity(koboConfig)
+      .then((res) => {
+        if (res.repaired) {
+          toast({
+            title: "Kobo identity mapping repaired",
+            description: `Participant names resolved from “${res.nameField}”. ${res.rescored} submission(s) re-scored.`,
+          });
+          void koboReload();
+        }
+      })
+      .catch((e) => console.warn("Kobo identity repair failed:", (e as Error).message))
+      .finally(() => setRepairing(false));
+  }, [koboConfig, repairTried, koboReload]);
+
+  const forceResync = async () => {
+    if (!koboConfig) return;
+    setRepairing(true);
+    try {
+      const repair = await repairKoboIdentity(koboConfig).catch(() => null);
+      const rescored = repair?.repaired ? repair.rescored : await rescoreStoredSubmissions(koboConfig);
+      toast({ title: "Re-scored from Kobo", description: `${rescored} submission(s) refreshed with the current configuration.` });
+      void koboReload();
+    } catch (e) {
+      toast({ title: "Re-score failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setRepairing(false);
+    }
+  };
+
 
   const koboGroups = useMemo(() => {
     const fromConfig = groupsOf(koboConfig?.question_config ?? []);
@@ -186,6 +226,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
   const koboRows = useMemo(() => filterByGroup(koboSubmissions, koboGroup), [koboSubmissions, koboGroup]);
   const koboIdentity = koboConfig?.identity_fields ?? null;
   const koboPairs = useMemo(() => pairParticipants(koboRows, koboIdentity), [koboRows, koboIdentity]);
+  const koboPairing = useMemo(() => pairingConsistency(koboPairs), [koboPairs]);
   const koboStats = useMemo(() => koboPairedTTest(koboPairs), [koboPairs]);
   const koboSummary = useMemo(
     () => improvementSummary(koboPairs, koboRows, quiz.passing_score),
@@ -608,6 +649,13 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
             </select>
           )}
           <div className="ml-auto flex items-center gap-2">
+            {koboConfig && (
+              <Button variant="outline" size="sm" className="gap-1 h-8" disabled={repairing}
+                onClick={forceResync}>
+                <Radio className={`h-3.5 w-3.5 ${repairing ? "animate-spin" : ""}`} />
+                {repairing ? "Re-scoring…" : "Re-score from Kobo"}
+              </Button>
+            )}
             <Button variant="outline" size="sm" className="gap-1 h-8" disabled={!koboRows.length}
               onClick={() => exportKoboCSV(exportCtx)}>
               <Download className="h-3.5 w-3.5" /> CSV
@@ -619,6 +667,57 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Pairing consistency — participants missing one of the two assessments */}
+      {koboPairing.total > 0 && (
+        <Card className={`form-card border-l-4 ${koboPairing.hasGaps ? "border-l-amber-500" : "border-l-emerald-500"}`}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              {koboPairing.hasGaps
+                ? <AlertTriangle className="h-4 w-4 text-amber-500" />
+                : <CheckCircle className="h-4 w-4 text-emerald-500" />}
+              Pairing consistency check
+            </CardTitle>
+            <CardDescription className="text-xs">
+              {koboPairing.complete} of {koboPairing.total} participants have both a Pre-Test and a Post-Test
+              ({koboPairing.completionRate}% complete).
+              {koboPairing.hasGaps
+                ? ` ${koboPairing.missingPost.length} missing Post-Test, ${koboPairing.missingPre.length} missing Pre-Test — excluded from paired statistics.`
+                : " No data gaps detected."}
+            </CardDescription>
+          </CardHeader>
+          {koboPairing.hasGaps && (
+            <CardContent className="pt-0">
+              <div className="max-h-56 overflow-y-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">Participant</TableHead>
+                      <TableHead className="text-xs">MDA group</TableHead>
+                      <TableHead className="text-xs">Missing</TableHead>
+                      <TableHead className="text-xs text-right">Recorded score</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {koboPairing.gaps.map((g) => (
+                      <TableRow key={g.key}>
+                        <TableCell className="text-xs font-medium">{g.name}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{g.group ?? "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[10px] border-amber-500 text-amber-600">
+                            {g.missing === "post" ? "Post-Test" : "Pre-Test"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-right">{Math.round(g.have)}%</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
 
       {/* KPI Cards — computed across all ingested Kobo records + in-app attempts */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
