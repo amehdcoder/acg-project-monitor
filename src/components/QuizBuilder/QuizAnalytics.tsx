@@ -311,28 +311,87 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
     };
   }, [attempts, quiz.passing_score]);
 
-  // Chart data
-  const comparisonChartData = useMemo(() =>
-    analysis.pairedData.map(p => {
+  // ───── Unified dataset: in-app attempts + KoboToolbox ingested submissions ─────
+  const unifiedPairs = useMemo(() => {
+    const fromKobo = koboPairs.map((p) => ({
+      key: `kobo-${p.key}`,
+      name: p.name,
+      group: p.group ?? "Kobo",
+      pre: p.pre,
+      post: p.post,
+      diff: p.delta,
+      source: "Kobo" as const,
+    }));
+    const fromApp = analysis.pairedData.map((p) => {
       const prof = profiles[p.userId];
       return {
-        name: prof ? `${prof.first_name} ${prof.last_name?.charAt(0) || ""}.` : p.userId.slice(0, 8),
-        "Pre-test": Math.round(p.pre),
-        "Post-test": Math.round(p.post),
-        Change: Math.round(p.diff),
+        key: `app-${p.userId}`,
+        name: prof ? `${prof.first_name} ${prof.last_name ?? ""}`.trim() : p.userId.slice(0, 12),
+        group: "In-app",
+        pre: p.pre as number | null,
+        post: p.post as number | null,
+        diff: p.diff as number | null,
+        source: "In-app" as const,
       };
-    }),
-  [analysis.pairedData, profiles]);
+    });
+    return [...fromKobo, ...fromApp];
+  }, [koboPairs, analysis.pairedData, profiles]);
+
+  const koboPre = useMemo(() => koboRows.filter(r => r.assessment_type === "pre").map(r => Number(r.percentage)), [koboRows]);
+  const koboPost = useMemo(() => koboRows.filter(r => r.assessment_type === "post").map(r => Number(r.percentage)), [koboRows]);
+
+  /** Top KPI cards computed across every ingested Kobo record + in-app attempts. */
+  const kpi = useMemo(() => {
+    const allPre = [...analysis.preAttempts.map(a => a.percentage), ...koboPre];
+    const allPost = [...analysis.postAttempts.map(a => a.percentage), ...koboPost];
+    const participants =
+      analysis.totalParticipants + new Set(koboRows.map(r => r.participant_key)).size;
+    const paired = analysis.pairedCount + (koboStats?.n ?? 0);
+    const rate = (arr: number[]) =>
+      arr.length ? Math.round((arr.filter(v => v >= quiz.passing_score).length / arr.length) * 100) : 0;
+    return {
+      participants,
+      paired,
+      preCount: allPre.length,
+      postCount: allPost.length,
+      preMean: allPre.length ? Math.round(mean(allPre) * 10) / 10 : 0,
+      postMean: allPost.length ? Math.round(mean(allPost) * 10) / 10 : 0,
+      prePassRate: rate(allPre),
+      postPassRate: rate(allPost),
+      hasPre: allPre.length > 0,
+      hasPost: allPost.length > 0,
+      improved: unifiedPairs.filter(p => (p.diff ?? 0) > 0).length,
+      declined: unifiedPairs.filter(p => (p.diff ?? 0) < 0).length,
+      unchanged: unifiedPairs.filter(p => p.diff === 0).length,
+    };
+  }, [analysis, koboPre, koboPost, koboRows, koboStats, unifiedPairs, quiz.passing_score]);
+
+  // Chart data
+  const comparisonChartData = useMemo(() =>
+    unifiedPairs
+      .filter(p => p.pre != null || p.post != null)
+      .map(p => ({
+        name: p.name.length > 20 ? `${p.name.slice(0, 19)}…` : p.name,
+        "Pre-test": p.pre != null ? Math.round(p.pre) : 0,
+        "Post-test": p.post != null ? Math.round(p.post) : 0,
+        Change: p.diff != null ? Math.round(p.diff) : 0,
+      })),
+  [unifiedPairs]);
 
   const distributionData = useMemo(() => {
     const bins = ["0-20%", "21-40%", "41-60%", "61-80%", "81-100%"];
     const ranges = [[0, 20], [21, 40], [41, 60], [61, 80], [81, 100]];
+    const pre = [...analysis.preAttempts.map(a => a.percentage), ...koboPre];
+    const post = [...analysis.postAttempts.map(a => a.percentage), ...koboPost];
+    const inBin = (arr: number[], i: number) =>
+      arr.filter(v => v >= ranges[i][0] && v <= ranges[i][1]).length;
     return bins.map((label, i) => ({
       range: label,
-      "Pre-test": analysis.preAttempts.filter(a => a.percentage >= ranges[i][0] && a.percentage <= ranges[i][1]).length,
-      "Post-test": analysis.postAttempts.filter(a => a.percentage >= ranges[i][0] && a.percentage <= ranges[i][1]).length,
+      "Pre-test": inBin(pre, i),
+      "Post-test": inBin(post, i),
     }));
-  }, [analysis]);
+  }, [analysis, koboPre, koboPost]);
+
 
   // ───── Per-question difficulty analysis ─────
   // For each question, count how many attempts answered it correctly vs incorrectly.
