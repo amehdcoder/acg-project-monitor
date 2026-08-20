@@ -16,6 +16,8 @@ export interface KoboItemStat {
   incorrect: number;
   correctRate: number;
   failRate: number;
+  /** Distinct participants who answered this item. */
+  participants: number;
   points: number;
   /** Configured correct response, human label where available. */
   correctLabel: string;
