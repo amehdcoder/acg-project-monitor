@@ -26,7 +26,10 @@ import {
   Plus, Trash2, Save, Eye, Send, ChevronUp, ChevronDown,
   BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, CalendarIcon, Users, UserPlus, Archive, Eraser,
   Lock, LockOpen, DoorOpen, DoorClosed, Sparkles, RotateCcw, Mail, TrendingUp, AlertTriangle, Copy, ArrowRight, Pencil,
+  PlugZap,
 } from "lucide-react";
+import QuizKoboSyncDialog from "./QuizKoboSyncDialog";
+import { useQuizKobo } from "@/hooks/useQuizKobo";
 import { validateMessageTokens, KNOWN_QUIZ_TOKENS } from "@/lib/quizTokens";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -98,6 +101,11 @@ const QuizBuilder = () => {
   const [assignedUserIds, setAssignedUserIds] = useState<Set<string>>(new Set());
   const [assignSearch, setAssignSearch] = useState("");
   const [assignLoading, setAssignLoading] = useState(false);
+
+  // KoboToolbox sync settings for the selected quiz
+  const [showKoboSync, setShowKoboSync] = useState(false);
+  const { config: koboConfig, reload: reloadKobo } = useQuizKobo(selectedQuiz?.id ?? null);
+
 
   // Quiz settings (pass mark + custom messages) — editable on published quizzes
   const [showSettings, setShowSettings] = useState(false);
@@ -956,6 +964,13 @@ const QuizBuilder = () => {
                     <Button size="sm" variant="outline" onClick={openAssignDialog} className="gap-1">
                       <UserPlus className="h-3 w-3" /> Assign Users
                     </Button>
+                    <Button
+                      size="sm" variant="outline" onClick={() => setShowKoboSync(true)}
+                      className="gap-1 text-cyan-600"
+                    >
+                      <PlugZap className="h-3 w-3" /> KoboToolbox Sync
+                      {koboConfig && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+                    </Button>
                     {isOwner && (
                       <>
                         <Button
@@ -1518,6 +1533,18 @@ const QuizBuilder = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* KoboToolbox sync settings */}
+      {selectedQuiz && (
+        <QuizKoboSyncDialog
+          open={showKoboSync}
+          onClose={() => setShowKoboSync(false)}
+          quizId={selectedQuiz.id}
+          quizTitle={selectedQuiz.title}
+          config={koboConfig}
+          onSaved={() => { void reloadKobo(); }}
+        />
+      )}
 
       {/* Quiz Settings Dialog (pass mark + custom messages) */}
       <Dialog open={showSettings} onOpenChange={setShowSettings}>
