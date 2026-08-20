@@ -1165,7 +1165,11 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
                       const declined = complete && (p.diff ?? 0) < 0;
                       const initials = p.name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase()).join("") || "?";
                       return (
-                        <TableRow key={p.key} className={i % 2 === 0 ? "bg-muted/20" : ""}>
+                        <TableRow
+                          key={p.key}
+                          onClick={() => setDrillKey(p.key)}
+                          className={`cursor-pointer hover:bg-primary/5 ${i % 2 === 0 ? "bg-muted/20" : ""}`}
+                        >
                           <TableCell className="font-mono text-xs text-muted-foreground">{pagination.startIndex + i + 1}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
