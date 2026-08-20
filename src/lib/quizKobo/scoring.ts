@@ -305,9 +305,12 @@ export function scoreSubmission(
   });
 
   const answers: Record<string, string> = {};
+  // Keep the identity answers so names stay recoverable from stored rows.
+  if (identity.nameField) answers[identity.nameField] = asAnswerString(readField(payload, identity.nameField));
   const perQuestion: PerQuestionScore[] = [];
   let score = 0;
   let maxScore = 0;
+
 
   for (const q of relevant) {
     const raw = asAnswerString(readField(payload, q.name));
