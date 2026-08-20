@@ -19,7 +19,9 @@ export const fmtP = (p: number) => (p < 0.001 ? "p < 0.001" : `p = ${p.toFixed(3
 const fileBaseFor = (groupLabel: string, stamp: Date) =>
   `quiz-analytics-${groupLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${stamp.toISOString().slice(0, 10)}`;
 
+export function exportKoboCSV(ctx: KoboExportContext) {
   const { pairs, stats, summary } = ctx;
+
 
   const stamp = new Date();
   const esc = (v: unknown) => {
