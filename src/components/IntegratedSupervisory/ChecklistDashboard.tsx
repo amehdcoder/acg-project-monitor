@@ -35,14 +35,16 @@ import HouseholdCoverageAnalysis from "./HouseholdCoverageAnalysis";
 import MlIntelligenceHub from "./MlIntelligenceHub";
 import ChecklistPresetBar from "./ChecklistPresetBar";
 import CommunityVisitedTable, { buildCommunityVisits } from "./CommunityVisitedTable";
+import { BRIGHT_CHART_PALETTE } from "@/lib/charts/brightPalette";
 
 
 
 const PALETTE = [
-  "hsl(214,80%,45%)", "hsl(160,60%,40%)", "hsl(35,90%,50%)", "hsl(350,70%,52%)",
-  "hsl(265,55%,55%)", "hsl(190,65%,42%)", "hsl(95,45%,42%)", "hsl(20,75%,52%)",
-  "hsl(320,50%,50%)",
+  "#1D4ED8", "#059669", "#F59E0B", "#DC2626",
+  "#7C3AED", "#0891B2", "#65A30D", "#EA580C",
+  "#DB2777",
 ];
+
 
 /** Semantic colours for the Status of MDA bar chart. */
 const MDA_STATUS_COLORS: { match: RegExp; color: string }[] = [
@@ -139,12 +141,9 @@ const Empty = () => (
 );
 
 
-/** Vivid, professional donut palette (distinct hues, good contrast on light + dark). */
-const DONUT_PALETTE = [
-  "#2563eb", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#06b6d4", "#84cc16", "#f97316", "#ec4899", "#14b8a6",
-  "#6366f1", "#eab308",
-];
+/** Vivid, professional donut palette (shared app-wide). */
+const DONUT_PALETTE = BRIGHT_CHART_PALETTE;
+
 
 /**
  * Infographic-style label: bold coloured percentage inside the outer petal,
@@ -210,8 +209,8 @@ function DonutChart({ data, height = 300 }: { data: { name: string; value: numbe
           <defs>
             {DONUT_PALETTE.map((c, i) => (
               <linearGradient key={i} id={`petalGrad${i}`} x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor={c} stopOpacity={0.16} />
-                <stop offset="100%" stopColor={c} stopOpacity={0.04} />
+                <stop offset="0%" stopColor={c} stopOpacity={0.62} />
+                <stop offset="100%" stopColor={c} stopOpacity={0.34} />
               </linearGradient>
             ))}
             {DONUT_PALETTE.map((c, i) => (
