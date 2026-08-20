@@ -956,6 +956,13 @@ const QuizBuilder = () => {
                     <Button size="sm" variant="outline" onClick={openAssignDialog} className="gap-1">
                       <UserPlus className="h-3 w-3" /> Assign Users
                     </Button>
+                    <Button
+                      size="sm" variant="outline" onClick={() => setShowKoboSync(true)}
+                      className="gap-1 text-cyan-600"
+                    >
+                      <PlugZap className="h-3 w-3" /> KoboToolbox Sync
+                      {koboConfig && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+                    </Button>
                     {isOwner && (
                       <>
                         <Button
