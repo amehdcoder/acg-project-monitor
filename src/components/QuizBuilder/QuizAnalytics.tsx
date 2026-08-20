@@ -12,7 +12,7 @@ import { useTablePagination } from "@/hooks/useTablePagination";
 import {
   ArrowLeft, Users, TrendingUp, TrendingDown, BarChart3, Award, CheckCircle, XCircle,
   BookOpen, Target, Percent, Activity, Brain, Lightbulb, AlertTriangle, Radio,
-  FileSpreadsheet, FileText, Sigma,
+  FileSpreadsheet, FileText, Sigma, Download,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
