@@ -1221,7 +1221,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
           ) : (
             <>
               <p className="text-[11px] text-muted-foreground -mb-1">
-                Based on <span className="font-semibold text-foreground">{questionSource}</span> responses across {questionStats[0]?.answered ?? 0} participants.
+                Based on <span className="font-semibold text-foreground">{questionSource}</span> responses across {uniqueParticipantCount(koboRows)} unique participants.
               </p>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
