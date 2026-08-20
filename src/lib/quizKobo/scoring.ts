@@ -233,6 +233,51 @@ export function detectAssessmentType(value: unknown): "pre" | "post" {
   return /post/.test(s) ? "post" : "pre";
 }
 
+/** Prettify a Kobo choice name / raw answer into a human name. */
+const humanizeName = (raw: string): string =>
+  raw.replace(/[_\-.]+/g, " ").replace(/\s+/g, " ").trim()
+    .split(" ")
+    .map((w) => (/[a-z]/.test(w) && /^[a-z]/.test(w) ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+
+const NAME_FIELD_RE = /independent.?monitor|monitor.?name|participant.?name|respondent.?name|interviewer.?name|full.?name|^name$|name of/;
+
+/**
+ * Resolve the participant's actual name from the Kobo submission.
+ * Order: configured name field (choice label first) → any name-like field in
+ * the payload → Kobo submitter username. Never silently returns "Unknown"
+ * when the payload carries a usable answer.
+ */
+export function resolveParticipantName(
+  payload: Record<string, any>,
+  identity: QuizKoboIdentityFields,
+  choiceLabelFor?: (field: string, value: string) => string,
+): string {
+  const fromField = (field: string, raw: string): string => {
+    if (!raw) return "";
+    const label = choiceLabelFor ? choiceLabelFor(field, raw) : "";
+    return humanizeName(label || raw);
+  };
+
+  if (identity.nameField) {
+    const direct = fromField(identity.nameField, asAnswerString(readField(payload, identity.nameField)));
+    if (direct) return direct;
+  }
+
+  for (const [key, value] of Object.entries(payload)) {
+    const leaf = leafName(key);
+    if (KOBO_META_FIELDS.has(leaf) || leaf.startsWith("_")) continue;
+    if (!NAME_FIELD_RE.test(normalizeKey(leaf))) continue;
+    const candidate = fromField(leaf, asAnswerString(value));
+    if (candidate) return candidate;
+  }
+
+  const submitter = asAnswerString(payload?._submitted_by ?? payload?.username);
+  if (submitter) return humanizeName(submitter);
+  return "Unknown";
+}
+
+
 /**
  * Score one Kobo submission payload against the configured question set.
  * Only questions relevant to the submission's intervention group count towards
