@@ -253,6 +253,31 @@ const humanizeName = (raw: string): string =>
 
 const NAME_FIELD_RE = /independent.?monitor|monitor.?name|participant.?name|respondent.?name|interviewer.?name|full.?name|^name$|name of/;
 
+/** Identity / classification fields that must never be scored as questions. */
+export const IDENTITY_FIELD_RE =
+  /independent.?monitor|monitor.?name|participant.?name|respondent.?name|interviewer.?name|full.?name|^name$|name of|assessment.?type|^intervention$|mda.?intervention/;
+
+/**
+ * True when a configured "question" is really a participant identifier or a
+ * classification field (name, assessment type, MDA intervention) — or a blank
+ * row. These must never contribute points, otherwise a perfect participant
+ * scores 100/101 = 99%.
+ */
+export function isIdentityQuestion(
+  q: { name?: string | null; label?: string | null },
+  identity?: QuizKoboIdentityFields | null,
+): boolean {
+  const name = String(q?.name ?? "").trim();
+  if (!name) return true;
+  const leaf = leafName(name);
+  if (identity) {
+    for (const f of [identity.nameField, identity.assessmentField, identity.interventionField]) {
+      if (f && leafName(String(f)) === leaf) return true;
+    }
+  }
+  return IDENTITY_FIELD_RE.test(normalizeKey(`${leaf} ${q?.label ?? ""}`));
+}
+
 /**
  * Resolve the participant's actual name from the Kobo submission.
  * Order: configured name field (choice label first) → any name-like field in
