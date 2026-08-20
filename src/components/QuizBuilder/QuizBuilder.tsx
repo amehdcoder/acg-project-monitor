@@ -102,6 +102,11 @@ const QuizBuilder = () => {
   const [assignSearch, setAssignSearch] = useState("");
   const [assignLoading, setAssignLoading] = useState(false);
 
+  // KoboToolbox sync settings for the selected quiz
+  const [showKoboSync, setShowKoboSync] = useState(false);
+  const { config: koboConfig, reload: reloadKobo } = useQuizKobo(selectedQuiz?.id ?? null);
+
+
   // Quiz settings (pass mark + custom messages) — editable on published quizzes
   const [showSettings, setShowSettings] = useState(false);
   const [settingsScore, setSettingsScore] = useState(70);
