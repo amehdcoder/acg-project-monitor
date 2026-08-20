@@ -5,21 +5,7 @@
  */
 import type { QuizKoboSubmissionRow } from "@/hooks/useQuizKobo";
 import type { QuizKoboIdentityFields, QuizKoboQuestion } from "./scoring";
-import { leafName, normalizeKey } from "./scoring";
-
-/** Identity/classification fields that must never be scored as questions. */
-const IDENTITY_RE =
-  /independent.?monitor|monitor.?name|participant.?name|respondent.?name|interviewer.?name|full.?name|^name$|assessment.?type|^intervention$|mda.?intervention/;
-
-const isIdentityField = (name: string, identity?: QuizKoboIdentityFields | null): boolean => {
-  const leaf = leafName(name);
-  if (identity) {
-    for (const f of [identity.nameField, identity.assessmentField, identity.interventionField]) {
-      if (f && leafName(f) === leaf) return true;
-    }
-  }
-  return IDENTITY_RE.test(normalizeKey(leaf));
-};
+import { isIdentityQuestion, leafName } from "./scoring";
 
 export interface KoboItemStat {
   name: string;
