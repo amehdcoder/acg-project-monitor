@@ -39,10 +39,11 @@ import CommunityVisitedTable, { buildCommunityVisits } from "./CommunityVisitedT
 
 
 const PALETTE = [
-  "hsl(214,80%,45%)", "hsl(160,60%,40%)", "hsl(35,90%,50%)", "hsl(350,70%,52%)",
-  "hsl(265,55%,55%)", "hsl(190,65%,42%)", "hsl(95,45%,42%)", "hsl(20,75%,52%)",
-  "hsl(320,50%,50%)",
+  "#1D4ED8", "#059669", "#F59E0B", "#DC2626",
+  "#7C3AED", "#0891B2", "#65A30D", "#EA580C",
+  "#DB2777",
 ];
+
 
 /** Semantic colours for the Status of MDA bar chart. */
 const MDA_STATUS_COLORS: { match: RegExp; color: string }[] = [
