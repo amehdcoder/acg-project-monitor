@@ -44,7 +44,7 @@ export function exportKoboCSV(ctx: KoboExportContext) {
     ["Pass rate post %", summary.postPassRate.toFixed(1)],
     [],
   ];
-  void config;
+
   const header = ["Name of Independent Monitor", "MDA group", "Pre %", "Post %", "Delta", "Status"];
   const body = pairs.map((p) => [
     p.name, p.group ?? "", p.pre?.toFixed(1) ?? "", p.post?.toFixed(1) ?? "",
