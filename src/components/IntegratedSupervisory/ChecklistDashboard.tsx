@@ -354,6 +354,8 @@ export interface PerfRow {
   respondents: number;
   avgRespondents: number;
   days: number;
+  /** Configured on the Kobo form but has never submitted a checklist. */
+  noSubmissions?: boolean;
 }
 
 /** Submissions / respondents / average / days-worked table. */
