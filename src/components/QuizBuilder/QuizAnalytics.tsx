@@ -168,6 +168,42 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
   const [profiles, setProfiles] = useState<Record<string, { first_name: string; last_name: string }>>({});
   const [loading, setLoading] = useState(true);
 
+  // ───── KoboToolbox realtime ingestion (embedded across every tab) ─────
+  const { config: koboConfig, submissions: koboSubmissions, live: koboLive, lastEventAt: koboLastEvent, loading: koboLoading } =
+    useQuizKobo(quiz.id);
+  const [koboGroup, setKoboGroup] = useState("all");
+
+  const koboGroups = useMemo(() => {
+    const fromConfig = groupsOf(koboConfig?.question_config ?? []);
+    if (fromConfig.length) return fromConfig;
+    const codes = new Map<string, number>();
+    koboSubmissions.forEach((s) => {
+      if (s.intervention_group) codes.set(s.intervention_group, (codes.get(s.intervention_group) ?? 0) + 1);
+    });
+    return [...codes.entries()].map(([code, count]) => ({ code, label: code, count }));
+  }, [koboConfig, koboSubmissions]);
+
+  const koboRows = useMemo(() => filterByGroup(koboSubmissions, koboGroup), [koboSubmissions, koboGroup]);
+  const koboPairs = useMemo(() => pairParticipants(koboRows), [koboRows]);
+  const koboStats = useMemo(() => koboPairedTTest(koboPairs), [koboPairs]);
+  const koboSummary = useMemo(
+    () => improvementSummary(koboPairs, koboRows, quiz.passing_score),
+    [koboPairs, koboRows, quiz.passing_score],
+  );
+  const koboBands = useMemo(() => bandBreakdown(koboRows), [koboRows]);
+  const koboPreBands = useMemo(() => bandBreakdown(koboRows.filter((r) => r.assessment_type === "pre")), [koboRows]);
+  const koboPostBands = useMemo(() => bandBreakdown(koboRows.filter((r) => r.assessment_type === "post")), [koboRows]);
+  const koboItems = useMemo(() => koboItemStats(koboRows), [koboRows]);
+  const koboMaxScore = useMemo(
+    () => koboRows.reduce((m, r) => Math.max(m, Number(r.max_score) || 0), 0),
+    [koboRows],
+  );
+  const koboGroupLabel = koboGroup === "all"
+    ? "All Questions"
+    : `${koboGroups.find((g) => g.code === koboGroup)?.label ?? koboGroup} MDA`;
+
+
+
   useEffect(() => {
     const fetch = async () => {
       setLoading(true);
