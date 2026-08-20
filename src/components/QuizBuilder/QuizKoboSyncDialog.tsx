@@ -356,7 +356,27 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
                         </TableCell>
                         <TableCell className="text-xs">{q.groupLabel || questionGroupKey(q)}</TableCell>
                         <TableCell>
-                          {q.choices.length ? (
+                          {q.choices.length && q.type === "select_multiple" ? (
+                            <div className="flex flex-wrap gap-1">
+                              {q.choices.map((c) => {
+                                const on = q.correct.includes(c.name);
+                                return (
+                                  <Badge
+                                    key={c.name}
+                                    variant={on ? "default" : "outline"}
+                                    className="cursor-pointer text-[10px]"
+                                    onClick={() => updateQuestion(q.name, {
+                                      correct: on
+                                        ? q.correct.filter((x) => x !== c.name)
+                                        : [...q.correct, c.name],
+                                    })}
+                                  >
+                                    {c.label}
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          ) : q.choices.length ? (
                             <Select
                               value={q.correct[0] ?? ""}
                               onValueChange={(v) => updateQuestion(q.name, { correct: [v] })}
@@ -373,7 +393,7 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
                               className="h-8 text-xs"
                               value={q.correct.join(" ")}
                               onChange={(e) => updateQuestion(q.name, { correct: e.target.value.split(/\s+/).filter(Boolean) })}
-                              placeholder="Expected value"
+                              placeholder="Re-import schema to load options"
                             />
                           )}
                         </TableCell>
@@ -395,20 +415,20 @@ export default function QuizKoboSyncDialog({ open, onClose, quizId, quizTitle, c
               <Button
                 variant="outline" size="sm"
                 onClick={() => setQuestions((p) => p.map((q) => (
-                  questionGroupKey(q) === groupFilter || groupFilter === "all" ? { ...q, points: 4 } : q
+                  questionGroupKey(q) === groupFilter || groupFilter === "all" ? { ...q, points: 10 } : q
                 )))}
                 disabled={!questions.length}
               >
-                Set 4 pts for shown
+                Set 10 pts for shown
               </Button>
               <Button
                 variant="outline" size="sm"
                 onClick={() => setQuestions((p) => p.map((q) => (
-                  questionGroupKey(q) === groupFilter || groupFilter === "all" ? { ...q, points: 1 } : q
+                  questionGroupKey(q) === groupFilter || groupFilter === "all" ? { ...q, points: 5 } : q
                 )))}
                 disabled={!questions.length}
               >
-                Set 1 pt for shown
+                Set 5 pts for shown
               </Button>
               <Button onClick={save} disabled={busy !== null} className="gap-1.5">
                 {busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save answer key
