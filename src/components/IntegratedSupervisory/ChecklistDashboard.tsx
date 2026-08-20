@@ -430,7 +430,7 @@ function performanceBy(
     const rec = m.get(name) ?? { subs: 0, resp: 0, days: new Set<string>() };
     rec.subs += 1;
     rec.resp += Number(p.respondent_count) || 0;
-    const t = String(p._submission_time ?? "").slice(0, 10);
+    const t = koboWorkDay(p);
     if (t) rec.days.add(t);
     m.set(name, rec);
   }
