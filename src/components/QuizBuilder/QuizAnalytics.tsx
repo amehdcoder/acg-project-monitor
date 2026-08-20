@@ -160,7 +160,7 @@ const COLORS = {
   purple: "hsl(270, 60%, 55%)",
 };
 
-const PIE_COLORS = ["hsl(150, 60%, 45%)", "hsl(0, 70%, 55%)"];
+const PIE_COLORS = ["#059669", "#DC2626"];
 
 const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
   const [attempts, setAttempts] = useState<Attempt[]>([]);

@@ -209,8 +209,8 @@ function DonutChart({ data, height = 300 }: { data: { name: string; value: numbe
           <defs>
             {DONUT_PALETTE.map((c, i) => (
               <linearGradient key={i} id={`petalGrad${i}`} x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor={c} stopOpacity={0.16} />
-                <stop offset="100%" stopColor={c} stopOpacity={0.04} />
+                <stop offset="0%" stopColor={c} stopOpacity={0.62} />
+                <stop offset="100%" stopColor={c} stopOpacity={0.34} />
               </linearGradient>
             ))}
             {DONUT_PALETTE.map((c, i) => (
