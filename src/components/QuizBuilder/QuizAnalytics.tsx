@@ -494,9 +494,10 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
 
 
 
-  // Pagination for individual scores
-  const pagination = useTablePagination(analysis.pairedData, 10);
+  // Pagination for individual results (Kobo + in-app)
+  const pagination = useTablePagination(unifiedPairs, 10);
   const pagedPairedData = pagination.paginatedData;
+
 
   // Generate interpretation text
   const interpretation = useMemo(() => {
