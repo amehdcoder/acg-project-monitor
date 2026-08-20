@@ -19,8 +19,11 @@ import {
   Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import {
-  Activity, ArrowDownRight, ArrowUpRight, Minus, Radio, Sigma, Users,
+  Activity, ArrowDownRight, ArrowUpRight, FileSpreadsheet, FileText, Minus, Radio, Sigma, Users,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import jsPDF from "jspdf";
 import PetalDonutChart from "@/components/charts/PetalDonutChart";
 import { useQuizKobo } from "@/hooks/useQuizKobo";
 import {
@@ -67,6 +70,111 @@ export default function QuizKoboAnalytics({ quizId, passingScore }: Props) {
     [pairs],
   );
 
+  const groupLabel = group === "all"
+    ? "All Questions"
+    : `${groups.find((g) => g.code === group)?.label ?? group} MDA`;
+  const stamp = new Date();
+  const fileBase = `quiz-analytics-${groupLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${stamp.toISOString().slice(0, 10)}`;
+
+  const exportCSV = () => {
+    if (!pairs.length) { toast.error("Nothing to export yet"); return; }
+    const esc = (v: unknown) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const meta: (string | number)[][] = [
+      ["Quiz Kobo Analytics"],
+      ["Form", config?.form_title ?? config?.form_uid ?? ""],
+      ["MDA intervention filter", groupLabel],
+      ["Generated", stamp.toLocaleString()],
+      ["Pre-tests", summary.preCount], ["Post-tests", summary.postCount],
+      ["Paired participants", stats?.n ?? 0],
+      ["Mean pre %", stats ? stats.meanPre.toFixed(1) : ""],
+      ["Mean post %", stats ? stats.meanPost.toFixed(1) : ""],
+      ["Mean gain %", stats ? stats.meanGain.toFixed(1) : ""],
+      ["t", stats ? stats.t.toFixed(3) : ""], ["df", stats?.df ?? ""],
+      ["p-value", stats ? stats.p.toFixed(4) : ""], ["Cohen's d", stats ? stats.cohensD.toFixed(3) : ""],
+      ["Pass rate pre %", summary.prePassRate.toFixed(1)],
+      ["Pass rate post %", summary.postPassRate.toFixed(1)],
+      [],
+    ];
+    const header = ["Name of Independent Monitor", "MDA group", "Pre %", "Post %", "Delta", "Status"];
+    const body = pairs.map((p) => [
+      p.name, p.group ?? "", p.pre?.toFixed(1) ?? "", p.post?.toFixed(1) ?? "",
+      p.delta?.toFixed(1) ?? "", p.trend === "incomplete" ? "Awaiting pair" : p.trend,
+    ]);
+    const csv = [...meta, header, ...body].map((r) => r.map(esc).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `${fileBase}.csv`; a.click();
+    URL.revokeObjectURL(url);
+    toast.success("CSV exported");
+  };
+
+  const exportPDF = () => {
+    if (!pairs.length) { toast.error("Nothing to export yet"); return; }
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+    let y = 46;
+    doc.setFont("helvetica", "bold").setFontSize(16);
+    doc.text("Quiz Pre/Post Test Analytics Report", 40, y); y += 18;
+    doc.setFont("helvetica", "normal").setFontSize(10).setTextColor(90);
+    doc.text(`${config?.form_title ?? config?.form_uid ?? ""}`, 40, y); y += 13;
+    doc.text(`MDA intervention: ${groupLabel}   |   Generated: ${stamp.toLocaleString()}`, 40, y); y += 22;
+    doc.setTextColor(0);
+
+    doc.setFont("helvetica", "bold").setFontSize(12).text("Summary", 40, y); y += 14;
+    doc.setFont("helvetica", "normal").setFontSize(10);
+    const lines = [
+      `Pre-tests: ${summary.preCount}    Post-tests: ${summary.postCount}    Paired participants: ${stats?.n ?? 0}`,
+      stats
+        ? `Mean score: ${stats.meanPre.toFixed(1)}% -> ${stats.meanPost.toFixed(1)}% (gain ${stats.meanGain > 0 ? "+" : ""}${stats.meanGain.toFixed(1)} pp)`
+        : "Mean score: awaiting paired submissions",
+      stats
+        ? `Paired t-test: t = ${stats.t.toFixed(3)}, df = ${stats.df}, ${fmtP(stats.p)}, Cohen's d = ${stats.cohensD.toFixed(3)}`
+        : "Paired t-test: not available",
+      `Pass rate (>= ${passingScore}%): pre ${summary.prePassRate.toFixed(1)}% -> post ${summary.postPassRate.toFixed(1)}%`,
+      `Improved: ${summary.improved}    Declined: ${summary.declined}    Unchanged: ${summary.unchanged}`,
+      stats
+        ? (stats.significant ? "Conclusion: statistically significant improvement." : "Conclusion: no statistically significant change.")
+        : "",
+    ].filter(Boolean);
+    lines.forEach((l) => { doc.text(doc.splitTextToSize(l, W - 80), 46, y); y += 14; });
+    y += 10;
+
+    doc.setFont("helvetica", "bold").setFontSize(12).text("Independent Monitor results", 40, y); y += 16;
+    const cols = [46, 250, 330, 400, 460, 510];
+    const head = ["Independent Monitor", "MDA group", "Pre %", "Post %", "Delta", "Status"];
+    const drawHead = () => {
+      doc.setFont("helvetica", "bold").setFontSize(9).setTextColor(255);
+      doc.setFillColor(37, 99, 235).rect(40, y - 11, W - 80, 16, "F");
+      head.forEach((h, i) => doc.text(h, cols[i], y));
+      doc.setTextColor(0).setFont("helvetica", "normal");
+      y += 16;
+    };
+    drawHead();
+    pairs.forEach((p, i) => {
+      if (y > H - 60) { doc.addPage(); y = 50; drawHead(); }
+      if (i % 2 === 0) { doc.setFillColor(245, 247, 250).rect(40, y - 10, W - 80, 14, "F"); }
+      doc.setFontSize(9);
+      const row = [
+        p.name.slice(0, 34), (p.group ?? "—").slice(0, 14),
+        p.pre != null ? p.pre.toFixed(1) : "—",
+        p.post != null ? p.post.toFixed(1) : "—",
+        p.delta == null ? "—" : `${p.delta > 0 ? "+" : ""}${p.delta.toFixed(1)}`,
+        p.trend === "incomplete" ? "Awaiting pair" : p.trend,
+      ];
+      row.forEach((c, ci) => doc.text(String(c), cols[ci], y));
+      y += 14;
+    });
+
+    doc.setFontSize(8).setTextColor(120);
+    doc.text("Score bands: Excellent >= 80% | Good >= 70% | Moderate >= 60% | below 60% needs additional training.", 40, H - 34, { maxWidth: W - 80 });
+    doc.save(`${fileBase}.pdf`);
+    toast.success("PDF report generated");
+  };
+
   if (!config) {
     return (
       <Card className="form-card">
@@ -94,16 +202,24 @@ export default function QuizKoboAnalytics({ quizId, passingScore }: Props) {
                 {lastEventAt && ` · last update ${lastEventAt.toLocaleTimeString()}`}
               </CardDescription>
             </div>
-            <div className="w-64">
-              <Select value={group} onValueChange={setGroup}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Questions</SelectItem>
-                  {groups.map((g) => (
-                    <SelectItem key={g.code} value={g.code}>{g.label} MDA</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="w-56">
+                <Select value={group} onValueChange={setGroup}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Questions</SelectItem>
+                    {groups.map((g) => (
+                      <SelectItem key={g.code} value={g.code}>{g.label} MDA</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button variant="outline" size="sm" onClick={exportCSV} className="gap-1.5">
+                <FileSpreadsheet className="h-4 w-4" /> CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportPDF} className="gap-1.5">
+                <FileText className="h-4 w-4" /> PDF report
+              </Button>
             </div>
           </div>
         </CardHeader>

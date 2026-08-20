@@ -148,9 +148,9 @@ export function parseKoboForm(survey: any[], choices: any[]): ParsedKoboForm {
       groupLabel: group?.label ?? null,
       interventionCode: parseInterventionCode(row?.relevant),
       type: kind as QuizKoboQuestion["type"],
-      choices: choiceMap.get(listName ?? "") ?? [],
+      choices: choiceMap.get(String(row?.select_from_list_name ?? row?.["select from list name"] ?? listName ?? "")) ?? [],
       correct: [],
-      points: 1,
+      points: 10,
       enabled: true,
     });
   }
