@@ -9443,6 +9443,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      can_read_quiz_kobo: {
+        Args: { _quiz_id: string; _user_id: string }
+        Returns: boolean
+      }
       can_review_after_hours: {
         Args: { p_project_id: string }
         Returns: boolean
