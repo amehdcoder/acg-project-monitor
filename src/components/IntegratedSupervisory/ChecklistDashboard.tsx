@@ -415,6 +415,29 @@ function makeNameResolver(
   };
 }
 
+/**
+ * Calendar day a checklist was actually worked, taken from the KoboToolbox
+ * device metadata `_end` (the moment the enumerator saved the form) so the
+ * count reflects real field days, not server sync days.
+ *
+ * The Kobo timestamp carries the device UTC offset (e.g.
+ * "2026-08-19T16:40:12.123+01:00"), so the leading YYYY-MM-DD is already the
+ * enumerator's local date — slicing avoids any timezone shift from the
+ * viewer's browser. Falls back to `_start`, then the server submission time.
+ */
+function koboWorkDay(p: Record<string, unknown>): string {
+  const candidates = [p._end, p.end, p._start, p.start, p._submission_time];
+  for (const c of candidates) {
+    const s = String(c ?? "").trim();
+    if (!s) continue;
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
+    const d = new Date(s);
+    if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  return "";
+}
+
 function performanceBy(
   parents: Record<string, unknown>[],
   field: string,
