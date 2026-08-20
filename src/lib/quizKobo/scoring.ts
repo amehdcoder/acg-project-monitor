@@ -31,6 +31,8 @@ export interface QuizKoboIdentityFields {
   nameField?: string | null;
   assessmentField?: string | null;
   interventionField?: string | null;
+  /** Choice list of the participant-name question, so codes resolve to labels. */
+  nameChoices?: KoboChoice[] | null;
 }
 
 export type ScoreBand = "excellent" | "good" | "moderate" | "needs_training";
@@ -133,7 +135,12 @@ export function parseKoboForm(survey: any[], choices: any[]): ParsedKoboForm {
     // Identity / classification fields (kept out of the scored set).
     const nk = normalizeKey(name);
     if (kind === "select_one" && /assessment.?type/.test(nk)) { identity.assessmentField = name; continue; }
-    if (/independent.?monitor|participant.?name|monitor.?name/.test(nk)) { identity.nameField = name; continue; }
+    if (/independent.?monitor|participant.?name|monitor.?name/.test(nk)) {
+      identity.nameField = name;
+      identity.nameChoices =
+        choiceMap.get(String(row?.select_from_list_name ?? row?.["select from list name"] ?? listName ?? "")) ?? null;
+      continue;
+    }
     if (kind === "select_one" && /^intervention$|mda.?intervention/.test(nk)) { identity.interventionField = name; continue; }
 
     if (META_TYPES.has(kind) || KOBO_META_FIELDS.has(name)) continue;
@@ -253,9 +260,12 @@ export function resolveParticipantName(
   identity: QuizKoboIdentityFields,
   choiceLabelFor?: (field: string, value: string) => string,
 ): string {
+  const fromChoices = (raw: string): string =>
+    identity.nameChoices?.find((c) => String(c.name) === raw)?.label ?? "";
+
   const fromField = (field: string, raw: string): string => {
     if (!raw) return "";
-    const label = choiceLabelFor ? choiceLabelFor(field, raw) : "";
+    const label = fromChoices(raw) || (choiceLabelFor ? choiceLabelFor(field, raw) : "");
     return humanizeName(label || raw);
   };
 
