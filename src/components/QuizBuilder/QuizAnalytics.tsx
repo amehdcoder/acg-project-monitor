@@ -12,8 +12,20 @@ import { useTablePagination } from "@/hooks/useTablePagination";
 import {
   ArrowLeft, Users, TrendingUp, TrendingDown, BarChart3, Award, CheckCircle, XCircle,
   BookOpen, Target, Percent, Activity, Brain, Lightbulb, AlertTriangle, Radio,
+  FileSpreadsheet, FileText, Sigma,
 } from "lucide-react";
-import QuizKoboAnalytics from "./QuizKoboAnalytics";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import PetalDonutChart from "@/components/charts/PetalDonutChart";
+import { useQuizKobo } from "@/hooks/useQuizKobo";
+import {
+  bandBreakdown, filterByGroup, improvementSummary,
+  pairedTTest as koboPairedTTest, pairParticipants,
+} from "@/lib/quizKobo/analytics";
+import { groupsOf } from "@/lib/quizKobo/scoring";
+import { koboItemStats } from "@/lib/quizKobo/itemAnalysis";
+import { exportKoboCSV, exportKoboPDF, fmtP } from "@/lib/quizKobo/exports";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -21,6 +33,7 @@ import {
   LineChart, Line, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis,
   PolarRadiusAxis, Radar, AreaChart, Area, ScatterChart, Scatter, ZAxis,
 } from "recharts";
+
 
 interface QuizAnalyticsProps {
   quiz: {
