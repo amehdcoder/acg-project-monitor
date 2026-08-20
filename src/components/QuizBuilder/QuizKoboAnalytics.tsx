@@ -202,16 +202,24 @@ export default function QuizKoboAnalytics({ quizId, passingScore }: Props) {
                 {lastEventAt && ` · last update ${lastEventAt.toLocaleTimeString()}`}
               </CardDescription>
             </div>
-            <div className="w-64">
-              <Select value={group} onValueChange={setGroup}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Questions</SelectItem>
-                  {groups.map((g) => (
-                    <SelectItem key={g.code} value={g.code}>{g.label} MDA</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="w-56">
+                <Select value={group} onValueChange={setGroup}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Questions</SelectItem>
+                    {groups.map((g) => (
+                      <SelectItem key={g.code} value={g.code}>{g.label} MDA</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button variant="outline" size="sm" onClick={exportCSV} className="gap-1.5">
+                <FileSpreadsheet className="h-4 w-4" /> CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportPDF} className="gap-1.5">
+                <FileText className="h-4 w-4" /> PDF report
+              </Button>
             </div>
           </div>
         </CardHeader>
