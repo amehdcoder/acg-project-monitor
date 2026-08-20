@@ -27,7 +27,8 @@ import {
   pairedTTest as koboPairedTTest, pairParticipants,
 } from "@/lib/quizKobo/analytics";
 import { groupsOf } from "@/lib/quizKobo/scoring";
-import { koboItemStats } from "@/lib/quizKobo/itemAnalysis";
+import { koboItemStats, uniqueParticipantCount } from "@/lib/quizKobo/itemAnalysis";
+import { fullSyncKobo } from "@/lib/quizKobo/fullSync";
 import { pairingConsistency } from "@/lib/quizKobo/pairingCheck";
 import { needsIdentityRepair, repairKoboIdentity, rescoreStoredSubmissions } from "@/lib/quizKobo/identityRepair";
 import { exportKoboCSV, exportKoboPDF, fmtP } from "@/lib/quizKobo/exports";
