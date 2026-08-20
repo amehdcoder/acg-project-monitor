@@ -12,8 +12,20 @@ import { useTablePagination } from "@/hooks/useTablePagination";
 import {
   ArrowLeft, Users, TrendingUp, TrendingDown, BarChart3, Award, CheckCircle, XCircle,
   BookOpen, Target, Percent, Activity, Brain, Lightbulb, AlertTriangle, Radio,
+  FileSpreadsheet, FileText, Sigma, Download,
 } from "lucide-react";
-import QuizKoboAnalytics from "./QuizKoboAnalytics";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import PetalDonutChart from "@/components/charts/PetalDonutChart";
+import { useQuizKobo } from "@/hooks/useQuizKobo";
+import {
+  bandBreakdown, filterByGroup, improvementSummary,
+  pairedTTest as koboPairedTTest, pairParticipants,
+} from "@/lib/quizKobo/analytics";
+import { groupsOf } from "@/lib/quizKobo/scoring";
+import { koboItemStats } from "@/lib/quizKobo/itemAnalysis";
+import { exportKoboCSV, exportKoboPDF, fmtP } from "@/lib/quizKobo/exports";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -21,6 +33,7 @@ import {
   LineChart, Line, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis,
   PolarRadiusAxis, Radar, AreaChart, Area, ScatterChart, Scatter, ZAxis,
 } from "recharts";
+
 
 interface QuizAnalyticsProps {
   quiz: {
@@ -155,6 +168,42 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
   const [profiles, setProfiles] = useState<Record<string, { first_name: string; last_name: string }>>({});
   const [loading, setLoading] = useState(true);
 
+  // ───── KoboToolbox realtime ingestion (embedded across every tab) ─────
+  const { config: koboConfig, submissions: koboSubmissions, live: koboLive, lastEventAt: koboLastEvent, loading: koboLoading } =
+    useQuizKobo(quiz.id);
+  const [koboGroup, setKoboGroup] = useState("all");
+
+  const koboGroups = useMemo(() => {
+    const fromConfig = groupsOf(koboConfig?.question_config ?? []);
+    if (fromConfig.length) return fromConfig;
+    const codes = new Map<string, number>();
+    koboSubmissions.forEach((s) => {
+      if (s.intervention_group) codes.set(s.intervention_group, (codes.get(s.intervention_group) ?? 0) + 1);
+    });
+    return [...codes.entries()].map(([code, count]) => ({ code, label: code, count }));
+  }, [koboConfig, koboSubmissions]);
+
+  const koboRows = useMemo(() => filterByGroup(koboSubmissions, koboGroup), [koboSubmissions, koboGroup]);
+  const koboPairs = useMemo(() => pairParticipants(koboRows), [koboRows]);
+  const koboStats = useMemo(() => koboPairedTTest(koboPairs), [koboPairs]);
+  const koboSummary = useMemo(
+    () => improvementSummary(koboPairs, koboRows, quiz.passing_score),
+    [koboPairs, koboRows, quiz.passing_score],
+  );
+  const koboBands = useMemo(() => bandBreakdown(koboRows), [koboRows]);
+  const koboPreBands = useMemo(() => bandBreakdown(koboRows.filter((r) => r.assessment_type === "pre")), [koboRows]);
+  const koboPostBands = useMemo(() => bandBreakdown(koboRows.filter((r) => r.assessment_type === "post")), [koboRows]);
+  const koboItems = useMemo(() => koboItemStats(koboRows), [koboRows]);
+  const koboMaxScore = useMemo(
+    () => koboRows.reduce((m, r) => Math.max(m, Number(r.max_score) || 0), 0),
+    [koboRows],
+  );
+  const koboGroupLabel = koboGroup === "all"
+    ? "All Questions"
+    : `${koboGroups.find((g) => g.code === koboGroup)?.label ?? koboGroup} MDA`;
+
+
+
   useEffect(() => {
     const fetch = async () => {
       setLoading(true);
@@ -262,33 +311,92 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
     };
   }, [attempts, quiz.passing_score]);
 
-  // Chart data
-  const comparisonChartData = useMemo(() =>
-    analysis.pairedData.map(p => {
+  // ───── Unified dataset: in-app attempts + KoboToolbox ingested submissions ─────
+  const unifiedPairs = useMemo(() => {
+    const fromKobo = koboPairs.map((p) => ({
+      key: `kobo-${p.key}`,
+      name: p.name,
+      group: p.group ?? "Kobo",
+      pre: p.pre,
+      post: p.post,
+      diff: p.delta,
+      source: "Kobo" as const,
+    }));
+    const fromApp = analysis.pairedData.map((p) => {
       const prof = profiles[p.userId];
       return {
-        name: prof ? `${prof.first_name} ${prof.last_name?.charAt(0) || ""}.` : p.userId.slice(0, 8),
-        "Pre-test": Math.round(p.pre),
-        "Post-test": Math.round(p.post),
-        Change: Math.round(p.diff),
+        key: `app-${p.userId}`,
+        name: prof ? `${prof.first_name} ${prof.last_name ?? ""}`.trim() : p.userId.slice(0, 12),
+        group: "In-app",
+        pre: p.pre as number | null,
+        post: p.post as number | null,
+        diff: p.diff as number | null,
+        source: "In-app" as const,
       };
-    }),
-  [analysis.pairedData, profiles]);
+    });
+    return [...fromKobo, ...fromApp];
+  }, [koboPairs, analysis.pairedData, profiles]);
+
+  const koboPre = useMemo(() => koboRows.filter(r => r.assessment_type === "pre").map(r => Number(r.percentage)), [koboRows]);
+  const koboPost = useMemo(() => koboRows.filter(r => r.assessment_type === "post").map(r => Number(r.percentage)), [koboRows]);
+
+  /** Top KPI cards computed across every ingested Kobo record + in-app attempts. */
+  const kpi = useMemo(() => {
+    const allPre = [...analysis.preAttempts.map(a => a.percentage), ...koboPre];
+    const allPost = [...analysis.postAttempts.map(a => a.percentage), ...koboPost];
+    const participants =
+      analysis.totalParticipants + new Set(koboRows.map(r => r.participant_key)).size;
+    const paired = analysis.pairedCount + (koboStats?.n ?? 0);
+    const rate = (arr: number[]) =>
+      arr.length ? Math.round((arr.filter(v => v >= quiz.passing_score).length / arr.length) * 100) : 0;
+    return {
+      participants,
+      paired,
+      preCount: allPre.length,
+      postCount: allPost.length,
+      preMean: allPre.length ? Math.round(mean(allPre) * 10) / 10 : 0,
+      postMean: allPost.length ? Math.round(mean(allPost) * 10) / 10 : 0,
+      prePassRate: rate(allPre),
+      postPassRate: rate(allPost),
+      hasPre: allPre.length > 0,
+      hasPost: allPost.length > 0,
+      improved: unifiedPairs.filter(p => (p.diff ?? 0) > 0).length,
+      declined: unifiedPairs.filter(p => (p.diff ?? 0) < 0).length,
+      unchanged: unifiedPairs.filter(p => p.diff === 0).length,
+    };
+  }, [analysis, koboPre, koboPost, koboRows, koboStats, unifiedPairs, quiz.passing_score]);
+
+  // Chart data
+  const comparisonChartData = useMemo(() =>
+    unifiedPairs
+      .filter(p => p.pre != null || p.post != null)
+      .map(p => ({
+        name: p.name.length > 20 ? `${p.name.slice(0, 19)}…` : p.name,
+        "Pre-test": p.pre != null ? Math.round(p.pre) : 0,
+        "Post-test": p.post != null ? Math.round(p.post) : 0,
+        Change: p.diff != null ? Math.round(p.diff) : 0,
+      })),
+  [unifiedPairs]);
 
   const distributionData = useMemo(() => {
     const bins = ["0-20%", "21-40%", "41-60%", "61-80%", "81-100%"];
     const ranges = [[0, 20], [21, 40], [41, 60], [61, 80], [81, 100]];
+    const pre = [...analysis.preAttempts.map(a => a.percentage), ...koboPre];
+    const post = [...analysis.postAttempts.map(a => a.percentage), ...koboPost];
+    const inBin = (arr: number[], i: number) =>
+      arr.filter(v => v >= ranges[i][0] && v <= ranges[i][1]).length;
     return bins.map((label, i) => ({
       range: label,
-      "Pre-test": analysis.preAttempts.filter(a => a.percentage >= ranges[i][0] && a.percentage <= ranges[i][1]).length,
-      "Post-test": analysis.postAttempts.filter(a => a.percentage >= ranges[i][0] && a.percentage <= ranges[i][1]).length,
+      "Pre-test": inBin(pre, i),
+      "Post-test": inBin(post, i),
     }));
-  }, [analysis]);
+  }, [analysis, koboPre, koboPost]);
+
 
   // ───── Per-question difficulty analysis ─────
   // For each question, count how many attempts answered it correctly vs incorrectly.
   // Post-test answers are used when available, otherwise all attempts.
-  const questionStats = useMemo(() => {
+  const appQuestionStats = useMemo(() => {
     if (questions.length === 0) return [];
     const post = attempts.filter(a => a.attempt_type === "post_test");
     const source = post.length > 0 ? post : attempts;
@@ -322,7 +430,26 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
       .filter(q => q.answered > 0);
   }, [questions, attempts]);
 
-  const questionSource = attempts.some(a => a.attempt_type === "post_test") ? "Post-test" : "All attempts";
+  /** Item analysis across in-app questions AND every ingested Kobo question. */
+  const questionStats = useMemo(() => {
+    const offset = appQuestionStats.length;
+    const fromKobo = koboItems.map((it, i) => ({
+      id: `kobo-${it.name}`,
+      number: offset + i + 1,
+      text: it.label,
+      correctLabel: it.group === "general" ? "—" : it.group,
+      answered: it.answered,
+      correct: it.correct,
+      incorrect: it.incorrect,
+      correctRate: it.correctRate,
+      failRate: it.failRate,
+    }));
+    return [...appQuestionStats, ...fromKobo];
+  }, [appQuestionStats, koboItems]);
+
+  const questionSource = koboItems.length
+    ? "KoboToolbox submissions"
+    : (attempts.some(a => a.attempt_type === "post_test") ? "Post-test" : "All attempts");
   const mostPassed = useMemo(
     () => [...questionStats].sort((a, b) => b.correctRate - a.correctRate).slice(0, 5),
     [questionStats],
@@ -332,89 +459,108 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
     [questionStats],
   );
 
-
-
   const improvementPie = useMemo(() => [
-    { name: "Improved", value: analysis.improvedCount, color: COLORS.post },
-    { name: "Declined", value: analysis.declinedCount, color: COLORS.danger },
-    { name: "No Change", value: analysis.noChangeCount, color: COLORS.accent },
-  ].filter(d => d.value > 0), [analysis]);
+    { name: "Improved", value: kpi.improved, color: COLORS.post },
+    { name: "Declined", value: kpi.declined, color: COLORS.danger },
+    { name: "No Change", value: kpi.unchanged, color: COLORS.accent },
+  ].filter(d => d.value > 0), [kpi]);
 
   const passRateComparison = useMemo(() => {
     const rows: any[] = [];
-    if (analysis.hasPre) rows.push({ name: "Pre-test", Passed: analysis.prePassRate, Failed: 100 - analysis.prePassRate });
-    if (analysis.hasPost) rows.push({ name: "Post-test", Passed: analysis.postPassRate, Failed: 100 - analysis.postPassRate });
+    if (kpi.hasPre) rows.push({ name: "Pre-test", Passed: kpi.prePassRate, Failed: 100 - kpi.prePassRate });
+    if (kpi.hasPost) rows.push({ name: "Post-test", Passed: kpi.postPassRate, Failed: 100 - kpi.postPassRate });
     return rows;
-  }, [analysis]);
-
+  }, [kpi]);
 
   const scatterData = useMemo(() =>
-    analysis.pairedData.map(p => ({
-      pre: Math.round(p.pre),
-      post: Math.round(p.post),
-      name: profiles[p.userId] ? `${profiles[p.userId].first_name} ${profiles[p.userId].last_name?.charAt(0)}.` : "",
-    })),
-  [analysis.pairedData, profiles]);
+    unifiedPairs
+      .filter(p => p.pre != null && p.post != null)
+      .map(p => ({ pre: Math.round(p.pre as number), post: Math.round(p.post as number), name: p.name })),
+  [unifiedPairs]);
 
   const descriptiveStats = useMemo(() => {
-    const post = (v: string) => (analysis.hasPost ? v : "—");
+    const preAll = [...analysis.preAttempts.map(a => a.percentage), ...koboPre];
+    const postAll = [...analysis.postAttempts.map(a => a.percentage), ...koboPost];
+    const fmt = (arr: number[], f: (a: number[]) => number, suffix = "%") =>
+      arr.length ? `${Math.round(f(arr) * 10) / 10}${suffix}` : "—";
     return [
-      { metric: "Mean", pre: `${analysis.preMean}%`, post: post(`${analysis.postMean}%`) },
-      { metric: "Median", pre: `${analysis.preMedian}%`, post: post(`${analysis.postMedian}%`) },
-      { metric: "Std Dev", pre: `${analysis.preStd}`, post: post(`${analysis.postStd}`) },
-      { metric: "Pass Rate", pre: `${analysis.prePassRate}%`, post: post(`${analysis.postPassRate}%`) },
-      { metric: "Sample Size", pre: `${analysis.preCount}`, post: `${analysis.postCount}` },
+      { metric: "Mean", pre: fmt(preAll, mean), post: fmt(postAll, mean) },
+      { metric: "Median", pre: fmt(preAll, median), post: fmt(postAll, median) },
+      { metric: "Std Dev", pre: preAll.length > 1 ? `${Math.round(stdDev(preAll) * 10) / 10}` : "—", post: postAll.length > 1 ? `${Math.round(stdDev(postAll) * 10) / 10}` : "—" },
+      { metric: "Pass Rate", pre: kpi.hasPre ? `${kpi.prePassRate}%` : "—", post: kpi.hasPost ? `${kpi.postPassRate}%` : "—" },
+      { metric: "Sample Size", pre: `${kpi.preCount}`, post: `${kpi.postCount}` },
     ];
-  }, [analysis]);
+  }, [analysis, koboPre, koboPost, kpi]);
 
 
-  // Pagination for individual scores
-  const pagination = useTablePagination(analysis.pairedData, 10);
+
+  // Pagination for individual results (Kobo + in-app)
+  const pagination = useTablePagination(unifiedPairs, 10);
   const pagedPairedData = pagination.paginatedData;
+
 
   // Generate interpretation text
   const interpretation = useMemo(() => {
-    const t = analysis.testResult;
-    if (!t) return null;
     const lines: string[] = [];
+    const t = analysis.testResult;
 
-    // Test selection rationale
-    lines.push(`📊 **Test Used:** ${t.method.toUpperCase()} — ${t.n >= 30 ? "Selected because sample size n ≥ 30 satisfies the Central Limit Theorem for normal approximation." : `Selected because sample size n = ${t.n} < 30, requiring the t-distribution for accurate p-value estimation.`}`);
-
-    // Hypothesis
-    lines.push(`\n🔬 **Hypotheses:**\n• H₀: There is no significant difference between Pre-test and Post-test scores (μ_diff = 0)\n• H₁: There is a significant difference between Pre-test and Post-test scores (μ_diff ≠ 0)`);
-
-    // Results
-    const statLabel = t.method === "z-test" ? `z = ${t.z}` : `t(${t.df}) = ${t.t}`;
-    lines.push(`\n📈 **Results:** ${statLabel}, p = ${t.p < 0.0001 ? "< 0.0001" : t.p} (two-tailed, α = 0.05)`);
-
-    // Decision
-    if (t.significant) {
-      lines.push(`\n✅ **Decision:** REJECT H₀. The improvement from Pre-test (M = ${t.preMean}%) to Post-test (M = ${t.postMean}%) is statistically significant.`);
-    } else {
-      lines.push(`\n⚠️ **Decision:** FAIL TO REJECT H₀. The difference between Pre-test and Post-test scores is not statistically significant at α = 0.05.`);
+    if (t) {
+      lines.push(`📊 **Test Used:** ${t.method.toUpperCase()} — ${t.n >= 30 ? "Selected because sample size n ≥ 30 satisfies the Central Limit Theorem for normal approximation." : `Selected because sample size n = ${t.n} < 30, requiring the t-distribution for accurate p-value estimation.`}`);
+      lines.push(`\n🔬 **Hypotheses:**\n• H₀: There is no significant difference between Pre-test and Post-test scores (μ_diff = 0)\n• H₁: There is a significant difference between Pre-test and Post-test scores (μ_diff ≠ 0)`);
+      const statLabel = t.method === "z-test" ? `z = ${t.z}` : `t(${t.df}) = ${t.t}`;
+      lines.push(`\n📈 **Results:** ${statLabel}, p = ${t.p < 0.0001 ? "< 0.0001" : t.p} (two-tailed, α = 0.05)`);
+      if (t.significant) {
+        lines.push(`\n✅ **Decision:** REJECT H₀. The improvement from Pre-test (M = ${t.preMean}%) to Post-test (M = ${t.postMean}%) is statistically significant.`);
+      } else {
+        lines.push(`\n⚠️ **Decision:** FAIL TO REJECT H₀. The difference between Pre-test and Post-test scores is not statistically significant at α = 0.05.`);
+      }
+      const absD = Math.abs(t.effectSize);
+      const effectLabel = absD < 0.2 ? "negligible" : absD < 0.5 ? "small" : absD < 0.8 ? "medium" : "large";
+      lines.push(`\n📐 **Effect Size:** Cohen's d = ${t.effectSize} (${effectLabel}). ${absD >= 0.8 ? "This indicates a practically meaningful difference — the intervention had a strong impact." : absD >= 0.5 ? "This suggests a moderate practical significance." : absD >= 0.2 ? "While statistically detectable, the practical impact is small." : "The difference, even if significant, may not be practically meaningful."}`);
+      if (t.preCI && t.postCI) {
+        lines.push(`\n📏 **95% Confidence Intervals:**\n• Pre-test: [${t.preCI.lower}%, ${t.preCI.upper}%]\n• Post-test: [${t.postCI.lower}%, ${t.postCI.upper}%]`);
+      }
     }
 
-    // Effect size
-    const absD = Math.abs(t.effectSize);
-    const effectLabel = absD < 0.2 ? "negligible" : absD < 0.5 ? "small" : absD < 0.8 ? "medium" : "large";
-    lines.push(`\n📐 **Effect Size:** Cohen's d = ${t.effectSize} (${effectLabel}). ${absD >= 0.8 ? "This indicates a practically meaningful difference — the intervention had a strong impact." : absD >= 0.5 ? "This suggests a moderate practical significance." : absD >= 0.2 ? "While statistically detectable, the practical impact is small." : "The difference, even if significant, may not be practically meaningful."}`);
-
-    // Confidence intervals
-    if (t.preCI && t.postCI) {
-      lines.push(`\n📏 **95% Confidence Intervals:**\n• Pre-test: [${t.preCI.lower}%, ${t.preCI.upper}%]\n• Post-test: [${t.postCI.lower}%, ${t.postCI.upper}%]`);
+    // ───── KoboToolbox ingested submissions ─────
+    if (koboRows.length) {
+      lines.push(`\n📡 **KoboToolbox ingestion (${koboGroupLabel}):** ${koboRows.length} submissions scored — ${koboSummary.preCount} Pre-test, ${koboSummary.postCount} Post-test, ${koboStats?.n ?? 0} matched participant pairs.`);
+      if (koboStats) {
+        lines.push(`\n🧮 **Paired t-test on Kobo data:** t = ${koboStats.t.toFixed(3)}, df = ${koboStats.df}, ${fmtP(koboStats.p)}, Cohen's d = ${koboStats.cohensD.toFixed(3)}. Mean score moved ${koboStats.meanPre.toFixed(1)}% → ${koboStats.meanPost.toFixed(1)}% (${koboStats.meanGain > 0 ? "+" : ""}${koboStats.meanGain.toFixed(1)} pp). ${koboStats.significant ? "This change is statistically significant." : "This change is not statistically significant at α = 0.05."}`);
+      }
+      lines.push(`\n🎯 **Pass rate (≥ ${quiz.passing_score}%):** pre ${koboSummary.prePassRate.toFixed(1)}% → post ${koboSummary.postPassRate.toFixed(1)}%. Improved: ${koboSummary.improved}, declined: ${koboSummary.declined}, unchanged: ${koboSummary.unchanged}, awaiting a pair: ${koboSummary.incomplete}.`);
+      const weakest = [...koboItems].sort((a, b) => a.correctRate - b.correctRate).slice(0, 3);
+      if (weakest.length) {
+        lines.push(`\n🧠 **Retraining priorities:** ${weakest.map(w => `“${w.label}” (${w.correctRate}% correct)`).join("; ")}.`);
+      }
+      const needTraining = koboBands.find(b => b.key === "needs_training")?.value ?? 0;
+      if (needTraining) {
+        lines.push(`\n⚠️ **Score bands:** ${needTraining} submission(s) fall below 60% and require additional training.`);
+      }
     }
 
-    // Practical conclusion
-    const pctImproved = analysis.pairedCount > 0 ? Math.round((analysis.improvedCount / analysis.pairedCount) * 100) : 0;
-    lines.push(`\n💡 **Practical Conclusion:** ${pctImproved}% of participants improved their scores. Mean improvement was ${t.improvement > 0 ? "+" : ""}${t.improvement} percentage points. ${t.significant && t.improvement > 0 ? "The training/intervention appears to be effective." : t.significant && t.improvement < 0 ? "Scores declined significantly — consider reviewing the intervention." : "More data may be needed to draw a definitive conclusion."}`);
+    if (!lines.length) return null;
+
+    const pairedTotal = kpi.paired;
+    const pctImproved = pairedTotal > 0 ? Math.round((kpi.improved / pairedTotal) * 100) : 0;
+    lines.push(`\n💡 **Practical Conclusion:** ${pctImproved}% of paired participants improved. Overall mean moved ${kpi.preMean}% → ${kpi.postMean}% across ${kpi.participants} participants. ${kpi.postMean > kpi.preMean ? "The training appears to be working; sustain and target the weakest items." : "No overall gain yet — review facilitation and re-test."}`);
 
     return lines.join("\n");
-  }, [analysis]);
+  }, [analysis, koboRows, koboStats, koboSummary, koboItems, koboBands, koboGroupLabel, kpi, quiz.passing_score]);
+
 
   if (loading) {
     return <div className="flex justify-center py-20"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
   }
+
+  const exportCtx = {
+    formTitle: koboConfig?.form_title || quiz.title,
+    groupLabel: koboGroupLabel,
+    passingScore: quiz.passing_score,
+    pairs: koboPairs,
+    stats: koboStats,
+    summary: koboSummary,
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -428,28 +574,70 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* Persistent Kobo ingestion / export header */}
+      <Card className="form-card border-0 shadow-sm">
+        <CardContent className="py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="flex items-center gap-1.5 text-xs font-semibold">
+            <Radio className={`h-3.5 w-3.5 ${koboLive ? "text-emerald-500 animate-pulse" : "text-muted-foreground"}`} />
+            {koboConfig ? (koboLive ? "Live — Kobo sync active" : "Kobo connected") : "Kobo not connected"}
+          </span>
+          {koboConfig?.form_title && (
+            <Badge variant="secondary" className="text-[10px]">{koboConfig.form_title}</Badge>
+          )}
+          <Badge variant="outline" className="text-[10px]">{koboSubmissions.length} submissions</Badge>
+          {koboMaxScore > 0 && <Badge variant="outline" className="text-[10px]">Max score: {koboMaxScore} pts</Badge>}
+          <Badge variant="outline" className="text-[10px]">Pass mark: {quiz.passing_score}%</Badge>
+          {koboLastEvent && (
+            <span className="text-[10px] text-muted-foreground">Last event {koboLastEvent.toLocaleTimeString()}</span>
+          )}
+          {koboGroups.length > 0 && (
+            <select
+              value={koboGroup}
+              onChange={(e) => setKoboGroup(e.target.value)}
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+              aria-label="MDA intervention filter"
+            >
+              <option value="all">All MDA interventions</option>
+              {koboGroups.map((g) => (
+                <option key={g.code} value={g.code}>{g.label}</option>
+              ))}
+            </select>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-1 h-8" disabled={!koboRows.length}
+              onClick={() => exportKoboCSV(exportCtx)}>
+              <Download className="h-3.5 w-3.5" /> CSV
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1 h-8" disabled={!koboRows.length}
+              onClick={() => exportKoboPDF(exportCtx)}>
+              <FileText className="h-3.5 w-3.5" /> PDF Report
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* KPI Cards — computed across all ingested Kobo records + in-app attempts */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { icon: Users, label: "Participants", value: analysis.totalParticipants, color: "text-primary", bg: "bg-primary/10" },
-          { icon: BarChart3, label: "Pre-test Mean", value: `${analysis.preMean}%`, color: "text-blue-600", bg: "bg-blue-100 dark:bg-blue-900/30" },
-          { icon: TrendingUp, label: "Post-test Mean", value: analysis.hasPost ? `${analysis.postMean}%` : "—", color: "text-emerald-600", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
-          { icon: Target, label: "Paired Tests", value: analysis.pairedCount, color: "text-amber-600", bg: "bg-amber-100 dark:bg-amber-900/30" },
-          { icon: Percent, label: "Pre Pass Rate", value: analysis.hasPre ? `${analysis.prePassRate}%` : "—", color: "text-violet-600", bg: "bg-violet-100 dark:bg-violet-900/30" },
-          { icon: Award, label: "Post Pass Rate", value: analysis.hasPost ? `${analysis.postPassRate}%` : "—", color: "text-rose-600", bg: "bg-rose-100 dark:bg-rose-900/30" },
-
-        ].map((kpi, i) => (
+          { icon: Users, label: "Participants", value: kpi.participants, color: "text-primary", bg: "bg-primary/10" },
+          { icon: BarChart3, label: "Pre-test Mean", value: kpi.hasPre ? `${kpi.preMean}%` : "—", color: "text-blue-600", bg: "bg-blue-100 dark:bg-blue-900/30" },
+          { icon: TrendingUp, label: "Post-test Mean", value: kpi.hasPost ? `${kpi.postMean}%` : "—", color: "text-emerald-600", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
+          { icon: Target, label: "Paired Tests", value: kpi.paired, color: "text-amber-600", bg: "bg-amber-100 dark:bg-amber-900/30" },
+          { icon: Percent, label: "Pre Pass Rate", value: kpi.hasPre ? `${kpi.prePassRate}%` : "—", color: "text-violet-600", bg: "bg-violet-100 dark:bg-violet-900/30" },
+          { icon: Award, label: "Post Pass Rate", value: kpi.hasPost ? `${kpi.postPassRate}%` : "—", color: "text-rose-600", bg: "bg-rose-100 dark:bg-rose-900/30" },
+        ].map((card, i) => (
           <Card key={i} className="form-card border-0 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="py-4 text-center">
-              <div className={`mx-auto flex h-10 w-10 items-center justify-center rounded-xl ${kpi.bg} mb-2`}>
-                <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
+              <div className={`mx-auto flex h-10 w-10 items-center justify-center rounded-xl ${card.bg} mb-2`}>
+                <card.icon className={`h-5 w-5 ${card.color}`} />
               </div>
-              <div className="text-2xl font-bold text-foreground">{kpi.value}</div>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{kpi.label}</p>
+              <div className="text-2xl font-bold text-foreground">{card.value}</div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{card.label}</p>
             </CardContent>
           </Card>
         ))}
       </div>
+
 
       {/* Statistical Test Result */}
       {analysis.testResult && (
@@ -531,18 +719,48 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
           <TabsTrigger value="individual" className="gap-1"><Users className="h-3 w-3" /> Individual</TabsTrigger>
           <TabsTrigger value="questions" className="gap-1"><BookOpen className="h-3 w-3" /> Questions</TabsTrigger>
           <TabsTrigger value="insights" className="gap-1"><Lightbulb className="h-3 w-3" /> Insights</TabsTrigger>
-          <TabsTrigger value="kobo" className="gap-1"><Radio className="h-3 w-3" /> Kobo Realtime</TabsTrigger>
-
         </TabsList>
 
-        {/* KoboToolbox realtime Pre/Post analytics */}
-        <TabsContent value="kobo" className="mt-4">
-          <QuizKoboAnalytics quizId={quiz.id} passingScore={quiz.passing_score} />
-        </TabsContent>
+
 
         {/* Comparison Tab */}
         <TabsContent value="comparison" className="mt-4 space-y-4">
+          {koboStats && (
+            <Card className={`form-card border-l-4 ${koboStats.significant ? "border-l-emerald-500" : "border-l-amber-400"}`}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Sigma className="h-4 w-4 text-primary" />
+                  Paired t-test — KoboToolbox ({koboGroupLabel})
+                  <Badge variant={koboStats.significant ? "default" : "secondary"} className="text-[10px]">
+                    {koboStats.significant ? "Significant" : "Not significant"}
+                  </Badge>
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Paired on Name of Independent Monitor across ingested Pre/Post submissions.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 text-sm">
+                  {[
+                    { l: "Pairs (n)", v: koboStats.n },
+                    { l: "Mean pre", v: `${koboStats.meanPre.toFixed(1)}%` },
+                    { l: "Mean post", v: `${koboStats.meanPost.toFixed(1)}%` },
+                    { l: "Mean gain", v: `${koboStats.meanGain > 0 ? "+" : ""}${koboStats.meanGain.toFixed(1)} pp` },
+                    { l: `t(${koboStats.df})`, v: koboStats.t.toFixed(3) },
+                    { l: fmtP(koboStats.p), v: `d = ${koboStats.cohensD.toFixed(2)}` },
+                  ].map((s, i) => (
+                    <div key={i} className="p-3 rounded-xl bg-muted/40 text-center">
+                      <p className="text-muted-foreground text-[10px] uppercase tracking-wider font-semibold">{s.l}</p>
+                      <p className="font-mono font-bold text-lg mt-1">{s.v}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
             <Card className="form-card">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
@@ -625,7 +843,30 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
 
         {/* Distribution Tab */}
         <TabsContent value="distribution" className="mt-4 space-y-4">
+          {koboRows.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {[
+                { title: "All submissions", data: koboBands },
+                { title: "Pre-tests", data: koboPreBands },
+                { title: "Post-tests", data: koboPostBands },
+              ].map((b) => (
+                <Card key={b.title} className="form-card">
+                  <CardHeader className="pb-1">
+                    <CardTitle className="text-sm">{b.title}</CardTitle>
+                    <CardDescription className="text-[11px]">
+                      Excellent ≥80% · Good ≥70% · Moderate ≥60% · below 60% needs additional training
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <PetalDonutChart data={b.data} height={260} unitLabel="submissions" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
           <Card className="form-card">
+
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Activity className="h-4 w-4 text-primary" />
@@ -729,8 +970,11 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Users className="h-4 w-4 text-primary" />
-                Individual Score Comparison
+                Individual Results — {koboGroupLabel}
               </CardTitle>
+              <CardDescription className="text-xs">
+                Name of Independent Monitor, MDA group, Pre %, Post %, Δ and status — live from KoboToolbox and in-app attempts.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="rounded-xl border border-border overflow-hidden">
@@ -738,52 +982,54 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-bold text-xs">#</TableHead>
-                      <TableHead className="font-bold text-xs">Participant</TableHead>
-                      <TableHead className="font-bold text-xs text-center">Pre-test</TableHead>
-                      <TableHead className="font-bold text-xs text-center">Post-test</TableHead>
-                      <TableHead className="font-bold text-xs text-center">Change</TableHead>
+                      <TableHead className="font-bold text-xs">Name of Independent Monitor</TableHead>
+                      <TableHead className="font-bold text-xs">MDA group</TableHead>
+                      <TableHead className="font-bold text-xs text-center">Pre %</TableHead>
+                      <TableHead className="font-bold text-xs text-center">Post %</TableHead>
+                      <TableHead className="font-bold text-xs text-center">Δ</TableHead>
                       <TableHead className="font-bold text-xs text-center">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {pagedPairedData.map((p, i) => {
-                      const prof = profiles[p.userId];
-                      const improved = p.diff > 0;
-                      const declined = p.diff < 0;
+                      const complete = p.pre != null && p.post != null;
+                      const improved = complete && (p.diff ?? 0) > 0;
+                      const declined = complete && (p.diff ?? 0) < 0;
+                      const initials = p.name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase()).join("") || "?";
                       return (
-                        <TableRow key={p.userId} className={i % 2 === 0 ? "bg-muted/20" : ""}>
+                        <TableRow key={p.key} className={i % 2 === 0 ? "bg-muted/20" : ""}>
                           <TableCell className="font-mono text-xs text-muted-foreground">{pagination.startIndex + i + 1}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary shrink-0">
-                                {prof ? `${prof.first_name?.[0]}${prof.last_name?.[0]}` : "?"}
+                                {initials}
                               </div>
-                              <span className="text-sm font-medium truncate">
-                                {prof ? `${prof.first_name} ${prof.last_name}` : p.userId.slice(0, 12)}
-                              </span>
+                              <span className="text-sm font-medium truncate">{p.name}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-center font-mono text-sm">{Math.round(p.pre)}%</TableCell>
-                          <TableCell className="text-center font-mono text-sm">{Math.round(p.post)}%</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{p.group}</TableCell>
+                          <TableCell className="text-center font-mono text-sm">{p.pre != null ? `${Math.round(p.pre)}%` : "—"}</TableCell>
+                          <TableCell className="text-center font-mono text-sm">{p.post != null ? `${Math.round(p.post)}%` : "—"}</TableCell>
                           <TableCell className="text-center">
                             <span className={`font-mono font-bold text-sm ${improved ? "text-emerald-600" : declined ? "text-red-500" : "text-muted-foreground"}`}>
-                              {p.diff > 0 ? "+" : ""}{Math.round(p.diff)}%
+                              {complete ? `${(p.diff ?? 0) > 0 ? "+" : ""}${Math.round(p.diff ?? 0)}%` : "—"}
                             </span>
                           </TableCell>
                           <TableCell className="text-center">
                             <Badge variant={improved ? "default" : declined ? "destructive" : "secondary"} className="text-[10px] gap-0.5">
                               {improved ? <TrendingUp className="h-3 w-3" /> : declined ? <TrendingDown className="h-3 w-3" /> : null}
-                              {improved ? "Improved" : declined ? "Declined" : "Same"}
+                              {!complete ? "Awaiting pair" : improved ? "Improved" : declined ? "Declined" : "Unchanged"}
                             </Badge>
                           </TableCell>
                         </TableRow>
                       );
                     })}
-                    {analysis.pairedData.length === 0 && (
+                    {unifiedPairs.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">No paired results yet.</TableCell>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">No results yet.</TableCell>
                       </TableRow>
                     )}
+
                   </TableBody>
                 </Table>
               </div>
