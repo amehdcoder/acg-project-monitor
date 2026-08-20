@@ -725,7 +725,42 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
 
         {/* Comparison Tab */}
         <TabsContent value="comparison" className="mt-4 space-y-4">
+          {koboStats && (
+            <Card className={`form-card border-l-4 ${koboStats.significant ? "border-l-emerald-500" : "border-l-amber-400"}`}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Sigma className="h-4 w-4 text-primary" />
+                  Paired t-test — KoboToolbox ({koboGroupLabel})
+                  <Badge variant={koboStats.significant ? "default" : "secondary"} className="text-[10px]">
+                    {koboStats.significant ? "Significant" : "Not significant"}
+                  </Badge>
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Paired on Name of Independent Monitor across ingested Pre/Post submissions.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 text-sm">
+                  {[
+                    { l: "Pairs (n)", v: koboStats.n },
+                    { l: "Mean pre", v: `${koboStats.meanPre.toFixed(1)}%` },
+                    { l: "Mean post", v: `${koboStats.meanPost.toFixed(1)}%` },
+                    { l: "Mean gain", v: `${koboStats.meanGain > 0 ? "+" : ""}${koboStats.meanGain.toFixed(1)} pp` },
+                    { l: `t(${koboStats.df})`, v: koboStats.t.toFixed(3) },
+                    { l: fmtP(koboStats.p), v: `d = ${koboStats.cohensD.toFixed(2)}` },
+                  ].map((s, i) => (
+                    <div key={i} className="p-3 rounded-xl bg-muted/40 text-center">
+                      <p className="text-muted-foreground text-[10px] uppercase tracking-wider font-semibold">{s.l}</p>
+                      <p className="font-mono font-bold text-lg mt-1">{s.v}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
             <Card className="form-card">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
