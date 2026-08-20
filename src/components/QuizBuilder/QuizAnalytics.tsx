@@ -912,8 +912,11 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Users className="h-4 w-4 text-primary" />
-                Individual Score Comparison
+                Individual Results — {koboGroupLabel}
               </CardTitle>
+              <CardDescription className="text-xs">
+                Name of Independent Monitor, MDA group, Pre %, Post %, Δ and status — live from KoboToolbox and in-app attempts.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="rounded-xl border border-border overflow-hidden">
@@ -921,52 +924,54 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-bold text-xs">#</TableHead>
-                      <TableHead className="font-bold text-xs">Participant</TableHead>
-                      <TableHead className="font-bold text-xs text-center">Pre-test</TableHead>
-                      <TableHead className="font-bold text-xs text-center">Post-test</TableHead>
-                      <TableHead className="font-bold text-xs text-center">Change</TableHead>
+                      <TableHead className="font-bold text-xs">Name of Independent Monitor</TableHead>
+                      <TableHead className="font-bold text-xs">MDA group</TableHead>
+                      <TableHead className="font-bold text-xs text-center">Pre %</TableHead>
+                      <TableHead className="font-bold text-xs text-center">Post %</TableHead>
+                      <TableHead className="font-bold text-xs text-center">Δ</TableHead>
                       <TableHead className="font-bold text-xs text-center">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {pagedPairedData.map((p, i) => {
-                      const prof = profiles[p.userId];
-                      const improved = p.diff > 0;
-                      const declined = p.diff < 0;
+                      const complete = p.pre != null && p.post != null;
+                      const improved = complete && (p.diff ?? 0) > 0;
+                      const declined = complete && (p.diff ?? 0) < 0;
+                      const initials = p.name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase()).join("") || "?";
                       return (
-                        <TableRow key={p.userId} className={i % 2 === 0 ? "bg-muted/20" : ""}>
+                        <TableRow key={p.key} className={i % 2 === 0 ? "bg-muted/20" : ""}>
                           <TableCell className="font-mono text-xs text-muted-foreground">{pagination.startIndex + i + 1}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary shrink-0">
-                                {prof ? `${prof.first_name?.[0]}${prof.last_name?.[0]}` : "?"}
+                                {initials}
                               </div>
-                              <span className="text-sm font-medium truncate">
-                                {prof ? `${prof.first_name} ${prof.last_name}` : p.userId.slice(0, 12)}
-                              </span>
+                              <span className="text-sm font-medium truncate">{p.name}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-center font-mono text-sm">{Math.round(p.pre)}%</TableCell>
-                          <TableCell className="text-center font-mono text-sm">{Math.round(p.post)}%</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{p.group}</TableCell>
+                          <TableCell className="text-center font-mono text-sm">{p.pre != null ? `${Math.round(p.pre)}%` : "—"}</TableCell>
+                          <TableCell className="text-center font-mono text-sm">{p.post != null ? `${Math.round(p.post)}%` : "—"}</TableCell>
                           <TableCell className="text-center">
                             <span className={`font-mono font-bold text-sm ${improved ? "text-emerald-600" : declined ? "text-red-500" : "text-muted-foreground"}`}>
-                              {p.diff > 0 ? "+" : ""}{Math.round(p.diff)}%
+                              {complete ? `${(p.diff ?? 0) > 0 ? "+" : ""}${Math.round(p.diff ?? 0)}%` : "—"}
                             </span>
                           </TableCell>
                           <TableCell className="text-center">
                             <Badge variant={improved ? "default" : declined ? "destructive" : "secondary"} className="text-[10px] gap-0.5">
                               {improved ? <TrendingUp className="h-3 w-3" /> : declined ? <TrendingDown className="h-3 w-3" /> : null}
-                              {improved ? "Improved" : declined ? "Declined" : "Same"}
+                              {!complete ? "Awaiting pair" : improved ? "Improved" : declined ? "Declined" : "Unchanged"}
                             </Badge>
                           </TableCell>
                         </TableRow>
                       );
                     })}
-                    {analysis.pairedData.length === 0 && (
+                    {unifiedPairs.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">No paired results yet.</TableCell>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">No results yet.</TableCell>
                       </TableRow>
                     )}
+
                   </TableBody>
                 </Table>
               </div>
