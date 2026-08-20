@@ -396,7 +396,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
   // ───── Per-question difficulty analysis ─────
   // For each question, count how many attempts answered it correctly vs incorrectly.
   // Post-test answers are used when available, otherwise all attempts.
-  const questionStats = useMemo(() => {
+  const appQuestionStats = useMemo(() => {
     if (questions.length === 0) return [];
     const post = attempts.filter(a => a.attempt_type === "post_test");
     const source = post.length > 0 ? post : attempts;
@@ -430,7 +430,26 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
       .filter(q => q.answered > 0);
   }, [questions, attempts]);
 
-  const questionSource = attempts.some(a => a.attempt_type === "post_test") ? "Post-test" : "All attempts";
+  /** Item analysis across in-app questions AND every ingested Kobo question. */
+  const questionStats = useMemo(() => {
+    const offset = appQuestionStats.length;
+    const fromKobo = koboItems.map((it, i) => ({
+      id: `kobo-${it.name}`,
+      number: offset + i + 1,
+      text: it.label,
+      correctLabel: it.group === "general" ? "—" : it.group,
+      answered: it.answered,
+      correct: it.correct,
+      incorrect: it.incorrect,
+      correctRate: it.correctRate,
+      failRate: it.failRate,
+    }));
+    return [...appQuestionStats, ...fromKobo];
+  }, [appQuestionStats, koboItems]);
+
+  const questionSource = koboItems.length
+    ? "KoboToolbox submissions"
+    : (attempts.some(a => a.attempt_type === "post_test") ? "Post-test" : "All attempts");
   const mostPassed = useMemo(
     () => [...questionStats].sort((a, b) => b.correctRate - a.correctRate).slice(0, 5),
     [questionStats],
@@ -440,40 +459,39 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
     [questionStats],
   );
 
-
-
   const improvementPie = useMemo(() => [
-    { name: "Improved", value: analysis.improvedCount, color: COLORS.post },
-    { name: "Declined", value: analysis.declinedCount, color: COLORS.danger },
-    { name: "No Change", value: analysis.noChangeCount, color: COLORS.accent },
-  ].filter(d => d.value > 0), [analysis]);
+    { name: "Improved", value: kpi.improved, color: COLORS.post },
+    { name: "Declined", value: kpi.declined, color: COLORS.danger },
+    { name: "No Change", value: kpi.unchanged, color: COLORS.accent },
+  ].filter(d => d.value > 0), [kpi]);
 
   const passRateComparison = useMemo(() => {
     const rows: any[] = [];
-    if (analysis.hasPre) rows.push({ name: "Pre-test", Passed: analysis.prePassRate, Failed: 100 - analysis.prePassRate });
-    if (analysis.hasPost) rows.push({ name: "Post-test", Passed: analysis.postPassRate, Failed: 100 - analysis.postPassRate });
+    if (kpi.hasPre) rows.push({ name: "Pre-test", Passed: kpi.prePassRate, Failed: 100 - kpi.prePassRate });
+    if (kpi.hasPost) rows.push({ name: "Post-test", Passed: kpi.postPassRate, Failed: 100 - kpi.postPassRate });
     return rows;
-  }, [analysis]);
-
+  }, [kpi]);
 
   const scatterData = useMemo(() =>
-    analysis.pairedData.map(p => ({
-      pre: Math.round(p.pre),
-      post: Math.round(p.post),
-      name: profiles[p.userId] ? `${profiles[p.userId].first_name} ${profiles[p.userId].last_name?.charAt(0)}.` : "",
-    })),
-  [analysis.pairedData, profiles]);
+    unifiedPairs
+      .filter(p => p.pre != null && p.post != null)
+      .map(p => ({ pre: Math.round(p.pre as number), post: Math.round(p.post as number), name: p.name })),
+  [unifiedPairs]);
 
   const descriptiveStats = useMemo(() => {
-    const post = (v: string) => (analysis.hasPost ? v : "—");
+    const preAll = [...analysis.preAttempts.map(a => a.percentage), ...koboPre];
+    const postAll = [...analysis.postAttempts.map(a => a.percentage), ...koboPost];
+    const fmt = (arr: number[], f: (a: number[]) => number, suffix = "%") =>
+      arr.length ? `${Math.round(f(arr) * 10) / 10}${suffix}` : "—";
     return [
-      { metric: "Mean", pre: `${analysis.preMean}%`, post: post(`${analysis.postMean}%`) },
-      { metric: "Median", pre: `${analysis.preMedian}%`, post: post(`${analysis.postMedian}%`) },
-      { metric: "Std Dev", pre: `${analysis.preStd}`, post: post(`${analysis.postStd}`) },
-      { metric: "Pass Rate", pre: `${analysis.prePassRate}%`, post: post(`${analysis.postPassRate}%`) },
-      { metric: "Sample Size", pre: `${analysis.preCount}`, post: `${analysis.postCount}` },
+      { metric: "Mean", pre: fmt(preAll, mean), post: fmt(postAll, mean) },
+      { metric: "Median", pre: fmt(preAll, median), post: fmt(postAll, median) },
+      { metric: "Std Dev", pre: preAll.length > 1 ? `${Math.round(stdDev(preAll) * 10) / 10}` : "—", post: postAll.length > 1 ? `${Math.round(stdDev(postAll) * 10) / 10}` : "—" },
+      { metric: "Pass Rate", pre: kpi.hasPre ? `${kpi.prePassRate}%` : "—", post: kpi.hasPost ? `${kpi.postPassRate}%` : "—" },
+      { metric: "Sample Size", pre: `${kpi.preCount}`, post: `${kpi.postCount}` },
     ];
-  }, [analysis]);
+  }, [analysis, koboPre, koboPost, kpi]);
+
 
 
   // Pagination for individual scores
