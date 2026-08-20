@@ -23,6 +23,7 @@ export interface CommunityVisitRow {
   start: string;
   end: string;
   duration: string;
+  respondents: number;
 }
 
 const txt = (v: unknown) => String(v ?? "").trim();
@@ -74,6 +75,7 @@ export function buildCommunityVisits(
       start,
       end,
       duration: durationOf(start, end),
+      respondents: Number(p.respondent_count) || 0,
     });
   });
   return rows.sort((a, b) => (b.start || "").localeCompare(a.start || ""));
@@ -118,7 +120,7 @@ export default function CommunityVisitedTable({
         </div>
       ) : (
         <div className="max-h-[340px] overflow-auto rounded-md border">
-          <table className="w-full min-w-[720px] text-xs">
+          <table className="w-full min-w-[820px] text-xs">
             <thead className="bg-muted/60 sticky top-0 z-10">
               <tr>
                 <th className="text-left px-2 py-2 font-semibold whitespace-nowrap">Name of Community</th>
@@ -126,6 +128,7 @@ export default function CommunityVisitedTable({
                 <th className="text-left px-2 py-2 font-semibold whitespace-nowrap">Monitor / Supervisor</th>
                 <th className="text-left px-2 py-2 font-semibold whitespace-nowrap">Start Time</th>
                 <th className="text-left px-2 py-2 font-semibold whitespace-nowrap">End Time</th>
+                <th className="text-right px-2 py-2 font-semibold whitespace-nowrap">Respondents Interviewed</th>
                 <th className="text-right px-2 py-2 font-semibold whitespace-nowrap">Duration</th>
               </tr>
             </thead>
@@ -139,6 +142,7 @@ export default function CommunityVisitedTable({
                   <td className="px-2 py-1.5 whitespace-normal break-words">{r.person || "—"}</td>
                   <td className="px-2 py-1.5 tabular-nums whitespace-nowrap">{fmt(r.start)}</td>
                   <td className="px-2 py-1.5 tabular-nums whitespace-nowrap">{fmt(r.end)}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{r.respondents.toLocaleString()}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{r.duration}</td>
                 </tr>
               ))}
