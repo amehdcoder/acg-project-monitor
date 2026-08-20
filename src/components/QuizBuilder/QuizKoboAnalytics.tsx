@@ -19,8 +19,11 @@ import {
   Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import {
-  Activity, ArrowDownRight, ArrowUpRight, Minus, Radio, Sigma, Users,
+  Activity, ArrowDownRight, ArrowUpRight, FileSpreadsheet, FileText, Minus, Radio, Sigma, Users,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import jsPDF from "jspdf";
 import PetalDonutChart from "@/components/charts/PetalDonutChart";
 import { useQuizKobo } from "@/hooks/useQuizKobo";
 import {
