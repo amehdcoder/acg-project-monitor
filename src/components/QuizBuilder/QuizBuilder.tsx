@@ -26,7 +26,10 @@ import {
   Plus, Trash2, Save, Eye, Send, ChevronUp, ChevronDown,
   BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, CalendarIcon, Users, UserPlus, Archive, Eraser,
   Lock, LockOpen, DoorOpen, DoorClosed, Sparkles, RotateCcw, Mail, TrendingUp, AlertTriangle, Copy, ArrowRight, Pencil,
+  PlugZap,
 } from "lucide-react";
+import QuizKoboSyncDialog from "./QuizKoboSyncDialog";
+import { useQuizKobo } from "@/hooks/useQuizKobo";
 import { validateMessageTokens, KNOWN_QUIZ_TOKENS } from "@/lib/quizTokens";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
