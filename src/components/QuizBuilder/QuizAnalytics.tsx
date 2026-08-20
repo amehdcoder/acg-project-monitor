@@ -205,16 +205,48 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
     if (!koboConfig) return;
     setRepairing(true);
     try {
-      const repair = await repairKoboIdentity(koboConfig).catch(() => null);
-      const rescored = repair?.repaired ? repair.rescored : await rescoreStoredSubmissions(koboConfig);
-      toast({ title: "Re-scored from Kobo", description: `${rescored} submission(s) refreshed with the current configuration.` });
+      await repairKoboIdentity(koboConfig).catch(() => null);
+      const res = await fullSyncKobo(koboConfig);
+      toast({
+        title: "Synced with KoboToolbox",
+        description: `${res.saved} of ${res.fetched} submission(s) re-scored${res.deleted ? `, ${res.deleted} removed (deleted on Kobo)` : ""}.`,
+      });
       void koboReload();
     } catch (e) {
-      toast({ title: "Re-score failed", description: (e as Error).message, variant: "destructive" });
+      toast({ title: "Sync failed", description: (e as Error).message, variant: "destructive" });
     } finally {
       setRepairing(false);
     }
   };
+
+  /**
+   * Continuous reconciliation with KoboToolbox: re-scores edited submissions
+   * and removes rows deleted on Kobo. Realtime pushes both to the UI.
+   */
+  const syncing = useRef(false);
+  const runReconcile = useCallback(async () => {
+    if (!koboConfig || syncing.current) return;
+    syncing.current = true;
+    try {
+      await fullSyncKobo(koboConfig);
+    } catch (e) {
+      console.warn("Kobo reconcile failed:", (e as Error).message);
+    } finally {
+      syncing.current = false;
+    }
+  }, [koboConfig]);
+
+  useEffect(() => {
+    if (!koboConfig) return;
+    void runReconcile();
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") void runReconcile();
+    }, 60_000);
+    const onFocus = () => { if (document.visibilityState === "visible") void runReconcile(); };
+    document.addEventListener("visibilitychange", onFocus);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", onFocus); };
+  }, [koboConfig, runReconcile]);
+
 
 
   const koboGroups = useMemo(() => {
