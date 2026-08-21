@@ -813,8 +813,22 @@ export default function ChecklistDashboard({
 
       <StatusDrilldownDialog statusLabel={drill.status} rows={drillRows} onClose={drill.close} />
 
+      {/* Supervisory insight bars — swallowing behaviour drivers */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel title="Reasons for NOT swallowing" icon={AlertTriangle}>
+          <InfoBarH data={noSwallowReasons} color="#DC2626" axisLabel="Number of responses" />
+        </Panel>
+        <Panel title="Reasons for swallowing" icon={ClipboardCheck}>
+          <InfoBarH data={swallowReasons} color="#1668DC" axisLabel="Number of responses" />
+        </Panel>
+      </div>
+
+      {/* Medicine offered — geography breakdown (State & LGA) */}
+      <MedicineOfferedGeo respondents={respondents} />
+
       {/* Geospatial: community status + household medicine-offer maps */}
       <ChecklistMaps parents={parents} respondents={respondents} filters={filters} />
+
 
       {/* Household survey coverage generalised to Community → Ward → LGA → State */}
       <HouseholdCoverageAnalysis respondents={respondents} campaignFilter={filters.campaign || null} />
