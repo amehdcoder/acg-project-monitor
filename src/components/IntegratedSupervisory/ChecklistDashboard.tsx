@@ -142,210 +142,31 @@ const Empty = () => (
 );
 
 
-/** Vivid, professional donut palette (shared app-wide). */
-const DONUT_PALETTE = BRIGHT_CHART_PALETTE;
-
-
-/**
- * Infographic-style label: bold coloured percentage inside the outer petal,
- * with the category name + count on a leader line outside the ring.
- */
-const petalLabel = (props: any) => {
-  const { cx, cy, midAngle, innerRadius, outerRadius, percent, value, name, fill } = props;
-  if (!percent || percent < 0.02) return null;
-  const RAD = Math.PI / 180;
-  const cos = Math.cos(-midAngle * RAD);
-  const sin = Math.sin(-midAngle * RAD);
-
-  // Big % sits in the middle of the petal band.
-  const mid = (Number(innerRadius) + Number(outerRadius)) / 2;
-  const px = cx + mid * cos;
-  const py = cy + mid * sin;
-
-  // Category name outside the ring, clamped inside the box.
-  const r = Number(outerRadius) + 14;
-  const rawX = cx + r * cos;
-  const y = cy + r * sin;
-  const right = rawX > cx;
-  const maxX = cx * 2;
-  const x = Math.max(6, Math.min(maxX - 6, rawX));
-  const anchor = right ? "start" : "end";
-  const room = right ? maxX - x : x;
-  const chars = Math.max(6, Math.floor(room / 5.4));
-  const label = String(name ?? "");
-  const short = label.length > chars ? `${label.slice(0, chars - 1)}…` : label;
-
-  return (
-    <g>
-      <text
-        x={px} y={py} textAnchor="middle" dominantBaseline="central"
-        fontSize={15} fontWeight={800} fill={fill}
-        style={{ paintOrder: "stroke", stroke: "hsl(var(--card))", strokeWidth: 3, strokeLinejoin: "round" }}
-      >
-        {(percent * 100).toFixed(0)}%
-      </text>
-      <text x={x} y={y} textAnchor={anchor} dominantBaseline="central" className="fill-foreground" fontSize={10} fontWeight={700}>
-        <tspan>{short}</tspan>
-        <tspan x={x} dy={11} className="fill-muted-foreground" fontWeight={500}>
-          {Number(value).toLocaleString()}
-        </tspan>
-      </text>
-    </g>
-  );
-};
-
-/**
- * Freepik-infographic styled chart: a small solid colour core, a gap, then
- * exploded "petal" segments — near-white fills with a thick coloured outline
- * and a bold coloured percentage inside each petal.
- */
+/** Poster-style donut (big central share, counted legend, leader callouts). */
 function DonutChart({ data, height = 300 }: { data: { name: string; value: number }[]; height?: number }) {
-  if (data.length === 0) return <Empty />;
-  const total = data.reduce((s, d) => s + (Number(d.value) || 0), 0);
-  const colorAt = (i: number) => DONUT_PALETTE[i % DONUT_PALETTE.length];
-  return (
-    <div className="relative w-full min-w-0" style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart margin={{ top: 12, right: 10, bottom: 4, left: 10 }}>
-          <defs>
-            {DONUT_PALETTE.map((c, i) => (
-              <linearGradient key={i} id={`petalGrad${i}`} x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor={c} stopOpacity={0.62} />
-                <stop offset="100%" stopColor={c} stopOpacity={0.34} />
-              </linearGradient>
-            ))}
-            {DONUT_PALETTE.map((c, i) => (
-              <linearGradient key={`core${i}`} id={`coreGrad${i}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={c} stopOpacity={1} />
-                <stop offset="100%" stopColor={c} stopOpacity={0.78} />
-              </linearGradient>
-            ))}
-          </defs>
-
-          {/* Solid colour core — the "key" ring of the infographic */}
-          <Pie
-            data={data}
-            dataKey="value"
-            nameKey="name"
-            cx="50%"
-            cy="46%"
-            innerRadius="12%"
-            outerRadius="26%"
-            paddingAngle={1}
-            stroke="hsl(var(--card))"
-            strokeWidth={2}
-            isAnimationActive={false}
-          >
-            {data.map((_, i) => <Cell key={i} fill={`url(#coreGrad${i % DONUT_PALETTE.length})`} />)}
-          </Pie>
-
-          {/* Exploded outer petals */}
-          <Pie
-            data={data}
-            dataKey="value"
-            nameKey="name"
-            cx="50%"
-            cy="46%"
-            innerRadius="38%"
-            outerRadius="62%"
-            paddingAngle={5}
-            cornerRadius={8}
-            strokeWidth={2.5}
-            labelLine={{ stroke: "hsl(var(--border))", strokeWidth: 1 }}
-            label={petalLabel}
-            isAnimationActive
-            animationDuration={700}
-          >
-            {data.map((_, i) => (
-              <Cell key={i} fill={`url(#petalGrad${i % DONUT_PALETTE.length})`} stroke={colorAt(i)} />
-            ))}
-          </Pie>
-
-          <Tooltip
-            formatter={(v: any, n: any) => [
-              `${Number(v).toLocaleString()} (${total ? ((Number(v) / total) * 100).toFixed(1) : 0}%)`,
-              n,
-            ]}
-            contentStyle={{
-              background: "hsl(var(--card))",
-              border: "1px solid hsl(var(--border))",
-              borderRadius: 10,
-              fontSize: 11,
-              boxShadow: "0 8px 24px -12px rgba(0,0,0,.35)",
-            }}
-          />
-          <Legend
-            verticalAlign="bottom"
-            height={34}
-            wrapperStyle={{ fontSize: 11, lineHeight: "16px" }}
-            iconType="circle"
-            iconSize={8}
-            formatter={(v: string) => <span className="text-muted-foreground">{v}</span>}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-      <div className="pointer-events-none absolute right-1 top-0 rounded-full border bg-card/80 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground tabular-nums backdrop-blur-sm">
-        n = {total.toLocaleString()}
-      </div>
-
-    </div>
-  );
+  return <InfoDonut data={data} height={height} />;
 }
 
-
-
-function HBarChart({ data, color = PALETTE[0] }: { data: { name: string; value: number }[]; color?: string }) {
-  if (data.length === 0) return <Empty />;
-  return (
-    <div className="w-full min-w-0">
-      <ResponsiveContainer width="100%" height={Math.max(220, data.length * 34)}>
-        <BarChart data={data} layout="vertical" margin={{ left: 4, right: 28, top: 4, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-          <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-          <YAxis
-            type="category"
-            dataKey="name"
-            width={140}
-            tick={{ fontSize: 10 }}
-            tickFormatter={(v: string) => (String(v).length > 22 ? `${String(v).slice(0, 21)}…` : String(v))}
-          />
-          <Tooltip
-            contentStyle={{
-              background: "hsl(var(--card))", border: "1px solid hsl(var(--border))",
-              borderRadius: 10, fontSize: 11,
-            }}
-          />
-          <Bar dataKey="value" fill={color} radius={[0, 4, 4, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
+/** Ranked horizontal bars with the exact count printed at the end of each bar. */
+function HBarChart({
+  data, color = PALETTE[0], axisLabel,
+}: { data: { name: string; value: number }[]; color?: string; axisLabel?: string }) {
+  return <InfoBarH data={data} color={color} axisLabel={axisLabel ?? "Number of responses"} />;
 }
 
-
-/** Vertical bar chart with semantic per-status colours. */
+/** Vertical bar chart with semantic per-status colours and value labels. */
 function StatusBarChart({
   data, onSelect,
 }: { data: { name: string; value: number }[]; onSelect?: (name: string) => void }) {
-  if (data.length === 0) return <Empty />;
   return (
-    <ResponsiveContainer width="100%" height={260}>
-      <BarChart data={data} margin={{ left: 4, right: 12, top: 12 }}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} height={48} angle={-12} textAnchor="end" />
-        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-        <Tooltip formatter={(v: number) => [`${v} submission${v === 1 ? "" : "s"} — click to drill down`, "Count"]} />
-        <Bar
-          dataKey="value"
-          radius={[6, 6, 0, 0]}
-          maxBarSize={72}
-          cursor={onSelect ? "pointer" : undefined}
-          onClick={(d: any) => onSelect?.(String(d?.name ?? d?.payload?.name ?? ""))}
-        >
-          {data.map((d, i) => <Cell key={i} fill={mdaStatusColor(d.name)} />)}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <InfoBarV
+      data={data}
+      height={280}
+      colorOf={(n) => mdaStatusColor(n)}
+      yLabel="Number of activities"
+      xLabel="MDA status"
+      onSelect={onSelect}
+    />
   );
 }
 
