@@ -360,7 +360,16 @@ export function scoreSubmission(
     const raw = asAnswerString(readField(payload, q.name));
     answers[q.name] = raw;
     const points = Number(q.points) || 0;
-    const ok = answerMatches(q, raw);
+    // Authority for correctness: the configured answer key, else the form's own
+    // `<field>_score` calculate column shipped by the XLSForm. A question with
+    // neither is unscoreable and is excluded from the denominator entirely, so
+    // it can never silently deflate a participant's percentage.
+    const koboScoreRaw = readField(payload, `${q.name}_score`);
+    const hasKoboScore =
+      koboScoreRaw !== undefined && koboScoreRaw !== null && String(koboScoreRaw).trim() !== "" &&
+      Number.isFinite(Number(koboScoreRaw));
+    if (!q.correct?.length && !hasKoboScore) continue;
+    const ok = q.correct?.length ? answerMatches(q, raw) : Number(koboScoreRaw) > 0;
     maxScore += points;
     if (ok) score += points;
     perQuestion.push({
