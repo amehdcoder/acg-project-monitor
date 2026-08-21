@@ -445,3 +445,46 @@ export function campaignOptions(rows: Row[]): { code: string; label: string; n: 
 }
 
 export const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+
+// ---------------------------------------------------------------------------
+// Programme coverage targets (WHO / NTD programme thresholds)
+// ---------------------------------------------------------------------------
+
+/**
+ * Effective programme coverage threshold per MDA campaign type:
+ *   • Lymphatic Filariasis .......................... 65%
+ *   • Schistosomiasis / Soil Transmitted Helminths ... 75%
+ *   • Onchocerciasis Only / Trachoma ................. 80%
+ * Order matters — combined "Onchocerciasis/Lymphatic Filariasis" campaigns are
+ * evaluated against the LF threshold.
+ */
+export const CAMPAIGN_COVERAGE_TARGETS: { match: RegExp; target: number; label: string }[] = [
+  { match: /lymphatic|filaria|\blf\b/i, target: 65, label: "Lymphatic Filariasis" },
+  { match: /schisto|helminth|\bsth\b/i, target: 75, label: "Schistosomiasis / STH" },
+  { match: /onchocerc|trachoma/i, target: 80, label: "Onchocerciasis / Trachoma" },
+];
+
+/** Threshold used when the campaign type is unknown or mixed. */
+export const DEFAULT_COVERAGE_TARGET = 80;
+
+/** Coverage target (%) for a single campaign-type label. */
+export function coverageTargetFor(campaign?: string | null): number {
+  const c = String(campaign ?? "").trim();
+  if (!c) return DEFAULT_COVERAGE_TARGET;
+  return CAMPAIGN_COVERAGE_TARGETS.find((t) => t.match.test(c))?.target ?? DEFAULT_COVERAGE_TARGET;
+}
+
+/**
+ * Target for an administrative unit that may mix campaign types. The strictest
+ * (highest) applicable threshold is used so no unit is scored too leniently.
+ */
+export function coverageTargetForMany(campaigns: string[]): {
+  target: number; mixed: boolean; label: string;
+} {
+  const list = (campaigns ?? []).map((c) => String(c).trim()).filter(Boolean);
+  if (!list.length) return { target: DEFAULT_COVERAGE_TARGET, mixed: false, label: "Programme default" };
+  const targets = list.map(coverageTargetFor);
+  const target = Math.max(...targets);
+  const mixed = new Set(targets).size > 1;
+  return { target, mixed, label: mixed ? `Mixed campaigns — strictest of ${list.join(", ")}` : list.join(", ") };
+}

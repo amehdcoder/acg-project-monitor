@@ -40,6 +40,7 @@ import ChecklistPresetBar from "./ChecklistPresetBar";
 import CommunityVisitedTable, { buildCommunityVisits } from "./CommunityVisitedTable";
 import { BRIGHT_CHART_PALETTE } from "@/lib/charts/brightPalette";
 import { InfoDonut, InfoBarH, InfoBarV } from "./charts/InfographicCharts";
+import ChartRecordsDialog, { type ChartDrillSpec } from "./ChartRecordsDialog";
 import MedicineOfferedGeo from "./MedicineOfferedGeo";
 
 
@@ -147,15 +148,22 @@ const Empty = () => (
 
 
 /** Poster-style donut (big central share, counted legend, leader callouts). */
-function DonutChart({ data, height = 300 }: { data: { name: string; value: number }[]; height?: number }) {
-  return <InfoDonut data={data} height={height} />;
+function DonutChart({
+  data, height = 300, onSelect,
+}: { data: { name: string; value: number }[]; height?: number; onSelect?: (name: string) => void }) {
+  return <InfoDonut data={data} height={height} onSelect={onSelect} />;
 }
 
 /** Ranked horizontal bars with the exact count printed at the end of each bar. */
 function HBarChart({
-  data, color = PALETTE[0], axisLabel,
-}: { data: { name: string; value: number }[]; color?: string; axisLabel?: string }) {
-  return <InfoBarH data={data} color={color} axisLabel={axisLabel ?? "Number of responses"} />;
+  data, color = PALETTE[0], axisLabel, onSelect,
+}: {
+  data: { name: string; value: number }[];
+  color?: string;
+  axisLabel?: string;
+  onSelect?: (name: string) => void;
+}) {
+  return <InfoBarH data={data} color={color} axisLabel={axisLabel ?? "Number of responses"} onSelect={onSelect} />;
 }
 
 /** Vertical bar chart with semantic per-status colours and value labels. */
@@ -489,6 +497,27 @@ export default function ChecklistDashboard({
     [parents, drill.status],
   );
 
+  /* Universal chart drill-down: any pie slice / bar opens the records behind it. */
+  const [chartDrill, setChartDrill] = useState<ChartDrillSpec | null>(null);
+  const openFieldDrill = (
+    title: string,
+    field: string,
+    category: string,
+    opts: { source?: "parents" | "respondents"; multi?: boolean; color?: string } = {},
+  ) => {
+    if (!category) return;
+    const source = opts.source === "respondents" ? respondents : parents;
+    const matches = (source as Record<string, unknown>[]).filter((r) => {
+      const raw = r[field];
+      if (raw == null || raw === "") return false;
+      const parts = opts.multi ? String(raw).split(/\s+/).filter(Boolean) : [raw];
+      return parts.some((p) => (resolveChecklistValue(field, p) || String(p)) === category);
+    });
+    setChartDrill({ title, category, color: opts.color, rows: matches });
+  };
+
+
+
   /* Geographic coverage target, configured per State from the synced data. */
   const [geoTargets, setGeoTargets] = useState<Record<string, number>>(() => {
     try {
@@ -807,7 +836,7 @@ export default function ChecklistDashboard({
         <CardContent className="p-4 grid gap-4 md:grid-cols-2">
           <div>
             <p className="text-xs font-semibold text-muted-foreground mb-2">SAE types reported</p>
-            {saeTypes.length ? <HBarChart data={saeTypes} color="hsl(350,70%,52%)" /> : <Empty />}
+            {saeTypes.length ? <HBarChart data={saeTypes} color="hsl(350,70%,52%)" onSelect={(n) => openFieldDrill("SAE types reported", "If_YES_what_type_of_SAE", n, { multi: true, color: "hsl(350,70%,52%)" })} /> : <Empty />}
           </div>
           <div className="max-h-[280px] overflow-auto rounded-md border bg-background">
             {saeRows.length === 0 ? (
@@ -840,14 +869,14 @@ export default function ChecklistDashboard({
 
       {/* Campaign & inventory */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <Panel title="MDA Campaign Type" icon={Activity}><DonutChart data={campaign} /></Panel>
-        <Panel title="Medicine Inventory Available" icon={ClipboardCheck}><DonutChart data={inventory} /></Panel>
-        <Panel title="Medicine Sufficiency" icon={ClipboardCheck}><DonutChart data={sufficiency} /></Panel>
+        <Panel title="MDA Campaign Type" icon={Activity}><DonutChart data={campaign} onSelect={(n) => openFieldDrill("MDA Campaign Type", "MDA_Campaign_Type", n)} /></Panel>
+        <Panel title="Medicine Inventory Available" icon={ClipboardCheck}><DonutChart data={inventory} onSelect={(n) => openFieldDrill("Medicine Inventory Available", "Is_Medicine_Inventory_Availabl", n)} /></Panel>
+        <Panel title="Medicine Sufficiency" icon={ClipboardCheck}><DonutChart data={sufficiency} onSelect={(n) => openFieldDrill("Medicine Sufficiency", "Does_CDI_CDD_have_sufficient_d", n)} /></Panel>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Treatment Register Available" icon={ClipboardCheck}><DonutChart data={register} /></Panel>
-        <Panel title="Register Entries Correct" icon={ClipboardCheck}><DonutChart data={registerCorrect} /></Panel>
+        <Panel title="Treatment Register Available" icon={ClipboardCheck}><DonutChart data={register} onSelect={(n) => openFieldDrill("Treatment Register Available", "Is_Treatment_Register_Availabl", n)} /></Panel>
+        <Panel title="Register Entries Correct" icon={ClipboardCheck}><DonutChart data={registerCorrect} onSelect={(n) => openFieldDrill("Register Entries Correct", "Are_entries_in_Register_CORRECT", n)} /></Panel>
       </div>
 
       <Panel
@@ -871,13 +900,15 @@ export default function ChecklistDashboard({
 
       <StatusDrilldownDialog statusLabel={drill.status} rows={drillRows} onClose={drill.close} />
 
+      <ChartRecordsDialog spec={chartDrill} onClose={() => setChartDrill(null)} />
+
       {/* Supervisory insight bars — swallowing behaviour drivers */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Reasons for NOT swallowing" icon={AlertTriangle}>
-          <InfoBarH data={noSwallowReasons} color="#DC2626" axisLabel="Number of responses" />
+          <InfoBarH data={noSwallowReasons} color="#DC2626" axisLabel="Number of responses" onSelect={(n) => openFieldDrill("Reasons for NOT swallowing", "Reason_respondent_DID_NOT_SWAL", n, { source: "respondents", color: "#DC2626" })} />
         </Panel>
         <Panel title="Reasons for swallowing" icon={ClipboardCheck}>
-          <InfoBarH data={swallowReasons} color="#1668DC" axisLabel="Number of responses" />
+          <InfoBarH data={swallowReasons} color="#1668DC" axisLabel="Number of responses" onSelect={(n) => openFieldDrill("Reasons for swallowing", "Reason_respondent_SWALLOWED_th", n, { source: "respondents", color: "#1668DC" })} />
         </Panel>
       </div>
 
@@ -953,28 +984,28 @@ export default function ChecklistDashboard({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-4">
-        <Panel title="CDDs Trained" icon={Users}><DonutChart data={cddTrained} /></Panel>
-        <Panel title="CDD Stipends Received" icon={Users}><DonutChart data={stipends} /></Panel>
-        <Panel title="Dose Pole Available" icon={ClipboardCheck}><DonutChart data={dosePole} /></Panel>
-        <Panel title="CDD Knows Dose Pole Use" icon={ClipboardCheck}><DonutChart data={dosePoleKnow} /></Panel>
+        <Panel title="CDDs Trained" icon={Users}><DonutChart data={cddTrained} onSelect={(n) => openFieldDrill("CDDs Trained", "Has_CDI_CDD_been_trained", n)} /></Panel>
+        <Panel title="CDD Stipends Received" icon={Users}><DonutChart data={stipends} onSelect={(n) => openFieldDrill("CDD Stipends Received", "Did_CDI_CDD_receive_stipends", n)} /></Panel>
+        <Panel title="Dose Pole Available" icon={ClipboardCheck}><DonutChart data={dosePole} onSelect={(n) => openFieldDrill("Dose Pole Available", "Is_Dose_Pole_Available", n)} /></Panel>
+        <Panel title="CDD Knows Dose Pole Use" icon={ClipboardCheck}><DonutChart data={dosePoleKnow} onSelect={(n) => openFieldDrill("CDD Knows Dose Pole Use", "Does_CDI_CDD_Know_how_to_use_Dose_Pole", n)} /></Panel>
       </div>
 
       <div className="grid gap-4">
-        <Panel title="NTD Posters Displayed" icon={ClipboardCheck}><DonutChart data={posters} /></Panel>
+        <Panel title="NTD Posters Displayed" icon={ClipboardCheck}><DonutChart data={posters} onSelect={(n) => openFieldDrill("NTD Posters Displayed", "Are_any_NTD_posters_the_School_Community", n)} /></Panel>
       </div>
 
       {/* WASH */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Latrine Type (Households)" icon={Droplets}><HBarChart data={latrine} color={PALETTE[1]} /></Panel>
-        <Panel title="Household Water Sources" icon={Droplets}><HBarChart data={waterHh} color={PALETTE[5]} /></Panel>
+        <Panel title="Latrine Type (Households)" icon={Droplets}><HBarChart data={latrine} color={PALETTE[1]} onSelect={(n) => openFieldDrill("Latrine Type (Households)", "What_type_of_Laterin_our_school_household", n, { source: "respondents", color: PALETTE[1] })} /></Panel>
+        <Panel title="Household Water Sources" icon={Droplets}><HBarChart data={waterHh} color={PALETTE[5]} onSelect={(n) => openFieldDrill("Household Water Sources", "What_water_source_i_your_class_household", n, { source: "respondents", multi: true, color: PALETTE[5] })} /></Panel>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Domestic Dirty-Water Disposal" icon={Droplets}><HBarChart data={waste} color={PALETTE[2]} /></Panel>
-        <Panel title="Community Water Source Proximity" icon={Droplets}><DonutChart data={waterWithin} /></Panel>
+        <Panel title="Domestic Dirty-Water Disposal" icon={Droplets}><HBarChart data={waste} color={PALETTE[2]} onSelect={(n) => openFieldDrill("Domestic Dirty-Water Disposal", "How_do_you_Dispose_D_your_class_household", n, { source: "respondents", multi: true, color: PALETTE[2] })} /></Panel>
+        <Panel title="Community Water Source Proximity" icon={Droplets}><DonutChart data={waterWithin} onSelect={(n) => openFieldDrill("Community Water Source Proximity", "Are_all_sources_of_water_used_", n)} /></Panel>
       </div>
 
       <div className="grid gap-4">
-        <Panel title="Top LGAs by Supervision Volume" icon={MapPin}><HBarChart data={topLgas} /></Panel>
+        <Panel title="Top LGAs by Supervision Volume" icon={MapPin}><HBarChart data={topLgas} axisLabel="Number of checklists" onSelect={(n) => openFieldDrill("Top LGAs by Supervision Volume", "LGA", n)} /></Panel>
       </div>
 
       <MlIntelligenceHub

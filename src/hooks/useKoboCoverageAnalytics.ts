@@ -9,8 +9,8 @@
  */
 import { useMemo } from "react";
 import {
-  COVERAGE_INDICATORS, communityKey, coverageByLevel, estimateIndicator,
-  reasonBreakdown,
+  COVERAGE_INDICATORS, communityKey, coverageByLevel, coverageTargetFor, coverageTargetForMany,
+  estimateIndicator, reasonBreakdown,
   type CoverageEstimate, type CoverageLevel, type CoverageRow, type Row,
 } from "@/lib/isc/householdCoverage";
 import { resolveChecklistValue } from "@/components/IntegratedSupervisory/checklistSchema";
@@ -42,6 +42,12 @@ export interface AdminUnitRow {
   openDefecationPct: number | null;
   washRisk: WashRisk;
   topReason: string | null;
+  /** Programme coverage threshold (%) for this unit's campaign type(s). */
+  targetPct: number;
+  /** Campaign type(s) behind the target, for tooltips. */
+  targetLabel: string;
+  /** True when the unit mixes campaign types with different thresholds. */
+  mixedTargets: boolean;
   estimates: Record<string, CoverageEstimate>;
 }
 
@@ -62,6 +68,8 @@ export interface CoverageStats {
   marginOfError: number;
   effectiveSample: number;
   unreachedClusterCount: number;
+  /** Programme coverage threshold (%) applied to the current campaign filter. */
+  targetPct: number;
   lowestLgaName: string;
   lowestLgaPct: number | null;
   improvedWaterPct: number | null;
@@ -97,9 +105,9 @@ function primaryNonCoverageReason(group: Row[]): string | null {
   return null;
 }
 
-function riskOf(coveragePct: number | null, washPct: number | null): WashRisk {
+function riskOf(coveragePct: number | null, washPct: number | null, targetPct = 80): WashRisk {
   if (coveragePct == null || washPct == null) return "none";
-  const highCov = coveragePct >= 80;
+  const highCov = coveragePct >= targetPct;
   const highWash = washPct >= 50;
   if (highCov && !highWash) return "reinfection";
   if (!highCov && !highWash) return "critical";
@@ -143,7 +151,8 @@ export function useKoboCoverageAnalytics(
     const uptakePct = uptake && uptake.n > 0 ? uptake.p * 100 : 0;
     const unmetNeedPct = offeredDen > 0 ? 100 - offeredPct : 0;
 
-    const gapPct = epi && epi.n > 0 ? Math.max(0, 80 - swallowedPct) : 0;
+    const targetPct = coverageTargetFor(campaign);
+    const gapPct = epi && epi.n > 0 ? Math.max(0, targetPct - swallowedPct) : 0;
     const gapCount = epi ? Math.max(0, epi.n - epi.x) : 0;
 
     // Clusters where nobody swallowed / nobody was reached.
@@ -176,13 +185,14 @@ export function useKoboCoverageAnalytics(
       marginOfError: epi?.marginPct ?? 0,
       effectiveSample: epi && epi.deff > 0 ? Math.round((epi.n || totalN) / epi.deff) : totalN,
       unreachedClusterCount,
+      targetPct,
       lowestLgaName: lowest?.name ?? "—",
       lowestLgaPct: lowest ? lowest.estimates.epi_coverage.p * 100 : null,
       improvedWaterPct: asPct(overall.improved_water),
       improvedLatrinePct: asPct(overall.improved_sanitation),
       openDefecationPct: asPct(overall.open_defecation),
     };
-  }, [rows, overall, lgaRows, communityRows]);
+  }, [rows, overall, lgaRows, communityRows, campaign]);
 
   const buildTable = (source: CoverageRow[]): AdminUnitRow[] =>
     source.map((r) => {
@@ -192,6 +202,9 @@ export function useKoboCoverageAnalytics(
       const latrine = asPct(r.estimates.improved_sanitation);
       const washPct =
         water == null && latrine == null ? null : ((water ?? 0) + (latrine ?? 0)) / (water != null && latrine != null ? 2 : 1);
+      const target = campaign
+        ? { target: coverageTargetFor(campaign), mixed: false, label: campaign }
+        : coverageTargetForMany(r.campaigns);
       return {
         key: r.key,
         name: r.name,
@@ -207,8 +220,11 @@ export function useKoboCoverageAnalytics(
         lowPower: r.communities < 5 || (epi?.marginPct ?? 0) > 10,
         washPct,
         openDefecationPct: asPct(r.estimates.open_defecation),
-        washRisk: riskOf(coveragePct, washPct),
-        topReason: coveragePct != null && coveragePct < 65 ? primaryNonCoverageReason([]) : null,
+        washRisk: riskOf(coveragePct, washPct, target.target),
+        topReason: coveragePct != null && coveragePct < target.target ? primaryNonCoverageReason([]) : null,
+        targetPct: target.target,
+        targetLabel: target.label,
+        mixedTargets: target.mixed,
         estimates: r.estimates,
       };
     });
@@ -234,7 +250,7 @@ export function useKoboCoverageAnalytics(
           cache[level] = buildTable(source).map((row) => ({
             ...row,
             topReason:
-              row.coveragePct != null && row.coveragePct < 65
+              row.coveragePct != null && row.coveragePct < row.targetPct
                 ? primaryNonCoverageReason(groups.get(row.key) ?? [])
                 : null,
           }));
