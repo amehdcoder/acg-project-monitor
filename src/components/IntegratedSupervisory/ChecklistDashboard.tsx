@@ -37,6 +37,8 @@ import MlIntelligenceHub from "./MlIntelligenceHub";
 import ChecklistPresetBar from "./ChecklistPresetBar";
 import CommunityVisitedTable, { buildCommunityVisits } from "./CommunityVisitedTable";
 import { BRIGHT_CHART_PALETTE } from "@/lib/charts/brightPalette";
+import { InfoDonut, InfoBarH, InfoBarV } from "./charts/InfographicCharts";
+import MedicineOfferedGeo from "./MedicineOfferedGeo";
 
 
 
