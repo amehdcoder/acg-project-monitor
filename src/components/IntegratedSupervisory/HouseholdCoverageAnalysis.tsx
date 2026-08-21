@@ -1,31 +1,35 @@
 /**
- * Household Survey Coverage — design-based coverage analysis for the
- * Integrated MDA Supervisory Checklist dashboard.
+ * Household Survey Coverage & Administrative Level Analytics.
  *
- * Generalises the household/class respondent interviews to the whole population
- * of the Community → Ward → LGA → State using a cluster-sample ratio estimator
- * with Taylor-linearised 95% confidence intervals (see lib/isc/householdCoverage).
+ * Design-based coverage analysis for the Integrated MDA Supervisory Checklist
+ * dashboard. Every figure on this panel is derived live from the synced
+ * KoboToolbox respondent records through `useKoboCoverageAnalytics`, then
+ * re-validated for mathematical consistency before it is rendered.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  AlertTriangle, BookOpen, CheckCircle2, Droplets, HeartPulse, Home,
-  Info, Sigma, XCircle,
+  AlertTriangle, ArrowDown, ArrowUp, BookOpen, CheckCircle2, ChevronLeft, ChevronRight,
+  Droplets, HeartPulse, Home, Info, Search, Sigma, Siren, XCircle,
 } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import {
-  COVERAGE_INDICATORS, coverageByLevel, estimateIndicator,
-  pct, reasonBreakdown,
+  COVERAGE_INDICATORS, pct,
   type CoverageEstimate, type CoverageLevel, type IndicatorDef, type Row,
 } from "@/lib/isc/householdCoverage";
+import { useKoboCoverageAnalytics, type AdminUnitRow, type WashRisk } from "@/hooks/useKoboCoverageAnalytics";
+import { useTablePagination } from "@/hooks/useTablePagination";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import DataIntegrityBadge from "./DataIntegrityBadge";
 
 const GOOD = "hsl(142,71%,38%)";
 const BAD = "hsl(0,72%,48%)";
@@ -37,6 +41,17 @@ const toneFor = (est: CoverageEstimate, positive: boolean) => {
   if (v >= 0.8) return GOOD;
   if (v >= 0.65) return WARN;
   return BAD;
+};
+
+/** Heat colour for a coverage percentage (green ≥ 80, amber 65–79, red < 65). */
+const heatFor = (p: number | null) => (p == null ? "hsl(var(--muted-foreground))" : p >= 80 ? GOOD : p >= 65 ? WARN : BAD);
+
+const RISK_META: Record<WashRisk, { label: string; cls: string } | null> = {
+  critical: { label: "Critical Transmission Hotspot", cls: "bg-rose-100 text-rose-800 border-rose-200" },
+  reinfection: { label: "High Re-Infection Risk Zone", cls: "bg-amber-100 text-amber-800 border-amber-200" },
+  controlled: { label: "Controlled / Maintenance Zone", cls: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+  watch: { label: "Watch — coverage below target", cls: "bg-sky-100 text-sky-800 border-sky-200" },
+  none: null,
 };
 
 const Empty = ({ label = "No household respondents yet" }: { label?: string }) => (
@@ -68,7 +83,6 @@ function IndicatorCard({ ind, est }: { ind: IndicatorDef; est: CoverageEstimate 
           ? `95% confident the true value is between ${lo.toFixed(1)}% and ${hi.toFixed(1)}%`
           : "no respondent answered this question yet"}
       </p>
-      {/* CI band */}
       <div className="relative mt-2 h-1.5 w-full rounded-full bg-muted overflow-hidden">
         <div
           className="absolute h-full rounded-full opacity-35"
@@ -76,9 +90,7 @@ function IndicatorCard({ ind, est }: { ind: IndicatorDef; est: CoverageEstimate 
         />
         <div className="absolute h-full w-[2px]" style={{ left: `${Math.min(99.5, p)}%`, background: color }} />
       </div>
-      <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
-        {ind.description}
-      </p>
+      <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">{ind.description}</p>
       <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
         <span className="font-medium text-foreground/80">{est.x.toLocaleString()}</span> of{" "}
         <span className="font-medium text-foreground/80">{est.n.toLocaleString()}</span>{" "}
@@ -93,22 +105,6 @@ function IndicatorCard({ ind, est }: { ind: IndicatorDef; est: CoverageEstimate 
     </div>
   );
 }
-
-/** Coverage cell: point estimate + CI, coloured like the supervisory registers. */
-function CoverageCell({ est, positive }: { est: CoverageEstimate; positive: boolean }) {
-  if (!est.n) return <td className="px-2 py-1.5 text-right text-muted-foreground">—</td>;
-  const color = toneFor(est, positive);
-  return (
-    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
-      <span className="font-semibold" style={{ color }}>{pct(est.p)}</span>
-      <span className="block text-[10px] text-muted-foreground">
-        {(est.ciLow * 100).toFixed(1)}–{(est.ciHigh * 100).toFixed(1)}
-      </span>
-    </td>
-  );
-}
-
-const TABLE_INDICATORS = ["epi_coverage", "offered", "not_offered", "not_swallowed", "improved_water", "improved_sanitation", "safe_wastewater"];
 
 function MethodologyDialog() {
   return (
@@ -139,41 +135,31 @@ function MethodologyDialog() {
             <strong className="text-foreground">2. Point estimate.</strong> Coverage is the
             self-weighting ratio estimator <code>p = Σxᵢ / Σnᵢ</code> over clusters i, where
             xᵢ households met the indicator out of nᵢ assessed. Respondents for whom the
-            question was skipped or not applicable are excluded from the denominator, so
-            coverage is neither inflated (by dropping non-responders from the numerator only)
-            nor deflated (by counting skips as failures).
+            question was skipped or not applicable are excluded from the denominator.
           </p>
           <p>
             <strong className="text-foreground">3. Variance &amp; 95% CI.</strong> The
             between-cluster (Taylor-linearised) variance of the ratio is used:
             <code> var(p) = m/(m−1) · Σ(xᵢ − p·nᵢ)² / (Σnᵢ)²</code>. Intervals are computed on
-            the logit scale with a Student-t multiplier (df = clusters − 1) and back-transformed,
-            so they remain inside 0–100% even at extreme coverage. With a single cluster there
-            is no between-cluster information, so a Wilson score interval is used and the row is
-            flagged as indicative.
+            the logit scale with a Student-t multiplier (df = clusters − 1) and back-transformed.
           </p>
           <p>
             <strong className="text-foreground">4. Design effect.</strong> DEFF = design
-            variance ÷ simple-random-sample variance; the effective sample size is n / DEFF and
-            the implied intra-cluster correlation is ρ = (DEFF − 1)/(n̄ − 1). Estimates based on
-            fewer than 5 clusters, or with a margin of error wider than ±10 percentage points,
-            are marked <em>indicative only</em> and should not be reported as the coverage of
-            the whole administrative unit.
+            variance ÷ simple-random-sample variance; effective sample size = n / DEFF and the
+            implied intra-cluster correlation is ρ = (DEFF − 1)/(n̄ − 1). The margin of error is
+            <code> 1.96 · √(p(1−p)·DEFF / n)</code>. Estimates from fewer than 5 clusters, or with
+            a margin wider than ±10 pp, are flagged <em>Indicative / Low Power</em>.
           </p>
           <p>
             <strong className="text-foreground">5. Indicator definitions.</strong>{" "}
-            <em>Epidemiological coverage</em> = swallowed ÷ all respondents surveyed (those never
-            offered count as not treated). <em>Uptake</em> = swallowed ÷ those actually offered.
-            WASH indicators follow WHO/UNICEF JMP service-ladder logic: improved water (piped,
-            borehole, protected well/spring, rainwater), improved sanitation (flush, pour-flush
-            or pit latrine — open defecation excluded), and contained wastewater disposal
-            (closed septic/sink system or contained pit).
+            <em>Epidemiological coverage</em> = swallowed ÷ all respondents surveyed.{" "}
+            <em>Uptake</em> = swallowed ÷ those actually offered. <em>Unmet need</em> = 100% −
+            offered rate. WASH indicators follow WHO/UNICEF JMP service-ladder logic.
           </p>
           <p>
-            <strong className="text-foreground">6. Interpretation.</strong> Compare the lower
-            confidence bound — not the point estimate — against the programme threshold
-            (e.g. 65% epidemiological coverage for STH/schistosomiasis). If the lower bound sits
-            below the threshold, coverage cannot be declared achieved at that administrative level.
+            <strong className="text-foreground">6. Consistency checks.</strong> Every percentage,
+            stacked segment and KPI on this panel is re-derived from the raw submissions and
+            compared with the rendered value; discrepancies appear in the data-integrity badge.
           </p>
         </div>
       </DialogContent>
@@ -181,55 +167,76 @@ function MethodologyDialog() {
   );
 }
 
+type SortKey = "name" | "clusters" | "households" | "coverage" | "gap";
+
 export default function HouseholdCoverageAnalysis({
   respondents, campaignFilter,
 }: { respondents: Row[]; campaignFilter?: string | null }) {
   const [level, setLevel] = useState<CoverageLevel>("Ward");
-  const rows = respondents;
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "households", dir: "desc" });
+  const debouncedSearch = useDebouncedValue(search, 300);
 
-  const overall = useMemo(() => {
-    const m: Record<string, CoverageEstimate> = {};
-    for (const ind of COVERAGE_INDICATORS) m[ind.key] = estimateIndicator(rows, ind);
-    return m;
-  }, [rows]);
+  const analytics = useKoboCoverageAnalytics(respondents, { campaign: campaignFilter ?? null });
+  const { stats, overall, validation, showClusterAlert, refusalReasons, acceptReasons, rows } = analytics;
 
-  const table = useMemo(() => coverageByLevel(rows, level), [rows, level]);
+  const levelRows = useMemo(() => analytics.levelTable(level), [analytics, level]);
 
-  const refusalReasons = useMemo(
-    () => reasonBreakdown(rows, "Reason_respondent_DID_NOT_SWAL"),
-    [rows],
-  );
-  const acceptReasons = useMemo(
-    () => reasonBreakdown(rows, "Reason_respondent_SWALLOWED_th"),
-    [rows],
-  );
+  const filteredRows = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    const base = q
+      ? levelRows.filter((r) => `${r.name} ${r.parentPath}`.toLowerCase().includes(q))
+      : levelRows;
+    const dir = sort.dir === "asc" ? 1 : -1;
+    const val = (r: AdminUnitRow) => {
+      switch (sort.key) {
+        case "name": return r.name.toLowerCase();
+        case "clusters": return r.clusters;
+        case "coverage": return r.coveragePct ?? -1;
+        case "gap": return (r.coveragePct ?? 0) - 80;
+        default: return r.households;
+      }
+    };
+    return [...base].sort((a, b) => {
+      const x = val(a), y = val(b);
+      if (typeof x === "string" || typeof y === "string") return String(x).localeCompare(String(y)) * dir;
+      return (Number(x) - Number(y)) * dir;
+    });
+  }, [levelRows, debouncedSearch, sort]);
 
-  const tableIndicators = TABLE_INDICATORS
-    .map((k) => COVERAGE_INDICATORS.find((i) => i.key === k)!)
-    .filter(Boolean);
+  const page = useTablePagination(filteredRows, 15);
+  // Keep the table anchored when the level or query changes (no layout jump).
+  useEffect(() => { page.resetPage(); }, [level, debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const medicine = COVERAGE_INDICATORS.filter((i) => i.group === "medicine");
   const wash = COVERAGE_INDICATORS.filter((i) => i.group === "wash");
-
   const epi = overall.epi_coverage;
-  const totalClusters = epi?.clusters ?? 0;
+
+  const toggleSort = (key: SortKey) =>
+    setSort((s) => ({ key, dir: s.key === key && s.dir === "desc" ? "asc" : "desc" }));
+
+  const SortHead = ({ k, children, className = "" }: { k: SortKey; children: React.ReactNode; className?: string }) => (
+    <th className={`px-2 py-2 font-semibold align-bottom whitespace-nowrap ${className}`}>
+      <button type="button" className="inline-flex items-center gap-1 hover:text-primary" onClick={() => toggleSort(k)}>
+        {children}
+        {sort.key === k && (sort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+      </button>
+    </th>
+  );
 
   return (
     <Card className="overflow-hidden border-emerald-200/70">
       <CardHeader className="py-3 px-4 border-b bg-gradient-to-r from-emerald-50 to-sky-50 flex-row flex-wrap items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
           <Home className="h-4 w-4 text-emerald-700" />
-          Household Survey Coverage
-          <Badge variant="outline" className="ml-1 font-normal text-[10px]">
-            design-based · 95% CI
-          </Badge>
+          Household Survey Coverage &amp; Administrative Level Analytics
+          <Badge variant="outline" className="ml-1 font-normal text-[10px]">design-based · 95% CI</Badge>
         </CardTitle>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary" className="text-[10px] font-medium">
-            {campaignFilter
-              ? `Campaign: ${campaignFilter}`
-              : "All MDA campaign types (use the dashboard filter bar)"}
+            {campaignFilter ? `Campaign: ${campaignFilter}` : "All MDA campaign types (use the dashboard filter bar)"}
           </Badge>
+          <DataIntegrityBadge report={validation} label="Coverage analytics integrity" />
           <MethodologyDialog />
         </div>
       </CardHeader>
@@ -239,15 +246,27 @@ export default function HouseholdCoverageAnalysis({
           <Empty />
         ) : (
           <>
+            {/* A. Actionable dynamic narrative banner */}
+            {showClusterAlert && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-[11px] leading-relaxed text-amber-900">
+                <Siren className="mt-[2px] h-4 w-4 shrink-0 text-amber-600" />
+                <p>
+                  <strong>Systemic Clustering Detected (ICC ρ = {stats.icc.toFixed(3)}, DEFF = {stats.deff.toFixed(2)}):</strong>{" "}
+                  Coverage gap of {stats.gapPct.toFixed(1)}% ({stats.gapCount.toLocaleString()} households) is concentrated
+                  across {stats.unreachedClusterCount.toLocaleString()} unreached community clusters.{" "}
+                  <strong>Priority:</strong> Deploy mop-up teams to underperforming clusters in {stats.lowestLgaName}.
+                </p>
+              </div>
+            )}
+
             <div className="rounded-lg border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground flex items-start gap-2">
               <Info className="h-3.5 w-3.5 mt-[1px] shrink-0 text-primary" />
               <span>
-                {rows.length.toLocaleString()} household / class respondents interviewed across{" "}
-                {totalClusters.toLocaleString()} community clusters
-                {campaignFilter ? ` for the ${campaignFilter} campaign` : " across all MDA campaign types"}. Coverage is estimated with a
-                cluster-sample ratio estimator and generalised to all households in each unit —
-                point estimates are shown with their 95% confidence interval, design effect (DEFF)
-                and effective sample size.
+                {stats.totalN.toLocaleString()} household / class respondents interviewed across{" "}
+                {stats.clusters.toLocaleString()} community clusters
+                {campaignFilter ? ` for the ${campaignFilter} campaign` : " across all MDA campaign types"}.{" "}
+                Offered {stats.offeredPct.toFixed(1)}% · Epidemiological coverage {stats.swallowedPct.toFixed(1)}% ·
+                Uptake {stats.uptakePct.toFixed(1)}% · Unmet need {stats.unmetNeedPct.toFixed(1)}%.
               </span>
             </div>
 
@@ -257,9 +276,7 @@ export default function HouseholdCoverageAnalysis({
                 <HeartPulse className="h-3.5 w-3.5 text-rose-600" /> Medicine coverage &amp; uptake
               </p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {medicine.map((ind) => (
-                  <IndicatorCard key={ind.key} ind={ind} est={overall[ind.key]} />
-                ))}
+                {medicine.map((ind) => <IndicatorCard key={ind.key} ind={ind} est={overall[ind.key]} />)}
               </div>
             </div>
 
@@ -269,20 +286,18 @@ export default function HouseholdCoverageAnalysis({
                 <Droplets className="h-3.5 w-3.5 text-sky-600" /> WASH infrastructure &amp; practice
               </p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {wash.map((ind) => (
-                  <IndicatorCard key={ind.key} ind={ind} est={overall[ind.key]} />
-                ))}
+                {wash.map((ind) => <IndicatorCard key={ind.key} ind={ind} est={overall[ind.key]} />)}
               </div>
             </div>
 
-            {/* Effective-sample summary */}
+            {/* B. Statistical sampling strip (live) */}
             {epi && epi.n > 0 && (
               <div className="grid gap-3 sm:grid-cols-4 text-[11px]">
                 {[
-                  { l: "Effective sample size", v: Math.round(epi.neff).toLocaleString(), s: `The ${epi.n.toLocaleString()} interviews carry only as much statistical information as this many independent households, because neighbours answer alike.` },
-                  { l: "Design effect (DEFF)", v: epi.deff.toFixed(2), s: `How much clustering inflates uncertainty versus a random household sample — ${epi.deff > 2 ? "strong clustering, widen your sample across more communities" : "acceptable clustering"}.` },
-                  { l: "Intra-cluster correlation (ρ)", v: epi.icc.toFixed(3), s: "Similarity between households in the same community: 0 = independent, 1 = identical answers." },
-                  { l: "Margin of error", v: `±${epi.marginPct.toFixed(1)} pp`, s: "Half-width of the 95% interval on treatment (swallowed) coverage, in percentage points." },
+                  { l: "Effective sample size", v: stats.effectiveSample.toLocaleString(), s: `The ${epi.n.toLocaleString()} interviews carry only as much statistical information as this many independent households.` },
+                  { l: "Design effect (DEFF)", v: stats.deff.toFixed(2), s: stats.deff > 2 ? "Strong clustering — widen the sample across more communities." : "Acceptable clustering versus a random household sample." },
+                  { l: "Intra-cluster correlation (ICC ρ)", v: stats.icc.toFixed(3), s: "Similarity between households in the same community: 0 = independent, 1 = identical answers." },
+                  { l: "Margin of error", v: `±${stats.marginOfError.toFixed(1)} pp`, s: "Half-width of the 95% interval on treatment (swallowed) coverage, in percentage points." },
                 ].map((k) => (
                   <div key={k.l} className="rounded-lg border bg-muted/20 px-3 py-2">
                     <p className="uppercase tracking-wide text-[10px] font-semibold text-muted-foreground">{k.l}</p>
@@ -293,108 +308,168 @@ export default function HouseholdCoverageAnalysis({
               </div>
             )}
 
-            {/* Generalised coverage table */}
+            {/* C. Administrative aggregation table */}
             <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-semibold flex items-center gap-1.5">
                   <Sigma className="h-3.5 w-3.5 text-primary" />
                   Coverage generalised by administrative level
                 </p>
-                <Tabs value={level} onValueChange={(v) => setLevel(v as CoverageLevel)}>
-                  <TabsList className="h-7">
-                    {(["State", "LGA", "Ward", "Community"] as CoverageLevel[]).map((l) => (
-                      <TabsTrigger key={l} value={l} className="text-[11px] px-2.5 py-1">{l}</TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder={`Search ${level.toLowerCase()}…`}
+                      className="h-7 w-[180px] pl-7 text-[11px]"
+                    />
+                  </div>
+                  <Tabs value={level} onValueChange={(v) => setLevel(v as CoverageLevel)}>
+                    <TabsList className="h-7">
+                      {(["State", "LGA", "Ward", "Community"] as CoverageLevel[]).map((l) => (
+                        <TabsTrigger key={l} value={l} className="text-[11px] px-2.5 py-1">{l}</TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </Tabs>
+                </div>
               </div>
 
-              {table.length === 0 ? (
-                <Empty label="No units at this level" />
-              ) : (
-                <div className="max-h-[460px] overflow-auto rounded-md border">
-                  <table className="w-full min-w-[1080px] text-xs">
-                    <thead className="bg-muted/60 sticky top-0 z-10">
-                      <tr>
-                        <th className="text-left px-2 py-2 font-semibold align-bottom whitespace-nowrap">
-                          {level}
-                          <span className="block text-[9px] font-normal text-muted-foreground">
-                            Administrative unit the estimate applies to
-                          </span>
-                        </th>
-                        {level !== "State" && (
+              <div className="min-h-[240px]">
+                {filteredRows.length === 0 ? (
+                  <Empty label="No units match this level / search" />
+                ) : (
+                  <div className="overflow-auto rounded-md border">
+                    <table className="w-full min-w-[1080px] text-xs">
+                      <thead className="bg-muted/60 sticky top-0 z-10">
+                        <tr>
+                          <SortHead k="name" className="text-left">
+                            {level}
+                            <span className="block text-[9px] font-normal text-muted-foreground">Administrative unit</span>
+                          </SortHead>
+                          {level !== "State" && (
+                            <th className="text-left px-2 py-2 font-semibold align-bottom whitespace-nowrap">
+                              Located within
+                              <span className="block text-[9px] font-normal text-muted-foreground">Parent hierarchy</span>
+                            </th>
+                          )}
+                          <SortHead k="clusters" className="text-right">
+                            Communities sampled
+                            <span className="block text-[9px] font-normal text-muted-foreground">Clusters (≥5 needed)</span>
+                          </SortHead>
+                          <SortHead k="households" className="text-right">
+                            Households interviewed
+                            <span className="block text-[9px] font-normal text-muted-foreground">Sample size (n)</span>
+                          </SortHead>
+                          <SortHead k="coverage" className="text-right">
+                            Epidemiological coverage
+                            <span className="block text-[9px] font-normal text-muted-foreground">% swallowed · 95% CI</span>
+                          </SortHead>
+                          <SortHead k="gap" className="text-right">
+                            Distance to target
+                            <span className="block text-[9px] font-normal text-muted-foreground">vs. 80% threshold</span>
+                          </SortHead>
                           <th className="text-left px-2 py-2 font-semibold align-bottom whitespace-nowrap">
-                            Located within
-                            <span className="block text-[9px] font-normal text-muted-foreground">
-                              Parent LGA / State
-                            </span>
+                            WASH risk classification
+                            <span className="block text-[9px] font-normal text-muted-foreground">Coverage × WASH cross-analysis</span>
                           </th>
-                        )}
-                        <th className="text-right px-2 py-2 font-semibold align-bottom whitespace-nowrap" title="Number of distinct communities (primary sampling units) surveyed inside this unit. More clusters = a more generalisable estimate.">
-                          Communities sampled
-                          <span className="block text-[9px] font-normal text-muted-foreground">
-                            Clusters (≥5 needed)
-                          </span>
-                        </th>
-                        <th className="text-right px-2 py-2 font-semibold align-bottom whitespace-nowrap" title="Total household / class respondents interviewed inside this unit.">
-                          Households interviewed
-                          <span className="block text-[9px] font-normal text-muted-foreground">Sample size (n)</span>
-                        </th>
-                        {tableIndicators.map((ind) => (
-                          <th key={ind.key} className="text-right px-2 py-2 font-semibold whitespace-nowrap align-bottom" title={`${ind.label} — ${ind.description} Denominator: ${ind.denominator}.`}>
-                            {ind.label}
-                            <span className="block text-[9px] font-normal text-muted-foreground">
-                              % of {ind.denominator.toLowerCase()} · 95% CI
-                            </span>
+                          <th className="text-left px-2 py-2 font-semibold align-bottom whitespace-nowrap">
+                            Data quality
+                            <span className="block text-[9px] font-normal text-muted-foreground">Precision verdict</span>
                           </th>
-                        ))}
-                        <th className="text-left px-2 py-2 font-semibold align-bottom whitespace-nowrap" title="Whether the estimate is precise enough to be reported as the coverage of the whole unit.">
-                          Can this be generalised?
-                          <span className="block text-[9px] font-normal text-muted-foreground">
-                            Precision verdict
-                          </span>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {table.map((r) => {
-                        const e = r.estimates.epi_coverage;
-                        return (
-                          <tr key={r.key} className="border-t hover:bg-muted/30">
-                            <td className="px-2 py-1.5 font-medium whitespace-nowrap">{r.name}</td>
-                            {level !== "State" && (
-                              <td className="px-2 py-1.5 text-muted-foreground whitespace-nowrap">
-                                {[r.parent, r.grandParent].filter(Boolean).join(" · ") || "—"}
-                              </td>
-                            )}
-                            <td className="px-2 py-1.5 text-right tabular-nums">{r.communities}</td>
-                            <td className="px-2 py-1.5 text-right tabular-nums">{r.respondents}</td>
-                            {tableIndicators.map((ind) => (
-                              <CoverageCell key={ind.key} est={r.estimates[ind.key]} positive={ind.positive} />
-                            ))}
-                            <td className="px-2 py-1.5">
-                              {e.lowPrecision ? (
-                                <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 text-[10px] font-medium">
-                                  Indicative
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-medium">
-                                  Generalisable
-                                </Badge>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {page.paginatedData.map((r) => {
+                          const gap = r.coveragePct == null ? null : r.coveragePct - 80;
+                          const risk = RISK_META[r.washRisk];
+                          const under = r.coveragePct != null && r.coveragePct < 65;
+                          return (
+                            <tr
+                              key={r.key}
+                              className={`border-t hover:bg-muted/30 ${under ? "bg-rose-50/40" : ""}`}
+                              title={under && r.topReason ? `Primary reported reason for non-coverage: ${r.topReason}` : undefined}
+                            >
+                              <td className="px-2 py-1.5 font-medium whitespace-nowrap">{r.name}</td>
+                              {level !== "State" && (
+                                <td className="px-2 py-1.5 text-muted-foreground whitespace-nowrap">{r.parentPath}</td>
                               )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                              <td className="px-2 py-1.5 text-right tabular-nums">{r.clusters}</td>
+                              <td className="px-2 py-1.5 text-right tabular-nums">{r.households}</td>
+                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                {r.coveragePct == null ? <span className="text-muted-foreground">—</span> : (
+                                  <>
+                                    <span className="font-semibold" style={{ color: heatFor(r.coveragePct) }}>
+                                      {r.coveragePct.toFixed(1)}%
+                                    </span>
+                                    <span className="block text-[10px] text-muted-foreground">
+                                      {r.ciLow.toFixed(1)}–{r.ciHigh.toFixed(1)}
+                                    </span>
+                                  </>
+                                )}
+                              </td>
+                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                {gap == null ? "—" : (
+                                  <span className="font-semibold" style={{ color: gap >= 0 ? GOOD : BAD }}>
+                                    {gap >= 0 ? "+" : ""}{gap.toFixed(1)} pp
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-2 py-1.5">
+                                {risk ? (
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-[10px] font-medium ${risk.cls}`}
+                                    title={`WASH access ${r.washPct == null ? "—" : `${r.washPct.toFixed(1)}%`} · open defecation ${r.openDefecationPct == null ? "—" : `${r.openDefecationPct.toFixed(1)}%`}`}
+                                  >
+                                    {risk.label}
+                                  </Badge>
+                                ) : <span className="text-muted-foreground">—</span>}
+                              </td>
+                              <td className="px-2 py-1.5">
+                                {r.lowPower ? (
+                                  <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 text-[10px] font-medium">
+                                    Indicative / Low Power
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-medium">
+                                    Generalisable
+                                  </Badge>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {page.totalPages > 1 && (
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                  <span>
+                    Showing {page.startIndex + 1}–{Math.min(page.startIndex + page.pageSize, page.totalItems)} of{" "}
+                    {page.totalItems.toLocaleString()} {level.toLowerCase()}s
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button size="icon" variant="outline" className="h-6 w-6" disabled={!page.hasPrev} onClick={page.prevPage}>
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </Button>
+                    <span className="tabular-nums">{page.currentPage} / {page.totalPages}</span>
+                    <Button size="icon" variant="outline" className="h-6 w-6" disabled={!page.hasNext} onClick={page.nextPage}>
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
               )}
+
               <p className="text-[10px] text-muted-foreground">
-                Each cell shows the design-based coverage with its 95% confidence interval below.
-                Green ≥ 80%, amber 65–80%, red &lt; 65% (reversed for gap indicators). Rows marked
-                <em> Indicative</em> have fewer than 5 community clusters or a margin of error wider
-                than ±10 pp and must not be reported as the coverage of the whole unit.
+                Coverage is heat-mapped green ≥ 80%, amber 65–79%, red &lt; 65%. Rows marked
+                <em> Indicative / Low Power</em> have fewer than 5 community clusters or a margin of error
+                wider than ±10 pp. Hover an underperforming row to see the primary reported reason for
+                non-coverage. WASH risk combines coverage with improved water + sanitation access
+                (high coverage / low WASH = re-infection risk; low coverage / low WASH = transmission hotspot).
               </p>
             </div>
 
