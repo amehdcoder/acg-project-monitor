@@ -282,7 +282,9 @@ export function isIdentityQuestion(
       if (f && leafName(String(f)) === leaf) return true;
     }
   }
-  return IDENTITY_FIELD_RE.test(normalizeKey(`${leaf} ${q?.label ?? ""}`));
+  // Name only — labels legitimately contain phrases like "name of the medicine".
+  return IDENTITY_FIELD_RE.test(normalizeKey(leaf));
+
 }
 
 /**
