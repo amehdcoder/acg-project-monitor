@@ -21,6 +21,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import PetalDonutChart from "@/components/charts/PetalDonutChart";
+import { InfoDonut, InfoBarH } from "@/components/IntegratedSupervisory/charts/InfographicCharts";
 import { useQuizKobo } from "@/hooks/useQuizKobo";
 import {
   bandBreakdown, filterByGroup, improvementSummary,
@@ -967,17 +968,11 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
               </CardHeader>
               <CardContent>
                 {improvementPie.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie data={improvementPie} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
-                        {improvementPie.map((entry, i) => (
-                          <Cell key={i} fill={entry.color} strokeWidth={2} stroke="hsl(var(--background))" />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => [value, "Participants"]} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <InfoDonut
+                    data={improvementPie.map((d) => ({ name: d.name, value: d.value }))}
+                    height={300}
+                    centerLabel="participants"
+                  />
                 ) : (
                   <div className="py-12 text-center text-muted-foreground text-sm">No paired data yet.</div>
                 )}
@@ -1026,7 +1021,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <PetalDonutChart data={b.data} height={260} unitLabel="submissions" />
+                    <InfoDonut data={b.data.map((d: any) => ({ name: d.name, value: d.value }))} height={280} centerLabel="submissions" />
                   </CardContent>
                 </Card>
               ))}
@@ -1314,26 +1309,13 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
                   <CardDescription className="text-xs">Every question ranked by how many participants answered correctly.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={Math.max(240, questionStats.length * 34)}>
-                    <BarChart
-                      layout="vertical"
-                      data={[...questionStats].sort((a, b) => b.correctRate - a.correctRate).map(q => ({ name: `Q${q.number}`, "Correct %": q.correctRate }))}
-                      margin={{ left: 8, right: 24 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} horizontal={false} />
-                      <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
-                      <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={44} />
-                      <Tooltip
-                        contentStyle={{ borderRadius: "12px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
-                        formatter={(value: number) => [`${value}%`, "Correct"]}
-                      />
-                      <Bar dataKey="Correct %" radius={[0, 6, 6, 0]}>
-                        {[...questionStats].sort((a, b) => b.correctRate - a.correctRate).map((q, i) => (
-                          <Cell key={i} fill={q.correctRate >= 70 ? COLORS.post : q.correctRate >= 40 ? COLORS.accent : COLORS.danger} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <InfoBarH
+                    data={[...questionStats]
+                      .sort((a, b) => b.correctRate - a.correctRate)
+                      .map((q) => ({ name: `Q${q.number}`, value: q.correctRate }))}
+                    axisLabel="Correct answers (%)"
+                    colorByName
+                  />
                 </CardContent>
               </Card>
             </>
