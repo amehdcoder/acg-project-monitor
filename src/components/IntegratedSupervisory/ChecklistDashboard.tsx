@@ -785,11 +785,14 @@ export default function ChecklistDashboard({
         <p className="text-xs text-muted-foreground">
           {cache ? `Synced ${new Date(cache.fetchedAt).toLocaleString()} · ${kpi.total} submissions · ${kpi.respondents} flattened respondent records` : "No Kobo data cached yet — run a sync."}
         </p>
+        <div className="flex items-center gap-2">
+          <DataIntegrityBadge report={integrity} label="Dashboard data integrity" />
         {onRefresh && (
           <Button size="sm" variant="outline" onClick={onRefresh} disabled={syncing}>
             {syncing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />} Refresh
           </Button>
         )}
+        </div>
       </div>
 
       {/* SAE monitor */}
