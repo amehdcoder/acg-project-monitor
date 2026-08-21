@@ -53,8 +53,8 @@ export const ChartEmpty = ({ height = 220 }: { height?: number }) => (
  * sits in its own row below the ring.
  */
 export function InfoDonut({
-  data, height = 300, centerLabel,
-}: { data: Datum[]; height?: number; centerLabel?: string }) {
+  data, height = 300, centerLabel, onSelect,
+}: { data: Datum[]; height?: number; centerLabel?: string; onSelect?: (name: string) => void }) {
   if (!data.length) return <ChartEmpty height={height} />;
   const total = data.reduce((s, d) => s + (Number(d.value) || 0), 0);
   if (total <= 0) return <ChartEmpty height={height} />;
@@ -108,6 +108,8 @@ export function InfoDonut({
               label={inSliceLabel}
               isAnimationActive
               animationDuration={650}
+              cursor={onSelect ? "pointer" : undefined}
+              onClick={(d: any) => onSelect?.(String(d?.name ?? d?.payload?.name ?? ""))}
             >
               {ordered.map((d, i) => <Cell key={d.name} fill={colors[i]} />)}
             </Pie>
@@ -132,13 +134,19 @@ export function InfoDonut({
 
       <div className="mt-1 grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
         {ordered.map((d, i) => (
-          <span key={d.name} className="flex min-w-0 items-center gap-1.5 text-[10px] font-medium">
+          <button
+            key={d.name}
+            type="button"
+            disabled={!onSelect}
+            onClick={() => onSelect?.(d.name)}
+            className={`flex min-w-0 items-center gap-1.5 text-left text-[10px] font-medium ${onSelect ? "rounded hover:bg-muted/60" : "cursor-default"}`}
+          >
             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: colors[i] }} />
             <span className="min-w-0 flex-1 truncate text-foreground" title={d.name}>{d.name}</span>
             <span className="shrink-0 tabular-nums text-muted-foreground">
               {nf(d.value)} · {((Number(d.value) / total) * 100).toFixed(1)}%
             </span>
-          </span>
+          </button>
         ))}
       </div>
     </div>
@@ -150,13 +158,14 @@ export function InfoDonut({
 
 /** Horizontal ranked bars with the exact count printed at the end of each bar. */
 export function InfoBarH({
-  data, color, axisLabel = "Number of responses", colorByName = false, maxBars,
+  data, color, axisLabel = "Number of responses", colorByName = false, maxBars, onSelect,
 }: {
   data: Datum[];
   color?: string;
   axisLabel?: string;
   colorByName?: boolean;
   maxBars?: number;
+  onSelect?: (name: string) => void;
 }) {
   if (!data.length) return <ChartEmpty />;
   const rows = maxBars ? data.slice(0, maxBars) : data;
@@ -181,7 +190,13 @@ export function InfoBarH({
             tickFormatter={(v: string) => (String(v).length > 26 ? `${String(v).slice(0, 25)}…` : String(v))}
           />
           <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "hsl(var(--muted)/.4)" }} formatter={(v: any) => [nf(Number(v)), "Responses"]} />
-          <Bar dataKey="value" radius={[0, 5, 5, 0]} maxBarSize={22}>
+          <Bar
+            dataKey="value"
+            radius={[0, 5, 5, 0]}
+            maxBarSize={22}
+            cursor={onSelect ? "pointer" : undefined}
+            onClick={(d: any) => onSelect?.(String(d?.name ?? d?.payload?.name ?? ""))}
+          >
             {rows.map((d, i) => (
               <Cell key={d.name} fill={colorByName ? semanticColor(d.name, i) : (color ?? BRIGHT_CHART_PALETTE[0])} />
             ))}

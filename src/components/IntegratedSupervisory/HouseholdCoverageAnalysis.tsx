@@ -26,6 +26,9 @@ import {
   COVERAGE_INDICATORS, pct,
   type CoverageEstimate, type CoverageLevel, type IndicatorDef, type Row,
 } from "@/lib/isc/householdCoverage";
+import { resolveChecklistValue } from "./checklistSchema";
+import { InfoBarH } from "./charts/InfographicCharts";
+import ChartRecordsDialog, { type ChartDrillSpec } from "./ChartRecordsDialog";
 import { useKoboCoverageAnalytics, type AdminUnitRow, type WashRisk } from "@/hooks/useKoboCoverageAnalytics";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -43,8 +46,9 @@ const toneFor = (est: CoverageEstimate, positive: boolean) => {
   return BAD;
 };
 
-/** Heat colour for a coverage percentage (green ≥ 80, amber 65–79, red < 65). */
-const heatFor = (p: number | null) => (p == null ? "hsl(var(--muted-foreground))" : p >= 80 ? GOOD : p >= 65 ? WARN : BAD);
+/** Heat colour relative to the campaign's programme target (green ≥ target, amber within 10 pp, red below). */
+const heatFor = (p: number | null, target = 80) =>
+  p == null ? "hsl(var(--muted-foreground))" : p >= target ? GOOD : p >= target - 10 ? WARN : BAD;
 
 const RISK_META: Record<WashRisk, { label: string; cls: string } | null> = {
   critical: { label: "Critical Transmission Hotspot", cls: "bg-rose-100 text-rose-800 border-rose-200" },
@@ -179,6 +183,18 @@ export default function HouseholdCoverageAnalysis({
 
   const analytics = useKoboCoverageAnalytics(respondents, { campaign: campaignFilter ?? null });
   const { stats, overall, validation, showClusterAlert, refusalReasons, acceptReasons, rows } = analytics;
+
+  const [drill, setDrill] = useState<ChartDrillSpec | null>(null);
+
+  /** Open the record drill-down for a clicked reason bar. */
+  const openReasonDrill = (title: string, field: string, category: string, color: string) => {
+    const matches = rows.filter((r) => {
+      const v = r[field];
+      if (v == null || v === "") return false;
+      return (resolveChecklistValue(field, v) || String(v)) === category;
+    });
+    setDrill({ title, category, color, rows: matches as Record<string, unknown>[] });
+  };
 
   const levelRows = useMemo(() => analytics.levelTable(level), [analytics, level]);
 
@@ -365,9 +381,13 @@ export default function HouseholdCoverageAnalysis({
                             Epidemiological coverage
                             <span className="block text-[9px] font-normal text-muted-foreground">% swallowed · 95% CI</span>
                           </SortHead>
+                          <th className="text-right px-2 py-2 font-semibold align-bottom whitespace-nowrap">
+                            Programme target
+                            <span className="block text-[9px] font-normal text-muted-foreground">By campaign type</span>
+                          </th>
                           <SortHead k="gap" className="text-right">
                             Distance to target
-                            <span className="block text-[9px] font-normal text-muted-foreground">vs. 80% threshold</span>
+                            <span className="block text-[9px] font-normal text-muted-foreground">vs. campaign threshold</span>
                           </SortHead>
                           <th className="text-left px-2 py-2 font-semibold align-bottom whitespace-nowrap">
                             WASH risk classification
@@ -381,9 +401,9 @@ export default function HouseholdCoverageAnalysis({
                       </thead>
                       <tbody>
                         {page.paginatedData.map((r) => {
-                          const gap = r.coveragePct == null ? null : r.coveragePct - 80;
+                          const gap = r.coveragePct == null ? null : r.coveragePct - r.targetPct;
                           const risk = RISK_META[r.washRisk];
-                          const under = r.coveragePct != null && r.coveragePct < 65;
+                          const under = r.coveragePct != null && r.coveragePct < r.targetPct;
                           return (
                             <tr
                               key={r.key}
@@ -399,7 +419,7 @@ export default function HouseholdCoverageAnalysis({
                               <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
                                 {r.coveragePct == null ? <span className="text-muted-foreground">—</span> : (
                                   <>
-                                    <span className="font-semibold" style={{ color: heatFor(r.coveragePct) }}>
+                                    <span className="font-semibold" style={{ color: heatFor(r.coveragePct, r.targetPct) }}>
                                       {r.coveragePct.toFixed(1)}%
                                     </span>
                                     <span className="block text-[10px] text-muted-foreground">
@@ -407,6 +427,12 @@ export default function HouseholdCoverageAnalysis({
                                     </span>
                                   </>
                                 )}
+                              </td>
+                              <td className="px-2 py-1.5 text-right whitespace-nowrap" title={r.targetLabel}>
+                                <span className="font-semibold tabular-nums">{r.targetPct}%</span>
+                                <span className="block max-w-[150px] truncate text-[10px] text-muted-foreground">
+                                  {r.mixedTargets ? "Mixed campaigns · strictest" : r.targetLabel}
+                                </span>
                               </td>
                               <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
                                 {gap == null ? "—" : (
@@ -465,7 +491,11 @@ export default function HouseholdCoverageAnalysis({
               )}
 
               <p className="text-[10px] text-muted-foreground">
-                Coverage is heat-mapped green ≥ 80%, amber 65–79%, red &lt; 65%. Rows marked
+                Programme coverage targets follow the campaign type: <strong>65%</strong> for Lymphatic
+                Filariasis, <strong>75%</strong> for Schistosomiasis / Soil Transmitted Helminths and{" "}
+                <strong>80%</strong> for Onchocerciasis Only or Trachoma. Units mixing campaign types are
+                scored against the strictest applicable threshold. Coverage is heat-mapped green at or above
+                target, amber within 10 pp of target, red below that. Rows marked
                 <em> Indicative / Low Power</em> have fewer than 5 community clusters or a margin of error
                 wider than ±10 pp. Hover an underperforming row to see the primary reported reason for
                 non-coverage. WASH risk combines coverage with improved water + sanitation access
@@ -480,38 +510,33 @@ export default function HouseholdCoverageAnalysis({
                   <XCircle className="h-3.5 w-3.5 text-rose-600" /> Reasons for NOT swallowing
                 </p>
                 {refusalReasons.length === 0 ? <Empty label="No refusals recorded" /> : (
-                  <ResponsiveContainer width="100%" height={Math.max(180, refusalReasons.length * 34)}>
-                    <BarChart data={refusalReasons} layout="vertical" margin={{ left: 8, right: 24 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                      <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-                      <YAxis type="category" dataKey="name" width={170} tick={{ fontSize: 10 }} />
-                      <Tooltip />
-                      <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                        {refusalReasons.map((_, i) => <Cell key={i} fill={BAD} />)}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <InfoBarH
+                    data={refusalReasons}
+                    color={BAD}
+                    axisLabel="Number of respondents"
+                    onSelect={(name) => openReasonDrill("Reasons for NOT swallowing", "Reason_respondent_DID_NOT_SWAL", name, BAD)}
+                  />
                 )}
+                <p className="mt-1 text-[10px] text-muted-foreground">Click a bar to see the respondent records behind it.</p>
               </div>
               <div className="rounded-md border p-3">
                 <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Reasons for swallowing
                 </p>
                 {acceptReasons.length === 0 ? <Empty label="No acceptance reasons recorded" /> : (
-                  <ResponsiveContainer width="100%" height={Math.max(180, acceptReasons.length * 34)}>
-                    <BarChart data={acceptReasons} layout="vertical" margin={{ left: 8, right: 24 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                      <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-                      <YAxis type="category" dataKey="name" width={170} tick={{ fontSize: 10 }} />
-                      <Tooltip />
-                      <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                        {acceptReasons.map((_, i) => <Cell key={i} fill={INFO} />)}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <InfoBarH
+                    data={acceptReasons}
+                    color={INFO}
+                    axisLabel="Number of respondents"
+                    onSelect={(name) => openReasonDrill("Reasons for swallowing", "Reason_respondent_SWALLOWED_th", name, INFO)}
+                  />
                 )}
+                <p className="mt-1 text-[10px] text-muted-foreground">Click a bar to see the respondent records behind it.</p>
               </div>
             </div>
+
+            <ChartRecordsDialog spec={drill} onClose={() => setDrill(null)} />
+
           </>
         )}
       </CardContent>
