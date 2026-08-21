@@ -610,6 +610,17 @@ export default function ChecklistDashboard({
   const sufficiency = useMemo(() => tally(parents.map((p) => p.Does_CDI_CDD_have_sufficient_d), "Does_CDI_CDD_have_sufficient_d"), [parents]);
   const mdaStatus = useMemo(() => tally(parents.map((p) => p.Status_of_MDA), "Status_of_MDA"), [parents]);
 
+  /* Supervisory insight bars: why respondents swallowed / did not swallow. */
+  const swallowReasons = useMemo(
+    () => tally(respondents.map((r) => r.Reason_respondent_SWALLOWED_th), "Reason_respondent_SWALLOWED_th"),
+    [respondents],
+  );
+  const noSwallowReasons = useMemo(
+    () => tally(respondents.map((r) => r.Reason_respondent_DID_NOT_SWAL), "Reason_respondent_DID_NOT_SWAL"),
+    [respondents],
+  );
+
+
   const latrine = useMemo(() => tally(respondents.map((r) => r.What_type_of_Laterin_our_school_household), "What_type_of_Laterin_our_school_household"), [respondents]);
   const waterHh = useMemo(() => tallyMulti(respondents.map((r) => r.What_water_source_i_your_class_household), "What_water_source_i_your_class_household"), [respondents]);
   const waste = useMemo(() => tallyMulti(respondents.map((r) => r.How_do_you_Dispose_D_your_class_household), "How_do_you_Dispose_D_your_class_household"), [respondents]);
