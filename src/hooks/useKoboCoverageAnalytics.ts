@@ -78,6 +78,8 @@ export interface KoboCoverageAnalytics {
   acceptReasons: { name: string; value: number }[];
   validation: ValidationReport;
   showClusterAlert: boolean;
+  /** Aggregation for any administrative level (memoised per level). */
+  levelTable: (level: CoverageLevel) => AdminUnitRow[];
 }
 
 const rate = (x: number, n: number) => (n > 0 ? (x / n) * 100 : 0);
@@ -182,7 +184,7 @@ export function useKoboCoverageAnalytics(
     };
   }, [rows, overall, lgaRows, communityRows]);
 
-  const buildTable = (level: CoverageLevel, source: CoverageRow[]): AdminUnitRow[] =>
+  const buildTable = (source: CoverageRow[]): AdminUnitRow[] =>
     source.map((r) => {
       const epi = r.estimates.epi_coverage;
       const coveragePct = asPct(epi);
@@ -229,7 +231,7 @@ export function useKoboCoverageAnalytics(
             const k = parts.join(" › ");
             groups.set(k, [...(groups.get(k) ?? []), r]);
           }
-          cache[level] = buildTable(level, source).map((row) => ({
+          cache[level] = buildTable(source).map((row) => ({
             ...row,
             topReason:
               row.coveragePct != null && row.coveragePct < 65
@@ -297,9 +299,8 @@ export function useKoboCoverageAnalytics(
     acceptReasons,
     validation,
     showClusterAlert: stats.icc > 0.35 && stats.gapPct > 2,
-    // exposed for the level switcher
-    ...({ levelTable: (l: CoverageLevel) => levelCache.get(l) } as any),
-  } as KoboCoverageAnalytics & { levelTable: (l: CoverageLevel) => AdminUnitRow[] };
+    levelTable: (l: CoverageLevel) => levelCache.get(l),
+  };
 }
 
 export default useKoboCoverageAnalytics;
