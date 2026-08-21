@@ -49,7 +49,8 @@ export const ChartEmpty = ({ height = 220 }: { height?: number }) => (
 
 /**
  * Poster-style donut: thick coloured ring, dominant share printed in the
- * middle, category callouts on leader lines and a counted legend below.
+ * middle, in-slice percentages (never overlapping) and a counted legend that
+ * sits in its own row below the ring.
  */
 export function InfoDonut({
   data, height = 300, centerLabel,
@@ -57,94 +58,93 @@ export function InfoDonut({
   if (!data.length) return <ChartEmpty height={height} />;
   const total = data.reduce((s, d) => s + (Number(d.value) || 0), 0);
   if (total <= 0) return <ChartEmpty height={height} />;
-  const top = [...data].sort((a, b) => b.value - a.value)[0];
-  const topPct = Math.round((top.value / total) * 100);
-  const colors = data.map((d, i) => semanticColor(d.name, i));
 
-  const callout = (props: any) => {
-    const { cx, cy, midAngle, outerRadius, percent, value, name, index } = props;
-    if (!percent || percent < 0.015) return null;
+  const ordered = [...data].sort((a, b) => Number(b.value) - Number(a.value));
+  const top = ordered[0];
+  const topPct = Math.round((top.value / total) * 100);
+  const colors = ordered.map((d, i) => semanticColor(d.name, i));
+
+  // Legend is laid out in normal flow so it can never collide with the ring.
+  const legendRows = Math.ceil(ordered.length / 2);
+  const legendHeight = Math.min(96, 22 + legendRows * 16);
+  const ringHeight = Math.max(150, height - legendHeight);
+
+  /** Percentage printed inside the slice — only when the slice is wide enough. */
+  const inSliceLabel = (props: any) => {
+    const { cx, cy, midAngle, innerRadius, outerRadius, percent } = props;
+    if (!percent || percent < 0.06) return null;
     const RAD = Math.PI / 180;
-    const cos = Math.cos(-midAngle * RAD);
-    const sin = Math.sin(-midAngle * RAD);
-    const r = Number(outerRadius) + 16;
-    const rawX = cx + r * cos;
-    const y = cy + r * sin;
-    const right = rawX > cx;
-    const maxX = cx * 2;
-    const x = Math.max(4, Math.min(maxX - 4, rawX));
-    const room = right ? maxX - x : x;
-    const chars = Math.max(6, Math.floor(room / 5.2));
-    const label = String(name ?? "");
-    const short = label.length > chars ? `${label.slice(0, chars - 1)}…` : label;
+    const r = Number(innerRadius) + (Number(outerRadius) - Number(innerRadius)) * 0.55;
+    const x = cx + r * Math.cos(-midAngle * RAD);
+    const y = cy + r * Math.sin(-midAngle * RAD);
     return (
-      <text x={x} y={y} textAnchor={right ? "start" : "end"} dominantBaseline="central" fontSize={10}>
-        <tspan className="fill-foreground" fontWeight={700}>{short}</tspan>
-        <tspan x={x} dy={12} fontWeight={800} fill={colors[index % colors.length]}>
-          {nf(value)} ({Math.round(percent * 100)}%)
-        </tspan>
+      <text
+        x={x} y={y} textAnchor="middle" dominantBaseline="central"
+        fontSize={11} fontWeight={800} fill="#FFFFFF"
+      >
+        {Math.round(percent * 100)}%
       </text>
     );
   };
 
   return (
-    <div className="relative w-full min-w-0" style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart margin={{ top: 8, right: 8, bottom: 4, left: 8 }}>
-          <Pie
-            data={data}
-            dataKey="value"
-            nameKey="name"
-            cx="50%"
-            cy="47%"
-            innerRadius="42%"
-            outerRadius="70%"
-            paddingAngle={1.5}
-            cornerRadius={3}
-            stroke="hsl(var(--card))"
-            strokeWidth={2}
-            labelLine={{ stroke: "hsl(var(--border))", strokeWidth: 1 }}
-            label={callout}
-            animationDuration={650}
-          >
-            {data.map((d, i) => <Cell key={d.name} fill={colors[i]} />)}
-          </Pie>
-          <Tooltip
-            contentStyle={TOOLTIP_STYLE}
-            formatter={(v: any, n: any) => [`${nf(Number(v))} (${((Number(v) / total) * 100).toFixed(1)}%)`, n]}
-          />
-        </PieChart>
-      </ResponsiveContainer>
+    <div className="w-full min-w-0">
+      <div className="relative w-full min-w-0" style={{ height: ringHeight }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart margin={{ top: 6, right: 6, bottom: 6, left: 6 }}>
+            <Pie
+              data={ordered}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              innerRadius="52%"
+              outerRadius="82%"
+              paddingAngle={1.5}
+              cornerRadius={3}
+              stroke="hsl(var(--card))"
+              strokeWidth={2}
+              labelLine={false}
+              label={inSliceLabel}
+              isAnimationActive
+              animationDuration={650}
+            >
+              {ordered.map((d, i) => <Cell key={d.name} fill={colors[i]} />)}
+            </Pie>
+            <Tooltip
+              contentStyle={TOOLTIP_STYLE}
+              formatter={(v: any, n: any) => [`${nf(Number(v))} (${((Number(v) / total) * 100).toFixed(1)}%)`, n]}
+            />
+          </PieChart>
+        </ResponsiveContainer>
 
-      {/* Dominant share, printed in the hole of the donut */}
-      <div
-        className="pointer-events-none absolute inset-x-0 flex flex-col items-center justify-center"
-        style={{ top: 0, height: "94%" }}
-      >
-        <span className="font-display text-3xl font-extrabold leading-none" style={{ color: colors[data.indexOf(top)] }}>
-          {topPct}%
-        </span>
-        <span className="mt-0.5 max-w-[42%] truncate text-[10px] font-semibold text-muted-foreground">
-          {centerLabel ?? top.name}
-        </span>
+        {/* Dominant share, printed in the hole of the donut */}
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="font-display text-3xl font-extrabold leading-none" style={{ color: colors[0] }}>
+            {topPct}%
+          </span>
+          <span className="mt-0.5 max-w-[40%] truncate text-[10px] font-semibold text-muted-foreground">
+            {centerLabel ?? top.name}
+          </span>
+          <span className="text-[10px] font-bold tabular-nums text-muted-foreground">n = {nf(total)}</span>
+        </div>
       </div>
 
-      <div className="pointer-events-none absolute right-1 top-0 rounded-full border bg-card/85 px-2 py-0.5 text-[10px] font-bold tabular-nums text-muted-foreground backdrop-blur-sm">
-        n = {nf(total)}
-      </div>
-
-      <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-        {data.map((d, i) => (
-          <span key={d.name} className="flex items-center gap-1 text-[10px] font-medium">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ background: colors[i] }} />
-            <span className="text-foreground">{d.name}</span>
-            <span className="tabular-nums text-muted-foreground">({nf(d.value)})</span>
+      <div className="mt-1 grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
+        {ordered.map((d, i) => (
+          <span key={d.name} className="flex min-w-0 items-center gap-1.5 text-[10px] font-medium">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: colors[i] }} />
+            <span className="min-w-0 flex-1 truncate text-foreground" title={d.name}>{d.name}</span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">
+              {nf(d.value)} · {((Number(d.value) / total) * 100).toFixed(1)}%
+            </span>
           </span>
         ))}
       </div>
     </div>
   );
 }
+
 
 /* ------------------------------------------------------------- InfoBarH */
 

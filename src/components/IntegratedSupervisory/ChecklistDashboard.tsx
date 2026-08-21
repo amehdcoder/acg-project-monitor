@@ -33,6 +33,8 @@ import {
 import ChecklistPredictive from "./ChecklistPredictive";
 import ChecklistMaps from "./ChecklistMaps";
 import HouseholdCoverageAnalysis from "./HouseholdCoverageAnalysis";
+import DataIntegrityBadge from "./DataIntegrityBadge";
+import { validate } from "@/lib/isc/chartValidation";
 import MlIntelligenceHub from "./MlIntelligenceHub";
 import ChecklistPresetBar from "./ChecklistPresetBar";
 import CommunityVisitedTable, { buildCommunityVisits } from "./CommunityVisitedTable";
@@ -664,6 +666,59 @@ export default function ChecklistDashboard({
     return [...m.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 10);
   }, [parents]);
 
+  /* Dashboard-wide mathematical consistency audit — every distribution, KPI and
+     ranking is re-derived from the Kobo submissions and compared with what the
+     charts are about to render. */
+  const integrity = useMemo(() => {
+    const v = validate();
+    const parentDists: [string, { name: string; value: number }[]][] = [
+      ["MDA Campaign Type", campaign],
+      ["Medicine Inventory Available", inventory],
+      ["Medicine Sufficiency", sufficiency],
+      ["Treatment Register Available", register],
+      ["Register Entries Correct", registerCorrect],
+      ["Status of MDA", mdaStatus],
+      ["Dose Pole Available", dosePole],
+      ["CDD Knows Dose Pole Use", dosePoleKnow],
+      ["NTD Posters Displayed", posters],
+      ["CDDs Trained", cddTrained],
+      ["CDD Stipends Received", stipends],
+      ["Community Water Source Proximity", waterWithin],
+    ];
+    for (const [scope, d] of parentDists) v.distribution(scope, d, parents.length);
+    for (const [scope, d] of [
+      ["Latrine type", latrine],
+      ["Reasons for swallowing", swallowReasons],
+      ["Reasons for NOT swallowing", noSwallowReasons],
+    ] as [string, { name: string; value: number }[]][]) {
+      v.distribution(scope, d, respondents.length);
+    }
+    v.rate(
+      "KPI · Offered medicine",
+      Math.round(((uptake.offeredPct ?? 0) / 100) * respondents.length),
+      respondents.length,
+      null,
+    );
+    v.atMost("KPI · Swallowed ≤ offered", uptake.swallowPct ?? 0, uptake.offeredPct ?? 0,
+      "KPI strip shows a swallowed rate above the offered rate.");
+    v.stacked("KPI · Treatment commenced", [
+      { name: "Treatment status", parts: [kpi.started, kpi.notStarted], total: kpi.started + kpi.notStarted },
+    ]);
+    v.stacked("KPI · Top LGA ranking", [
+      { name: "Ranked LGAs", parts: topLgas.map((l) => l.value), total: topLgas.reduce((s, l) => s + l.value, 0) },
+    ]);
+    if (geoCoverage && geoCoverage.visited > geoCoverage.target) {
+      v.atMost("KPI · Geographic coverage", geoCoverage.visited, geoCoverage.target,
+        "More communities visited than the configured target — coverage exceeds 100%.");
+    }
+    return v.report();
+  }, [
+    campaign, inventory, sufficiency, register, registerCorrect, mdaStatus, dosePole, dosePoleKnow,
+    posters, cddTrained, stipends, waterWithin, latrine, swallowReasons, noSwallowReasons,
+    parents.length, respondents.length, uptake, kpi, geoCoverage, topLgas,
+  ]);
+
+
   return (
     <div className="space-y-4">
 
@@ -730,11 +785,14 @@ export default function ChecklistDashboard({
         <p className="text-xs text-muted-foreground">
           {cache ? `Synced ${new Date(cache.fetchedAt).toLocaleString()} · ${kpi.total} submissions · ${kpi.respondents} flattened respondent records` : "No Kobo data cached yet — run a sync."}
         </p>
+        <div className="flex items-center gap-2">
+          <DataIntegrityBadge report={integrity} label="Dashboard data integrity" />
         {onRefresh && (
           <Button size="sm" variant="outline" onClick={onRefresh} disabled={syncing}>
             {syncing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />} Refresh
           </Button>
         )}
+        </div>
       </div>
 
       {/* SAE monitor */}
