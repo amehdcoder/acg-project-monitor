@@ -133,18 +133,25 @@ export function parseKoboForm(survey: any[], choices: any[]): ParsedKoboForm {
     }
 
     // Identity / classification fields (kept out of the scored set).
-    // Match on the field name AND its label — some forms ship identity rows
-    // with an empty/auto-generated name.
-    const nk = normalizeKey(name);
-    const nl = normalizeKey(`${name} ${label}`);
-    if (/assessment.?type/.test(nl)) { identity.assessmentField = name || identity.assessmentField; continue; }
-    if (NAME_FIELD_RE.test(nl)) {
-      identity.nameField = name || identity.nameField;
-      identity.nameChoices =
-        choiceMap.get(String(row?.select_from_list_name ?? row?.["select from list name"] ?? listName ?? "")) ?? null;
-      continue;
+    // IMPORTANT: match on the FIELD NAME only. Question *labels* legitimately
+    // contain wording such as "name of the medicine", and matching those would
+    // silently delete real questions from the scored set (a 9/10 participant
+    // would then read 7/8 = 87.5%). The label is only consulted for top-level
+    // rows that ship without a usable name.
+    const probe = name.trim()
+      ? normalizeKey(name)
+      : groupStack.length === 0 ? normalizeKey(label) : "";
+    if (probe) {
+      if (/assessment.?type/.test(probe)) { identity.assessmentField = name || identity.assessmentField; continue; }
+      if (NAME_FIELD_RE.test(probe)) {
+        identity.nameField = name || identity.nameField;
+        identity.nameChoices =
+          choiceMap.get(String(row?.select_from_list_name ?? row?.["select from list name"] ?? listName ?? "")) ?? null;
+        continue;
+      }
+      if (/^intervention$|mda.?intervention/.test(probe)) { identity.interventionField = name || identity.interventionField; continue; }
     }
-    if (/^intervention$|mda.?intervention/.test(nl)) { identity.interventionField = name || identity.interventionField; continue; }
+
 
     if (META_TYPES.has(kind) || KOBO_META_FIELDS.has(name)) continue;
     if (!SUPPORTED_TYPES.has(kind)) continue;
