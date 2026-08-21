@@ -657,6 +657,15 @@ export default function ChecklistDashboard({
       .map(([date, visits]) => ({ date: date.slice(5), visits }));
   }, [parents]);
 
+  const topLgas = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of parents) {
+      const k = String(p.LGA ?? "").trim();
+      if (k) m.set(k, (m.get(k) ?? 0) + 1);
+    }
+    return [...m.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 10);
+  }, [parents]);
+
   /* Dashboard-wide mathematical consistency audit — every distribution, KPI and
      ranking is re-derived from the Kobo submissions and compared with what the
      charts are about to render. */
@@ -696,7 +705,7 @@ export default function ChecklistDashboard({
       { name: "Treatment status", parts: [kpi.started, kpi.notStarted], total: kpi.started + kpi.notStarted },
     ]);
     v.stacked("KPI · Top LGA ranking", [
-      { name: "Ranked LGAs", parts: topLgasRaw.map((l) => l.value), total: topLgasRaw.reduce((s, l) => s + l.value, 0) },
+      { name: "Ranked LGAs", parts: topLgas.map((l) => l.value), total: topLgas.reduce((s, l) => s + l.value, 0) },
     ]);
     if (geoCoverage && geoCoverage.visited > geoCoverage.target) {
       v.atMost("KPI · Geographic coverage", geoCoverage.visited, geoCoverage.target,
@@ -706,17 +715,9 @@ export default function ChecklistDashboard({
   }, [
     campaign, inventory, sufficiency, register, registerCorrect, mdaStatus, dosePole, dosePoleKnow,
     posters, cddTrained, stipends, waterWithin, latrine, swallowReasons, noSwallowReasons,
-    parents.length, respondents.length, uptake, kpi, geoCoverage, topLgasRaw,
+    parents.length, respondents.length, uptake, kpi, geoCoverage, topLgas,
   ]);
 
-  const topLgas = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const p of parents) {
-      const k = String(p.LGA ?? "").trim();
-      if (k) m.set(k, (m.get(k) ?? 0) + 1);
-    }
-    return [...m.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 10);
-  }, [parents]);
 
   return (
     <div className="space-y-4">
