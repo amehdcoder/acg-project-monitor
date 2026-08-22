@@ -53,9 +53,9 @@ export function useQuizKobo(quizId: string | null | undefined) {
   const [lastEventAt, setLastEventAt] = useState<Date | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     if (!quizId) { setConfig(null); setSubmissions([]); setLoading(false); return; }
-    setLoading(true);
+    if (!silent) setLoading(true);
     const [{ data: cfg }, { data: subs }] = await Promise.all([
       supabase.from("quiz_kobo_configs").select("*").eq("quiz_id", quizId).maybeSingle(),
       supabase.from("quiz_kobo_submissions").select("*").eq("quiz_id", quizId)
@@ -65,6 +65,7 @@ export function useQuizKobo(quizId: string | null | undefined) {
     setSubmissions(((subs ?? []) as unknown as QuizKoboSubmissionRow[]));
     setLoading(false);
   }, [quizId]);
+
 
   useEffect(() => { void load(); }, [load]);
 
