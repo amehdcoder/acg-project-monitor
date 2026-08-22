@@ -79,7 +79,7 @@ export function useQuizKobo(quizId: string | null | undefined) {
         () => {
           setLastEventAt(new Date());
           if (timer.current) clearTimeout(timer.current);
-          timer.current = setTimeout(() => { void load(); }, 250);
+          timer.current = setTimeout(() => { void load(true); }, 250);
         },
       )
       // The config carries the scoring key; changing it must re-render analytics.
@@ -88,7 +88,7 @@ export function useQuizKobo(quizId: string | null | undefined) {
         { event: "*", schema: "public", table: "quiz_kobo_configs", filter: `quiz_id=eq.${quizId}` },
         () => {
           if (timer.current) clearTimeout(timer.current);
-          timer.current = setTimeout(() => { void load(); }, 250);
+          timer.current = setTimeout(() => { void load(true); }, 250);
         },
       )
       .subscribe((status) => setLive(status === "SUBSCRIBED"));
@@ -96,7 +96,7 @@ export function useQuizKobo(quizId: string | null | undefined) {
     // Safety net: if the realtime socket is degraded (offline field networks,
     // proxy timeouts) a light poll still surfaces updates and deletions.
     const poll = setInterval(() => {
-      if (document.visibilityState === "visible") void load();
+      if (document.visibilityState === "visible") void load(true);
     }, 20_000);
 
     return () => {
