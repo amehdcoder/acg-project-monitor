@@ -240,13 +240,23 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
   useEffect(() => {
     if (!koboConfig) return;
     void runReconcile();
+    // Near-realtime: KoboToolbox REST Services only push new/edited rows, so a
+    // tight reconciliation loop is what surfaces edits and deletions instantly.
     const id = setInterval(() => {
       if (document.visibilityState === "visible") void runReconcile();
-    }, 60_000);
+    }, 15_000);
     const onFocus = () => { if (document.visibilityState === "visible") void runReconcile(); };
     document.addEventListener("visibilitychange", onFocus);
-    return () => { clearInterval(id); document.removeEventListener("visibilitychange", onFocus); };
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("online", onFocus);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("online", onFocus);
+    };
   }, [koboConfig, runReconcile]);
+
 
 
 

@@ -48,43 +48,56 @@ export async function fullSyncKobo(config: QuizKoboConfig): Promise<FullSyncResu
   const liveIds = new Set<string>();
   let fetched = 0;
   let saved = 0;
+  // Tracks whether every page request succeeded. Deletions may only be applied
+  // when we hold a complete, authoritative picture of the Kobo form — a partial
+  // fetch must never wipe local rows.
+  let pagesOk = true;
 
-  for (let page = 0; page <= 50; page += 1) {
-    const { data, error } = await supabase.functions.invoke("kobo-form-manager", {
-      body: {
-        action: "fetch_submissions",
-        server_url: config.server_url,
-        form_uid: config.form_uid,
-        api_token: config.api_token,
-        page_size: PAGE,
-        page,
-      },
-    });
-    if (error) throw new Error(error.message);
-    if ((data as any)?.error) throw new Error((data as any).detail || (data as any).error);
+  try {
+    for (let page = 0; page <= 50; page += 1) {
+      const { data, error } = await supabase.functions.invoke("kobo-form-manager", {
+        body: {
+          action: "fetch_submissions",
+          server_url: config.server_url,
+          form_uid: config.form_uid,
+          api_token: config.api_token,
+          page_size: PAGE,
+          page,
+        },
+      });
+      if (error) throw new Error(error.message);
+      if ((data as any)?.error) throw new Error((data as any).detail || (data as any).error);
 
-    const results: any[] = Array.isArray((data as any)?.results) ? (data as any).results : [];
-    if (!results.length) break;
-    fetched += results.length;
-    for (const r of results) {
-      const id = String(r?._id ?? r?.["meta/instanceID"] ?? r?._uuid ?? "");
-      if (id) liveIds.add(id);
+      const results: any[] = Array.isArray((data as any)?.results) ? (data as any).results : [];
+      if (!results.length) break;
+      fetched += results.length;
+      for (const r of results) {
+        const id = String(r?._id ?? r?.["meta/instanceID"] ?? r?._uuid ?? "");
+        if (id) liveIds.add(id);
+      }
+
+      // Re-play every payload through the scoring webhook so edits made on
+      // KoboToolbox (changed answers, corrected names) are re-scored locally.
+      const resp = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-kobo-secret": config.webhook_secret },
+        body: JSON.stringify(results),
+      });
+      const out = await resp.json().catch(() => ({}));
+      saved += Number((out as any)?.saved ?? 0);
+
+      if (results.length < PAGE) break;
     }
-
-    const resp = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-kobo-secret": config.webhook_secret },
-      body: JSON.stringify(results),
-    });
-    const out = await resp.json().catch(() => ({}));
-    saved += Number((out as any)?.saved ?? 0);
-
-    if (results.length < PAGE) break;
+  } catch (e) {
+    pagesOk = false;
+    throw e;
   }
 
-  // Remove local rows deleted on KoboToolbox.
+  // Remove local rows deleted on KoboToolbox. This must also run when Kobo now
+  // returns ZERO submissions (every submission deleted there) — the previous
+  // `fetched > 0` guard left orphaned rows on the dashboard forever.
   let deleted = 0;
-  if (fetched > 0) {
+  if (pagesOk) {
     const { data: local } = await supabase
       .from("quiz_kobo_submissions")
       .select("id, kobo_submission_id")
@@ -99,6 +112,7 @@ export async function fullSyncKobo(config: QuizKoboConfig): Promise<FullSyncResu
       if (!error) deleted += chunk.length;
     }
   }
+
 
   await supabase
     .from("quiz_kobo_configs")
