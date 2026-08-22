@@ -7076,6 +7076,38 @@ export type Database = {
         }
         Relationships: []
       }
+      quiz_analytics_access: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          id: string
+          quiz_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          quiz_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          quiz_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_analytics_access_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quiz_archived_attempts: {
         Row: {
           answers: Json | null
@@ -7223,6 +7255,66 @@ export type Database = {
           source_quiz_title?: string | null
           target_project_id?: string
           target_project_name?: string | null
+        }
+        Relationships: []
+      }
+      quiz_kobo_archived_submissions: {
+        Row: {
+          answers: Json
+          archived_at: string
+          archived_by: string | null
+          assessment_type: string | null
+          band: string | null
+          id: string
+          intervention_group: string | null
+          kobo_submission_id: string | null
+          max_score: number
+          original_id: string | null
+          participant_key: string | null
+          participant_name: string | null
+          per_question: Json
+          percentage: number
+          quiz_id: string
+          score: number
+          submitted_at: string | null
+        }
+        Insert: {
+          answers?: Json
+          archived_at?: string
+          archived_by?: string | null
+          assessment_type?: string | null
+          band?: string | null
+          id?: string
+          intervention_group?: string | null
+          kobo_submission_id?: string | null
+          max_score?: number
+          original_id?: string | null
+          participant_key?: string | null
+          participant_name?: string | null
+          per_question?: Json
+          percentage?: number
+          quiz_id: string
+          score?: number
+          submitted_at?: string | null
+        }
+        Update: {
+          answers?: Json
+          archived_at?: string
+          archived_by?: string | null
+          assessment_type?: string | null
+          band?: string | null
+          id?: string
+          intervention_group?: string | null
+          kobo_submission_id?: string | null
+          max_score?: number
+          original_id?: string | null
+          participant_key?: string | null
+          participant_name?: string | null
+          per_question?: Json
+          percentage?: number
+          quiz_id?: string
+          score?: number
+          submitted_at?: string | null
         }
         Relationships: []
       }
@@ -9577,6 +9669,10 @@ export type Database = {
       has_minimal_access: { Args: { _user_id: string }; Returns: boolean }
       has_page_access: {
         Args: { _page_id: string; _user_id: string }
+        Returns: boolean
+      }
+      has_quiz_analytics_access: {
+        Args: { _quiz_id: string; _user_id: string }
         Returns: boolean
       }
       has_quiz_page_access: { Args: { _user_id: string }; Returns: boolean }
