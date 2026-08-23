@@ -16,7 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { resolveChecklistLabel, resolveChecklistValue } from "./checklistSchema";
+import { FIELD_BY_NAME, resolveChecklistValue } from "./checklistSchema";
 
 type Row = Record<string, unknown>;
 
@@ -203,7 +203,7 @@ export default function Grid3MismatchDetailDialog({
                       <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10.5px]">
                         {KEY_FIELDS.filter((f) => s(r[f])).map((f) => (
                           <div key={f}>
-                            <span className="text-muted-foreground">{resolveChecklistLabel(f)}: </span>
+                            <span className="text-muted-foreground">{FIELD_BY_NAME.get(f)?.label ?? f}: </span>
                             <span className="font-medium">{s(resolveChecklistValue(f, r[f])) || s(r[f])}</span>
                           </div>
                         ))}
