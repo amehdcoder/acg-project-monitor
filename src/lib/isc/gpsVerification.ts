@@ -481,16 +481,42 @@ export const OVERRIDE_META: Record<OverrideDecision, { label: string; color: str
   rejected:  { label: "Admin rejected", color: "#be123c" },
 };
 
+/** A synthetic factor appended when an administrator has ruled on the point. */
+function adminFactor(ovr: GpsOverride): ConfidenceFactor {
+  const value = ovr.decision === "rejected" ? 0 : ovr.decision === "corrected" ? 90 : 100;
+  return {
+    key: "admin",
+    label: "Administrator ruling",
+    value,
+    weight: 0,
+    verdict: OVERRIDE_META[ovr.decision].label,
+    detail:
+      (ovr.decision === "corrected"
+        ? `An administrator corrected the settlement name to “${ovr.corrected_name || "—"}” after inspecting the imagery. `
+        : ovr.decision === "rejected"
+          ? "An administrator inspected the imagery and rejected this GPS point. "
+          : "An administrator inspected the imagery and confirmed this GPS point. ") +
+      (ovr.note ? `Note: ${ovr.note}` : "No reviewer note was left."),
+    color: OVERRIDE_META[ovr.decision].color,
+  };
+}
+
 /** Apply an admin decision on top of the computed verdict. */
 export function applyOverride(base: VerifyResult, ovr?: GpsOverride | null): VerifyResult {
   if (!ovr) return base;
+  const factors = [...base.factors.filter((f) => f.key !== "admin" || f.label !== "Administrator ruling"), adminFactor(ovr)];
   if (ovr.decision === "rejected") {
-    return { ...base, status: "mismatch", reason: `Admin rejected this point. ${ovr.note || ""}`.trim() };
+    return {
+      ...base, status: "mismatch", factors, confidence: 0,
+      reason: `Admin rejected this point. ${ovr.note || ""}`.trim(),
+    };
   }
   return {
     ...base,
     status: "verified",
     score: Math.max(base.score, ovr.decision === "corrected" ? 90 : 100),
+    confidence: ovr.decision === "corrected" ? Math.max(base.confidence, 90) : 100,
+    factors,
     matchedName: ovr.corrected_name || base.matchedName,
     reason:
       ovr.decision === "corrected"
@@ -498,4 +524,5 @@ export function applyOverride(base: VerifyResult, ovr?: GpsOverride | null): Ver
         : `Admin manually verified this GPS point. ${ovr.note || ""}`.trim(),
   };
 }
+
 
