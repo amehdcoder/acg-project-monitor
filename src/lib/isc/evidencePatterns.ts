@@ -198,6 +198,12 @@ export interface RegressionTerm {
   failWhenAbsent: number;
   n: number;
   significant: boolean;
+  /** Variance inflation factor (multicollinearity check). */
+  vif: number;
+  /** Records where the risk condition was present (drill-down evidence). */
+  rowsPresent: Row[];
+  /** Records where the risk condition was absent. */
+  rowsAbsent: Row[];
 }
 
 export interface RegressionResult {
@@ -209,6 +215,41 @@ export interface RegressionResult {
   accuracy: number;
   converged: boolean;
   note?: string;
+  /** All records entering the model (drill-down evidence). */
+  rows: Row[];
+  diagnostics: RegressionDiagnostics | null;
+}
+
+export interface DiagnosticCheck {
+  key: string;
+  label: string;
+  status: "pass" | "warn" | "fail";
+  value: string;
+  explanation: string;
+}
+
+export interface CalibrationBin {
+  bin: number;
+  n: number;
+  predicted: number;
+  observed: number;
+}
+
+export interface RegressionDiagnostics {
+  /** Events per variable — ≥10 is the classic rule of thumb. */
+  epv: number;
+  maxVif: number;
+  /** Share of predictor cells that had to be mean-imputed. */
+  imputedShare: number;
+  separation: boolean;
+  calibration: CalibrationBin[];
+  /** Hosmer–Lemeshow goodness-of-fit. High p = well calibrated. */
+  hlChiSq: number;
+  hlDf: number;
+  hlP: number;
+  brier: number;
+  auc: number;
+  checks: DiagnosticCheck[];
 }
 
 function invert(m: number[][]): number[][] | null {
@@ -326,6 +367,7 @@ export function runCompletionRegression(parents: Row[], target: "any" | MdaClass
   if (n < 12 || events === 0 || events === n || active.length === 0) {
     return {
       n, events, baseRate: n ? events / n : 0, terms: [], pseudoR2: 0, accuracy: 0, converged: false,
+      rows: usable, diagnostics: null,
       note:
         n < 12
           ? "Not enough completed checklists yet — the model needs at least 12 records with a recorded MDA status."
@@ -340,6 +382,7 @@ export function runCompletionRegression(parents: Row[], target: "any" | MdaClass
   // Design matrix, mean-imputed for unanswered items.
   const X = usable.map((_, i) => [1, ...active.map((c) => (c.vals[i] == null ? c.mean : (c.vals[i] as number)))]);
   const fit = fitLogistic(X, y);
+  const vifs = computeVIF(X.map((r) => r.slice(1)));
 
   const terms: RegressionTerm[] = active.map((c, j) => {
     const coef = fit.beta[j + 1];
@@ -365,13 +408,195 @@ export function runCompletionRegression(parents: Row[], target: "any" | MdaClass
       failWhenAbsent: nA ? failA / nA : 0,
       n: c.answered,
       significant: p < 0.05,
+      vif: vifs[j] ?? 1,
+      rowsPresent: usable.filter((_, i) => c.vals[i] === 1),
+      rowsAbsent: usable.filter((_, i) => c.vals[i] === 0),
     };
   }).sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
+
+  const predicted = X.map((row) => {
+    const eta = row.reduce((s2, v, j) => s2 + v * fit.beta[j], 0);
+    return 1 / (1 + Math.exp(-Math.max(-30, Math.min(30, eta))));
+  });
+  const imputed = active.reduce((s2, c) => s2 + c.vals.filter((v) => v == null).length, 0);
+  const diagnostics = buildDiagnostics({
+    y, predicted, terms, converged: fit.converged,
+    imputedShare: imputed / Math.max(active.length * n, 1),
+  });
 
   return {
     n, events, baseRate: events / n, terms,
     pseudoR2: fit.pseudoR2, accuracy: fit.accuracy, converged: fit.converged,
+    rows: usable, diagnostics,
   };
+}
+
+/* ------------------------------------------------- regression diagnostics */
+
+/** Upper-tail p-value of a chi-square statistic (regularized incomplete gamma Q). */
+export function chiSquareP(x: number, df: number): number {
+  if (!isFinite(x) || x <= 0 || df <= 0) return 1;
+  const a = df / 2;
+  const xx = x / 2;
+  const lg = lnGamma(a);
+  if (xx < a + 1) {
+    // series expansion for P(a, x)
+    let ap = a, sum = 1 / a, del = sum;
+    for (let i = 0; i < 500; i++) {
+      ap++; del *= xx / ap; sum += del;
+      if (Math.abs(del) < Math.abs(sum) * 1e-12) break;
+    }
+    const P = sum * Math.exp(-xx + a * Math.log(xx) - lg);
+    return Math.min(1, Math.max(0, 1 - P));
+  }
+  // continued fraction for Q(a, x)
+  let b = xx + 1 - a, c = 1e30, d = 1 / b, h = d;
+  for (let i = 1; i < 500; i++) {
+    const an = -i * (i - a);
+    b += 2; d = an * d + b; if (Math.abs(d) < 1e-30) d = 1e-30;
+    c = b + an / c; if (Math.abs(c) < 1e-30) c = 1e-30;
+    d = 1 / d;
+    const del = d * c; h *= del;
+    if (Math.abs(del - 1) < 1e-12) break;
+  }
+  const Q = Math.exp(-xx + a * Math.log(xx) - lg) * h;
+  return Math.min(1, Math.max(0, Q));
+}
+
+function lnGamma(x: number): number {
+  const c = [76.18009172947146, -86.50532032941677, 24.01409824083091,
+    -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+  let y = x, tmp = x + 5.5;
+  tmp -= (x + 0.5) * Math.log(tmp);
+  let ser = 1.000000000190015;
+  for (let j = 0; j < 6; j++) ser += c[j] / ++y;
+  return -tmp + Math.log((2.5066282746310005 * ser) / x);
+}
+
+/** Variance inflation factors from the predictor block (no intercept column). */
+export function computeVIF(cols: number[][]): number[] {
+  const n = cols.length;
+  const k = n ? cols[0].length : 0;
+  if (k < 2) return new Array(k).fill(1);
+  const mean = Array.from({ length: k }, (_, j) => cols.reduce((s, r) => s + r[j], 0) / n);
+  const sd = Array.from({ length: k }, (_, j) =>
+    Math.sqrt(cols.reduce((s, r) => s + (r[j] - mean[j]) ** 2, 0) / Math.max(n - 1, 1)));
+  const corr: number[][] = Array.from({ length: k }, () => new Array(k).fill(0));
+  for (let a = 0; a < k; a++) {
+    for (let b2 = 0; b2 < k; b2++) {
+      if (!sd[a] || !sd[b2]) { corr[a][b2] = a === b2 ? 1 : 0; continue; }
+      const cov = cols.reduce((s, r) => s + (r[a] - mean[a]) * (r[b2] - mean[b2]), 0) / Math.max(n - 1, 1);
+      corr[a][b2] = cov / (sd[a] * sd[b2]);
+    }
+  }
+  for (let a = 0; a < k; a++) corr[a][a] += 1e-8;
+  const inv = invert(corr);
+  if (!inv) return new Array(k).fill(NaN);
+  return Array.from({ length: k }, (_, j) => Math.max(1, inv[j][j]));
+}
+
+function buildDiagnostics(args: {
+  y: number[];
+  predicted: number[];
+  terms: RegressionTerm[];
+  converged: boolean;
+  imputedShare: number;
+}): RegressionDiagnostics {
+  const { y, predicted, terms, converged, imputedShare } = args;
+  const events = y.reduce((s, v) => s + v, 0);
+  const epv = terms.length ? Math.min(events, y.length - events) / terms.length : 0;
+  const maxVif = terms.reduce((m, t) => Math.max(m, Number.isFinite(t.vif) ? t.vif : 0), 0);
+  const separation = terms.some((t) => Math.abs(t.coef) > 5 || t.ciHigh > 500 || (t.ciLow > 0 && t.ciLow < 1e-3));
+
+  // Calibration: order by predicted risk, split into up to 10 equal bins.
+  const idx = predicted.map((p, i) => i).sort((a, b2) => predicted[a] - predicted[b2]);
+  const g = Math.max(2, Math.min(10, Math.floor(y.length / 10) || 2));
+  const calibration: CalibrationBin[] = [];
+  let hl = 0;
+  for (let b2 = 0; b2 < g; b2++) {
+    const slice = idx.slice(Math.floor((b2 * idx.length) / g), Math.floor(((b2 + 1) * idx.length) / g));
+    if (!slice.length) continue;
+    const exp = slice.reduce((s, i) => s + predicted[i], 0);
+    const obs = slice.reduce((s, i) => s + y[i], 0);
+    const nb = slice.length;
+    const pbar = exp / nb;
+    if (pbar > 0 && pbar < 1) hl += ((obs - exp) ** 2) / (nb * pbar * (1 - pbar));
+    calibration.push({ bin: calibration.length + 1, n: nb, predicted: pbar, observed: obs / nb });
+  }
+  const hlDf = Math.max(1, calibration.length - 2);
+  const hlP = chiSquareP(hl, hlDf);
+
+  const brier = y.reduce((s, yi, i) => s + (predicted[i] - yi) ** 2, 0) / Math.max(y.length, 1);
+
+  // AUC via rank statistic.
+  const pos = y.map((v, i) => (v === 1 ? predicted[i] : null)).filter((v): v is number => v != null);
+  const neg = y.map((v, i) => (v === 0 ? predicted[i] : null)).filter((v): v is number => v != null);
+  let auc = 0.5;
+  if (pos.length && neg.length) {
+    let wins = 0;
+    for (const a of pos) for (const b2 of neg) wins += a > b2 ? 1 : a === b2 ? 0.5 : 0;
+    auc = wins / (pos.length * neg.length);
+  }
+
+  const checks: DiagnosticCheck[] = [
+    {
+      key: "epv",
+      label: "Events per variable",
+      status: epv >= 10 ? "pass" : epv >= 5 ? "warn" : "fail",
+      value: epv.toFixed(1),
+      explanation:
+        "At least 10 outcomes per predictor keeps the odds ratios stable. Below 5 the coefficients can swing wildly with one extra record.",
+    },
+    {
+      key: "vif",
+      label: "Multicollinearity (max VIF)",
+      status: maxVif < 5 ? "pass" : maxVif < 10 ? "warn" : "fail",
+      value: Number.isFinite(maxVif) ? maxVif.toFixed(2) : "n/a",
+      explanation:
+        "VIF under 5 means the predictors carry independent information. Above 10 two factors are effectively the same measurement and their individual odds ratios cannot be separated.",
+    },
+    {
+      key: "separation",
+      label: "Complete separation",
+      status: separation ? "warn" : "pass",
+      value: separation ? "Detected" : "None",
+      explanation:
+        "Separation happens when a factor perfectly predicts the outcome; ridge regularisation keeps the fit finite, but the affected odds ratio should be read as directional only.",
+    },
+    {
+      key: "convergence",
+      label: "Model convergence",
+      status: converged ? "pass" : "warn",
+      value: converged ? "Converged" : "Iteration limit",
+      explanation: "The IRLS solver reached a stable solution; otherwise the estimates are the best available approximation.",
+    },
+    {
+      key: "hl",
+      label: "Calibration (Hosmer–Lemeshow)",
+      status: hlP >= 0.05 ? "pass" : "warn",
+      value: `χ²=${hl.toFixed(2)}, ${hlP < 0.001 ? "p<0.001" : `p=${hlP.toFixed(3)}`}`,
+      explanation:
+        "A high p-value means predicted risk matches observed failure rates across risk bands — the model is honest about how likely non-completion really is.",
+    },
+    {
+      key: "auc",
+      label: "Discrimination (AUC)",
+      status: auc >= 0.7 ? "pass" : auc >= 0.6 ? "warn" : "fail",
+      value: auc.toFixed(3),
+      explanation:
+        "Probability the model scores a genuinely failing community higher than a completed one. 0.5 is a coin toss, 0.7+ is useful.",
+    },
+    {
+      key: "missing",
+      label: "Imputed answers",
+      status: imputedShare < 0.1 ? "pass" : imputedShare < 0.25 ? "warn" : "fail",
+      value: `${Math.round(imputedShare * 100)}%`,
+      explanation:
+        "Unanswered checklist items are filled with the factor's average. The more imputation, the more the effects are pulled toward zero.",
+    },
+  ];
+
+  return { epv, maxVif, imputedShare, separation, calibration, hlChiSq: hl, hlDf, hlP, brier, auc, checks };
 }
 
 /* -------------------------------------------- 1. daily new-evidence ledger */
@@ -389,6 +614,10 @@ export interface EvidenceFact {
   occurrences: number;
   /** Corroborated on ≥2 separate field days with ≥3 observations. */
   undeniable: boolean;
+  /** Exact submissions that asserted this finding (drill-down evidence). */
+  rows: Row[];
+  /** Per-day corroboration notes, oldest first. */
+  notes: { day: string; count: number }[];
 }
 
 export interface EvidenceDay {
@@ -462,6 +691,7 @@ export function buildEvidenceLedger(parents: Row[]): EvidenceLedger {
           const fact: EvidenceFact = {
             id, theme: f.theme, statement: f.statement, place: where, severity: f.severity,
             firstSeen: day, lastSeen: day, days: [day], occurrences: 1, undeniable: false,
+            rows: [p], notes: [{ day, count: 1 }],
           };
           registry.set(id, fact);
           todaysNew.push(fact);
@@ -470,6 +700,9 @@ export function buildEvidenceLedger(parents: Row[]): EvidenceLedger {
           prev.occurrences++;
           prev.lastSeen = day;
           if (!prev.days.includes(day)) prev.days.push(day);
+          prev.rows.push(p);
+          const note = prev.notes.find((nn) => nn.day === day);
+          if (note) note.count++; else prev.notes.push({ day, count: 1 });
           repeatFacts++;
         }
       }
@@ -509,6 +742,10 @@ export interface GeoVerdict {
   worked: { label: string; rate: number; n: number }[];
   failed: { label: string; rate: number; gap: number; n: number }[];
   why: string;
+  /** Records behind this verdict (drill-down evidence). */
+  rows: Row[];
+  /** Risk prevalence per predictor key, used by the side-by-side comparison. */
+  factors: Record<string, { rate: number; n: number }>;
 }
 
 const UNIT_KEYS: Record<GeoVerdict["level"], string[]> = {
@@ -550,6 +787,12 @@ export function buildGeoVerdicts(parents: Row[], level: GeoVerdict["level"], min
       if (riskRate >= 0.4) failed.push({ label: d.label, rate: riskRate, gap: riskRate, n: vals.length });
       else if (riskRate <= 0.1) worked.push({ label: d.label.replace(/^No\s+/i, "").replace(/\bnot\b\s*/i, ""), rate: 1 - riskRate, n: vals.length });
     }
+    const factors: GeoVerdict["factors"] = {};
+    for (const d of PREDICTORS) {
+      const vals = rows.map((r) => d.read(r)).filter((v) => v != null) as number[];
+      if (!vals.length) continue;
+      factors[d.key] = { rate: vals.reduce((s2, v) => s2 + v, 0) / vals.length, n: vals.length };
+    }
     failed.sort((a, b) => b.gap - a.gap);
     worked.sort((a, b) => b.rate - a.rate);
 
@@ -574,6 +817,8 @@ export function buildGeoVerdicts(parents: Row[], level: GeoVerdict["level"], min
       worked: worked.slice(0, 4),
       failed: failed.slice(0, 4),
       why,
+      rows,
+      factors,
     });
   }
 
@@ -591,6 +836,8 @@ export interface DistilledFact {
   kind: "fact" | "decoy";
   /** Why a claim was discarded (decoys only). */
   discardReason?: string;
+  /** Records where the condition was present (drill-down evidence). */
+  rows: Row[];
 }
 
 export interface Distillation {
@@ -619,26 +866,27 @@ export function distillFacts(parents: Row[], minSample = 20): Distillation {
       if (v === 1) { nP++; failP += fail; } else { nA++; failA += fail; }
     }
     const n = nP + nA;
+    const evidenceRows = scored.filter((p) => d.read(p) === 1);
     if (!nP || !nA) {
       decoys.push({
         statement: d.label,
         detail: `Observed on only one side (${nP} present / ${nA} absent) — no comparison possible.`,
-        n, effect: 0, p: 1, kind: "decoy", discardReason: "No contrast group",
+        n, effect: 0, p: 1, kind: "decoy", discardReason: "No contrast group", rows: evidenceRows,
       });
       continue;
     }
     const { p: pv, diff } = twoProportionTest(failP, nP, failA, nA);
     const detail = `Non-completion ${Math.round((failP / nP) * 100)}% when present vs ${Math.round((failA / nA) * 100)}% when absent (n=${n}).`;
     if (n < minSample) {
-      decoys.push({ statement: d.label, detail, n, effect: diff, p: pv, kind: "decoy", discardReason: `Sample too small (n=${n} < ${minSample})` });
+      decoys.push({ statement: d.label, detail, n, effect: diff, p: pv, kind: "decoy", discardReason: `Sample too small (n=${n} < ${minSample})`, rows: evidenceRows });
     } else if (Math.abs(diff) < 0.15) {
-      decoys.push({ statement: d.label, detail, n, effect: diff, p: pv, kind: "decoy", discardReason: `Effect too small (${Math.round(Math.abs(diff) * 100)} pts < 15 pts)` });
+      decoys.push({ statement: d.label, detail, n, effect: diff, p: pv, kind: "decoy", discardReason: `Effect too small (${Math.round(Math.abs(diff) * 100)} pts < 15 pts)`, rows: evidenceRows });
     } else if (pv >= 0.05) {
-      decoys.push({ statement: d.label, detail, n, effect: diff, p: pv, kind: "decoy", discardReason: `Not statistically distinguishable from chance (p=${pv.toFixed(2)})` });
+      decoys.push({ statement: d.label, detail, n, effect: diff, p: pv, kind: "decoy", discardReason: `Not statistically distinguishable from chance (p=${pv.toFixed(2)})`, rows: evidenceRows });
     } else {
       facts.push({
         statement: `${d.label} moves non-completion by ${diff > 0 ? "+" : ""}${Math.round(diff * 100)} points`,
-        detail, n, effect: diff, p: pv, kind: "fact",
+        detail, n, effect: diff, p: pv, kind: "fact", rows: evidenceRows,
       });
     }
   }
@@ -647,3 +895,81 @@ export function distillFacts(parents: Row[], minSample = 20): Distillation {
   decoys.sort((a, b) => b.n - a.n);
   return { facts, decoys, screened: PREDICTORS.length, minSample };
 }
+
+
+/* ------------------------------------- 5. side-by-side unit comparison */
+
+export interface UnitPairDiff {
+  a: string;
+  b: string;
+  diff: number;
+  p: number;
+  significant: boolean;
+  verdict: string;
+}
+
+export interface FactorSpread {
+  key: string;
+  label: string;
+  /** Risk prevalence per selected unit id. */
+  byUnit: Record<string, { rate: number; n: number }>;
+  spread: number;
+  best: string;
+  worst: string;
+  p: number;
+  significant: boolean;
+}
+
+export interface UnitComparison {
+  units: GeoVerdict[];
+  pairs: UnitPairDiff[];
+  factors: FactorSpread[];
+}
+
+const unitId = (v: GeoVerdict) => (v.parent ? `${v.parent} › ${v.unit}` : v.unit);
+
+/**
+ * Compare several States / LGAs / Wards side by side and flag the differences
+ * that are statistically meaningful rather than cosmetic.
+ */
+export function compareUnits(verdicts: GeoVerdict[], selected: string[]): UnitComparison {
+  const units = verdicts.filter((v) => selected.includes(unitId(v)));
+  const pairs: UnitPairDiff[] = [];
+  for (let i = 0; i < units.length; i++) {
+    for (let j = i + 1; j < units.length; j++) {
+      const A = units[i], B = units[j];
+      const { p, diff } = twoProportionTest(A.completed, A.n, B.completed, B.n);
+      const significant = p < 0.05;
+      pairs.push({
+        a: unitId(A), b: unitId(B), diff, p, significant,
+        verdict: significant
+          ? `${diff > 0 ? A.unit : B.unit} completes ${Math.abs(Math.round(diff * 100))} points more often — a real difference.`
+          : `The ${Math.abs(Math.round(diff * 100))}-point gap is within sampling noise; treat these units as equivalent for now.`,
+      });
+    }
+  }
+
+  const factors: FactorSpread[] = [];
+  for (const d of PREDICTORS) {
+    const byUnit: FactorSpread["byUnit"] = {};
+    for (const u of units) {
+      const f = u.factors[d.key];
+      if (f && f.n >= 2) byUnit[unitId(u)] = f;
+    }
+    const ids = Object.keys(byUnit);
+    if (ids.length < 2) continue;
+    const sorted = ids.slice().sort((a, b) => byUnit[a].rate - byUnit[b].rate);
+    const best = sorted[0];
+    const worst = sorted[sorted.length - 1];
+    const spread = byUnit[worst].rate - byUnit[best].rate;
+    const { p } = twoProportionTest(
+      Math.round(byUnit[worst].rate * byUnit[worst].n), byUnit[worst].n,
+      Math.round(byUnit[best].rate * byUnit[best].n), byUnit[best].n,
+    );
+    factors.push({ key: d.key, label: d.label, byUnit, spread, best, worst, p, significant: p < 0.05 && spread >= 0.15 });
+  }
+  factors.sort((a, b) => Number(b.significant) - Number(a.significant) || b.spread - a.spread);
+  return { units, pairs, factors };
+}
+
+export { unitId as geoUnitId };
