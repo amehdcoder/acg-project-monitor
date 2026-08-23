@@ -156,7 +156,16 @@ export function useGpsVerificationReview() {
     return true;
   }, [isAdmin, user]);
 
+  const clearOverride = useCallback(async (locKey: string) => {
+    if (!isAdmin) { toast.error("Only administrators can review GPS matches."); return; }
+    const { error } = await supabase.from("gps_verification_overrides").delete().eq("loc_key", locKey);
+    if (error) { toast.error(error.message); return; }
+    setOverrides((p) => { const n = { ...p }; delete n[locKey]; return n; });
+    toast.success("Override removed");
+  }, [isAdmin]);
+
   /** Apply the same decision + note to many locations in one round trip. */
+
   const saveOverridesBulk = useCallback(async (
     items: { locKey: string; submissionId?: string; community: string; lat: number; lng: number }[],
     opts: { decision: OverrideDecision; correctedName?: string; note?: string },
