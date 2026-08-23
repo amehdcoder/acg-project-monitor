@@ -568,14 +568,25 @@ export interface Filters {
   medicine?: string;
   from?: string;
   to?: string;
+  /** Advanced (custodian-level) filters — applied only to the levels that
+   * actually carry the field, so cross-level reconciliation stays comparable. */
+  ward?: string;
+  facility?: string;
+  /** FLHF health worker / facility in-charge. */
+  worker?: string;
+  cdd?: string;
 }
 
 const inRange = (d: string, f: Filters) =>
   (!f.from || d >= f.from) && (!f.to || d <= f.to);
 
-const matches = (t: { state: string; lga: string; medicine: string; date: string }, f: Filters) =>
+const eq = (want: string | undefined, got: string | undefined) =>
+  !want || (got ?? "").trim().toLowerCase() === want.trim().toLowerCase();
+
+const matches = (t: { state: string; lga: string; ward?: string; medicine: string; date: string }, f: Filters) =>
   (!f.state || t.state === f.state) &&
   (!f.lga || t.lga === f.lga) &&
+  eq(f.ward, t.ward) &&
   (!f.medicine || t.medicine === f.medicine) &&
   inRange(t.date, f);
 
@@ -584,11 +595,24 @@ export function applyFilters(ds: LogisticsDataset, f: Filters): LogisticsDataset
     dispatches: ds.dispatches.filter((t) => matches(t, f)),
 
     receipts: ds.receipts.filter((t) => matches(t, f)),
-    issues: ds.issues.filter((t) => matches(t, f)),
-    cddIssues: ds.cddIssues.filter((t) => matches(t, f)),
+    issues: ds.issues.filter((t) => matches(t, f) && eq(f.facility, t.facility) && eq(f.worker, t.inCharge)),
+    cddIssues: ds.cddIssues.filter(
+      (t) => matches(t, f) && eq(f.facility, t.facility) && eq(f.cdd, t.cddName)),
     returns: (ds.returns ?? []).filter((t) => matches(t, f)),
 
     submissions: ds.submissions,
+  };
+}
+
+/** Distinct option lists for the advanced filter controls. */
+export function filterOptions(ds: LogisticsDataset) {
+  const uniq = (xs: string[]) =>
+    Array.from(new Set(xs.map((x) => (x ?? "").trim()).filter((x) => x && x !== "—"))).sort((a, b) => a.localeCompare(b));
+  return {
+    wards: uniq([...ds.receipts, ...ds.issues, ...ds.cddIssues].map((t) => t.ward)),
+    facilities: uniq([...ds.issues.map((t) => t.facility), ...ds.cddIssues.map((t) => t.facility)]),
+    workers: uniq(ds.issues.map((t) => t.inCharge)),
+    cdds: uniq(ds.cddIssues.map((t) => t.cddName)),
   };
 }
 
