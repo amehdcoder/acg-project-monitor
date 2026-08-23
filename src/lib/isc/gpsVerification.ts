@@ -388,6 +388,48 @@ export function clearGeoCache() {
   geoCacheStats.hits = geoCacheStats.misses = geoCacheStats.network = geoCacheStats.throttled = 0;
 }
 
+/**
+ * GRID3 fallback.
+ *
+ * OSM has almost no named settlements across rural Nigeria, which produced the
+ * bulk of "No reference" verdicts. When the provider returns nothing (or a
+ * result with no named locality), we resolve the nearest GRID3 settlement —
+ * the same registry the microplanning forms cascade from — and synthesise a
+ * GeoName from it so every point gets an authoritative name to verify against.
+ */
+async function grid3Fallback(lat: number, lng: number, base: GeoName | null): Promise<GeoName | null> {
+  try {
+    const { nearestGrid3Settlement } = await import("@/lib/isc/grid3Nearest");
+    const hit = await nearestGrid3Settlement(lat, lng, 25000);
+    if (!hit) return base;
+    const addr = { ...(base?.address ?? {}) } as Record<string, string>;
+    if (!addr.village && !addr.hamlet && !addr.town && !addr.city && !addr.suburb) {
+      addr.village = hit.settlement;
+    }
+    addr.grid3_settlement = hit.settlement;
+    addr.grid3_ward = hit.ward;
+    if (!addr.county && !addr.state_district) addr.county = hit.lga;
+    if (!addr.state) addr.state = `${hit.state} State`.replace(/ State State$/, " State");
+    return {
+      display_name:
+        base?.display_name ||
+        `${hit.settlement}, ${hit.ward} Ward, ${hit.lga}, ${hit.state} State (GRID3 settlement registry)`,
+      address: addr,
+      // Prefer the GRID3 feature coordinate when the provider gave none.
+      lat: base?.lat ?? hit.lat,
+      lon: base?.lon ?? hit.lng,
+    };
+  } catch {
+    return base;
+  }
+}
+
+const hasNamedLocality = (g: GeoName | null) => {
+  if (!g) return false;
+  const a = g.address ?? {};
+  return LOCALITY_KEYS.some((k) => !!a[k]);
+};
+
 /** Reverse geocode a single point (memory + localStorage cached, rate limited). */
 export async function reverseGeocode(lat: number, lng: number, force = false): Promise<GeoName | null> {
   loadDisk();
@@ -405,6 +447,7 @@ export async function reverseGeocode(lat: number, lng: number, force = false): P
     refill();
     if (tokens < 1) geoCacheStats.throttled++;
     await takeToken();
+    let value: GeoName | null = null;
     try {
       geoCacheStats.network++;
       const { data, error } = await supabase.functions.invoke("geo-tools", {
@@ -412,23 +455,32 @@ export async function reverseGeocode(lat: number, lng: number, force = false): P
       });
       if (error) throw error;
       const found = (data as { found?: boolean }) ?? {};
-      const value: GeoName | null = found.found ? (data as GeoName) : null;
-      memCache.set(k, { v: value, t: Date.now() });
-      scheduleFlush();
-      return value;
+      value = found.found ? (data as GeoName) : null;
     } catch {
-      // Cache negatives briefly (1h) so a provider blip doesn't hammer it.
-      memCache.set(k, { v: null, t: Date.now() - (TTL_MS - 60 * 60 * 1000) });
+      value = null;
+    }
+    try {
+      // Always enrich with GRID3 when the provider has no named settlement.
+      if (!hasNamedLocality(value)) value = await grid3Fallback(lat, lng, value);
+    } catch { /* keep provider value */ }
+
+    try {
+      memCache.set(k, {
+        v: value,
+        // Cache negatives only briefly (1h) so a provider blip isn't sticky.
+        t: value ? Date.now() : Date.now() - (TTL_MS - 60 * 60 * 1000),
+      });
       scheduleFlush();
-      return null;
     } finally {
       inFlight.delete(k);
     }
+    return value;
   })();
 
   inFlight.set(k, task);
   return task;
 }
+
 
 /** Reverse geocode many points with bounded concurrency (provider-friendly). */
 export async function reverseGeocodeBatch(
