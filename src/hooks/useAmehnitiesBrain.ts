@@ -204,6 +204,12 @@ export function useAmehnitiesBrain() {
 
   useEffect(() => { workerRef.current?.postMessage({ type: "budget", ms: budget }); }, [budget]);
 
+  // The guardrail pauses training inside the worker; mirror that in UI state so
+  // the controls (and the visibility watcher) never silently resume a diverged run.
+  useEffect(() => {
+    if (telemetry?.alert) setRunning(false);
+  }, [telemetry?.alert?.at]);
+
   const toggleSource = useCallback((label: string) => {
     setEnabledSources((cur) => (cur.includes(label) ? cur.filter((l) => l !== label) : [...cur, label]));
   }, []);
