@@ -831,6 +831,10 @@ function loadCheckpoint(ckpt: any) {
   tokensSeen = ckpt.tokensSeen || 0;
   lossEMA = ckpt.lossEMA || 0;
   lossHistory = Array.isArray(ckpt.lossHistory) ? ckpt.lossHistory.slice(-180) : [];
+  // a restored checkpoint is a clean slate for the guardrails, and is scored
+  // immediately against the held-out slice so the UI shows real numbers
+  lastAlert = null; gradSpikes = 0;
+  evaluateValidation();
   postTelemetry(true);
 }
 
@@ -901,6 +905,7 @@ self.onmessage = (e: MessageEvent) => {
     }
     case "restart": {
       lossEMA = 0; lossHistory = []; tokensSeen = 0; lastFwd = null; lastTokens = null; metrics = []; gradNormEMA = 0;
+      evalSeries = []; lastEval = null; lastAlert = null; gradSpikes = 0;
       build(msg.patch || {}, msg.fresh !== false);
       break;
     }
