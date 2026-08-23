@@ -362,14 +362,40 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
           ))}
         </div>
 
+        {/* Review filters + cache telemetry */}
+        <div className="flex flex-wrap items-center gap-2">
+          {([
+            { k: "all" as const, label: "All points", n: verified.length },
+            { k: "borderline" as const, label: "Needs review", n: borderlineCount },
+            { k: "reviewed" as const, label: "Admin reviewed", n: reviewedCount },
+            { k: "unreviewed" as const, label: "Not reviewed", n: verified.length - reviewedCount },
+          ]).map((f) => (
+            <button
+              key={f.k}
+              onClick={() => setReviewFilter(f.k)}
+              className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                reviewFilter === f.k ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted/50"
+              }`}
+            >
+              {f.label} · {f.n}
+            </button>
+          ))}
+          <span className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground">
+            <Database className="h-3 w-3" />
+            Cache {cacheInfo.size || geoCacheSize()} pts · {cacheInfo.hits} hits · {cacheInfo.network} lookups
+            {cacheInfo.throttled > 0 ? ` · ${cacheInfo.throttled} rate-limited` : ""}
+          </span>
+        </div>
+
         {running && (
           <div className="space-y-1">
             <Progress value={progress.total ? (progress.done / progress.total) * 100 : 0} className="h-1.5" />
             <p className="text-[11px] text-muted-foreground">
-              Geolocating {progress.done} / {progress.total} GPS points…
+              Geolocating {progress.done} / {progress.total} GPS points (cached results reused, 8 lookups/sec cap)…
             </p>
           </div>
         )}
+
 
         {/* Map */}
         <div className="relative overflow-hidden rounded-xl border border-border">
