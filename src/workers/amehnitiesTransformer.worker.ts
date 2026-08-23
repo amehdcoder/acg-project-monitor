@@ -399,6 +399,150 @@ let tokensPerSec = 0;
 let stepsPerSec = 0;
 let winTokens = 0, winSteps = 0, winStart = 0;
 
+/* ------------------------------------------- held-out validation + guards */
+
+/** Fraction of the activity stream reserved for evaluation (never trained on). */
+const VAL_FRACTION = 0.15;
+
+export interface EvalSample {
+  at: number; step: number; loss: number; perplexity: number;
+  accuracy: number; top5: number; confidence: number; windows: number;
+}
+let evalEnabled = true;
+let evalEveryMs = 4000;
+let lastEvalAt = 0;
+let lastEval: EvalSample | null = null;
+let evalSeries: EvalSample[] = [];
+
+/** Divergence guardrail state. */
+let guardEnabled = true;
+let gradSpikes = 0;
+let lastAlert: {
+  at: number; reason: string; title: string; detail: string;
+  metrics: Record<string, number>; suggestions: string[];
+} | null = null;
+
+/** Index at which the held-out validation slice begins. */
+function trainEndIndex() {
+  const T = cfg.ctx;
+  const valLen = Math.floor(stream.length * VAL_FRACTION);
+  // keep enough room on both sides, otherwise train on everything
+  if (stream.length < (T + 1) * 3) return stream.length;
+  return Math.max(T + 1, stream.length - Math.max(T + 1, valLen));
+}
+
+/**
+ * Score the model on the held-out tail of the stream: cross-entropy loss,
+ * perplexity, next-token top-1 accuracy / top-5 hit-rate and the mean
+ * probability the model assigns to the correct event (its confidence).
+ *
+ * Forward passes only — no gradients, no optimiser updates, so evaluation can
+ * never leak validation data into the trained weights.
+ */
+function evaluateValidation(maxWindows = 6): EvalSample | null {
+  if (!model) return null;
+  const T = cfg.ctx, V = cfg.vocab;
+  const valStart = trainEndIndex();
+  const avail = stream.length - valStart - 1;
+  if (avail < T) return null;
+
+  const n = Math.max(1, Math.min(maxWindows, Math.floor(avail / T)));
+  const span = Math.max(0, avail - T);
+  let loss = 0, correct = 0, top5 = 0, conf = 0, positions = 0;
+
+  for (let w = 0; w < n; w++) {
+    const start = valStart + (n === 1 ? Math.floor(span / 2) : Math.round((w * span) / (n - 1)));
+    const x = new Int32Array(T), y = new Int32Array(T);
+    for (let i = 0; i < T; i++) { x[i] = stream[start + i] % V; y[i] = stream[start + i + 1] % V; }
+    const fwd = model.forward(x, y);
+    loss += fwd.loss;
+    // forward returns dLogits = (softmax - onehot)/T, so softmax is recoverable
+    // for free — no second pass over the vocabulary projection needed.
+    for (let t = 0; t < T; t++) {
+      const o = t * V, target = y[t];
+      let best = -1, bestP = -Infinity, rank = 0;
+      const pTarget = fwd.dLogits[o + target] * T + 1;
+      for (let c = 0; c < V; c++) {
+        const p = fwd.dLogits[o + c] * T + (c === target ? 1 : 0);
+        if (p > bestP) { bestP = p; best = c; }
+        if (p > pTarget) rank++;
+      }
+      if (best === target) correct++;
+      if (rank < 5) top5++;
+      conf += Math.max(0, Math.min(1, pTarget));
+      positions++;
+    }
+  }
+
+  const sample: EvalSample = {
+    at: Date.now(),
+    step: model.step,
+    loss: loss / n,
+    perplexity: Math.exp(Math.min(loss / n, 20)),
+    accuracy: positions ? correct / positions : 0,
+    top5: positions ? top5 / positions : 0,
+    confidence: positions ? conf / positions : 0,
+    windows: n,
+  };
+  lastEval = sample;
+  evalSeries.push(sample);
+  if (evalSeries.length > 180) evalSeries = evalSeries.slice(-180);
+  return sample;
+}
+
+/** Pause training and tell the UI exactly what went wrong and how to recover. */
+function raiseAlert(reason: string, title: string, detail: string, suggestions: string[], extra: Record<string, number> = {}) {
+  running = false;
+  lastAlert = {
+    at: Date.now(), reason, title, detail, suggestions,
+    metrics: { loss: lossEMA, gradNorm: gradNormEMA, lr: cfg.lr, batch: cfg.batch, step: model?.step ?? 0, ...extra },
+  };
+  (self as unknown as Worker).postMessage({ type: "alert", ...lastAlert });
+  postTelemetry(true);
+}
+
+/** Divergence detector — runs after every optimiser step. */
+function checkDivergence(rawGradNorm: number, batchLoss: number) {
+  if (!guardEnabled || !model) return;
+
+  if (!Number.isFinite(batchLoss) || !Number.isFinite(rawGradNorm)) {
+    raiseAlert("nan", "Numerical breakdown detected",
+      "The loss or gradient became NaN/Infinity, which means the weights are no longer usable for training.",
+      [
+        "Roll back to the best saved checkpoint.",
+        `Lower the learning rate (currently ${cfg.lr.toExponential(1)}) by 10×.`,
+        "Restart training fresh if the rollback still diverges.",
+      ], { rawGradNorm: Number.isFinite(rawGradNorm) ? rawGradNorm : -1 });
+    return;
+  }
+
+  const baseline = gradNormEMA || rawGradNorm;
+  if (rawGradNorm > Math.max(25, baseline * 12)) gradSpikes++;
+  else gradSpikes = Math.max(0, gradSpikes - 1);
+
+  if (gradSpikes >= 4) {
+    gradSpikes = 0;
+    raiseAlert("exploding_gradient", "Exploding gradients — training paused",
+      `Gradient norm reached ${rawGradNorm.toFixed(1)}, far above the recent average of ${baseline.toFixed(2)}. Continuing would corrupt the weights.`,
+      [
+        `Reduce the learning rate to ~${Math.max(1e-5, cfg.lr / 5).toExponential(1)}.`,
+        `Raise the batch size (currently ${cfg.batch}) to smooth the gradient estimate.`,
+        "Roll back to the best checkpoint, then resume.",
+      ], { rawGradNorm });
+    return;
+  }
+
+  if (lossEMA > 0 && batchLoss > lossEMA * 4 && batchLoss > 6) {
+    raiseAlert("loss_spike", "Loss spike — training paused",
+      `A single step produced a loss of ${batchLoss.toFixed(2)} against a running average of ${lossEMA.toFixed(2)}.`,
+      [
+        "Roll back to the best checkpoint.",
+        `Lower the learning rate (currently ${cfg.lr.toExponential(1)}).`,
+        "Shorten the context window if the corpus is small.",
+      ], { batchLoss });
+  }
+}
+
 function build(next: Partial<Cfg>, fresh = false) {
   const prev = fresh ? null : model;
   cfg = { ...cfg, ...next };
