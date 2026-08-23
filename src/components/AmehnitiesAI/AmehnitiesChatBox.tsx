@@ -374,6 +374,14 @@ export default function AmehnitiesChatBox({
           <Radio className="h-3 w-3" />
           Corpus: {corpusEvents.toLocaleString()} events
         </Badge>
+        <Badge
+          variant="outline"
+          title="Behaviour rules the assistant has learned from your ratings and corrections"
+          className="gap-1.5 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+        >
+          <GraduationCap className="h-3 w-3" />
+          Learned rules: {learnedRules}
+        </Badge>
 
         <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
           <PopoverTrigger asChild>
@@ -479,6 +487,74 @@ export default function AmehnitiesChatBox({
                               <span className="shrink-0 text-muted-foreground">{fmtTime(c.timestamp)}</span>
                             </button>
                           ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                        Was this right?
+                      </span>
+                      <Button
+                        size="sm" variant={m.rated === 1 ? "default" : "ghost"}
+                        disabled={rewarding === m.id} aria-label="Helpful answer"
+                        className="h-7 gap-1 px-2 text-[11px]"
+                        onClick={() => rate(m, 1)}
+                      >
+                        {rewarding === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <ThumbsUp className="h-3 w-3" />}
+                        Helpful
+                      </Button>
+                      <Button
+                        size="sm" variant={m.rated === -1 ? "destructive" : "ghost"}
+                        disabled={rewarding === m.id} aria-label="Unhelpful answer"
+                        className="h-7 gap-1 px-2 text-[11px]"
+                        onClick={() => { setCorrecting(m.id); setCorrection(""); }}
+                      >
+                        <ThumbsDown className="h-3 w-3" /> Needs work
+                      </Button>
+                      <Button
+                        size="sm" variant="ghost" disabled={busy || !m.question}
+                        className="h-7 gap-1 px-2 text-[11px]" onClick={() => regenerate(m)}
+                      >
+                        <RefreshCw className="h-3 w-3" /> Retry with what it learned
+                      </Button>
+                      {m.rated && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+                          <Check className="h-3 w-3" /> Signal applied to policy
+                        </span>
+                      )}
+                      {!!m.policyApplied?.length && (
+                        <span
+                          title={m.policyApplied.map((r) => `• [${r.topic}] ${r.content}`).join("\n")}
+                          className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[10px] text-muted-foreground"
+                        >
+                          <BrainCircuit className="h-3 w-3 text-primary" />
+                          {m.policyApplied.length} learned rule{m.policyApplied.length === 1 ? "" : "s"} applied
+                        </span>
+                      )}
+                    </div>
+
+                    {correcting === m.id && (
+                      <div className="space-y-2 rounded-xl border border-destructive/30 bg-destructive/5 p-2.5">
+                        <p className="text-[11px] font-medium text-foreground">
+                          What was wrong or missing? Your correction becomes a permanent rule.
+                        </p>
+                        <Textarea
+                          value={correction} rows={2}
+                          onChange={(e) => setCorrection(e.target.value)}
+                          placeholder="e.g. Always break submission counts down by state, and never mix the 24h and 7d windows."
+                          className="min-h-[52px] resize-none text-xs"
+                        />
+                        <div className="flex gap-2">
+                          <Button size="sm" className="h-7 text-[11px]" disabled={rewarding === m.id}
+                            onClick={() => rate(m, -1, correction.trim() || undefined)}>
+                            {rewarding === m.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                            Teach the assistant
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 text-[11px]"
+                            onClick={() => { setCorrecting(null); setCorrection(""); }}>
+                            Cancel
+                          </Button>
                         </div>
                       </div>
                     )}
