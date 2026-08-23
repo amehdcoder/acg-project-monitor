@@ -388,6 +388,17 @@ let tokensSeen = 0;
 let lastTelemetry = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
+/** Rolling training-metric series (one sample per telemetry post). */
+export interface MetricSample {
+  at: number; step: number; loss: number; gradNorm: number;
+  tokensPerSec: number; stepsPerSec: number; entropy: number; tokensSeen: number;
+}
+let metrics: MetricSample[] = [];
+let gradNormEMA = 0;
+let tokensPerSec = 0;
+let stepsPerSec = 0;
+let winTokens = 0, winSteps = 0, winStart = 0;
+
 function build(next: Partial<Cfg>, fresh = false) {
   const prev = fresh ? null : model;
   cfg = { ...cfg, ...next };
