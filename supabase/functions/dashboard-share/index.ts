@@ -226,6 +226,39 @@ function sanitizeColumns(table: string, columns: string): string {
   return allowed.join(",");
 }
 
+/**
+ * Embedded PostgREST resources (`form_submissions?select=*,profiles(email)`)
+ * bypass BOTH the per-table column allow-list and the project scoping applied
+ * to the top-level table, so a share link could otherwise join out to the full
+ * platform user directory. Share links are flat reads only: any selection that
+ * contains an embedded resource, a JSON path, a cast or a hint is rejected.
+ */
+function rejectEmbeddedSelect(columns: string): string | null {
+  if (columns.includes("(") || columns.includes(")")) {
+    return "Embedded/related-table selections are not allowed on share links";
+  }
+  if (columns.includes("!") || columns.includes("->") || columns.includes("::")) {
+    return "Only plain column selections are allowed on share links";
+  }
+  return null;
+}
+
+/**
+ * Filters may also reference an embedded relation (`profiles.email=eq...`) or
+ * smuggle one through `or(...)`. Reject any filter argument that names a table
+ * we do not scope, so filtering can never traverse out of the shared project.
+ */
+function rejectUnsafeFilterArgs(args: unknown[]): string | null {
+  for (const a of args) {
+    if (typeof a !== "string") continue;
+    if (/\b(profiles|user_roles|auth\.users)\b/i.test(a)) {
+      return "Filters may not reference the user directory";
+    }
+  }
+  return null;
+}
+
+
 // Decide whether a request carries a valid, live grant for this share.
 async function isShareGranted(
   share: any,
@@ -318,11 +351,18 @@ Deno.serve(async (req) => {
     // Column selection is sanitized so sensitive PII (profile emails/phones)
     // can never be returned through a share link.
     const rawColumns = typeof body?.columns === "string" ? body.columns : "*";
+    const embedErr = rejectEmbeddedSelect(rawColumns);
+    if (embedErr) return json({ error: embedErr, data: null }, 403);
     const columns = sanitizeColumns(table, rawColumns);
-    const selectOptions = body?.selectOptions && typeof body.selectOptions === "object"
-      ? body.selectOptions : undefined;
+    const rawSelectOptions = body?.selectOptions && typeof body.selectOptions === "object"
+      ? body.selectOptions as Record<string, unknown> : undefined;
+    // Only `count`/`head` are honoured — never a referenced-table traversal.
+    const selectOptions = rawSelectOptions
+      ? { count: rawSelectOptions.count, head: rawSelectOptions.head } as any
+      : undefined;
     const filters = Array.isArray(body?.filters) ? body.filters : [];
     const order = Array.isArray(body?.order) ? body.order : [];
+
 
     // Every query is scoped to the share's own project. Tables without a
     // project dimension that could expose per-user PII (e.g. profiles) are
@@ -372,11 +412,21 @@ Deno.serve(async (req) => {
           return json({ error: `Filter "${method}" not allowed`, data: null }, 403);
         }
         const args = Array.isArray(f?.args) ? f.args : [];
+        const argErr = table === "profiles" ? null : rejectUnsafeFilterArgs(args);
+        if (argErr) return json({ error: argErr, data: null }, 403);
         q = q[method](...args);
       }
       for (const o of order) {
-        q = q.order(String(o?.column ?? ""), o?.options ?? undefined);
+        const column = String(o?.column ?? "");
+        if (column.includes(".") || column.includes("(")) {
+          return json({ error: "Ordering by a related table is not allowed", data: null }, 403);
+        }
+        const opts = o?.options && typeof o.options === "object"
+          ? { ascending: (o.options as any).ascending, nullsFirst: (o.options as any).nullsFirst }
+          : undefined;
+        q = q.order(column, opts as any);
       }
+
       if (typeof body?.rangeFrom === "number" && typeof body?.rangeTo === "number") {
         q = q.range(body.rangeFrom, body.rangeTo);
       }
