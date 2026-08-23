@@ -3,71 +3,107 @@
  *
  * Questions are answered by the `chat-app-data` edge function, which pulls a
  * bounded slice of real database activity plus the live Transformer metrics and
- * streams a Markdown answer back token by token.
+ * streams a Markdown answer back token by token. Every factual claim carries a
+ * clickable [E#] citation resolving to a real event id + timestamp, the whole
+ * conversation is saved to the backend, and the assistant proposes follow-up
+ * questions based on what it actually found.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Bot, User, SendHorizontal, Loader2, Trash2, Radio } from "lucide-react";
+import {
+  Bot, User, SendHorizontal, Loader2, Trash2, Radio, History, Plus,
+  Database, Clock, Hash, MessageSquare, Sparkles,
+} from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Telemetry } from "@/hooks/useAmehnitiesBrain";
+import {
+  type Citation, type Conversation, createConversation, deleteConversation,
+  listConversations, loadMessages, saveMessage, splitFollowups, titleFromQuestion, usedCitations,
+} from "@/lib/amehnitiesAi/chatHistory";
 
-interface ChatMessage { id: string; role: "user" | "assistant"; content: string }
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  citations?: Citation[];
+  followups?: string[];
+}
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 
-/** Markdown renderers styled with the app's semantic tokens (no typography plugin needed). */
-const MD = {
-  p: (p: any) => <p className="text-sm text-foreground" {...p} />,
-  strong: (p: any) => <strong className="font-semibold text-foreground" {...p} />,
-  em: (p: any) => <em className="italic" {...p} />,
-  ul: (p: any) => <ul className="ml-4 list-disc space-y-1 text-sm text-foreground" {...p} />,
-  ol: (p: any) => <ol className="ml-4 list-decimal space-y-1 text-sm text-foreground" {...p} />,
-  li: (p: any) => <li className="marker:text-primary" {...p} />,
-  h1: (p: any) => <h4 className="text-sm font-semibold text-foreground" {...p} />,
-  h2: (p: any) => <h4 className="text-sm font-semibold text-foreground" {...p} />,
-  h3: (p: any) => <h5 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground" {...p} />,
-  a: (p: any) => <a className="text-primary underline underline-offset-2" target="_blank" rel="noreferrer" {...p} />,
-  code: ({ inline, ...p }: any) =>
-    inline
-      ? <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]" {...p} />
-      : <code className="block overflow-x-auto rounded-lg bg-muted p-3 font-mono text-[11px]" {...p} />,
-  blockquote: (p: any) => <blockquote className="border-l-2 border-primary/50 pl-3 text-sm text-muted-foreground" {...p} />,
-  table: (p: any) => (
-    <div className="overflow-x-auto rounded-lg border border-border/60">
-      <table className="w-full border-collapse text-xs" {...p} />
-    </div>
-  ),
-  thead: (p: any) => <thead className="bg-muted/60" {...p} />,
-  th: (p: any) => <th className="border-b border-border/60 px-2.5 py-1.5 text-left font-semibold text-foreground" {...p} />,
-  td: (p: any) => <td className="border-b border-border/40 px-2.5 py-1.5 text-muted-foreground" {...p} />,
-  hr: () => <hr className="border-border/60" />,
+const fmtTime = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 };
+
+/** Rewrites bare [E3] markers into links the markdown renderer can make clickable. */
+const linkifyCitations = (text: string) =>
+  text.replace(/\[(E\d+)\]/g, (_m, ref) => `[${ref}](#cite-${ref})`);
 
 export default function AmehnitiesChatBox({
   telemetry, corpusEvents,
 }: { telemetry: Telemetry | null; corpusEvents: number }) {
+  const navigate = useNavigate();
+  const { conversationId } = useParams<{ conversationId?: string }>();
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [openCitation, setOpenCitation] = useState<Citation | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const feedRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const convIdRef = useRef<string | undefined>(conversationId);
+  convIdRef.current = conversationId;
 
   const suggestions = useMemo(() => [
     "Summarize recent submission activity",
-    "What are the most common page views?",
+    "Which activity stream moved most in the last 24 hours?",
     `Explain current loss (${(telemetry?.loss ?? 0).toFixed(3)}) and perplexity (${(telemetry?.perplexity ?? 0).toFixed(1)})`,
-    "Show latest audit log events",
+    "Show the latest audit trail events",
   ], [telemetry?.loss, telemetry?.perplexity]);
+
+  const refreshConversations = useCallback(async () => {
+    try { setConversations(await listConversations()); } catch { /* history unavailable */ }
+  }, []);
+
+  useEffect(() => { void refreshConversations(); }, [refreshConversations]);
+
+  // Load whichever conversation the route points at.
+  useEffect(() => {
+    let cancelled = false;
+    if (!conversationId) { setMessages([]); return; }
+    (async () => {
+      try {
+        const rows = await loadMessages(conversationId);
+        if (cancelled) return;
+        setMessages(rows.map((r) => ({
+          id: r.id, role: r.role, content: r.content, citations: r.citations, followups: r.followups,
+        })));
+      } catch (e: any) {
+        if (!cancelled) toast.error("Could not open that conversation", { description: e?.message });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [conversationId]);
 
   useEffect(() => {
     const el = feedRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages, busy]);
+
+  useEffect(() => { if (!busy) inputRef.current?.focus(); }, [busy, conversationId]);
 
   const send = useCallback(async (text: string) => {
     const question = text.trim();
@@ -79,6 +115,22 @@ export default function AmehnitiesChatBox({
     setMessages([...history, { id: replyId, role: "assistant", content: "" }]);
     setBusy(true);
 
+    // Ensure the conversation exists (and that its URL is shareable/reloadable).
+    let convId = convIdRef.current;
+    try {
+      if (!convId) {
+        const conv = await createConversation(titleFromQuestion(question));
+        convId = conv.id;
+        convIdRef.current = conv.id;
+        navigate(`/amehnities-ai/c/${conv.id}`, { replace: true });
+        void refreshConversations();
+      }
+      await saveMessage(convId, { role: "user", content: question });
+    } catch (e: any) {
+      toast.error("Chat history could not be saved", { description: e?.message });
+    }
+
+    let catalog: Citation[] = [];
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-app-data`, {
@@ -127,19 +179,37 @@ export default function AmehnitiesChatBox({
           const data = trimmed.slice(5).trim();
           if (!data || data === "[DONE]") continue;
           try {
-            const delta = JSON.parse(data)?.choices?.[0]?.delta?.content;
+            const parsed = JSON.parse(data);
+            if (parsed?.amehnities?.citations) {
+              catalog = parsed.amehnities.citations as Citation[];
+              continue;
+            }
+            const delta = parsed?.choices?.[0]?.delta?.content;
             if (typeof delta === "string" && delta) {
               answer += delta;
-              setMessages((m) => m.map((x) => (x.id === replyId ? { ...x, content: answer } : x)));
+              const shown = splitFollowups(answer).answer;
+              setMessages((m) => m.map((x) => (x.id === replyId ? { ...x, content: shown } : x)));
             }
           } catch { /* partial frame — wait for more bytes */ }
         }
       }
 
-      if (!answer) {
-        setMessages((m) => m.map((x) => (x.id === replyId
-          ? { ...x, content: "_I could not determine an answer from the available application data._" }
-          : x)));
+      const { answer: finalAnswer, followups } = splitFollowups(answer);
+      const body = finalAnswer || "_I could not determine an answer from the available application data._";
+      const cites = usedCitations(body, catalog);
+      setMessages((m) => m.map((x) => (x.id === replyId
+        ? { ...x, content: body, citations: cites, followups }
+        : x)));
+
+      if (convIdRef.current) {
+        try {
+          await saveMessage(convIdRef.current, {
+            role: "assistant", content: body, citations: cites, followups,
+          });
+          void refreshConversations();
+        } catch (e: any) {
+          toast.error("Answer could not be saved to history", { description: e?.message });
+        }
       }
     } catch (e: any) {
       setMessages((m) => m.filter((x) => x.id !== replyId));
@@ -147,7 +217,84 @@ export default function AmehnitiesChatBox({
     } finally {
       setBusy(false);
     }
-  }, [busy, messages, telemetry, corpusEvents]);
+  }, [busy, messages, telemetry, corpusEvents, navigate, refreshConversations]);
+
+  const startNewChat = useCallback(() => {
+    setMessages([]);
+    convIdRef.current = undefined;
+    navigate("/amehnities-ai");
+    setHistoryOpen(false);
+  }, [navigate]);
+
+  const removeConversation = useCallback(async (id: string) => {
+    try {
+      await deleteConversation(id);
+      setConversations((c) => c.filter((x) => x.id !== id));
+      if (convIdRef.current === id) startNewChat();
+    } catch (e: any) {
+      toast.error("Could not delete conversation", { description: e?.message });
+    }
+  }, [startNewChat]);
+
+  /** Markdown renderers styled with the app's semantic tokens. */
+  const MD = useMemo(() => {
+    const base = {
+      p: (p: any) => <p className="text-sm text-foreground" {...p} />,
+      strong: (p: any) => <strong className="font-semibold text-foreground" {...p} />,
+      em: (p: any) => <em className="italic" {...p} />,
+      ul: (p: any) => <ul className="ml-4 list-disc space-y-1 text-sm text-foreground" {...p} />,
+      ol: (p: any) => <ol className="ml-4 list-decimal space-y-1 text-sm text-foreground" {...p} />,
+      li: (p: any) => <li className="marker:text-primary" {...p} />,
+      h1: (p: any) => <h4 className="text-sm font-semibold text-foreground" {...p} />,
+      h2: (p: any) => <h4 className="text-sm font-semibold text-foreground" {...p} />,
+      h3: (p: any) => <h5 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground" {...p} />,
+      code: ({ inline, ...p }: any) =>
+        inline
+          ? <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]" {...p} />
+          : <code className="block overflow-x-auto rounded-lg bg-muted p-3 font-mono text-[11px]" {...p} />,
+      blockquote: (p: any) => <blockquote className="border-l-2 border-primary/50 pl-3 text-sm text-muted-foreground" {...p} />,
+      table: (p: any) => (
+        <div className="overflow-x-auto rounded-lg border border-border/60">
+          <table className="w-full border-collapse text-xs" {...p} />
+        </div>
+      ),
+      thead: (p: any) => <thead className="bg-muted/60" {...p} />,
+      th: (p: any) => <th className="border-b border-border/60 px-2.5 py-1.5 text-left font-semibold text-foreground" {...p} />,
+      td: (p: any) => <td className="border-b border-border/40 px-2.5 py-1.5 text-muted-foreground" {...p} />,
+      hr: () => <hr className="border-border/60" />,
+    };
+    return base;
+  }, []);
+
+  const renderMarkdown = (msg: ChatMessage) => {
+    const catalog = msg.citations ?? [];
+    const components = {
+      ...MD,
+      a: (p: any) => {
+        const href = String(p.href ?? "");
+        if (href.startsWith("#cite-")) {
+          const ref = href.slice(6);
+          const cite = catalog.find((c) => c.ref === ref);
+          return (
+            <button
+              type="button"
+              onClick={() => cite && setOpenCitation(cite)}
+              title={cite ? `${cite.label} · ${fmtTime(cite.timestamp)}` : "Source unavailable"}
+              className="mx-0.5 inline-flex items-center rounded-md border border-primary/40 bg-primary/10 px-1.5 py-px align-baseline font-mono text-[10px] font-semibold text-primary transition-colors hover:bg-primary/20"
+            >
+              {ref}
+            </button>
+          );
+        }
+        return <a className="text-primary underline underline-offset-2" target="_blank" rel="noreferrer" {...p} />;
+      },
+    };
+    return (
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        {linkifyCitations(msg.content)}
+      </ReactMarkdown>
+    );
+  };
 
   return (
     <Card className="border-border/60 bg-card/80 backdrop-blur">
@@ -157,15 +304,73 @@ export default function AmehnitiesChatBox({
         </div>
         <div className="min-w-0">
           <h3 className="text-sm font-semibold leading-tight">Amehnities Data Assistant</h3>
-          <p className="text-[11px] text-muted-foreground">Grounded in live application activity — never invented.</p>
+          <p className="text-[11px] text-muted-foreground">Grounded in live application activity — every claim cited.</p>
         </div>
         <Badge variant="outline" className="ml-auto gap-1.5 border-primary/40 text-primary">
           <Radio className="h-3 w-3" />
-          Connected to corpus: {corpusEvents.toLocaleString()} events
+          Corpus: {corpusEvents.toLocaleString()} events
         </Badge>
-        <Button size="sm" variant="ghost" disabled={busy || !messages.length}
-          onClick={() => setMessages([])} className="gap-1.5">
-          <Trash2 className="h-3.5 w-3.5" /> Clear chat
+
+        <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
+          <PopoverTrigger asChild>
+            <Button size="sm" variant="outline" className="gap-1.5">
+              <History className="h-3.5 w-3.5" /> History
+              {conversations.length > 0 && (
+                <span className="rounded bg-muted px-1 text-[10px]">{conversations.length}</span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80 p-0">
+            <div className="flex items-center justify-between border-b border-border/60 px-3 py-2">
+              <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Saved conversations
+              </span>
+              <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" onClick={startNewChat}>
+                <Plus className="h-3.5 w-3.5" /> New
+              </Button>
+            </div>
+            <ScrollArea className="max-h-72">
+              {!conversations.length && (
+                <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                  No saved conversations yet.
+                </p>
+              )}
+              <div className="p-1">
+                {conversations.map((c) => (
+                  <div
+                    key={c.id}
+                    className={`flex items-center gap-1 rounded-lg px-1 ${
+                      c.id === conversationId ? "bg-primary/10" : "hover:bg-muted/60"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => { navigate(`/amehnities-ai/c/${c.id}`); setHistoryOpen(false); }}
+                      className="flex min-w-0 flex-1 items-start gap-2 px-2 py-2 text-left"
+                    >
+                      <MessageSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-medium text-foreground">{c.title}</span>
+                        <span className="block text-[10px] text-muted-foreground">{fmtTime(c.updatedAt)}</span>
+                      </span>
+                    </button>
+                    <Button
+                      size="icon" variant="ghost" aria-label="Delete conversation"
+                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => removeConversation(c.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </PopoverContent>
+        </Popover>
+
+        <Button size="sm" variant="ghost" disabled={busy || (!messages.length && !conversationId)}
+          onClick={startNewChat} className="gap-1.5">
+          <Plus className="h-3.5 w-3.5" /> New chat
         </Button>
       </div>
 
@@ -174,7 +379,7 @@ export default function AmehnitiesChatBox({
           <div className="py-8 text-center">
             <p className="text-sm font-medium">Ask anything about field activity, submissions or app metrics.</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Answers use only the live database context and the current model metrics.
+              Answers use only live database context and current model metrics — with clickable event citations.
             </p>
           </div>
         )}
@@ -188,12 +393,50 @@ export default function AmehnitiesChatBox({
             )}
             <div className={m.role === "user"
               ? "max-w-[80%] rounded-2xl rounded-tr-sm bg-primary px-3.5 py-2 text-sm text-primary-foreground"
-              : "max-w-[85%] text-sm text-foreground"}>
+              : "max-w-[85%] space-y-2.5 text-sm text-foreground"}>
               {m.role === "assistant" ? (
                 m.content ? (
-                  <div className="space-y-2 leading-relaxed">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD}>{m.content}</ReactMarkdown>
-                  </div>
+                  <>
+                    <div className="space-y-2 leading-relaxed">{renderMarkdown(m)}</div>
+
+                    {!!m.citations?.length && (
+                      <div className="rounded-xl border border-border/60 bg-muted/30 p-2.5">
+                        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                          Sources ({m.citations.length})
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {m.citations.map((c) => (
+                            <button
+                              key={c.ref} type="button" onClick={() => setOpenCitation(c)}
+                              className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/60 bg-background px-2 py-1 text-left text-[10px] transition-colors hover:border-primary/50 hover:bg-primary/5"
+                            >
+                              <span className="font-mono font-semibold text-primary">{c.ref}</span>
+                              <span className="truncate text-foreground">{c.label}</span>
+                              <span className="shrink-0 text-muted-foreground">{fmtTime(c.timestamp)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {!!m.followups?.length && (
+                      <div>
+                        <p className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                          <Sparkles className="h-3 w-3 text-primary" /> Suggested follow-ups
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {m.followups.map((q) => (
+                            <button
+                              key={q} type="button" disabled={busy} onClick={() => send(q)}
+                              className="rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-[11px] text-foreground transition-colors hover:bg-primary/15 disabled:opacity-50"
+                            >
+                              {q}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <span className="flex items-center gap-2 text-muted-foreground">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" /> Reading application activity…
@@ -213,20 +456,23 @@ export default function AmehnitiesChatBox({
       </div>
 
       <div className="border-t border-border/60 px-4 py-3">
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {suggestions.map((s) => (
-            <button key={s} type="button" disabled={busy} onClick={() => send(s)}
-              className="rounded-full border border-border/70 bg-background/60 px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:opacity-50">
-              {s}
-            </button>
-          ))}
-        </div>
+        {!messages.length && (
+          <div className="mb-2.5 flex flex-wrap gap-1.5">
+            {suggestions.map((s) => (
+              <button key={s} type="button" disabled={busy} onClick={() => send(s)}
+                className="rounded-full border border-border/60 bg-muted/40 px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-50">
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex items-end gap-2">
           <Textarea
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); }
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(input); }
             }}
             rows={2}
             placeholder="Ask a question about field activity, submissions, or app metrics..."
@@ -236,8 +482,61 @@ export default function AmehnitiesChatBox({
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizontal className="h-4 w-4" />}
           </Button>
         </div>
-        <p className="mt-1.5 text-[10px] text-muted-foreground">Enter to send · Shift + Enter for a new line</p>
+        <p className="mt-1.5 text-[10px] text-muted-foreground">
+          Enter to send · Shift + Enter for a new line · Conversations are saved to your account
+        </p>
       </div>
+
+      <Dialog open={!!openCitation} onOpenChange={(o) => !o && setOpenCitation(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <span className="rounded-md border border-primary/40 bg-primary/10 px-1.5 py-0.5 font-mono text-xs text-primary">
+                {openCitation?.ref}
+              </span>
+              {openCitation?.label}
+            </DialogTitle>
+          </DialogHeader>
+          {openCitation && (
+            <div className="space-y-2.5 text-sm">
+              <div className="flex items-start gap-2">
+                <Hash className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Event ID</p>
+                  <p className="break-all font-mono text-xs text-foreground">{openCitation.eventId}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Recorded at</p>
+                  <p className="text-xs text-foreground">{fmtTime(openCitation.timestamp)}</p>
+                  <p className="font-mono text-[10px] text-muted-foreground">{openCitation.timestamp}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Database className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Source record</p>
+                  <p className="font-mono text-xs text-foreground">{openCitation.table}</p>
+                  {openCitation.detail && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">{openCitation.detail}</p>
+                  )}
+                </div>
+              </div>
+              <Button
+                size="sm" variant="outline" className="w-full"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(openCitation.eventId);
+                  toast.success("Event ID copied");
+                }}
+              >
+                Copy event ID
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
