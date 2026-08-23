@@ -231,6 +231,42 @@ export default function AmehnitiesAI() {
             </Card>
           </div>
         </div>
+
+        {/* Training telemetry dashboard */}
+        <div className="mt-4">
+          <TrainingMetricsDashboard metrics={telemetry?.metrics ?? []} running={running} />
+        </div>
+
+        {/* Control, sources, inference and checkpoints */}
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          <TrainingControlPanel
+            telemetry={telemetry}
+            budget={budget}
+            exportCheckpoint={exportCheckpoint}
+            importCheckpoint={importCheckpoint}
+            applyConfig={applyConfig}
+          />
+          <DataSourcePanel
+            allSources={allSources}
+            enabledSources={enabledSources}
+            toggleSource={toggleSource}
+            setAllSources={setAllSources}
+            sourceCounts={sourceCounts}
+            running={running}
+            onToggleRunning={toggle}
+            corpusReady={corpusReady}
+          />
+          <AskModelPanel askModel={askModel} vocab={vocab} />
+        </div>
+
+        <div className="mt-4">
+          <CheckpointsPanel
+            checkpoints={checkpoints}
+            downloadSavedCheckpoint={downloadSavedCheckpoint}
+            inspectCheckpoint={inspectCheckpoint}
+            importCheckpoint={importCheckpoint}
+          />
+        </div>
       </div>
     </div>
   );
