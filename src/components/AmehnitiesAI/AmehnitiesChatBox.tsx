@@ -486,13 +486,18 @@ export default function AmehnitiesChatBox({
                           {m.citations.map((c) => (
                             <button
                               key={c.ref} type="button" onClick={() => setOpenCitation(c)}
-                              className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/60 bg-background px-2 py-1 text-left text-[10px] transition-colors hover:border-primary/50 hover:bg-primary/5"
+                              className={`inline-flex max-w-full items-center gap-1.5 rounded-lg border bg-background px-2 py-1 text-left text-[10px] transition-colors hover:bg-primary/5 ${
+                                c.kind === "web" ? "border-emerald-500/50 hover:border-emerald-500" : "border-border/60 hover:border-primary/50"
+                              }`}
                             >
-                              <span className="font-mono font-semibold text-primary">{c.ref}</span>
+                              <span className={`font-mono font-semibold ${c.kind === "web" ? "text-emerald-600 dark:text-emerald-400" : "text-primary"}`}>{c.ref}</span>
                               <span className="truncate text-foreground">{c.label}</span>
-                              <span className="shrink-0 text-muted-foreground">{fmtTime(c.timestamp)}</span>
+                              <span className="shrink-0 text-muted-foreground">
+                                {c.kind === "web" ? (c.publisher ?? "Web") : fmtTime(c.timestamp)}
+                              </span>
                             </button>
                           ))}
+
                         </div>
                       </div>
                     )}
