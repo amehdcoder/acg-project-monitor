@@ -7,16 +7,23 @@
  *   • the community name is looked up in the registry (exact, then fuzzy),
  *     constrained to the declared State / LGA;
  *   • the registry coordinate is compared with the captured GPS fix using the
- *     Haversine distance, against a 10 km supervisory accuracy radius;
+ *     Haversine distance, against a CONFIGURABLE supervisory accuracy radius
+ *     (5 / 10 / 15 / 25 km) — changing it instantly re-flags the register
+ *     without re-running the registry lookups;
  *   • the nearest registry settlement to the captured point is also resolved,
  *     so a wrong-name capture can be named, not just flagged.
+ *
+ * Every verdict carries audit provenance (matched registry record, match
+ * method, lookup timestamp) and drills down to the exact submissions,
+ * coordinates, timestamps and evidence attachments behind it.
  *
  * Only NON-CONFORMING records are listed — a clean capture never occupies
  * supervisory attention.
  */
 import { useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle, Compass, Download, Loader2, MapPin, RefreshCw, Search, ShieldAlert, ShieldCheck,
+  AlertTriangle, Compass, Download, Loader2, MapPin, RefreshCw, Ruler, Search, ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,14 +34,21 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   findGrid3Named, nearestGrid3Settlement, warmGrid3Index, norm,
   type NamedGrid3Match, type NearestSettlement,
 } from "@/lib/isc/grid3Nearest";
+import Grid3MismatchDetailDialog, { type Grid3DrillSpec } from "./Grid3MismatchDetailDialog";
 
 type Row = Record<string, unknown>;
 
 const s = (v: unknown) => String(v ?? "").trim();
-const RADIUS_M = 10000;
+
+const RADIUS_OPTIONS = [5000, 10000, 15000, 25000];
+const RADIUS_KEY = "isc.grid3.radiusM";
+const REGISTRY_SOURCE = "GRID3 Nigeria settlement registry (/data/grid3_settlements.json)";
 
 function parsePoint(v: unknown): { lat: number; lng: number } | null {
   if (!v) return null;
@@ -54,8 +68,8 @@ type Verdict = "out_of_radius" | "name_mismatch" | "not_in_registry" | "admin_mi
 
 const VERDICT_META: Record<Exclude<Verdict, "match">, { label: string; note: string; cls: string; dot: string }> = {
   out_of_radius: {
-    label: "Outside 10 km radius",
-    note: "The registry settlement of the same name sits further than the 10 km supervisory accuracy radius from the captured fix.",
+    label: "Outside accuracy radius",
+    note: "The registry settlement of the same name sits further than the supervisory accuracy radius from the captured fix.",
     cls: "bg-rose-50 text-rose-700 border-rose-300",
     dot: "#E11D48",
   },
@@ -79,7 +93,8 @@ const VERDICT_META: Record<Exclude<Verdict, "match">, { label: string; note: str
   },
 };
 
-interface AuditRow {
+/** A resolved capture — radius-independent (lookups run once). */
+interface ResolvedRow {
   id: string;
   community: string;
   flhf: string;
@@ -92,33 +107,57 @@ interface AuditRow {
   lng: number;
   named: NamedGrid3Match | null;
   nearest: NearestSettlement | null;
-  verdict: Verdict;
-  distanceM: number | null;
+  /** ISO timestamp of the registry lookup (audit provenance). */
+  lookupAt: string;
+  /** All supervisor submissions that produced this capture. */
+  sources: Row[];
 }
 
-const km = (m: number | null) => (m == null ? "—" : m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`);
+/** A resolved capture classified against the radius currently in force. */
+interface AuditRow extends ResolvedRow {
+  verdict: Verdict;
+  distanceM: number | null;
+  method: string;
+}
+
+const km = (m: number | null) =>
+  m == null ? "—" : m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`;
+
+const METHOD_LABEL: Record<string, string> = {
+  exact: "Registry name lookup — exact match",
+  fuzzy: "Registry name lookup — fuzzy match",
+  nearest: "Nearest-neighbour spatial match (no name in registry)",
+  none: "No registry candidate found",
+};
 
 export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
-  const [rows, setRows] = useState<AuditRow[]>([]);
+  const [resolved, setResolved] = useState<ResolvedRow[]>([]);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [running, setRunning] = useState(false);
   const [query, setQuery] = useState("");
   const [verdictFilter, setVerdictFilter] = useState<"all" | Exclude<Verdict, "match">>("all");
   const [nonce, setNonce] = useState(0);
+  const [drill, setDrill] = useState<Grid3DrillSpec | null>(null);
+  const [radiusM, setRadiusM] = useState<number>(() => {
+    const stored = Number(localStorage.getItem(RADIUS_KEY));
+    return RADIUS_OPTIONS.includes(stored) ? stored : 10000;
+  });
 
   useEffect(() => { warmGrid3Index(); }, []);
+  useEffect(() => { localStorage.setItem(RADIUS_KEY, String(radiusM)); }, [radiusM]);
 
+  /* ------------------------------------------------- captures to audit */
   const points = useMemo(() => {
-    const out: Omit<AuditRow, "named" | "nearest" | "verdict" | "distanceM">[] = [];
-    const seen = new Set<string>();
+    const byKey = new Map<string, Omit<ResolvedRow, "named" | "nearest" | "lookupAt">>();
     parents.forEach((p, i) => {
       const g = parsePoint(p.GPS ?? p._geolocation);
       if (!g) return;
       const community = s(p.COMMUNITIES) || "Unnamed community";
       const key = `${community.toLowerCase()}|${g.lat.toFixed(4)}|${g.lng.toFixed(4)}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      out.push({
+      const tagged = { ...p, __lat: g.lat, __lng: g.lng };
+      const existing = byKey.get(key);
+      if (existing) { existing.sources.push(tagged); return; }
+      byKey.set(key, {
         id: s(p._id) || `${i}`,
         community,
         flhf: s(p.FLHF) || "—",
@@ -128,52 +167,63 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
         monitor: s(p.Independent_Monitor_s_Name) || s(p.Name_of_Supervisor) || s(p.Designation) || "Unspecified",
         date: s(p._submission_time).slice(0, 10),
         lat: g.lat, lng: g.lng,
+        sources: [tagged],
       });
     });
-    return out;
+    return [...byKey.values()];
   }, [parents]);
 
-  /* ------------------------------------------------------------- the audit */
+  /* --------------------------------- registry resolution (radius-free) */
   useEffect(() => {
     let cancelled = false;
-    if (!points.length) { setRows([]); return; }
+    if (!points.length) { setResolved([]); return; }
 
     (async () => {
       setRunning(true);
       setProgress({ done: 0, total: points.length });
-      const out: AuditRow[] = [];
+      const out: ResolvedRow[] = [];
       for (let i = 0; i < points.length; i++) {
         if (cancelled) return;
         const p = points[i];
         const named = await findGrid3Named(p.community, p.lat, p.lng, { lga: p.lga, state: p.state });
         const nearest = await nearestGrid3Settlement(p.lat, p.lng, 25000);
-
-        let verdict: Verdict = "match";
-        if (!named) verdict = "not_in_registry";
-        else if (named.distanceM > RADIUS_M) verdict = "out_of_radius";
-        else if (nearest && norm(nearest.settlement) !== norm(p.community) && nearest.distanceM < 1500) {
-          verdict = "name_mismatch";
-        } else if (
-          named &&
-          ((p.ward && norm(named.ward) !== norm(p.ward)) || (p.lga && norm(named.lga) !== norm(p.lga)))
-        ) {
-          verdict = "admin_mismatch";
-        }
-
-        out.push({ ...p, named, nearest, verdict, distanceM: named?.distanceM ?? nearest?.distanceM ?? null });
+        out.push({ ...p, named, nearest, lookupAt: new Date().toISOString() });
         if (i % 15 === 0) {
           setProgress({ done: i + 1, total: points.length });
           await new Promise((r) => setTimeout(r, 0)); // keep the tab responsive
         }
       }
       if (cancelled) return;
-      setRows(out);
+      setResolved(out);
       setProgress({ done: points.length, total: points.length });
       setRunning(false);
     })();
 
     return () => { cancelled = true; };
   }, [points, nonce]);
+
+  /* --------------------------- classification against the chosen radius */
+  const rows: AuditRow[] = useMemo(
+    () =>
+      resolved.map((r) => {
+        const { named, nearest } = r;
+        let verdict: Verdict = "match";
+        if (!named) verdict = "not_in_registry";
+        else if (named.distanceM > radiusM) verdict = "out_of_radius";
+        else if (nearest && norm(nearest.settlement) !== norm(r.community) && nearest.distanceM < 1500) {
+          verdict = "name_mismatch";
+        } else if ((r.ward && norm(named.ward) !== norm(r.ward)) || (r.lga && norm(named.lga) !== norm(r.lga))) {
+          verdict = "admin_mismatch";
+        }
+        return {
+          ...r,
+          verdict,
+          distanceM: named?.distanceM ?? nearest?.distanceM ?? null,
+          method: named ? named.how : nearest ? "nearest" : "none",
+        };
+      }),
+    [resolved, radiusM],
+  );
 
   const mismatches = useMemo(() => rows.filter((r) => r.verdict !== "match"), [rows]);
 
@@ -193,19 +243,49 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
 
   const conformity = rows.length ? (rows.length - mismatches.length) / rows.length : 0;
 
+  const openDrill = (r: AuditRow) => {
+    const meta = VERDICT_META[r.verdict as Exclude<Verdict, "match">];
+    const registry = r.named ?? r.nearest;
+    setDrill({
+      title: `${r.community} — ${r.ward || "—"}, ${r.lga || "—"}`,
+      verdictLabel: meta.label,
+      verdictNote: meta.note,
+      accent: meta.dot,
+      radiusKm: radiusM / 1000,
+      distanceM: r.distanceM,
+      provenance: registry
+        ? {
+            settlement: registry.settlement,
+            ward: registry.ward,
+            lga: registry.lga,
+            state: registry.state,
+            lat: registry.lat,
+            lng: registry.lng,
+            method: METHOD_LABEL[r.method] ?? r.method,
+            lookupAt: r.lookupAt,
+            source: REGISTRY_SOURCE,
+          }
+        : null,
+      rows: r.sources,
+    });
+  };
+
   const exportCsv = () => {
     const head = [
       "Community (Kobo)", "FLHF", "Ward", "LGA", "State", "Independent Monitor / Supervisor",
-      "Visit date", "Captured latitude", "Captured longitude",
-      "GRID3 settlement (name lookup)", "GRID3 ward", "GRID3 LGA",
-      "Distance to registry (m)", "Nearest GRID3 settlement to point", "Nearest distance (m)",
-      "Verdict", "Interpretation",
+      "Visit date", "Submissions behind row", "Captured latitude", "Captured longitude",
+      "GRID3 settlement (name lookup)", "GRID3 ward", "GRID3 LGA", "GRID3 latitude", "GRID3 longitude",
+      "Distance to registry (m)", "Radius in force (m)",
+      "Nearest GRID3 settlement to point", "Nearest distance (m)",
+      "Match method", "Lookup timestamp", "Registry source", "Verdict", "Interpretation",
     ];
     const lines = filtered.map((r) => [
-      r.community, r.flhf, r.ward, r.lga, r.state, r.monitor, r.date, r.lat, r.lng,
+      r.community, r.flhf, r.ward, r.lga, r.state, r.monitor, r.date, r.sources.length, r.lat, r.lng,
       r.named?.settlement ?? "", r.named?.ward ?? "", r.named?.lga ?? "",
-      r.named ? Math.round(r.named.distanceM) : "",
+      r.named?.lat ?? "", r.named?.lng ?? "",
+      r.named ? Math.round(r.named.distanceM) : "", radiusM,
       r.nearest?.settlement ?? "", r.nearest ? Math.round(r.nearest.distanceM) : "",
+      METHOD_LABEL[r.method] ?? r.method, r.lookupAt, REGISTRY_SOURCE,
       VERDICT_META[r.verdict as Exclude<Verdict, "match">].label,
       VERDICT_META[r.verdict as Exclude<Verdict, "match">].note,
     ]);
@@ -215,17 +295,18 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `grid3-coordinate-accuracy-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `grid3-coordinate-accuracy-audit-${radiusM / 1000}km-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   return (
+    <>
     <Card className="overflow-hidden border-primary/30">
       <CardHeader className="border-b bg-gradient-to-r from-sky-500/10 via-emerald-500/5 to-transparent py-3 px-4">
         <CardTitle className="flex flex-wrap items-center gap-2 text-sm font-semibold">
           <Compass className="h-4 w-4 text-sky-600" />
-          GRID3 Coordinate Accuracy Audit — Community vs Registry (10 km standard)
+          GRID3 Coordinate Accuracy Audit — Community vs Registry ({radiusM / 1000} km standard)
           <Badge variant="outline" className="text-[10px] font-normal">
             {rows.length.toLocaleString()} georeferenced visits
           </Badge>
@@ -238,7 +319,8 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
         </CardTitle>
         <CardDescription className="text-[11px]">
           Every supervisor-captured coordinate is matched to the GRID3 Nigeria settlement registry.
-          Only records that fail the 10 km accuracy standard or contradict the registry are listed below.
+          Only records that fail the accuracy standard in force or contradict the registry are listed below —
+          click any row to open the submissions, timestamps and evidence behind it.
         </CardDescription>
       </CardHeader>
 
@@ -268,6 +350,20 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
               className="h-8 pl-7 text-[12px]"
             />
           </div>
+
+          <div className="flex items-center gap-1.5 rounded-md border bg-muted/40 px-2 py-1">
+            <Ruler className="h-3.5 w-3.5 text-sky-600" />
+            <span className="text-[10.5px] font-medium text-muted-foreground">Accuracy radius</span>
+            <Select value={String(radiusM)} onValueChange={(v) => setRadiusM(Number(v))}>
+              <SelectTrigger className="h-7 w-[92px] text-[11.5px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {RADIUS_OPTIONS.map((m) => (
+                  <SelectItem key={m} value={String(m)}>{m / 1000} km</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <Select value={verdictFilter} onValueChange={(v) => setVerdictFilter(v as typeof verdictFilter)}>
             <SelectTrigger className="h-8 w-[210px] text-[12px]"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -299,15 +395,18 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
         {!running && !mismatches.length ? (
           <div className="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-[12px] text-emerald-800">
             <ShieldCheck className="h-4 w-4" />
-            Every captured coordinate falls inside the 10 km accuracy radius of its GRID3 registry settlement — no exceptions to review.
+            Every captured coordinate falls inside the {radiusM / 1000} km accuracy radius of its GRID3 registry
+            settlement — no exceptions to review at this threshold.
           </div>
         ) : (
+          <TooltipProvider delayDuration={200}>
           <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full min-w-[1080px] border-collapse text-[11.5px]">
+            <table className="w-full min-w-[1220px] border-collapse text-[11.5px]">
               <thead>
                 <tr className="bg-gradient-to-r from-slate-800 to-slate-700 text-white">
                   {["#", "Community (captured)", "FLHF", "Ward", "LGA", "State", "Independent Monitor / Supervisor",
-                    "Captured GPS", "GRID3 registry match", "Distance", "Nearest registry settlement", "Verdict"].map((h) => (
+                    "Captured GPS", "GRID3 registry match", "Distance", "Nearest registry settlement",
+                    "Audit provenance", "Verdict", ""].map((h) => (
                     <th key={h} className="whitespace-nowrap px-2.5 py-2 text-left font-semibold uppercase tracking-wide text-[10px]">
                       {h}
                     </th>
@@ -320,7 +419,8 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
                   return (
                     <tr
                       key={`${r.id}-${i}`}
-                      className={`border-t transition-colors ${i % 2 ? "bg-muted/30" : "bg-background"} hover:bg-sky-50/70`}
+                      onClick={() => openDrill(r)}
+                      className={`cursor-pointer border-t transition-colors ${i % 2 ? "bg-muted/30" : "bg-background"} hover:bg-sky-50/70`}
                     >
                       <td className="px-2.5 py-2 text-muted-foreground">{i + 1}</td>
                       <td className="px-2.5 py-2 font-semibold text-slate-900">
@@ -329,6 +429,9 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
                           {r.community}
                         </span>
                         {r.date && <span className="ml-1 text-[10px] text-muted-foreground">· {r.date}</span>}
+                        <span className="ml-1 text-[10px] text-sky-700">
+                          · {r.sources.length} submission{r.sources.length === 1 ? "" : "s"}
+                        </span>
                       </td>
                       <td className="px-2.5 py-2">{r.flhf}</td>
                       <td className="px-2.5 py-2">{r.ward || "—"}</td>
@@ -344,7 +447,7 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
                           <>
                             <span className="font-medium">{r.named.settlement}</span>
                             <span className="block text-[10px] text-muted-foreground">
-                              {r.named.ward} · {r.named.lga} ({r.named.how})
+                              {r.named.ward} · {r.named.lga}
                             </span>
                           </>
                         ) : (
@@ -354,7 +457,7 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
                       <td className="whitespace-nowrap px-2.5 py-2">
                         <span
                           className={`rounded px-1.5 py-0.5 font-semibold ${
-                            (r.distanceM ?? 0) > RADIUS_M ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"
+                            (r.distanceM ?? 0) > radiusM ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"
                           }`}
                         >
                           {km(r.distanceM)}
@@ -370,11 +473,63 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
                           </>
                         ) : "—"}
                       </td>
+                      {/* audit provenance */}
+                      <td className="px-2.5 py-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="max-w-[190px] cursor-help">
+                              <Badge
+                                variant="outline"
+                                className={`text-[9.5px] ${
+                                  r.method === "exact"
+                                    ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                                    : r.method === "fuzzy"
+                                      ? "border-amber-300 bg-amber-50 text-amber-700"
+                                      : "border-slate-300 bg-slate-50 text-slate-600"
+                                }`}
+                              >
+                                {r.method === "exact" ? "exact name" : r.method === "fuzzy" ? "fuzzy name" : r.method === "nearest" ? "spatial only" : "no candidate"}
+                              </Badge>
+                              <span className="block truncate text-[10px] text-muted-foreground">
+                                {(r.named ?? r.nearest)
+                                  ? `${(r.named ?? r.nearest)!.lat.toFixed(4)}, ${(r.named ?? r.nearest)!.lng.toFixed(4)}`
+                                  : "—"}
+                              </span>
+                              <span className="block text-[9.5px] text-muted-foreground">
+                                {new Date(r.lookupAt).toLocaleTimeString()}
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-[280px] text-[11px]">
+                            <p className="font-semibold">{METHOD_LABEL[r.method] ?? r.method}</p>
+                            <p className="mt-1">Source: {REGISTRY_SOURCE}</p>
+                            {(r.named ?? r.nearest) && (
+                              <p className="mt-1">
+                                Registry record: {(r.named ?? r.nearest)!.settlement} —{" "}
+                                {(r.named ?? r.nearest)!.ward}, {(r.named ?? r.nearest)!.lga},{" "}
+                                {(r.named ?? r.nearest)!.state}
+                              </p>
+                            )}
+                            <p className="mt-1">Looked up {new Date(r.lookupAt).toLocaleString()}</p>
+                            <p className="mt-1">Radius in force: {radiusM / 1000} km</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </td>
                       <td className="px-2.5 py-2">
                         <Badge variant="outline" className={`text-[10px] ${meta.cls}`}>
                           {r.verdict === "out_of_radius" ? <ShieldAlert className="mr-1 h-3 w-3" /> : <AlertTriangle className="mr-1 h-3 w-3" />}
                           {meta.label}
                         </Badge>
+                      </td>
+                      <td className="px-2.5 py-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-[10.5px]"
+                          onClick={(e) => { e.stopPropagation(); openDrill(r); }}
+                        >
+                          Evidence
+                        </Button>
                       </td>
                     </tr>
                   );
@@ -382,16 +537,20 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
               </tbody>
             </table>
           </div>
+          </TooltipProvider>
         )}
 
         <p className="rounded-md border border-dashed bg-muted/40 px-3 py-2 text-[10.5px] leading-relaxed text-muted-foreground">
           <strong>How to read this register.</strong> Distances are great-circle (Haversine) separations between the
           supervisor's device fix and the GRID3 Nigeria settlement registry coordinate. A capture is conforming when a
-          registry settlement of the same name lies within {RADIUS_M / 1000} km of the fix and the registry agrees on
-          the Ward and LGA. “Not in GRID3 registry” usually signals a locally-used community alias; “Name does not match
-          point” signals the monitor stood in a different settlement than the one recorded.
+          registry settlement of the same name lies within {radiusM / 1000} km of the fix and the registry agrees on
+          the Ward and LGA. Changing the accuracy radius re-flags the register immediately using the same registry
+          lookups. “Not in GRID3 registry” usually signals a locally-used community alias; “Name does not match point”
+          signals the monitor stood in a different settlement than the one recorded.
         </p>
       </CardContent>
     </Card>
+    <Grid3MismatchDetailDialog spec={drill} onClose={() => setDrill(null)} />
+    </>
   );
 }
