@@ -212,6 +212,59 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
     ? Math.round(((counts.verified + counts.nearby) / points.length) * 100)
     : 0;
 
+  const avgConfidence = verified.length
+    ? Math.round(verified.reduce((s, p) => s + (p.verify?.confidence ?? 0), 0) / verified.length)
+    : 0;
+
+  /* ------------------------------------------------------- bulk admin review */
+  const selectedPoints = useMemo(
+    () => shown.filter((p) => selected.has(p.locKey || "")),
+    [shown, selected],
+  );
+  const allShownSelected = shown.length > 0 && shown.every((p) => selected.has(p.locKey || ""));
+
+  const toggleOne = (locKey: string) =>
+    setSelected((prev) => {
+      const n = new Set(prev);
+      n.has(locKey) ? n.delete(locKey) : n.add(locKey);
+      return n;
+    });
+
+  const toggleAllShown = () =>
+    setSelected(allShownSelected ? new Set() : new Set(shown.map((p) => p.locKey || "")));
+
+  const selectBorderline = () =>
+    setSelected(new Set(
+      verified
+        .filter((p) => !p.override && (p.baseVerify?.status === "nearby" || p.baseVerify?.status === "mismatch"))
+        .map((p) => p.locKey || ""),
+    ));
+
+  const applyBulk = async () => {
+    setBulkSaving(true);
+    const ok = await review.saveOverridesBulk(
+      selectedPoints.map((p) => ({
+        locKey: p.locKey!, submissionId: p.id, community: p.community, lat: p.lat, lng: p.lng,
+      })),
+      {
+        decision: bulkDecision,
+        correctedName: bulkDecision === "corrected" ? bulkName.trim() : "",
+        note: bulkNote.trim(),
+      },
+    );
+    setBulkSaving(false);
+    if (ok) { setSelected(new Set()); setBulkNote(""); setBulkName(""); }
+  };
+
+  const clearBulk = async () => {
+    setBulkSaving(true);
+    await review.clearOverridesBulk(selectedPoints.filter((p) => p.override).map((p) => p.locKey!));
+    setBulkSaving(false);
+    setSelected(new Set());
+  };
+
+
+
 
   /* ------------------------------------------------------------------- maps */
   useEffect(() => {
