@@ -334,6 +334,25 @@ Deno.serve(async (req) => {
       return json({ error: "This share is not scoped to a project", data: null }, 403);
     }
 
+    // `profiles` has no project column, so it is scoped by joining through
+    // user_project_assignments: a share link may only see the directory of the
+    // project it was created for — never the whole organization.
+    let profileUserIds: string[] | null = null;
+    if (table === "profiles") {
+      if (!shareProjectId) {
+        return json({ error: "This share is not scoped to a project", data: null }, 403);
+      }
+      const { data: members, error: memberErr } = await admin
+        .from("user_project_assignments")
+        .select("user_id")
+        .eq("project_id", shareProjectId);
+      if (memberErr) return json({ error: memberErr.message, data: null }, 400);
+      profileUserIds = Array.from(
+        new Set((members ?? []).map((m: { user_id: string }) => m.user_id).filter(Boolean)),
+      );
+      if (!profileUserIds.length) return json({ data: [], count: 0, error: null });
+    }
+
     try {
       let q: any = admin.from(table).select(columns, selectOptions);
 
@@ -342,6 +361,10 @@ Deno.serve(async (req) => {
       if (scopeColumn && shareProjectId) {
         q = q.eq(scopeColumn, shareProjectId);
       }
+      if (profileUserIds) {
+        q = q.in("user_id", profileUserIds);
+      }
+
 
       for (const f of filters) {
         const method = String(f?.method ?? "");
