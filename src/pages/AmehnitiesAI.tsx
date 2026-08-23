@@ -22,6 +22,8 @@ import TrainingMetricsDashboard from "@/components/AmehnitiesAI/TrainingMetricsD
 import DataSourcePanel from "@/components/AmehnitiesAI/DataSourcePanel";
 import AskModelPanel from "@/components/AmehnitiesAI/AskModelPanel";
 import CheckpointsPanel from "@/components/AmehnitiesAI/CheckpointsPanel";
+import ValidationPanel from "@/components/AmehnitiesAI/ValidationPanel";
+import DivergenceAlert from "@/components/AmehnitiesAI/DivergenceAlert";
 import AmehnitiesChatBox from "@/components/AmehnitiesAI/AmehnitiesChatBox";
 
 const fmt = (n: number) =>
@@ -49,6 +51,10 @@ export default function AmehnitiesAI() {
     allSources, enabledSources, toggleSource, setAllSources,
     exportCheckpoint, importCheckpoint, inspectCheckpoint, applyConfig,
     checkpoints, downloadSavedCheckpoint, askModel,
+    evaluation, evalSeries, evalEnabled, trainTokens, valTokens,
+    runEvaluation, setEvalEnabled, alert, guardEnabled, setGuardEnabled, dismissAlert,
+    bestCheckpoints, autoSave, setAutoSave, bestMetric, setBestMetric,
+    autoSaving, rollbackTo, downloadBestCheckpoint, clearBestCheckpoints,
   } = useAmehnitiesBrain();
 
   const cfg = telemetry?.cfg;
@@ -239,6 +245,19 @@ export default function AmehnitiesAI() {
           </div>
         </div>
 
+        {/* Divergence guardrail */}
+        {alert && (
+          <div className="mt-4">
+            <DivergenceAlert
+              alert={alert}
+              onDismiss={dismissAlert}
+              onResume={() => { dismissAlert(); toggle(); }}
+              canRollback={bestCheckpoints.length > 0}
+              onRollback={() => { rollbackTo(bestCheckpoints[0].id); dismissAlert(); }}
+            />
+          </div>
+        )}
+
         {/* Training telemetry dashboard */}
         <div className="mt-4">
           <TrainingMetricsDashboard metrics={telemetry?.metrics ?? []} running={running} />
@@ -264,6 +283,29 @@ export default function AmehnitiesAI() {
             corpusReady={corpusReady}
           />
           <AskModelPanel askModel={askModel} vocab={vocab} />
+        </div>
+
+        <div className="mt-4">
+          <ValidationPanel
+            evaluation={evaluation}
+            evalSeries={evalSeries}
+            evalEnabled={evalEnabled}
+            trainTokens={trainTokens}
+            valTokens={valTokens}
+            setEvalEnabled={setEvalEnabled}
+            runEvaluation={runEvaluation}
+            guardEnabled={guardEnabled}
+            setGuardEnabled={setGuardEnabled}
+            bestCheckpoints={bestCheckpoints}
+            autoSave={autoSave}
+            setAutoSave={setAutoSave}
+            bestMetric={bestMetric}
+            setBestMetric={setBestMetric}
+            autoSaving={autoSaving}
+            rollbackTo={rollbackTo}
+            downloadBestCheckpoint={downloadBestCheckpoint}
+            clearBestCheckpoints={clearBestCheckpoints}
+          />
         </div>
 
         <div className="mt-4">
