@@ -14,6 +14,10 @@
  *   → { type: "run",    running }             start/pause the training loop
  *   → { type: "grow" }                        scale capacity up (more params)
  *   → { type: "budget", ms }                  compute budget per animation tick
+ *   → { type: "config", patch }               live hyper-parameter update (safe restart)
+ *   → { type: "restart", fresh }              reset optimiser / re-initialise weights
+ *   → { type: "checkpoint" }                  export weights + optimiser + training state
+ *   → { type: "load", ckpt }                  restore a previously exported checkpoint
  *   ← { type: "telemetry", ... }              metrics + attention + activations
  */
 
@@ -25,9 +29,12 @@ type Cfg = {
   ctx: number;
   vocab: number;
   lr: number;
+  batch: number;
 };
 
-const DEFAULT_CFG: Cfg = { dModel: 64, nHeads: 4, nLayers: 4, dFF: 256, ctx: 32, vocab: 256, lr: 3e-3 };
+const DEFAULT_CFG: Cfg = { dModel: 64, nHeads: 4, nLayers: 4, dFF: 256, ctx: 32, vocab: 256, lr: 3e-3, batch: 1 };
+
+const CHECKPOINT_VERSION = 1;
 
 /* ------------------------------------------------------------------ utils */
 
@@ -381,11 +388,15 @@ let tokensSeen = 0;
 let lastTelemetry = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
-function build(next: Partial<Cfg>) {
-  const prev = model;
+function build(next: Partial<Cfg>, fresh = false) {
+  const prev = fresh ? null : model;
   cfg = { ...cfg, ...next };
   cfg.dModel = Math.max(cfg.nHeads, cfg.dModel - (cfg.dModel % cfg.nHeads));
+  cfg.ctx = Math.max(8, Math.min(128, Math.round(cfg.ctx)));
+  cfg.batch = Math.max(1, Math.min(16, Math.round(cfg.batch)));
+  cfg.lr = Math.max(1e-5, Math.min(0.05, cfg.lr));
   model = new Transformer(cfg, prev ?? undefined);
+  lastFwd = null; lastTokens = null;
   postTelemetry(true);
 }
 
@@ -403,17 +414,25 @@ function tick() {
   if (!running || !model) return;
   const t0 = performance.now();
   let steps = 0;
+  const B = Math.max(1, cfg.batch);
   while (performance.now() - t0 < budgetMs) {
-    const w = sampleWindow();
-    if (!w) break;
     model.zeroGrad();
-    const fwd = model.forward(w.x, w.y);
-    model.backward(w.x, fwd);
+    let used = 0, batchLoss = 0;
+    for (let b = 0; b < B; b++) {
+      const w = sampleWindow();
+      if (!w) break;
+      const fwd = model.forward(w.x, w.y);
+      model.backward(w.x, fwd);
+      batchLoss += fwd.loss;
+      lastFwd = fwd; lastTokens = w.x;
+      used++;
+    }
+    if (!used) break;
+    if (used > 1) { const inv = 1 / used; for (const p of model.params) for (let i = 0; i < p.size; i++) p.g[i] *= inv; }
     model.adam();
-    lossEMA = lossEMA === 0 ? fwd.loss : lossEMA * 0.95 + fwd.loss * 0.05;
-    tokensSeen += cfg.ctx;
-    lastFwd = fwd;
-    lastTokens = w.x;
+    const loss = batchLoss / used;
+    lossEMA = lossEMA === 0 ? loss : lossEMA * 0.95 + loss * 0.05;
+    tokensSeen += cfg.ctx * used;
     steps++;
   }
   const now = performance.now();
@@ -509,6 +528,64 @@ function postTelemetry(structural = false) {
   });
 }
 
+/* ------------------------------------------------------------- checkpoint */
+
+function exportCheckpoint(includeOptimizer: boolean) {
+  if (!model) return;
+  const total = model.paramCount;
+  const weights = new Float32Array(total);
+  const m = includeOptimizer ? new Float32Array(total) : null;
+  const v = includeOptimizer ? new Float32Array(total) : null;
+  let off = 0;
+  const shapes: { size: number }[] = [];
+  for (const p of model.params) {
+    weights.set(p.v, off);
+    if (m && v) { m.set(p.m, off); v.set(p.s, off); }
+    shapes.push({ size: p.size });
+    off += p.size;
+  }
+  const payload: Record<string, unknown> = {
+    type: "checkpoint",
+    version: CHECKPOINT_VERSION,
+    createdAt: new Date().toISOString(),
+    cfg: { ...cfg },
+    step: model.step,
+    tokensSeen,
+    lossEMA,
+    lossHistory: [...lossHistory],
+    streamSize: stream.length,
+    paramCount: total,
+    shapes,
+    weights,
+    optimizer: includeOptimizer ? { m, v } : null,
+  };
+  const transfer: ArrayBuffer[] = [weights.buffer];
+  if (m && v) transfer.push(m.buffer, v.buffer);
+  (self as unknown as Worker).postMessage(payload, transfer);
+}
+
+function loadCheckpoint(ckpt: any) {
+  if (!ckpt?.cfg || !ckpt?.weights) return;
+  build({ ...DEFAULT_CFG, ...ckpt.cfg }, true);
+  if (!model) return;
+  const weights: Float32Array = ckpt.weights instanceof Float32Array ? ckpt.weights : new Float32Array(ckpt.weights);
+  if (weights.length !== model.paramCount) { postTelemetry(true); return; }
+  const om = ckpt.optimizer?.m ? new Float32Array(ckpt.optimizer.m) : null;
+  const ov = ckpt.optimizer?.v ? new Float32Array(ckpt.optimizer.v) : null;
+  let off = 0;
+  for (const p of model.params) {
+    p.v.set(weights.subarray(off, off + p.size));
+    if (om) p.m.set(om.subarray(off, off + p.size));
+    if (ov) p.s.set(ov.subarray(off, off + p.size));
+    off += p.size;
+  }
+  model.step = ckpt.step || 0;
+  tokensSeen = ckpt.tokensSeen || 0;
+  lossEMA = ckpt.lossEMA || 0;
+  lossHistory = Array.isArray(ckpt.lossHistory) ? ckpt.lossHistory.slice(-180) : [];
+  postTelemetry(true);
+}
+
 self.onmessage = (e: MessageEvent) => {
   const msg = e.data || {};
   switch (msg.type) {
@@ -537,6 +614,31 @@ self.onmessage = (e: MessageEvent) => {
       build({ dModel, nHeads: dModel % nHeads === 0 ? nHeads : cfg.nHeads, nLayers, dFF: dModel * 4 });
       break;
     }
+    case "config": {
+      const patch = (msg.patch || {}) as Partial<Cfg>;
+      const structural = patch.ctx !== undefined && patch.ctx !== cfg.ctx;
+      if (structural) {
+        // ctx changes the positional table — rebuild, warm-starting everything else
+        build(patch);
+      } else {
+        cfg = { ...cfg, ...patch };
+        cfg.lr = Math.max(1e-5, Math.min(0.05, cfg.lr));
+        cfg.batch = Math.max(1, Math.min(16, Math.round(cfg.batch)));
+        postTelemetry(true);
+      }
+      break;
+    }
+    case "restart": {
+      lossEMA = 0; lossHistory = []; tokensSeen = 0; lastFwd = null; lastTokens = null;
+      build(msg.patch || {}, msg.fresh !== false);
+      break;
+    }
+    case "checkpoint":
+      exportCheckpoint(msg.includeOptimizer !== false);
+      break;
+    case "load":
+      loadCheckpoint(msg.ckpt);
+      break;
     case "shrink": {
       const dModel = Math.max(32, cfg.dModel / 2);
       build({ dModel, nHeads: Math.max(2, Math.min(cfg.nHeads, dModel / 16)), nLayers: Math.max(2, cfg.nLayers - 1), dFF: dModel * 4 });
