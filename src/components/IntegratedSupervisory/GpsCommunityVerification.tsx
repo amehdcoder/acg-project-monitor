@@ -129,6 +129,10 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
     return out;
   }, [parents]);
 
+  // Warm the GRID3 settlement index up-front so the first "no OSM result"
+  // point resolves instantly instead of waiting on a 10 MB parse.
+  useEffect(() => { warmGrid3Index(); }, []);
+
   /* -------------------------------------------------------- verification run */
   const runVerification = async (force = false) => {
     if (running || points.length === 0) return;
@@ -138,7 +142,7 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
     const res = await reverseGeocodeBatch(
       points.map((p) => ({ lat: p.lat, lng: p.lng })),
       (done, total) => setProgress({ done, total }),
-      4,
+      6,
       force,
     );
     setGeoMap(new Map(res));
@@ -148,6 +152,7 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
       network: geoCacheStats.network, throttled: geoCacheStats.throttled,
     });
   };
+
 
   useEffect(() => {
     if (points.length && geoMap.size === 0 && !running) void runVerification();
