@@ -148,55 +148,163 @@ export const STATUS_META: Record<VerifyStatus, { label: string; color: string; h
 };
 
 /* ------------------------------------------------------- reverse geocoding */
+/**
+ * Caching + rate limiting.
+ *
+ *  L1  in-memory Map (instant, per-session)
+ *  L2  localStorage with a 30-day TTL and an LRU cap so the quota never blows
+ *  L3  in-flight de-duplication — the same coordinate asked twice concurrently
+ *      only ever produces ONE network call
+ *
+ * Every real network call passes through a token bucket (default 8 requests
+ * per second, burst 8) so a dashboard with thousands of points can never
+ * exceed the Google/provider rate limits.
+ */
 
-const memCache = new Map<string, GeoName | null>();
-const LS_KEY = "isc.revgeo.v1";
+interface CacheEntry { v: GeoName | null; t: number }
 
-function lsRead(): Record<string, GeoName | null> {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || "{}"); } catch { return {}; }
-}
-function lsWrite(map: Record<string, GeoName | null>) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(map)); } catch { /* quota */ }
-}
+const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const MAX_ENTRIES = 4000;
+const LS_KEY = "isc.revgeo.v2";
+
+const memCache = new Map<string, CacheEntry>();
+const inFlight = new Map<string, Promise<GeoName | null>>();
+
+let diskLoaded = false;
+let diskDirty = false;
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
 const keyOf = (lat: number, lng: number) => `${lat.toFixed(4)},${lng.toFixed(4)}`;
 
-/** Reverse geocode a single point (cached in memory + localStorage). */
-export async function reverseGeocode(lat: number, lng: number): Promise<GeoName | null> {
-  const k = keyOf(lat, lng);
-  if (memCache.has(k)) return memCache.get(k)!;
-  const disk = lsRead();
-  if (k in disk) { memCache.set(k, disk[k]); return disk[k]; }
+function loadDisk() {
+  if (diskLoaded) return;
+  diskLoaded = true;
   try {
-    const { data, error } = await supabase.functions.invoke("geo-tools", {
-      body: { action: "reverse", lat, lng },
-    });
-    if (error) throw error;
-    const found = (data as { found?: boolean }) ?? {};
-    const value: GeoName | null = found.found ? (data as GeoName) : null;
-    memCache.set(k, value);
-    disk[k] = value;
-    lsWrite(disk);
-    return value;
-  } catch {
-    memCache.set(k, null);
-    return null;
+    const raw = JSON.parse(localStorage.getItem(LS_KEY) || "{}") as Record<string, CacheEntry>;
+    const now = Date.now();
+    for (const [k, e] of Object.entries(raw)) {
+      if (e && typeof e.t === "number" && now - e.t < TTL_MS) memCache.set(k, e);
+    }
+  } catch { /* corrupted cache — start clean */ }
+}
+
+function scheduleFlush() {
+  diskDirty = true;
+  if (flushTimer) return;
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    if (!diskDirty) return;
+    diskDirty = false;
+    try {
+      // LRU-ish trim: keep the most recently written entries.
+      const entries = Array.from(memCache.entries()).sort((a, b) => b[1].t - a[1].t).slice(0, MAX_ENTRIES);
+      if (entries.length < memCache.size) {
+        memCache.clear();
+        entries.forEach(([k, v]) => memCache.set(k, v));
+      }
+      localStorage.setItem(LS_KEY, JSON.stringify(Object.fromEntries(entries)));
+    } catch { /* quota — cache stays in memory only */ }
+  }, 1200);
+}
+
+/* ------------------------------------------------------------ token bucket */
+
+const RATE_PER_SEC = 8;
+const BURST = 8;
+let tokens = BURST;
+let lastRefill = Date.now();
+
+function refill() {
+  const now = Date.now();
+  tokens = Math.min(BURST, tokens + ((now - lastRefill) / 1000) * RATE_PER_SEC);
+  lastRefill = now;
+}
+
+async function takeToken(): Promise<void> {
+  for (;;) {
+    refill();
+    if (tokens >= 1) { tokens -= 1; return; }
+    const waitMs = Math.max(40, ((1 - tokens) / RATE_PER_SEC) * 1000);
+    await new Promise((r) => setTimeout(r, waitMs));
   }
+}
+
+/** Cache/rate-limiter telemetry surfaced in the UI. */
+export const geoCacheStats = { hits: 0, misses: 0, network: 0, throttled: 0 };
+
+export function geoCacheSize(): number { loadDisk(); return memCache.size; }
+
+export function clearGeoCache() {
+  memCache.clear();
+  inFlight.clear();
+  try { localStorage.removeItem(LS_KEY); } catch { /* noop */ }
+  geoCacheStats.hits = geoCacheStats.misses = geoCacheStats.network = geoCacheStats.throttled = 0;
+}
+
+/** Reverse geocode a single point (memory + localStorage cached, rate limited). */
+export async function reverseGeocode(lat: number, lng: number, force = false): Promise<GeoName | null> {
+  loadDisk();
+  const k = keyOf(lat, lng);
+
+  if (!force) {
+    const hit = memCache.get(k);
+    if (hit && Date.now() - hit.t < TTL_MS) { geoCacheStats.hits++; return hit.v; }
+    const pending = inFlight.get(k);
+    if (pending) { geoCacheStats.hits++; return pending; }
+  }
+  geoCacheStats.misses++;
+
+  const task = (async (): Promise<GeoName | null> => {
+    refill();
+    if (tokens < 1) geoCacheStats.throttled++;
+    await takeToken();
+    try {
+      geoCacheStats.network++;
+      const { data, error } = await supabase.functions.invoke("geo-tools", {
+        body: { action: "reverse", lat, lng },
+      });
+      if (error) throw error;
+      const found = (data as { found?: boolean }) ?? {};
+      const value: GeoName | null = found.found ? (data as GeoName) : null;
+      memCache.set(k, { v: value, t: Date.now() });
+      scheduleFlush();
+      return value;
+    } catch {
+      // Cache negatives briefly (1h) so a provider blip doesn't hammer it.
+      memCache.set(k, { v: null, t: Date.now() - (TTL_MS - 60 * 60 * 1000) });
+      scheduleFlush();
+      return null;
+    } finally {
+      inFlight.delete(k);
+    }
+  })();
+
+  inFlight.set(k, task);
+  return task;
 }
 
 /** Reverse geocode many points with bounded concurrency (provider-friendly). */
 export async function reverseGeocodeBatch(
   points: { lat: number; lng: number }[],
   onProgress?: (done: number, total: number) => void,
-  concurrency = 3,
+  concurrency = 4,
+  force = false,
 ): Promise<Map<string, GeoName | null>> {
+  loadDisk();
   const out = new Map<string, GeoName | null>();
+
+  // Collapse duplicate coordinates before doing any work at all.
+  const unique = new Map<string, { lat: number; lng: number }>();
+  points.forEach((p) => unique.set(keyOf(p.lat, p.lng), p));
+  const list = Array.from(unique.values());
+
   let i = 0, done = 0;
-  const total = points.length;
+  const total = list.length;
+  onProgress?.(0, total);
   const workers = Array.from({ length: Math.min(concurrency, total || 1) }, async () => {
     while (i < total) {
-      const p = points[i++];
-      const res = await reverseGeocode(p.lat, p.lng);
+      const p = list[i++];
+      const res = await reverseGeocode(p.lat, p.lng, force);
       out.set(keyOf(p.lat, p.lng), res);
       onProgress?.(++done, total);
     }
@@ -206,3 +314,41 @@ export async function reverseGeocodeBatch(
 }
 
 export const geoKey = keyOf;
+
+/* ------------------------------------------------- admin overrides + history */
+
+export type OverrideDecision = "verified" | "corrected" | "rejected";
+
+export interface GpsOverride {
+  loc_key: string;
+  decision: OverrideDecision;
+  corrected_name?: string | null;
+  note?: string | null;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+}
+
+export const OVERRIDE_META: Record<OverrideDecision, { label: string; color: string }> = {
+  verified:  { label: "Admin verified", color: "#0d9488" },
+  corrected: { label: "Admin corrected", color: "#7c3aed" },
+  rejected:  { label: "Admin rejected", color: "#be123c" },
+};
+
+/** Apply an admin decision on top of the computed verdict. */
+export function applyOverride(base: VerifyResult, ovr?: GpsOverride | null): VerifyResult {
+  if (!ovr) return base;
+  if (ovr.decision === "rejected") {
+    return { ...base, status: "mismatch", reason: `Admin rejected this point. ${ovr.note || ""}`.trim() };
+  }
+  return {
+    ...base,
+    status: "verified",
+    score: Math.max(base.score, ovr.decision === "corrected" ? 90 : 100),
+    matchedName: ovr.corrected_name || base.matchedName,
+    reason:
+      ovr.decision === "corrected"
+        ? `Admin corrected the place name to “${ovr.corrected_name || base.matchedName}”. ${ovr.note || ""}`.trim()
+        : `Admin manually verified this GPS point. ${ovr.note || ""}`.trim(),
+  };
+}
+

@@ -21,14 +21,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
-  Satellite, Eye, RefreshCw, Search, MapPin, ShieldCheck, ShieldAlert, Loader2,
+  Satellite, Eye, RefreshCw, Search, MapPin, ShieldCheck, ShieldAlert, Loader2, History, Database, Gavel,
 } from "lucide-react";
 import GoogleStreetViewPanel from "@/components/maps/GoogleStreetViewPanel";
 import { loadGoogleMaps, googleMapsAuthFailed } from "@/lib/maps/googleMapsLoader";
 import {
-  reverseGeocodeBatch, verifyPlace, geoKey, STATUS_META,
+  reverseGeocodeBatch, verifyPlace, geoKey, STATUS_META, OVERRIDE_META, applyOverride,
+  geoCacheStats, geoCacheSize, clearGeoCache,
   type GeoName, type VerifyResult, type VerifyStatus,
 } from "@/lib/isc/gpsVerification";
+import { useGpsVerificationReview } from "@/hooks/useGpsVerificationReview";
+import GpsPointPreviewDialog from "./GpsPointPreviewDialog";
+import GpsDiscrepancyHistoryDialog from "./GpsDiscrepancyHistoryDialog";
+
 
 type Row = Record<string, unknown>;
 
@@ -60,6 +65,10 @@ interface VisitPoint {
   monitor: string;
   date: string;
   verify?: VerifyResult;
+  baseVerify?: VerifyResult;
+  locKey?: string;
+  override?: import("@/lib/isc/gpsVerification").GpsOverride | null;
+
 }
 
 export default function GpsCommunityVerification({ parents }: { parents: Row[] }) {
@@ -75,8 +84,14 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
   const [running, setRunning] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<VerifyStatus | "all">("all");
+  const [reviewFilter, setReviewFilter] = useState<"all" | "reviewed" | "unreviewed" | "borderline">("all");
   const [sv, setSv] = useState<{ lat: number; lng: number; title: string } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<VisitPoint | null>(null);
+  const [historyFor, setHistoryFor] = useState<VisitPoint | null>(null);
+  const [cacheInfo, setCacheInfo] = useState({ size: 0, hits: 0, network: 0, throttled: 0 });
+
+  const review = useGpsVerificationReview();
 
   /* ------------------------------------------------------------- raw points */
   const points = useMemo<VisitPoint[]>(() => {
@@ -105,13 +120,20 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
   const runVerification = async (force = false) => {
     if (running || points.length === 0) return;
     setRunning(true);
+    if (force) clearGeoCache();
     setProgress({ done: 0, total: points.length });
     const res = await reverseGeocodeBatch(
       points.map((p) => ({ lat: p.lat, lng: p.lng })),
       (done, total) => setProgress({ done, total }),
+      4,
+      force,
     );
     setGeoMap(new Map(res));
     setRunning(false);
+    setCacheInfo({
+      size: geoCacheSize(), hits: geoCacheStats.hits,
+      network: geoCacheStats.network, throttled: geoCacheStats.throttled,
+    });
   };
 
   useEffect(() => {
@@ -120,15 +142,31 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
   }, [points.length]);
 
   const verified = useMemo<VisitPoint[]>(
-    () => points.map((p) => ({
-      ...p,
-      verify: verifyPlace(
+    () => points.map((p) => {
+      const locKey = geoKey(p.lat, p.lng);
+      const base = verifyPlace(
         { community: p.community, ward: p.ward, lga: p.lga, state: p.state },
-        geoMap.get(geoKey(p.lat, p.lng)) ?? null,
-      ),
-    })),
-    [points, geoMap],
+        geoMap.get(locKey) ?? null,
+      );
+      const ovr = review.overrides[locKey];
+      return { ...p, locKey, baseVerify: base, override: ovr, verify: applyOverride(base, ovr) };
+    }),
+    [points, geoMap, review.overrides],
   );
+
+  // Record verdict snapshots so the per-location discrepancy history stays current.
+  useEffect(() => {
+    if (running || review.loading || geoMap.size === 0) return;
+    const snaps = verified
+      .filter((p) => p.baseVerify)
+      .map((p) => ({
+        locKey: p.locKey!, submissionId: p.id, community: p.community,
+        ward: p.ward, lga: p.lga, state: p.state, lat: p.lat, lng: p.lng,
+        verify: p.baseVerify!,
+      }));
+    void review.recordSnapshots(snaps);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verified, running, review.loading]);
 
   const counts = useMemo(() => {
     const c: Record<VerifyStatus, number> = { verified: 0, nearby: 0, mismatch: 0, outside: 0, unknown: 0 };
@@ -136,19 +174,29 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
     return c;
   }, [verified]);
 
+  const reviewedCount = verified.filter((p) => p.override).length;
+  const borderlineCount = verified.filter(
+    (p) => !p.override && (p.baseVerify?.status === "nearby" || p.baseVerify?.status === "mismatch"),
+  ).length;
+
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     return verified.filter((p) => {
       if (statusFilter !== "all" && p.verify?.status !== statusFilter) return false;
+      if (reviewFilter === "reviewed" && !p.override) return false;
+      if (reviewFilter === "unreviewed" && p.override) return false;
+      if (reviewFilter === "borderline" &&
+        !(!p.override && (p.baseVerify?.status === "nearby" || p.baseVerify?.status === "mismatch"))) return false;
       if (!q) return true;
       return [p.community, p.ward, p.lga, p.state, p.verify?.matchedName, p.verify?.displayName]
         .some((v) => (v || "").toLowerCase().includes(q));
     });
-  }, [verified, query, statusFilter]);
+  }, [verified, query, statusFilter, reviewFilter]);
 
   const confirmRate = points.length
     ? Math.round(((counts.verified + counts.nearby) / points.length) * 100)
     : 0;
+
 
   /* ------------------------------------------------------------------- maps */
   useEffect(() => {
@@ -314,14 +362,40 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
           ))}
         </div>
 
+        {/* Review filters + cache telemetry */}
+        <div className="flex flex-wrap items-center gap-2">
+          {([
+            { k: "all" as const, label: "All points", n: verified.length },
+            { k: "borderline" as const, label: "Needs review", n: borderlineCount },
+            { k: "reviewed" as const, label: "Admin reviewed", n: reviewedCount },
+            { k: "unreviewed" as const, label: "Not reviewed", n: verified.length - reviewedCount },
+          ]).map((f) => (
+            <button
+              key={f.k}
+              onClick={() => setReviewFilter(f.k)}
+              className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                reviewFilter === f.k ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted/50"
+              }`}
+            >
+              {f.label} · {f.n}
+            </button>
+          ))}
+          <span className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground">
+            <Database className="h-3 w-3" />
+            Cache {cacheInfo.size || geoCacheSize()} pts · {cacheInfo.hits} hits · {cacheInfo.network} lookups
+            {cacheInfo.throttled > 0 ? ` · ${cacheInfo.throttled} rate-limited` : ""}
+          </span>
+        </div>
+
         {running && (
           <div className="space-y-1">
             <Progress value={progress.total ? (progress.done / progress.total) * 100 : 0} className="h-1.5" />
             <p className="text-[11px] text-muted-foreground">
-              Geolocating {progress.done} / {progress.total} GPS points…
+              Geolocating {progress.done} / {progress.total} GPS points (cached results reused, 8 lookups/sec cap)…
             </p>
           </div>
         )}
+
 
         {/* Map */}
         <div className="relative overflow-hidden rounded-xl border border-border">
@@ -403,20 +477,44 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
                         {p.verify?.status === "verified" ? <ShieldCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
                         {meta.label}
                       </span>
+                      {p.override && (
+                        <span
+                          className="ml-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+                          style={{ background: OVERRIDE_META[p.override.decision].color }}
+                        >
+                          <Gavel className="h-3 w-3" /> {OVERRIDE_META[p.override.decision].label}
+                        </span>
+                      )}
                       <div className="mt-0.5 max-w-[260px] text-[10px] text-muted-foreground">{p.verify?.reason}</div>
                     </td>
                     <td className="px-2.5 py-2 font-mono font-bold" style={{ color: meta.color }}>{p.verify?.score ?? 0}%</td>
                     <td className="px-2.5 py-2 text-muted-foreground">{[p.ward, p.lga, p.state].filter(Boolean).join(" · ") || "—"}</td>
                     <td className="px-2.5 py-2 font-mono text-[10px] text-muted-foreground">{p.lat.toFixed(5)}, {p.lng.toFixed(5)}</td>
                     <td className="px-2.5 py-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="h-7 px-2 text-[10px]"
-                        onClick={(e) => { e.stopPropagation(); setSv({ lat: p.lat, lng: p.lng, title: `${p.community} — Street View` }); }}
-                      >
-                        <Eye className="mr-1 h-3 w-3" /> Street View
-                      </Button>
+                      <div className="flex flex-wrap gap-1">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 px-2 text-[10px]"
+                          onClick={(e) => { e.stopPropagation(); setPreview(p); }}
+                        >
+                          <Eye className="mr-1 h-3 w-3" /> Preview pin
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 px-2 text-[10px]"
+                          onClick={(e) => { e.stopPropagation(); setHistoryFor(p); }}
+                        >
+                          <History className="mr-1 h-3 w-3" />
+                          {review.isAdmin ? "History / review" : "History"}
+                          {(review.historyByKey.get(p.locKey || "")?.length ?? 0) > 1 && (
+                            <span className="ml-1 rounded-full bg-amber-500 px-1 text-[9px] font-bold text-white">
+                              {review.historyByKey.get(p.locKey || "")!.length}
+                            </span>
+                          )}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -426,6 +524,28 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
         </div>
       </CardContent>
 
+      <GpsPointPreviewDialog
+        open={!!preview}
+        onOpenChange={(o) => !o && setPreview(null)}
+        point={preview}
+        onLaunchStreetView={() => {
+          if (!preview) return;
+          setSv({ lat: preview.lat, lng: preview.lng, title: `${preview.community} — Street View` });
+          setPreview(null);
+        }}
+      />
+
+      <GpsDiscrepancyHistoryDialog
+        open={!!historyFor}
+        onOpenChange={(o) => !o && setHistoryFor(null)}
+        point={historyFor ? { ...historyFor, locKey: historyFor.locKey || geoKey(historyFor.lat, historyFor.lng) } : null}
+        history={historyFor ? (review.historyByKey.get(historyFor.locKey || geoKey(historyFor.lat, historyFor.lng)) ?? []) : []}
+        override={historyFor?.override ?? null}
+        isAdmin={review.isAdmin}
+        onSave={review.saveOverride}
+        onClear={review.clearOverride}
+      />
+
       <GoogleStreetViewPanel
         open={!!sv}
         onOpenChange={(o) => !o && setSv(null)}
@@ -433,6 +553,7 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
         lng={sv?.lng ?? null}
         title={sv?.title ?? "Street View"}
       />
+
     </Card>
   );
 }

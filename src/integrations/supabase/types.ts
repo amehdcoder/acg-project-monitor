@@ -4242,6 +4242,111 @@ export type Database = {
         }
         Relationships: []
       }
+      gps_verification_history: {
+        Row: {
+          community: string
+          created_at: string
+          display_name: string | null
+          id: string
+          lat: number
+          lga: string | null
+          lng: number
+          loc_key: string
+          matched_name: string | null
+          reason: string | null
+          recorded_by: string | null
+          score: number
+          state: string | null
+          status: string
+          submission_id: string | null
+          ward: string | null
+        }
+        Insert: {
+          community?: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          lat: number
+          lga?: string | null
+          lng: number
+          loc_key: string
+          matched_name?: string | null
+          reason?: string | null
+          recorded_by?: string | null
+          score?: number
+          state?: string | null
+          status: string
+          submission_id?: string | null
+          ward?: string | null
+        }
+        Update: {
+          community?: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          lat?: number
+          lga?: string | null
+          lng?: number
+          loc_key?: string
+          matched_name?: string | null
+          reason?: string | null
+          recorded_by?: string | null
+          score?: number
+          state?: string | null
+          status?: string
+          submission_id?: string | null
+          ward?: string | null
+        }
+        Relationships: []
+      }
+      gps_verification_overrides: {
+        Row: {
+          community: string | null
+          corrected_name: string | null
+          created_at: string
+          decision: string
+          id: string
+          lat: number | null
+          lng: number | null
+          loc_key: string
+          note: string | null
+          reviewed_at: string
+          reviewed_by: string | null
+          submission_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          community?: string | null
+          corrected_name?: string | null
+          created_at?: string
+          decision: string
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          loc_key: string
+          note?: string | null
+          reviewed_at?: string
+          reviewed_by?: string | null
+          submission_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          community?: string | null
+          corrected_name?: string | null
+          created_at?: string
+          decision?: string
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          loc_key?: string
+          note?: string | null
+          reviewed_at?: string
+          reviewed_by?: string | null
+          submission_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       health_facilities: {
         Row: {
           address: string | null
