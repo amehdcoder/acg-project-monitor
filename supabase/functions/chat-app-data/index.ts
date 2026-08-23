@@ -14,7 +14,9 @@ import { guardRequest } from "../_shared/authGuard.ts";
 import {
   applyLearnedRoute, classifyQuestion, TIER_LABEL, TIER_MODEL, tierDirective, type Tier,
 } from "../_shared/modelRouter.ts";
+import { retrieveWebKnowledge, shouldSearchWeb, webKnowledgeBlock } from "../_shared/webKnowledge.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,17 +44,18 @@ Judgement rules: distinguish association from causation; name the denominator be
 
 Safety: this is programme analytics, not clinical advice. Never give individual patient treatment instructions; refer dosing questions to the national NTD treatment guidelines.`;
 
-const SYSTEM_PROMPT = `You are the official Amehnities Data Assistant. Provide accurate, factual answers to user questions using ONLY the provided application activity context and live metrics. Do not invent data. If the answer cannot be determined from the application data, state that clearly.
+const SYSTEM_PROMPT = `You are the official Amehnities Data Assistant. You answer from two grounded sources and nothing else: (1) the supplied application activity context and live metrics, and (2) the PUBLISHED EVIDENCE FROM THE INTERNET block when it is present. Never invent data. Figures about this deployment come only from the application context; standards, definitions, methodology and global comparisons come from the published evidence. If neither can answer, state that clearly.
 
-CITATIONS (mandatory): every factual claim drawn from the activity context must end with one or more citation markers taken from the SOURCE EVENTS catalog, written exactly as [E12] or [E3][E7]. Never invent a marker that is not in the catalog. Claims about the live Transformer metrics use [MODEL] instead. Sentences that are purely interpretation may go uncited.
+CITATIONS (mandatory): every factual claim drawn from the activity context must end with one or more citation markers taken from the SOURCE EVENTS catalog, written exactly as [E12] or [E3][E7]. Every claim drawn from published literature or guidance must cite its web marker, written exactly as [W1] or [W2][W4]. Never invent a marker that is not in a catalog. Claims about the live Transformer metrics use [MODEL] instead. Sentences that are purely interpretation may go uncited.
 
-REASONING DISCIPLINE: think through the question silently before answering — identify which streams answer it, do the arithmetic from the supplied counts only, and re-check every number you print against the context. If two figures disagree, say so rather than picking one. Never extrapolate beyond the sampled window; state the window when it matters. If the data cannot answer the question, say exactly what is missing and what would answer it.
+REASONING DISCIPLINE: think through the question silently before answering — identify which streams answer it, do the arithmetic from the supplied counts only, and re-check every number you print against the context. If two figures disagree, say so rather than picking one. Never extrapolate beyond the sampled window; state the window when it matters. When the published evidence gives a threshold or standard, compare this programme's figures against it explicitly. If the data cannot answer the question, say exactly what is missing and what would answer it.
 
 Formatting: reply in clean Markdown. Use tables for comparisons and breakdowns, bullet points for lists, and bold for key figures. Always quote the exact counts you were given. Keep answers under 350 words unless the user asks for more detail.
 
 FOLLOW-UPS (mandatory): finish your reply with a final line, on its own, in exactly this form:
 FOLLOWUPS: question one | question two | question three
-Each follow-up must be a specific, answerable question about something you actually observed in the supplied data (name the stream, status, or figure). No generic questions. Nothing may come after that line.`;
+Each follow-up must be a specific, answerable question about something you actually observed in the supplied data or evidence (name the stream, status, figure, or standard). No generic questions. Nothing may come after that line.`;
+
 
 /** Bounded pulls — never a heavy scan, even on very large projects. */
 const SOURCES: {
@@ -316,10 +319,21 @@ Deno.serve(async (req) => {
 
     const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     const lastQuestion = String(messages[messages.length - 1]?.content ?? "").slice(0, 2000);
-    const [ctx, policy, routeStats] = await Promise.all([
-      buildContext(token), retrievePolicy(lastQuestion), loadRouteStats(),
+
+    // Web grounding: on by default, skipped for pure record look-ups, and
+    // overridable per request with `useWeb`.
+    const webRequested = body?.useWeb === undefined ? null : Boolean(body.useWeb);
+    const wantWeb = webRequested === null ? shouldSearchWeb(lastQuestion) : webRequested;
+
+    const [ctx, policy, routeStats, webSources] = await Promise.all([
+      buildContext(token),
+      retrievePolicy(lastQuestion),
+      loadRouteStats(),
+      wantWeb ? retrieveWebKnowledge(lastQuestion).catch(() => []) : Promise.resolve([]),
     ]);
     const learned = policyBlock(policy.rules, policy.exemplars);
+    const webBlock = webKnowledgeBlock(webSources);
+
 
     // ---- Automatic model routing -------------------------------------------
     const { questionClass, heuristicTier } = classifyQuestion(lastQuestion);
@@ -351,6 +365,8 @@ Deno.serve(async (req) => {
           { role: "system", content: PUBLIC_HEALTH_EXPERTISE },
           { role: "system", content: tierDirective(tier) },
           ...(learned ? [{ role: "system", content: learned }] : []),
+          ...(webBlock ? [{ role: "system", content: webBlock }] : []),
+
           { role: "system", content: `LIVE APPLICATION CONTEXT\n\n${contextBlock(ctx, modelStats)}` },
           ...trimmed,
         ],
@@ -373,7 +389,23 @@ Deno.serve(async (req) => {
     const encoder = new TextEncoder();
     const catalogFrame = `data: ${JSON.stringify({
       amehnities: {
-        citations: ctx.citations,
+        citations: [
+          ...ctx.citations,
+          // Web evidence joins the same clickable catalog, marked as external.
+          ...webSources.map((w) => ({
+            ref: w.ref,
+            table: "web",
+            kind: "web" as const,
+            label: w.title,
+            eventId: w.url,
+            url: w.url,
+            publisher: w.publisher,
+            timestamp: w.year ? `${w.year}-01-01T00:00:00.000Z` : new Date().toISOString(),
+            detail: w.snippet.slice(0, 400),
+          })),
+        ],
+        webSourceCount: webSources.length,
+
         generatedAt: ctx.generatedAt,
         policyIds: policy.ids,
         policyApplied: policy.rules.map((r) => ({ topic: r.topic, content: r.content, avgReward: Number(r.avg_reward) })),

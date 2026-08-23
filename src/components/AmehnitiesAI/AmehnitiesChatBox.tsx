@@ -56,9 +56,10 @@ const fmtTime = (iso: string) => {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 };
 
-/** Rewrites bare [E3] markers into links the markdown renderer can make clickable. */
+/** Rewrites bare [E3]/[W2] markers into links the markdown renderer can make clickable. */
 const linkifyCitations = (text: string) =>
-  text.replace(/\[(E\d+)\]/g, (_m, ref) => `[${ref}](#cite-${ref})`);
+  text.replace(/\[([EW]\d+)\]/g, (_m, ref) => `[${ref}](#cite-${ref})`);
+
 
 export default function AmehnitiesChatBox({
   telemetry, corpusEvents,
@@ -348,8 +349,13 @@ export default function AmehnitiesChatBox({
             <button
               type="button"
               onClick={() => cite && setOpenCitation(cite)}
-              title={cite ? `${cite.label} · ${fmtTime(cite.timestamp)}` : "Source unavailable"}
-              className="mx-0.5 inline-flex items-center rounded-md border border-primary/40 bg-primary/10 px-1.5 py-px align-baseline font-mono text-[10px] font-semibold text-primary transition-colors hover:bg-primary/20"
+              title={cite ? `${cite.label} · ${cite.kind === "web" ? (cite.publisher ?? "Web source") : fmtTime(cite.timestamp)}` : "Source unavailable"}
+              className={`mx-0.5 inline-flex items-center rounded-md border px-1.5 py-px align-baseline font-mono text-[10px] font-semibold transition-colors ${
+                cite?.kind === "web"
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400"
+                  : "border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
+              }`}
+
             >
               {ref}
             </button>
@@ -485,13 +491,18 @@ export default function AmehnitiesChatBox({
                           {m.citations.map((c) => (
                             <button
                               key={c.ref} type="button" onClick={() => setOpenCitation(c)}
-                              className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/60 bg-background px-2 py-1 text-left text-[10px] transition-colors hover:border-primary/50 hover:bg-primary/5"
+                              className={`inline-flex max-w-full items-center gap-1.5 rounded-lg border bg-background px-2 py-1 text-left text-[10px] transition-colors hover:bg-primary/5 ${
+                                c.kind === "web" ? "border-emerald-500/50 hover:border-emerald-500" : "border-border/60 hover:border-primary/50"
+                              }`}
                             >
-                              <span className="font-mono font-semibold text-primary">{c.ref}</span>
+                              <span className={`font-mono font-semibold ${c.kind === "web" ? "text-emerald-600 dark:text-emerald-400" : "text-primary"}`}>{c.ref}</span>
                               <span className="truncate text-foreground">{c.label}</span>
-                              <span className="shrink-0 text-muted-foreground">{fmtTime(c.timestamp)}</span>
+                              <span className="shrink-0 text-muted-foreground">
+                                {c.kind === "web" ? (c.publisher ?? "Web") : fmtTime(c.timestamp)}
+                              </span>
                             </button>
                           ))}
+
                         </div>
                       </div>
                     )}
@@ -660,7 +671,29 @@ export default function AmehnitiesChatBox({
               {openCitation?.label}
             </DialogTitle>
           </DialogHeader>
-          {openCitation && (
+          {openCitation?.kind === "web" ? (
+            <div className="space-y-2.5 text-sm">
+              <div className="flex items-start gap-2">
+                <Globe className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Published source</p>
+                  <p className="text-xs text-foreground">
+                    {openCitation.publisher ?? "Web"}
+                    {openCitation.timestamp?.slice(0, 4) ? ` · ${openCitation.timestamp.slice(0, 4)}` : ""}
+                  </p>
+                  <p className="break-all font-mono text-[10px] text-muted-foreground">{openCitation.url}</p>
+                </div>
+              </div>
+              {openCitation.detail && (
+                <p className="rounded-lg border border-border/60 bg-muted/30 p-2.5 text-xs leading-relaxed text-muted-foreground">
+                  {openCitation.detail}
+                </p>
+              )}
+              <Button size="sm" variant="outline" className="w-full" asChild>
+                <a href={openCitation.url} target="_blank" rel="noreferrer">Open source</a>
+              </Button>
+            </div>
+          ) : openCitation && (
             <div className="space-y-2.5 text-sm">
               <div className="flex items-start gap-2">
                 <Hash className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -697,6 +730,7 @@ export default function AmehnitiesChatBox({
                 Copy event ID
               </Button>
             </div>
+
           )}
         </DialogContent>
       </Dialog>
