@@ -610,12 +610,24 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
               )}
               {shown.map((p) => {
                 const meta = STATUS_META[p.verify?.status ?? "unknown"];
+                const isSel = selected.has(p.locKey || "");
                 return (
                   <tr
                     key={p.id + p.lat}
                     onClick={() => focus(p)}
-                    className={`cursor-pointer border-t border-border/60 transition hover:bg-muted/40 ${activeId === p.id ? "bg-primary/5" : ""}`}
+                    className={`cursor-pointer border-t border-border/60 transition hover:bg-muted/40 ${
+                      isSel ? "bg-primary/10" : activeId === p.id ? "bg-primary/5" : ""
+                    }`}
                   >
+                    {review.isAdmin && (
+                      <td className="px-2.5 py-2" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={isSel}
+                          onCheckedChange={() => toggleOne(p.locKey || "")}
+                          aria-label={`Select ${p.community}`}
+                        />
+                      </td>
+                    )}
                     <td className="px-2.5 py-2 font-semibold">{p.community}</td>
                     <td className="px-2.5 py-2">
                       <div className="font-medium">{p.verify?.matchedName || "—"}</div>
@@ -642,7 +654,18 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
                       <div className="mt-0.5 max-w-[260px] text-[10px] text-muted-foreground">{p.verify?.reason}</div>
                     </td>
                     <td className="px-2.5 py-2 font-mono font-bold" style={{ color: meta.color }}>{p.verify?.score ?? 0}%</td>
+                    <td className="px-2.5 py-2">
+                      {p.verify && <GpsConfidenceBreakdown verify={p.verify} community={p.community} />}
+                      <div className="mt-0.5 text-[9px] text-muted-foreground">
+                        {p.verify?.distanceM === null || p.verify?.distanceM === undefined
+                          ? "distance n/a"
+                          : p.verify.distanceM < 1000
+                            ? `${p.verify.distanceM} m off`
+                            : `${(p.verify.distanceM / 1000).toFixed(1)} km off`}
+                      </div>
+                    </td>
                     <td className="px-2.5 py-2 text-muted-foreground">{[p.ward, p.lga, p.state].filter(Boolean).join(" · ") || "—"}</td>
+
                     <td className="px-2.5 py-2 font-mono text-[10px] text-muted-foreground">{p.lat.toFixed(5)}, {p.lng.toFixed(5)}</td>
                     <td className="px-2.5 py-2">
                       <div className="flex flex-wrap gap-1">
