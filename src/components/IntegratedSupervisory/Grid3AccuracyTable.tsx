@@ -20,7 +20,8 @@
  * Only NON-CONFORMING records are listed — a clean capture never occupies
  * supervisory attention.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   AlertTriangle, Compass, Download, Loader2, MapPin, RefreshCw, Ruler, Search, ShieldAlert,
   ShieldCheck,
@@ -41,6 +42,7 @@ import {
   type NamedGrid3Match, type NearestSettlement,
 } from "@/lib/isc/grid3Nearest";
 import Grid3MismatchDetailDialog, { type Grid3DrillSpec } from "./Grid3MismatchDetailDialog";
+import Grid3SupervisorSummary from "./Grid3SupervisorSummary";
 
 type Row = Record<string, unknown>;
 
@@ -130,6 +132,24 @@ const METHOD_LABEL: Record<string, string> = {
   none: "No registry candidate found",
 };
 
+type SortKey = "distance" | "community" | "lga" | "monitor" | "date";
+
+const SORTERS: Record<SortKey, (a: AuditRow, b: AuditRow) => number> = {
+  distance: (a, b) => (b.distanceM ?? 0) - (a.distanceM ?? 0),
+  community: (a, b) => a.community.localeCompare(b.community),
+  lga: (a, b) => (a.lga || "~").localeCompare(b.lga || "~") || a.community.localeCompare(b.community),
+  monitor: (a, b) => a.monitor.localeCompare(b.monitor) || (b.distanceM ?? 0) - (a.distanceM ?? 0),
+  date: (a, b) => (b.date || "").localeCompare(a.date || ""),
+};
+
+const SORT_LABEL: Record<SortKey, string> = {
+  distance: "Largest separation first",
+  community: "Community A → Z",
+  lga: "LGA A → Z",
+  monitor: "Monitor A → Z",
+  date: "Most recent visit first",
+};
+
 export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
   const [resolved, setResolved] = useState<ResolvedRow[]>([]);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -138,6 +158,10 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
   const [verdictFilter, setVerdictFilter] = useState<"all" | Exclude<Verdict, "match">>("all");
   const [nonce, setNonce] = useState(0);
   const [drill, setDrill] = useState<Grid3DrillSpec | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("distance");
+  const [pageSize, setPageSize] = useState(100);
+  const [page, setPage] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [radiusM, setRadiusM] = useState<number>(() => {
     const stored = Number(localStorage.getItem(RADIUS_KEY));
     return RADIUS_OPTIONS.includes(stored) ? stored : 10000;
@@ -232,8 +256,30 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
     return mismatches
       .filter((r) => verdictFilter === "all" || r.verdict === verdictFilter)
       .filter((r) => !q || [r.community, r.flhf, r.ward, r.lga, r.state, r.monitor].join(" ").toLowerCase().includes(q))
-      .sort((a, b) => (b.distanceM ?? 0) - (a.distanceM ?? 0));
-  }, [mismatches, verdictFilter, query]);
+      .sort(SORTERS[sortKey]);
+  }, [mismatches, verdictFilter, query, sortKey]);
+
+  /* ------------------------- server-style pagination + row virtualization */
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, pageCount - 1);
+  const paged = useMemo(
+    () => filtered.slice(safePage * pageSize, safePage * pageSize + pageSize),
+    [filtered, safePage, pageSize],
+  );
+
+  useEffect(() => { setPage(0); scrollRef.current?.scrollTo({ top: 0 }); }, [query, verdictFilter, sortKey, pageSize, radiusM]);
+
+  const virtualizer = useVirtualizer({
+    count: paged.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 46,
+    overscan: 14,
+  });
+  const virtualRows = virtualizer.getVirtualItems();
+  const padTop = virtualRows.length ? virtualRows[0].start : 0;
+  const padBottom = virtualRows.length
+    ? virtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
+    : 0;
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -253,6 +299,7 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
       accent: meta.dot,
       radiusKm: radiusM / 1000,
       distanceM: r.distanceM,
+      capture: { lat: r.lat, lng: r.lng, label: r.community },
       provenance: registry
         ? {
             settlement: registry.settlement,
@@ -325,6 +372,14 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
       </CardHeader>
 
       <CardContent className="space-y-3 p-4">
+        {/* supervisor-level aggregation */}
+        <Grid3SupervisorSummary
+          rows={rows.map((r) => ({
+            monitor: r.monitor, flhf: r.flhf, ward: r.ward, lga: r.lga,
+            state: r.state, date: r.date, verdict: r.verdict,
+          }))}
+        />
+
         {/* KPI strip */}
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           {(Object.keys(VERDICT_META) as Exclude<Verdict, "match">[]).map((k) => (
@@ -373,6 +428,22 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
               ))}
             </SelectContent>
           </Select>
+          <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+            <SelectTrigger className="h-8 w-[190px] text-[12px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+                <SelectItem key={k} value={k}>{SORT_LABEL[k]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+            <SelectTrigger className="h-8 w-[120px] text-[12px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {[50, 100, 250, 500].map((n) => (
+                <SelectItem key={n} value={String(n)}>{n} / page</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button size="sm" variant="outline" className="h-8 text-[11px]" onClick={exportCsv} disabled={!filtered.length}>
             <Download className="mr-1 h-3.5 w-3.5" /> Export audit
           </Button>
@@ -400,9 +471,9 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
           </div>
         ) : (
           <TooltipProvider delayDuration={200}>
-          <div className="overflow-x-auto rounded-lg border">
+          <div ref={scrollRef} className="max-h-[560px] overflow-auto rounded-lg border">
             <table className="w-full min-w-[1220px] border-collapse text-[11.5px]">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-gradient-to-r from-slate-800 to-slate-700 text-white">
                   {["#", "Community (captured)", "FLHF", "Ward", "LGA", "State", "Independent Monitor / Supervisor",
                     "Captured GPS", "GRID3 registry match", "Distance", "Nearest registry settlement",
@@ -414,7 +485,10 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r, i) => {
+                {padTop > 0 && <tr style={{ height: padTop }} />}
+                {virtualRows.map((v) => {
+                  const r = paged[v.index];
+                  const i = safePage * pageSize + v.index;
                   const meta = VERDICT_META[r.verdict as Exclude<Verdict, "match">];
                   return (
                     <tr
@@ -534,8 +608,26 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
                     </tr>
                   );
                 })}
+                {padBottom > 0 && <tr style={{ height: padBottom }} />}
               </tbody>
             </table>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="text-muted-foreground">
+              Showing {filtered.length ? safePage * pageSize + 1 : 0}–
+              {Math.min(filtered.length, (safePage + 1) * pageSize)} of {filtered.length.toLocaleString()} exceptions
+              (page {safePage + 1} of {pageCount}) · rows rendered on demand
+            </span>
+            <div className="ml-auto flex items-center gap-1">
+              <Button size="sm" variant="outline" className="h-7 text-[10.5px]" disabled={safePage === 0}
+                onClick={() => { setPage(0); scrollRef.current?.scrollTo({ top: 0 }); }}>First</Button>
+              <Button size="sm" variant="outline" className="h-7 text-[10.5px]" disabled={safePage === 0}
+                onClick={() => { setPage((p) => Math.max(0, p - 1)); scrollRef.current?.scrollTo({ top: 0 }); }}>Prev</Button>
+              <Button size="sm" variant="outline" className="h-7 text-[10.5px]" disabled={safePage >= pageCount - 1}
+                onClick={() => { setPage((p) => Math.min(pageCount - 1, p + 1)); scrollRef.current?.scrollTo({ top: 0 }); }}>Next</Button>
+              <Button size="sm" variant="outline" className="h-7 text-[10.5px]" disabled={safePage >= pageCount - 1}
+                onClick={() => { setPage(pageCount - 1); scrollRef.current?.scrollTo({ top: 0 }); }}>Last</Button>
+            </div>
           </div>
           </TooltipProvider>
         )}
