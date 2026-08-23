@@ -317,10 +317,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Emit the citation catalog first, then relay the model stream untouched.
+    // Emit the citation catalog + the policy entries used (for reward credit
+    // assignment when the user rates the answer), then relay the model stream.
     const encoder = new TextEncoder();
     const catalogFrame = `data: ${JSON.stringify({
-      amehnities: { citations: ctx.citations, generatedAt: ctx.generatedAt },
+      amehnities: {
+        citations: ctx.citations,
+        generatedAt: ctx.generatedAt,
+        policyIds: policy.ids,
+        policyApplied: policy.rules.map((r) => ({ topic: r.topic, content: r.content, avgReward: Number(r.avg_reward) })),
+        precedents: policy.exemplars.length,
+      },
     })}\n\n`;
 
     const stream = new ReadableStream({
