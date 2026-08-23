@@ -44,7 +44,10 @@ export default function AmehnitiesAI() {
   const navigate = useNavigate();
   const {
     telemetry, running, toggle, budget, setBudget, grow, shrink,
-    feed, sourceCounts, corpusReady, synthetic, predictions,
+    feed, sourceCounts, corpusReady, synthetic, predictions, vocab,
+    allSources, enabledSources, toggleSource, setAllSources,
+    exportCheckpoint, importCheckpoint, inspectCheckpoint, applyConfig,
+    checkpoints, downloadSavedCheckpoint, askModel,
   } = useAmehnitiesBrain();
 
   const cfg = telemetry?.cfg;
