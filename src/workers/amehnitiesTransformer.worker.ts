@@ -715,6 +715,14 @@ function postTelemetry(structural = false) {
     stepsPerSec,
     entropy: meanEntropy,
     metrics,
+    running,
+    evaluation: lastEval,
+    evalSeries,
+    evalEnabled,
+    guardEnabled,
+    alert: lastAlert,
+    trainTokens: trainEndIndex(),
+    valTokens: Math.max(0, stream.length - trainEndIndex()),
   });
 }
 
