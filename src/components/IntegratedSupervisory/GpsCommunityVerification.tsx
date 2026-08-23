@@ -402,12 +402,13 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
     setActiveId(p.id);
     if (provider === "google" && gmapRef.current) {
       gmapRef.current.setCenter({ lat: p.lat, lng: p.lng });
-      gmapRef.current.setZoom(19);
+      gmapRef.current.setZoom(21);
       gmapRef.current.setMapTypeId(google.maps.MapTypeId.HYBRID);
     } else if (lmapRef.current) {
-      lmapRef.current.setView([p.lat, p.lng], 19);
+      lmapRef.current.setView([p.lat, p.lng], 21);
     }
   };
+
 
   return (
     <Card className="overflow-hidden">
