@@ -413,9 +413,11 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
 
       <CardContent className="space-y-4">
         {/* KPI strip */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
           <Kpi label="GPS points" value={points.length} icon={MapPin} color="#0f172a" />
           <Kpi label="Confirmed rate" value={`${confirmRate}%`} icon={ShieldCheck} color="#16a34a" />
+          <Kpi label="Avg confidence" value={`${avgConfidence}%`} icon={Gavel} color="#2563eb" />
+
           {(["verified", "nearby", "mismatch", "outside"] as VerifyStatus[]).map((k) => (
             <button
               key={k}
