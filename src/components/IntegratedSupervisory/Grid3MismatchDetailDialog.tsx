@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FIELD_BY_NAME, resolveChecklistValue } from "./checklistSchema";
+import Grid3MiniMap from "./Grid3MiniMap";
 
 type Row = Record<string, unknown>;
 
@@ -27,6 +28,8 @@ export interface Grid3DrillSpec {
   accent: string;
   radiusKm: number;
   distanceM: number | null;
+  /** Supervisor-captured fix behind this row (for the mini map preview). */
+  capture: { lat: number; lng: number; label: string } | null;
   provenance: {
     settlement: string;
     ward: string;
@@ -123,6 +126,18 @@ export default function Grid3MismatchDetailDialog({
 
         <ScrollArea className="max-h-[70vh]">
           <div className="space-y-3 p-4">
+            {/* mini map: captured fix vs matched registry point */}
+            <Grid3MiniMap
+              capture={spec.capture}
+              registry={
+                spec.provenance
+                  ? { lat: spec.provenance.lat, lng: spec.provenance.lng, label: spec.provenance.settlement }
+                  : null
+              }
+              distanceM={spec.distanceM}
+              radiusKm={spec.radiusKm}
+            />
+
             {/* provenance */}
             {spec.provenance && (
               <div className="rounded-lg border bg-muted/40 p-3">
