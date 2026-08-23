@@ -58,7 +58,7 @@ export default function GpsPointPreviewDialog({ open, onOpenChange, point, onLau
         lmap = L.map(el, { zoomControl: true, attributionControl: false }).setView([center.lat, center.lng], 18);
         L.tileLayer(
           "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-          { maxZoom: 22, maxNativeZoom: 19, detectRetina: true },
+          { maxZoom: 22, maxNativeZoom: 21, detectRetina: true },
         ).addTo(lmap);
         L.circleMarker([center.lat, center.lng], {
           radius: 8, color: "#fff", weight: 3, fillOpacity: 1,

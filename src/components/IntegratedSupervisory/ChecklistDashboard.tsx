@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -481,7 +481,15 @@ export default function ChecklistDashboard({
   );
 
   const [filters, setFilters] = useState<ChecklistFilterState>({ ...EMPTY_FILTERS });
-  const parents = useMemo(() => applyChecklistFilters(allParents, filters), [allParents, filters]);
+  // Selects/inputs update instantly; the (expensive) analytics recompute runs
+  // at a lower priority so the filter bar never feels frozen.
+  const appliedFilters = useDeferredValue(filters);
+  const recomputing = appliedFilters !== filters;
+  const parents = useMemo(
+    () => applyChecklistFilters(allParents, appliedFilters),
+    [allParents, appliedFilters],
+  );
+
   const parentKeys = useMemo(
     () => new Set(parents.map((p) => `${p._uuid ?? ""}|${p._id ?? ""}`)),
     [parents],
@@ -753,18 +761,21 @@ export default function ChecklistDashboard({
   return (
     <div className="space-y-4">
 
-      <ChecklistFilters
-        parents={allParents}
-        value={filters}
-        onChange={setFilters}
-        presetSlot={
-          <ChecklistPresetBar
-            connectionId={getActiveConnectionId()}
-            value={filters}
-            onApply={setFilters}
-          />
-        }
-      />
+      <div className={recomputing ? "opacity-90 transition-opacity" : "transition-opacity"}>
+        <ChecklistFilters
+          parents={allParents}
+          value={filters}
+          onChange={setFilters}
+          presetSlot={
+            <ChecklistPresetBar
+              connectionId={getActiveConnectionId()}
+              value={filters}
+              onApply={setFilters}
+            />
+          }
+        />
+      </div>
+
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">

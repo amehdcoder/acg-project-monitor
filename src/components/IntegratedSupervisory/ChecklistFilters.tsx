@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,10 +55,6 @@ export function applyChecklistFilters<T extends Record<string, unknown>>(
   });
 }
 
-const uniq = (rows: Record<string, unknown>[], field: string) =>
-  [...new Set(rows.map((r) => label(field, r[field])).filter(Boolean))].sort((a, b) =>
-    a.localeCompare(b),
-  );
 
 function FilterSelect({
   id, title, value, options, onChange, disabled, locked,
@@ -96,9 +92,31 @@ export default function ChecklistFilters({
   /** Optional saved-view controls rendered in the filter bar header. */
   presetSlot?: React.ReactNode;
 }) {
+  // Resolve every filterable label exactly ONCE per dataset. All option lists
+  // below then work on cheap primitive strings instead of re-resolving Kobo
+  // codes for every row on every keystroke.
+  const rows = useMemo(
+    () =>
+      parents.map((p) => ({
+        day: day(p._submission_time),
+        state: label("State", p.State),
+        lga: label("LGA", p.LGA),
+        ward: label("Ward", p.Ward),
+        designation: label("Designation", p.Designation),
+        monitor: label("Independent_Monitor_s_Name", p.Independent_Monitor_s_Name),
+        supervisor: label("Name_of_Supervisor", p.Name_of_Supervisor),
+        campaign: label("MDA_Campaign_Type", p.MDA_Campaign_Type),
+      })),
+    [parents],
+  );
+
+  type LRow = (typeof rows)[number];
+  const pick = (list: LRow[], field: keyof LRow) =>
+    [...new Set(list.map((r) => r[field]).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
   const dateScoped = useMemo(
-    () => applyChecklistFilters(parents, { ...EMPTY_FILTERS, from: value.from, to: value.to }),
-    [parents, value.from, value.to],
+    () => rows.filter((r) => !((value.from && (!r.day || r.day < value.from)) || (value.to && (!r.day || r.day > value.to)))),
+    [rows, value.from, value.to],
   );
 
   // MDA Lens: geography selects are restricted (and locked when a single value
@@ -118,51 +136,54 @@ export default function ChecklistFilters({
     );
 
   const states = useMemo(
-    () => uniq(dateScoped, "State").filter((s) => keep("state", s)),
+    () => pick(dateScoped, "state").filter((s) => keep("state", s)),
     [dateScoped, lens],
   );
 
   const byState = useMemo(
-    () => (value.state ? dateScoped.filter((p) => label("State", p.State) === value.state) : dateScoped),
+    () => (value.state ? dateScoped.filter((r) => r.state === value.state) : dateScoped),
     [dateScoped, value.state],
   );
-  const lgas = useMemo(() => uniq(byState, "LGA").filter((l) => keep("lga", l)), [byState, lens]);
+  const lgas = useMemo(() => pick(byState, "lga").filter((l) => keep("lga", l)), [byState, lens]);
   const byLga = useMemo(
-    () => (value.lga ? byState.filter((p) => label("LGA", p.LGA) === value.lga) : byState),
+    () => (value.lga ? byState.filter((r) => r.lga === value.lga) : byState),
     [byState, value.lga],
   );
-  const wards = useMemo(() => uniq(byLga, "Ward").filter((w) => keep("ward", w)), [byLga, lens]);
+  const wards = useMemo(() => pick(byLga, "ward").filter((w) => keep("ward", w)), [byLga, lens]);
 
   const byWard = useMemo(
-    () => (value.ward ? byLga.filter((p) => label("Ward", p.Ward) === value.ward) : byLga),
+    () => (value.ward ? byLga.filter((r) => r.ward === value.ward) : byLga),
     [byLga, value.ward],
   );
-  const designations = useMemo(() => uniq(byWard, "Designation"), [byWard]);
+  const designations = useMemo(() => pick(byWard, "designation"), [byWard]);
   const byDesig = useMemo(
-    () => (value.designation ? byWard.filter((p) => label("Designation", p.Designation) === value.designation) : byWard),
+    () => (value.designation ? byWard.filter((r) => r.designation === value.designation) : byWard),
     [byWard, value.designation],
   );
   const monitors = useMemo(
-    () => [...new Set([
-      ...uniq(byDesig, "Independent_Monitor_s_Name"),
-      ...uniq(byDesig, "Name_of_Supervisor"),
-    ])].sort((a, b) => a.localeCompare(b)),
+    () => [...new Set([...pick(byDesig, "monitor"), ...pick(byDesig, "supervisor")])]
+      .sort((a, b) => a.localeCompare(b)),
     [byDesig],
   );
-  const campaigns = useMemo(() => uniq(byWard, "MDA_Campaign_Type"), [byWard]);
+  const campaigns = useMemo(() => pick(byWard, "campaign"), [byWard]);
 
   const lockState = !!only(lens?.states) && states.length <= 1;
   const lockLga = !!only(lens?.lgas) && lgas.length <= 1;
   const lockWard = !!only(lens?.wards) && wards.length <= 1;
 
   // Pin the locked levels so the dashboards always read the granted slice.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
   useEffect(() => {
+    const cur = valueRef.current;
     const patch: Partial<ChecklistFilterState> = {};
-    if (lockState && states[0] && value.state !== states[0]) patch.state = states[0];
-    if (lockLga && lgas[0] && value.lga !== lgas[0]) patch.lga = lgas[0];
-    if (lockWard && wards[0] && value.ward !== wards[0]) patch.ward = wards[0];
-    if (Object.keys(patch).length) onChange({ ...value, ...patch });
-  }, [lockState, lockLga, lockWard, states, lgas, wards, value, onChange]);
+    if (lockState && states[0] && cur.state !== states[0]) patch.state = states[0];
+    if (lockLga && lgas[0] && cur.lga !== lgas[0]) patch.lga = lgas[0];
+    if (lockWard && wards[0] && cur.ward !== wards[0]) patch.ward = wards[0];
+    if (Object.keys(patch).length) onChangeRef.current({ ...cur, ...patch });
+  }, [lockState, lockLga, lockWard, states, lgas, wards]);
 
   const set = (patch: Partial<ChecklistFilterState>) => {
     const next = { ...value, ...patch };
@@ -180,6 +201,7 @@ export default function ChecklistFilters({
   const clearAll = () => set({ ...EMPTY_FILTERS });
 
   const active = Object.values(value).filter(Boolean).length;
+
 
 
   return (

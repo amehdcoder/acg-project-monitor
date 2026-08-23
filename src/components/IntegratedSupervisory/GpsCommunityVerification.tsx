@@ -34,6 +34,8 @@ import {
   type GeoName, type VerifyResult, type VerifyStatus, type OverrideDecision,
 } from "@/lib/isc/gpsVerification";
 import { useGpsVerificationReview } from "@/hooks/useGpsVerificationReview";
+import { warmGrid3Index } from "@/lib/isc/grid3Nearest";
+
 import GpsPointPreviewDialog from "./GpsPointPreviewDialog";
 import GpsDiscrepancyHistoryDialog from "./GpsDiscrepancyHistoryDialog";
 import GpsConfidenceBreakdown from "./GpsConfidenceBreakdown";
@@ -129,6 +131,10 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
     return out;
   }, [parents]);
 
+  // Warm the GRID3 settlement index up-front so the first "no OSM result"
+  // point resolves instantly instead of waiting on a 10 MB parse.
+  useEffect(() => { warmGrid3Index(); }, []);
+
   /* -------------------------------------------------------- verification run */
   const runVerification = async (force = false) => {
     if (running || points.length === 0) return;
@@ -138,7 +144,7 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
     const res = await reverseGeocodeBatch(
       points.map((p) => ({ lat: p.lat, lng: p.lng })),
       (done, total) => setProgress({ done, total }),
-      4,
+      6,
       force,
     );
     setGeoMap(new Map(res));
@@ -148,6 +154,7 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
       network: geoCacheStats.network, throttled: geoCacheStats.throttled,
     });
   };
+
 
   useEffect(() => {
     if (points.length && geoMap.size === 0 && !running) void runVerification();
@@ -284,26 +291,46 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
           streetViewControl: true,
           fullscreenControl: true,
           mapTypeControl: true,
+          scaleControl: true,
+          rotateControl: true,
+          // Google serves imagery to z21 and interpolates beyond; allowing the
+          // deeper zoom lets supervisors inspect individual rooftops.
           maxZoom: 22,
+          mapTypeControlOptions: {
+            mapTypeIds: [
+              google.maps.MapTypeId.HYBRID,
+              google.maps.MapTypeId.SATELLITE,
+              google.maps.MapTypeId.ROADMAP,
+              google.maps.MapTypeId.TERRAIN,
+            ],
+          },
         });
         gmapRef.current = map;
         setProvider("google");
       } catch {
         if (cancelled) return;
-        const map = L.map(el, { zoomControl: true, attributionControl: false }).setView([9.082, 8.6753], 6);
+        const map = L.map(el, { zoomControl: true, attributionControl: false, maxZoom: 22 })
+          .setView([9.082, 8.6753], 6);
+        // Esri World Imagery publishes level-21 tiles over most of Nigeria
+        // (≈0.3 m/px); retina detection doubles the effective sharpness.
         L.tileLayer(
           "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-          { maxZoom: 23, maxNativeZoom: 19, detectRetina: true },
+          { maxZoom: 22, maxNativeZoom: 21, detectRetina: true, crossOrigin: true },
         ).addTo(map);
         L.tileLayer(
           "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
-          { maxZoom: 23, maxNativeZoom: 19, opacity: 0.9 },
+          { maxZoom: 22, maxNativeZoom: 19, opacity: 0.9 },
+        ).addTo(map);
+        L.tileLayer(
+          "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
+          { maxZoom: 22, maxNativeZoom: 19, opacity: 0.8 },
         ).addTo(map);
         lmapRef.current = map;
         lLayer.current = L.layerGroup().addTo(map);
         setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 60);
         setProvider("esri");
       }
+
     })();
     return () => {
       cancelled = true;
@@ -382,12 +409,13 @@ export default function GpsCommunityVerification({ parents }: { parents: Row[] }
     setActiveId(p.id);
     if (provider === "google" && gmapRef.current) {
       gmapRef.current.setCenter({ lat: p.lat, lng: p.lng });
-      gmapRef.current.setZoom(19);
+      gmapRef.current.setZoom(21);
       gmapRef.current.setMapTypeId(google.maps.MapTypeId.HYBRID);
     } else if (lmapRef.current) {
-      lmapRef.current.setView([p.lat, p.lng], 19);
+      lmapRef.current.setView([p.lat, p.lng], 21);
     }
   };
+
 
   return (
     <Card className="overflow-hidden">

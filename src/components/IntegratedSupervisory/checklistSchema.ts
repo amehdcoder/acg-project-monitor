@@ -249,28 +249,63 @@ export const RESPONDENT_FIELDS = CHECKLIST_FIELDS.filter((f) => f.repeat);
 
 const normToken = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
+/** Lazily-built normalised index per choice list (avoids O(n) scans per cell). */
+const NORM_INDEX = new Map<string, Map<string, string>>();
+function normIndex(list: string): Map<string, string> {
+  let idx = NORM_INDEX.get(list);
+  if (!idx) {
+    idx = new Map();
+    const map = CHECKLIST_CHOICES[list] || {};
+    for (const k of Object.keys(map)) idx.set(normToken(k), map[k]);
+    NORM_INDEX.set(list, idx);
+  }
+  return idx;
+}
+
+/**
+ * Memo cache for resolved labels. Dashboards resolve the same
+ * (field, raw value) pair thousands of times while filtering, so caching turns
+ * every repeat lookup into a Map hit.
+ */
+const RESOLVE_CACHE = new Map<string, string>();
+
 /** Resolve a raw Kobo answer into its human label (arrays joined). */
 export function resolveChecklistValue(fieldName: string, raw: unknown): string {
   if (raw == null || raw === "") return "";
+  const primitive = typeof raw !== "object";
+  const cacheKey = primitive ? `${fieldName}\u0000${String(raw)}` : "";
+  if (primitive) {
+    const hit = RESOLVE_CACHE.get(cacheKey);
+    if (hit !== undefined) return hit;
+  }
+
   const field = FIELD_BY_NAME.get(fieldName);
-  const map = field?.list ? CHECKLIST_CHOICES[field.list] : undefined;
+  const list = field?.list;
+  const map = list ? CHECKLIST_CHOICES[list] : undefined;
 
   const one = (v: unknown): string => {
     const s = String(v).trim();
     if (!s) return "";
-    if (!map) return s;
+    if (!map || !list) return s;
     if (map[s]) return map[s];
-    const hit = Object.keys(map).find((k) => normToken(k) === normToken(s));
-    return hit ? map[hit] : s.replace(/^_+/, "").replace(/_/g, " ");
+    const hit = normIndex(list).get(normToken(s));
+    return hit ?? s.replace(/^_+/, "").replace(/_/g, " ");
   };
 
-  if (Array.isArray(raw)) return raw.map(one).filter(Boolean).join(", ");
-  if (field?.type === "select_multiple" && typeof raw === "string") {
-    return raw.split(/\s+/).filter(Boolean).map(one).join(", ");
+  let out: string;
+  if (Array.isArray(raw)) out = raw.map(one).filter(Boolean).join(", ");
+  else if (field?.type === "select_multiple" && typeof raw === "string") {
+    out = raw.split(/\s+/).filter(Boolean).map(one).join(", ");
+  } else if (typeof raw === "object") out = JSON.stringify(raw);
+  else out = one(raw);
+
+  if (primitive) {
+    if (RESOLVE_CACHE.size > 20000) RESOLVE_CACHE.clear();
+    RESOLVE_CACHE.set(cacheKey, out);
   }
-  if (typeof raw === "object") return JSON.stringify(raw);
-  return one(raw);
+  return out;
 }
+
 
 /** Split a select_multiple answer into individual codes. */
 export function splitMulti(raw: unknown): string[] {
