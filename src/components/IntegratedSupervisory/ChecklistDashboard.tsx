@@ -936,8 +936,9 @@ export default function ChecklistDashboard({
       {/* Geospatial: community status + household medicine-offer maps */}
       <ChecklistMaps parents={parents} respondents={respondents} filters={filters} />
 
-      {/* Google satellite / Street View GPS ⇄ community-name verification */}
-      <GpsCommunityVerification parents={parents} />
+      {/* WHO-standard GRID3 coordinate accuracy audit (10 km radius, mismatches only) */}
+      <Grid3AccuracyTable parents={parents} />
+
 
 
       {/* Household survey coverage generalised to Community → Ward → LGA → State */}
