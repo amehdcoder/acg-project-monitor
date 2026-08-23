@@ -20,7 +20,8 @@
  * Only NON-CONFORMING records are listed — a clean capture never occupies
  * supervisory attention.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   AlertTriangle, Compass, Download, Loader2, MapPin, RefreshCw, Ruler, Search, ShieldAlert,
   ShieldCheck,
@@ -41,6 +42,7 @@ import {
   type NamedGrid3Match, type NearestSettlement,
 } from "@/lib/isc/grid3Nearest";
 import Grid3MismatchDetailDialog, { type Grid3DrillSpec } from "./Grid3MismatchDetailDialog";
+import Grid3SupervisorSummary from "./Grid3SupervisorSummary";
 
 type Row = Record<string, unknown>;
 
@@ -130,6 +132,24 @@ const METHOD_LABEL: Record<string, string> = {
   none: "No registry candidate found",
 };
 
+type SortKey = "distance" | "community" | "lga" | "monitor" | "date";
+
+const SORTERS: Record<SortKey, (a: AuditRow, b: AuditRow) => number> = {
+  distance: (a, b) => (b.distanceM ?? 0) - (a.distanceM ?? 0),
+  community: (a, b) => a.community.localeCompare(b.community),
+  lga: (a, b) => (a.lga || "~").localeCompare(b.lga || "~") || a.community.localeCompare(b.community),
+  monitor: (a, b) => a.monitor.localeCompare(b.monitor) || (b.distanceM ?? 0) - (a.distanceM ?? 0),
+  date: (a, b) => (b.date || "").localeCompare(a.date || ""),
+};
+
+const SORT_LABEL: Record<SortKey, string> = {
+  distance: "Largest separation first",
+  community: "Community A → Z",
+  lga: "LGA A → Z",
+  monitor: "Monitor A → Z",
+  date: "Most recent visit first",
+};
+
 export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
   const [resolved, setResolved] = useState<ResolvedRow[]>([]);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -138,6 +158,10 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
   const [verdictFilter, setVerdictFilter] = useState<"all" | Exclude<Verdict, "match">>("all");
   const [nonce, setNonce] = useState(0);
   const [drill, setDrill] = useState<Grid3DrillSpec | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("distance");
+  const [pageSize, setPageSize] = useState(100);
+  const [page, setPage] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [radiusM, setRadiusM] = useState<number>(() => {
     const stored = Number(localStorage.getItem(RADIUS_KEY));
     return RADIUS_OPTIONS.includes(stored) ? stored : 10000;
@@ -232,8 +256,30 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
     return mismatches
       .filter((r) => verdictFilter === "all" || r.verdict === verdictFilter)
       .filter((r) => !q || [r.community, r.flhf, r.ward, r.lga, r.state, r.monitor].join(" ").toLowerCase().includes(q))
-      .sort((a, b) => (b.distanceM ?? 0) - (a.distanceM ?? 0));
-  }, [mismatches, verdictFilter, query]);
+      .sort(SORTERS[sortKey]);
+  }, [mismatches, verdictFilter, query, sortKey]);
+
+  /* ------------------------- server-style pagination + row virtualization */
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, pageCount - 1);
+  const paged = useMemo(
+    () => filtered.slice(safePage * pageSize, safePage * pageSize + pageSize),
+    [filtered, safePage, pageSize],
+  );
+
+  useEffect(() => { setPage(0); scrollRef.current?.scrollTo({ top: 0 }); }, [query, verdictFilter, sortKey, pageSize, radiusM]);
+
+  const virtualizer = useVirtualizer({
+    count: paged.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 46,
+    overscan: 14,
+  });
+  const virtualRows = virtualizer.getVirtualItems();
+  const padTop = virtualRows.length ? virtualRows[0].start : 0;
+  const padBottom = virtualRows.length
+    ? virtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
+    : 0;
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -253,6 +299,7 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
       accent: meta.dot,
       radiusKm: radiusM / 1000,
       distanceM: r.distanceM,
+      capture: { lat: r.lat, lng: r.lng, label: r.community },
       provenance: registry
         ? {
             settlement: registry.settlement,
