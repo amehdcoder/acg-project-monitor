@@ -9,6 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { buildCheckpointFile, downloadCheckpoint, parseCheckpointFile, type CheckpointFile } from "@/lib/amehnitiesAi/checkpoint";
 import {
   ACTIVITY_SOURCES, Tokenizer, encodeEvent, encodeEvents, loadActivityCorpus,
   syntheticCorpus, type ActivityEvent,
@@ -16,7 +17,7 @@ import {
 
 export interface Telemetry {
   structural?: boolean;
-  cfg: { dModel: number; nHeads: number; nLayers: number; dFF: number; ctx: number; vocab: number; lr: number };
+  cfg: { dModel: number; nHeads: number; nLayers: number; dFF: number; ctx: number; vocab: number; lr: number; batch: number };
   params: number;
   step: number;
   loss: number;
@@ -42,6 +43,7 @@ export function useAmehnitiesBrain() {
   const [feed, setFeed] = useState<ActivityEvent[]>([]);
   const [sourceCounts, setSourceCounts] = useState<Record<string, number>>({});
   const [corpusReady, setCorpusReady] = useState(false);
+  const checkpointWaiters = useRef<((payload: any) => void)[]>([]);
   const [synthetic, setSynthetic] = useState(false);
 
   // ---- worker lifecycle
@@ -50,8 +52,13 @@ export function useAmehnitiesBrain() {
     workerRef.current = w;
     w.onmessage = (e: MessageEvent) => {
       if (e.data?.type === "telemetry") setTelemetry(e.data as Telemetry);
+      else if (e.data?.type === "checkpoint") {
+        const waiters = checkpointWaiters.current;
+        checkpointWaiters.current = [];
+        waiters.forEach((r) => r(e.data));
+      }
     };
-    w.postMessage({ type: "init", cfg: { dModel: 64, nHeads: 4, nLayers: 4, dFF: 256, ctx: 32, vocab: 256, lr: 3e-3 } });
+    w.postMessage({ type: "init", cfg: { dModel: 64, nHeads: 4, nLayers: 4, dFF: 256, ctx: 32, vocab: 256, lr: 3e-3, batch: 1 } });
     w.postMessage({ type: "run", running: true });
     return () => { w.postMessage({ type: "run", running: false }); w.terminate(); workerRef.current = null; };
   }, []);
@@ -114,6 +121,58 @@ export function useAmehnitiesBrain() {
 
   useEffect(() => { workerRef.current?.postMessage({ type: "budget", ms: budget }); }, [budget]);
 
+  /** Ask the worker for a full snapshot of weights + optimiser + training state. */
+  const captureCheckpoint = useCallback((includeOptimizer = true) => {
+    const w = workerRef.current;
+    if (!w) return Promise.reject(new Error("Model is not running"));
+    return new Promise<any>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Checkpoint timed out")), 15000);
+      checkpointWaiters.current.push((payload) => { clearTimeout(timeout); resolve(payload); });
+      w.postMessage({ type: "checkpoint", includeOptimizer });
+    });
+  }, []);
+
+  /** Capture and download the checkpoint as a portable .amz.json file. */
+  const exportCheckpoint = useCallback(async (includeOptimizer = true) => {
+    const payload = await captureCheckpoint(includeOptimizer);
+    const file = buildCheckpointFile(payload, tokenizerRef.current.vocab);
+    const bytes = downloadCheckpoint(file);
+    return { file, bytes };
+  }, [captureCheckpoint]);
+
+  /** Restore a previously exported checkpoint file. */
+  const importCheckpoint = useCallback(async (f: File) => {
+    const { file, ckpt } = parseCheckpointFile(await f.text());
+    workerRef.current?.postMessage({ type: "load", ckpt });
+    setBudget((b) => b);
+    return file as CheckpointFile;
+  }, []);
+
+  /**
+   * Apply hyper-parameters. Training is paused, the worker rebuilds/updates
+   * safely (warm-starting weights unless a fresh restart is requested) and then
+   * resumes — so a config change can never corrupt an in-flight step.
+   */
+  const applyConfig = useCallback(
+    async (patch: { lr?: number; batch?: number; ctx?: number; budgetMs?: number }, opts?: { fresh?: boolean }) => {
+      const w = workerRef.current;
+      if (!w) return;
+      const wasRunning = running;
+      w.postMessage({ type: "run", running: false });
+      await new Promise((r) => setTimeout(r, 60));
+      if (patch.budgetMs !== undefined) { setBudget(patch.budgetMs); w.postMessage({ type: "budget", ms: patch.budgetMs }); }
+      const { budgetMs: _omit, ...cfgPatch } = patch;
+      if (Object.keys(cfgPatch).length) {
+        w.postMessage(opts?.fresh ? { type: "restart", fresh: true, patch: cfgPatch } : { type: "config", patch: cfgPatch });
+      } else if (opts?.fresh) {
+        w.postMessage({ type: "restart", fresh: true });
+      }
+      await new Promise((r) => setTimeout(r, 60));
+      if (wasRunning && !document.hidden) w.postMessage({ type: "run", running: true });
+    },
+    [running],
+  );
+
   const grow = useCallback(() => workerRef.current?.postMessage({ type: "grow" }), []);
   const shrink = useCallback(() => workerRef.current?.postMessage({ type: "shrink" }), []);
   const toggle = useCallback(() => setRunning((r) => !r), []);
@@ -124,5 +183,9 @@ export function useAmehnitiesBrain() {
     [telemetry, vocab],
   );
 
-  return { telemetry, running, toggle, budget, setBudget, grow, shrink, feed, sourceCounts, corpusReady, synthetic, predictions, vocab };
+  return {
+    telemetry, running, toggle, budget, setBudget, grow, shrink, feed, sourceCounts,
+    corpusReady, synthetic, predictions, vocab,
+    exportCheckpoint, importCheckpoint, applyConfig,
+  };
 }
