@@ -21,14 +21,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
-  Satellite, Eye, RefreshCw, Search, MapPin, ShieldCheck, ShieldAlert, Loader2,
+  Satellite, Eye, RefreshCw, Search, MapPin, ShieldCheck, ShieldAlert, Loader2, History, Database, Gavel,
 } from "lucide-react";
 import GoogleStreetViewPanel from "@/components/maps/GoogleStreetViewPanel";
 import { loadGoogleMaps, googleMapsAuthFailed } from "@/lib/maps/googleMapsLoader";
 import {
-  reverseGeocodeBatch, verifyPlace, geoKey, STATUS_META,
+  reverseGeocodeBatch, verifyPlace, geoKey, STATUS_META, OVERRIDE_META, applyOverride,
+  geoCacheStats, geoCacheSize, clearGeoCache,
   type GeoName, type VerifyResult, type VerifyStatus,
 } from "@/lib/isc/gpsVerification";
+import { useGpsVerificationReview } from "@/hooks/useGpsVerificationReview";
+import GpsPointPreviewDialog from "./GpsPointPreviewDialog";
+import GpsDiscrepancyHistoryDialog from "./GpsDiscrepancyHistoryDialog";
+
 
 type Row = Record<string, unknown>;
 
