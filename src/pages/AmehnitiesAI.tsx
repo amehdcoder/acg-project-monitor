@@ -22,6 +22,7 @@ import TrainingMetricsDashboard from "@/components/AmehnitiesAI/TrainingMetricsD
 import DataSourcePanel from "@/components/AmehnitiesAI/DataSourcePanel";
 import AskModelPanel from "@/components/AmehnitiesAI/AskModelPanel";
 import CheckpointsPanel from "@/components/AmehnitiesAI/CheckpointsPanel";
+import AmehnitiesChatBox from "@/components/AmehnitiesAI/AmehnitiesChatBox";
 
 const fmt = (n: number) =>
   n >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : `${n}`;
@@ -127,6 +128,12 @@ export default function AmehnitiesAI() {
             Training runs in a Web Worker with a hard per-tick time budget and pauses when this page is hidden — the rest of Amehnities stays fully responsive while the model grows.
           </p>
         </Card>
+
+        {/* Grounded assistant over live application data */}
+        <div className="mt-4">
+          <AmehnitiesChatBox telemetry={telemetry} corpusEvents={totalEvents} />
+        </div>
+
 
         <div className="mt-4 grid gap-4 lg:grid-cols-3">
           <Card className="border-border/60 bg-card/70 p-4 backdrop-blur lg:col-span-2">
