@@ -56,9 +56,10 @@ const fmtTime = (iso: string) => {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 };
 
-/** Rewrites bare [E3] markers into links the markdown renderer can make clickable. */
+/** Rewrites bare [E3]/[W2] markers into links the markdown renderer can make clickable. */
 const linkifyCitations = (text: string) =>
-  text.replace(/\[(E\d+)\]/g, (_m, ref) => `[${ref}](#cite-${ref})`);
+  text.replace(/\[([EW]\d+)\]/g, (_m, ref) => `[${ref}](#cite-${ref})`);
+
 
 export default function AmehnitiesChatBox({
   telemetry, corpusEvents,
