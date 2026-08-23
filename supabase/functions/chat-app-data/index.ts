@@ -389,7 +389,23 @@ Deno.serve(async (req) => {
     const encoder = new TextEncoder();
     const catalogFrame = `data: ${JSON.stringify({
       amehnities: {
-        citations: ctx.citations,
+        citations: [
+          ...ctx.citations,
+          // Web evidence joins the same clickable catalog, marked as external.
+          ...webSources.map((w) => ({
+            ref: w.ref,
+            table: "web",
+            kind: "web" as const,
+            label: w.title,
+            eventId: w.url,
+            url: w.url,
+            publisher: w.publisher,
+            timestamp: w.year ? `${w.year}-01-01T00:00:00.000Z` : new Date().toISOString(),
+            detail: w.snippet.slice(0, 400),
+          })),
+        ],
+        webSourceCount: webSources.length,
+
         generatedAt: ctx.generatedAt,
         policyIds: policy.ids,
         policyApplied: policy.rules.map((r) => ({ topic: r.topic, content: r.content, avgReward: Number(r.avg_reward) })),
