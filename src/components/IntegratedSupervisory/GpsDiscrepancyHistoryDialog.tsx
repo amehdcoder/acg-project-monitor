@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { History, ShieldCheck, PencilLine, Ban, Trash2 } from "lucide-react";
 import { STATUS_META, OVERRIDE_META, type GpsOverride, type OverrideDecision, type VerifyResult, type VerifyStatus } from "@/lib/isc/gpsVerification";
 import type { GpsHistoryRow } from "@/hooks/useGpsVerificationReview";
+import { ConfidenceBars } from "./GpsConfidenceBreakdown";
+
 
 interface Props {
   open: boolean;
