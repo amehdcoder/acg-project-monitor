@@ -132,6 +132,22 @@ const METHOD_LABEL: Record<string, string> = {
   none: "No registry candidate found",
 };
 
+/** Administrative scope in which the registry name match was found. */
+const SCOPE_LABEL: Record<string, string> = {
+  ward: "same ward",
+  lga: "same LGA",
+  state: "same state",
+  unscoped: "unscoped",
+};
+
+const SCOPE_NOTE: Record<string, string> = {
+  ward: "matched inside the declared Ward and LGA",
+  lga: "no same-name settlement in the declared Ward — widened to the declared LGA",
+  state: "no same-name settlement in the declared LGA — widened to the declared State",
+  unscoped: "record carried no administrative labels, so the whole registry was searched",
+};
+
+
 type SortKey = "distance" | "community" | "lga" | "monitor" | "date";
 
 const SORTERS: Record<SortKey, (a: AuditRow, b: AuditRow) => number> = {
