@@ -25,6 +25,16 @@ export interface MetricSample {
   tokensPerSec: number; stepsPerSec: number; entropy: number; tokensSeen: number;
 }
 
+export interface EvalSample {
+  at: number; step: number; loss: number; perplexity: number;
+  accuracy: number; top5: number; confidence: number; windows: number;
+}
+
+export interface DivergenceAlert {
+  at: number; reason: string; title: string; detail: string;
+  metrics: Record<string, number>; suggestions: string[];
+}
+
 export interface Telemetry {
   structural?: boolean;
   cfg: { dModel: number; nHeads: number; nLayers: number; dFF: number; ctx: number; vocab: number; lr: number; batch: number };
@@ -46,6 +56,14 @@ export interface Telemetry {
   stepsPerSec: number;
   entropy: number;
   metrics: MetricSample[];
+  running: boolean;
+  evaluation: EvalSample | null;
+  evalSeries: EvalSample[];
+  evalEnabled: boolean;
+  guardEnabled: boolean;
+  alert: DivergenceAlert | null;
+  trainTokens: number;
+  valTokens: number;
 }
 
 export interface QueryResult {
@@ -65,7 +83,16 @@ export interface CheckpointRecord {
   bytes: number;
   withOptimizer: boolean;
   file: CheckpointFile;
+  /** Auto-saved best-checkpoint metadata (absent for manual exports). */
+  auto?: boolean;
+  score?: number;
+  valLoss?: number;
+  accuracy?: number;
+  confidence?: number;
 }
+
+/** How an auto-saved checkpoint is judged to be "the best so far". */
+export type BestMetric = "loss" | "confidence";
 
 const SOURCE_LABELS = ACTIVITY_SOURCES.map((s) => s.label);
 
