@@ -32,7 +32,7 @@ import {
 import CustodianLedgerTables from "./CustodianLedgerTables";
 import { toast } from "@/hooks/use-toast";
 import {
-  applyFilters, computeAccountability, computeSupplyIntegrity, loadAllocations, medicineLabel, parseLogistics,
+  applyFilters, computeAccountability, computeSupplyIntegrity, filterOptions, loadAllocations, medicineLabel, parseLogistics,
   saveAllocations, type Allocation, type Filters,
 } from "@/lib/isc/medicineAccountability";
 import {
@@ -208,6 +208,23 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
 
   const dataset = useMemo(() => parseLogistics(cache?.results ?? []), [cache]);
   const filtered = useMemo(() => applyFilters(dataset, filters), [dataset, filters]);
+
+  /* Advanced filter option lists, scoped to the geography/date already chosen
+   * so the dropdowns only ever offer selectable values. */
+  const advOptions = useMemo(
+    () => filterOptions(applyFilters(dataset, {
+      state: filters.state, lga: filters.lga, medicine: filters.medicine, from: filters.from, to: filters.to,
+    })),
+    [dataset, filters.state, filters.lga, filters.medicine, filters.from, filters.to],
+  );
+
+  /** Quick global date-range presets (inclusive of today). */
+  const setRangeDays = (days: number | null) => setFilters((f) => {
+    if (days === null) return { ...f, from: undefined, to: undefined };
+    const to = new Date();
+    const from = new Date(to.getTime() - (days - 1) * 86_400_000);
+    return { ...f, from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+  });
   const scopedAllocations = useMemo(
     () => allocations.filter((a) =>
       (!filters.state || a.state === filters.state) &&
@@ -282,6 +299,10 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
       filters.lga ? `${filters.lga} LGA` : null,
       filters.medicine ? medicineLabel(filters.medicine) : "All medicines",
       filters.from || filters.to ? `${filters.from || "start"} → ${filters.to || "today"}` : null,
+      filters.ward ? `${filters.ward} ward` : null,
+      filters.facility || null,
+      filters.worker ? `HW: ${filters.worker}` : null,
+      filters.cdd ? `CDD: ${filters.cdd}` : null,
     ].filter(Boolean);
     return bits.join(" · ");
   }, [filters]);
@@ -431,8 +452,36 @@ export default function MedicineAccountabilityDashboard({ canExport = true, chec
             <SelectContent><SelectItem value="all" className="text-xs">All medicines</SelectItem>
               {medicines.map((s) => <SelectItem key={s} value={s} className="text-xs">{medicineLabel(s)}</SelectItem>)}</SelectContent>
           </Select>
-          <Input type="date" className="h-8 w-[150px] text-xs" value={filters.from ?? ""} onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value || undefined }))} />
-          <Input type="date" className="h-8 w-[150px] text-xs" value={filters.to ?? ""} onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value || undefined }))} />
+          <div className="flex items-center gap-1 rounded-md border px-2 py-1">
+            <span className="text-[11px] font-semibold text-muted-foreground">Date range</span>
+            <Input type="date" className="h-7 w-[140px] text-xs" value={filters.from ?? ""} onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value || undefined }))} />
+            <span className="text-[11px] text-muted-foreground">→</span>
+            <Input type="date" className="h-7 w-[140px] text-xs" value={filters.to ?? ""} onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value || undefined }))} />
+            {[{ l: "7d", d: 7 }, { l: "30d", d: 30 }, { l: "90d", d: 90 }, { l: "All", d: null }].map((p) => (
+              <Button key={p.l} size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => setRangeDays(p.d)}>{p.l}</Button>
+            ))}
+          </div>
+
+          <Select value={filters.ward ?? "all"} onValueChange={(v) => setFilters((f) => ({ ...f, ward: v === "all" ? undefined : v }))}>
+            <SelectTrigger className="h-8 w-[150px] text-xs"><SelectValue placeholder="Ward" /></SelectTrigger>
+            <SelectContent><SelectItem value="all" className="text-xs">All wards</SelectItem>
+              {advOptions.wards.map((s) => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={filters.facility ?? "all"} onValueChange={(v) => setFilters((f) => ({ ...f, facility: v === "all" ? undefined : v }))}>
+            <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue placeholder="FLHF" /></SelectTrigger>
+            <SelectContent><SelectItem value="all" className="text-xs">All FLHFs</SelectItem>
+              {advOptions.facilities.map((s) => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={filters.worker ?? "all"} onValueChange={(v) => setFilters((f) => ({ ...f, worker: v === "all" ? undefined : v }))}>
+            <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue placeholder="Health worker" /></SelectTrigger>
+            <SelectContent><SelectItem value="all" className="text-xs">All health workers</SelectItem>
+              {advOptions.workers.map((s) => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={filters.cdd ?? "all"} onValueChange={(v) => setFilters((f) => ({ ...f, cdd: v === "all" ? undefined : v }))}>
+            <SelectTrigger className="h-8 w-[170px] text-xs"><SelectValue placeholder="CDD" /></SelectTrigger>
+            <SelectContent><SelectItem value="all" className="text-xs">All CDDs</SelectItem>
+              {advOptions.cdds.map((s) => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
+          </Select>
           <div className="flex items-center gap-1">
             <span className="text-[11px] text-muted-foreground">Push target</span>
             <Input type="number" min={1} className="h-8 w-16 text-xs" value={targetWindow}
