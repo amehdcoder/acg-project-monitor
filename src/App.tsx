@@ -163,6 +163,7 @@ const App = () => (
                    <Route path="/kobo-hub/manage" element={<ProtectedRoute><KoboHubPage manage /></ProtectedRoute>} />
                    <Route path="/learning-log" element={<ProtectedRoute><LearningLog /></ProtectedRoute>} />
                    <Route path="/amehnities-ai" element={<ProtectedRoute><Suspense fallback={null}><AmehnitiesAI /></Suspense></ProtectedRoute>} />
+                   <Route path="/amehnities-ai/c/:conversationId" element={<ProtectedRoute><Suspense fallback={null}><AmehnitiesAI /></Suspense></ProtectedRoute>} />
                     <Route path="/__test/mda-analyses" element={<MdaAnalysesHarness />} />
                     <Route path="/__test/mda-lens" element={<MdaLensHarness />} />
                     {/* Extra path segments must not unlock anything — same guarded harness. */}
