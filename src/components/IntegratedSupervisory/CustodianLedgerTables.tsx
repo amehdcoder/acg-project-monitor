@@ -15,10 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, Download, Minus, Plus, Scale, Search, Truck, UserCog, Users, Warehouse } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { medicineLabel, type LogisticsDataset } from "@/lib/isc/medicineAccountability";
-import {
-  EXPIRY_TONE, expiryInfo, reconcileEdoVsFlhf, reconcileFlhfVsCdd, RECON_TONE,
-  type ExpiryRisk, type ReconSummary,
-} from "@/lib/isc/custodianReconciliation";
+import { EXPIRY_TONE, expiryInfo, type ExpiryRisk } from "@/lib/isc/custodianReconciliation";
+import InventoryReconciliationView from "./InventoryReconciliationView";
 import { exportCsv } from "./exportKoboData";
 
 type MedMap = Record<string, number>;
@@ -419,6 +417,7 @@ export default function CustodianLedgerTables({ dataset }: { dataset: LogisticsD
         <TabsTrigger value="edo" className="text-xs"><Warehouse className="mr-1 h-3.5 w-3.5" /> State → LGA EDO</TabsTrigger>
         <TabsTrigger value="flhf" className="text-xs"><Truck className="mr-1 h-3.5 w-3.5" /> LGA EDO → FLHF worker</TabsTrigger>
         <TabsTrigger value="cdd" className="text-xs"><Users className="mr-1 h-3.5 w-3.5" /> FLHF worker → CDD</TabsTrigger>
+        <TabsTrigger value="recon" className="text-xs"><Scale className="mr-1 h-3.5 w-3.5" /> Inventory reconciliation</TabsTrigger>
       </TabsList>
 
       <TabsContent value="edo">
@@ -446,6 +445,9 @@ export default function CustodianLedgerTables({ dataset }: { dataset: LogisticsD
           subtitle="Level 3 register — facility-to-CDD issues with the exact communities and settlements each consignment was given for."
           icon={<Users className="h-4 w-4" />} filename={`CDD_Issues_${stampDate}.csv`}
         />
+      </TabsContent>
+      <TabsContent value="recon">
+        <InventoryReconciliationView dataset={dataset} />
       </TabsContent>
     </Tabs>
   );
