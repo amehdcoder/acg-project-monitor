@@ -15,7 +15,7 @@ import remarkGfm from "remark-gfm";
 import {
   Bot, User, SendHorizontal, Loader2, Trash2, Radio, History, Plus,
   Database, Clock, Hash, MessageSquare, Sparkles, ThumbsUp, ThumbsDown,
-  RefreshCw, GraduationCap, Check, BrainCircuit,
+  RefreshCw, GraduationCap, Check, BrainCircuit, Gauge, Zap, Scale, Telescope,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Telemetry } from "@/hooks/useAmehnitiesBrain";
 import {
-  type Citation, type Conversation, type PolicyApplied, countLearnedRules,
+  type Citation, type Conversation, type PolicyApplied, type RouteInfo, countLearnedRules,
   createConversation, deleteConversation, listConversations, loadMessages, saveMessage,
   sendFeedback, splitFollowups, titleFromQuestion, usedCitations,
 } from "@/lib/amehnitiesAi/chatHistory";
@@ -45,6 +45,8 @@ interface ChatMessage {
   /** The question this answer responded to (needed by the learning loop). */
   question?: string;
   rated?: -1 | 0 | 1;
+  /** Which model tier answered, and why. */
+  route?: RouteInfo;
 }
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
@@ -149,6 +151,7 @@ export default function AmehnitiesChatBox({
     let catalog: Citation[] = [];
     let policyIds: string[] = [];
     let policyApplied: PolicyApplied[] = [];
+    let route: RouteInfo | undefined;
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-app-data`, {
@@ -202,6 +205,7 @@ export default function AmehnitiesChatBox({
               catalog = (parsed.amehnities.citations ?? []) as Citation[];
               policyIds = (parsed.amehnities.policyIds ?? []) as string[];
               policyApplied = (parsed.amehnities.policyApplied ?? []) as PolicyApplied[];
+              route = parsed.amehnities.route as RouteInfo | undefined;
               continue;
             }
             const delta = parsed?.choices?.[0]?.delta?.content;
@@ -218,7 +222,7 @@ export default function AmehnitiesChatBox({
       const body = finalAnswer || "_I could not determine an answer from the available application data._";
       const cites = usedCitations(body, catalog);
       setMessages((m) => m.map((x) => (x.id === replyId
-        ? { ...x, content: body, citations: cites, followups, policyIds, policyApplied, question }
+        ? { ...x, content: body, citations: cites, followups, policyIds, policyApplied, question, route }
         : x)));
 
       if (convIdRef.current) {
@@ -276,6 +280,7 @@ export default function AmehnitiesChatBox({
         citations: msg.citations?.length ?? 0,
         followups: msg.followups?.length ?? 0,
         policyIds: msg.policyIds ?? [],
+        route: msg.route,
       });
       setMessages((m) => m.map((x) => (x.id === msg.id ? { ...x, rated: rating } : x)));
       setCorrecting(null);
@@ -492,6 +497,24 @@ export default function AmehnitiesChatBox({
                     )}
 
                     <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                      {m.route && (
+                        <span
+                          title={`Routed automatically: ${m.route.questionClass} question → ${m.route.model}${m.route.learned ? " (learned override of the default route)" : ""}`}
+                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+                            m.route.tier === "deep"
+                              ? "border-violet-500/40 text-violet-600 dark:text-violet-400"
+                              : m.route.tier === "fast"
+                                ? "border-amber-500/40 text-amber-600 dark:text-amber-400"
+                                : "border-sky-500/40 text-sky-600 dark:text-sky-400"
+                          }`}
+                        >
+                          {m.route.tier === "deep" ? <Telescope className="h-3 w-3" />
+                            : m.route.tier === "fast" ? <Zap className="h-3 w-3" />
+                              : <Scale className="h-3 w-3" />}
+                          {m.route.label}
+                          {m.route.learned && <Gauge className="h-3 w-3" />}
+                        </span>
+                      )}
                       <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
                         Was this right?
                       </span>
