@@ -1017,9 +1017,16 @@ const QuizBuilder = () => {
                     <Button size="sm" variant="outline" onClick={() => setShowAnalytics(selectedQuiz)} className="gap-1">
                       <BarChart3 className="h-3 w-3" /> Analytics
                     </Button>
+                    <Button
+                      size="sm" variant="outline" onClick={() => setShowAnalyticsAccess(true)}
+                      className="gap-1 text-indigo-600"
+                    >
+                      <ShieldCheck className="h-3 w-3" /> Analytics Access
+                    </Button>
                     <Button size="sm" variant="outline" onClick={openAssignDialog} className="gap-1">
                       <UserPlus className="h-3 w-3" /> Assign Users
                     </Button>
+
                     <Button
                       size="sm" variant="outline" onClick={() => setShowKoboSync(true)}
                       className="gap-1 text-cyan-600"
