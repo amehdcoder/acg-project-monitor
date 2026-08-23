@@ -580,13 +580,22 @@ const QuizBuilder = () => {
         const { error: aErr } = await supabase.from("quiz_archived_attempts" as any).insert(rows);
         if (aErr) throw aErr;
       }
+
+      // KoboToolbox-synced submissions live in their own table; archive them
+      // into `quiz_kobo_archived_submissions` so nothing is lost on clear.
+      const koboCount = await archiveKoboSubmissions(quiz.id);
+
       if (alsoClear) {
         const { error: dErr } = await supabase.from("quiz_attempts").delete().eq("quiz_id", quiz.id);
         if (dErr) throw dErr;
+        const { error: kdErr } = await supabase.from("quiz_kobo_submissions").delete().eq("quiz_id", quiz.id);
+        if (kdErr) throw kdErr;
       }
       toast({
         title: alsoClear ? "Submissions archived & cleared" : "Submissions archived",
-        description: `${rows.length} attempt${rows.length === 1 ? "" : "s"} archived${alsoClear ? " and removed for fresh entries" : ""}.`,
+        description:
+          `${rows.length} in-app attempt${rows.length === 1 ? "" : "s"} and ${koboCount} KoboToolbox submission${koboCount === 1 ? "" : "s"} archived` +
+          `${alsoClear ? " and removed for fresh entries" : ""}.`,
       });
     } catch (e: any) {
       toast({ title: "Could not archive submissions", description: e.message, variant: "destructive" });
@@ -595,13 +604,52 @@ const QuizBuilder = () => {
     }
   };
 
-  // Owner-only: clear (delete) all submissions for fresh entries.
+  // Copy every Kobo-synced submission of a quiz into the archive table.
+  const archiveKoboSubmissions = async (quizId: string): Promise<number> => {
+    const { data: subs, error } = await supabase
+      .from("quiz_kobo_submissions")
+      .select("*")
+      .eq("quiz_id", quizId);
+    if (error) throw error;
+    const rows = (subs || []).map((s: any) => ({
+      quiz_id: s.quiz_id,
+      original_id: s.id,
+      kobo_submission_id: s.kobo_submission_id,
+      participant_name: s.participant_name,
+      participant_key: s.participant_key,
+      assessment_type: s.assessment_type,
+      intervention_group: s.intervention_group,
+      answers: s.answers ?? {},
+      per_question: s.per_question ?? [],
+      score: s.score ?? 0,
+      max_score: s.max_score ?? 0,
+      percentage: s.percentage ?? 0,
+      band: s.band,
+      submitted_at: s.submitted_at,
+      archived_by: user?.id ?? null,
+    }));
+    if (rows.length > 0) {
+      const { error: aErr } = await supabase
+        .from("quiz_kobo_archived_submissions" as any)
+        .insert(rows);
+      if (aErr) throw aErr;
+    }
+    return rows.length;
+  };
+
+  // Owner-only: clear (delete) all submissions for fresh entries — both the
+  // in-app attempts and the KoboToolbox-synced rows.
   const clearSubmissions = async (quiz: Quiz) => {
     setSubmissionAction(true);
     try {
       const { error } = await supabase.from("quiz_attempts").delete().eq("quiz_id", quiz.id);
       if (error) throw error;
-      toast({ title: "Submissions cleared", description: "All quiz attempts were removed for fresh entries." });
+      const { error: kErr } = await supabase.from("quiz_kobo_submissions").delete().eq("quiz_id", quiz.id);
+      if (kErr) throw kErr;
+      toast({
+        title: "Submissions cleared",
+        description: "All quiz attempts and KoboToolbox-synced submissions were removed for fresh entries.",
+      });
     } catch (e: any) {
       toast({ title: "Could not clear submissions", description: e.message, variant: "destructive" });
     } finally {
@@ -609,6 +657,7 @@ const QuizBuilder = () => {
       setConfirmClearQuiz(null);
     }
   };
+
 
   // Admin-only: reset a specific test type (or both) so authorized members can
   // retake it. Previous attempts are archived server-side before removal.
