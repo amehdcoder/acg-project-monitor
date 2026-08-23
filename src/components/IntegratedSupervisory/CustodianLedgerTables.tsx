@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Minus, Plus, Search, Truck, UserCog, Users, Warehouse } from "lucide-react";
+import { AlertTriangle, Download, Minus, Plus, Scale, Search, Truck, UserCog, Users, Warehouse } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { medicineLabel, type LogisticsDataset } from "@/lib/isc/medicineAccountability";
 import {
@@ -163,6 +163,48 @@ function MedChips({ meds, tone }: { meds: MedMap; tone: string }) {
   );
 }
 
+/** Highest expiry risk band worth highlighting on a ledger row. */
+function rowRisk(r: Row): ExpiryRisk | null {
+  const risk = expiryInfo(r.earliestExpiry).risk;
+  return risk === "expired" || risk === "critical" || risk === "watch" ? risk : null;
+}
+
+function ExpiryBadge({ expiry, unitsAtRisk }: { expiry: string; unitsAtRisk: number }) {
+  const info = expiryInfo(expiry);
+  const tone = EXPIRY_TONE[info.risk];
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span
+        className="inline-flex w-fit items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-bold"
+        style={{ background: tone.bg, color: tone.fg, borderColor: tone.border }}
+        title={info.label}
+      >
+        {info.risk === "expired" || info.risk === "critical" ? <AlertTriangle className="h-3 w-3" /> : null}
+        {expiry || "No expiry"}
+      </span>
+      {info.days !== null && (
+        <span className="text-[9px]" style={{ color: tone.fg }}>
+          {info.days < 0 ? `${Math.abs(info.days)}d overdue` : `${info.days}d left`}
+          {unitsAtRisk > 0 ? ` · ${nf(unitsAtRisk)} at risk` : ""}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function BatchChips({ batches, tone }: { batches: string[]; tone: string }) {
+  if (!batches.length) return <span className="text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {batches.slice(0, 3).map((b) => (
+        <span key={b} className="rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-semibold"
+          style={{ borderColor: tone, color: tone }}>{b}</span>
+      ))}
+      {batches.length > 3 && <span className="text-[10px] text-muted-foreground">+{batches.length - 3}</span>}
+    </div>
+  );
+}
+
 function LedgerTable({
   rows, tone, personLabel, contextLabel, showCommunities, showDamage, title, subtitle, icon, filename,
 }: {
@@ -179,13 +221,17 @@ function LedgerTable({
     const n = dq.trim().toLowerCase();
     if (!n) return rows;
     return rows.filter((r) =>
-      [r.person, r.state, r.lga, r.ward, r.context, r.communities.join(" "), Object.keys(r.meds).map(medicineLabel).join(" ")]
+      [r.person, r.state, r.lga, r.ward, r.context, r.communities.join(" "), r.batches.join(" "), r.earliestExpiry,
+        Object.keys(r.meds).map(medicineLabel).join(" ")]
         .join(" ").toLowerCase().includes(n));
   }, [rows, dq]);
 
   const totals = useMemo(() => filtered.reduce(
-    (a, r) => ({ total: a.total + r.total, damaged: a.damaged + r.damaged, net: a.net + r.netUsable, txns: a.txns + r.txns }),
-    { total: 0, damaged: 0, net: 0, txns: 0 }), [filtered]);
+    (a, r) => ({
+      total: a.total + r.total, damaged: a.damaged + r.damaged, net: a.net + r.netUsable,
+      txns: a.txns + r.txns, atRisk: a.atRisk + r.unitsAtRisk,
+    }),
+    { total: 0, damaged: 0, net: 0, txns: 0, atRisk: 0 }), [filtered]);
 
   const toggle = (k: string) => setOpen((p) => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n; });
 
@@ -196,6 +242,8 @@ function LedgerTable({
     { key: "lga", label: "LGA" },
     { key: "ward", label: "Ward" },
     ...(showCommunities ? [{ key: "communities", label: "Target communities / settlements" }] : []),
+    { key: "batches", label: "Batch / lot no." },
+    { key: "expiry", label: "Earliest expiry" },
     { key: "medicines", label: "Medicines (units)" },
     { key: "total", label: "Total units" },
     ...(showDamage ? [{ key: "damaged", label: "Damaged / expired" }, { key: "netUsable", label: "Net usable" }] : []),
@@ -206,6 +254,8 @@ function LedgerTable({
   const exportRows = filtered.map((r) => ({
     person: r.person, context: r.context, state: r.state, lga: r.lga, ward: r.ward,
     communities: r.communities.join("; "),
+    batches: r.batches.join("; "),
+    expiry: [r.earliestExpiry || "", expiryInfo(r.earliestExpiry).label].filter(Boolean).join(" · "),
     medicines: Object.entries(r.meds).map(([m, v]) => `${medicineLabel(m)}: ${v}`).join("; "),
     total: r.total, damaged: r.damaged, netUsable: r.netUsable, txns: r.txns,
     period: [r.firstDate, r.lastDate].filter(Boolean).join(" → "),
@@ -224,6 +274,11 @@ function LedgerTable({
             <Badge variant="outline" className="bg-background">{filtered.length.toLocaleString()} custodians</Badge>
             <Badge variant="outline" className="bg-background">{nf(totals.total)} units</Badge>
             {showDamage && <Badge variant="outline" className="bg-background">{nf(totals.damaged)} damaged</Badge>}
+            {totals.atRisk > 0 && (
+              <Badge variant="outline" className="border-destructive/40 bg-destructive/10 text-destructive">
+                <AlertTriangle className="mr-1 h-3 w-3" /> {nf(totals.atRisk)} units near / past expiry
+              </Badge>
+            )}
             <Button size="sm" variant="outline" className="h-8 bg-background"
               onClick={() => exportCsv(exportRows, cols, null, filename)}>
               <Download className="mr-1.5 h-3.5 w-3.5" /> CSV
@@ -254,7 +309,10 @@ function LedgerTable({
               const expanded = open.has(r.key);
               return (
                 <Fragment key={r.key}>
-                  <tr className={i % 2 ? "bg-muted/30" : ""}>
+                  <tr
+                    className={i % 2 ? "bg-muted/30" : ""}
+                    style={rowRisk(r) ? { background: EXPIRY_TONE[rowRisk(r)!].bg, boxShadow: `inset 3px 0 0 ${EXPIRY_TONE[rowRisk(r)!].border}` } : undefined}
+                  >
                     <td className="px-2 py-1.5">
                       <button type="button" onClick={() => toggle(r.key)}
                         className="inline-flex h-5 w-5 items-center justify-center rounded text-white"
@@ -282,6 +340,8 @@ function LedgerTable({
                         ) : "—"}
                       </td>
                     )}
+                    <td className="px-3 py-1.5"><BatchChips batches={r.batches} tone={t.chip} /></td>
+                    <td className="px-3 py-1.5"><ExpiryBadge expiry={r.earliestExpiry} unitsAtRisk={r.unitsAtRisk} /></td>
                     <td className="min-w-[220px] px-3 py-1.5"><MedChips meds={r.meds} tone={t.chip} /></td>
                     <td className="px-3 py-1.5 text-right font-bold tabular-nums" style={{ color: t.head }}>{nf(r.total)}</td>
                     {showDamage && <td className="px-3 py-1.5 text-right tabular-nums text-destructive">{nf(r.damaged)}</td>}
@@ -333,7 +393,7 @@ function LedgerTable({
           {filtered.length > 0 && (
             <tfoot className="sticky bottom-0">
               <tr className="font-bold" style={{ background: t.soft, color: t.head }}>
-                <td colSpan={showCommunities ? 8 : 7} className="px-3 py-2">Total ({filtered.length} custodians)</td>
+                <td colSpan={showCommunities ? 10 : 9} className="px-3 py-2">Total ({filtered.length} custodians)</td>
                 <td className="px-3 py-2" />
                 <td className="px-3 py-2 text-right tabular-nums">{nf(totals.total)}</td>
                 {showDamage && <td className="px-3 py-2 text-right tabular-nums">{nf(totals.damaged)}</td>}
