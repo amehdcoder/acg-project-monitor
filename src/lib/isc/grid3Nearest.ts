@@ -164,6 +164,8 @@ export function warmGrid3Index() { void loadGrid3Index(); }
 export interface NamedGrid3Match extends NearestSettlement {
   /** exact | fuzzy (prefix/containment on the normalised name). */
   how: "exact" | "fuzzy";
+  /** Administrative scope the winning candidate satisfied. */
+  scope: "ward" | "lga" | "state" | "unscoped";
 }
 
 /** Cache of fuzzy key resolutions (the fallback scan is the expensive path). */
@@ -186,51 +188,90 @@ function fuzzyKeys(idx: Index, key: string): string[] {
 }
 
 /**
- * Find the GRID3 registry entry that carries this community name and sits
- * closest to the captured GPS point. Optionally constrained to the LGA/State
- * the monitor declared, so same-name settlements elsewhere never win.
+ * Find the GRID3 registry entry that carries this community name INSIDE the
+ * administrative unit the monitor declared, and sits closest to the captured
+ * GPS point.
+ *
+ * Scoping is strict by default: a community named "Obasanjo" declared in a Yobe
+ * ward is only ever compared with registry settlements of that name inside the
+ * SAME Ward and LGA — never with a same-name settlement in Bayelsa. When the
+ * declared ward yields no candidate we relax one step at a time (Ward → LGA →
+ * State) and report which scope produced the match, so the audit can show it.
+ * With `strict: true` (default) the search never leaves the declared State.
  */
 export async function findGrid3Named(
   community: string,
   lat: number,
   lng: number,
-  scope: { lga?: string; state?: string } = {},
+  scope: { ward?: string; lga?: string; state?: string; strict?: boolean } = {},
 ): Promise<NamedGrid3Match | null> {
   const key = norm(community);
   if (!key) return null;
   const idx = await loadGrid3Index();
   if (!idx) return null;
 
+  const wardK = norm(scope.ward ?? "");
   const lgaK = norm(scope.lga ?? "");
   const stateK = norm(scope.state ?? "");
+  const strict = scope.strict !== false;
 
-  const pick = (cands: number[], how: "exact" | "fuzzy"): NamedGrid3Match | null => {
-    let best = -1, bestD = Infinity, bestScoped = false;
+  const levels: { name: NamedGrid3Match["scope"]; ok: (i: number) => boolean }[] = [];
+  if (wardK && lgaK) {
+    levels.push({
+      name: "ward",
+      ok: (i) =>
+        norm(idx.ward[i]) === wardK &&
+        norm(idx.lga[i]) === lgaK &&
+        (!stateK || norm(idx.state[i]) === stateK),
+    });
+  }
+  if (lgaK) {
+    levels.push({
+      name: "lga",
+      ok: (i) => norm(idx.lga[i]) === lgaK && (!stateK || norm(idx.state[i]) === stateK),
+    });
+  }
+  if (stateK) levels.push({ name: "state", ok: (i) => norm(idx.state[i]) === stateK });
+  // Only fall through to a nationwide search when the caller opts out of strict
+  // scoping, or when the record carries no administrative labels at all.
+  if (!strict || levels.length === 0) levels.push({ name: "unscoped", ok: () => true });
+
+  const closest = (
+    cands: number[],
+    ok: (i: number) => boolean,
+    how: "exact" | "fuzzy",
+    scopeName: NamedGrid3Match["scope"],
+  ): NamedGrid3Match | null => {
+    let best = -1;
+    let bestD = Infinity;
     for (const i of cands) {
-      const scoped =
-        (!lgaK || norm(idx.lga[i]) === lgaK) && (!stateK || norm(idx.state[i]) === stateK);
+      if (!ok(i)) continue;
       const d = haversine(lat, lng, idx.lat[i], idx.lng[i]);
-      // scoped candidates always beat unscoped ones
-      if (bestScoped && !scoped) continue;
-      if ((scoped && !bestScoped) || d < bestD) {
-        best = i; bestD = d; bestScoped = scoped || bestScoped;
-      }
+      if (d < bestD) { bestD = d; best = i; }
     }
     if (best < 0) return null;
     return {
       settlement: idx.name[best], ward: idx.ward[best], lga: idx.lga[best],
       state: idx.state[best], lat: idx.lat[best], lng: idx.lng[best],
-      distanceM: bestD, how,
+      distanceM: bestD, how, scope: scopeName,
     };
   };
 
-  const exact = idx.names.get(key);
-  if (exact?.length) {
-    const m = pick(exact, "exact");
-    if (m) return m;
+  const exact = idx.names.get(key) ?? [];
+  const fuzzyPool: number[] = [];
+  for (const k of fuzzyKeys(idx, key)) {
+    if (k === key) continue;
+    for (const i of idx.names.get(k) ?? []) fuzzyPool.push(i);
   }
-  const keys = fuzzyKeys(idx, key);
-  const pool: number[] = [];
-  for (const k of keys) for (const i of idx.names.get(k) ?? []) pool.push(i);
-  return pool.length ? pick(pool, "fuzzy") : null;
+
+  // Tightest administrative scope wins, and within a scope an exact name beats
+  // a fuzzy one — never the other way round.
+  for (const level of levels) {
+    const hit =
+      (exact.length ? closest(exact, level.ok, "exact", level.name) : null) ??
+      (fuzzyPool.length ? closest(fuzzyPool, level.ok, "fuzzy", level.name) : null);
+    if (hit) return hit;
+  }
+  return null;
 }
+
