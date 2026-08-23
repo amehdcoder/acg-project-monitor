@@ -65,6 +65,10 @@ interface VisitPoint {
   monitor: string;
   date: string;
   verify?: VerifyResult;
+  baseVerify?: VerifyResult;
+  locKey?: string;
+  override?: import("@/lib/isc/gpsVerification").GpsOverride | null;
+
 }
 
 export default function GpsCommunityVerification({ parents }: { parents: Row[] }) {
