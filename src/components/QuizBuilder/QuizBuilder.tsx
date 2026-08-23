@@ -29,7 +29,10 @@ import {
   PlugZap,
 } from "lucide-react";
 import QuizKoboSyncDialog from "./QuizKoboSyncDialog";
+import KoboQuestionList from "./KoboQuestionList";
+import QuizAnalyticsAccessDialog from "./QuizAnalyticsAccessDialog";
 import { useQuizKobo } from "@/hooks/useQuizKobo";
+import { useQuizAnalyticsAccess } from "@/hooks/useQuizAnalyticsAccess";
 import { validateMessageTokens, KNOWN_QUIZ_TOKENS } from "@/lib/quizTokens";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
