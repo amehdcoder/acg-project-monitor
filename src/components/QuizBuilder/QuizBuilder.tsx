@@ -109,6 +109,10 @@ const QuizBuilder = () => {
   const [showKoboSync, setShowKoboSync] = useState(false);
   const { config: koboConfig, reload: reloadKobo } = useQuizKobo(selectedQuiz?.id ?? null);
 
+  // Analytics-tab access (admins/owners always; others need an explicit grant)
+  const { canViewAnalytics } = useQuizAnalyticsAccess(selectedQuiz?.id ?? null);
+  const [showAnalyticsAccess, setShowAnalyticsAccess] = useState(false);
+
 
   // Quiz settings (pass mark + custom messages) — editable on published quizzes
   const [showSettings, setShowSettings] = useState(false);
