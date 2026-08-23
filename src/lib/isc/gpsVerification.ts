@@ -82,17 +82,20 @@ const LOCALITY_KEYS = [
   "village", "hamlet", "isolated_dwelling", "suburb", "neighbourhood", "quarter",
   "town", "city", "municipality", "locality", "residential", "city_district",
 ];
+/** Names injected by the GRID3 settlement registry fallback. */
+const GRID3_KEYS = ["grid3_settlement", "grid3_ward"];
 const ROAD_KEYS = ["road", "pedestrian", "footway", "residential"];
 
 /** Extract every locality/street candidate name from a reverse-geocode result. */
 export function candidateNames(geo: GeoName): string[] {
   const a = geo.address ?? {};
   const out: string[] = [];
-  for (const k of [...LOCALITY_KEYS, ...ROAD_KEYS]) if (a[k]) out.push(String(a[k]));
+  for (const k of [...LOCALITY_KEYS, ...GRID3_KEYS, ...ROAD_KEYS]) if (a[k]) out.push(String(a[k]));
   const head = (geo.display_name || "").split(",")[0]?.trim();
   if (head) out.push(head);
   return Array.from(new Set(out.filter(Boolean)));
 }
+
 
 export interface CapturedPlace {
   community: string;
