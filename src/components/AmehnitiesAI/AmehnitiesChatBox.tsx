@@ -163,8 +163,8 @@ export default function AmehnitiesChatBox({
               : "max-w-[85%] text-sm text-foreground"}>
               {m.role === "assistant" ? (
                 m.content ? (
-                  <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground prose-table:text-xs prose-th:text-foreground prose-td:text-muted-foreground">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                  <div className="space-y-2 leading-relaxed">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD}>{m.content}</ReactMarkdown>
                   </div>
                 ) : (
                   <span className="flex items-center gap-2 text-muted-foreground">
