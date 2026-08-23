@@ -209,7 +209,9 @@ export default function Grid3AccuracyTable({ parents }: { parents: Row[] }) {
       for (let i = 0; i < points.length; i++) {
         if (cancelled) return;
         const p = points[i];
-        const named = await findGrid3Named(p.community, p.lat, p.lng, { lga: p.lga, state: p.state });
+        const named = await findGrid3Named(p.community, p.lat, p.lng, {
+          ward: p.ward, lga: p.lga, state: p.state, strict: true,
+        });
         const nearest = await nearestGrid3Settlement(p.lat, p.lng, 25000);
         out.push({ ...p, named, nearest, lookupAt: new Date().toISOString() });
         if (i % 15 === 0) {
