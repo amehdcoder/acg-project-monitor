@@ -172,6 +172,87 @@ function contextBlock(ctx: Awaited<ReturnType<typeof buildContext>>, model: Reco
   return lines.join("\n");
 }
 
+/**
+ * Retrieval of the learned policy (RLHF-style, weights untouched).
+ *
+ * Rules distilled from past human feedback are ranked by their bandit score —
+ * an upper-confidence bound on average reward — so well-performing rules are
+ * exploited while fresh, untried rules still get explored. Exemplars are
+ * additionally matched to the current question by keyword overlap, giving the
+ * assistant retrieval-augmented few-shot conditioning on its own best answers.
+ */
+interface PolicyRow {
+  id: string; kind: string; topic: string; content: string;
+  question: string | null; answer: string | null;
+  avg_reward: number; trials: number;
+}
+
+const STOPWORDS = new Set(["the", "and", "for", "what", "which", "with", "from", "that", "this", "how", "why", "are", "was", "does", "did", "our", "you", "show", "give", "list", "many", "much", "into", "over"]);
+
+const keywords = (s: string) =>
+  new Set(s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/)
+    .filter((w) => w.length > 3 && !STOPWORDS.has(w)));
+
+function overlap(a: Set<string>, b: Set<string>) {
+  let hits = 0;
+  for (const w of a) if (b.has(w)) hits++;
+  return hits / Math.max(1, Math.min(a.size, b.size));
+}
+
+async function retrievePolicy(question: string) {
+  const url = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !serviceKey) return { rules: [] as PolicyRow[], exemplars: [] as PolicyRow[], ids: [] as string[] };
+
+  const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+  const { data, error } = await admin
+    .from("ai_chat_policy")
+    .select("id,kind,topic,content,question,answer,avg_reward,trials")
+    .eq("active", true)
+    .order("avg_reward", { ascending: false })
+    .limit(200);
+  if (error || !data) return { rules: [], exemplars: [], ids: [] };
+
+  const rows = data as PolicyRow[];
+  const totalTrials = rows.reduce((a, r) => a + (r.trials || 0), 0) + 1;
+  const ucb = (r: PolicyRow) =>
+    Number(r.avg_reward || 0) + Math.sqrt((2 * Math.log(totalTrials)) / Math.max(1, r.trials || 1)) * 0.35;
+
+  const qk = keywords(question);
+  const rules = rows.filter((r) => r.kind === "rule")
+    .map((r) => ({ r, score: ucb(r) + overlap(qk, keywords(`${r.topic} ${r.content}`)) * 0.5 }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8)
+    .map((x) => x.r);
+
+  const exemplars = rows.filter((r) => r.kind === "exemplar" && r.question && r.answer)
+    .map((r) => ({ r, score: overlap(qk, keywords(r.question ?? "")) + Number(r.avg_reward || 0) * 0.2 }))
+    .filter((x) => x.score > 0.15)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2)
+    .map((x) => x.r);
+
+  return { rules, exemplars, ids: [...rules, ...exemplars].map((r) => r.id) };
+}
+
+function policyBlock(rules: PolicyRow[], exemplars: PolicyRow[]) {
+  if (!rules.length && !exemplars.length) return "";
+  const lines: string[] = [];
+  if (rules.length) {
+    lines.push("LEARNED OPERATING RULES (distilled from verified human feedback on your previous answers — follow them):");
+    rules.forEach((r, i) => lines.push(`${i + 1}. [${r.topic}] ${r.content}`));
+  }
+  if (exemplars.length) {
+    lines.push("");
+    lines.push("HIGH-RATED PRECEDENTS (match this depth, structure and citation discipline — never reuse their figures):");
+    exemplars.forEach((e, i) => {
+      lines.push(`Precedent ${i + 1} — Q: ${String(e.question).slice(0, 300)}`);
+      lines.push(`A (excerpt): ${String(e.answer).slice(0, 900)}`);
+    });
+  }
+  return lines.join("\n");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
