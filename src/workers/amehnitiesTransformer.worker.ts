@@ -720,7 +720,7 @@ self.onmessage = (e: MessageEvent) => {
       break;
     }
     case "restart": {
-      lossEMA = 0; lossHistory = []; tokensSeen = 0; lastFwd = null; lastTokens = null;
+      lossEMA = 0; lossHistory = []; tokensSeen = 0; lastFwd = null; lastTokens = null; metrics = []; gradNormEMA = 0;
       build(msg.patch || {}, msg.fresh !== false);
       break;
     }
