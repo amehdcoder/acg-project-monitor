@@ -159,7 +159,8 @@ export function detectUniqueSignals(
       if (bit === 1) flags.push(d.label);
     }
     const cls = mdaClass(p);
-    const notDone = cls && cls !== "completed" ? 1 : 0;
+    const notDone = cls !== "Completed" && cls !== "Unknown" ? 1 : 0;
+
     vec.push(notDone);
     if (notDone) flags.push("MDA not completed");
     X.push(vec);
