@@ -43,6 +43,7 @@ import { BRIGHT_CHART_PALETTE } from "@/lib/charts/brightPalette";
 import { InfoDonut, InfoBarH, InfoBarV } from "./charts/InfographicCharts";
 import ChartRecordsDialog, { type ChartDrillSpec } from "./ChartRecordsDialog";
 import MedicineOfferedGeo from "./MedicineOfferedGeo";
+import EvidenceIntelligencePanel from "./EvidenceIntelligencePanel";
 
 
 
