@@ -22,6 +22,7 @@ import TrainingMetricsDashboard from "@/components/AmehnitiesAI/TrainingMetricsD
 import DataSourcePanel from "@/components/AmehnitiesAI/DataSourcePanel";
 import AskModelPanel from "@/components/AmehnitiesAI/AskModelPanel";
 import CheckpointsPanel from "@/components/AmehnitiesAI/CheckpointsPanel";
+import AmehnitiesChatBox from "@/components/AmehnitiesAI/AmehnitiesChatBox";
 
 const fmt = (n: number) =>
   n >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : `${n}`;
