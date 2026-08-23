@@ -761,18 +761,21 @@ export default function ChecklistDashboard({
   return (
     <div className="space-y-4">
 
-      <ChecklistFilters
-        parents={allParents}
-        value={filters}
-        onChange={setFilters}
-        presetSlot={
-          <ChecklistPresetBar
-            connectionId={getActiveConnectionId()}
-            value={filters}
-            onApply={setFilters}
-          />
-        }
-      />
+      <div className={recomputing ? "opacity-90 transition-opacity" : "transition-opacity"}>
+        <ChecklistFilters
+          parents={allParents}
+          value={filters}
+          onChange={setFilters}
+          presetSlot={
+            <ChecklistPresetBar
+              connectionId={getActiveConnectionId()}
+              value={filters}
+              onApply={setFilters}
+            />
+          }
+        />
+      </div>
+
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
