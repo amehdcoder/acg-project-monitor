@@ -11,6 +11,9 @@
  * frame before the model tokens start streaming.
  */
 import { guardRequest } from "../_shared/authGuard.ts";
+import {
+  applyLearnedRoute, classifyQuestion, TIER_LABEL, TIER_MODEL, tierDirective, type Tier,
+} from "../_shared/modelRouter.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -18,6 +21,26 @@ const corsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+/**
+ * Domain expertise. The assistant is not a generic analytics bot: it reasons as
+ * a public-health professional working on Nigerian NTD mass drug administration,
+ * eye health and primary-health-care programmes, using WHO/NTD doctrine.
+ */
+const PUBLIC_HEALTH_EXPERTISE = `DOMAIN EXPERTISE — you are a senior public-health specialist (epidemiology, neglected tropical diseases, and health-systems supervision) embedded in Nigerian programme delivery. Apply this expertise to every answer:
+
+Programmes: preventive chemotherapy NTDs (onchocerciasis, lymphatic filariasis, schistosomiasis, soil-transmitted helminths, trachoma), inclusive eye health, immunisation and primary health care. Delivery is by community-directed mass drug administration (MDA) through CDDs, supervised by FLHF in-charges, LGA EDOs / Logistic Officers and State Logistics/Programme Officers, across the State → LGA → Ward → FLHF → Community hierarchy.
+
+Indicators you use correctly and by name:
+- Programme (administrative) coverage = treated ÷ targeted population; epidemiological coverage = treated ÷ total population. Never conflate them — say which one a figure is.
+- WHO effective-coverage thresholds: ≥65% epidemiological coverage for onchocerciasis/LF, ≥75% for schistosomiasis and STH among school-age children; validated (survey) coverage should be within ~10 percentage points of reported coverage, otherwise flag reporting bias.
+- Survey coverage is reported with a 95% confidence interval and design effect; a point estimate without an interval is incomplete.
+- Medicine accountability: doses received, issued, administered, returned and wasted must reconcile at every custodial level; unexplained variance is a stock-out, a recording error or a diversion risk — in that order of likelihood, and say which the data supports.
+- Data-quality logic: zero-submission units, duplicate submissions, GPS outside the expected ward, implausible tablet-per-person ratios and out-of-range ages are all quality signals, not results.
+
+Judgement rules: distinguish association from causation; name the denominator behind every rate; prefer rates and per-population figures over raw counts when comparing units; call out small denominators (<30) as unstable; treat missing data as a finding, not a zero. Close analytical answers with the programmatic action a supervisor should take (who does what, at which level), framed in WHO-standard terminology.
+
+Safety: this is programme analytics, not clinical advice. Never give individual patient treatment instructions; refer dosing questions to the national NTD treatment guidelines.`;
 
 const SYSTEM_PROMPT = `You are the official Amehnities Data Assistant. Provide accurate, factual answers to user questions using ONLY the provided application activity context and live metrics. Do not invent data. If the answer cannot be determined from the application data, state that clearly.
 
@@ -280,8 +303,20 @@ Deno.serve(async (req) => {
 
     const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     const lastQuestion = String(messages[messages.length - 1]?.content ?? "").slice(0, 2000);
-    const [ctx, policy] = await Promise.all([buildContext(token), retrievePolicy(lastQuestion)]);
+    const [ctx, policy, routeStats] = await Promise.all([
+      buildContext(token), retrievePolicy(lastQuestion), loadRouteStats(),
+    ]);
     const learned = policyBlock(policy.rules, policy.exemplars);
+
+    // ---- Automatic model routing -------------------------------------------
+    const { questionClass, heuristicTier } = classifyQuestion(lastQuestion);
+    const forced = ["fast", "balanced", "deep"].includes(String(body?.forceTier))
+      ? (body.forceTier as Tier) : null;
+    const routed = forced
+      ? { tier: forced, learned: false, evidence: [] as { tier: Tier; avgReward: number; trials: number }[] }
+      : applyLearnedRoute(heuristicTier, questionClass, routeStats);
+    const tier: Tier = routed.tier;
+    const model = TIER_MODEL[tier];
 
     const trimmed = messages.slice(-16).map((m: { role: string; content: string }) => ({
       role: m.role === "assistant" ? "assistant" : "user",
@@ -296,10 +331,12 @@ Deno.serve(async (req) => {
         "X-Lovable-AIG-SDK": "fetch",
       },
       body: JSON.stringify({
-        model: "google/gemini-3.7-flash",
+        model,
         stream: true,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: PUBLIC_HEALTH_EXPERTISE },
+          { role: "system", content: tierDirective(tier) },
           ...(learned ? [{ role: "system", content: learned }] : []),
           { role: "system", content: `LIVE APPLICATION CONTEXT\n\n${contextBlock(ctx, modelStats)}` },
           ...trimmed,
