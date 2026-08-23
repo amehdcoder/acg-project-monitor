@@ -25,6 +25,8 @@ import CheckpointsPanel from "@/components/AmehnitiesAI/CheckpointsPanel";
 import ValidationPanel from "@/components/AmehnitiesAI/ValidationPanel";
 import DivergenceAlert from "@/components/AmehnitiesAI/DivergenceAlert";
 import AmehnitiesChatBox from "@/components/AmehnitiesAI/AmehnitiesChatBox";
+import ReviewQueuePanel from "@/components/AmehnitiesAI/ReviewQueuePanel";
+import { useAuth } from "@/hooks/useAuth";
 
 const fmt = (n: number) =>
   n >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : `${n}`;
@@ -45,6 +47,7 @@ function Stat({ icon: Icon, label, value, sub }: { icon: any; label: string; val
 
 export default function AmehnitiesAI() {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const {
     telemetry, running, toggle, budget, setBudget, grow, shrink,
     feed, sourceCounts, corpusReady, synthetic, predictions, vocab,
@@ -138,6 +141,13 @@ export default function AmehnitiesAI() {
         {/* Grounded assistant over live application data */}
         <div className="mt-4">
           <AmehnitiesChatBox telemetry={telemetry} corpusEvents={totalEvents} />
+
+          {/* Human-in-the-loop correction queue — admins only. */}
+          {isAdmin && (
+            <div className="mt-4">
+              <ReviewQueuePanel />
+            </div>
+          )}
         </div>
 
 

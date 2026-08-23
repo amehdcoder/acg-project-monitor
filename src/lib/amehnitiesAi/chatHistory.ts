@@ -161,6 +161,16 @@ export function usedCitations(answer: string, catalog: Citation[]): Citation[] {
 
 export interface PolicyApplied { topic: string; content: string; avgReward: number }
 
+export interface RouteInfo {
+  tier: "fast" | "balanced" | "deep";
+  model: string;
+  label: string;
+  questionClass: string;
+  heuristicTier: string;
+  learned: boolean;
+  evidence?: { tier: string; avgReward: number; trials: number }[];
+}
+
 export interface FeedbackPayload {
   messageId?: string;
   conversationId?: string;
@@ -172,11 +182,18 @@ export interface FeedbackPayload {
   followups: number;
   policyIds: string[];
   regenerated?: boolean;
+  route?: RouteInfo;
+  /** Set when the feedback comes from the admin review queue. */
+  reviewQueueId?: string;
 }
 
 export async function sendFeedback(
   payload: FeedbackPayload,
-): Promise<{ reward: number; learned: { topic: string; rule: string } | null }> {
+): Promise<{
+  reward: number;
+  learned: { topic: string; rule: string } | null;
+  queued?: { reason: string; severity: number } | null;
+}> {
   const { data: { session } } = await supabase.auth.getSession();
   const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-feedback`, {
     method: "POST",
@@ -189,7 +206,11 @@ export async function sendFeedback(
   });
   const out = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(out?.error || `Feedback failed (${res.status})`);
-  return { reward: Number(out?.reward ?? 0), learned: out?.learned ?? null };
+  return {
+    reward: Number(out?.reward ?? 0),
+    learned: out?.learned ?? null,
+    queued: out?.queued ?? null,
+  };
 }
 
 /** How many behaviour rules the assistant has learned so far. */
@@ -201,4 +222,74 @@ export async function countLearnedRules(): Promise<number> {
     .eq("kind", "rule");
   if (error) return 0;
   return count ?? 0;
+}
+
+
+/* ------------------------------------------------------------------ *
+ * Admin review queue
+ * ------------------------------------------------------------------ */
+
+export interface ReviewItem {
+  id: string;
+  conversation_id: string | null;
+  message_id: string | null;
+  question: string;
+  answer: string;
+  reason: string;
+  severity: number;
+  downvotes: number;
+  citations: number;
+  reward: number;
+  question_class: string;
+  tier: "fast" | "balanced" | "deep";
+  model: string;
+  policy_ids: string[] | null;
+  status: string;
+  created_at: string;
+}
+
+export async function listReviewQueue(status = "pending"): Promise<ReviewItem[]> {
+  const { data, error } = await supabase
+    .from("ai_review_queue")
+    .select("*")
+    .eq("status", status)
+    .order("severity", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return (data ?? []) as unknown as ReviewItem[];
+}
+
+export async function dismissReviewItem(id: string) {
+  const { error } = await supabase
+    .from("ai_review_queue")
+    .update({ status: "dismissed", resolved_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** Submit an admin correction — this is what re-trains the learned policy. */
+export async function resolveReviewItem(item: ReviewItem, correction: string) {
+  return sendFeedback({
+    reviewQueueId: item.id,
+    messageId: item.message_id ?? undefined,
+    conversationId: item.conversation_id ?? undefined,
+    question: item.question,
+    answer: item.answer,
+    rating: -1,
+    correction,
+    citations: item.citations,
+    followups: 0,
+    policyIds: Array.isArray(item.policy_ids) ? item.policy_ids : [],
+  });
+}
+
+/** Learned routing evidence, for the admin panel. */
+export async function listRouteStats() {
+  const { data, error } = await supabase
+    .from("ai_route_stats")
+    .select("question_class,tier,model,avg_reward,trials")
+    .order("question_class");
+  if (error) return [];
+  return data ?? [];
 }
