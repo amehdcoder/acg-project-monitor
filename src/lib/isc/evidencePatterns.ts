@@ -198,6 +198,12 @@ export interface RegressionTerm {
   failWhenAbsent: number;
   n: number;
   significant: boolean;
+  /** Variance inflation factor (multicollinearity check). */
+  vif: number;
+  /** Records where the risk condition was present (drill-down evidence). */
+  rowsPresent: Row[];
+  /** Records where the risk condition was absent. */
+  rowsAbsent: Row[];
 }
 
 export interface RegressionResult {
@@ -209,6 +215,41 @@ export interface RegressionResult {
   accuracy: number;
   converged: boolean;
   note?: string;
+  /** All records entering the model (drill-down evidence). */
+  rows: Row[];
+  diagnostics: RegressionDiagnostics | null;
+}
+
+export interface DiagnosticCheck {
+  key: string;
+  label: string;
+  status: "pass" | "warn" | "fail";
+  value: string;
+  explanation: string;
+}
+
+export interface CalibrationBin {
+  bin: number;
+  n: number;
+  predicted: number;
+  observed: number;
+}
+
+export interface RegressionDiagnostics {
+  /** Events per variable — ≥10 is the classic rule of thumb. */
+  epv: number;
+  maxVif: number;
+  /** Share of predictor cells that had to be mean-imputed. */
+  imputedShare: number;
+  separation: boolean;
+  calibration: CalibrationBin[];
+  /** Hosmer–Lemeshow goodness-of-fit. High p = well calibrated. */
+  hlChiSq: number;
+  hlDf: number;
+  hlP: number;
+  brier: number;
+  auc: number;
+  checks: DiagnosticCheck[];
 }
 
 function invert(m: number[][]): number[][] | null {
@@ -389,6 +430,10 @@ export interface EvidenceFact {
   occurrences: number;
   /** Corroborated on ≥2 separate field days with ≥3 observations. */
   undeniable: boolean;
+  /** Exact submissions that asserted this finding (drill-down evidence). */
+  rows: Row[];
+  /** Per-day corroboration notes, oldest first. */
+  notes: { day: string; count: number }[];
 }
 
 export interface EvidenceDay {
@@ -462,6 +507,7 @@ export function buildEvidenceLedger(parents: Row[]): EvidenceLedger {
           const fact: EvidenceFact = {
             id, theme: f.theme, statement: f.statement, place: where, severity: f.severity,
             firstSeen: day, lastSeen: day, days: [day], occurrences: 1, undeniable: false,
+            rows: [p], notes: [{ day, count: 1 }],
           };
           registry.set(id, fact);
           todaysNew.push(fact);
@@ -470,6 +516,9 @@ export function buildEvidenceLedger(parents: Row[]): EvidenceLedger {
           prev.occurrences++;
           prev.lastSeen = day;
           if (!prev.days.includes(day)) prev.days.push(day);
+          prev.rows.push(p);
+          const note = prev.notes.find((nn) => nn.day === day);
+          if (note) note.count++; else prev.notes.push({ day, count: 1 });
           repeatFacts++;
         }
       }
